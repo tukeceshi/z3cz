@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "wrangler dev --live-reload --port 3002",
-    "dev:preview": "wrangler dev --remote --port 3002",
+    "dev": "wrangler dev --live-reload --port 3102",
+    "dev:docker": "wrangler dev --live-reload --port 3102 --ip 0.0.0.0",
+    "dev:preview": "wrangler dev --remote --port 3102",
     "lint": "biome check",
     "typecheck": "tsc --noEmit",
     "check": "biome check --write",

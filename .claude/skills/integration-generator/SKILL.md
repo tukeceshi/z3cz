@@ -19,7 +19,7 @@ Generate OAuth integration providers for Dafthunk: research provider APIs, creat
 **Register OAuth application:**
 - Create a developer account on the provider's platform
 - Register a new OAuth application/client
-- Set redirect URI to: `http://localhost:3001/oauth/{provider-id}/connect` (dev)
+- Set redirect URI to: `http://localhost:3102/oauth/{provider-id}/connect` (dev)
 - Note the generated Client ID and Client Secret
 - Configure required scopes/permissions
 
@@ -41,7 +41,7 @@ Based on {Provider} OAuth documentation:
 **OAuth App Registered**:
 - Client ID: {id}
 - Client Secret: {secret}
-- Redirect URI: http://localhost:3001/oauth/{provider-id}/connect
+- Redirect URI: http://localhost:3102/oauth/{provider-id}/connect
 
 Ready to implement?
 ```

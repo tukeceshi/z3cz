@@ -1,5 +1,5 @@
-WEB_HOST=http://localhost:3001
-WEBSITE_URL=http://localhost:3002
+WEB_HOST=http://localhost:3101
+WEBSITE_URL=http://localhost:3100
 
 EMAIL_DOMAIN=mail.dafthunk.com
 

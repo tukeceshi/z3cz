@@ -1,48 +1,39 @@
-# Dafthunk Marketing Website
+# Dafthunk 营销站
 
-The marketing website for Dafthunk, built with React Router v7 and deployed on Cloudflare Workers.
+基于 React Router v7 构建，部署于 Cloudflare Workers。
 
-## Development
+## 开发
 
-Create a `.dev.vars` file for local development:
+本地开发统一使用 Docker，见仓库根目录 [docker/README.md](../docker/README.md)。
+
+容器启动后访问 http://localhost:3100。
+
+如需在宿主机直接运行（需 Node 20.19+ / pnpm 10.3+）：
 
 ```bash
 cp .dev.vars.example .dev.vars
-```
-
-Then run:
-
-```bash
-# Start dev server (port 3000)
 pnpm dev
-
-# Type check
-pnpm typecheck
-
-# Build
-pnpm build
 ```
 
-## Deployment
+## 部署
 
-### Build-Time Secrets
+### 构建时环境变量
 
-Configure build-time secrets in the Cloudflare dashboard:
+在 Cloudflare Dashboard 中配置：
 
-1. Go to **Workers & Pages** > Your Worker > **Settings** > **Build**
-2. Add **Build variables and secrets**:
+**Workers & Pages → 对应 Worker → Settings → Build → Build variables and secrets**
 
-| Variable                 | Description                                    |
-| ------------------------ | ---------------------------------------------- |
-| `VITE_API_HOST`          | API URL (e.g., `https://api.dafthunk.com`)     |
-| `VITE_APP_URL`           | App URL (e.g., `https://app.dafthunk.com`)     |
-| `VITE_WEBSITE_URL`       | Website URL (e.g., `https://www.dafthunk.com`) |
-| `VITE_CONTACT_EMAIL`     | Contact email                                  |
-| `VITE_GA_MEASUREMENT_ID` | Google Analytics 4 Measurement ID (optional)   |
+| 变量 | 说明 |
+|------|------|
+| `VITE_API_HOST` | API 地址（如 `https://api.dafthunk.com`） |
+| `VITE_APP_URL` | 应用地址（如 `https://app.dafthunk.com`） |
+| `VITE_WEBSITE_URL` | 网站地址（如 `https://www.dafthunk.com`） |
+| `VITE_CONTACT_EMAIL` | 联系邮箱 |
+| `VITE_GA_MEASUREMENT_ID` | Google Analytics 4 ID（可选） |
 
-These are injected during the build process and not stored in the repository.
+这些变量在构建时注入，不写入代码仓库。
 
-### Deploy
+### 部署命令
 
 ```bash
 pnpm deploy
@@ -50,10 +41,10 @@ pnpm deploy
 
 ## Google Analytics
 
-Google Analytics is configured with [Consent Mode v2](https://developers.google.com/tag-platform/security/guides/consent?consentmode=advanced):
+采用 [Consent Mode v2](https://developers.google.com/tag-platform/security/guides/consent?consentmode=advanced)：
 
-- **Default state**: All consent denied (no tracking until user accepts)
-- **Consent banner**: Appears on first visit, lets users accept or reject
-- **Persistence**: User choice saved to localStorage
+- **默认**：拒绝所有追踪，直至用户同意
+- **横幅**：首次访问时展示，用户可选择接受或拒绝
+- **持久化**：选择结果保存至 localStorage
 
-To enable analytics, set `VITE_GA_MEASUREMENT_ID` as a build-time secret. Leave it unset to disable analytics entirely (no scripts loaded, no banner shown).
+设置 `VITE_GA_MEASUREMENT_ID` 启用；留空则完全不加载分析脚本与横幅。

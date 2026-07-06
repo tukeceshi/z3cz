@@ -492,7 +492,7 @@ export abstract class OAuthProvider<
     const base =
       env.CLOUDFLARE_ENV === "production"
         ? "https://api.dafthunk.com"
-        : "http://localhost:3002";
+        : "http://localhost:3102";
     return `${base}/oauth/${this.name}/connect`;
   }
 

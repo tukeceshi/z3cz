@@ -2,488 +2,320 @@
 
 > Break it, fix it, prompt it, automatic, automatic, ...
 
-A workflow execution platform built on top of the fantastic Cloudflare infrastructure.
+基于 Cloudflare 基础设施构建的可视化工作流自动化平台。
 
 ![Workflow](./images/workflow.png)
 
-## 🔍 Overview
+## 概览
 
-[Daf·thunk](https://en.wikipedia.org/wiki/Thunk) is a powerful, visual workflow automation platform that allows you to create, manage, and execute workflows directly in your browser. Built on Cloudflare's infrastructure, it leverages Cloudflare Workers and Workflows for serverless execution, Cloudflare AI for intelligent processing, and Cloudflare D1, R2, and KV for persistent storage.
+[Daf·thunk](https://en.wikipedia.org/wiki/Thunk) 是一个可视化工作流自动化平台，支持在浏览器中创建、管理和执行工作流。平台基于 Cloudflare Workers、D1、R2、AI 等能力，提供无服务器执行与持久化存储。
 
-The platform features a visual workflow editor built with [React Flow](https://reactflow.dev/), allowing you to create complex workflows by connecting various node types, including AI-powered nodes for text processing, image classification, and more. Think digital LEGO, but with less risk to your bare feet at 2 AM.
+可视化编辑器基于 [React Flow](https://reactflow.dev/)，通过连接多种节点类型（含 AI 节点）构建复杂工作流。
 
-## ✨ Features
+## 功能特性
 
-- **Visual Workflow Editor**: A drag-and-drop interface for creating and editing workflows that makes command-line enthusiasts mildly uncomfortable.
-- **AI-Powered Nodes**: Leverage Cloudflare AI for text summarization, sentiment analysis, translation, image classification, audio transcription, image generation, and more.
-- **Serverless Execution**: Run workflows on Cloudflare's global network using Cloudflare Workers, where servers are merely a philosophical concept.
-- **Live Monitoring**: Watch your workflows succeed, fail, or do something in between, all live with a UI or an API.
-- **Persistent Storage**: Save and load execution data from Cloudflare D1 and R2 with reasonable confidence that they'll still be there tomorrow.
-- **Triggers & Integrations**: Nothing happens unless something happens. So you can make it happen with HTTP APIs, emails, and more.
+- **可视化工作流编辑器**：拖拽式界面，无需编写代码即可编排流程
+- **AI 节点**：文本摘要、情感分析、翻译、图像分类、语音转写、图像生成等
+- **无服务器执行**：工作流在 Cloudflare 全球网络上运行
+- **实时监控**：通过 UI 或 API 查看执行状态与结果
+- **持久化存储**：执行数据存储于 Cloudflare D1 与 R2
+- **触发器与集成**：HTTP API、邮件、队列、Bot 等多种触发方式
 
-## 🛠️ Technology Stack
+## 技术栈
 
-Our collection of carefully selected technologies, guaranteed to be outdated by the time you read this:
+### 运行环境
 
-### Environment
+- **pnpm** — Monorepo 包管理
+- **TypeScript** — 静态类型
+- **Vitest** — 单元与集成测试
+- **Docker** — 本地开发容器化
+- **Cloudflare** — 边缘部署与运行时
 
-- **pnpm** for fast and efficient package management with workspace support.
-- **TypeScript** for static typing and enhanced developer experience.
-- **Vitest** for unit and integration testing.
-- **Cloudflare** for edge-optimized deployment and performance.
+### 后端
 
-### Backend
+- **Hono** — REST API 框架
+- **Cloudflare Workers** — 无服务器执行
+- **Cloudflare D1** — SQLite 数据库
+- **Cloudflare R2** — 对象存储
+- **Cloudflare AI** — 模型推理
+- **Drizzle ORM** — 类型安全数据库操作
+- **Zod** — 运行时校验
 
-- **Hono** for lightweight, expressive REST API development.
-- **Cloudflare Workers** for serverless function execution.
-- **Cloudflare D1** (SQLite) for database storage.
-- **Cloudflare R2** for object storage.
-- **Cloudflare AI** for AI model inference.
-- **Drizzle ORM** for type-safe database operations.
-- **Zod** for runtime type validation.
+### 前端
 
-### Frontend
+- **Vite** — 构建工具
+- **React 19** — UI 框架
+- **React Router v7** — 路由
+- **React Flow** — 节点编辑器
+- **Tailwind CSS** — 样式
+- **shadcn/ui** — 组件库
 
-- **Vite** as the build tool and dev server for lightning-fast development.
-- **React 19** for building interactive user interfaces.
-- **React Router v7** for declarative client-side routing.
-- **React Flow (@xyflow/react)** for rendering interactive node-based diagrams.
-- **Tailwind CSS** for utility-first styling.
-- **shadcn/ui** for headless, accessible component primitives.
+## 快速开始
 
-## 🚀 Getting Started
+### 前置要求
 
-### 📋 Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) 24+
+- [Docker Compose](https://docs.docker.com/compose/) v2
+- Git
+- Cloudflare 账号（AI、远程 preview 等功能需要）
 
-- Node.js (v18 or later)
-- pnpm (v8 or later)
-- Cloudflare account with Workers, D1, R2, and AI access
-- A reasonable amount of patience
-
-### 💻 Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/dafthunk-com/dafthunk.git
-   cd dafthunk
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   pnpm install
-   ```
-
-3. Set up environment variables:
-
-   ```bash
-   cp apps/api/.dev.vars.example apps/api/.dev.vars
-   # Edit with custom values
-   ```
-
-   Generate a master key for token encryption:
-
-   ```bash
-   node apps/api/scripts/generate-master-key.js
-   ```
-
-   Required environment variables in `apps/api/.dev.vars`:
-
-   ```
-   WEB_HOST=http://localhost:3001
-   CLOUDFLARE_ENV=development
-
-   JWT_SECRET=your_32_character_secret_here
-   SECRET_MASTER_KEY=your_64_character_hex_from_script
-   ```
-
-4. Configure authentication (OAuth providers for user login):
-
-   **GitHub OAuth**:
-   - Go to [GitHub Settings > Developer settings > OAuth Apps](https://github.com/settings/applications/new)
-   - Create new OAuth App with:
-     - Application Name: `Dafthunk Dev`
-     - Homepage URL: `http://localhost:3000`
-     - Authorization callback URL: `http://localhost:3002/auth/login/github`
-   - Copy the Client ID and generate a new client secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   GITHUB_CLIENT_ID=your_client_id_here
-   GITHUB_CLIENT_SECRET=your_client_secret_here
-   ```
-
-   **Google OAuth** (optional):
-   - Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Create a new OAuth 2.0 Client ID with:
-     - Application type: `Web application`
-     - Authorized redirect URIs: `http://localhost:3002/auth/login/google`
-   - Copy the Client ID and Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
-   ```
-
-5. Configure integrations (OAuth providers for workflow integrations - optional):
-
-   **Google Mail Integration**:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Create a **separate** OAuth 2.0 Client ID (or use a different project):
-     - Application type: `Web application`
-     - Authorized redirect URIs: `http://localhost:3002/oauth/google-mail/connect`
-     - Enable Gmail API in [API Library](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-   - Copy the Client ID and Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_GOOGLE_MAIL_CLIENT_ID=your_gmail_integration_client_id
-   INTEGRATION_GOOGLE_MAIL_CLIENT_SECRET=your_gmail_integration_client_secret
-   ```
-
-   **Google Calendar Integration**:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Create a **separate** OAuth 2.0 Client ID (or use a different project):
-     - Application type: `Web application`
-     - Authorized redirect URIs: `http://localhost:3002/oauth/google-calendar/connect`
-     - Enable Google Calendar API in [API Library](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-   - Copy the Client ID and Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_GOOGLE_CALENDAR_CLIENT_ID=your_calendar_integration_client_id
-   INTEGRATION_GOOGLE_CALENDAR_CLIENT_SECRET=your_calendar_integration_client_secret
-   ```
-
-   **Discord Integration**:
-   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
-   - Create a new application
-   - Go to OAuth2 settings and add redirect URI:
-     - Redirect URI: `http://localhost:3002/oauth/discord/connect`
-   - Copy the Client ID and Client Secret from the OAuth2 page
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_DISCORD_CLIENT_ID=your_discord_client_id
-   INTEGRATION_DISCORD_CLIENT_SECRET=your_discord_client_secret
-   ```
-
-   **Reddit Integration**:
-   - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
-   - Click "create another app..." at the bottom
-   - Fill in the form:
-     - Name: Dafthunk (or your app name)
-     - App type: `web app`
-     - Redirect URI: `http://localhost:3002/oauth/reddit/connect`
-   - Click "create app"
-   - Copy the Client ID (shown under the app name) and Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_REDDIT_CLIENT_ID=your_reddit_client_id
-   INTEGRATION_REDDIT_CLIENT_SECRET=your_reddit_client_secret
-   ```
-
-   **LinkedIn Integration**:
-   - Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
-   - Create a new app
-   - In the Auth tab, add redirect URL:
-     - Redirect URL: `http://localhost:3002/oauth/linkedin/connect`
-   - Request access to the "Sign In with LinkedIn using OpenID Connect" and "Share on LinkedIn" products
-   - Copy the Client ID and Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_LINKEDIN_CLIENT_ID=your_linkedin_client_id
-   INTEGRATION_LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
-   ```
-
-   **GitHub Integration**:
-   - Go to [GitHub Developer Settings](https://github.com/settings/developers)
-   - Click "New OAuth App"
-   - Fill in the form:
-     - Application name: Dafthunk (or your app name)
-     - Homepage URL: `http://localhost:3000`
-     - Authorization callback URL: `http://localhost:3002/oauth/github/connect`
-   - Click "Register application"
-   - Copy the Client ID and generate a Client Secret
-   - Add them to your `.dev.vars` file:
-
-   ```
-   INTEGRATION_GITHUB_CLIENT_ID=your_github_client_id
-   INTEGRATION_GITHUB_CLIENT_SECRET=your_github_client_secret
-   ```
-
-   > **Note**: Keep authentication and integration OAuth apps separate for security isolation. They use different scopes and redirect URIs.
-
-6. Create a Cloudflare account and login with Wrangler, a process that's almost as straightforward as it sounds:
-
-   ```bash
-   # Install Wrangler globally
-   npm install -g wrangler
-
-   # Login to Cloudflare
-   wrangler login
-
-   # Create a D1 database
-   wrangler d1 create DB
-   ```
-
-7. Apply the database migration files
-
-   ```bash
-   cd apps/api
-   pnpm db:migrate
-   ```
-
-8. Create a Cloudflare Queue for workflow messaging:
-
-   ```bash
-   # Create the queue
-   wrangler queues create WORKFLOW_QUEUE
-   ```
-
-   After creating the queue, add the binding to `apps/api/wrangler.jsonc`:
-
-   ```jsonc
-   "queues": {
-     "producers": [
-       {
-         "binding": "WORKFLOW_QUEUE",
-         "queue": "WORKFLOW_QUEUE"
-       }
-     ],
-     "consumers": [
-       {
-         "queue": "WORKFLOW_QUEUE",
-         "max_batch_size": 10,
-         "max_batch_timeout": 30
-       }
-     ]
-   }
-   ```
-
-   Also add it to the production environment section (`env.production`).
-
-   The queue enables asynchronous workflow execution through message triggers. When you publish a message to a queue using the **Queue Publish** node, workflows subscribed to that queue via queue triggers will be automatically executed.
-
-   **Queue Architecture:**
-   - **Producer**: The Queue Publish node sends messages to the queue
-   - **Consumer**: The queue handler (`src/queue.ts`) processes messages and triggers subscribed workflows
-   - **Multi-tenant**: Each message includes `queueId` and `organizationId` for proper isolation
-
-   **Usage:**
-   1. Create a queue in the UI (under your organization)
-   2. Create a workflow with type "Queue Message"
-   3. Add a queue trigger to the workflow (links workflow to queue)
-   4. Use the Queue Message node to access the message payload
-   5. Publish messages using the Queue Publish node from any workflow
-
-9. Start the development server and cross your fingers:
-
-   ```bash
-   pnpm dev
-   ```
-
-10. Open your browser and navigate to `http://localhost:3000` (website) or `http://localhost:3001` (app). Prepare to either celebrate or debug.
-
-## 👨‍💻 Development
-
-### 📁 Project Structure
-
-A sensible monorepo organization using pnpm workspaces that we all pretend won't change dramatically tomorrow:
-
-- **`apps/api/`** - Cloudflare Workers API backend
-  - `/src/routes/` - REST API endpoints
-  - `/src/nodes/` - Workflow node implementations (50+ types)
-  - `/src/db/` - Database schema and migrations
-  - `/src/runtime/` - Workflow execution engine
-  - `/src/middleware/` - Custom middleware
-- **`apps/web/`** - React frontend application
-  - `/src/components/` - Reusable UI components
-    - `/workflow/` - Visual workflow editor components
-    - `/ui/` - Shadcn UI components
-  - `/src/pages/` - Application pages and routes
-  - `/src/services/` - API service clients
-  - `/src/hooks/` - Custom React hooks
-  - `/functions/` - Cloudflare Pages functions
-- **`packages/types/`** - Shared TypeScript types
-- **`packages/utils/`** - Shared TypeScript utilities
-
-### 🧑‍💻 Development Commands
-
-#### Root Level Commands
+> 完整 Docker 说明见 [docker/README.md](docker/README.md)。
+
+### 初始化
+
+**1. 克隆仓库**
 
 ```bash
-# Start all services in development mode
-pnpm dev
-
-# Build all packages and apps
-pnpm build
-
-# Run tests
-pnpm test
-
-# Type checking across all workspaces
-pnpm typecheck
-
-# Linting and formatting
-pnpm lint
-pnpm format
-pnpm fix
-
-# Dependency analysis
-pnpm knip
+git clone https://github.com/tukeceshi/dafthunk.git
+cd dafthunk
 ```
 
-#### Workspace-Specific Commands
+**2. 复制环境配置**
 
 ```bash
-# API development
+cp .env.docker.example .env.docker
+cp apps/api/.dev.vars.example apps/api/.dev.vars
+```
+
+**3. 生成并填写密钥**
+
+```bash
+docker compose run --rm dev node apps/api/scripts/generate-master-key.js
+```
+
+将输出的 `SECRET_MASTER_KEY` 写入 `apps/api/.dev.vars`。同时设置至少 32 字符的 `JWT_SECRET`：
+
+```env
+WEB_HOST=http://localhost:3101
+WEBSITE_URL=http://localhost:3100
+CLOUDFLARE_ENV=development
+
+JWT_SECRET=你的_32_字符以上_随机字符串
+SECRET_MASTER_KEY=上一步生成的_64_位_hex
+```
+
+**4. 启动开发栈**
+
+```bash
+docker compose --env-file .env.docker up --build
+```
+
+容器会自动安装依赖并执行本地 D1 迁移。
+
+**5. 打开浏览器**
+
+| 地址 | 服务 |
+|------|------|
+| http://localhost:3100 | 营销站 |
+| http://localhost:3101 | 产品应用 / 工作流编辑器 |
+| http://localhost:3102 | API |
+
+> 本地开发统一使用 **3100 / 3101 / 3102** 三个端口。
+
+### OAuth 配置（可选）
+
+如需 GitHub / Google 登录或第三方集成，在 `apps/api/.dev.vars` 中配置 OAuth 凭证。回调地址格式为 `http://localhost:3102/...`。
+
+**GitHub 登录示例**
+
+1. [创建 OAuth App](https://github.com/settings/applications/new)
+2. Homepage URL：`http://localhost:3100`
+3. Callback URL：`http://localhost:3102/auth/login/github`
+4. 写入 `.dev.vars`：
+
+```env
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
+
+**Google 登录（可选）**
+
+- 重定向 URI：`http://localhost:3102/auth/login/google`
+
+更多集成配置项见 `apps/api/.dev.vars.example` 与 [docker/README.md](docker/README.md)。
+
+### 常用 Docker 命令
+
+```bash
+# 后台运行
+docker compose --env-file .env.docker up -d --build
+
+# 停止
+docker compose down
+
+# 单独启动某个服务
+docker compose --profile split up app
+
+# 在容器内运行测试
+docker compose run --rm dev pnpm test
+```
+
+## 开发
+
+### 项目结构
+
+Monorepo（pnpm workspaces）：
+
+- **`apps/api/`** — Cloudflare Workers API
+  - `/src/routes/` — REST 路由
+  - `/src/db/` — 数据库 schema 与迁移
+  - `/src/runtime/` — 工作流运行时
+- **`apps/app/`** — 产品 UI（React + Vite）
+  - `/src/components/workflow/` — 可视化编辑器
+  - `/src/pages/` — 页面与路由
+  - `/src/services/` — API 客户端
+- **`apps/www/`** — 营销站（React Router SSR）
+- **`packages/types/`** — 共享类型
+- **`packages/utils/`** — 共享工具
+- **`packages/runtime/`** — 工作流节点运行时
+- **`docker/`** — Docker 入口脚本与文档
+
+### 开发命令
+
+在容器内执行（或宿主机已安装 Node 20.19+ / pnpm 10.3+ 时本地执行）：
+
+```bash
+# 启动全部服务（Docker 内默认使用 dev:docker）
+pnpm dev:docker
+
+# 本地非 Docker 开发
+pnpm dev
+
+# 构建
+pnpm build
+
+# 测试
+pnpm test
+
+# 类型检查
+pnpm typecheck
+
+# 代码检查与格式化
+pnpm lint
+pnpm format
+pnpm check
+```
+
+#### 按工作区执行
+
+```bash
+# API
 pnpm --filter '@dafthunk/api' dev
 pnpm --filter '@dafthunk/api' deploy
 
-# Web development
-pnpm --filter '@dafthunk/web' dev
-pnpm --filter '@dafthunk/web' build
-pnpm --filter '@dafthunk/web' deploy
+# 产品 UI
+pnpm --filter '@dafthunk/app' dev
+pnpm --filter '@dafthunk/app' deploy
 
-# Types package
+# 营销站
+pnpm --filter '@dafthunk/www' dev
+pnpm --filter '@dafthunk/www' deploy
+
+# 类型包
 pnpm --filter '@dafthunk/types' build
 ```
 
-### 🗄️ Database
+### 数据库
 
-The project uses Cloudflare D1 (SQLite) as the database with Drizzle ORM. Migrations are automatically applied when the project is deployed, but you can also apply them manually if you're feeling adventurous:
-
-#### 🧪 Development
+使用 Cloudflare D1（SQLite）+ Drizzle ORM。Docker 启动时会自动迁移；也可手动执行：
 
 ```bash
-# Apply migrations to local database
-pnpm --filter '@dafthunk/api' db:migrate
+# 应用本地迁移
+docker compose run --rm dev pnpm --filter '@dafthunk/api' db:migrate
 
-# Reset local database (dangerous!)
-pnpm --filter '@dafthunk/api' db:reset
+# 重置本地数据库（危险）
+docker compose run --rm dev pnpm --filter '@dafthunk/api' db:reset
 
-# Generate new migrations
-pnpm --filter '@dafthunk/api' db:generate
+# 生成新迁移
+docker compose run --rm dev pnpm --filter '@dafthunk/api' db:generate
 ```
 
-To run queries against the development database:
+查询本地 D1：
 
 ```bash
-npx wrangler d1 execute DB --local --command "SELECT name FROM sqlite_master WHERE type='table';"
+docker compose run --rm dev npx wrangler d1 execute DB --local --command "SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-#### 🚨 Production
+#### 生产环境
 
 ```bash
-# Apply migrations to production
 pnpm --filter '@dafthunk/api' db:prod:migrate
-
-# Reset production database (proceed with extreme caution!)
-pnpm --filter '@dafthunk/api' db:prod:reset
+pnpm --filter '@dafthunk/api' db:prod:reset   # 极度谨慎
 ```
 
-To run queries against the production database:
+### 队列
+
+本地开发使用 `wrangler.jsonc` 中已配置的 Queue 绑定，无需手动创建 Cloudflare Queue。
+
+使用流程：
+
+1. 在 UI 中创建 Queue
+2. 创建工作流，触发类型选择「Queue Message」
+3. 为工作流添加 Queue 触发器
+4. 使用 Queue Message 节点读取消息，Queue Publish 节点发布消息
+
+## 部署
+
+主分支通过 GitHub Actions 自动部署至 Cloudflare：
+
+- **API** — Cloudflare Workers
+- **产品 UI** — Cloudflare Workers
+- **营销站** — Cloudflare Workers
+- **数据库** — Cloudflare D1（自动迁移）
+- **存储** — Cloudflare R2
+
+### 生产密钥
+
+部署前需配置 Analytics Engine 与 R2 预签名 URL 相关密钥。
+
+**1. 创建 Cloudflare API Token**
+
+1. 打开 https://dash.cloudflare.com/profile/api-tokens
+2. 创建 Custom Token，权限：**Account → Analytics → Read**
+
+**2. 设置生产密钥**
 
 ```bash
-npx wrangler d1 execute DB --env production --command "SELECT name FROM sqlite_master WHERE type='table';" --remote
-```
-
-## 🚢 Deployment
-
-The main branch is deployed automatically to Cloudflare using GitHub Actions:
-
-- **Frontend**: Deployed to Cloudflare Pages
-- **Backend**: Deployed to Cloudflare Workers
-- **Database**: Cloudflare D1 with automatic migrations
-- **Storage**: Cloudflare R2 for file storage
-
-### Required Production Secrets
-
-Before deploying to production, you must set up secrets for Analytics Engine and R2 presigned URLs.
-
-#### 1. Create a Cloudflare API Token
-
-1. Go to https://dash.cloudflare.com/profile/api-tokens
-2. Click "Create Token"
-3. Use "Create Custom Token"
-4. Set permissions: **Account → Analytics → Read**
-5. Click "Continue to summary" → "Create Token"
-6. Copy the token (you'll only see it once)
-
-#### 2. Set Secrets in Production
-
-```bash
-# Set your Cloudflare Account ID (find it at https://dash.cloudflare.com/)
 echo "YOUR_ACCOUNT_ID" | pnpm wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production
-
-# Set your Cloudflare API Token (created above)
 echo "YOUR_API_TOKEN" | pnpm wrangler secret put CLOUDFLARE_API_TOKEN --env production
 ```
 
-These secrets are required for the execution dashboard to query Analytics Engine for workflow execution metrics.
+**3. 创建 R2 API Token（预签名 URL）**
 
-#### 3. Create R2 API Token for Presigned URLs
+1. Cloudflare Dashboard → R2 → Manage R2 API Tokens
+2. 权限：Object Read & Write，指定 bucket
 
-Presigned URLs allow temporary, secure access to R2 objects without exposing your bucket directly. R2 uses S3-compatible credentials which are separate from the standard Cloudflare API token.
-
-1. Go to https://dash.cloudflare.com/ → R2 Object Storage → Manage R2 API Tokens
-2. Click "Create API token"
-3. Configure the token:
-   - **Token name**: `dafthunk-presigned-urls`
-   - **Permissions**: Object Read & Write
-   - **Specify bucket(s)**: Select your R2 buckets (`dafthunk-ressources-production`)
-   - **TTL**: Optional, set an expiration if desired
-4. Click "Create API Token"
-5. Copy the **Access Key ID** and **Secret Access Key** (you'll only see them once)
-
-#### 4. Set R2 Secrets in Production
+**4. 设置 R2 密钥**
 
 ```bash
-# The Access Key ID from step 3
 echo "YOUR_ACCESS_KEY_ID" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env production
-
-# The Secret Access Key from step 3
 echo "YOUR_SECRET_ACCESS_KEY" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env production
 ```
 
-These secrets, combined with `CLOUDFLARE_ACCOUNT_ID` (already configured), enable generating presigned URLs for secure, temporary access to R2 objects.
+**5. 营销站配置**
 
-#### 5. Website (www) Configuration
+详见 [apps/www/README.md](apps/www/README.md)。
 
-See [apps/www/README.md](apps/www/README.md) for website-specific configuration and deployment instructions.
-
-### Manual Deployment
+### 手动部署
 
 ```bash
-# Deploy API to Cloudflare Workers
 pnpm --filter '@dafthunk/api' deploy
-
-# Deploy web app to Cloudflare Pages
-pnpm --filter '@dafthunk/web' deploy
-
-# Deploy marketing website to Cloudflare Workers
+pnpm --filter '@dafthunk/app' deploy
 pnpm --filter '@dafthunk/www' deploy
 ```
 
-## 🤝 Contributing
+## 参与贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request. We aim to review them in a timely manner, though our definition of "timely" may be flexible.
+欢迎提交 Pull Request：
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交更改（`git commit -m 'Add some amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 创建 Pull Request
 
-## 🙏 Acknowledgements
+本地开发请使用 Docker 流程，详见 [docker/README.md](docker/README.md)。
 
-We've embraced the AI future before being deprecated (or obliterated?), but we still do the important bits ourselves (like architecture, blablabla, etc.). Right?
+## 致谢
 
-🎵 _I kissed an AI and I liked it, hope my dev team doesn't mind it. It felt so wrong, it felt so right—doesn't mean I'm coding tonight._ 🎵
-
-(With apologies to Katy Perry)
+架构与设计由团队主导完成；AI 工具辅助部分实现细节。

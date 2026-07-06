@@ -1,5 +1,5 @@
 let apiBaseUrlSingleton: string | undefined;
-const DEFAULT_API_HOST = "http://localhost:3001";
+const DEFAULT_API_HOST = "http://localhost:3102";
 
 /**
  * Initializes the API base URL. This function MUST be called once at the application startup

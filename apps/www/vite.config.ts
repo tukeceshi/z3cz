@@ -10,6 +10,7 @@ export default defineConfig({
     reactRouter(),
   ],
   server: {
-    port: 3000,
+    port: 3100,
+    host: true,
   },
 });

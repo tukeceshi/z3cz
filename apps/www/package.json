@@ -9,6 +9,7 @@
     "prebuild": "pnpm run extract-nodes",
     "build": "react-router build",
     "dev": "react-router dev",
+    "dev:docker": "react-router dev",
     "lint": "biome check",
     "pretypecheck": "pnpm run extract-nodes",
     "typecheck": "tsc --noEmit",

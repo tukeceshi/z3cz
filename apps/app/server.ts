@@ -1,6 +1,6 @@
 import { createServer } from "vite";
 
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3101;
 
 const vite = await createServer({
   server: {

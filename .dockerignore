@@ -1,0 +1,38 @@
+# 依赖与构建产物
+**/node_modules
+**/.pnpm-store
+**/dist
+**/build
+**/.react-router
+**/.vite
+**/.wrangler
+**/.turbo
+
+# Git 与 IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+**/*.swp
+**/*.swo
+
+# 日志与缓存
+**/*.log
+**/.cache
+**/coverage
+**/.vitest
+
+# 本地密钥（运行时通过卷挂载）
+**/.dev.vars
+**/.env.local
+**/.env.*.local
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# Docker 文件本身无需进入构建上下文
+Dockerfile*
+docker-compose*.yml
+.dockerignore

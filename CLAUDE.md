@@ -22,8 +22,9 @@ pnpm check                                     # Auto-fix linting + format
 pnpm test                                      # Run tests
 
 # Workspace-specific (use --filter)
-pnpm --filter '@dafthunk/api' dev              # API dev server (port 3001)
-pnpm --filter '@dafthunk/web' dev              # Web dev server (port 3000)
+pnpm --filter '@dafthunk/api' dev              # API dev server (port 3102)
+pnpm --filter '@dafthunk/www' dev              # Marketing site (port 3100)
+pnpm --filter '@dafthunk/app' dev              # App dev server (port 3101)
 pnpm --filter '@dafthunk/api' test:integration # Integration tests
 
 # Database migrations

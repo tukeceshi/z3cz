@@ -3,9 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0",
+    "pnpm": ">=10.3.0"
+  },
   "preinstall": "npx only-allow pnpm",
   "scripts": {
     "dev": "pnpm --parallel dev",
+    "dev:docker": "pnpm --parallel --filter '@dafthunk/www' --filter '@dafthunk/app' --filter '@dafthunk/api' dev:docker",
     "dev:preview": "pnpm --parallel dev:preview",
     "format": "pnpm --parallel format",
     "lint": "pnpm run typecheck && pnpm --parallel lint && pnpm run knip",

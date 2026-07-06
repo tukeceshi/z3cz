@@ -3,9 +3,9 @@ import { DocsLayout } from "../../components/docs/docs-layout";
 const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
-  const title = "Developers Guide - Dafthunk Documentation";
+  const title = "开发者指南 - Dafthunk 文档";
   const description =
-    "Set up the Dafthunk codebase locally, contribute pull requests, and learn the technology stack: React, Hono, Cloudflare Workers, D1, and React Flow.";
+    "使用 Docker 在本地运行 Dafthunk 完整开发栈，了解项目结构、技术栈与贡献方式。";
   const url = `${websiteUrl}/docs/developers`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -55,120 +55,133 @@ export default function DocsDevelopers() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <h1>Developers Guide</h1>
+      <h1>开发者指南</h1>
       <p className="lead">
-        Welcome to the Dafthunk developer guide. This guide is designed to help
-        you understand our architecture, set up your development environment,
-        and start contributing to Dafthunk. Dafthunk is an open-source project
-        and you are welcome to contribute to it.
+        欢迎阅读 Dafthunk 开发者指南。本文介绍如何在本地启动项目、理解架构，以及参与贡献。
+        Dafthunk 是开源项目，欢迎提交 Issue 与 Pull Request。
       </p>
 
-      <h2 id="getting-started">Getting Started</h2>
+      <h2 id="getting-started">本地开发</h2>
       <p>
-        To start developing Dafthunk, you'll need to set up the project locally.
-        Our codebase is hosted on GitHub. For detailed instructions on cloning
-        the repository, installing dependencies (using pnpm), and running the
-        development servers for both the web application and the API, please
-        refer to the main <code>README.md</code> at the root of the project.
-      </p>
-      <p>In summary, you will typically:</p>
-      <ol>
-        <li>
-          Clone the repository:{" "}
-          <code>git clone https://github.com/dafthunk-com/dafthunk.git</code>
-        </li>
-        <li>
-          Install all dependencies: <code>pnpm install</code>
-        </li>
-        <li>
-          Run the application: <code>pnpm dev</code>
-        </li>
-      </ol>
-
-      <h2 id="how-to-contribute">How to Contribute</h2>
-      <p>We welcome contributions of all kinds! Here's how you can help:</p>
-
-      <h3>Reporting Bugs</h3>
-      <p>
-        If you find a bug, please{" "}
-        <a
-          href="https://github.com/dafthunk-com/dafthunk/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          open an issue
-        </a>{" "}
-        on GitHub. Include as much detail as possible: steps to reproduce,
-        expected behavior, and actual behavior. Screenshots or code snippets are
-        also helpful.
+        推荐使用 Docker 运行完整开发栈，无需在宿主机安装 Node.js 或 pnpm。详细说明见仓库根目录{" "}
+        <code>docker/README.md</code> 与 <code>README.md</code>。
       </p>
 
-      <h3>Suggesting Enhancements</h3>
-      <p>
-        Have an idea for a new feature or an improvement to an existing one?
-        Feel free to{" "}
-        <a
-          href="https://github.com/dafthunk-com/dafthunk/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          open an issue
-        </a>{" "}
-        to discuss it. If GitHub Discussions are enabled for the repository,
-        that would also be an excellent place for broader ideas.
-      </p>
-
-      <h3>Pull Requests</h3>
-      <p>We use the standard GitHub flow for pull requests:</p>
-      <ol>
-        <li>Fork the repository.</li>
-        <li>Create a new branch for your feature or bug fix.</li>
-        <li>Make your changes, adhering to our coding standards.</li>
-        <li>Commit your changes with clear and descriptive messages.</li>
-        <li>Push your branch to your fork.</li>
-        <li>Open a pull request against the Dafthunk repository.</li>
-      </ol>
-      <p>
-        Please ensure your PR description clearly explains the changes and why
-        they are needed.
-      </p>
-
-      <h2 id="technology-stack">Technology Stack</h2>
-      <p>
-        Dafthunk leverages a modern technology stack to deliver a high-quality
-        experience. Here's an overview:
-      </p>
+      <h3 id="ports">本地端口</h3>
       <table>
         <thead>
           <tr>
-            <th>Component</th>
-            <th>Technologies</th>
+            <th>地址</th>
+            <th>服务</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>
-              <strong>Frontend</strong>
+              <code>http://localhost:3100</code>
             </td>
-            <td>React 19, TypeScript, TailwindCSS, Shadcn UI</td>
+            <td>营销站（<code>@dafthunk/www</code>）</td>
           </tr>
           <tr>
             <td>
-              <strong>Backend</strong>
+              <code>http://localhost:3101</code>
             </td>
-            <td>Hono, Cloudflare Workers, Cloudflare Workflow, D1 Database</td>
+            <td>产品应用（<code>@dafthunk/app</code>）</td>
           </tr>
           <tr>
             <td>
-              <strong>Workflow Editor</strong>
+              <code>http://localhost:3102</code>
             </td>
-            <td>React Flow, Custom Components</td>
+            <td>API（<code>@dafthunk/api</code>）</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 id="setup">初始化步骤</h3>
+      <ol>
+        <li>
+          克隆仓库：
+          <code>git clone https://github.com/dafthunk-com/dafthunk.git</code>
+        </li>
+        <li>
+          复制配置：
+          <code>cp .env.docker.example .env.docker</code>，{" "}
+          <code>cp apps/api/.dev.vars.example apps/api/.dev.vars</code>
+        </li>
+        <li>
+          生成密钥：
+          <code>
+            docker compose run --rm dev node
+            apps/api/scripts/generate-master-key.js
+          </code>
+          ，将结果写入 <code>apps/api/.dev.vars</code>
+        </li>
+        <li>
+          启动：
+          <code>docker compose --env-file .env.docker up --build</code>
+        </li>
+      </ol>
+      <p>
+        OAuth 回调地址使用 API 端口，例如 GitHub 登录：{" "}
+        <code>http://localhost:3102/auth/login/github</code>。
+      </p>
+
+      <h2 id="how-to-contribute">如何贡献</h2>
+
+      <h3>报告 Bug</h3>
+      <p>
+        在{" "}
+        <a
+          href="https://github.com/dafthunk-com/dafthunk/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub Issues
+        </a>{" "}
+        提交问题，请附上复现步骤、期望行为与实际行为。
+      </p>
+
+      <h3>提交 Pull Request</h3>
+      <ol>
+        <li>Fork 仓库</li>
+        <li>创建功能分支</li>
+        <li>编写改动并遵循项目代码规范</li>
+        <li>提交清晰的 commit message</li>
+        <li>发起 Pull Request</li>
+      </ol>
+
+      <h2 id="technology-stack">技术栈</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th>技术</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>前端</strong>
+            </td>
+            <td>React 19、TypeScript、Tailwind CSS、shadcn/ui</td>
           </tr>
           <tr>
             <td>
-              <strong>AI/ML</strong>
+              <strong>后端</strong>
             </td>
-            <td>Cloudflare AI, Workers AI</td>
+            <td>Hono、Cloudflare Workers、D1、R2</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>工作流编辑器</strong>
+            </td>
+            <td>React Flow</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>AI</strong>
+            </td>
+            <td>Cloudflare AI、Workers AI</td>
           </tr>
         </tbody>
       </table>
