@@ -1,19 +1,28 @@
 import type {
+  AuthSetupStatusResponse,
   JWTTokenPayload,
   OrganizationInfo,
   OrganizationRoleType,
+  PasswordAuthResponse,
 } from "@dafthunk/types";
 import { githubAuth } from "@hono/oauth-providers/github";
 import { googleAuth } from "@hono/oauth-providers/google";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { jwtVerify, SignJWT } from "jose";
+import { z } from "zod";
 
 import { ApiContext } from "./context";
 import {
   createDatabase,
+  EmailAlreadyRegisteredError,
+  getLocalUserByEmail,
+  hasAnyUsers,
   OrganizationRole,
+  registerLocalUser,
+  resolveAuthProvider,
   saveUser,
   userExists,
   users,
@@ -21,6 +30,14 @@ import {
 } from "./db";
 import type { UserData } from "./db/queries";
 import { memberships, organizations } from "./db/schema";
+import {
+  hashPassword,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  validatePasswordStrength,
+  verifyPassword,
+} from "./auth/password";
+import { validateJwtSecret } from "./auth/jwt-config";
 import { sendWelcomeEmail } from "./services/welcome-email";
 
 // Constants
@@ -30,23 +47,35 @@ const JWT_ACCESS_TOKEN_DURATION = 300; // 5 minutes
 const JWT_REFRESH_TOKEN_DURATION = 86400; // 1 days
 const OAUTH_RETURN_TO_COOKIE = "oauth_return_to";
 const OAUTH_RETURN_TO_MAX_AGE = 300; // 5 minutes
+const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+const EMAIL_NOT_FOUND_CODE = "EMAIL_NOT_FOUND";
 
-// Security validation
-const validateJWTSecret = (secret: string): void => {
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters long");
-  }
-  if (secret === "your-secret-key" || secret === "development") {
-    throw new Error("JWT_SECRET must not use default/weak values");
-  }
-};
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email()
+  .max(255);
+
+const passwordLoginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+
+const passwordRegisterSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+});
+
+const isJwtConfigError = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes("JWT_SECRET");
 
 // Utility functions
 const createAccessToken = async (
   payload: JWTTokenPayload,
   jwtSecret: string
 ): Promise<string> => {
-  validateJWTSecret(jwtSecret);
+  validateJwtSecret(jwtSecret);
   const secret = new TextEncoder().encode(jwtSecret);
   const expirationTime =
     Math.floor(Date.now() / 1000) + JWT_ACCESS_TOKEN_DURATION;
@@ -61,7 +90,7 @@ const createRefreshToken = async (
   payload: { sub: string; organization: { id: string } },
   jwtSecret: string
 ): Promise<string> => {
-  validateJWTSecret(jwtSecret);
+  validateJwtSecret(jwtSecret);
   const secret = new TextEncoder().encode(jwtSecret);
   const expirationTime =
     Math.floor(Date.now() / 1000) + JWT_REFRESH_TOKEN_DURATION;
@@ -73,7 +102,7 @@ const createRefreshToken = async (
 };
 
 const verifyToken = async (token: string, jwtSecret: string) => {
-  validateJWTSecret(jwtSecret);
+  validateJwtSecret(jwtSecret);
   const secret = new TextEncoder().encode(jwtSecret);
   try {
     const { payload } = await jwtVerify(token, secret);
@@ -152,12 +181,14 @@ const validateUserData = (user: any, provider: string) => {
   return user;
 };
 
+const getAuthCookiePath = (): string => "/";
+
 const deleteCookieOptions = (c: Context<ApiContext>) => {
   const hostname = new URL(c.env.WEB_HOST).hostname;
   const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
 
   return {
-    path: "/",
+    path: getAuthCookiePath(),
     ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
   };
 };
@@ -172,8 +203,14 @@ const setCookieOptions = (c: Context<ApiContext>, maxAge: number) => {
     sameSite: "Lax" as const,
     ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
     maxAge,
-    path: "/",
+    path: getAuthCookiePath(),
   };
+};
+
+const clearAuthCookies = (c: Context<ApiContext>): void => {
+  const cookieOptions = deleteCookieOptions(c);
+  deleteCookie(c, JWT_ACCESS_TOKEN_NAME, cookieOptions);
+  deleteCookie(c, JWT_REFRESH_TOKEN_NAME, cookieOptions);
 };
 
 // Validate returnTo is a safe relative path (prevents open redirects)
@@ -246,8 +283,6 @@ export const jwtMiddleware = async (
   const db = createDatabase(c.env);
   const organizationIdFromUrl = c.req.param("organizationId");
 
-  let organizationId: string;
-
   if (organizationIdFromUrl) {
     // Resolve organization from URL param
     const [membership] = await db
@@ -264,16 +299,25 @@ export const jwtMiddleware = async (
       return c.json({ error: "Organization not found or access denied" }, 403);
     }
 
-    organizationId = membership.organizationId;
+    c.set("organizationId", membership.organizationId);
+  } else if (c.req.path.startsWith("/admin")) {
+    // Platform admin routes are cross-tenant; org context is optional here.
+  } else if (payload.organization?.id) {
+    c.set("organizationId", payload.organization.id);
   } else {
-    // Fallback to default org from token if no URL param
-    if (!payload.organization?.id) {
+    const [user] = await db
+      .select({ organizationId: users.organizationId })
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1);
+
+    if (!user?.organizationId) {
       return c.json({ error: "Organization required" }, 400);
     }
-    organizationId = payload.organization.id;
+
+    c.set("organizationId", user.organizationId);
   }
 
-  c.set("organizationId", organizationId);
   await next();
 };
 
@@ -463,11 +507,16 @@ const setAuthTokens = async (
 // Create auth router
 const auth = new Hono<ApiContext>();
 
+const respondRefreshUnauthorized = (c: Context<ApiContext>) => {
+  clearAuthCookies(c);
+  return c.json({ error: "Authentication required" }, 401);
+};
+
 auth.post("/refresh", async (c) => {
   const refreshToken = getCookie(c, JWT_REFRESH_TOKEN_NAME);
 
   if (!refreshToken) {
-    return c.json({ error: "Authentication required" }, 401);
+    return respondRefreshUnauthorized(c);
   }
 
   const rawPayload = await verifyToken(refreshToken, c.env.JWT_SECRET);
@@ -480,7 +529,7 @@ auth.post("/refresh", async (c) => {
       hasSub: !!payload?.sub,
       hasOrg: !!orgId,
     });
-    return c.json({ error: "Authentication required" }, 401);
+    return respondRefreshUnauthorized(c);
   }
 
   const db = createDatabase(c.env);
@@ -494,7 +543,7 @@ auth.post("/refresh", async (c) => {
 
     if (userResults.length === 0) {
       console.warn("User not found during refresh", { userId: payload.sub });
-      return c.json({ error: "Authentication required" }, 401);
+      return respondRefreshUnauthorized(c);
     }
     const result = userResults[0];
 
@@ -506,7 +555,7 @@ auth.post("/refresh", async (c) => {
 
     if (orgResults.length === 0) {
       console.warn("Organization not found during refresh", { orgId });
-      return c.json({ error: "Authentication required" }, 401);
+      return respondRefreshUnauthorized(c);
     }
     const orgResult = orgResults[0];
 
@@ -526,13 +575,12 @@ auth.post("/refresh", async (c) => {
         userId: payload.sub,
         orgId: orgResult.id,
       });
-      return c.json({ error: "Authentication required" }, 401);
+      return respondRefreshUnauthorized(c);
     }
 
     const membershipRole = membershipResults[0].role as OrganizationRoleType;
 
-    // Determine provider from githubId/googleId fields
-    const provider: "github" | "google" = result.githubId ? "github" : "google";
+    const provider = resolveAuthProvider(result);
 
     const accessPayload: JWTTokenPayload = {
       sub: result.id,
@@ -557,15 +605,18 @@ auth.post("/refresh", async (c) => {
     return c.json({ success: true, user: accessPayload });
   } catch (error) {
     console.error("Error during token refresh:", error);
-    return c.json({ error: "Authentication required" }, 401);
+    return respondRefreshUnauthorized(c);
   }
 });
 
 auth.post("/logout", (c) => {
-  const cookieOptions = deleteCookieOptions(c);
-  deleteCookie(c, JWT_ACCESS_TOKEN_NAME, cookieOptions);
-  deleteCookie(c, JWT_REFRESH_TOKEN_NAME, cookieOptions);
+  clearAuthCookies(c);
   return c.redirect(c.env.WEB_HOST);
+});
+
+auth.post("/clear-session", (c) => {
+  clearAuthCookies(c);
+  return c.json({ ok: true });
 });
 
 /**
@@ -627,6 +678,147 @@ async function completeOAuthLogin(
 
   return c.redirect(consumeReturnTo(c));
 }
+
+async function completePasswordLogin(
+  c: Context<ApiContext>,
+  user: {
+    id: string;
+    name: string;
+    email: string | null;
+    avatarUrl: string | null;
+    role: string;
+    developerMode: boolean;
+  },
+  organization: OrganizationInfo
+): Promise<Response> {
+  const accessPayload: JWTTokenPayload = {
+    sub: user.id,
+    name: user.name,
+    email: user.email ?? undefined,
+    avatarUrl: user.avatarUrl ?? undefined,
+    role: user.role,
+    developerMode: user.developerMode,
+    provider: "local",
+    organization,
+  };
+
+  await setAuthTokens(c, accessPayload, {
+    sub: user.id,
+    organization: { id: organization.id },
+  });
+
+  return c.json({
+    success: true,
+    user: accessPayload,
+  } satisfies PasswordAuthResponse);
+}
+
+auth.get("/setup-status", async (c) => {
+  const db = createDatabase(c.env);
+  const hasUsers = await hasAnyUsers(db);
+  return c.json({ hasUsers } satisfies AuthSetupStatusResponse);
+});
+
+auth.post(
+  "/register",
+  zValidator("json", passwordRegisterSchema),
+  async (c) => {
+    const { email, password } = c.req.valid("json");
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) {
+      return c.json({ error: passwordError }, 400);
+    }
+
+    const db = createDatabase(c.env);
+
+    try {
+      const passwordHash = await hashPassword(password);
+      const { user, organization } = await registerLocalUser(db, {
+        email,
+        passwordHash,
+      });
+
+      return completePasswordLogin(c, user, {
+        id: organization.id,
+        name: organization.name,
+        role: OrganizationRole.OWNER,
+      });
+    } catch (error) {
+      if (error instanceof EmailAlreadyRegisteredError) {
+        return c.json({ error: "Email already registered" }, 409);
+      }
+      if (isJwtConfigError(error)) {
+        console.error("Registration JWT config error:", error);
+        return c.json({ error: "Authentication service misconfigured" }, 503);
+      }
+      console.error("Registration error:", error);
+      return c.json({ error: "Registration failed" }, 500);
+    }
+  }
+);
+
+auth.post(
+  "/login/password",
+  zValidator("json", passwordLoginSchema),
+  async (c) => {
+    try {
+      const { email, password } = c.req.valid("json");
+      const db = createDatabase(c.env);
+      const user = await getLocalUserByEmail(db, email);
+
+      if (!user) {
+        return c.json(
+          {
+            error: "Email not registered",
+            code: EMAIL_NOT_FOUND_CODE,
+          },
+          404
+        );
+      }
+
+      if (!user.passwordHash) {
+        return c.json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
+      }
+
+      const passwordValid = await verifyPassword(password, user.passwordHash);
+      if (!passwordValid) {
+        return c.json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
+      }
+
+      const [organization] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, user.organizationId));
+
+      if (!organization) {
+        return c.json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
+      }
+
+      const [membership] = await db
+        .select({ role: memberships.role })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.userId, user.id),
+            eq(memberships.organizationId, organization.id)
+          )
+        );
+
+      return completePasswordLogin(c, user, {
+        id: organization.id,
+        name: organization.name,
+        role: (membership?.role as OrganizationRoleType) ?? OrganizationRole.OWNER,
+      });
+    } catch (error) {
+      if (isJwtConfigError(error)) {
+        console.error("Password login JWT config error:", error);
+        return c.json({ error: "Authentication service misconfigured" }, 503);
+      }
+      console.error("Password login error:", error);
+      return c.json({ error: "Login failed" }, 500);
+    }
+  }
+);
 
 auth.get(
   "/login/github",
@@ -712,22 +904,6 @@ auth.get(
     }
   }
 );
-
-auth.get("/login/dev", async (c) => {
-  if (c.env.CLOUDFLARE_ENV !== "development") {
-    return c.json({ error: "Not found" }, 404);
-  }
-
-  storeReturnTo(c);
-
-  return completeOAuthLogin(c, {
-    provider: "google",
-    providerId: "dev-test-user",
-    name: "Test User",
-    email: "test@localhost.dev",
-    avatarUrl: undefined,
-  });
-});
 
 auth.get("/protected", jwtMiddleware, (c) => {
   // If jwtAuth passes, user is authenticated

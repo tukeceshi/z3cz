@@ -91,7 +91,7 @@ export default function DocsDevelopers() {
       <h2 id="getting-started">本地开发</h2>
       <p>
         推荐使用 Docker 运行完整开发栈，无需在宿主机安装 Node.js 或 pnpm。详细说明见仓库根目录{" "}
-        <code>docker/README.md</code> 与 <code>README.md</code>。
+        <code>README.md</code>。
       </p>
 
       <h3 id="ports">本地端口</h3>

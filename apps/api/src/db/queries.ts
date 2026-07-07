@@ -1,8 +1,9 @@
 import * as crypto from "crypto";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 
 import { TRIAL_CREDITS } from "../constants/billing";
+import { deriveDisplayNameFromEmail } from "../auth/display-name";
 import { Bindings } from "../context";
 import { encryptSecret } from "../utils/encryption";
 import {
@@ -189,6 +190,120 @@ export async function saveUser(
     await tx.insert(memberships).values(newMembership);
     return { user, organization: organizationRecord };
   });
+}
+
+const BOOTSTRAP_ADVISORY_LOCK_KEY = 0x6461667468756e6b;
+
+export class EmailAlreadyRegisteredError extends Error {
+  constructor() {
+    super("Email already registered");
+    this.name = "EmailAlreadyRegisteredError";
+  }
+}
+
+export async function hasAnyUsers(
+  db: ReturnType<typeof createDatabase>
+): Promise<boolean> {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users);
+  return (result?.count ?? 0) > 0;
+}
+
+export async function registerLocalUser(
+  db: ReturnType<typeof createDatabase>,
+  params: {
+    email: string;
+    passwordHash: string;
+  }
+): Promise<{ user: UserRow; organization: OrganizationInsert }> {
+  const now = new Date();
+  const normalizedEmail = params.email.trim().toLowerCase();
+  const displayName = deriveDisplayNameFromEmail(normalizedEmail);
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(${BOOTSTRAP_ADVISORY_LOCK_KEY})`
+    );
+
+    const [existingEmail] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1);
+
+    if (existingEmail) {
+      throw new EmailAlreadyRegisteredError();
+    }
+
+    const [countResult] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users);
+
+    const isFirstUser = (countResult?.count ?? 0) === 0;
+
+    const userId = uuidv7();
+    const organizationId = uuidv7();
+    const organization: OrganizationInsert = {
+      id: organizationId,
+      name: "Personal",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const newUser = {
+      id: userId,
+      name: displayName,
+      email: normalizedEmail,
+      passwordHash: params.passwordHash,
+      organizationId,
+      role: isFirstUser ? UserRole.ADMIN : UserRole.USER,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const newMembership: MembershipInsert = {
+      userId,
+      organizationId,
+      role: OrganizationRole.OWNER,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const [organizationRecord] = await tx
+      .insert(organizations)
+      .values(organization)
+      .returning();
+    const [user] = await tx.insert(users).values(newUser).returning();
+    await tx.insert(memberships).values(newMembership);
+
+    return { user, organization: organizationRecord };
+  });
+}
+
+export async function getLocalUserByEmail(
+  db: ReturnType<typeof createDatabase>,
+  email: string
+): Promise<UserRow | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+  return user ?? null;
+}
+
+export function resolveAuthProvider(
+  user: UserRow
+): "local" | "github" | "google" {
+  if (user.passwordHash) {
+    return "local";
+  }
+  if (user.githubId) {
+    return "github";
+  }
+  return "google";
 }
 
 /**

@@ -134,7 +134,7 @@ adminSupportRoutes.get("/unread-count", async (c) => {
   if (!adminUserId) return c.json({ count: 0 });
 
   const [row] = await db
-    .select({ count: sql<number>`COUNT()` })
+    .select({ count: sql<number>`COUNT(*)` })
     .from(threads)
     .leftJoin(
       threadReads,

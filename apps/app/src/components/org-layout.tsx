@@ -22,6 +22,8 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { AppLayout } from "@/components/layouts/app-layout";
+import { useTranslation } from "@/components/locale-provider";
+import type { TranslationKey } from "@/i18n";
 import { TourProvider } from "@/components/tour";
 import { useOrganizations } from "@/services/organizations-service";
 
@@ -30,88 +32,104 @@ interface OrgLayoutProps {
   title: string;
 }
 
-export const getDashboardSidebarGroups = (orgId: string) => {
+export const getDashboardSidebarGroups = (
+  orgId: string,
+  t: (key: TranslationKey) => string
+) => {
   const groups = [
     {
       items: [
         {
-          title: "Dashboard",
+          id: "dashboard",
+          title: t("sidebar.dashboard"),
           url: `/org/${orgId}/dashboard`,
           icon: LayoutDashboard,
         },
       ],
     },
     {
-      label: "Workflows",
+      label: t("sidebar.workflows"),
       items: [
         {
-          title: "Workflows",
+          id: "workflows",
+          title: t("sidebar.workflows"),
           url: `/org/${orgId}/workflows`,
           icon: SquareTerminal,
         },
-
         {
-          title: "Executions",
+          id: "executions",
+          title: t("sidebar.executions"),
           url: `/org/${orgId}/executions`,
           icon: Logs,
         },
         {
-          title: "Feedback",
+          id: "feedback",
+          title: t("sidebar.feedback"),
           url: `/org/${orgId}/feedback`,
           icon: MessageSquareText,
         },
         {
-          title: "Templates",
+          id: "templates",
+          title: t("sidebar.templates"),
           url: `/org/${orgId}/templates`,
           icon: Wand,
         },
         {
-          title: "Playground",
+          id: "playground",
+          title: t("sidebar.playground"),
           url: `/org/${orgId}/playground`,
           icon: FlaskConical,
         },
       ],
     },
     {
-      label: "Resources",
+      label: t("sidebar.resources"),
       items: [
         {
-          title: "Schemas",
+          id: "schemas",
+          title: t("sidebar.schemas"),
           url: `/org/${orgId}/schemas`,
           icon: TableProperties,
         },
         {
-          title: "Databases",
+          id: "databases",
+          title: t("sidebar.databases"),
           url: `/org/${orgId}/databases`,
           icon: Database,
         },
         {
-          title: "Datasets",
+          id: "datasets",
+          title: t("sidebar.datasets"),
           url: `/org/${orgId}/datasets`,
           icon: Folder,
         },
         {
-          title: "Integrations",
+          id: "integrations",
+          title: t("sidebar.integrations"),
           url: `/org/${orgId}/integrations`,
           icon: Plug,
         },
         {
-          title: "Secrets",
+          id: "secrets",
+          title: t("sidebar.secrets"),
           url: `/org/${orgId}/secrets`,
           icon: Lock,
         },
         {
-          title: "Emails",
+          id: "emails",
+          title: t("sidebar.emails"),
           url: `/org/${orgId}/emails`,
           icon: Mail,
         },
         {
-          title: "Queues",
+          id: "queues",
+          title: t("sidebar.queues"),
           url: `/org/${orgId}/queues`,
           icon: Inbox,
         },
         {
-          title: "Bots",
+          id: "bots",
+          title: t("sidebar.bots"),
           url: `/org/${orgId}/bots`,
           icon: Bot,
         },
@@ -119,22 +137,24 @@ export const getDashboardSidebarGroups = (orgId: string) => {
     },
   ];
 
-  // Add Settings section
   groups.push({
-    label: "Settings",
+    label: t("nav.settings"),
     items: [
       {
-        title: "API Keys",
+        id: "api-keys",
+        title: t("sidebar.apiKeys"),
         url: `/org/${orgId}/api-keys`,
         icon: KeyRound,
       },
       {
-        title: "Members",
+        id: "members",
+        title: t("sidebar.members"),
         url: `/org/${orgId}/members`,
         icon: Users,
       },
       {
-        title: "Billing",
+        id: "billing",
+        title: t("sidebar.billing"),
         url: `/org/${orgId}/billing`,
         icon: CreditCard,
       },
@@ -148,6 +168,7 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
   const params = useParams<{ organizationId: string }>();
   const { organization, setSelectedOrganization } = useAuth();
   const { organizations: orgList } = useOrganizations();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (params.organizationId && organization?.id && orgList.length > 0) {
@@ -173,11 +194,10 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
   ]);
 
   if (!organization?.id) {
-    // Fallback to a loading state or redirect
-    return <div>Loading...</div>;
+    return <div>{t("common.loading")}</div>;
   }
 
-  const sidebarGroups = getDashboardSidebarGroups(organization.id);
+  const sidebarGroups = getDashboardSidebarGroups(organization.id, t);
 
   return (
     <AppLayout

@@ -6,6 +6,7 @@ import { AdminPagination } from "@/components/admin/admin-pagination";
 import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getListStageLabel } from "@/i18n/admin-labels";
+import type { TranslateFn } from "@/i18n";
 import {
   type AdminStuckUser,
-  LIST_STAGE_LABEL,
   LIST_STAGES,
   type ListStage,
   useAdminStuckSummary,
@@ -29,18 +31,16 @@ import {
 } from "@/services/admin-service";
 import { formatDate } from "@/utils/date";
 
-// Stage tabs are bounded above by the server-side dormancy cap (30d),
-// so a threshold of 30+ would always be empty. Dormant cohort surfaces
-// the 30+ users in their own tab.
 const THRESHOLD_OPTIONS = [3, 7, 14];
 
 function createColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminStuckUser>[] {
   return [
     {
       accessorKey: "name",
-      header: "User",
+      header: t("admin.table.user"),
       cell: ({ row }) => (
         <Link
           to={`/admin/users/${row.original.id}`}
@@ -58,7 +58,7 @@ function createColumns(
     },
     {
       accessorKey: "email",
-      header: "Email",
+      header: t("admin.table.email"),
       cell: ({ row }) =>
         row.original.email ? (
           <span className="text-muted-foreground">{row.original.email}</span>
@@ -68,7 +68,7 @@ function createColumns(
     },
     {
       accessorKey: "plan",
-      header: "Plan",
+      header: t("admin.table.plan"),
       cell: ({ row }) => (
         <Badge variant={row.original.plan === "pro" ? "default" : "secondary"}>
           {row.original.plan}
@@ -77,7 +77,7 @@ function createColumns(
     },
     {
       accessorKey: "furthestStageAt",
-      header: "Stuck since",
+      header: t("admin.table.stuckSince"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.furthestStageAt)}
@@ -86,7 +86,7 @@ function createColumns(
     },
     {
       accessorKey: "daysSinceAdvance",
-      header: "Days",
+      header: t("admin.table.days"),
       cell: ({ row }) => (
         <Badge variant="outline">{row.original.daysSinceAdvance}d</Badge>
       ),
@@ -100,12 +100,12 @@ function createColumns(
               navigate(`/admin/users/${row.original.id}?compose=draft`)
             }
           >
-            Draft message
+            {t("admin.table.draftMessage")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => navigate(`/admin/users/${row.original.id}`)}
           >
-            View user
+            {t("admin.table.viewUser")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -121,11 +121,12 @@ export function AdminStuckUsersPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Stuck in funnel" }]);
+    setBreadcrumbs([{ label: t("admin.onboarding.breadcrumb") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const { stuckSummary, stuckSummaryError } = useAdminStuckSummary(minDays);
   const { stuckUsers, pagination, stuckUsersError } = useAdminStuckUsers(
@@ -135,12 +136,15 @@ export function AdminStuckUsersPage() {
     limit
   );
 
-  const columns = useMemo(() => createColumns(navigate), [navigate]);
+  const columns = useMemo(
+    () => createColumns(navigate, t),
+    [navigate, t]
+  );
 
   if (stuckSummaryError) {
     return (
       <InsetError
-        title="Stuck in funnel"
+        title={t("admin.onboarding.breadcrumb")}
         errorMessage={stuckSummaryError.message}
       />
     );
@@ -156,12 +160,17 @@ export function AdminStuckUsersPage() {
     setPage(1);
   };
 
+  const dormantDays = stuckSummary?.dormantDays ?? 30;
+
   return (
-    <InsetLayout title="Onboarding">
+    <InsetLayout title={t("admin.onboarding.title")}>
       <p className="text-sm text-muted-foreground mb-4">
         {isDormantTab
-          ? `Pre-activation users idle ${stuckSummary?.dormantDays ?? 30}+ days. Drafted messages skip past correspondence and use a re-engagement tone.`
-          : `Users who reached an onboarding stage more than ${minDays} day${minDays === 1 ? "" : "s"} ago and have not advanced (capped at <${stuckSummary?.dormantDays ?? 30}d — older users move to Dormant).`}
+          ? t("admin.onboarding.dormantDescription", { days: dormantDays })
+          : t("admin.onboarding.activeDescription", {
+              days: minDays,
+              cap: dormantDays,
+            })}
       </p>
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -169,7 +178,7 @@ export function AdminStuckUsersPage() {
           <TabsList>
             {LIST_STAGES.map((s) => (
               <TabsTrigger key={s} value={s}>
-                {LIST_STAGE_LABEL[s]}
+                {getListStageLabel(t, s)}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {stuckSummary?.counts[s] ?? "—"}
                 </span>
@@ -180,7 +189,9 @@ export function AdminStuckUsersPage() {
 
         {!isDormantTab && (
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-muted-foreground">Stuck for</span>
+            <span className="text-sm text-muted-foreground">
+              {t("admin.onboarding.stuckFor")}
+            </span>
             <Select value={String(minDays)} onValueChange={onThresholdChange}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -188,7 +199,7 @@ export function AdminStuckUsersPage() {
               <SelectContent>
                 {THRESHOLD_OPTIONS.map((d) => (
                   <SelectItem key={d} value={String(d)}>
-                    {d}+ days
+                    {t("admin.onboarding.daysPlus", { days: d })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -199,7 +210,7 @@ export function AdminStuckUsersPage() {
 
       {stuckUsersError ? (
         <InsetError
-          title="Stuck in funnel"
+          title={t("admin.onboarding.breadcrumb")}
           errorMessage={stuckUsersError.message}
         />
       ) : (
@@ -208,10 +219,15 @@ export function AdminStuckUsersPage() {
             columns={columns}
             data={stuckUsers}
             emptyState={{
-              title: isDormantTab ? "No dormant users" : "Nobody is stuck here",
+              title: isDormantTab
+                ? t("admin.onboarding.emptyDormantTitle")
+                : t("admin.onboarding.emptyStuckTitle"),
               description: isDormantTab
-                ? "No pre-activation users have been idle long enough yet."
-                : `No users at "${LIST_STAGE_LABEL[stage]}" past ${minDays} days. Try a shorter threshold or a different stage.`,
+                ? t("admin.onboarding.emptyDormantDesc")
+                : t("admin.onboarding.emptyStuckDesc", {
+                    stage: getListStageLabel(t, stage),
+                    days: minDays,
+                  }),
             }}
           />
 
@@ -221,7 +237,6 @@ export function AdminStuckUsersPage() {
             itemCount={stuckUsers.length}
             total={pagination?.total}
             totalPages={pagination?.totalPages}
-            itemLabel="users"
             onPageChange={setPage}
           />
         </>

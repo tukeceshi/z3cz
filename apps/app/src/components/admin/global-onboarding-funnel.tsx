@@ -1,9 +1,8 @@
-import {
-  type AdminStatsFunnel,
-  ONBOARDING_STAGE_LABEL,
-  ONBOARDING_STAGES,
-  type OnboardingStage,
-} from "@/services/admin-service";
+import type { AdminStatsFunnel, OnboardingStage } from "@/services/admin-service";
+import { ONBOARDING_STAGES } from "@/services/admin-service";
+
+import { useTranslation } from "@/components/locale-provider";
+import { getOnboardingStageLabel } from "@/i18n/admin-labels";
 
 import {
   Card,
@@ -33,17 +32,14 @@ export function GlobalOnboardingFunnel({
 }: {
   funnel: AdminStatsFunnel;
 }) {
+  const { t } = useTranslation();
   const total = funnel.signedUp;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Onboarding funnel</CardTitle>
-        <CardDescription>
-          How many users have ever reached each onboarding stage. Counts are
-          cumulative — a user who succeeded is included in every earlier stage
-          too.
-        </CardDescription>
+        <CardTitle>{t("admin.funnel.title")}</CardTitle>
+        <CardDescription>{t("admin.funnel.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -61,13 +57,19 @@ export function GlobalOnboardingFunnel({
               <div key={stage} className="space-y-1">
                 <div className="flex items-baseline justify-between text-sm">
                   <span className="font-medium">
-                    {ONBOARDING_STAGE_LABEL[stage]}
+                    {getOnboardingStageLabel(t, stage)}
                   </span>
                   <span className="text-muted-foreground">
                     {count.toLocaleString()}
                     <span className="ml-2 text-xs">
-                      ({percentOfTotal.toFixed(1)}% of signups
-                      {index > 0 && `, ${conversion.toFixed(1)}% from previous`}
+                      (
+                      {t("admin.funnel.percentOfSignups", {
+                        percent: percentOfTotal.toFixed(1),
+                      })}
+                      {index > 0 &&
+                        t("admin.funnel.fromPrevious", {
+                          percent: conversion.toFixed(1),
+                        })}
                       )
                     </span>
                   </span>

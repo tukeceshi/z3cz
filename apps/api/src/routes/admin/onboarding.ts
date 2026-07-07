@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -24,7 +24,7 @@ type OnboardingStage =
   | "workflow_executed"
   | "workflow_executed_ok";
 
-// Stages a user can be "stuck" at ‚Ä?the terminal `workflow_executed_ok`
+// Stages a user can be "stuck" at ù?the terminal `workflow_executed_ok`
 // stage is excluded because that user has activated.
 const STUCK_STAGES = [
   "signed_up",
@@ -40,7 +40,7 @@ type StuckStage = (typeof STUCK_STAGES)[number];
 // for a stage-specific nudge", dormant = "gone cold, re-engage".
 const DORMANT_DAYS = 30;
 
-// Virtual stage value accepted by /admin/onboarding ‚Ä?not a real funnel
+// Virtual stage value accepted by /admin/onboarding ù?not a real funnel
 // stage but a cohort union (any pre-activation user idle 30d+).
 const LIST_STAGES = [...STUCK_STAGES, "dormant"] as const;
 
@@ -69,7 +69,7 @@ function toStage(at: Date | null): FunnelStage {
 }
 
 // Build the WHERE filter for users currently stuck at a given stage in the
-// window [cutoffNew, cutoffOld) ‚Ä?that is, the stage's stamp is present
+// window [cutoffNew, cutoffOld) ù?that is, the stage's stamp is present
 // (createdAt for signed_up), every later-stage stamp is null, the stamp
 // is older than `cutoffOld`, and (when provided) not older than
 // `cutoffNew`. The upper bound is what keeps stage tabs disjoint from
@@ -116,14 +116,15 @@ function stuckFilter(stage: StuckStage, cutoffOld: Date, cutoffNew?: Date) {
 // older than the dormancy cutoff. COALESCE picks the latest non-null
 // stamp; createdAt is the floor since it's notNull.
 function dormantFilter(cutoffOld: Date) {
+  const cutoff = cutoffOld.toISOString();
   return and(
     isNull(users.workflowExecutedOk),
-    sql`COALESCE(${users.workflowExecuted}, ${users.workflowCreated}, ${users.tourCompleted}, ${users.createdAt}) < ${Math.floor(cutoffOld.getTime() / 1000)}`
+    sql`COALESCE(${users.workflowExecuted}, ${users.workflowCreated}, ${users.tourCompleted}, ${users.createdAt}) < ${cutoff}`
   );
 }
 
 // Date column whose value represents when the user landed in this stuck
-// stage ‚Ä?used for ordering "oldest stuck first" and for daysSinceAdvance.
+// stage ù?used for ordering "oldest stuck first" and for daysSinceAdvance.
 function stageEnteredColumn(stage: StuckStage) {
   switch (stage) {
     case "signed_up":
@@ -140,7 +141,7 @@ function stageEnteredColumn(stage: StuckStage) {
 /**
  * GET /admin/onboarding/users/:id/funnel
  *
- * Per-user onboarding funnel built from D1 only ‚Ä?every stage is a
+ * Per-user onboarding funnel built from D1 only ù?every stage is a
  * nullable timestamp column on the users row, so this is a single
  * primary-key lookup with no joins.
  */
@@ -259,7 +260,7 @@ adminOnboardingRoutes.get("/users/:id/executions-summary", async (c) => {
         ? "dafthunk_executions_production"
         : "dafthunk_executions_development";
 
-    // CF Analytics Engine SQL requires `COUNT()` with zero arguments ‚Ä?
+    // CF Analytics Engine SQL requires `COUNT()` with zero arguments ù?
     // `COUNT(*)` is rejected with `COUNT() function must have 0 arguments`.
     const sql = `
       SELECT blob4 AS status,
@@ -357,36 +358,38 @@ adminOnboardingRoutes.get(
     const { minDays } = c.req.valid("query");
 
     try {
-      // Drizzle's raw `sql` template binds non-Param chunks with the noop
-      // encoder, so interpolating a JS `Date` would land in D1 as an
-      // unsupported parameter type. The timestamp columns are stored as
-      // unix-seconds integers (`mode: "timestamp"`), so we pre-encode the
-      // cutoff ourselves to a number primitive and compare on that.
-      const nowSec = Math.floor(Date.now() / 1000);
-      const lowerCutoffSec = nowSec - minDays * 24 * 60 * 60;
-      const dormantCutoffSec = nowSec - DORMANT_DAYS * 24 * 60 * 60;
-      // Each stage count is now bounded by [lowerCutoff, dormantCutoff)
-      // so users idle 30d+ only show up in the dormant count, never in
-      // both a stage tab AND dormant.
-      const [row] = await db
-        .select({
-          signedUp: sql<number>`COUNT(CASE WHEN ${users.tourCompleted} IS NULL AND ${users.workflowCreated} IS NULL AND ${users.workflowExecuted} IS NULL AND ${users.workflowExecutedOk} IS NULL AND ${users.createdAt} < ${lowerCutoffSec} AND ${users.createdAt} >= ${dormantCutoffSec} THEN 1 END)`,
-          tourCompleted: sql<number>`COUNT(CASE WHEN ${users.tourCompleted} IS NOT NULL AND ${users.workflowCreated} IS NULL AND ${users.workflowExecuted} IS NULL AND ${users.workflowExecutedOk} IS NULL AND ${users.tourCompleted} < ${lowerCutoffSec} AND ${users.tourCompleted} >= ${dormantCutoffSec} THEN 1 END)`,
-          workflowCreated: sql<number>`COUNT(CASE WHEN ${users.workflowCreated} IS NOT NULL AND ${users.workflowExecuted} IS NULL AND ${users.workflowExecutedOk} IS NULL AND ${users.workflowCreated} < ${lowerCutoffSec} AND ${users.workflowCreated} >= ${dormantCutoffSec} THEN 1 END)`,
-          workflowExecuted: sql<number>`COUNT(CASE WHEN ${users.workflowExecuted} IS NOT NULL AND ${users.workflowExecutedOk} IS NULL AND ${users.workflowExecuted} < ${lowerCutoffSec} AND ${users.workflowExecuted} >= ${dormantCutoffSec} THEN 1 END)`,
-          dormant: sql<number>`COUNT(CASE WHEN ${users.workflowExecutedOk} IS NULL AND COALESCE(${users.workflowExecuted}, ${users.workflowCreated}, ${users.tourCompleted}, ${users.createdAt}) < ${dormantCutoffSec} THEN 1 END)`,
-        })
-        .from(users);
+      const now = Date.now();
+      const lowerCutoff = new Date(now - minDays * 24 * 60 * 60 * 1000);
+      const dormantCutoff = new Date(now - DORMANT_DAYS * 24 * 60 * 60 * 1000);
+
+      const countWhere = async (
+        filter: ReturnType<typeof stuckFilter> | ReturnType<typeof dormantFilter>
+      ): Promise<number> => {
+        const [row] = await db
+          .select({ count: count() })
+          .from(users)
+          .where(filter);
+        return Number(row?.count ?? 0);
+      };
+
+      const [signedUp, tourCompleted, workflowCreated, workflowExecuted, dormant] =
+        await Promise.all([
+          countWhere(stuckFilter("signed_up", lowerCutoff, dormantCutoff)),
+          countWhere(stuckFilter("tour_completed", lowerCutoff, dormantCutoff)),
+          countWhere(stuckFilter("workflow_created", lowerCutoff, dormantCutoff)),
+          countWhere(stuckFilter("workflow_executed", lowerCutoff, dormantCutoff)),
+          countWhere(dormantFilter(dormantCutoff)),
+        ]);
 
       return c.json({
         minDays,
         dormantDays: DORMANT_DAYS,
         counts: {
-          signed_up: Number(row?.signedUp ?? 0),
-          tour_completed: Number(row?.tourCompleted ?? 0),
-          workflow_created: Number(row?.workflowCreated ?? 0),
-          workflow_executed: Number(row?.workflowExecuted ?? 0),
-          dormant: Number(row?.dormant ?? 0),
+          signed_up: signedUp,
+          tour_completed: tourCompleted,
+          workflow_created: workflowCreated,
+          workflow_executed: workflowExecuted,
+          dormant,
         },
       });
     } catch (error) {
@@ -424,7 +427,7 @@ adminOnboardingRoutes.get(
       const now = Date.now();
       const dormantCutoff = new Date(now - DORMANT_DAYS * 24 * 60 * 60 * 1000);
 
-      // Dormant cohort is a union across stages ‚Ä?order by COALESCE of
+      // Dormant cohort is a union across stages ù?order by COALESCE of
       // the latest stamp so the oldest-cold users surface first.
       if (stage === "dormant") {
         const filter = dormantFilter(dormantCutoff);
@@ -464,7 +467,7 @@ adminOnboardingRoutes.get(
           ({ subscriptionStatus, currentPeriodEnd, furthestStageAt, ...u }) => {
             // SQLite returns the COALESCE result as a unix-seconds integer
             // (since the underlying columns are stored that way), but
-            // Drizzle does not know to wrap it as a Date ‚Ä?coerce here.
+            // Drizzle does not know to wrap it as a Date ù?coerce here.
             const enteredAt =
               furthestStageAt instanceof Date
                 ? furthestStageAt

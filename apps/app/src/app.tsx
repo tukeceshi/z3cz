@@ -6,6 +6,7 @@ import {
 } from "react-router";
 
 import { HeadSeo } from "@/components/head-seo";
+import { LocaleProvider, useTranslation } from "@/components/locale-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
 import { AuthProvider } from "./components/auth-context";
@@ -31,6 +32,7 @@ export function FallbackErrorUI() {
 function CurrentRouteHead() {
   const matches = useMatches();
   const location = useLocation();
+  const { siteSettings } = useTranslation();
   const lastMatch = matches[matches.length - 1];
   const handle = lastMatch?.handle as RouteHandle | undefined;
 
@@ -43,17 +45,19 @@ function CurrentRouteHead() {
     }
     return handle.head as React.ReactElement;
   }
-  return <HeadSeo title="Dafthunk" />;
+  return <HeadSeo title={siteSettings.siteName} />;
 }
 
 function App() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <AuthProvider>
-        <CurrentRouteHead />
-        <Outlet />
-        <ScrollRestoration />
-      </AuthProvider>
+      <LocaleProvider>
+        <AuthProvider>
+          <CurrentRouteHead />
+          <Outlet />
+          <ScrollRestoration />
+        </AuthProvider>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }

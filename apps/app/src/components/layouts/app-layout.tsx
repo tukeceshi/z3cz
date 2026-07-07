@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
 import { PageProvider } from "@/components/page-context";
+import { SiteBrandingEffect } from "@/components/site-branding-effect";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { NavMainProps } from "@/components/sidebar/nav-main";
 import * as Sidebar from "@/components/ui/sidebar";
@@ -21,6 +22,7 @@ interface AppLayoutProps {
 export function AppLayout({ children, sidebar, className }: AppLayoutProps) {
   return (
     <PageProvider>
+      <SiteBrandingEffect />
       <div className="flex h-screen w-screen overflow-hidden flex-col">
         <AppHeader />
         <Toaster />

@@ -1,7 +1,4 @@
-import Building2 from "lucide-react/icons/building-2";
-import Mail from "lucide-react/icons/mail";
-import User from "lucide-react/icons/user";
-import React from "react";
+import { SettingsLayout } from "./components/settings-layout";
 import type { RouteObject, RouterState } from "react-router";
 import { Navigate } from "react-router";
 
@@ -10,6 +7,7 @@ import { HeadSeo } from "./components/head-seo";
 import { AdminLayout } from "./components/layouts/admin-layout";
 import { AppLayout } from "./components/layouts/app-layout";
 import { OrgLayout } from "./components/org-layout";
+import { HomeRedirect } from "./components/home-redirect";
 import { OrgRedirect } from "./components/org-redirect";
 import { ProtectedRoute } from "./components/protected-route";
 import { AdminDashboardPage } from "./pages/admin/admin-dashboard-page";
@@ -22,6 +20,7 @@ import { AdminExecutionsPage } from "./pages/admin/admin-executions-page";
 import { AdminOrganizationDetailPage } from "./pages/admin/admin-organization-detail-page";
 import { AdminOrganizationsPage } from "./pages/admin/admin-organizations-page";
 import { AdminQueuesPage } from "./pages/admin/admin-queues-page";
+import { AdminSettingsPage } from "./pages/admin/admin-settings-page";
 import { AdminStuckUsersPage } from "./pages/admin/admin-stuck-users-page";
 import { AdminSupportPage } from "./pages/admin/admin-support-page";
 import { AdminUserDetailPage } from "./pages/admin/admin-user-detail-page";
@@ -85,34 +84,10 @@ export type AppRouteObject = RouteObject & {
   handle?: RouteHandle;
 };
 
-const settingsSidebarItems = [
-  {
-    items: [
-      {
-        title: "Profile",
-        url: "/settings/profile",
-        icon: User,
-      },
-      {
-        title: "Organizations",
-        url: "/settings/organizations",
-        icon: Building2,
-      },
-      {
-        title: "Invitations",
-        url: "/settings/invitations",
-        icon: Mail,
-      },
-    ],
-  },
-];
-
-const footerItems = [];
-
 export const routes: AppRouteObject[] = [
   {
     path: "/",
-    element: <OrgRedirect to="/org/:organizationId/dashboard" />,
+    element: <HomeRedirect />,
   },
   {
     path: "/login",
@@ -130,17 +105,11 @@ export const routes: AppRouteObject[] = [
   {
     path: "/settings/profile",
     element: (
-      <AppLayout
-        sidebar={{
-          title: "Settings",
-          groups: settingsSidebarItems,
-          footerItems: footerItems,
-        }}
-      >
+      <SettingsLayout>
         <ProtectedRoute>
           <ProfilePage />
         </ProtectedRoute>
-      </AppLayout>
+      </SettingsLayout>
     ),
     handle: { head: <HeadSeo title="Profile - Settings - Dafthunk" /> },
   },
@@ -309,6 +278,17 @@ export const routes: AppRouteObject[] = [
     handle: { head: <HeadSeo title="Datasets - Admin - Dafthunk" /> },
   },
   {
+    path: "/admin/settings",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminSettingsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: <HeadSeo title="Site Settings - Admin - Dafthunk" /> },
+  },
+  {
     path: "/admin/databases",
     element: (
       <AdminLayout>
@@ -326,34 +306,22 @@ export const routes: AppRouteObject[] = [
   {
     path: "/settings/organizations",
     element: (
-      <AppLayout
-        sidebar={{
-          title: "Settings",
-          groups: settingsSidebarItems,
-          footerItems: footerItems,
-        }}
-      >
+      <SettingsLayout>
         <ProtectedRoute>
           <OrganizationsPage />
         </ProtectedRoute>
-      </AppLayout>
+      </SettingsLayout>
     ),
     handle: { head: <HeadSeo title="Organizations - Dafthunk" /> },
   },
   {
     path: "/settings/invitations",
     element: (
-      <AppLayout
-        sidebar={{
-          title: "Settings",
-          groups: settingsSidebarItems,
-          footerItems: footerItems,
-        }}
-      >
+      <SettingsLayout>
         <ProtectedRoute>
           <InvitationsPage />
         </ProtectedRoute>
-      </AppLayout>
+      </SettingsLayout>
     ),
     handle: { head: <HeadSeo title="Invitations - Dafthunk" /> },
   },

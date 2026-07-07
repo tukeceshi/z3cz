@@ -59,6 +59,34 @@ const refreshAccessToken = async (): Promise<boolean> => {
   return refreshPromise;
 };
 
+interface ApiErrorBody {
+  error?: string;
+  message?: string;
+  code?: string;
+}
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+const throwApiRequestError = (
+  status: number,
+  errorData: ApiErrorBody | null
+): never => {
+  const message =
+    errorData?.message ||
+    errorData?.error ||
+    `Request failed with status: ${status}`;
+  throw new ApiRequestError(message, status, errorData?.code);
+};
+
 /**
  * Make a generic request to the API
  */
@@ -102,16 +130,11 @@ export const makeRequest = async <T>(
   }
 
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error("Resource not found");
-    } else if (response.status === 401 && !skipRefresh) {
-      // Try to refresh token once if we get 401
+    if (response.status === 401 && !skipRefresh) {
       const refreshSuccess = await refreshAccessToken();
       if (refreshSuccess) {
-        // Retry the original request with the new token
         const retryResponse = await fetch(fullUrl, requestOptions);
         if (retryResponse.ok) {
-          // Handle successful retry response
           if (retryResponse.status === 204) {
             return undefined as T;
           }
@@ -122,25 +145,15 @@ export const makeRequest = async <T>(
           return retryResponse.json();
         }
       }
-      throw new Error("Unauthorized access");
-    } else if (response.status === 401) {
-      throw new Error("Unauthorized access");
-    } else if (response.status === 403) {
-      throw new Error("Forbidden access");
     }
-    // Attempt to parse error response body if available
+
+    let errorData: ApiErrorBody | null = null;
     try {
-      const errorData = await response.json();
-      // Assuming errorData has a 'message' or similar property
-      const errorMessage =
-        errorData?.message ||
-        errorData?.error ||
-        `Request failed with status: ${response.status}`;
-      throw new Error(errorMessage);
-    } catch (_e) {
-      // Fallback if error response is not JSON or other parsing error
-      throw new Error(`Request failed with status: ${response.status}`);
+      errorData = (await response.json()) as ApiErrorBody;
+    } catch {
+      errorData = null;
     }
+    throwApiRequestError(response.status, errorData);
   }
 
   // Handle responses that are OK but might not have a JSON body

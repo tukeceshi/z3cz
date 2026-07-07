@@ -21,6 +21,7 @@ export * from "./replicate";
 export * from "./scheduled";
 export * from "./schema";
 export * from "./secret";
+export * from "./site-settings";
 export * from "./slack";
 export * from "./telegram";
 export * from "./types";

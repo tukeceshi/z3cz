@@ -5,6 +5,7 @@ import Mail from "lucide-react/icons/mail";
 import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import { getInitials } from "@/utils/user-utils";
 export function UserProfile() {
   const { user, logout, isAuthenticated } = useAuth();
   const { invitations } = useUserInvitations();
+  const { t } = useTranslation();
 
   const hasInvitations = invitations.length > 0;
 
@@ -52,7 +54,7 @@ export function UserProfile() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email || "No email provided"}
+              {user.email || t("common.noEmail")}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -60,13 +62,13 @@ export function UserProfile() {
         <DropdownMenuItem asChild className="cursor-pointer">
           <Link to="/settings/profile" className="flex items-center">
             <CircleUserRound className="mr-2 size-4 text-muted-foreground" />
-            <span>Profile</span>
+            <span>{t("userMenu.profile")}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer">
           <Link to="/settings/organizations" className="flex items-center">
             <Building2 className="mr-2 size-4 text-muted-foreground" />
-            <span>Organizations</span>
+            <span>{t("userMenu.organizations")}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer">
@@ -76,7 +78,7 @@ export function UserProfile() {
           >
             <span className="flex items-center">
               <Mail className="mr-2 size-4 text-muted-foreground" />
-              <span>Invitations</span>
+              <span>{t("userMenu.invitations")}</span>
             </span>
             {hasInvitations && (
               <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -88,7 +90,7 @@ export function UserProfile() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
           <LogOut className="mr-2 size-4 text-muted-foreground" />
-          <span>Log out</span>
+          <span>{t("userMenu.logout")}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

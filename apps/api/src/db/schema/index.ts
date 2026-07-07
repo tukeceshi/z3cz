@@ -198,6 +198,7 @@ export const users = pgTable(
     email: text("email").unique(),
     githubId: text("github_id").unique(),
     googleId: text("google_id").unique(),
+    passwordHash: text("password_hash"),
     avatarUrl: text("avatar_url"),
     organizationId: text("organization_id")
       .notNull()
@@ -227,6 +228,20 @@ export const users = pgTable(
     index("users_created_at_idx").on(table.createdAt),
   ]
 );
+
+export const PLATFORM_SETTINGS_ID = "default";
+
+export const platformSettings = pgTable("platform_settings", {
+  id: text("id").primaryKey(),
+  siteName: text("site_name").notNull().default("Dafthunk"),
+  siteTagline: text("site_tagline")
+    .notNull()
+    .default("Build serverless workflows visually."),
+  defaultLocale: text("default_locale").notNull().default("en"),
+  supportEmail: text("support_email"),
+  updatedAt: createUpdatedAt(),
+  updatedBy: text("updated_by").references(() => users.id),
+});
 
 // Memberships - Join table for users and organizations (many-to-many)
 export const memberships = pgTable(
@@ -1177,3 +1192,6 @@ export type AttachmentInsert = typeof attachments.$inferInsert;
 
 export type ThreadReadRow = typeof threadReads.$inferSelect;
 export type ThreadReadInsert = typeof threadReads.$inferInsert;
+
+export type PlatformSettingsRow = typeof platformSettings.$inferSelect;
+export type PlatformSettingsInsert = typeof platformSettings.$inferInsert;

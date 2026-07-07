@@ -3,6 +3,7 @@
 import { type LucideIcon, PanelLeftClose } from "lucide-react";
 import PanelLeftOpen from "lucide-react/icons/panel-left-open";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -14,13 +15,13 @@ import {
 
 import { NavLink } from "../nav-link";
 
-interface NavMainItem {
+export interface NavMainItem {
+  id: string;
   title: string;
   url: string;
   icon?: LucideIcon;
   isActive?: boolean;
   end?: boolean;
-  /** When > 0, renders a small pill at the right of the nav row. */
   badgeCount?: number;
 }
 
@@ -30,24 +31,23 @@ interface NavMainGroup {
 }
 
 const NAV_ITEM_TOUR_MAP: Record<string, string> = {
-  Templates: "templates-nav",
-  Workflows: "workflows-nav",
-
-  Executions: "executions-nav",
-  Playground: "playground-nav",
-  Emails: "emails-nav",
-  Queues: "queues-nav",
-  Datasets: "datasets-nav",
-  Databases: "databases-nav",
-  Integrations: "integrations-nav",
-  Secrets: "secrets-nav",
-  "API Keys": "api-keys-nav",
-  Members: "members-nav",
-  Billing: "billing-nav",
+  templates: "templates-nav",
+  workflows: "workflows-nav",
+  executions: "executions-nav",
+  playground: "playground-nav",
+  emails: "emails-nav",
+  queues: "queues-nav",
+  datasets: "datasets-nav",
+  databases: "databases-nav",
+  integrations: "integrations-nav",
+  secrets: "secrets-nav",
+  "api-keys": "api-keys-nav",
+  members: "members-nav",
+  billing: "billing-nav",
 };
 
-function NavMainItem({ item }: { item: NavMainItem }) {
-  const dataTour = NAV_ITEM_TOUR_MAP[item.title];
+function NavMainItemRow({ item }: { item: NavMainItem }) {
+  const dataTour = NAV_ITEM_TOUR_MAP[item.id];
 
   return (
     <SidebarMenuItem data-tour={dataTour}>
@@ -85,6 +85,7 @@ export interface NavMainProps {
 
 export function NavMain({ groups, footerItems }: NavMainProps) {
   const { toggleSidebar, open } = useSidebar();
+  const { t } = useTranslation();
 
   return (
     <div className="flex-1 flex flex-col justify-between pt-4 pb-0">
@@ -104,7 +105,7 @@ export function NavMain({ groups, footerItems }: NavMainProps) {
             )}
             <SidebarMenu className="bg-transparent">
               {group.items.map((item) => (
-                <NavMainItem key={item.title} item={item} />
+                <NavMainItemRow key={item.id} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroup>
@@ -114,17 +115,17 @@ export function NavMain({ groups, footerItems }: NavMainProps) {
         <SidebarMenu className="bg-transparent px-4">
           {footerItems &&
             footerItems.map((item) => (
-              <NavMainItem key={item.title} item={item} />
+              <NavMainItemRow key={item.id} item={item} />
             ))}
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="Toggle sidebar"
+              tooltip={t("common.toggleSidebar")}
               onClick={toggleSidebar}
               className="hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors mt-1 mb-5 overflow-hidden whitespace-nowrap"
             >
               {open ? <PanelLeftClose /> : <PanelLeftOpen />}
               <span className="uppercase text-semibold text-xs group-data-[collapsible=icon]:hidden">
-                Collapse
+                {t("common.collapse")}
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>

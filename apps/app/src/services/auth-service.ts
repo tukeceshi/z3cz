@@ -1,10 +1,15 @@
-import { AuthProvider, JWTTokenPayload } from "@dafthunk/types";
+import {
+  AuthProvider,
+  AuthSetupStatusResponse,
+  JWTTokenPayload,
+  PasswordAuthResponse,
+} from "@dafthunk/types";
 import { mutate } from "swr";
 
 import { AUTH_USER_KEY } from "@/components/auth-context";
 import { buildApiUrl } from "@/config/api";
 
-import { makeRequest } from "./utils";
+import { makeRequest, ApiRequestError } from "./utils";
 
 // Error types for better error handling
 export class AuthError extends Error {
@@ -38,7 +43,8 @@ export const authService = {
         "/auth/user",
         {
           method: "GET",
-        }
+        },
+        true
       );
 
       if (!response?.user) {
@@ -52,12 +58,16 @@ export const authService = {
 
       return response.user;
     } catch (error) {
-      if (error instanceof AuthError) {
-        console.error("Auth error getting user info:", error.message);
-      } else {
-        console.error("Network error getting user info:", error);
+      if (error instanceof ApiRequestError && error.status === 401) {
+        throw new AuthError("Unauthorized", "UNAUTHORIZED");
       }
-      return null;
+
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      console.error("Network error getting user info:", error);
+      throw error;
     }
   },
 
@@ -114,6 +124,85 @@ export const authService = {
     } catch (error) {
       console.error("Login initiation failed:", error);
       throw error;
+    }
+  },
+
+  async getSetupStatus(): Promise<AuthSetupStatusResponse> {
+    return makeRequest<AuthSetupStatusResponse>("/auth/setup-status", {
+      method: "GET",
+    });
+  },
+
+  async loginWithPassword(
+    email: string,
+    password: string
+  ): Promise<JWTTokenPayload> {
+    try {
+      const response = await makeRequest<PasswordAuthResponse>(
+        "/auth/login/password",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        },
+        true
+      );
+
+      if (!response.success || !response.user?.sub) {
+        throw new AuthError("Login failed");
+      }
+
+      mutate(AUTH_USER_KEY, response.user, { revalidate: false });
+      return response.user;
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "EMAIL_NOT_FOUND") {
+        throw new AuthError(error.message, "EMAIL_NOT_FOUND");
+      }
+      if (error instanceof ApiRequestError) {
+        throw new AuthError(error.message, error.code);
+      }
+      throw error;
+    }
+  },
+
+  async registerWithPassword(
+    email: string,
+    password: string
+  ): Promise<JWTTokenPayload> {
+    try {
+      const response = await makeRequest<PasswordAuthResponse>(
+        "/auth/register",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        },
+        true
+      );
+
+      if (!response.success || !response.user?.sub) {
+        throw new AuthError("Registration failed");
+      }
+
+      mutate(AUTH_USER_KEY, response.user, { revalidate: false });
+      mutate("/auth/setup-status");
+      return response.user;
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        throw new AuthError(error.message, error.code);
+      }
+      throw error;
+    }
+  },
+
+  async clearSession(): Promise<void> {
+    mutate(AUTH_USER_KEY, null, { revalidate: false });
+    try {
+      await makeRequest<{ ok: boolean }>(
+        "/auth/clear-session",
+        { method: "POST" },
+        true
+      );
+    } catch (error) {
+      console.warn("Failed to clear auth session cookies:", error);
     }
   },
 

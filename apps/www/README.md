@@ -4,7 +4,7 @@
 
 ## 开发
 
-本地开发统一使用 Docker，见仓库根目录 [docker/README.md](../docker/README.md)。
+本地开发统一使用 Docker，见仓库根目录 [README.md](../README.md)。
 
 容器启动后访问 http://localhost:3100。
 

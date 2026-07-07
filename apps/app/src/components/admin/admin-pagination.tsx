@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/locale-provider";
 
 interface AdminPaginationProps {
   page: number;
@@ -16,9 +17,12 @@ export function AdminPagination({
   itemCount,
   total,
   totalPages,
-  itemLabel = "items",
+  itemLabel,
   onPageChange,
 }: AdminPaginationProps) {
+  const { t } = useTranslation();
+  const resolvedItemLabel = itemLabel ?? t("admin.pagination.users");
+
   const hasTotals = typeof total === "number" && typeof totalPages === "number";
 
   if (hasTotals) {
@@ -29,7 +33,12 @@ export function AdminPagination({
     return (
       <div className="flex items-center justify-between mt-4">
         <p className="text-sm text-muted-foreground">
-          Showing {start} to {end} of {total} {itemLabel}
+          {t("admin.pagination.showingRange", {
+            start,
+            end,
+            total,
+            label: resolvedItemLabel,
+          })}
         </p>
         <div className="flex gap-2">
           <Button
@@ -38,7 +47,7 @@ export function AdminPagination({
             disabled={page === 1}
             onClick={() => onPageChange(page - 1)}
           >
-            Previous
+            {t("admin.pagination.previous")}
           </Button>
           <Button
             variant="outline"
@@ -46,7 +55,7 @@ export function AdminPagination({
             disabled={page === totalPages}
             onClick={() => onPageChange(page + 1)}
           >
-            Next
+            {t("admin.pagination.next")}
           </Button>
         </div>
       </div>
@@ -58,7 +67,11 @@ export function AdminPagination({
   return (
     <div className="flex items-center justify-between mt-4">
       <p className="text-sm text-muted-foreground">
-        Showing {itemCount} {itemLabel} on page {page}
+        {t("admin.pagination.showingPage", {
+          count: itemCount,
+          label: resolvedItemLabel,
+          page,
+        })}
       </p>
       <div className="flex gap-2">
         <Button
@@ -67,7 +80,7 @@ export function AdminPagination({
           disabled={page === 1}
           onClick={() => onPageChange(page - 1)}
         >
-          Previous
+          {t("admin.pagination.previous")}
         </Button>
         <Button
           variant="outline"
@@ -75,7 +88,7 @@ export function AdminPagination({
           disabled={itemCount < limit}
           onClick={() => onPageChange(page + 1)}
         >
-          Next
+          {t("admin.pagination.next")}
         </Button>
       </div>
     </div>

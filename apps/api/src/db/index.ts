@@ -70,6 +70,7 @@ export async function closeDatabaseConnections(): Promise<void> {
   nodeClients.clear();
 }
 export * from "./onboarding";
+export * from "./platform-settings-queries";
 export * from "./queries";
 export * from "./schema";
 export * from "./support-queries";

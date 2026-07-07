@@ -52,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     AUTH_USER_KEY,
     authService.getCurrentUser,
     {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 2000,
       // Retry failed requests, but not for auth errors
       shouldRetryOnError: (error) => !(error instanceof AuthError),
       // Refresh user data every 5 minutes when tab is focused

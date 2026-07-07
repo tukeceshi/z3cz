@@ -37,10 +37,34 @@ export interface JWTTokenPayload extends AuthUser {
   [key: string]: unknown;
 }
 
-export type AuthProvider = "github" | "google";
+export type AuthProvider = "github" | "google" | "local";
+
+export interface AuthSetupStatusResponse {
+  hasUsers: boolean;
+}
 
 export interface AuthCheckResponse {
   ok: boolean;
+}
+
+export interface PasswordLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface PasswordRegisterRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthErrorResponse {
+  error: string;
+  code?: string;
+}
+
+export interface PasswordAuthResponse {
+  success: boolean;
+  user: JWTTokenPayload;
 }
 
 export interface UserResponse {

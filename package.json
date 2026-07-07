@@ -10,7 +10,7 @@
   "preinstall": "npx only-allow pnpm",
   "scripts": {
     "dev": "pnpm --parallel dev",
-    "dev:docker": "pnpm --parallel --filter '@dafthunk/www' --filter '@dafthunk/app' --filter '@dafthunk/api' dev:docker",
+    "dev:docker": "node scripts/dev-docker.mjs",
     "dev:preview": "pnpm --parallel dev:preview",
     "format": "pnpm --parallel format",
     "lint": "pnpm run typecheck && pnpm --parallel lint && pnpm run knip",

@@ -11,6 +11,7 @@ import { GlobalOnboardingFunnel } from "@/components/admin/global-onboarding-fun
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAdminStats } from "@/services/admin-service";
@@ -18,18 +19,24 @@ import { useAdminStats } from "@/services/admin-service";
 export function AdminDashboardPage() {
   const { stats, statsError, isStatsLoading } = useAdminStats(30);
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Dashboard" }]);
+    setBreadcrumbs([{ label: t("admin.dashboard.title") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   if (isStatsLoading) {
-    return <InsetLoading title="Dashboard" />;
+    return <InsetLoading title={t("admin.dashboard.title")} />;
   }
 
   if (statsError) {
-    return <InsetError title="Dashboard" errorMessage={statsError.message} />;
+    return (
+      <InsetError
+        title={t("admin.dashboard.title")}
+        errorMessage={statsError.message}
+      />
+    );
   }
 
   const timeseries = stats?.timeseries ?? null;
@@ -40,17 +47,19 @@ export function AdminDashboardPage() {
     ) ?? 0;
 
   return (
-    <InsetLayout title="Dashboard">
+    <InsetLayout title={t("admin.dashboard.title")}>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.dashboard.totalUsers")}
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalUsers ?? 0}</div>
             <p className="text-xs text-muted-foreground">
-              Registered users across all organizations
+              {t("admin.dashboard.totalUsersDesc")}
             </p>
           </CardContent>
         </Card>
@@ -58,7 +67,7 @@ export function AdminDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Organizations
+              {t("admin.dashboard.totalOrganizations")}
             </CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -67,7 +76,7 @@ export function AdminDashboardPage() {
               {stats?.totalOrganizations ?? 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              Active organizations on the platform
+              {t("admin.dashboard.totalOrganizationsDesc")}
             </p>
           </CardContent>
         </Card>
@@ -75,7 +84,7 @@ export function AdminDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Workflows
+              {t("admin.dashboard.totalWorkflows")}
             </CardTitle>
             <Workflow className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -84,7 +93,7 @@ export function AdminDashboardPage() {
               {stats?.totalWorkflows ?? 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              Workflows created across all organizations
+              {t("admin.dashboard.totalWorkflowsDesc")}
             </p>
           </CardContent>
         </Card>
@@ -92,7 +101,7 @@ export function AdminDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Recent Signups
+              {t("admin.dashboard.recentSignups")}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -101,14 +110,16 @@ export function AdminDashboardPage() {
               {stats?.recentSignups ?? 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              New users in the last 7 days
+              {t("admin.dashboard.recentSignupsDesc")}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.dashboard.activeUsers")}
+            </CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -116,20 +127,22 @@ export function AdminDashboardPage() {
               {stats?.activeUsers24h ?? 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              Users active in the last 24 hours
+              {t("admin.dashboard.activeUsersDesc")}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Executions</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.dashboard.executions")}
+            </CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{executions30d}</div>
             <p className="text-xs text-muted-foreground">
-              Workflow runs in the last 30 days
+              {t("admin.dashboard.executionsDesc")}
             </p>
           </CardContent>
         </Card>

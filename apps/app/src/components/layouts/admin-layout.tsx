@@ -5,7 +5,7 @@ import LayoutDashboard from "lucide-react/icons/layout-dashboard";
 import ListTodo from "lucide-react/icons/list-todo";
 import Mail from "lucide-react/icons/mail";
 import Play from "lucide-react/icons/play";
-
+import Settings from "lucide-react/icons/settings";
 import Table from "lucide-react/icons/table";
 import UserMinus from "lucide-react/icons/user-minus";
 import Users from "lucide-react/icons/users";
@@ -14,7 +14,9 @@ import { ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
+import { useTranslation } from "@/components/locale-provider";
 import { PageProvider } from "@/components/page-context";
+import { SiteBrandingEffect } from "@/components/site-branding-effect";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import type { NavMainProps } from "@/components/sidebar/nav-main";
 import * as Sidebar from "@/components/ui/sidebar";
@@ -26,66 +28,84 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const { unreadCount } = useAdminSupportUnreadCount();
+  const { t } = useTranslation();
 
   const adminSidebarItems: NavMainProps["groups"] = [
     {
       items: [
         {
-          title: "Dashboard",
+          id: "dashboard",
+          title: t("sidebar.dashboard"),
           url: "/admin",
           icon: LayoutDashboard,
           end: true,
         },
         {
-          title: "Support",
+          id: "support",
+          title: t("sidebar.support"),
           url: "/admin/support",
           icon: Inbox,
           badgeCount: unreadCount,
         },
         {
-          title: "Users",
+          id: "users",
+          title: t("sidebar.users"),
           url: "/admin/users",
           icon: Users,
         },
         {
-          title: "Onboarding",
+          id: "onboarding",
+          title: t("sidebar.onboarding"),
           url: "/admin/onboarding",
           icon: UserMinus,
         },
         {
-          title: "Organizations",
+          id: "organizations",
+          title: t("sidebar.organizations"),
           url: "/admin/organizations",
           icon: Building2,
         },
         {
-          title: "Workflows",
+          id: "workflows",
+          title: t("sidebar.workflows"),
           url: "/admin/workflows",
           icon: Workflow,
         },
         {
-          title: "Executions",
+          id: "executions",
+          title: t("sidebar.executions"),
           url: "/admin/executions",
           icon: Play,
         },
         {
-          title: "Emails",
+          id: "emails",
+          title: t("sidebar.emails"),
           url: "/admin/emails",
           icon: Mail,
         },
         {
-          title: "Queues",
+          id: "queues",
+          title: t("sidebar.queues"),
           url: "/admin/queues",
           icon: ListTodo,
         },
         {
-          title: "Datasets",
+          id: "datasets",
+          title: t("sidebar.datasets"),
           url: "/admin/datasets",
           icon: Table,
         },
         {
-          title: "Databases",
+          id: "databases",
+          title: t("sidebar.databases"),
           url: "/admin/databases",
           icon: Database,
+        },
+        {
+          id: "site-settings",
+          title: t("sidebar.siteSettings"),
+          url: "/admin/settings",
+          icon: Settings,
         },
       ],
     },
@@ -93,12 +113,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <PageProvider>
+      <SiteBrandingEffect />
       <div className="flex h-screen w-screen overflow-hidden flex-col">
         <AppHeader />
         <Toaster />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar.SidebarProvider>
-            <AppSidebar title="Admin" groups={adminSidebarItems} />
+            <AppSidebar title={t("sidebar.admin")} groups={adminSidebarItems} />
             <Sidebar.SidebarInset className="bg-neutral-50 dark:bg-neutral-800">
               <div className="h-full w-full overflow-y-auto">{children}</div>
             </Sidebar.SidebarInset>

@@ -1,7 +1,7 @@
 # Dafthunk 本地开发编排
 #
 # 端口：营销站 3100 | 产品 3101 | API 3102 | Postgres 5432
-# 快速启动见 README.md 或 docker/README.md
+# 快速启动见 README.md
 
 services:
   supabase-db:

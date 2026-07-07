@@ -37,6 +37,7 @@ import replicateRoutes from "./routes/replicate";
 import robotsRoutes from "./routes/robots";
 import schemaRoutes from "./routes/schemas";
 import secretRoutes from "./routes/secrets";
+import siteSettingsRoutes from "./routes/site-settings";
 import slackWebhook from "./routes/slack-webhook";
 import stripeWebhooks from "./routes/stripe-webhooks";
 import telegramWebhook from "./routes/telegram-webhook";
@@ -66,7 +67,11 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     }
 
     const isAuthRoute =
-      c.req.path.startsWith("/auth/login") || c.req.path === "/auth/refresh";
+      c.req.path.startsWith("/auth/login") ||
+      c.req.path === "/auth/refresh" ||
+      c.req.path === "/auth/register" ||
+      c.req.path === "/auth/login/password" ||
+      c.req.path === "/auth/clear-session";
 
     if (options.runtime === "node") {
       return createNodeRateLimitMiddleware(isAuthRoute ? "auth" : "default")(
@@ -86,6 +91,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   });
 
   app.route("/health", health);
+  app.route("/site-settings", siteSettingsRoutes);
   if (options.runtime === "node") {
     app.route("/inbound-email", inboundEmailRoutes);
   }

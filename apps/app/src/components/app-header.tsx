@@ -6,6 +6,8 @@ import Settings from "lucide-react/icons/settings";
 import Shield from "lucide-react/icons/shield";
 import { Link, useLocation } from "react-router";
 
+import { LanguageToggle } from "@/components/language-toggle";
+import { useTranslation } from "@/components/locale-provider";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { UserProfile } from "@/components/user-profile";
 
@@ -16,6 +18,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
+  const { t, siteSettings } = useTranslation();
   const location = useLocation();
   const isAdminSection = location.pathname.startsWith("/admin");
   const isSettingsSection = location.pathname.startsWith("/settings");
@@ -30,15 +33,18 @@ export function AppHeader() {
       <div className="flex items-center gap-2">
         <Link to="/" className="flex items-center gap-2">
           <Bot className="h-6 w-6" />
+          <span className="text-sm font-semibold max-w-[12rem] truncate">
+            {siteSettings.siteName}
+          </span>
         </Link>
         {isAuthenticated &&
           (isAdminSection ? (
             <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50">
-              Administration
+              {t("nav.administration")}
             </span>
           ) : isSettingsSection ? (
             <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50">
-              Settings
+              {t("nav.settings")}
             </span>
           ) : (
             <OrganizationSwitcher />
@@ -55,7 +61,7 @@ export function AppHeader() {
                 activeClassName={activeNavLinkClasses}
               >
                 <Building className="h-4 w-4 mr-1.5" />
-                <span>Organization</span>
+                <span>{t("nav.organization")}</span>
               </NavLink>
               <NavLink
                 to={"/settings"}
@@ -64,7 +70,7 @@ export function AppHeader() {
                 data-tour="settings-link"
               >
                 <Settings className="h-4 w-4 mr-1.5" />
-                <span>Settings</span>
+                <span>{t("nav.settings")}</span>
               </NavLink>
               {user?.role === "admin" && (
                 <NavLink
@@ -73,7 +79,7 @@ export function AppHeader() {
                   activeClassName={activeNavLinkClasses}
                 >
                   <Shield className="h-4 w-4 mr-1.5" />
-                  <span>Administration</span>
+                  <span>{t("nav.administration")}</span>
                 </NavLink>
               )}
             </>
@@ -84,7 +90,7 @@ export function AppHeader() {
               className={navLinkClasses}
               activeClassName={activeNavLinkClasses}
             >
-              Login
+              {t("nav.login")}
             </NavLink>
           )}
           <a
@@ -95,7 +101,7 @@ export function AppHeader() {
             data-tour="documentation-link"
           >
             <BookOpen className="h-4 w-4 mr-1.5" />
-            <span>Documentation</span>
+            <span>{t("nav.documentation")}</span>
           </a>
           <a
             href="https://github.com/dafthunk-com/dafthunk"
@@ -104,9 +110,10 @@ export function AppHeader() {
             className={navLinkClasses}
           >
             <Github className="h-4 w-4 mr-1.5" />
-            <span>GitHub</span>
+            <span>{t("nav.github")}</span>
           </a>
         </nav>
+        <LanguageToggle />
         <ThemeToggle />
         <UserProfile />
       </div>

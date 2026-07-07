@@ -14,11 +14,10 @@
 
 | 日期 | 说明 |
 |------|------|
+| 2026-07-07 | **邮箱密码登录**：`POST /auth/register`、`POST /auth/login/password`；首个注册用户自动为超级管理员；清库 `pnpm --filter '@dafthunk/api' db:reset`；OAuth 回调须走 app 同源 `/api` 代理。 |
 | 2026-07-07 | **Node 本地运行时**：API 从 Cloudflare Workers 迁移为 Hono + `@hono/node-server`；D1/R2/DO/Queue 等绑定替换为 Postgres、本地 FS 与进程内实现；新增入站邮件 webhook、SMTP 网关、实验性 `docker-compose.prod.yml`（含 www Node SSR）。 |
 | 2026-07-06 | Docker 生产编排、`pnpm prod:up`、Nginx 静态 app 与 API 容器镜像。 |
 | 2026-07-05 | Docker 开发栈（3100/3101/3102）、Postgres 迁移与编辑器 WebSocket Node 路径。 |
-
-> 详细 Docker 用法见 [docker/README.md](docker/README.md)。
 
 可视化编辑器基于 [React Flow](https://reactflow.dev/)，通过连接多种节点类型（含 AI 节点）构建复杂工作流。
 
@@ -67,8 +66,6 @@
 - [Docker Compose](https://docs.docker.com/compose/) v2
 - Git
 - Cloudflare 账号（AI、远程 preview 等功能需要）
-
-> 完整 Docker 说明见 [docker/README.md](docker/README.md)。
 
 ### 初始化
 
@@ -119,17 +116,34 @@ docker compose --env-file .env.docker up --build
 | http://localhost:3101 | 产品应用 / 工作流编辑器 |
 | http://localhost:3102 | API |
 
-> 本地开发统一使用 **3100 / 3101 / 3102** 三个端口。
+> 本地开发统一使用 **3100 / 3101 / 3102** 三个端口。API 首次启动约需 **2–6 分钟**（WASM 初始化），日志出现 `[api] Node server listening` 后即可使用。`restart dev` 后 app 会等 API 就绪再启动，期间请勿刷新登录页。
+
+### 登录与首用户
+
+1. 打开 http://localhost:3101/login
+2. 使用邮箱 + 密码，点击 **「登录 / 注册」**
+3. **首个注册用户**自动获得超级管理员（`users.role = admin`）
+4. 若邮箱尚未注册，系统会提示确认注册后再登录
+
+产品 UI 通过 `/api` 代理访问 API（`VITE_API_HOST=/api`），会话 Cookie 与页面同源，请勿在开发环境将 API 指到 `http://localhost:3102`（会导致 Cookie 无法写入）。
+
+**清空所有用户与业务数据**（保留表结构；不删除 `LOCAL_STORAGE_PATH` 文件）：
+
+```bash
+docker compose exec dev sh -c "cd /app/apps/api && pnpm db:reset"
+```
+
+清库后刷新登录页；系统会在首次注册前清除浏览器中的失效会话 Cookie。
 
 ### OAuth 配置（可选）
 
-如需 GitHub / Google 登录或第三方集成，在 `apps/api/.dev.vars` 中配置 OAuth 凭证。回调地址格式为 `http://localhost:3102/...`。
+如需 GitHub / Google 登录或第三方集成，在 `apps/api/.dev.vars` 中配置 OAuth 凭证。**回调地址须与 app 同源**（经 `/api` 反代）：
 
 **GitHub 登录示例**
 
 1. [创建 OAuth App](https://github.com/settings/applications/new)
 2. Homepage URL：`http://localhost:3100`
-3. Callback URL：`http://localhost:3102/auth/login/github`
+3. Callback URL：`http://localhost:3101/api/auth/login/github`
 4. 写入 `.dev.vars`：
 
 ```env
@@ -139,9 +153,9 @@ GITHUB_CLIENT_SECRET=...
 
 **Google 登录（可选）**
 
-- 重定向 URI：`http://localhost:3102/auth/login/google`
+- 重定向 URI：`http://localhost:3101/api/auth/login/google`
 
-更多集成配置项见 `apps/api/.dev.vars.example` 与 [docker/README.md](docker/README.md)。
+更多集成配置项见 `apps/api/.dev.vars.example`。
 
 ### 常用 Docker 命令
 
@@ -152,12 +166,34 @@ docker compose --env-file .env.docker up -d --build
 # 停止
 docker compose down
 
+# 重启开发容器（修改代码未生效、API 路由异常或更新 .dev.vars 后）
+docker compose --env-file .env.docker restart dev
+
+# 查看日志
+docker compose --env-file .env.docker logs -f dev
+
 # 单独启动某个服务
 docker compose --profile split up app
 
 # 在容器内运行测试
 docker compose run --rm dev pnpm test
+
+# 数据库迁移
+docker compose run --rm dev pnpm --filter '@dafthunk/api' db:migrate
 ```
+
+### 故障排查
+
+| 现象 | 处理 |
+|------|------|
+| 端口占用 | 停止 prod/dev 另一方，或改 compose 端口映射 |
+| API 长时间无响应 | 等待 2–6 分钟；查看 `docker compose logs dev` 是否有 `listening` |
+| 代码/API 修改未生效 | 执行 `docker compose --env-file .env.docker restart dev`，等待约 2–6 分钟直至 `[api] Node server listening` |
+| 登录返回 401 | 确认通过 http://localhost:3101 访问；清库后刷新登录页再注册 |
+| 登录/API 返回 500 或 503 | API 可能仍在启动（重启后约 2–6 分钟）；查看 `docker compose logs dev` 是否有 `listening`；若日志报 `JWT_SECRET`，运行 `generate-master-key.js` 更新 `.dev.vars` |
+| OAuth 失败 | 回调 URL 须为 `http://localhost:3101/api/auth/login/{provider}` |
+| JWT 相关 500 | 检查 `.dev.vars` 中 `JWT_SECRET`、`SECRET_MASTER_KEY` 是否已填写 |
+| 邮件不触发 | 确认 DB 中 org 邮箱 handle 存在；用 simulate 脚本测试 |
 
 ## 开发
 
@@ -178,11 +214,22 @@ Monorepo（pnpm workspaces）：
 - **`packages/types/`** — 共享类型
 - **`packages/utils/`** — 共享工具
 - **`packages/runtime/`** — 工作流节点运行时
-- **`docker/`** — Docker 入口脚本与文档
+- **`docker/`** — Docker 入口脚本（详细说明见本 README）
+
+### Node 运行时说明（Docker）
+
+| Cloudflare 能力 | Node/Docker 替代 |
+|-------------------|------------------|
+| Workers API | `tsx src/server.ts` + Hono |
+| D1 | Postgres + Drizzle |
+| R2 | `LOCAL_STORAGE_PATH` 本地目录 |
+| Durable Workflow / Queue | 进程内 `node-*` 运行时 |
+| Email Routing | `POST /inbound-email` + SMTP 网关 |
+| Editor WebSocket | `ws-node.ts`（直连 `:3102` 或 app 反代） |
 
 ### 开发命令
 
-在容器内执行（或宿主机已安装 Node 20.19+ / pnpm 10.3+ 时本地执行）：
+在容器内执行（或宿主机已安装 Node 22.12+ / pnpm 10.3+ 时本地执行）：
 
 ```bash
 # 启动全部服务（Docker 内默认使用 dev:docker）
@@ -279,7 +326,20 @@ DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 pnpm prod:env && pnpm prod:up
 ```
 
-详见 [docker/README.md](docker/README.md#实验性生产栈容器内构建)。
+生产栈：`Postgres + Node API + www（SSR）+ app（Nginx + /api 反代）+ SMTP 网关`。与开发栈共用 **3100–3102** 端口，切换时需先停止另一方。
+
+| 地址 | 服务 |
+|------|------|
+| http://localhost:3100 | 营销站（Node SSR） |
+| http://localhost:3101 | 产品 app（Nginx + `/api` 反代） |
+| http://localhost:3102 | API |
+| localhost:2525 | SMTP → `/inbound-email/raw` |
+
+```bash
+pnpm prod:env          # 从 .dev.vars 同步密钥到 .env.docker.prod
+pnpm prod:up           # 构建并启动
+pnpm prod:down         # 停止
+```
 
 ### Cloudflare 生产
 
@@ -341,7 +401,7 @@ pnpm --filter '@dafthunk/www' deploy
 4. 推送分支（`git push origin feature/amazing-feature`）
 5. 创建 Pull Request
 
-本地开发请使用 Docker 流程，详见 [docker/README.md](docker/README.md)。
+本地开发请使用上文 Docker 流程。
 
 ## 致谢
 

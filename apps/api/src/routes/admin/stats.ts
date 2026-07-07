@@ -99,8 +99,8 @@ adminStatsRoutes.get(
 
       const buckets = buildEmptyBuckets(from, days);
 
-      const userDayBucket = sql<string>`strftime('%Y-%m-%d', ${users.createdAt}, 'unixepoch')`;
-      const workflowDayBucket = sql<string>`strftime('%Y-%m-%d', ${workflows.createdAt}, 'unixepoch')`;
+      const userDayBucket = sql<string>`to_char(${users.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+      const workflowDayBucket = sql<string>`to_char(${workflows.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
 
       const [
         totalUsersResult,
