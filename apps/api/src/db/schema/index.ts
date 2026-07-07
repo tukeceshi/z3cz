@@ -1,12 +1,14 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
+  pgTable,
   primaryKey,
-  sqliteTable,
   text,
+  timestamp,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
 /**
  * ENUMS & CONSTANTS
@@ -138,21 +140,21 @@ export type MessageDirectionType =
  */
 
 const createCreatedAt = () =>
-  integer("created_at", { mode: "timestamp" })
+  timestamp("created_at", { withTimezone: true, mode: "date" })
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`);
+    .defaultNow();
 
 const createUpdatedAt = () =>
-  integer("updated_at", { mode: "timestamp" })
+  timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`);
+    .defaultNow();
 
 /**
  * SCHEMA DEFINITION
  */
 
 // Organizations - Collaborative workspaces for teams
-export const organizations = sqliteTable(
+export const organizations = pgTable(
   "organizations",
   {
     id: text("id").primaryKey(),
@@ -163,13 +165,13 @@ export const organizations = sqliteTable(
     subscriptionStatus: text(
       "subscription_status"
     ).$type<SubscriptionStatusType>(),
-    currentPeriodStart: integer("current_period_start", { mode: "timestamp" }),
-    currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true, mode: "date" }),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true, mode: "date" }),
     overageLimit: integer("overage_limit"), // null = unlimited
-    unlimitedUsage: integer("unlimited_usage", { mode: "boolean" })
+    unlimitedUsage: boolean("unlimited_usage")
       .notNull()
       .default(false),
-    creditsExhausted: integer("credits_exhausted", { mode: "boolean" })
+    creditsExhausted: boolean("credits_exhausted")
       .notNull()
       .default(false),
     createdAt: createCreatedAt(),
@@ -188,7 +190,7 @@ export const organizations = sqliteTable(
 );
 
 // Users - System users with authentication and subscription details
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
@@ -201,16 +203,16 @@ export const users = sqliteTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     role: text("role").$type<UserRoleType>().notNull().default(UserRole.USER),
-    developerMode: integer("developer_mode", { mode: "boolean" })
+    developerMode: boolean("developer_mode")
       .notNull()
       .default(false),
     // Onboarding stage timestamps. Null until the user first performs that
     // milestone, then stamped with CURRENT_TIMESTAMP. Powers the admin
     // onboarding funnel; tour_completed replaces the prior boolean column.
-    tourCompleted: integer("tour_completed", { mode: "timestamp" }),
-    workflowCreated: integer("workflow_created", { mode: "timestamp" }),
-    workflowExecuted: integer("workflow_executed", { mode: "timestamp" }),
-    workflowExecutedOk: integer("workflow_executed_ok", { mode: "timestamp" }),
+    tourCompleted: timestamp("tour_completed", { withTimezone: true, mode: "date" }),
+    workflowCreated: timestamp("workflow_created", { withTimezone: true, mode: "date" }),
+    workflowExecuted: timestamp("workflow_executed", { withTimezone: true, mode: "date" }),
+    workflowExecutedOk: timestamp("workflow_executed_ok", { withTimezone: true, mode: "date" }),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -227,7 +229,7 @@ export const users = sqliteTable(
 );
 
 // Memberships - Join table for users and organizations (many-to-many)
-export const memberships = sqliteTable(
+export const memberships = pgTable(
   "memberships",
   {
     userId: text("user_id")
@@ -253,7 +255,7 @@ export const memberships = sqliteTable(
 );
 
 // API Keys - Authentication keys associated with organizations
-export const apiKeys = sqliteTable(
+export const apiKeys = pgTable(
   "api_keys",
   {
     id: text("id").primaryKey(),
@@ -274,7 +276,7 @@ export const apiKeys = sqliteTable(
 
 // Workflows - Workflow definitions created and edited by users
 // Note: Full workflow data is stored in R2, only metadata is in the database
-export const workflows = sqliteTable(
+export const workflows = pgTable(
   "workflows",
   {
     id: text("id").primaryKey(),
@@ -291,7 +293,7 @@ export const workflows = sqliteTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    enabled: boolean("enabled").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -307,14 +309,14 @@ export const workflows = sqliteTable(
 );
 
 // Scheduled Triggers - Scheduled triggers for workflows
-export const scheduledTriggers = sqliteTable(
+export const scheduledTriggers = pgTable(
   "scheduled_triggers",
   {
     workflowId: text("workflow_id")
       .primaryKey()
       .references(() => workflows.id, { onDelete: "cascade" }),
     scheduleExpression: text("schedule_expression").notNull(),
-    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    active: boolean("active").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -327,7 +329,7 @@ export const scheduledTriggers = sqliteTable(
 );
 
 // Datasets - Data collections associated with organizations
-export const datasets = sqliteTable(
+export const datasets = pgTable(
   "datasets",
   {
     id: text("id").primaryKey(),
@@ -355,7 +357,7 @@ export type FeedbackSentimentType =
   (typeof FeedbackSentiment)[keyof typeof FeedbackSentiment];
 
 // Feedback Criteria - Evaluation questions per workflow
-export const feedbackCriteria = sqliteTable(
+export const feedbackCriteria = pgTable(
   "feedback_criteria",
   {
     id: text("id").primaryKey(),
@@ -379,7 +381,7 @@ export const feedbackCriteria = sqliteTable(
 );
 
 // Feedback - User feedback on workflow executions (per criterion)
-export const feedback = sqliteTable(
+export const feedback = pgTable(
   "feedback",
   {
     id: text("id").primaryKey(),
@@ -418,7 +420,7 @@ export const feedback = sqliteTable(
 );
 
 // Queues - Message queues associated with organizations
-export const queues = sqliteTable(
+export const queues = pgTable(
   "queues",
   {
     id: text("id").primaryKey(),
@@ -436,8 +438,8 @@ export const queues = sqliteTable(
   ]
 );
 
-// Databases - Durable Object databases associated with organizations
-export const databases = sqliteTable(
+// Databases - Postgres-backed user databases associated with organizations
+export const databases = pgTable(
   "databases",
   {
     id: text("id").primaryKey(),
@@ -456,7 +458,7 @@ export const databases = sqliteTable(
 );
 
 // Schemas - User-defined record schemas for validation
-export const schemas = sqliteTable(
+export const schemas = pgTable(
   "schemas",
   {
     id: text("id").primaryKey(),
@@ -480,7 +482,7 @@ export type SchemaInsert = typeof schemas.$inferInsert;
 export type SchemaRow = typeof schemas.$inferSelect;
 
 // Queue Triggers - Message queue triggers for workflows
-export const queueTriggers = sqliteTable(
+export const queueTriggers = pgTable(
   "queue_triggers",
   {
     workflowId: text("workflow_id")
@@ -489,7 +491,7 @@ export const queueTriggers = sqliteTable(
     queueId: text("queue_id")
       .notNull()
       .references(() => queues.id, { onDelete: "cascade" }),
-    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    active: boolean("active").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -503,7 +505,7 @@ export const queueTriggers = sqliteTable(
 );
 
 // Emails - Emails associated with organizations
-export const emails = sqliteTable(
+export const emails = pgTable(
   "emails",
   {
     id: text("id").primaryKey(),
@@ -524,7 +526,7 @@ export const emails = sqliteTable(
 );
 
 // Email Triggers - Email triggers for workflows
-export const emailTriggers = sqliteTable(
+export const emailTriggers = pgTable(
   "email_triggers",
   {
     workflowId: text("workflow_id")
@@ -533,7 +535,7 @@ export const emailTriggers = sqliteTable(
     emailId: text("email_id")
       .notNull()
       .references(() => emails.id, { onDelete: "cascade" }),
-    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    active: boolean("active").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -550,7 +552,7 @@ export const emailTriggers = sqliteTable(
 // as the top-level R2 key segment so the bucket layout doesn't depend on the
 // alias; renaming an inbox doesn't move any data. The handler that decides
 // which inbox an inbound message belongs to looks the row up by `alias`.
-export const inboxes = sqliteTable(
+export const inboxes = pgTable(
   "inboxes",
   {
     id: text("id").primaryKey(),
@@ -565,7 +567,7 @@ export const inboxes = sqliteTable(
 // distinct conversation, threaded by RFC 5322 In-Reply-To / References, with
 // subject + fromEmail as a fallback. Only minimal metadata lives here; raw
 // MIME, parsed bodies, and attachments live in R2 under `{inboxId}/...`.
-export const threads = sqliteTable(
+export const threads = pgTable(
   "threads",
   {
     id: text("id").primaryKey(),
@@ -582,8 +584,8 @@ export const threads = sqliteTable(
     organizationId: text("organization_id").references(() => organizations.id, {
       onDelete: "set null",
     }),
-    archivedAt: integer("archived_at", { mode: "timestamp" }),
-    lastMessageAt: integer("last_message_at", { mode: "timestamp" }).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true, mode: "date" }).notNull(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -601,7 +603,7 @@ export const threads = sqliteTable(
 // Messages - Individual emails within a thread. `id` is our internal UUID and
 // also the R2 key prefix; `rfc822MessageId` is the RFC 5322 Message-ID used for
 // threading lookups against incoming In-Reply-To / References headers.
-export const messages = sqliteTable(
+export const messages = pgTable(
   "messages",
   {
     id: text("id").primaryKey(),
@@ -616,8 +618,8 @@ export const messages = sqliteTable(
     toEmail: text("to_email").notNull(),
     subject: text("subject").notNull(),
     snippet: text("snippet").notNull().default(""),
-    hasHtml: integer("has_html", { mode: "boolean" }).notNull().default(false),
-    hasText: integer("has_text", { mode: "boolean" }).notNull().default(false),
+    hasHtml: boolean("has_html").notNull().default(false),
+    hasText: boolean("has_text").notNull().default(false),
     attachmentCount: integer("attachment_count").notNull().default(0),
     rawR2Key: text("raw_r2_key").notNull(),
     authorAdminUserId: text("author_admin_user_id").references(() => users.id, {
@@ -636,7 +638,7 @@ export const messages = sqliteTable(
 // Thread reads - Per-admin read state. One row per (thread, admin user)
 // pair, tracking the last time that admin opened the thread. Used to surface
 // an unread count and badge in the admin UI.
-export const threadReads = sqliteTable(
+export const threadReads = pgTable(
   "thread_reads",
   {
     threadId: text("thread_id")
@@ -645,7 +647,7 @@ export const threadReads = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    lastReadAt: integer("last_read_at", { mode: "timestamp" }).notNull(),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.threadId, table.userId] }),
@@ -656,7 +658,7 @@ export const threadReads = sqliteTable(
 
 // Attachments - File parts of a message, stored in R2 with metadata indexed
 // here. `contentId` enables inline references in HTML bodies.
-export const attachments = sqliteTable(
+export const attachments = pgTable(
   "attachments",
   {
     id: text("id").primaryKey(),
@@ -678,7 +680,7 @@ export const attachments = sqliteTable(
 
 // Discord Bots - User-provided Discord bots associated with organizations
 // Bots - Unified table for all bot types (Discord, Telegram, WhatsApp, Slack)
-export const bots = sqliteTable(
+export const bots = pgTable(
   "bots",
   {
     id: text("id").primaryKey(),
@@ -703,7 +705,7 @@ export const bots = sqliteTable(
 );
 
 // Bot Triggers - Unified table for all bot-based workflow triggers
-export const botTriggers = sqliteTable(
+export const botTriggers = pgTable(
   "bot_triggers",
   {
     workflowId: text("workflow_id")
@@ -717,7 +719,7 @@ export const botTriggers = sqliteTable(
     }),
     provider: text("provider").$type<BotProviderType>().notNull(),
     metadata: text("metadata"), // JSON for provider-specific trigger config
-    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    active: boolean("active").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -732,7 +734,7 @@ export const botTriggers = sqliteTable(
 );
 
 // Secrets - Encrypted secrets associated with organizations
-export const secrets = sqliteTable(
+export const secrets = pgTable(
   "secrets",
   {
     id: text("id").primaryKey(),
@@ -757,7 +759,7 @@ export const secrets = sqliteTable(
 );
 
 // Invitations - Pending invitations to join organizations
-export const invitations = sqliteTable(
+export const invitations = pgTable(
   "invitations",
   {
     id: text("id").primaryKey(),
@@ -776,7 +778,7 @@ export const invitations = sqliteTable(
     invitedBy: text("invited_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -797,7 +799,7 @@ export const invitations = sqliteTable(
 );
 
 // Integrations - Third-party service connections with OAuth tokens
-export const integrations = sqliteTable(
+export const integrations = pgTable(
   "integrations",
   {
     id: text("id").primaryKey(),
@@ -809,7 +811,7 @@ export const integrations = sqliteTable(
       .default(IntegrationStatus.ACTIVE),
     encryptedToken: text("encrypted_token").notNull(),
     encryptedRefreshToken: text("encrypted_refresh_token"),
-    tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true, mode: "date" }),
     metadata: text("metadata"), // JSON for provider-specific data
     organizationId: text("organization_id")
       .notNull()

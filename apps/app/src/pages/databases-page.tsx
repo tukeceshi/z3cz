@@ -194,7 +194,7 @@ export function DatabasesPage() {
       <InsetLayout title="Databases">
         <div className="flex items-center justify-between mb-6  min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Create and manage SQLite databases for your workflows.
+            Create and manage Postgres databases for your workflows.
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />

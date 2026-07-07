@@ -1,6 +1,7 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { NodeExecution, NodeType, Schema } from "@dafthunk/types";
 import {
+  generatePutRowSQL,
   getPrimaryKeyField,
   validateIdentifier,
 } from "../../utils/database-table";
@@ -15,7 +16,7 @@ export class DatabasePutRowNode extends ExecutableNode {
     tags: ["Database", "Put", "Row"],
     icon: "database",
     documentation:
-      "Inserts a row into a table. If the schema defines a primary key and a row with the same key already exists, it replaces it (INSERT OR REPLACE). If no primary key is defined, the row is appended (INSERT INTO).",
+      "Inserts a row into a table. If the schema defines a primary key and a row with the same key already exists, it replaces it (INSERT ... ON CONFLICT). If no primary key is defined, the row is appended (INSERT INTO).",
     asTool: true,
     inputs: [
       {
@@ -110,9 +111,6 @@ export class DatabasePutRowNode extends ExecutableNode {
       for (const col of columns) {
         validateIdentifier(col, "column name");
       }
-      const placeholders = columns.map(() => "?").join(", ");
-      // SQLite bind params accept only primitives. Object/array values
-      // (json fields and blob-field ObjectReferences) are stored as JSON text.
       const values = columns.map((col) => {
         const value = record[col];
         return value !== null && typeof value === "object"
@@ -120,9 +118,7 @@ export class DatabasePutRowNode extends ExecutableNode {
           : value;
       });
 
-      const sql = pkField
-        ? `INSERT OR REPLACE INTO ${schema.name} (${columns.join(", ")}) VALUES (${placeholders})`
-        : `INSERT INTO ${schema.name} (${columns.join(", ")}) VALUES (${placeholders})`;
+      const sql = generatePutRowSQL(schema, columns, pkField);
 
       await connection.execute(sql, values);
 

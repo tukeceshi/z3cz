@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "vite build",
+    "build:docker-prod": "vite build --mode docker-prod",
     "build:production": "vite build --mode production",
     "dev": "tsx watch server.ts",
     "dev:docker": "tsx watch server.ts",

@@ -95,7 +95,7 @@ integrationRoutes.get("/providers", async (c) => {
  */
 integrationRoutes.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const integrations = await getIntegrations(db, organizationId);
@@ -142,7 +142,7 @@ integrationRoutes.post(
   ),
   async (c) => {
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { name, provider, token, refreshToken, tokenExpiresAt, metadata } =
       c.req.valid("json");
 
@@ -186,7 +186,7 @@ integrationRoutes.post(
  */
 integrationRoutes.get("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const integrationId = c.req.param("id");
 
   try {
@@ -225,7 +225,7 @@ integrationRoutes.put(
   ),
   async (c) => {
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const integrationId = c.req.param("id");
     const updates = c.req.valid("json");
 
@@ -271,7 +271,7 @@ integrationRoutes.put(
  */
 integrationRoutes.delete("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const integrationId = c.req.param("id");
 
   try {

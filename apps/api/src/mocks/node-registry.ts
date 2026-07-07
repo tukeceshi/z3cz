@@ -1,8 +1,8 @@
+import { BaseNodeRegistry } from "@dafthunk/runtime";
 import {
-  BaseNodeRegistry,
   FailingMultiStepNode,
   MultiStepAdditionNode,
-} from "@dafthunk/runtime";
+} from "@dafthunk/runtime/specification/test-nodes";
 import { FormRequestNode } from "@dafthunk/runtime/nodes/form/form-request-node";
 import { FormResponseNode } from "@dafthunk/runtime/nodes/form/form-response-node";
 import { FormWebhookNode } from "@dafthunk/runtime/nodes/form/form-webhook-node";

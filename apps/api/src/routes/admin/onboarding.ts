@@ -24,7 +24,7 @@ type OnboardingStage =
   | "workflow_executed"
   | "workflow_executed_ok";
 
-// Stages a user can be "stuck" at â€” the terminal `workflow_executed_ok`
+// Stages a user can be "stuck" at â€?the terminal `workflow_executed_ok`
 // stage is excluded because that user has activated.
 const STUCK_STAGES = [
   "signed_up",
@@ -40,7 +40,7 @@ type StuckStage = (typeof STUCK_STAGES)[number];
 // for a stage-specific nudge", dormant = "gone cold, re-engage".
 const DORMANT_DAYS = 30;
 
-// Virtual stage value accepted by /admin/onboarding â€” not a real funnel
+// Virtual stage value accepted by /admin/onboarding â€?not a real funnel
 // stage but a cohort union (any pre-activation user idle 30d+).
 const LIST_STAGES = [...STUCK_STAGES, "dormant"] as const;
 
@@ -69,7 +69,7 @@ function toStage(at: Date | null): FunnelStage {
 }
 
 // Build the WHERE filter for users currently stuck at a given stage in the
-// window [cutoffNew, cutoffOld) â€” that is, the stage's stamp is present
+// window [cutoffNew, cutoffOld) â€?that is, the stage's stamp is present
 // (createdAt for signed_up), every later-stage stamp is null, the stamp
 // is older than `cutoffOld`, and (when provided) not older than
 // `cutoffNew`. The upper bound is what keeps stage tabs disjoint from
@@ -123,7 +123,7 @@ function dormantFilter(cutoffOld: Date) {
 }
 
 // Date column whose value represents when the user landed in this stuck
-// stage â€” used for ordering "oldest stuck first" and for daysSinceAdvance.
+// stage â€?used for ordering "oldest stuck first" and for daysSinceAdvance.
 function stageEnteredColumn(stage: StuckStage) {
   switch (stage) {
     case "signed_up":
@@ -140,12 +140,12 @@ function stageEnteredColumn(stage: StuckStage) {
 /**
  * GET /admin/onboarding/users/:id/funnel
  *
- * Per-user onboarding funnel built from D1 only â€” every stage is a
+ * Per-user onboarding funnel built from D1 only â€?every stage is a
  * nullable timestamp column on the users row, so this is a single
  * primary-key lookup with no joins.
  */
 adminOnboardingRoutes.get("/users/:id/funnel", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   try {
@@ -222,7 +222,7 @@ interface ExecutionsSummaryResponse {
  * round-trip per request.
  */
 adminOnboardingRoutes.get("/users/:id/executions-summary", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   try {
@@ -259,7 +259,7 @@ adminOnboardingRoutes.get("/users/:id/executions-summary", async (c) => {
         ? "dafthunk_executions_production"
         : "dafthunk_executions_development";
 
-    // CF Analytics Engine SQL requires `COUNT()` with zero arguments â€”
+    // CF Analytics Engine SQL requires `COUNT()` with zero arguments â€?
     // `COUNT(*)` is rejected with `COUNT() function must have 0 arguments`.
     const sql = `
       SELECT blob4 AS status,
@@ -353,7 +353,7 @@ adminOnboardingRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { minDays } = c.req.valid("query");
 
     try {
@@ -416,7 +416,7 @@ adminOnboardingRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { stage, minDays, page, limit } = c.req.valid("query");
     const offset = (page - 1) * limit;
 
@@ -424,7 +424,7 @@ adminOnboardingRoutes.get(
       const now = Date.now();
       const dormantCutoff = new Date(now - DORMANT_DAYS * 24 * 60 * 60 * 1000);
 
-      // Dormant cohort is a union across stages â€” order by COALESCE of
+      // Dormant cohort is a union across stages â€?order by COALESCE of
       // the latest stamp so the oldest-cold users surface first.
       if (stage === "dormant") {
         const filter = dormantFilter(dormantCutoff);
@@ -464,7 +464,7 @@ adminOnboardingRoutes.get(
           ({ subscriptionStatus, currentPeriodEnd, furthestStageAt, ...u }) => {
             // SQLite returns the COALESCE result as a unix-seconds integer
             // (since the underlying columns are stored that way), but
-            // Drizzle does not know to wrap it as a Date â€” coerce here.
+            // Drizzle does not know to wrap it as a Date â€?coerce here.
             const enteredAt =
               furthestStageAt instanceof Date
                 ? furthestStageAt

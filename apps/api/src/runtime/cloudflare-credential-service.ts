@@ -41,7 +41,7 @@ export class CloudflareCredentialService implements CredentialService {
    */
   async initialize(organizationId: string): Promise<void> {
     this.organizationId = organizationId;
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
 
     // Preload secrets
     try {
@@ -157,7 +157,7 @@ export class CloudflareCredentialService implements CredentialService {
       throw new Error("Organization not initialized");
     }
 
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const integration = await getIntegrationById(
       db,
       integrationId,
@@ -244,7 +244,7 @@ export class CloudflareCredentialService implements CredentialService {
           cause ??
             (dbError instanceof Error ? dbError.message : String(dbError))
         );
-        // Token refresh succeeded â€” return it for this execution.
+        // Token refresh succeeded â€?return it for this execution.
         // Next execution will refresh again since the DB wasn't updated.
       }
 

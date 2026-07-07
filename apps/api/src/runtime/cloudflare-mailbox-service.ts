@@ -3,7 +3,7 @@
  *
  * Routes thread/message storage through the per-organization Mailbox Durable
  * Object and sends outbound mail via the Cloudflare Email Service. Sending
- * follows the support inbox's pre-insert â†’ send â†’ rollback pattern so the DB
+ * follows the support inbox's pre-insert â†?send â†?rollback pattern so the DB
  * record never gets out of sync with the wire, and threads outbound replies so
  * the recipient's answer returns to the same conversation.
  */
@@ -34,7 +34,7 @@ export class CloudflareMailboxService implements MailboxService {
   }
 
   async sendThreaded(args: SendThreadedArgs): Promise<SendThreadedResult> {
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const email = await getEmail(db, args.emailId, args.organizationId);
     if (!email) {
       throw new Error("Email address not found or not owned by organization");

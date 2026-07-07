@@ -2,7 +2,7 @@
  * Public Form Trigger Routes
  *
  * Renders a workflow's entry form (from the form-trigger node's schema) and
- * accepts submissions that START the workflow. Unauthenticated — the workflow
+ * accepts submissions that START the workflow. Unauthenticated �?the workflow
  * id in the URL is the handle, and the workflow only responds when it is
  * enabled and has a form-trigger node. `form_request` runs synchronously
  * (worker runtime); `form_webhook` runs asynchronously (durable runtime).
@@ -20,7 +20,7 @@ import {
   getWorkflowByIdUnscoped,
   resolveOrganizationBillingOptions,
 } from "../db";
-import { createRateLimitMiddleware } from "../middleware/rate-limit";
+import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { CloudflareObjectStore } from "../runtime/cloudflare-object-store";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
@@ -75,7 +75,7 @@ async function resolveForm(
   c: Context<ApiContext>,
   workflowId: string
 ): Promise<ResolvedForm | "not_found"> {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const workflow = await getWorkflowByIdUnscoped(db, workflowId);
   if (!workflow || !workflow.enabled) return "not_found";
 
@@ -154,7 +154,7 @@ formTriggerRoutes.get("/:workflowId", async (c) => {
  */
 formTriggerRoutes.post(
   "/:workflowId",
-  (c, next) => createRateLimitMiddleware(c.env.RATE_LIMIT_EXECUTE)(c, next),
+  createExecuteRateLimitMiddleware(),
   async (c) => {
     const resolved = await resolveForm(c, c.req.param("workflowId"));
     if (resolved === "not_found") {
@@ -163,7 +163,7 @@ formTriggerRoutes.post(
 
     const { organizationId, workflow, workflowData, trigger, schema } =
       resolved;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const billingInfo = await getOrganizationBillingInfo(db, organizationId);
     if (!billingInfo) {
@@ -203,7 +203,7 @@ formTriggerRoutes.post(
       return c.json({ error: validated.errors.join("; ") }, 400);
     }
 
-    // request → synchronous (worker); webhook → asynchronous (durable).
+    // request �?synchronous (worker); webhook �?asynchronous (durable).
     const runtime = trigger.mode === "request" ? "worker" : "workflow";
 
     const { execution } = await WorkflowExecutor.execute({

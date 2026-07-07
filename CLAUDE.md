@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Dafthunk is a visual workflow automation platform built on Cloudflare infrastructure (Workers, D1, R2, AI). Users create workflows by connecting 50+ node types in a visual editor (React Flow).
+Dafthunk is a visual workflow automation platform built on Cloudflare infrastructure (Workers, Supabase Postgres via Hyperdrive, R2, AI). Users create workflows by connecting 50+ node types in a visual editor (React Flow).
 
 **Monorepo structure** (pnpm workspaces):
 - `apps/api` - Backend (Hono on Cloudflare Workers)
@@ -45,7 +45,7 @@ pnpm --filter '@dafthunk/api' db:prod:migrate  # Apply to production
 - Validate with Zod + `@hono/zod-validator`
 
 **Database** (`src/db/`)
-- D1 (SQLite) + Drizzle ORM
+- Supabase Postgres + Drizzle ORM (local: `DATABASE_URL`; Workers: Hyperdrive binding)
 - Schema: `schema/index.ts`
 - Queries: `queries.ts`
 - Migrations: `migrations/` (generate with `drizzle-kit`)

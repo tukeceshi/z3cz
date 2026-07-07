@@ -1,7 +1,7 @@
 import type { QueueService, Queue as RuntimeQueue } from "@dafthunk/runtime";
 import type { QueueMessage } from "@dafthunk/types";
 
-import type { Bindings } from "../context";
+import type { Bindings, DatabaseEnv } from "../context";
 import { createDatabase, getQueue } from "../db";
 
 /**
@@ -42,13 +42,15 @@ class CloudflareQueue implements RuntimeQueue {
  * backed by Cloudflare Queues.
  */
 export class CloudflareQueueService implements QueueService {
-  constructor(private env: Pick<Bindings, "DB" | "WORKFLOW_QUEUE">) {}
+  constructor(
+    private env: DatabaseEnv & Pick<Bindings, "WORKFLOW_QUEUE">
+  ) {}
 
   async resolve(
     queueId: string,
     organizationId: string
   ): Promise<RuntimeQueue | undefined> {
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const queue = await getQueue(db, queueId, organizationId);
 
     if (!queue) return undefined;

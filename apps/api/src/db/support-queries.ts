@@ -157,8 +157,7 @@ export async function insertMessage(
 
 /**
  * Returns the un-awaited query builder so callers can either `await` it
- * directly or pass it to `db.batch()` to share a round-trip with another
- * query. The result is always an array; the caller pulls `[0]`.
+ * directly or combine it with `Promise.all()` for parallel reads.
  */
 export function selectLastInboundMessage(db: Database, threadId: string) {
   return db

@@ -1,6 +1,6 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { NodeExecution, NodeType } from "@dafthunk/types";
-import { validateIdentifier } from "../../utils/database-table";
+import { generateCheckTableExistsSQL, validateIdentifier } from "../../utils/database-table";
 
 export class DatabaseTruncateTableNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
@@ -70,10 +70,10 @@ export class DatabaseTruncateTableNode extends ExecutableNode {
         );
       }
 
-      // Check if table exists first
+      const checkTableSQL = generateCheckTableExistsSQL(table as string);
       const tableCheck = await connection.query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        [table]
+        checkTableSQL.sql,
+        checkTableSQL.params
       );
 
       if (tableCheck.results.length === 0) {
@@ -84,9 +84,7 @@ export class DatabaseTruncateTableNode extends ExecutableNode {
 
       validateIdentifier(table as string, "table name");
 
-      // Delete all rows from the table
-      // SQLite doesn't have TRUNCATE, so we use DELETE
-      const result = await connection.execute(`DELETE FROM ${table}`);
+      const result = await connection.execute(`TRUNCATE TABLE ${table}`);
 
       const deleted = result.meta?.rowsAffected ?? 0;
 

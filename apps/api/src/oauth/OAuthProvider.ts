@@ -157,12 +157,12 @@ export abstract class OAuthProvider<
     c.set("organizationId", state.organizationId);
 
     // Verify organization exists
-    const db = createDatabase(c.env.DB);
-    const org = await db
+    const db = createDatabase(c.env);
+    const [org] = await db
       .select({ id: organizations.id })
       .from(organizations)
       .where(eq(organizations.id, state.organizationId))
-      .get();
+      .limit(1);
 
     if (!org) {
       throw new OAuthError(
@@ -401,7 +401,7 @@ export abstract class OAuthProvider<
     user: TUser,
     env: Bindings
   ): Promise<void> {
-    const db = createDatabase(env.DB);
+    const db = createDatabase(env);
     const integrationName = this.formatIntegrationName(user);
     const metadata = this.formatUserMetadata(user);
 

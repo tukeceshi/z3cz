@@ -1,17 +1,38 @@
 # Dafthunk 本地开发编排
 #
-# 端口：营销站 3100 | 产品 3101 | API 3102
+# 端口：营销站 3100 | 产品 3101 | API 3102 | Postgres 5432
 # 快速启动见 README.md 或 docker/README.md
 
 services:
+  supabase-db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - dafthunk_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   dev:
     build:
       context: .
       dockerfile: Dockerfile
       target: dev
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.19.0}
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
         PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3100:3100"
       - "3101:3101"
@@ -20,9 +41,13 @@ services:
       - .:/app
       - dafthunk_node_modules:/app/node_modules
       - dafthunk_pnpm_store:/pnpm/store
+      - dafthunk_local_storage:/app/data/storage
     environment:
-      CI: "true"
       RUN_DB_MIGRATE: ${RUN_DB_MIGRATE:-true}
+      # 容器内固定使用 compose 服务名；勿用宿主机 .env 里的 localhost
+      DATABASE_URL: postgresql://postgres:postgres@supabase-db:5432/postgres
+      LOCAL_STORAGE_PATH: /app/data/storage
+      HOST: 0.0.0.0
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     command: pnpm dev:docker
@@ -36,7 +61,7 @@ services:
       dockerfile: Dockerfile
       target: dev
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.19.0}
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
         PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
     ports:
       - "3100:3100"
@@ -53,7 +78,7 @@ services:
       dockerfile: Dockerfile
       target: dev
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.19.0}
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
         PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
     ports:
       - "3101:3101"
@@ -70,7 +95,7 @@ services:
       dockerfile: Dockerfile
       target: dev
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.19.0}
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
         PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
     ports:
       - "3102:3102"
@@ -83,3 +108,5 @@ services:
 volumes:
   dafthunk_node_modules:
   dafthunk_pnpm_store:
+  dafthunk_postgres_data:
+  dafthunk_local_storage:

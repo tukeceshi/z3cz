@@ -2,13 +2,23 @@
 
 > Break it, fix it, prompt it, automatic, automatic, ...
 
-基于 Cloudflare 基础设施构建的可视化工作流自动化平台。
+基于 Cloudflare 与 Node 双运行时构建的可视化工作流自动化平台。**本地开发与实验性自托管**使用 Docker + Node API + Postgres；**线上生产**仍可部署至 Cloudflare Workers。
 
 ![Workflow](./images/workflow.png)
 
 ## 概览
 
-[Daf·thunk](https://en.wikipedia.org/wiki/Thunk) 是一个可视化工作流自动化平台，支持在浏览器中创建、管理和执行工作流。平台基于 Cloudflare Workers、D1、R2、AI 等能力，提供无服务器执行与持久化存储。
+[Daf·thunk](https://en.wikipedia.org/wiki/Thunk) 是一个可视化工作流自动化平台，支持在浏览器中创建、管理和执行工作流。本地开发通过 Docker 运行 Node API、Postgres 与本地对象存储；生产环境可部署至 Cloudflare Workers，数据库使用 Supabase Postgres。
+
+## 更新说明
+
+| 日期 | 说明 |
+|------|------|
+| 2026-07-07 | **Node 本地运行时**：API 从 Cloudflare Workers 迁移为 Hono + `@hono/node-server`；D1/R2/DO/Queue 等绑定替换为 Postgres、本地 FS 与进程内实现；新增入站邮件 webhook、SMTP 网关、实验性 `docker-compose.prod.yml`（含 www Node SSR）。 |
+| 2026-07-06 | Docker 生产编排、`pnpm prod:up`、Nginx 静态 app 与 API 容器镜像。 |
+| 2026-07-05 | Docker 开发栈（3100/3101/3102）、Postgres 迁移与编辑器 WebSocket Node 路径。 |
+
+> 详细 Docker 用法见 [docker/README.md](docker/README.md)。
 
 可视化编辑器基于 [React Flow](https://reactflow.dev/)，通过连接多种节点类型（含 AI 节点）构建复杂工作流。
 
@@ -16,9 +26,8 @@
 
 - **可视化工作流编辑器**：拖拽式界面，无需编写代码即可编排流程
 - **AI 节点**：文本摘要、情感分析、翻译、图像分类、语音转写、图像生成等
-- **无服务器执行**：工作流在 Cloudflare 全球网络上运行
-- **实时监控**：通过 UI 或 API 查看执行状态与结果
-- **持久化存储**：执行数据存储于 Cloudflare D1 与 R2
+- **双运行时**：本地 Node + Docker；线上 Cloudflare Workers（可选）
+- **持久化存储**：元数据在 Postgres；对象默认本地 FS（线上为 R2）
 - **触发器与集成**：HTTP API、邮件、队列、Bot 等多种触发方式
 
 ## 技术栈
@@ -28,16 +37,16 @@
 - **pnpm** — Monorepo 包管理
 - **TypeScript** — 静态类型
 - **Vitest** — 单元与集成测试
-- **Docker** — 本地开发容器化
-- **Cloudflare** — 边缘部署与运行时
+- **Docker** — 本地开发与实验性自托管
+- **Cloudflare** — 线上边缘部署（可选）
 
 ### 后端
 
 - **Hono** — REST API 框架
-- **Cloudflare Workers** — 无服务器执行
-- **Cloudflare D1** — SQLite 数据库
-- **Cloudflare R2** — 对象存储
-- **Cloudflare AI** — 模型推理
+- **Node.js** — 本地 API 运行时（`@hono/node-server`）
+- **Cloudflare Workers** — 线上 API 运行时（可选）
+- **Supabase Postgres** — 主数据库（Drizzle ORM）
+- **本地 FS / Cloudflare R2** — 对象存储（环境相关）
 - **Drizzle ORM** — 类型安全数据库操作
 - **Zod** — 运行时校验
 
@@ -80,18 +89,18 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 **3. 生成并填写密钥**
 
 ```bash
-docker compose run --rm dev node apps/api/scripts/generate-master-key.js
+docker compose run --rm -e RUN_DB_MIGRATE=false dev node apps/api/scripts/generate-master-key.js
 ```
 
-将输出的 `SECRET_MASTER_KEY` 写入 `apps/api/.dev.vars`。同时设置至少 32 字符的 `JWT_SECRET`：
+将输出的 `SECRET_MASTER_KEY` 与 `JWT_SECRET` 写入 `apps/api/.dev.vars`：
 
 ```env
 WEB_HOST=http://localhost:3101
 WEBSITE_URL=http://localhost:3100
 CLOUDFLARE_ENV=development
 
-JWT_SECRET=你的_32_字符以上_随机字符串
-SECRET_MASTER_KEY=上一步生成的_64_位_hex
+JWT_SECRET=脚本输出的_JWT_SECRET
+SECRET_MASTER_KEY=脚本输出的_SECRET_MASTER_KEY
 ```
 
 **4. 启动开发栈**
@@ -100,7 +109,7 @@ SECRET_MASTER_KEY=上一步生成的_64_位_hex
 docker compose --env-file .env.docker up --build
 ```
 
-容器会自动安装依赖并执行本地 D1 迁移。
+容器会自动安装依赖、启动 Postgres 并执行数据库迁移。
 
 **5. 打开浏览器**
 
@@ -156,7 +165,7 @@ docker compose run --rm dev pnpm test
 
 Monorepo（pnpm workspaces）：
 
-- **`apps/api/`** — Cloudflare Workers API
+- **`apps/api/`** — Hono API（本地 Node / 线上 Workers）
   - `/src/routes/` — REST 路由
   - `/src/db/` — 数据库 schema 与迁移
   - `/src/runtime/` — 工作流运行时
@@ -165,6 +174,7 @@ Monorepo（pnpm workspaces）：
   - `/src/pages/` — 页面与路由
   - `/src/services/` — API 客户端
 - **`apps/www/`** — 营销站（React Router SSR）
+- **`apps/smtp-gateway/`** — 入站 SMTP 网关（自托管）
 - **`packages/types/`** — 共享类型
 - **`packages/utils/`** — 共享工具
 - **`packages/runtime/`** — 工作流节点运行时
@@ -217,35 +227,42 @@ pnpm --filter '@dafthunk/types' build
 
 ### 数据库
 
-使用 Cloudflare D1（SQLite）+ Drizzle ORM。Docker 启动时会自动迁移；也可手动执行：
+使用 **Supabase Postgres** + Drizzle ORM。Docker 启动时会自动迁移；也可手动执行：
 
 ```bash
-# 应用本地迁移
+# 应用本地迁移（需 Postgres 运行，Docker 内默认连 supabase-db）
 docker compose run --rm dev pnpm --filter '@dafthunk/api' db:migrate
 
-# 重置本地数据库（危险）
-docker compose run --rm dev pnpm --filter '@dafthunk/api' db:reset
-
-# 生成新迁移
+# 从 schema 生成新迁移
 docker compose run --rm dev pnpm --filter '@dafthunk/api' db:generate
+
+# 打开 Drizzle Studio
+docker compose run --rm -p 4983:4983 dev pnpm --filter '@dafthunk/api' db:studio
 ```
 
-查询本地 D1：
+本地连接串（Docker 默认）：
 
-```bash
-docker compose run --rm dev npx wrangler d1 execute DB --local --command "SELECT name FROM sqlite_master WHERE type='table';"
+```env
+DATABASE_URL=postgresql://postgres:postgres@supabase-db:5432/postgres
 ```
 
-#### 生产环境
+#### 生产环境（Supabase + Hyperdrive）
+
+1. 在 [supabase.com](https://supabase.com) 创建项目
+2. 复制 **Transaction pooler** 连接串（端口 6543）
+3. 在 Cloudflare Dashboard 创建 **Hyperdrive**，指向该连接串
+4. 将 Hyperdrive ID 写入 `apps/api/wrangler.jsonc` 生产环境配置
+5. 对 Supabase 数据库执行迁移：
 
 ```bash
-pnpm --filter '@dafthunk/api' db:prod:migrate
-pnpm --filter '@dafthunk/api' db:prod:reset   # 极度谨慎
+DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 ```
 
 ### 队列
 
-本地开发使用 `wrangler.jsonc` 中已配置的 Queue 绑定，无需手动创建 Cloudflare Queue。
+**Node / Docker**：进程内队列，无需 Cloudflare Queue。
+
+**Cloudflare 生产**：使用 `wrangler.jsonc` 中的 Queue 绑定。
 
 使用流程：
 
@@ -256,12 +273,22 @@ pnpm --filter '@dafthunk/api' db:prod:reset   # 极度谨慎
 
 ## 部署
 
-主分支通过 GitHub Actions 自动部署至 Cloudflare：
+### Docker 自托管（实验性）
+
+```bash
+pnpm prod:env && pnpm prod:up
+```
+
+详见 [docker/README.md](docker/README.md#实验性生产栈容器内构建)。
+
+### Cloudflare 生产
+
+主分支可通过 GitHub Actions 部署至 Cloudflare：
 
 - **API** — Cloudflare Workers
 - **产品 UI** — Cloudflare Workers
 - **营销站** — Cloudflare Workers
-- **数据库** — Cloudflare D1（自动迁移）
+- **数据库** — Supabase Postgres（经 Cloudflare Hyperdrive）
 - **存储** — Cloudflare R2
 
 ### 生产密钥

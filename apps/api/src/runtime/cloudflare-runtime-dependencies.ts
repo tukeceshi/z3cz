@@ -2,7 +2,7 @@
  * Shared Cloudflare runtime dependency construction.
  *
  * Both WorkerRuntime and WorkflowRuntime use the same production services
- * (node registry, credential provider, object store, etc.) — they only
+ * (node registry, credential provider, object store, etc.) �?they only
  * differ in monitoring strategy. This module constructs the common
  * dependency bag once and is used by both runtime factories.
  */
@@ -17,7 +17,7 @@ import { createDatabase } from "../db";
 import { creditChecksEnabled } from "../utils/credits";
 import { CloudflareCredentialService } from "./cloudflare-credential-service";
 import { CloudflareCreditService } from "./cloudflare-credit-service";
-import { CloudflareDatabaseService } from "./cloudflare-database-service";
+import { PostgresDatabaseService } from "./postgres-database-service";
 import { CloudflareDatasetService } from "./cloudflare-dataset-service";
 import { CloudflareExecutionStore } from "./cloudflare-execution-store";
 import { CloudflareMailboxService } from "./cloudflare-mailbox-service";
@@ -44,13 +44,13 @@ export function buildDependencies(
     buildPresignedUrlConfig(env)
   );
   const credentialProvider = new CloudflareCredentialService(env);
-  const databaseService = new CloudflareDatabaseService(env);
+  const databaseService = new PostgresDatabaseService(env);
   const datasetService = new CloudflareDatasetService(env);
   const queueService = new CloudflareQueueService(env);
   const schemaService = new CloudflareSchemaService(env);
   const mailboxService = new CloudflareMailboxService(env);
   const codeModeExecutor = createCodeModeExecutor(env) ?? undefined;
-  // One sandbox container per execution — fresh ID isolates runs from each other
+  // One sandbox container per execution �?fresh ID isolates runs from each other
   // while reusing the same sandbox across nodes within a run.
   const sandboxExecutor =
     createSandboxExecutor(env, `exec-${crypto.randomUUID()}`) ?? undefined;
@@ -75,7 +75,7 @@ export function buildDependencies(
     monitoringService,
     creditService: new CloudflareCreditService(
       env.KV,
-      createDatabase(env.DB),
+      createDatabase(env),
       !creditChecksEnabled(env.CLOUDFLARE_ENV)
     ),
     objectStore,

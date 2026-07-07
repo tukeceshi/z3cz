@@ -1,6 +1,6 @@
 import { JWTTokenPayload } from "@dafthunk/types";
 
-import { getApiBaseUrl } from "@/config/api";
+import { buildApiUrl } from "@/config/api";
 
 // Track if we're currently refreshing to avoid multiple simultaneous refresh attempts
 let isRefreshing = false;
@@ -67,7 +67,7 @@ export const makeRequest = async <T>(
   options: RequestInit = {},
   skipRefresh = false
 ): Promise<T> => {
-  const fullUrl = `${getApiBaseUrl()}${endpoint}`;
+  const fullUrl = buildApiUrl(endpoint);
 
   const defaultHeaders: HeadersInit = {
     "Content-Type": "application/json",

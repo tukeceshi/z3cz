@@ -67,7 +67,7 @@ describe("DatabasePutRowNode", () => {
     expect(result.status).toBe("completed");
     expect(result.outputs?.success).toBe(true);
     expect(connection.execute).toHaveBeenCalledWith(
-      "INSERT OR REPLACE INTO users (id, name, email) VALUES (?, ?, ?)",
+      "INSERT INTO users (id, name, email) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email",
       [1, "Alice", "alice@example.com"]
     );
   });
@@ -85,7 +85,7 @@ describe("DatabasePutRowNode", () => {
 
     expect(result.status).toBe("completed");
     expect(connection.execute).toHaveBeenCalledWith(
-      "INSERT OR REPLACE INTO users (id, name) VALUES (?, ?)",
+      "INSERT INTO users (id, name) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name",
       [2, "Bob"]
     );
   });
@@ -110,7 +110,7 @@ describe("DatabasePutRowNode", () => {
 
     expect(result.status).toBe("completed");
     expect(connection.execute).toHaveBeenCalledWith(
-      "INSERT OR REPLACE INTO items (slug, title) VALUES (?, ?)",
+      "INSERT INTO items (slug, title) VALUES (?, ?) ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title",
       ["hello-world", "Hello World"]
     );
   });

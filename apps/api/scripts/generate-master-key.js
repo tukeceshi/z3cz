@@ -1,23 +1,26 @@
 /**
- * Script to generate a secure master key for secrets encryption
- * Run this once and store the result securely in your environment variables
+ * Generate local development secrets for apps/api/.dev.vars
+ * Run once and store the output securely (never commit to version control).
  */
 
-// Generate a secure 32-byte (256-bit) key
-const keyBytes = new Uint8Array(32);
-crypto.getRandomValues(keyBytes);
+function generateHexKey(byteLength) {
+  const keyBytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(keyBytes);
+  return Array.from(keyBytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
-// Convert to hex string
-const masterKey = Array.from(keyBytes)
-  .map((byte) => byte.toString(16).padStart(2, "0"))
-  .join("");
+const secretMasterKey = generateHexKey(32);
+const jwtSecret = generateHexKey(32);
 
-console.log("Generated master key (store this securely):");
-console.log(masterKey);
+console.log("Generated development secrets (store these securely):");
 console.log("");
-console.log("Add this to your environment variables as:");
-console.log(`SECRET_MASTER_KEY=${masterKey}`);
+console.log(`SECRET_MASTER_KEY=${secretMasterKey}`);
+console.log(`JWT_SECRET=${jwtSecret}`);
+console.log("");
+console.log("Add both lines to apps/api/.dev.vars");
 console.log("");
 console.log(
-  "⚠️  IMPORTANT: Store this key securely and never commit it to version control!"
+  "⚠️  IMPORTANT: Store these values securely and never commit them to version control!"
 );

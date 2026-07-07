@@ -210,14 +210,13 @@ export interface IntegrationInfo {
 }
 
 export interface NodeEnv {
-  DB: D1Database;
+  DATABASE_URL?: string;
+  HYPERDRIVE?: Hyperdrive;
   AI: Ai;
   AI_OPTIONS: AiOptions;
   RESSOURCES: R2Bucket;
   DATASETS: R2Bucket;
   DATASETS_AUTORAG: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  DATABASE: DurableObjectNamespace<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   AGENT_RUNNER: DurableObjectNamespace<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

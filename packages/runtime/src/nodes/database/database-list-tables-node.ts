@@ -1,5 +1,6 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { NodeExecution, NodeType } from "@dafthunk/types";
+import { generateListTablesSQL } from "../../utils/database-table";
 
 export class DatabaseListTablesNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
@@ -54,9 +55,10 @@ export class DatabaseListTablesNode extends ExecutableNode {
         );
       }
 
-      // Query sqlite_master for all tables
+      const listTablesSQL = generateListTablesSQL();
       const result = await connection.query(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        listTablesSQL.sql,
+        listTablesSQL.params
       );
 
       // Extract table names from results

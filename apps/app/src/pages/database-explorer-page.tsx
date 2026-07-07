@@ -161,7 +161,7 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
     const edgeList: Edge[] = tables.flatMap((table) =>
       table.foreignKeys
         .map((fk) => {
-          // When REFERENCES omits the column, SQLite returns empty string;
+          // When REFERENCES omits the column, Postgres may return null;
           // fall back to the primary key column of the referenced table.
           let targetCol = fk.referencedColumn;
           if (!targetCol) {

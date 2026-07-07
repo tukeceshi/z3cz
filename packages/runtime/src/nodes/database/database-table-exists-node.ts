@@ -1,6 +1,6 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { NodeExecution, NodeType } from "@dafthunk/types";
-import { validateIdentifier } from "../../utils/database-table";
+import { generateCheckTableExistsSQL, validateIdentifier } from "../../utils/database-table";
 
 export class DatabaseTableExistsNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
@@ -67,10 +67,10 @@ export class DatabaseTableExistsNode extends ExecutableNode {
 
       validateIdentifier(table as string, "table name");
 
-      // Check if table exists
+      const checkTableSQL = generateCheckTableExistsSQL(table as string);
       const result = await connection.query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        [table]
+        checkTableSQL.sql,
+        checkTableSQL.params
       );
 
       const exists = result.results.length > 0;

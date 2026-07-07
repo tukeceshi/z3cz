@@ -1,4 +1,3 @@
-import { getSandbox } from "@cloudflare/sandbox";
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type {
   Field,
@@ -101,6 +100,7 @@ export class ParquetQueryNode extends ExecutableNode {
     }
 
     try {
+      const { getSandbox } = await import("@cloudflare/sandbox");
       const sandbox = getSandbox(sandboxBinding, context.organizationId);
 
       // DuckDB and httpfs are pre-installed in the container image.

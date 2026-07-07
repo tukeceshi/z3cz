@@ -1,8 +1,10 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { Field, NodeExecution, NodeType, Schema } from "@dafthunk/types";
 import {
-  mapSqliteToType,
-  type PragmaTableInfoRow,
+  generateDescribeTableColumnsSQL,
+  generateUniqueColumnNamesSQL,
+  mapPostgresToType,
+  type ColumnInfoRow,
   validateIdentifier,
 } from "../../utils/database-table";
 
@@ -15,7 +17,7 @@ export class DatabaseDescribeTableNode extends ExecutableNode {
     tags: ["Database", "Schema", "Describe"],
     icon: "database",
     documentation:
-      "Describes a database table by returning its field definitions. Uses database introspection (PRAGMA table_info) to get field names and types. Useful for understanding table structure without fetching data.",
+      "Describes a database table by returning its field definitions. Uses Postgres catalog introspection to get field names and types. Useful for understanding table structure without fetching data.",
     asTool: true,
     inputs: [
       {
@@ -44,7 +46,6 @@ export class DatabaseDescribeTableNode extends ExecutableNode {
   async execute(context: NodeContext): Promise<NodeExecution> {
     const { database, table } = context.inputs;
 
-    // Validate required inputs
     if (!database) {
       return this.createErrorResult("'database' is a required input.");
     }
@@ -71,9 +72,10 @@ export class DatabaseDescribeTableNode extends ExecutableNode {
 
       validateIdentifier(table as string, "table name");
 
-      // Use PRAGMA table_info to get schema information
+      const describeSQL = generateDescribeTableColumnsSQL(table as string);
       const schemaResult = await connection.query(
-        `PRAGMA table_info(${table})`
+        describeSQL.sql,
+        describeSQL.params
       );
 
       if (!schemaResult.results || schemaResult.results.length === 0) {
@@ -82,38 +84,24 @@ export class DatabaseDescribeTableNode extends ExecutableNode {
         );
       }
 
-      // Map schema results to Field format
-      // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-      const rows = schemaResult.results as unknown as PragmaTableInfoRow[];
-
-      // Collect unique columns from single-column unique indexes
+      const rows = schemaResult.results as ColumnInfoRow[];
       const uniqueColumns = new Set<string>();
       try {
-        const indexList = await connection.query(`PRAGMA index_list(${table})`);
-        if (indexList.results) {
-          for (const idx of indexList.results as unknown as Array<{
-            name: string;
-            unique: number;
-          }>) {
-            if (!idx.unique) continue;
-            const indexInfo = await connection.query(
-              `PRAGMA index_info(${idx.name})`
-            );
-            if (indexInfo.results && indexInfo.results.length === 1) {
-              const col = indexInfo.results[0] as unknown as {
-                name: string;
-              };
-              uniqueColumns.add(col.name);
-            }
-          }
+        const uniqueSQL = generateUniqueColumnNamesSQL(table as string);
+        const uniqueResult = await connection.query(
+          uniqueSQL.sql,
+          uniqueSQL.params
+        );
+        for (const row of uniqueResult.results as { name: string }[]) {
+          uniqueColumns.add(row.name);
         }
       } catch {
-        // PRAGMA index_list may not be available; proceed without unique info
+        // Unique index introspection is best-effort.
       }
 
       const fields: Field[] = rows.map((col) => ({
         name: col.name,
-        type: mapSqliteToType(col.type || "TEXT"),
+        type: mapPostgresToType(col.type || "text"),
         ...(col.pk ? { primaryKey: true } : {}),
         ...(!col.pk && uniqueColumns.has(col.name) ? { unique: true } : {}),
       }));

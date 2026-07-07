@@ -49,6 +49,12 @@ importers:
       '@hono-rate-limiter/cloudflare':
         specifier: ^0.2.2
         version: 0.2.2(@cloudflare/workers-types@4.20260511.1)(hono@4.12.26)
+      '@hono/node-server':
+        specifier: ^1.19.9
+        version: 1.19.14(hono@4.12.26)
+      '@hono/node-ws':
+        specifier: ^1.2.0
+        version: 1.3.1(@hono/node-server@1.19.14(hono@4.12.26))(bufferutil@4.1.0)(hono@4.12.26)(utf-8-validate@6.0.6)
       '@hono/oauth-providers':
         specifier: ^0.8.5
         version: 0.8.5(hono@4.12.26)
@@ -66,10 +72,13 @@ importers:
         version: 5.5.0
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)
+        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(postgres@3.4.9)
       hono:
         specifier: ^4.12.26
         version: 4.12.26
+      hono-rate-limiter:
+        specifier: ^0.4.2
+        version: 0.4.2(hono@4.12.26)
       jose:
         specifier: ^6.2.3
         version: 6.2.3
@@ -82,12 +91,18 @@ importers:
       postal-mime:
         specifier: ^2.7.4
         version: 2.7.4
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
       stripe:
         specifier: ^20.4.1
         version: 20.4.1(@types/node@22.19.19)
       uuid:
         specifier: ^13.0.2
         version: 13.0.2
+      ws:
+        specifier: '>=8.20.1'
+        version: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -101,12 +116,18 @@ importers:
       '@types/node':
         specifier: ^22.19.19
         version: 22.19.19
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10
       partyserver:
         specifier: ^0.5.6
         version: 0.5.6(@cloudflare/workers-types@4.20260511.1)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -304,8 +325,27 @@ importers:
         specifier: ^4.90.1
         version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
+  apps/smtp-gateway:
+    dependencies:
+      smtp-server:
+        specifier: ^3.13.6
+        version: 3.19.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   apps/www:
     dependencies:
+      '@react-router/node':
+        specifier: ^7.18.0
+        version: 7.18.0(react-router@7.18.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -343,6 +383,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.0
         version: 4.3.0(vite@7.3.5(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
@@ -1326,6 +1369,13 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/node-ws@1.3.1':
+    resolution: {integrity: sha512-vo/MwCnpJAVHBkGzWjCJ28wF45fYHAfbPZcH2rodZODHtch2GHA94KtMfusmVycTUtsLAsaNsHhtY6P8X3RQsA==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      '@hono/node-server': ^1.19.11
+      hono: ^4.6.0
 
   '@hono/oauth-providers@0.8.5':
     resolution: {integrity: sha512-hgEDH/gUmB/opman9jvT8dLItZsSC9M9yFiaam0b6InK7WQkdzIcaRAkdda47QpixnK9S1Ah2vjDB2U16LkMnA==}
@@ -3153,6 +3203,9 @@ packages:
   '@types/wellknown@0.5.8':
     resolution: {integrity: sha512-/tXv+IfentaS3F0VplScdl+pwP7biW4RBnOxCTtoWlpNiulFBQWqA8rA7r/knavu9SELsFcNVtdGo6YNIElMdw==}
 
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@ungap/structured-clone@1.3.1':
     resolution: {integrity: sha512-mUFwbeTqrVgDQxFveS+df2yfap6iuP20NAKAsBt5jDEoOTDew+zwLAOilHCeQJOVSvmgCX4ogqIrA0mnyr08yQ==}
 
@@ -4022,6 +4075,11 @@ packages:
   hast-util-whitespace@3.0.0:
     resolution: {integrity: sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw==}
 
+  hono-rate-limiter@0.4.2:
+    resolution: {integrity: sha512-AAtFqgADyrmbDijcRTT/HJfwqfvhalya2Zo+MgfdrMPas3zSMD8SU03cv+ZsYwRU1swv7zgVt0shwN059yzhjw==}
+    peerDependencies:
+      hono: ^4.1.1
+
   hono@4.12.26:
     resolution: {integrity: sha512-uyZtpnYxM9CmQ7QsQknM4zN8EftNqhON1qYeIKM0Se67CCEe2c44xyGURwB0axX2fBDu1dqHrHAc1hmNT8ITkw==}
     engines: {node: '>=16.9.0'}
@@ -4074,6 +4132,9 @@ packages:
   ipaddr.js@1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
+
+  ipv6-normalize@1.0.1:
+    resolution: {integrity: sha512-Bm6H79i01DjgGTCWjUuCjJ6QDo1HB96PT/xCYuyJUP9WFbVDrLSbG4EZCvOCun2rNswZb0c3e4Jt/ws795esHA==}
 
   is-alphabetical@2.0.1:
     resolution: {integrity: sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==}
@@ -4498,6 +4559,10 @@ packages:
   node-releases@2.0.44:
     resolution: {integrity: sha512-5WUyunoPMsvvEhS8AxHtRzP+oA8UCkJ7YRxatWKjngndhDGLiqEVAQKWjFAiAiuL8zMRGzGSJxFnLetoa43qGQ==}
 
+  nodemailer@9.0.3:
+    resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
+    engines: {node: '>=6.0.0'}
+
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
@@ -4625,6 +4690,10 @@ packages:
     resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postgres@3.4.9:
+    resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
+    engines: {node: '>=12'}
+
   prettier@3.8.3:
     resolution: {integrity: sha512-7igPTM53cGHMW8xWuVTydi2KO233VFiTNyF5hLJqpilHfmn8C8gPf+PS7dUT64YcXFbiMGZxS9pCSxL/Dxm/Jw==}
     engines: {node: '>=14'}
@@ -4653,6 +4722,10 @@ packages:
   proxy-from-env@2.1.0:
     resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
     engines: {node: '>=10'}
+
+  punycode.js@2.3.1:
+    resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
+    engines: {node: '>=6'}
 
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
@@ -4924,6 +4997,10 @@ packages:
   smol-toml@1.6.1:
     resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
     engines: {node: '>= 18'}
+
+  smtp-server@3.19.2:
+    resolution: {integrity: sha512-kZVHvcynQ/Nq7EscK02OjbivmdGtlmhGXYgDjZDCTu4RPyuW3OijuGcLuzXbPvGs6drdATWoVhKOIIueLhJ8rQ==}
+    engines: {node: '>=18.18.0'}
 
   sonner@2.0.7:
     resolution: {integrity: sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w==}
@@ -5352,18 +5429,6 @@ packages:
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
-
-  ws@8.20.1:
-    resolution: {integrity: sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
 
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
@@ -6147,7 +6212,7 @@ snapshots:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.6.4
-      ws: 8.20.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
     transitivePeerDependencies:
@@ -6169,6 +6234,15 @@ snapshots:
   '@hono/node-server@1.19.14(hono@4.12.26)':
     dependencies:
       hono: 4.12.26
+
+  '@hono/node-ws@1.3.1(@hono/node-server@1.19.14(hono@4.12.26))(bufferutil@4.1.0)(hono@4.12.26)(utf-8-validate@6.0.6)':
+    dependencies:
+      '@hono/node-server': 1.19.14(hono@4.12.26)
+      hono: 4.12.26
+      ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@hono/oauth-providers@0.8.5(hono@4.12.26)':
     dependencies:
@@ -8638,6 +8712,10 @@ snapshots:
 
   '@types/wellknown@0.5.8': {}
 
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 22.19.19
+
   '@ungap/structured-clone@1.3.1': {}
 
   '@vercel/oidc@3.2.0': {}
@@ -9103,10 +9181,11 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.21.0
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(postgres@3.4.9):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260511.1
       '@opentelemetry/api': 1.9.1
+      postgres: 3.4.9
 
   dunder-proto@1.0.1:
     dependencies:
@@ -9499,6 +9578,10 @@ snapshots:
     dependencies:
       '@types/hast': 3.0.4
 
+  hono-rate-limiter@0.4.2(hono@4.12.26):
+    dependencies:
+      hono: 4.12.26
+
   hono@4.12.26: {}
 
   html-url-attributes@3.0.1: {}
@@ -9546,6 +9629,8 @@ snapshots:
   ip-address@10.2.0: {}
 
   ipaddr.js@1.9.1: {}
+
+  ipv6-normalize@1.0.1: {}
 
   is-alphabetical@2.0.1: {}
 
@@ -10070,6 +10155,8 @@ snapshots:
 
   node-releases@2.0.44: {}
 
+  nodemailer@9.0.3: {}
+
   object-assign@4.1.1: {}
 
   object-inspect@1.13.4: {}
@@ -10205,6 +10292,8 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  postgres@3.4.9: {}
+
   prettier@3.8.3: {}
 
   process-nextick-args@1.0.7: {}
@@ -10238,6 +10327,8 @@ snapshots:
       ipaddr.js: 1.9.1
 
   proxy-from-env@2.1.0: {}
+
+  punycode.js@2.3.1: {}
 
   qs@6.15.2:
     dependencies:
@@ -10617,6 +10708,12 @@ snapshots:
   skmeans@0.9.7: {}
 
   smol-toml@1.6.1: {}
+
+  smtp-server@3.19.2:
+    dependencies:
+      ipv6-normalize: 1.0.1
+      nodemailer: 9.0.3
+      punycode.js: 2.3.1
 
   sonner@2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
@@ -11029,11 +11126,6 @@ snapshots:
       strip-ansi: 7.2.0
 
   wrappy@1.0.2: {}
-
-  ws@8.20.1(bufferutil@4.1.0)(utf-8-validate@6.0.6):
-    optionalDependencies:
-      bufferutil: 4.1.0
-      utf-8-validate: 6.0.6
 
   ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:

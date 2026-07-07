@@ -31,7 +31,7 @@ invitationRoutes.get("/", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   // Get user's email from JWT or lookup
   const userEmail = jwtPayload.email;
@@ -67,7 +67,7 @@ invitationRoutes.post("/:id/accept", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const invitationId = c.req.param("id");
 
   try {
@@ -102,7 +102,7 @@ invitationRoutes.post("/:id/decline", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const invitationId = c.req.param("id");
 
   try {

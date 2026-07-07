@@ -131,7 +131,25 @@ export class CloudflareExecutionStore implements ExecutionStore {
     organizationId: string,
     options?: ListExecutionsOptions
   ): Promise<ExecutionRow[]> {
+    if (this.env.RUNTIME === "node" || !this.canQueryAnalytics()) {
+      return this.listFromObjectStorage(organizationId, options);
+    }
     return this.listFromAnalytics(organizationId, options);
+  }
+
+  private isPlaceholderCredential(value: string | undefined): boolean {
+    if (!value) {
+      return true;
+    }
+    const normalized = value.trim();
+    return normalized === "" || normalized === "CHANGE_ME";
+  }
+
+  private canQueryAnalytics(): boolean {
+    return (
+      !this.isPlaceholderCredential(this.env.CLOUDFLARE_ACCOUNT_ID) &&
+      !this.isPlaceholderCredential(this.env.CLOUDFLARE_API_TOKEN)
+    );
   }
 
   /**
@@ -292,12 +310,110 @@ export class CloudflareExecutionStore implements ExecutionStore {
   }
 
   /**
+   * List executions from object storage (Node runtime / no Analytics credentials).
+   */
+  private async listFromObjectStorage(
+    organizationId: string,
+    options?: ListExecutionsOptions
+  ): Promise<ExecutionRow[]> {
+    if (!this.env.RESSOURCES) {
+      return [];
+    }
+
+    try {
+      const listed = await this.env.RESSOURCES.list({
+        prefix: "executions/",
+      });
+
+      const rows: ExecutionRow[] = [];
+
+      for (const object of listed.objects) {
+        if (!object.key.endsWith("/execution.json")) {
+          continue;
+        }
+
+        const storedOrgId = object.customMetadata?.organizationId;
+        if (storedOrgId && storedOrgId !== organizationId) {
+          continue;
+        }
+
+        const storedWorkflowId = object.customMetadata?.workflowId;
+        if (options?.workflowId && storedWorkflowId !== options.workflowId) {
+          continue;
+        }
+
+        const storedStatus = object.customMetadata?.status;
+        if (options?.status && storedStatus !== options.status) {
+          continue;
+        }
+
+        const executionId = object.key.split("/")[1];
+        if (!executionId) {
+          continue;
+        }
+
+        try {
+          const executionData = await this.readFromR2(
+            executionId,
+            organizationId
+          );
+          const row = this.executionDataToRow(executionData, organizationId);
+
+          if (options?.startDate) {
+            const start = new Date(`${options.startDate}T00:00:00.000Z`);
+            if (row.startedAt && row.startedAt < start) {
+              continue;
+            }
+          }
+
+          if (options?.endDate) {
+            const end = new Date(`${options.endDate}T23:59:59.999Z`);
+            if (row.startedAt && row.startedAt > end) {
+              continue;
+            }
+          }
+
+          rows.push(row);
+        } catch (error) {
+          console.warn(
+            `ExecutionStore.listFromObjectStorage: skipping ${executionId}:`,
+            error
+          );
+        }
+      }
+
+      rows.sort(
+        (a, b) =>
+          (b.startedAt?.getTime() ?? b.updatedAt.getTime()) -
+          (a.startedAt?.getTime() ?? a.updatedAt.getTime())
+      );
+
+      const offset = options?.offset ?? 0;
+      const limit = options?.limit ?? 20;
+      return rows.slice(offset, offset + limit);
+    } catch (error) {
+      console.error(
+        "ExecutionStore.listFromObjectStorage: Failed to list executions:",
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
    * List executions from Analytics Engine (use Analytics Engine for querying/filtering)
    */
   private async listFromAnalytics(
     organizationId: string,
     options?: ListExecutionsOptions
   ): Promise<ExecutionRow[]> {
+    if (!this.canQueryAnalytics()) {
+      console.warn(
+        "ExecutionStore.listFromAnalytics: Analytics Engine unavailable — returning empty list. Configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to enable execution history."
+      );
+      return [];
+    }
+
     try {
       const dataset = this.getDatasetName();
 
@@ -369,6 +485,14 @@ export class CloudflareExecutionStore implements ExecutionStore {
         };
       });
     } catch (error) {
+      if (this.env.CLOUDFLARE_ENV === "development") {
+        console.warn(
+          "ExecutionStore.listFromAnalytics: Analytics query failed in development — returning empty list:",
+          error instanceof Error ? error.message : error
+        );
+        return [];
+      }
+
       console.error(
         `ExecutionStore.listFromAnalytics: Failed to list executions:`,
         error

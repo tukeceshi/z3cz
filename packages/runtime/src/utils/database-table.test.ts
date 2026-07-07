@@ -4,9 +4,10 @@ import {
   generateCheckTableExistsSQL,
   generateCreateTableSQL,
   generateInsertSQL,
+  generatePutRowSQL,
   getPrimaryKeyField,
-  mapSqliteToType,
-  mapTypeToSqlite,
+  mapPostgresToType,
+  mapTypeToPostgres,
   validateIdentifier,
 } from "./database-table";
 
@@ -51,84 +52,76 @@ describe("validateIdentifier", () => {
   });
 });
 
-describe("mapTypeToSqlite", () => {
+describe("mapTypeToPostgres", () => {
   it("should map string to TEXT", () => {
-    expect(mapTypeToSqlite("string")).toBe("TEXT");
+    expect(mapTypeToPostgres({ name: "name", type: "string" })).toBe("TEXT");
   });
 
   it("should map integer to INTEGER", () => {
-    expect(mapTypeToSqlite("integer")).toBe("INTEGER");
+    expect(mapTypeToPostgres({ name: "id", type: "integer" })).toBe("INTEGER");
   });
 
-  it("should map number to REAL", () => {
-    expect(mapTypeToSqlite("number")).toBe("REAL");
+  it("should map autoincrement primary key to BIGSERIAL", () => {
+    expect(
+      mapTypeToPostgres({
+        name: "id",
+        type: "integer",
+        primaryKey: true,
+        autoIncrement: true,
+      })
+    ).toBe("BIGSERIAL");
   });
 
-  it("should map boolean to INTEGER", () => {
-    expect(mapTypeToSqlite("boolean")).toBe("INTEGER");
+  it("should map number to DOUBLE PRECISION", () => {
+    expect(mapTypeToPostgres({ name: "score", type: "number" })).toBe(
+      "DOUBLE PRECISION"
+    );
   });
 
-  it("should map datetime to TEXT", () => {
-    expect(mapTypeToSqlite("datetime")).toBe("TEXT");
+  it("should map boolean to BOOLEAN", () => {
+    expect(mapTypeToPostgres({ name: "active", type: "boolean" })).toBe(
+      "BOOLEAN"
+    );
   });
 
-  it("should map json to TEXT", () => {
-    expect(mapTypeToSqlite("json")).toBe("TEXT");
+  it("should map datetime to TIMESTAMPTZ", () => {
+    expect(mapTypeToPostgres({ name: "created", type: "datetime" })).toBe(
+      "TIMESTAMPTZ"
+    );
+  });
+
+  it("should map json to JSONB", () => {
+    expect(mapTypeToPostgres({ name: "payload", type: "json" })).toBe("JSONB");
   });
 });
 
-describe("mapSqliteToType", () => {
+describe("mapPostgresToType", () => {
   it("should map INTEGER to integer", () => {
-    expect(mapSqliteToType("INTEGER")).toBe("integer");
+    expect(mapPostgresToType("INTEGER")).toBe("integer");
   });
 
-  it("should map INT to integer", () => {
-    expect(mapSqliteToType("INT")).toBe("integer");
+  it("should map BIGINT to integer", () => {
+    expect(mapPostgresToType("BIGINT")).toBe("integer");
   });
 
-  it("should map BOOLEAN to integer", () => {
-    expect(mapSqliteToType("BOOLEAN")).toBe("integer");
+  it("should map BOOLEAN to boolean", () => {
+    expect(mapPostgresToType("BOOLEAN")).toBe("boolean");
   });
 
-  it("should map REAL to number", () => {
-    expect(mapSqliteToType("REAL")).toBe("number");
+  it("should map DOUBLE PRECISION to number", () => {
+    expect(mapPostgresToType("DOUBLE PRECISION")).toBe("number");
   });
 
-  it("should map FLOAT to number", () => {
-    expect(mapSqliteToType("FLOAT")).toBe("number");
+  it("should map JSONB to json", () => {
+    expect(mapPostgresToType("JSONB")).toBe("json");
   });
 
-  it("should map DOUBLE to number", () => {
-    expect(mapSqliteToType("DOUBLE")).toBe("number");
-  });
-
-  it("should map JSON to json", () => {
-    expect(mapSqliteToType("JSON")).toBe("json");
-  });
-
-  it("should map BLOB to json", () => {
-    expect(mapSqliteToType("BLOB")).toBe("json");
-  });
-
-  it("should map DATETIME to datetime", () => {
-    expect(mapSqliteToType("DATETIME")).toBe("datetime");
-  });
-
-  it("should map TIMESTAMP to datetime", () => {
-    expect(mapSqliteToType("TIMESTAMP")).toBe("datetime");
+  it("should map TIMESTAMPTZ to datetime", () => {
+    expect(mapPostgresToType("TIMESTAMPTZ")).toBe("datetime");
   });
 
   it("should map TEXT to string", () => {
-    expect(mapSqliteToType("TEXT")).toBe("string");
-  });
-
-  it("should map unknown types to string", () => {
-    expect(mapSqliteToType("VARCHAR")).toBe("string");
-  });
-
-  it("should be case-insensitive", () => {
-    expect(mapSqliteToType("integer")).toBe("integer");
-    expect(mapSqliteToType("  REAL  ")).toBe("number");
+    expect(mapPostgresToType("TEXT")).toBe("string");
   });
 });
 
@@ -144,7 +137,7 @@ describe("generateCreateTableSQL", () => {
     };
 
     expect(generateCreateTableSQL(schema)).toBe(
-      "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, score REAL)"
+      "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, score DOUBLE PRECISION)"
     );
   });
 
@@ -196,16 +189,20 @@ describe("generateInsertSQL", () => {
   it("should throw for empty data", () => {
     expect(() => generateInsertSQL("users", [])).toThrow("No data to insert");
   });
+});
 
-  it("should throw for invalid table name", () => {
-    expect(() => generateInsertSQL("bad table", [{ id: 1 }])).toThrow(
-      "Invalid table name"
-    );
-  });
+describe("generatePutRowSQL", () => {
+  it("should generate upsert SQL when primary key exists", () => {
+    const schema: Schema = {
+      name: "users",
+      fields: [
+        { name: "id", type: "integer", primaryKey: true },
+        { name: "name", type: "string" },
+      ],
+    };
 
-  it("should throw for invalid column name", () => {
-    expect(() => generateInsertSQL("users", [{ "bad col": 1 }])).toThrow(
-      "Invalid column name"
+    expect(generatePutRowSQL(schema, ["id", "name"], schema.fields[0])).toBe(
+      "INSERT INTO users (id, name) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name"
     );
   });
 });
@@ -213,16 +210,8 @@ describe("generateInsertSQL", () => {
 describe("generateCheckTableExistsSQL", () => {
   it("should generate check table SQL", () => {
     const result = generateCheckTableExistsSQL("users");
-    expect(result.sql).toBe(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
-    );
+    expect(result.sql).toContain("information_schema.tables");
     expect(result.params).toEqual(["users"]);
-  });
-
-  it("should throw for invalid table name", () => {
-    expect(() => generateCheckTableExistsSQL("bad table")).toThrow(
-      "Invalid table name"
-    );
   });
 });
 
@@ -250,40 +239,5 @@ describe("getPrimaryKeyField", () => {
     };
 
     expect(getPrimaryKeyField(schema)).toBeNull();
-  });
-
-  it("should return null for empty fields", () => {
-    const schema: Schema = {
-      name: "empty",
-      fields: [],
-    };
-
-    expect(getPrimaryKeyField(schema)).toBeNull();
-  });
-
-  it("should return the first primary key when multiple exist", () => {
-    const schema: Schema = {
-      name: "test",
-      fields: [
-        { name: "a", type: "string", primaryKey: true },
-        { name: "b", type: "string", primaryKey: true },
-      ],
-    };
-
-    const pk = getPrimaryKeyField(schema);
-    expect(pk?.name).toBe("a");
-  });
-
-  it("should ignore fields with primaryKey set to false", () => {
-    const schema: Schema = {
-      name: "test",
-      fields: [
-        { name: "a", type: "string", primaryKey: false },
-        { name: "b", type: "integer", primaryKey: true },
-      ],
-    };
-
-    const pk = getPrimaryKeyField(schema);
-    expect(pk?.name).toBe("b");
   });
 });

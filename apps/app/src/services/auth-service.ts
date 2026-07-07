@@ -2,7 +2,7 @@ import { AuthProvider, JWTTokenPayload } from "@dafthunk/types";
 import { mutate } from "swr";
 
 import { AUTH_USER_KEY } from "@/components/auth-context";
-import { getApiBaseUrl } from "@/config/api";
+import { buildApiUrl } from "@/config/api";
 
 import { makeRequest } from "./utils";
 
@@ -106,12 +106,7 @@ export const authService = {
         throw new AuthError(`Invalid auth provider: ${provider}`);
       }
 
-      const baseUrl = getApiBaseUrl();
-      if (!baseUrl) {
-        throw new AuthError("API base URL not configured");
-      }
-
-      const loginUrl = new URL(`${baseUrl}/auth/login/${provider}`);
+      const loginUrl = new URL(buildApiUrl(`/auth/login/${provider}`));
       if (returnTo) {
         loginUrl.searchParams.set("returnTo", returnTo);
       }

@@ -5,8 +5,6 @@ import type {
 } from "@dafthunk/runtime";
 
 import type { Bindings } from "../context";
-import { createCodeModeExecutor } from "./code-mode-executor";
-import { createSandboxExecutor } from "./sandbox-executor";
 
 /** Optional services that tool-executed nodes may need */
 interface ToolContextServices {
@@ -43,12 +41,8 @@ export function createToolContext(
     datasetService: services?.datasetService,
     queueService: services?.queueService,
     schemaService: services?.schemaService,
-    codeModeExecutor:
-      services?.codeModeExecutor ?? createCodeModeExecutor(env) ?? undefined,
-    sandboxExecutor:
-      services?.sandboxExecutor ??
-      createSandboxExecutor(env, `tool-${crypto.randomUUID()}`) ??
-      undefined,
+    codeModeExecutor: services?.codeModeExecutor,
+    sandboxExecutor: services?.sandboxExecutor,
     env,
   };
 }

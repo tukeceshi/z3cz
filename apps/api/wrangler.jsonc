@@ -61,13 +61,13 @@
     }
   ],
   "worker_loaders": [{ "binding": "LOADER" }],
-  "d1_databases": [
+  // Local dev: localConnectionString (override via CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE).
+  // Production: replace id with your Hyperdrive config pointing at Supabase transaction pooler (port 6543).
+  "hyperdrive": [
     {
-      "binding": "DB",
-      "database_name": "dafthunk-development",
-      "database_id": "05b1b8e5-d566-47b8-9085-161de45bbd25",
-      "preview_database_id": "05b1b8e5-d566-47b8-9085-161de45bbd25",
-      "migrations_dir": "./src/db/migrations"
+      "binding": "HYPERDRIVE",
+      "id": "00000000-0000-0000-0000-000000000001",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
     }
   ],
   "kv_namespaces": [
@@ -132,11 +132,6 @@
   ],
   "durable_objects": {
     "bindings": [
-      {
-        "name": "DATABASE",
-        "class_name": "DatabaseDO",
-        "script_name": "dafthunk-api"
-      },
       {
         "name": "AGENT_RUNNER",
         "class_name": "AgentRunner",
@@ -222,6 +217,10 @@
     {
       "tag": "v13",
       "new_sqlite_classes": ["EmailAgentRunner"]
+    },
+    {
+      "tag": "v14",
+      "deleted_classes": ["DatabaseDO"]
     }
   ],
   "unsafe": {
@@ -320,13 +319,10 @@
         }
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
-      "d1_databases": [
+      "hyperdrive": [
         {
-          "binding": "DB",
-          "database_name": "dafthunk-production",
-          "database_id": "1d40113a-d6ec-4a46-8ba8-7958ee15b79a",
-          "preview_database_id": "1d40113a-d6ec-4a46-8ba8-7958ee15b79a",
-          "migrations_dir": "./src/db/migrations"
+          "binding": "HYPERDRIVE",
+          "id": "<your-production-hyperdrive-config-id>"
         }
       ],
       "kv_namespaces": [
@@ -362,11 +358,6 @@
       ],
       "durable_objects": {
         "bindings": [
-          {
-            "name": "DATABASE",
-            "class_name": "DatabaseDO",
-            "script_name": "dafthunk-api"
-          },
           {
             "name": "AGENT_RUNNER",
             "class_name": "AgentRunner",
@@ -452,6 +443,10 @@
         {
           "tag": "v13",
           "new_sqlite_classes": ["EmailAgentRunner"]
+        },
+        {
+          "tag": "v14",
+          "deleted_classes": ["DatabaseDO"]
         }
       ],
       "unsafe": {

@@ -42,7 +42,7 @@ datasetRoutes.use("*", jwtMiddleware);
  * List all datasets for the current organization
  */
 datasetRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const allDatasets = await getDatasets(db, organizationId);
@@ -66,7 +66,7 @@ datasetRoutes.post(
     const data = c.req.valid("json");
     const now = new Date();
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const datasetId = uuid();
     const datasetName = data.name || "Untitled Dataset";
@@ -95,7 +95,7 @@ datasetRoutes.post(
  */
 datasetRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const dataset = await getDataset(db, id, organizationId);
@@ -126,7 +126,7 @@ datasetRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existingDataset = await getDataset(db, id, organizationId);
@@ -158,7 +158,7 @@ datasetRoutes.put(
  */
 datasetRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existingDataset = await getDataset(db, id, organizationId);
@@ -232,7 +232,7 @@ const SUPPORTED_EXTENSIONS = new Set([
  */
 datasetRoutes.post("/:id/upload", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   // Verify dataset exists and belongs to organization
@@ -300,7 +300,7 @@ datasetRoutes.post("/:id/upload", async (c) => {
  */
 datasetRoutes.get("/:id/files", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   // Verify dataset exists and belongs to organization
@@ -335,7 +335,7 @@ datasetRoutes.get("/:id/files", async (c) => {
 datasetRoutes.delete("/:id/files/:filename", async (c) => {
   const id = c.req.param("id");
   const filename = c.req.param("filename");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   // Verify dataset exists and belongs to organization
@@ -366,7 +366,7 @@ datasetRoutes.delete("/:id/files/:filename", async (c) => {
 datasetRoutes.get("/:id/files/:filename", async (c) => {
   const id = c.req.param("id");
   const filename = c.req.param("filename");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   // Verify dataset exists and belongs to organization

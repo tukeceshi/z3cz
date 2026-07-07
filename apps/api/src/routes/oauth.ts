@@ -26,7 +26,7 @@ const resolveOrgFromQuery = async (
     if (!payload) {
       return c.json({ error: "Not authenticated" }, 401);
     }
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const [membership] = await db
       .select({ organizationId: memberships.organizationId })

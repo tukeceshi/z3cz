@@ -45,7 +45,7 @@ export class WorkflowStore {
   private db: Database;
 
   constructor(private env: Bindings) {
-    this.db = createDatabase(env.DB);
+    this.db = createDatabase(env);
   }
 
   /**
@@ -329,7 +329,7 @@ export class WorkflowStore {
         );
       }
     } else if (!hasReceiveNode) {
-      // Node removed entirely — delete trigger and clean up
+      // Node removed entirely ??delete trigger and clean up
       try {
         const existing = await getBotTrigger(
           this.db,
@@ -375,7 +375,7 @@ export class WorkflowStore {
           }
         }
       } catch (_error) {
-        // Ignore — trigger didn't exist
+        // Ignore ??trigger didn't exist
       }
     }
   }
@@ -680,19 +680,21 @@ export class WorkflowStore {
       return undefined;
     }
 
-    try {
-      const workflowData = await this.readFromR2(workflow.id);
-      return {
-        ...workflow,
-        data: workflowData,
-      };
-    } catch (error) {
-      console.error(
-        `WorkflowStore.getWithData: Failed to read workflow data from R2 for ${workflow.id}:`,
-        error
-      );
-      throw error;
-    }
+    const workflowData = await this.readFromR2(workflow.id);
+    return {
+      ...workflow,
+      data:
+        workflowData ??
+        ({
+          id: workflow.id,
+          name: workflow.name,
+          description: workflow.description ?? undefined,
+          trigger: workflow.trigger,
+          runtime: workflow.runtime,
+          nodes: [],
+          edges: [],
+        } satisfies WorkflowType),
+    };
   }
 
   /**
@@ -1002,7 +1004,7 @@ export class WorkflowStore {
   /**
    * Read workflow data from R2
    */
-  private async readFromR2(workflowId: string): Promise<WorkflowType> {
+  private async readFromR2(workflowId: string): Promise<WorkflowType | undefined> {
     try {
       if (!this.env.RESSOURCES) {
         throw new Error("R2 bucket is not initialized");
@@ -1012,7 +1014,7 @@ export class WorkflowStore {
       const object = await this.env.RESSOURCES.get(key);
 
       if (!object) {
-        throw new Error(`Workflow not found: ${workflowId}`);
+        return undefined;
       }
 
       const text = await object.text();

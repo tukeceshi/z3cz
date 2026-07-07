@@ -23,8 +23,8 @@ import { buildSnippet, stripHtml } from "./support-utils";
 /**
  * Cheap spam gate: trust Cloudflare's Authentication-Results header. We
  * accept the message if either SPF or DKIM passed (mirroring how DMARC
- * evaluates alignment). If both verdicts are present and both failed â€”
- * almost always a spoof â€” we drop without persisting. If the header is
+ * evaluates alignment). If both verdicts are present and both failed â€?
+ * almost always a spoof â€?we drop without persisting. If the header is
  * absent (local dev, unusual relays) we let the message through.
  */
 export function isAuthenticated(headers: Headers): boolean {
@@ -78,7 +78,7 @@ function parseReferences(value: string | undefined | null): string[] {
  *
  * `replySubaddress` is the RFC 5233 plus-tag from the inbound address. When
  * it verifies as a reply token we trust it alone and skip the subject/From
- * heuristics â€” see `support-reply-token.ts`.
+ * heuristics â€?see `support-reply-token.ts`.
  */
 export async function handleSupportEmail(
   message: ForwardableEmailMessage,
@@ -93,12 +93,12 @@ export async function handleSupportEmail(
     return;
   }
 
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const messageRowId = uuidv7();
 
   // Today the support handler always targets the "support" inbox. When
   // multi-inbox routing arrives, the alias will come from the routing layer.
-  // The lookup and the (potentially slow) stream read are independent â€” run
+  // The lookup and the (potentially slow) stream read are independent â€?run
   // them in parallel so a cold-cache lookup doesn't add latency. Use
   // allSettled so we can distinguish which side failed when one rejects.
   const [inboxResult, rawResult] = await Promise.allSettled([
@@ -141,7 +141,7 @@ export async function handleSupportEmail(
   try {
     parsed = await new PostalMime().parse(rawBytes);
   } catch (error) {
-    // Raw MIME is already in R2 so the message isn't lost â€” only the DB row
+    // Raw MIME is already in R2 so the message isn't lost â€?only the DB row
     // is. Log loudly so we notice.
     console.error("[support-email] postal-mime parse failed", error);
     return;
@@ -220,7 +220,7 @@ export async function handleSupportEmail(
       .where(eq(threads.id, verifiedThreadId))
       .limit(1);
     if (!existing) {
-      // Drop rather than silently creating a thread under a forged id â€”
+      // Drop rather than silently creating a thread under a forged id â€?
       // when the token verifies, the From: is intentionally untrusted.
       console.warn(
         `[support-email] tokenized reply for missing thread ${verifiedThreadId} from ${fromAddress}; dropping`

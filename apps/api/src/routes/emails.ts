@@ -80,7 +80,7 @@ const toEmailPayload = (
  * List all emails for the current organization
  */
 emailRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const allEmails = await getEmails(db, organizationId);
@@ -106,7 +106,7 @@ emailRoutes.post(
     const data = c.req.valid("json");
     const now = new Date();
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const emailName = data.name;
 
@@ -149,7 +149,7 @@ emailRoutes.post(
  */
 emailRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const email = await getEmail(db, id, organizationId);
@@ -175,7 +175,7 @@ emailRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existingEmail = await getEmail(db, id, organizationId);
@@ -233,7 +233,7 @@ emailRoutes.put(
  */
 emailRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existingEmail = await getEmail(db, id, organizationId);
@@ -275,7 +275,7 @@ emailRoutes.get(
   async (c) => {
     const id = c.req.param("id");
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const email = await getEmail(db, id, organizationId);
     if (!email) {
@@ -308,7 +308,7 @@ emailRoutes.get("/:id/threads/:threadId", async (c) => {
   const id = c.req.param("id");
   const threadId = c.req.param("threadId");
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   // These reads are independent: the ownership check (email exists, thread
   // belongs to it) gates the *response*, not the fetches, and the DO is already
@@ -378,7 +378,7 @@ emailRoutes.get(
     const id = c.req.param("id");
     const messageId = c.req.param("messageId");
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const email = await getEmail(db, id, organizationId);
     if (!email) {
@@ -419,7 +419,7 @@ emailRoutes.get("/:id/attachments/:attachmentId", async (c) => {
   const id = c.req.param("id");
   const attachmentId = c.req.param("attachmentId");
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const email = await getEmail(db, id, organizationId);
   if (!email) {

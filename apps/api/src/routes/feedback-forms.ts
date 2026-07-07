@@ -1,7 +1,7 @@
 /**
  * Public Feedback Form Routes
  *
- * These routes are unauthenticated — the signed token IS the authorization.
+ * These routes are unauthenticated �?the signed token IS the authorization.
  * They allow reviewers to view a workflow execution's outputs and submit
  * per-criterion feedback via a shareable URL produced by the
  * `create-feedback-form` node.
@@ -23,6 +23,7 @@ import type { ApiContext } from "../context";
 import { createDatabase } from "../db";
 import { type FeedbackInsert, feedback, feedbackCriteria } from "../db/schema";
 import { getAgentByName } from "../durable-objects/agent-utils";
+import { nodeFormStore } from "../runtime/node-form-store";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import {
   buildPresignedUrlConfig,
@@ -36,7 +37,7 @@ interface VisibleOutput {
   description?: string;
   type: string;
   /**
-   * Primitive / JSON value (absent for blob-like outputs — see `url`).
+   * Primitive / JSON value (absent for blob-like outputs �?see `url`).
    */
   value?: unknown;
   /**
@@ -69,6 +70,69 @@ feedbackFormRoutes.get("/:signedToken", async (c) => {
   }
 
   try {
+    if (c.env.RUNTIME === "node") {
+      const { submitted, config } = nodeFormStore.getFeedbackFormStatus(
+        payload.tok
+      );
+
+      if (!config) {
+        return c.json(
+          {
+            error: "Feedback page not yet available. Please try again shortly.",
+          },
+          404
+        );
+      }
+
+      const parsed = JSON.parse(config) as {
+        title: string;
+        description?: string;
+      };
+
+      const executionStore = new CloudflareExecutionStore(c.env);
+      const execution = await executionStore.getWithData(
+        payload.eid,
+        payload.org
+      );
+
+      const objectStore = new CloudflareObjectStore(
+        c.env.RESSOURCES,
+        buildPresignedUrlConfig(c.env)
+      );
+
+      const nodes = execution
+        ? await buildVisibleNodes(
+            execution.data.nodeExecutions,
+            execution.data.workflowDefinition,
+            objectStore
+          )
+        : [];
+
+      const db = createDatabase(c.env);
+      const criterionRows = await db.query.feedbackCriteria.findMany({
+        where: and(
+          eq(feedbackCriteria.workflowId, payload.wid),
+          eq(feedbackCriteria.organizationId, payload.org)
+        ),
+        orderBy: [feedbackCriteria.displayOrder],
+      });
+
+      const criteria = criterionRows.map((row) => ({
+        id: row.id,
+        question: row.question,
+        description: row.description ?? undefined,
+        displayOrder: row.displayOrder,
+      }));
+
+      return c.json({
+        title: parsed.title,
+        description: parsed.description,
+        nodes,
+        criteria,
+        submitted,
+      });
+    }
+
     const agent = await getAgentByName(c.env.WORKFLOW_AGENT, payload.wid);
     const { submitted, config } = await agent.getFeedbackFormStatus(
       payload.tok
@@ -107,7 +171,7 @@ feedbackFormRoutes.get("/:signedToken", async (c) => {
         )
       : [];
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const criterionRows = await db.query.feedbackCriteria.findMany({
       where: and(
         eq(feedbackCriteria.workflowId, payload.wid),
@@ -170,14 +234,22 @@ feedbackFormRoutes.post(
     const { responses } = c.req.valid("json");
 
     try {
-      const agent = await getAgentByName(c.env.WORKFLOW_AGENT, payload.wid);
-      const result = await agent.markFeedbackSubmitted(payload.tok);
+      if (c.env.RUNTIME === "node") {
+        const result = nodeFormStore.markFeedbackSubmitted(payload.tok);
 
-      if (!result.success) {
-        return c.json({ error: result.error }, 409);
+        if (!result.success) {
+          return c.json({ error: result.error }, 409);
+        }
+      } else {
+        const agent = await getAgentByName(c.env.WORKFLOW_AGENT, payload.wid);
+        const result = await agent.markFeedbackSubmitted(payload.tok);
+
+        if (!result.success) {
+          return c.json({ error: result.error }, 409);
+        }
       }
 
-      const db = createDatabase(c.env.DB);
+      const db = createDatabase(c.env);
       const now = new Date();
 
       // Reject tampering: every referenced criterion must belong to the

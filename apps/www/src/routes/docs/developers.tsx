@@ -61,6 +61,33 @@ export default function DocsDevelopers() {
         Dafthunk 是开源项目，欢迎提交 Issue 与 Pull Request。
       </p>
 
+      <h2 id="changelog">更新说明</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-07-07</td>
+            <td>
+              本地/自托管迁移至 Node 运行时：Postgres、本地对象存储、进程内工作流与队列、入站邮件
+              webhook + SMTP 网关；新增实验性生产 Docker 编排。
+            </td>
+          </tr>
+          <tr>
+            <td>2026-07-06</td>
+            <td>生产 Docker compose 与 <code>pnpm prod:up</code>。</td>
+          </tr>
+          <tr>
+            <td>2026-07-05</td>
+            <td>Docker 开发栈（3100/3101/3102）与 Node API 本地启动。</td>
+          </tr>
+        </tbody>
+      </table>
+
       <h2 id="getting-started">本地开发</h2>
       <p>
         推荐使用 Docker 运行完整开发栈，无需在宿主机安装 Node.js 或 pnpm。详细说明见仓库根目录{" "}
@@ -92,7 +119,7 @@ export default function DocsDevelopers() {
             <td>
               <code>http://localhost:3102</code>
             </td>
-            <td>API（<code>@dafthunk/api</code>）</td>
+            <td>API（<code>@dafthunk/api</code>，Node + Hono）</td>
           </tr>
         </tbody>
       </table>
@@ -111,10 +138,11 @@ export default function DocsDevelopers() {
         <li>
           生成密钥：
           <code>
-            docker compose run --rm dev node
+            docker compose run --rm -e RUN_DB_MIGRATE=false dev node
             apps/api/scripts/generate-master-key.js
           </code>
-          ，将结果写入 <code>apps/api/.dev.vars</code>
+          ，将输出的 <code>SECRET_MASTER_KEY</code> 与{" "}
+          <code>JWT_SECRET</code> 写入 <code>apps/api/.dev.vars</code>
         </li>
         <li>
           启动：
@@ -169,7 +197,7 @@ export default function DocsDevelopers() {
             <td>
               <strong>后端</strong>
             </td>
-            <td>Hono、Cloudflare Workers、D1、R2</td>
+            <td>Hono、Node.js（本地）/ Cloudflare Workers（线上）、Postgres、本地 FS / R2</td>
           </tr>
           <tr>
             <td>

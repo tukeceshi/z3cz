@@ -9,14 +9,12 @@ import { Hono } from "hono";
 import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
-import { CloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
+import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
 import {
   buildPresignedUrlConfig,
   CloudflareObjectStore,
 } from "../runtime/cloudflare-object-store";
 import { CloudflareToolRegistry } from "../runtime/cloudflare-tool-registry";
-import { createCodeModeExecutor } from "../runtime/code-mode-executor";
-import { createSandboxExecutor } from "../runtime/sandbox-executor";
 import { createToolContext } from "../runtime/tool-context";
 
 const playgroundRoutes = new Hono<ApiContext>();
@@ -35,7 +33,7 @@ playgroundRoutes.post("/", jwtMiddleware, async (c) => {
   }
 
   // Look up node type from registry
-  const nodeRegistry = new CloudflareNodeRegistry(c.env, false);
+  const nodeRegistry = await createCloudflareNodeRegistry(c.env, false);
   let nodeType;
   try {
     nodeType = nodeRegistry.getNodeType(body.nodeType);
@@ -69,10 +67,30 @@ playgroundRoutes.post("/", jwtMiddleware, async (c) => {
   );
   const credentialService = new CloudflareCredentialService(c.env);
   await credentialService.initialize(organizationId);
+
+  const [{ createCodeModeExecutor }, { createSandboxExecutor }] =
+    await Promise.all([
+      import("../runtime/code-mode-executor"),
+      import("../runtime/sandbox-executor"),
+    ]);
+  const playgroundSessionId = `playground-${crypto.randomUUID()}`;
+  const toolServices = {
+    codeModeExecutor: createCodeModeExecutor(c.env) ?? undefined,
+    sandboxExecutor:
+      createSandboxExecutor(c.env, playgroundSessionId) ?? undefined,
+  };
+
   const toolRegistry = new CloudflareToolRegistry(
     nodeRegistry,
     (nodeId, inputs) =>
-      createToolContext(nodeId, inputs, c.env, objectStore, credentialService)
+      createToolContext(
+        nodeId,
+        inputs,
+        c.env,
+        objectStore,
+        credentialService,
+        toolServices
+      )
   );
 
   // Transform API inputs to node-level values
@@ -113,10 +131,8 @@ playgroundRoutes.post("/", jwtMiddleware, async (c) => {
     onProgress: () => {},
     toolRegistry,
     objectStore,
-    codeModeExecutor: createCodeModeExecutor(c.env) ?? undefined,
-    sandboxExecutor:
-      createSandboxExecutor(c.env, `playground-${crypto.randomUUID()}`) ??
-      undefined,
+    codeModeExecutor: toolServices.codeModeExecutor,
+    sandboxExecutor: toolServices.sandboxExecutor,
     getSecret: (secretName) => credentialService.getSecret(secretName),
     getIntegration: (integrationId) =>
       credentialService.getIntegration(integrationId),

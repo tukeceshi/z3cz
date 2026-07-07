@@ -60,6 +60,7 @@ const docsSections: DocsSection[] = [
     title: "Developers Guide",
     href: "/docs/developers",
     anchors: [
+      { title: "Changelog", href: "#changelog" },
       { title: "Getting Started", href: "#getting-started" },
       { title: "How to Contribute", href: "#how-to-contribute" },
       { title: "Technology Stack", href: "#technology-stack" },

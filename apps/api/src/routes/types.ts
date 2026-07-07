@@ -4,14 +4,19 @@ import { Hono } from "hono";
 import { optionalJwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { getCloudflareModelNodeTypes } from "../runtime/cloudflare-model-catalog";
-import { CloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
+import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
+import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
 
 const typeRoutes = new Hono<ApiContext>();
 
 typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
   try {
-    const jwtPayload = c.get("jwtPayload");
-    const registry = new CloudflareNodeRegistry(
+    if (c.env.RUNTIME === "node") {
+      const nodeTypes = loadNodeTypesFromJson();
+      return c.json({ nodeTypes } satisfies GetNodeTypesResponse);
+    }
+
+    const jwtPayload = c.get("jwtPayload");    const registry = await createCloudflareNodeRegistry(
       c.env,
       jwtPayload?.developerMode ?? false
     );

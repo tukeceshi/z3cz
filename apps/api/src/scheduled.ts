@@ -6,8 +6,6 @@ import {
   getActiveScheduledTriggers,
   resolveOrganizationBillingOptions,
 } from "./db";
-import { getAgentByName } from "./durable-objects/agent-utils";
-import { createWorkerRuntime } from "./runtime/cloudflare-worker-runtime";
 import { WorkflowStore } from "./stores/workflow-store";
 import { creditChecksEnabled } from "./utils/credits";
 
@@ -18,7 +16,7 @@ export async function handleScheduledEvent(
 ): Promise<void> {
   console.log("Scheduled event triggered at:", new Date().toISOString());
 
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const workflowStore = new WorkflowStore(env);
 
   const triggers = await getActiveScheduledTriggers(
@@ -89,21 +87,14 @@ export async function handleScheduledEvent(
         },
       };
 
-      // Use WorkerRuntime for "worker" runtime (synchronous execution)
-      // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)
-      if (workflowData.runtime === "worker") {
-        const workerRuntime = createWorkerRuntime(env);
-        const execution = await workerRuntime.execute(executionParams);
-        console.log(
-          `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=scheduled`
-        );
-      } else {
-        const agent = await getAgentByName(env.WORKFLOW_AGENT, workflow.id);
-        const executionId = await agent.executeWorkflow(executionParams);
-        console.log(
-          `[Execution] ${executionId} workflow=${workflow.id} runtime=workflow trigger=scheduled`
-        );
-      }
+      const { startWorkflowExecution } = await import(
+        "./runtime/start-workflow-execution"
+      );
+      const result = await startWorkflowExecution(env, executionParams);
+      console.log(
+        `[Execution] ${result.executionId} workflow=${workflow.id} runtime=${workflowData.runtime} trigger=scheduled` +
+          (result.status ? ` status=${result.status}` : "")
+      );
     } catch (error) {
       console.error(
         `Error executing scheduled workflow ${workflow.id}:`,

@@ -50,7 +50,8 @@ describe("DatabaseListTablesNode", () => {
     expect(result.status).toBe("completed");
     expect(result.outputs?.tables).toEqual(["users", "posts"]);
     expect(connection.query).toHaveBeenCalledWith(
-      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+      expect.stringContaining("information_schema.tables"),
+      []
     );
   });
 

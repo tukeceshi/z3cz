@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "engines": {
-    "node": ">=20.19.0",
+    "node": ">=22.12.0",
     "pnpm": ">=10.3.0"
   },
   "preinstall": "npx only-allow pnpm",
@@ -20,6 +20,9 @@
     "build": "pnpm build:packages && pnpm build:apps",
     "build:packages": "pnpm --filter '@dafthunk/types' build",
     "build:apps": "pnpm --filter '@dafthunk/app' build && pnpm --filter '@dafthunk/www' build",
+    "prod:up": "node scripts/prod-up.mjs",
+    "prod:down": "node scripts/prod-up.mjs --down",
+    "prod:env": "node scripts/sync-env-docker-prod.mjs",
     "start": "pnpm --parallel start",
     "knip": "NODE_NO_WARNINGS=1 knip --include-libs 2>/dev/null || true",
     "knip:fix": "knip --include-libs --fix --allow-remove-files"

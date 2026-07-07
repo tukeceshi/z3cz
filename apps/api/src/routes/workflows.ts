@@ -44,9 +44,9 @@ import {
   workflows,
 } from "../db";
 import { getAgentByName } from "../durable-objects/agent-utils";
-import { createRateLimitMiddleware } from "../middleware/rate-limit";
+import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
-import { CloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
+import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
 import { getAuthContext } from "../utils/auth-context";
@@ -144,7 +144,7 @@ workflowRoutes.post(
       edges,
     };
 
-    const registry = new CloudflareNodeRegistry(c.env, false);
+    const registry = await createCloudflareNodeRegistry(c.env, false);
     const nodeTypes = registry.getNodeTypes();
     const validationErrors = validateWorkflow(workflowData, nodeTypes);
     if (validationErrors.length > 0) {
@@ -171,7 +171,7 @@ workflowRoutes.post(
     // Best-effort onboarding stamp; never fail the request on a stamp error.
     if (userId) {
       try {
-        const db = createDatabase(c.env.DB);
+        const db = createDatabase(c.env);
         await stampOnboardingStage(db, userId, "workflowCreated");
       } catch (error) {
         console.error("Failed to stamp workflow_created onboarding:", error);
@@ -315,7 +315,7 @@ workflowRoutes.put(
       nodes: sanitizedNodes,
       edges: sanitizedEdges,
     };
-    const updateRegistry = new CloudflareNodeRegistry(c.env, false);
+    const updateRegistry = await createCloudflareNodeRegistry(c.env, false);
     const updateNodeTypes = updateRegistry.getNodeTypes();
     const validationErrors = validateWorkflow(
       workflowToValidate,
@@ -385,7 +385,7 @@ async function executeWorkflow(
   workflow: { id: string; name: string },
   workflowData: any
 ): Promise<Response> {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const { organizationId, userId } = getAuthContext(c);
 
   // Get organization billing info
@@ -443,7 +443,7 @@ workflowRoutes.on(
   ["GET", "POST"],
   "/:workflowId/execute",
   jwtMiddleware,
-  (c, next) => createRateLimitMiddleware(c.env.RATE_LIMIT_EXECUTE)(c, next),
+  createExecuteRateLimitMiddleware(),
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
     const { organizationId } = getAuthContext(c);
@@ -493,7 +493,7 @@ workflowRoutes.on(
   ["GET", "POST"],
   "/:workflowId/execute/dev",
   jwtMiddleware,
-  (c, next) => createRateLimitMiddleware(c.env.RATE_LIMIT_EXECUTE)(c, next),
+  createExecuteRateLimitMiddleware(),
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
     const { organizationId } = getAuthContext(c);
@@ -557,12 +557,19 @@ workflowRoutes.post(
     const executionData = execution.data;
 
     try {
-      // Terminate the workflow via Agent RPC
-      const agent = await getAgentByName(
-        c.env.WORKFLOW_AGENT,
-        execution.workflowId
-      );
-      await agent.cancelWorkflow(executionId);
+      // Terminate the workflow via Agent RPC or Node in-process runner
+      if (c.env.RUNTIME === "node") {
+        const { nodeWorkflowExecutionService } = await import(
+          "../runtime/node-workflow-execution-service"
+        );
+        nodeWorkflowExecutionService.cancelExecution(executionId);
+      } else {
+        const agent = await getAgentByName(
+          c.env.WORKFLOW_AGENT,
+          execution.workflowId
+        );
+        await agent.cancelWorkflow(executionId);
+      }
 
       // Update the execution status in the database
       const now = new Date();
@@ -622,7 +629,7 @@ workflowRoutes.get("/:workflowId/queue-trigger", jwtMiddleware, async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const workflow = await workflowStore.get(workflowId, organizationId);
   if (!workflow) {
@@ -663,7 +670,7 @@ workflowRoutes.put(
     const workflowId = c.req.param("workflowId")!;
     const organizationId = c.get("organizationId")!;
     const data = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const workflowStore = new WorkflowStore(c.env);
 
     const workflow = await workflowStore.get(workflowId, organizationId);
@@ -726,7 +733,7 @@ workflowRoutes.delete(
     const workflowId = c.req.param("workflowId")!;
     const organizationId = c.get("organizationId")!;
     const workflowStore = new WorkflowStore(c.env);
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const workflow = await workflowStore.get(workflowId, organizationId);
     if (!workflow) {
@@ -760,7 +767,7 @@ workflowRoutes.get("/:workflowId/email-trigger", jwtMiddleware, async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const workflow = await workflowStore.get(workflowId, organizationId);
   if (!workflow) {
@@ -792,7 +799,7 @@ workflowRoutes.get("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const workflow = await workflowStore.get(workflowId, organizationId);
   if (!workflow) {
@@ -827,7 +834,7 @@ workflowRoutes.post(
     const workflowId = c.req.param("workflowId")!;
     const organizationId = c.get("organizationId")!;
     const workflowStore = new WorkflowStore(c.env);
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const workflow = await workflowStore.get(workflowId, organizationId);
     if (!workflow) {
@@ -907,7 +914,7 @@ workflowRoutes.delete("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const workflow = await workflowStore.get(workflowId, organizationId);
   if (!workflow) {
@@ -977,7 +984,7 @@ workflowRoutes.patch(
     const { enabled } = c.req.valid("json");
 
     const workflowStore = new WorkflowStore(c.env);
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const workflow = await workflowStore.get(workflowId, organizationId);
     if (!workflow) {

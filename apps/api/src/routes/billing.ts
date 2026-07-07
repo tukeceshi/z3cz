@@ -32,7 +32,7 @@ billing.use("*", jwtMiddleware);
  */
 billing.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const [org] = await db
     .select()
@@ -127,7 +127,7 @@ billing.post(
   async (c) => {
     const organizationId = c.get("organizationId")!;
     const { returnUrl } = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Get Stripe customer ID from organization
     const [org] = await db
@@ -176,7 +176,7 @@ billing.patch(
   async (c) => {
     const organizationId = c.get("organizationId")!;
     const { overageLimit } = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Lowering the cap can't restore availability, so only clear the
     // exhausted cache when the cap was raised or removed.

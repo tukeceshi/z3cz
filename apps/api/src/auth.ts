@@ -152,14 +152,29 @@ const validateUserData = (user: any, provider: string) => {
   return user;
 };
 
-const setCookieOptions = (c: Context<ApiContext>, maxAge: number) => ({
-  httpOnly: true,
-  secure: c.env.CLOUDFLARE_ENV !== "development",
-  sameSite: "Lax" as const,
-  domain: urlToTopLevelDomain(c.env.WEB_HOST),
-  maxAge,
-  path: "/",
-});
+const deleteCookieOptions = (c: Context<ApiContext>) => {
+  const hostname = new URL(c.env.WEB_HOST).hostname;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+
+  return {
+    path: "/",
+    ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
+  };
+};
+
+const setCookieOptions = (c: Context<ApiContext>, maxAge: number) => {
+  const hostname = new URL(c.env.WEB_HOST).hostname;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+
+  return {
+    httpOnly: true,
+    secure: isLocalhost ? false : c.env.CLOUDFLARE_ENV !== "development",
+    sameSite: "Lax" as const,
+    ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
+    maxAge,
+    path: "/",
+  };
+};
 
 // Validate returnTo is a safe relative path (prevents open redirects)
 const isValidReturnTo = (returnTo: string): boolean => {
@@ -201,7 +216,8 @@ export const jwtMiddleware = async (
   c: Context<ApiContext>,
   next: () => Promise<void>
 ) => {
-  const accessToken = getCookie(c, JWT_ACCESS_TOKEN_NAME);
+  const accessToken =
+    getCookie(c, JWT_ACCESS_TOKEN_NAME) ?? c.req.query("access_token");
 
   if (!accessToken) {
     return c.json({ error: "No access token" }, 401);
@@ -227,7 +243,7 @@ export const jwtMiddleware = async (
 
   c.set("jwtPayload", payload);
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationIdFromUrl = c.req.param("organizationId");
 
   let organizationId: string;
@@ -258,6 +274,67 @@ export const jwtMiddleware = async (
   }
 
   c.set("organizationId", organizationId);
+  await next();
+};
+
+/** Lightweight auth for WebSocket upgrades — avoids JSON 401 responses that break the WS handshake. */
+export const wsUpgradeAuthMiddleware = async (
+  c: Context<ApiContext>,
+  next: () => Promise<void>
+) => {
+  const accessToken =
+    getCookie(c, JWT_ACCESS_TOKEN_NAME) ?? c.req.query("access_token");
+
+  if (!accessToken) {
+    console.warn("[NodeWS] upgrade rejected: no access token");
+    return c.body(null, 401);
+  }
+
+  const payload = (await verifyToken(
+    accessToken,
+    c.env.JWT_SECRET
+  )) as JWTTokenPayload | null;
+
+  if (!payload?.sub) {
+    console.warn("[NodeWS] upgrade rejected: invalid token");
+    return c.body(null, 401);
+  }
+
+  c.set("jwtPayload", payload);
+
+  const organizationIdFromUrl = c.req.param("organizationId");
+
+  if (organizationIdFromUrl) {
+    if (payload.organization?.id === organizationIdFromUrl) {
+      c.set("organizationId", organizationIdFromUrl);
+      return next();
+    }
+
+    const db = createDatabase(c.env);
+    const [membership] = await db
+      .select({ organizationId: memberships.organizationId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, payload.sub),
+          eq(memberships.organizationId, organizationIdFromUrl)
+        )
+      );
+
+    if (!membership) {
+      console.warn("[NodeWS] upgrade rejected: org access denied");
+      return c.body(null, 403);
+    }
+
+    c.set("organizationId", organizationIdFromUrl);
+    return next();
+  }
+
+  if (!payload.organization?.id) {
+    return c.body(null, 400);
+  }
+
+  c.set("organizationId", payload.organization.id);
   await next();
 };
 
@@ -310,7 +387,7 @@ export const apiKeyMiddleware = async (
   }
 
   const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const validatedOrganizationId = await verifyApiKey(
     db,
@@ -406,7 +483,7 @@ auth.post("/refresh", async (c) => {
     return c.json({ error: "Authentication required" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     // Get fresh user data
@@ -485,14 +562,9 @@ auth.post("/refresh", async (c) => {
 });
 
 auth.post("/logout", (c) => {
-  deleteCookie(c, JWT_ACCESS_TOKEN_NAME, {
-    domain: urlToTopLevelDomain(c.env.WEB_HOST),
-    path: "/",
-  });
-  deleteCookie(c, JWT_REFRESH_TOKEN_NAME, {
-    domain: urlToTopLevelDomain(c.env.WEB_HOST),
-    path: "/",
-  });
+  const cookieOptions = deleteCookieOptions(c);
+  deleteCookie(c, JWT_ACCESS_TOKEN_NAME, cookieOptions);
+  deleteCookie(c, JWT_REFRESH_TOKEN_NAME, cookieOptions);
   return c.redirect(c.env.WEB_HOST);
 });
 
@@ -503,7 +575,7 @@ async function completeOAuthLogin(
   c: Context<ApiContext>,
   userData: UserData
 ): Promise<Response> {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const isNewUser = !(await userExists(
     db,
     userData.provider,
@@ -641,6 +713,22 @@ auth.get(
   }
 );
 
+auth.get("/login/dev", async (c) => {
+  if (c.env.CLOUDFLARE_ENV !== "development") {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  storeReturnTo(c);
+
+  return completeOAuthLogin(c, {
+    provider: "google",
+    providerId: "dev-test-user",
+    name: "Test User",
+    email: "test@localhost.dev",
+    avatarUrl: undefined,
+  });
+});
+
 auth.get("/protected", jwtMiddleware, (c) => {
   // If jwtAuth passes, user is authenticated
   return c.json({ ok: true }, 200);
@@ -648,6 +736,16 @@ auth.get("/protected", jwtMiddleware, (c) => {
 
 auth.get("/user", jwtMiddleware, (c) => {
   return c.json({ user: c.get("jwtPayload") });
+});
+
+/** Short-lived access token for WebSocket query auth (httpOnly cookies are not always sent on WS upgrade). */
+auth.get("/ws-token", jwtMiddleware, (c) => {
+  const token =
+    getCookie(c, JWT_ACCESS_TOKEN_NAME) ?? c.req.query("access_token");
+  if (!token) {
+    return c.json({ error: "No access token" }, 401);
+  }
+  return c.json({ token });
 });
 
 export default auth;

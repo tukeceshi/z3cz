@@ -180,16 +180,15 @@ export async function saveUser(
     updatedAt: now,
   };
 
-  const [organizationResult, userResult] = await db.batch([
-    db.insert(organizations).values(organization).returning(),
-    db.insert(users).values(newUser).returning(),
-    db.insert(memberships).values(newMembership),
-  ]);
-
-  const [user] = userResult;
-  const [organizationRecord] = organizationResult;
-
-  return { user, organization: organizationRecord };
+  return db.transaction(async (tx) => {
+    const [organizationRecord] = await tx
+      .insert(organizations)
+      .values(organization)
+      .returning();
+    const [user] = await tx.insert(users).values(newUser).returning();
+    await tx.insert(memberships).values(newMembership);
+    return { user, organization: organizationRecord };
+  });
 }
 
 /**
@@ -2170,11 +2169,10 @@ export async function createOrganization(
     updatedAt: now,
   };
 
-  // Use batch to ensure atomicity
-  await db.batch([
-    db.insert(organizations).values(organization),
-    db.insert(memberships).values(membership),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx.insert(organizations).values(organization);
+    await tx.insert(memberships).values(membership);
+  });
 
   return { organization, membership };
 }
@@ -2523,7 +2521,7 @@ export async function isOrganizationMember(
   userId: string,
   organizationId: string
 ): Promise<boolean> {
-  const row = await db
+  const [row] = await db
     .select({ userId: memberships.userId })
     .from(memberships)
     .where(
@@ -2532,7 +2530,7 @@ export async function isOrganizationMember(
         eq(memberships.organizationId, organizationId)
       )
     )
-    .get();
+    .limit(1);
 
   return !!row;
 }
@@ -2882,16 +2880,19 @@ export async function acceptInvitation(
     updatedAt: now,
   };
 
-  // Use batch for atomicity
-  const [membershipResult, _] = await db.batch([
-    db.insert(memberships).values(newMembership).returning(),
-    db
+  const membershipResult = await db.transaction(async (tx) => {
+    const [membership] = await tx
+      .insert(memberships)
+      .values(newMembership)
+      .returning();
+    await tx
       .update(invitations)
       .set({ status: InvitationStatus.ACCEPTED, updatedAt: now })
-      .where(eq(invitations.id, invitationId)),
-  ]);
+      .where(eq(invitations.id, invitationId));
+    return membership;
+  });
 
-  return membershipResult[0];
+  return membershipResult;
 }
 
 /**

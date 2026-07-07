@@ -14,6 +14,14 @@ import {
   type UpdateDatabaseRequest,
   type UpdateDatabaseResponse,
 } from "@dafthunk/types";
+import {
+  columnHasAutoIncrement,
+  generateDescribeTableColumnsSQL,
+  generateForeignKeysSQL,
+  generateListTablesSQL,
+  generateUniqueColumnNamesSQL,
+  type ColumnInfoRow,
+} from "@dafthunk/runtime";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { v7 as uuid } from "uuid";
@@ -25,14 +33,15 @@ import {
   createDatabase,
   createDatabaseRecord,
   deleteDatabaseRecord,
+  dropUserDatabaseSchema,
+  ensureUserDatabaseSchema,
   getDatabase,
   getDatabases,
   updateDatabaseRecord,
 } from "../db";
-import { CloudflareDatabaseService } from "../runtime/cloudflare-database-service";
+import { PostgresDatabaseService } from "../runtime/postgres-database-service";
 import { getAuthContext } from "../utils/auth-context";
 
-// Extend the ApiContext with our custom variable
 type ExtendedApiContext = ApiContext & {
   Variables: {
     organizationId?: string;
@@ -41,14 +50,10 @@ type ExtendedApiContext = ApiContext & {
 
 const databaseRoutes = new Hono<ExtendedApiContext>();
 
-// Apply JWT middleware to all database routes
 databaseRoutes.use("*", jwtMiddleware);
 
-/**
- * List all databases for the current organization
- */
 databaseRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const allDatabases = await getDatabases(db, organizationId);
@@ -57,9 +62,6 @@ databaseRoutes.get("/", async (c) => {
   return c.json(response);
 });
 
-/**
- * Create a new database for the current organization
- */
 databaseRoutes.post(
   "/",
   zValidator(
@@ -78,7 +80,7 @@ databaseRoutes.post(
     const data = c.req.valid("json");
     const now = new Date();
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const databaseId = uuid();
     const databaseName = data.name || "Untitled Database";
@@ -91,6 +93,8 @@ databaseRoutes.post(
       updatedAt: now,
     });
 
+    await ensureUserDatabaseSchema(db, databaseId);
+
     const response: CreateDatabaseResponse = {
       id: newDatabase.id,
       name: newDatabase.name,
@@ -102,12 +106,9 @@ databaseRoutes.post(
   }
 );
 
-/**
- * Get a specific database by ID
- */
 databaseRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const database = await getDatabase(db, id, organizationId);
@@ -125,9 +126,6 @@ databaseRoutes.get("/:id", async (c) => {
   return c.json(response);
 });
 
-/**
- * Update a database by ID
- */
 databaseRoutes.put(
   "/:id",
   zValidator(
@@ -144,7 +142,7 @@ databaseRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existingDatabase = await getDatabase(db, id, organizationId);
@@ -171,18 +169,17 @@ databaseRoutes.put(
   }
 );
 
-/**
- * Delete a database by ID
- */
 databaseRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existingDatabase = await getDatabase(db, id, organizationId);
   if (!existingDatabase) {
     return c.json({ error: "Database not found" }, 404);
   }
+
+  await dropUserDatabaseSchema(db, id);
 
   const deletedDatabase = await deleteDatabaseRecord(db, id, organizationId);
   if (!deletedDatabase) {
@@ -193,14 +190,11 @@ databaseRoutes.delete("/:id", async (c) => {
   return c.json(response);
 });
 
-/**
- * Get the schema of a database (tables, columns, foreign keys)
- */
 databaseRoutes.get("/:databaseId/schema", apiKeyOrJwtMiddleware, async (c) => {
   const databaseId = c.req.param("databaseId")!;
   const { organizationId } = getAuthContext(c);
 
-  const databaseService = new CloudflareDatabaseService(c.env);
+  const databaseService = new PostgresDatabaseService(c.env);
   const connection = await databaseService.resolve(databaseId, organizationId);
   if (!connection) {
     return c.json(
@@ -210,84 +204,49 @@ databaseRoutes.get("/:databaseId/schema", apiKeyOrJwtMiddleware, async (c) => {
   }
 
   try {
-    // Get all user-defined tables
+    const listTablesSQL = generateListTablesSQL();
     const tablesResult = await connection.query(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      listTablesSQL.sql,
+      listTablesSQL.params
     );
     const tableNames = (tablesResult.results as { name: string }[]).map(
-      (r) => r.name
+      (row) => row.name
     );
 
-    // Fetch columns, foreign keys, indexes, and DDL for each table
     const tables: DatabaseSchemaTable[] = await Promise.all(
       tableNames.map(async (tableName) => {
-        const [columnsResult, fksResult, indexListResult, ddlResult] =
-          await Promise.all([
-            connection.query(`PRAGMA table_info("${tableName}")`),
-            connection.query(`PRAGMA foreign_key_list("${tableName}")`),
-            connection.query(`PRAGMA index_list("${tableName}")`),
-            connection.query(
-              `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`,
-              [tableName]
-            ),
-          ]);
+        const describeSQL = generateDescribeTableColumnsSQL(tableName);
+        const uniqueSQL = generateUniqueColumnNamesSQL(tableName);
+        const foreignKeysSQL = generateForeignKeysSQL(tableName);
 
-        // Detect AUTOINCREMENT from the CREATE TABLE DDL
-        const ddl = (ddlResult.results as { sql: string }[])[0]?.sql ?? "";
-        const hasAutoIncrement = /AUTOINCREMENT/i.test(ddl);
+        const [columnsResult, uniqueResult, fksResult] = await Promise.all([
+          connection.query(describeSQL.sql, describeSQL.params),
+          connection.query(uniqueSQL.sql, uniqueSQL.params),
+          connection.query(foreignKeysSQL.sql, foreignKeysSQL.params),
+        ]);
 
-        // Collect unique columns from single-column unique indexes
-        const uniqueColumns = new Set<string>();
-        const indexes = indexListResult.results as {
-          seq: number;
-          name: string;
-          unique: number;
-          origin: string;
-          partial: number;
-        }[];
-        await Promise.all(
-          indexes
-            .filter((idx) => idx.unique === 1)
-            .map(async (idx) => {
-              const infoResult = await connection.query(
-                `PRAGMA index_info("${idx.name}")`
-              );
-              const cols = infoResult.results as {
-                seqno: number;
-                cid: number;
-                name: string;
-              }[];
-              if (cols.length === 1) {
-                uniqueColumns.add(cols[0].name);
-              }
-            })
+        const uniqueColumns = new Set(
+          (uniqueResult.results as { name: string }[]).map((row) => row.name)
         );
 
         const columns: DatabaseSchemaColumn[] = (
-          columnsResult.results as {
-            cid: number;
-            name: string;
-            type: string;
-            notnull: number;
-            dflt_value: string | null;
-            pk: number;
-          }[]
+          columnsResult.results as ColumnInfoRow[]
         ).map((col) => ({
           name: col.name,
           type: col.type,
-          notnull: col.notnull === 1,
+          notnull: col.notnull === true || col.notnull === 1,
           defaultValue: col.dflt_value,
-          primaryKey: col.pk > 0,
+          primaryKey: col.pk === true || col.pk === 1,
           unique: uniqueColumns.has(col.name),
-          autoIncrement: col.pk > 0 && hasAutoIncrement,
+          autoIncrement:
+            (col.pk === true || col.pk === 1) &&
+            columnHasAutoIncrement(col.dflt_value),
         }));
 
         const foreignKeys: DatabaseSchemaForeignKey[] = (
           fksResult.results as {
-            id: number;
-            seq: number;
-            table: string;
             from: string;
+            table: string;
             to: string;
           }[]
         ).map((fk) => ({
@@ -312,9 +271,6 @@ databaseRoutes.get("/:databaseId/schema", apiKeyOrJwtMiddleware, async (c) => {
   }
 });
 
-/**
- * Execute a query on a database (for testing/debugging via API)
- */
 databaseRoutes.post(
   "/:databaseId/query",
   apiKeyOrJwtMiddleware,
@@ -328,12 +284,9 @@ databaseRoutes.post(
   async (c) => {
     const databaseId = c.req.param("databaseId");
     const { sql, params } = c.req.valid("json");
-
-    // Get auth context from either JWT or API key
     const { organizationId } = getAuthContext(c);
 
-    // Resolve database via service (verifies ownership)
-    const databaseService = new CloudflareDatabaseService(c.env);
+    const databaseService = new PostgresDatabaseService(c.env);
     const connection = await databaseService.resolve(
       databaseId,
       organizationId

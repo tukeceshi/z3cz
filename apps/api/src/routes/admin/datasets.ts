@@ -25,7 +25,7 @@ adminDatasetsRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { page, limit, search, organizationId } = c.req.valid("query");
     const offset = (page - 1) * limit;
 

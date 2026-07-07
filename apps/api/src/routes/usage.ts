@@ -16,7 +16,7 @@ usage.get("/", async (c) => {
 
   try {
     const computeCredits = await getOrganizationComputeCredits(
-      createDatabase(c.env.DB),
+      createDatabase(c.env),
       organizationId
     );
     if (computeCredits === undefined) {

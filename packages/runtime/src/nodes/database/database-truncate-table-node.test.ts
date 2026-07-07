@@ -58,10 +58,10 @@ describe("DatabaseTruncateTableNode", () => {
     expect(result.outputs?.success).toBe(true);
     expect(result.outputs?.deleted).toBe(10);
     expect(connection.query).toHaveBeenCalledWith(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      expect.stringContaining("information_schema.tables"),
       ["users"]
     );
-    expect(connection.execute).toHaveBeenCalledWith("DELETE FROM users");
+    expect(connection.execute).toHaveBeenCalledWith("TRUNCATE TABLE users");
   });
 
   it("should return error for non-existent table", async () => {

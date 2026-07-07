@@ -80,7 +80,7 @@ function toSchemaEntity(row: {
  * List all schemas for the current organization
  */
 schemaRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const allSchemas = await getSchemas(db, organizationId);
@@ -124,7 +124,7 @@ schemaRoutes.post(
     const data = c.req.valid("json");
     const now = new Date();
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const newSchema = await createSchemaRecord(db, {
       id: uuid(),
@@ -148,7 +148,7 @@ schemaRoutes.post(
  */
 schemaRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const schema = await getSchema(db, id, organizationId);
@@ -194,7 +194,7 @@ schemaRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existing = await getSchema(db, id, organizationId);
@@ -224,7 +224,7 @@ schemaRoutes.put(
  */
 schemaRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existing = await getSchema(db, id, organizationId);

@@ -28,7 +28,7 @@ executionRoutes.get("/:id", apiKeyOrJwtMiddleware, async (c) => {
   }
 
   const executionStore = new CloudflareExecutionStore(c.env);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const execution = await executionStore.getWithData(id, organizationId);

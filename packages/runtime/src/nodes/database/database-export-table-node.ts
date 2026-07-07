@@ -1,8 +1,9 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
 import type { NodeExecution, NodeType, Schema } from "@dafthunk/types";
 import {
-  mapSqliteToType,
-  type PragmaTableInfoRow,
+  generateDescribeTableColumnsSQL,
+  mapPostgresToType,
+  type ColumnInfoRow,
   validateIdentifier,
 } from "../../utils/database-table";
 
@@ -15,7 +16,7 @@ export class DatabaseExportTableNode extends ExecutableNode {
     tags: ["Database", "Export", "Table"],
     icon: "database",
     documentation:
-      "Exports a complete database table including its schema and all data in Table format. Uses database introspection to determine field types. Perfect for backing up or copying tables.",
+      "Exports a complete database table including its schema and all data in Table format. Uses Postgres catalog introspection to determine field types. Perfect for backing up or copying tables.",
     asTool: true,
     inputs: [
       {
@@ -49,7 +50,6 @@ export class DatabaseExportTableNode extends ExecutableNode {
   async execute(context: NodeContext): Promise<NodeExecution> {
     const { database, table } = context.inputs;
 
-    // Validate required inputs
     if (!database) {
       return this.createErrorResult("'database' is a required input.");
     }
@@ -76,9 +76,10 @@ export class DatabaseExportTableNode extends ExecutableNode {
 
       validateIdentifier(table as string, "table name");
 
-      // Use PRAGMA table_info to get schema information
+      const describeSQL = generateDescribeTableColumnsSQL(table as string);
       const schemaResult = await connection.query(
-        `PRAGMA table_info(${table})`
+        describeSQL.sql,
+        describeSQL.params
       );
 
       if (!schemaResult.results || schemaResult.results.length === 0) {
@@ -87,16 +88,13 @@ export class DatabaseExportTableNode extends ExecutableNode {
         );
       }
 
-      // Map schema results to Field format
-      // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-      const rows = schemaResult.results as unknown as PragmaTableInfoRow[];
+      const rows = schemaResult.results as ColumnInfoRow[];
       const fields = rows.map((col) => ({
         name: col.name,
-        type: mapSqliteToType(col.type || "TEXT"),
+        type: mapPostgresToType(col.type || "text"),
         ...(col.pk ? { primaryKey: true } : {}),
       }));
 
-      // Query all data from the table
       const dataResult = await connection.query(`SELECT * FROM ${table}`);
       const data = dataResult.results as Record<string, unknown>[];
 

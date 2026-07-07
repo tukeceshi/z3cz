@@ -201,7 +201,7 @@ async function buildEncryptedMetadata(
 }
 
 botRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
   const provider = c.req.query("provider") as BotProvider | undefined;
 
@@ -232,7 +232,7 @@ botRoutes.post(
   async (c) => {
     const data = c.req.valid("json");
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Provider-specific field validation
     if (data.provider === "discord") {
@@ -298,7 +298,7 @@ botRoutes.post(
 
 botRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const bot = await getBot(db, id, organizationId);
@@ -324,7 +324,7 @@ botRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existingBot = await getBot(db, id, organizationId);
@@ -423,7 +423,7 @@ botRoutes.put(
 
 botRoutes.get("/:id/webhook-info", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const bot = await getBot(db, id, organizationId);
@@ -464,7 +464,7 @@ botRoutes.get("/:id/webhook-info", async (c) => {
 
 botRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existingBot = await getBot(db, id, organizationId);

@@ -33,7 +33,7 @@ apiKeyRoutes.use("*", jwtMiddleware);
  */
 apiKeyRoutes.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const apiKeys = await getApiKeys(db, organizationId);
@@ -60,7 +60,7 @@ apiKeyRoutes.post(
   ),
   async (c) => {
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { name } = c.req.valid("json");
 
     try {
@@ -89,7 +89,7 @@ apiKeyRoutes.post(
  */
 apiKeyRoutes.delete("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const apiKeyId = c.req.param("id");
 
   try {
@@ -115,7 +115,7 @@ apiKeyRoutes.delete("/:id", async (c) => {
  */
 apiKeyRoutes.patch("/:id/roll", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const apiKeyId = c.req.param("id");
 
   try {

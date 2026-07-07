@@ -34,7 +34,7 @@ adminOrganizationsRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { page, limit, search } = c.req.valid("query");
     const offset = (page - 1) * limit;
 
@@ -91,7 +91,7 @@ adminOrganizationsRoutes.get(
  * Get details for a specific organization including members and stats
  */
 adminOrganizationsRoutes.get("/:id", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
 
   try {
@@ -159,7 +159,7 @@ adminOrganizationsRoutes.get("/:id", async (c) => {
  * databases) for a specific organization in a single request
  */
 adminOrganizationsRoutes.get("/:id/entity-counts", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
 
   // organizationId comes from a URL path segment but is used directly in an
@@ -241,7 +241,7 @@ async function fetchExecutionCount(
       ? "dafthunk_executions_production"
       : "dafthunk_executions_development";
 
-  // CF Analytics Engine SQL requires `COUNT()` with zero arguments â€” `COUNT(*)`
+  // CF Analytics Engine SQL requires `COUNT()` with zero arguments â€?`COUNT(*)`
   // is rejected with `COUNT() function must have 0 arguments`.
   const aeSql = `
     SELECT COUNT() AS count

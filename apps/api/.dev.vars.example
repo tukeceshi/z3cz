@@ -3,6 +3,20 @@ WEBSITE_URL=http://localhost:3100
 
 EMAIL_DOMAIN=mail.dafthunk.com
 
+# Supabase Postgres — used by drizzle-kit migrate and the Node API server
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+
+# Local object storage (used when COS is not configured)
+LOCAL_STORAGE_PATH=./data/storage
+PORT=3102
+
+# Tencent COS — configure later via admin; leave unset to use local storage
+# COS_SECRET_ID=
+# COS_SECRET_KEY=
+# COS_BUCKET=
+# COS_REGION=
+# COS_ENDPOINT=
+
 CLOUDFLARE_ENV=development
 CLOUDFLARE_ACCOUNT_ID=CHANGE_ME
 CLOUDFLARE_API_TOKEN=CHANGE_ME
@@ -69,3 +83,9 @@ TWILIO_PHONE_NUMBER=CHANGE_ME
 # Cloudflare Email Service
 # Must be an address on a domain configured in Cloudflare Email Sending
 SEND_EMAIL_FROM=noreply@mail.dafthunk.com
+
+# Node inbound email webhook (optional in development; required in production)
+# INBOUND_EMAIL_SECRET=change-me-in-production
+
+# Support inbox local-part (routes to admin support inbox instead of org triggers)
+# SUPPORT_EMAIL_HANDLE=support

@@ -9,10 +9,40 @@ import type {
   WorkflowTrigger,
 } from "@dafthunk/types";
 
-import { getApiBaseUrl } from "@/config/api";
+import { buildApiUrl, getApiBaseUrl } from "@/config/api";
 
 // Re-export for convenience
 export type { WorkflowState };
+
+function getWebSocketBaseUrl(): string {
+  const wsHost =
+    typeof import.meta.env !== "undefined"
+      ? import.meta.env.VITE_WS_HOST
+      : undefined;
+  if (typeof wsHost === "string" && wsHost.length > 0) {
+    return wsHost.replace(/\/$/, "");
+  }
+
+  const apiBaseUrl = getApiBaseUrl();
+  if (apiBaseUrl.startsWith("http://") || apiBaseUrl.startsWith("https://")) {
+    return apiBaseUrl.replace(/^http/, "ws");
+  }
+
+  // Vite /api proxy cannot complete @hono/node-ws handshakes (returns HTTP 200).
+  if (
+    apiBaseUrl.startsWith("/") &&
+    typeof import.meta.env !== "undefined" &&
+    import.meta.env.DEV
+  ) {
+    return "ws://localhost:3102";
+  }
+
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin.replace(/^http/, "ws")
+      : "ws://localhost:3101";
+  return `${origin}${apiBaseUrl}`;
+}
 
 export interface WorkflowWSOptions {
   // Message-level callbacks (happy path only)
@@ -22,8 +52,27 @@ export interface WorkflowWSOptions {
 
   // Connection-level callbacks (problems)
   onConnectionOpen?: () => void;
-  onConnectionClose?: (event: CloseEvent) => void;
+  onConnectionClose?: (
+    event: CloseEvent,
+    context: { willReconnect: boolean }
+  ) => void;
   onConnectionError?: (event: Event) => void;
+}
+
+async function fetchWsAccessToken(): Promise<string | undefined> {
+  try {
+    const response = await fetch(buildApiUrl("/auth/ws-token"), {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const body = (await response.json()) as { token?: string };
+    return body.token;
+  } catch (error) {
+    console.warn("[WorkflowWS] Failed to fetch ws-token:", error);
+    return undefined;
+  }
 }
 
 export class WorkflowWebSocket {
@@ -37,6 +86,7 @@ export class WorkflowWebSocket {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000; // Start with 1 second
   private shouldReconnect = true;
+  private accessToken: string | undefined;
   private currentState: WorkflowState | null = null;
   private activeExecutionId: string | null = null;
 
@@ -46,14 +96,20 @@ export class WorkflowWebSocket {
     private options: WorkflowWSOptions = {}
   ) {}
 
-  connect(): void {
+  connect(accessToken?: string): void {
     if (this.isConnectedOrConnecting()) {
       return;
     }
 
-    const apiBaseUrl = getApiBaseUrl();
-    const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
-    const url = `${wsBaseUrl}/${this.orgId}/ws/${this.workflowId}`;
+    if (accessToken) {
+      this.accessToken = accessToken;
+    }
+
+    const wsBaseUrl = getWebSocketBaseUrl();
+    const basePath = `${wsBaseUrl}/${this.orgId}/ws/${this.workflowId}`;
+    const url = this.accessToken
+      ? `${basePath}?access_token=${encodeURIComponent(this.accessToken)}`
+      : basePath;
 
     try {
       this.ws = new WebSocket(url);
@@ -72,9 +128,10 @@ export class WorkflowWebSocket {
       };
 
       this.ws.onclose = (event) => {
-        this.options.onConnectionClose?.(event);
+        const willReconnect = this.shouldAttemptReconnect(event);
+        this.options.onConnectionClose?.(event, { willReconnect });
 
-        if (this.shouldAttemptReconnect(event)) {
+        if (willReconnect) {
           this.reconnectAttempts++;
 
           setTimeout(() => this.connect(), this.reconnectDelay);
@@ -318,12 +375,13 @@ export class WorkflowWebSocket {
   }
 }
 
-export const connectWorkflowWS = (
+export const connectWorkflowWS = async (
   orgId: string,
   workflowId: string,
   options: WorkflowWSOptions = {}
-): WorkflowWebSocket => {
+): Promise<WorkflowWebSocket> => {
+  const accessToken = await fetchWsAccessToken();
   const ws = new WorkflowWebSocket(orgId, workflowId, options);
-  ws.connect();
+  ws.connect(accessToken);
   return ws;
 };

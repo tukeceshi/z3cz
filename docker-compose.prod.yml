@@ -1,0 +1,136 @@
+# Dafthunk 实验性生产编排（Postgres + Node API + app + www SSR + SMTP 网关）
+#
+# 准备：
+#   node scripts/sync-env-docker-prod.mjs
+# 启动（容器内构建）：
+#   docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up --build -d
+#
+# 访问：
+#   www  http://localhost:3100
+#   app  http://localhost:3101
+#   api  http://localhost:3102
+#   smtp localhost:2525 → /inbound-email/raw
+
+services:
+  supabase-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - dafthunk_prod_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-api
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
+        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3102
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      LOCAL_STORAGE_PATH: /app/data/storage
+      RUN_DB_MIGRATE: ${RUN_DB_MIGRATE:-true}
+      WEB_HOST: ${WEB_HOST:-http://localhost:3101}
+      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:3100}
+      EMAIL_DOMAIN: ${EMAIL_DOMAIN:-mail.dafthunk.com}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.docker.prod}
+      SECRET_MASTER_KEY: ${SECRET_MASTER_KEY:?Set SECRET_MASTER_KEY in .env.docker.prod}
+      INBOUND_EMAIL_SECRET: ${INBOUND_EMAIL_SECRET:?Set INBOUND_EMAIL_SECRET in .env.docker.prod}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ENV: ${CLOUDFLARE_ENV:-production}
+    volumes:
+      - dafthunk_prod_storage:/app/data/storage
+    ports:
+      - "${API_PORT:-3102}:3102"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3102/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  www:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-www
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
+        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+        VITE_API_HOST: ${VITE_API_HOST:-http://localhost:3102}
+        VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3100}
+        VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
+        VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-hello@dafthunk.com}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WWW_PORT:-3100}:3100"
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-app
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
+        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+        VITE_API_HOST: /api
+        VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3100}
+        VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3101}:80"
+    restart: unless-stopped
+
+  smtp-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-smtp-gateway
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22.12.0}
+        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_URL: http://api:3102
+      INBOUND_EMAIL_SECRET: ${INBOUND_EMAIL_SECRET:?Set INBOUND_EMAIL_SECRET in .env.docker.prod}
+      SMTP_HOST: 0.0.0.0
+      SMTP_PORT: ${SMTP_PORT:-2525}
+    ports:
+      - "${SMTP_PORT:-2525}:2525"
+    restart: unless-stopped
+
+volumes:
+  dafthunk_prod_postgres_data:
+  dafthunk_prod_storage:

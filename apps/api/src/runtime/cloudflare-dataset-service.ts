@@ -9,7 +9,7 @@ import type {
   DatasetService,
 } from "@dafthunk/runtime";
 
-import type { Bindings } from "../context";
+import type { Bindings, DatabaseEnv } from "../context";
 import { createDatabase, getDataset } from "../db";
 
 /**
@@ -27,7 +27,7 @@ function buildAiSearchOptions(
   const retrieval: NonNullable<AiSearchOptions["retrieval"]> = {
     // Per-tenant isolation via a "starts with" folder filter, matching every
     // chunk under `${datasetId}/` (including subfolders). The managed AI Search
-    // binding expects this range form, not exact equality — `/` (0x2F) sorts
+    // binding expects this range form, not exact equality �?`/` (0x2F) sorts
     // just below `0` (0x30), so `${datasetId}/` <= folder < `${datasetId}0`.
     // See https://developers.cloudflare.com/ai-search/how-to/per-tenant-search/
     filters: { folder: { $gte: `${datasetId}/`, $lt: `${datasetId}0` } },
@@ -190,17 +190,15 @@ class CloudflareDataset implements Dataset {
  */
 export class CloudflareDatasetService implements DatasetService {
   constructor(
-    private env: Pick<
-      Bindings,
-      "DB" | "DATASETS" | "AI_SEARCH" | "DATASETS_AUTORAG"
-    >
+    private env: DatabaseEnv &
+      Pick<Bindings, "DATASETS" | "AI_SEARCH" | "DATASETS_AUTORAG">
   ) {}
 
   async resolve(
     datasetId: string,
     organizationId: string
   ): Promise<Dataset | undefined> {
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const dataset = await getDataset(db, datasetId, organizationId);
 
     if (!dataset) return undefined;

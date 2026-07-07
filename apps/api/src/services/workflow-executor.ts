@@ -9,8 +9,6 @@ import type { BlobParameter } from "@dafthunk/runtime";
 import type { Node, WorkflowExecution, WorkflowRuntime } from "@dafthunk/types";
 import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
-import { getAgentByName } from "../durable-objects/agent-utils";
-import { createWorkerRuntime } from "../runtime/cloudflare-worker-runtime";
 import { createSimulatedEmailMessage } from "../utils/email";
 import { createSimulatedHttpRequest } from "../utils/http";
 
@@ -87,7 +85,7 @@ export class WorkflowExecutor {
     // regardless of whether it ultimately succeeds. The ok-stamp happens after
     // execution finalizes (worker path below, or in WorkflowRuntimeEntrypoint).
     try {
-      const db = createDatabase(env.DB);
+      const db = createDatabase(env);
       await stampOnboardingStage(db, userId, "workflowExecuted");
     } catch (error) {
       console.error("Failed to stamp workflow_executed onboarding:", error);
@@ -170,17 +168,20 @@ export class WorkflowExecutor {
     // Use WorkerRuntime for "worker" runtime (synchronous execution)
     // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)
     if (workflow.runtime === "worker") {
+      const { createWorkerRuntime } = await import(
+        "../runtime/cloudflare-worker-runtime"
+      );
       const workerRuntime = createWorkerRuntime(env);
       const execution = await workerRuntime.execute(finalExecutionParams);
       console.log(
         `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=${workflow.trigger}`
       );
 
-      // Worker runtime is synchronous — stamp ok here. Durable runtime stamps
+      // Worker runtime is synchronous �?stamp ok here. Durable runtime stamps
       // in WorkflowRuntimeEntrypoint.run() once the workflow completes.
       if (execution.status === "completed") {
         try {
-          const db = createDatabase(env.DB);
+          const db = createDatabase(env);
           await stampOnboardingStage(db, userId, "workflowExecutedOk");
         } catch (error) {
           console.error(
@@ -193,21 +194,22 @@ export class WorkflowExecutor {
       return { executionId: execution.id, execution };
     }
 
-    // Start workflow execution via Agent RPC (durable)
-    const agent = await getAgentByName(env.WORKFLOW_AGENT, workflow.id);
-    const executionId = await agent.executeWorkflow(finalExecutionParams);
+    // Start workflow execution via Agent RPC (durable) or Node in-process runner
+    const { startWorkflowExecution } = await import(
+      "../runtime/start-workflow-execution"
+    );
+    const result = await startWorkflowExecution(env, finalExecutionParams);
+    const executionId = result.executionId;
     console.log(
       `[Execution] ${executionId} workflow=${workflow.id} runtime=workflow trigger=${workflow.trigger}`
     );
 
-    // Build initial nodeExecutions
     const nodeExecutions = workflow.nodes.map((node) => ({
       nodeId: node.id,
       status: "executing" as const,
       usage: 0,
     }));
 
-    // Create initial execution record
     const execution: WorkflowExecution = {
       id: executionId,
       workflowId: workflow.id,

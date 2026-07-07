@@ -1,0 +1,258 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1747658159305,
+      "tag": "0000_initialize_database",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1748781180897,
+      "tag": "0001_add_user_in_waitlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1748847710074,
+      "tag": "0002_improve_workflow_handle",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1749079139416,
+      "tag": "0003_add_cron_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1749153229786,
+      "tag": "0004_add_version_alias_to_cron",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1749163639615,
+      "tag": "0005_split_version_alias_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1749289788690,
+      "tag": "0006_allow_multiple_auth_providers_per_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1749634472152,
+      "tag": "0007_add_datasets_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1749823763329,
+      "tag": "0008_add_organization_compute_credits",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1750239511699,
+      "tag": "0009_add_developer_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1750831963943,
+      "tag": "0010_remove_user_in_waitlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1758263902291,
+      "tag": "0011_add_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1759828484317,
+      "tag": "0012_migrate_to_r2",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1760684648715,
+      "tag": "0013_add_integrations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1760718271260,
+      "tag": "0014_add_status_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1760987622510,
+      "tag": "0015_add_description_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1761317207481,
+      "tag": "0016_remove_executions_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1762296013672,
+      "tag": "0017_add_queues_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1762315456000,
+      "tag": "0018_unified_active_deployment",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1762318800000,
+      "tag": "0019_add_emails_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1762645590673,
+      "tag": "0020_remove_cron_trigger_timestamps",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1762685990000,
+      "tag": "0021_update_cron_to_scheduled",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1762686120000,
+      "tag": "0022_rename_cron_triggers_to_scheduled",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1762686240000,
+      "tag": "0023_add_databases_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1733691600000,
+      "tag": "0024_add_invitations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1733796480000,
+      "tag": "0025_add_stripe_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1733796481000,
+      "tag": "0026_add_overage_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1734307200000,
+      "tag": "0027_add_tour_completed",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1736035200000,
+      "tag": "0028_fix_integrations_unique_constraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1736120700000,
+      "tag": "0029_add_evaluations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1736121000000,
+      "tag": "0030_change_evaluations_to_deployments",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1736121300000,
+      "tag": "0031_add_feedback_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1736121600000,
+      "tag": "0032_make_feedback_deployment_id_optional",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1736121900000,
+      "tag": "0033_add_feedback_workflow_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1736200000000,
+      "tag": "0034_add_workflow_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1736300000000,
+      "tag": "0035_rename_type_to_trigger",
+      "breakpoints": true
+    }
+  ]
+}

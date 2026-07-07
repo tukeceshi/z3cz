@@ -81,6 +81,7 @@ export function EditorPage() {
   } = useEditableWorkflow({
     workflowId: id,
     nodeTypes: nodeTypes || [],
+    fallbackWorkflow: httpWorkflowMetadata,
     onExecutionUpdate: (execution) => {
       // Try to call the callback ref (for UI-triggered executions)
       if (executionCallbackRef.current) {
@@ -179,20 +180,30 @@ export function EditorPage() {
     );
   }
 
+  const effectiveWorkflowMetadata =
+    workflowMetadata ??
+    (httpWorkflowMetadata
+      ? {
+          id: httpWorkflowMetadata.id,
+          name: httpWorkflowMetadata.name,
+          description: httpWorkflowMetadata.description,
+          trigger: httpWorkflowMetadata.trigger,
+          runtime: httpWorkflowMetadata.runtime,
+        }
+      : null);
+
   const isLoading =
     isNodeTypesLoading ||
-    isWorkflowInitializing ||
-    !initialNodesForUI ||
-    !initialEdgesForUI;
+    (isWorkflowInitializing && !effectiveWorkflowMetadata);
 
   if (isLoading) {
     return <InsetLoading />;
   }
 
-  if (!workflowMetadata) {
+  if (!effectiveWorkflowMetadata) {
     return (
       <WorkflowError
-        message={`Workflow with ID "${id}" not found, or could not be loaded via WebSocket.`}
+        message={`Workflow with ID "${id}" not found, or could not be loaded.`}
         onRetry={() => navigate(getOrgUrl("workflows"))}
       />
     );
@@ -200,38 +211,28 @@ export function EditorPage() {
 
   return (
     <ReactFlowProvider>
-      <div className="h-full w-full flex flex-col relative">
-        <div className="h-full w-full grow">
-          <WorkflowBuilder
-            workflowId={id || ""}
-            workflowTrigger={
-              (httpWorkflowMetadata?.trigger || workflowMetadata?.trigger) as
-                | WorkflowTrigger
-                | undefined
-            }
-            workflowRuntime={
-              httpWorkflowMetadata?.runtime || workflowMetadata?.runtime
-            }
-            initialNodes={initialNodesForUI}
-            initialEdges={initialEdgesForUI}
-            nodeTypes={nodeTypes || []}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            executeWorkflow={executeWorkflowWrapper}
-            initialWorkflowExecution={latestExecution || undefined}
-            createObjectUrl={createObjectUrl}
-            workflowName={
-              httpWorkflowMetadata?.name || workflowMetadata?.name || ""
-            }
-            workflowDescription={httpWorkflowMetadata?.description}
-            onWorkflowUpdate={handleWorkflowUpdate}
-            orgId={orgId}
-            wsExecuteWorkflow={wsExecuteWorkflow}
-            isEnabled={isEnabled}
-            isTogglingEnabled={isTogglingEnabled}
-            onToggleEnabled={handleToggleEnabled}
-          />
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <WorkflowBuilder
+          workflowId={id || ""}
+          workflowTrigger={effectiveWorkflowMetadata.trigger as WorkflowTrigger}
+          workflowRuntime={effectiveWorkflowMetadata.runtime}
+          initialNodes={initialNodesForUI}
+          initialEdges={initialEdgesForUI}
+          nodeTypes={nodeTypes || []}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          executeWorkflow={executeWorkflowWrapper}
+          initialWorkflowExecution={latestExecution || undefined}
+          createObjectUrl={createObjectUrl}
+          workflowName={effectiveWorkflowMetadata.name || ""}
+          workflowDescription={effectiveWorkflowMetadata.description}
+          onWorkflowUpdate={handleWorkflowUpdate}
+          orgId={orgId}
+          wsExecuteWorkflow={wsExecuteWorkflow}
+          isEnabled={isEnabled}
+          isTogglingEnabled={isTogglingEnabled}
+          onToggleEnabled={handleToggleEnabled}
+        />
       </div>
     </ReactFlowProvider>
   );

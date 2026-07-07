@@ -7,8 +7,15 @@ export const corsMiddleware = (
   c: Context<ApiContext>,
   next: () => Promise<void>
 ) => {
+  if (c.req.header("upgrade")?.toLowerCase() === "websocket") {
+    return next();
+  }
+
+  const webHost = c.env?.WEB_HOST ?? "http://localhost:3101";
+  const isDevelopment = (c.env?.CLOUDFLARE_ENV ?? "development") !== "production";
+
   return cors({
-    origin: c.env.WEB_HOST,
+    origin: webHost,
     allowHeaders: [
       "X-Custom-Header",
       "Authorization",
@@ -16,9 +23,7 @@ export const corsMiddleware = (
       "X-Requested-With",
       "Content-Type",
       "Accept",
-      ...(c.env.CLOUDFLARE_ENV !== "development"
-        ? ["Upgrade-Insecure-Requests"]
-        : []),
+      ...(isDevelopment ? [] : ["Upgrade-Insecure-Requests"]),
     ],
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS", "PATCH"],
     exposeHeaders: ["Content-Length", "X-Content-Type-Options"],

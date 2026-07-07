@@ -9,8 +9,6 @@ import {
   getOrganizationBillingInfo,
   resolveOrganizationBillingOptions,
 } from "../db";
-import { getAgentByName } from "../durable-objects/agent-utils";
-import { createWorkerRuntime } from "../runtime/cloudflare-worker-runtime";
 import { WorkflowStore } from "../stores/workflow-store";
 import { isCreditExhausted } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
@@ -23,7 +21,7 @@ const telegramWebhook = new Hono<ApiContext>();
  */
 telegramWebhook.post("/webhook/:telegramBotId", async (c) => {
   const telegramBotId = c.req.param("telegramBotId");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   // Verify the secret token sent by Telegram (stored in trigger metadata)
   const incomingToken = c.req.header("X-Telegram-Bot-Api-Secret-Token");
@@ -114,7 +112,7 @@ async function dispatchWorkflows(
   telegramBotId: string,
   message: TelegramMessagePayload
 ): Promise<void> {
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const chatIdStr = String(message.chatId);
   const allTriggers = await getBotTriggersByBot(
     db,
@@ -180,7 +178,7 @@ async function executeWorkflow(
   workflowStore: WorkflowStore,
   perBotToken?: string
 ): Promise<void> {
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const organizationId = workflow.organizationId;
 
   let workflowData: Workflow;
@@ -253,19 +251,16 @@ async function executeWorkflow(
     ...(perBotToken ? { telegramBotToken: perBotToken } : {}),
   };
 
-  if (workflowData.runtime === "worker") {
-    const workerRuntime = createWorkerRuntime(env);
-    const execution = await workerRuntime.execute(executionParams);
-    console.log(
-      `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=telegram status=${execution.status} error=${execution.error ?? "none"}`
-    );
-  } else {
-    const agent = await getAgentByName(env.WORKFLOW_AGENT, workflow.id);
-    const executionId = await agent.executeWorkflow(executionParams);
-    console.log(
-      `[Execution] ${executionId} workflow=${workflow.id} runtime=workflow trigger=telegram`
-    );
-  }
+  const { startWorkflowExecution } = await import(
+    "../runtime/start-workflow-execution"
+  );
+  const result = await startWorkflowExecution(env, executionParams);
+  console.log(
+    `[Execution] ${result.executionId} workflow=${workflow.id} runtime=${workflowData.runtime} trigger=telegram` +
+      (result.status
+        ? ` status=${result.status} error=${result.error ?? "none"}`
+        : "")
+  );
 }
 
 export default telegramWebhook;

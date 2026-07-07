@@ -35,7 +35,7 @@ secretRoutes.use("*", jwtMiddleware);
  */
 secretRoutes.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const secrets = await getSecrets(db, organizationId);
@@ -63,7 +63,7 @@ secretRoutes.post(
   ),
   async (c) => {
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { name, value } = c.req.valid("json");
 
     try {
@@ -93,7 +93,7 @@ secretRoutes.post(
  */
 secretRoutes.get("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const secretId = c.req.param("id");
 
   try {
@@ -127,7 +127,7 @@ secretRoutes.put(
   ),
   async (c) => {
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const secretId = c.req.param("id");
     const updates = c.req.valid("json");
 
@@ -165,7 +165,7 @@ secretRoutes.put(
  */
 secretRoutes.delete("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const secretId = c.req.param("id");
 
   try {

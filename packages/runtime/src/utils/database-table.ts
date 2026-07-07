@@ -5,22 +5,17 @@ import {
   type Schema,
 } from "@dafthunk/types";
 
-/**
- * Result row from PRAGMA table_info()
- */
-export interface PragmaTableInfoRow {
-  cid: number;
+export interface ColumnInfoRow {
   name: string;
   type: string;
-  notnull: number;
+  notnull: boolean | number;
   dflt_value: string | null;
-  pk: number;
+  pk: boolean | number;
 }
 
-/**
- * Validate that a string is a safe SQL identifier (table or column name).
- * Throws if the identifier contains characters that could enable SQL injection.
- */
+/** @deprecated Use ColumnInfoRow */
+export type PragmaTableInfoRow = ColumnInfoRow;
+
 export function validateIdentifier(name: string, label: string): void {
   if (!IDENTIFIER_PATTERN.test(name)) {
     throw new Error(
@@ -29,62 +24,64 @@ export function validateIdentifier(name: string, label: string): void {
   }
 }
 
-/**
- * Map abstract field types to SQLite types
- */
-export function mapTypeToSqlite(type: FieldType): string {
-  switch (type) {
+export function mapTypeToPostgres(field: Field): string {
+  switch (field.type) {
     case "string":
       return "TEXT";
     case "integer":
+      if (field.primaryKey && field.autoIncrement) {
+        return "BIGSERIAL";
+      }
       return "INTEGER";
     case "number":
-      return "REAL";
+      return "DOUBLE PRECISION";
     case "boolean":
-      return "INTEGER"; // SQLite uses INTEGER for booleans
+      return "BOOLEAN";
     case "datetime":
-      return "TEXT"; // SQLite stores datetime as ISO8601 strings
+      return "TIMESTAMPTZ";
     case "json":
-      return "TEXT"; // SQLite stores JSON as TEXT
+      return "JSONB";
     case "image":
     case "document":
     case "audio":
     case "video":
     case "blob":
-      return "TEXT"; // Blob fields store their ObjectReference as JSON text
+      return "JSONB";
     default:
-      throw new Error(`Unsupported field type: ${type}`);
+      throw new Error(`Unsupported field type: ${field.type satisfies never}`);
   }
 }
 
-/**
- * Map SQLite types back to abstract field types
- * SQLite has flexible typing, so we use best-effort mapping
- */
-export function mapSqliteToType(sqliteType: string): FieldType {
-  const normalized = sqliteType.toUpperCase().trim();
+/** @deprecated Use mapTypeToPostgres */
+export function mapTypeToSqlite(type: FieldType): string {
+  return mapTypeToPostgres({ name: "_", type });
+}
 
-  // INTEGER types
+export function mapPostgresToType(pgType: string): FieldType {
+  const normalized = pgType.toUpperCase().trim();
+
   if (
     normalized.includes("INT") ||
-    normalized.includes("BOOLEAN") ||
-    normalized.includes("BOOL")
+    normalized.includes("SERIAL") ||
+    normalized === "BIGSERIAL"
   ) {
     return "integer";
   }
 
-  // REAL/FLOAT types
   if (
+    normalized.includes("DOUBLE") ||
     normalized.includes("REAL") ||
     normalized.includes("FLOAT") ||
-    normalized.includes("DOUBLE") ||
     normalized.includes("DECIMAL") ||
     normalized.includes("NUMERIC")
   ) {
     return "number";
   }
 
-  // TEXT types - check for special semantic types
+  if (normalized.includes("BOOL")) {
+    return "boolean";
+  }
+
   if (
     normalized.includes("JSON") ||
     normalized.includes("JSONB") ||
@@ -101,13 +98,14 @@ export function mapSqliteToType(sqliteType: string): FieldType {
     return "datetime";
   }
 
-  // Default to string for TEXT and unknown types
   return "string";
 }
 
-/**
- * Generate CREATE TABLE statement from table
- */
+/** @deprecated Use mapPostgresToType */
+export function mapSqliteToType(sqliteType: string): FieldType {
+  return mapPostgresToType(sqliteType);
+}
+
 export function generateCreateTableSQL(schema: Schema): string {
   const { name, fields } = schema;
 
@@ -121,24 +119,24 @@ export function generateCreateTableSQL(schema: Schema): string {
   }
 
   const columns = fields.map((field) => {
-    const sqlType = mapTypeToSqlite(field.type);
+    const sqlType = mapTypeToPostgres(field);
+    const isSerial = sqlType === "BIGSERIAL";
     const pk = field.primaryKey ? " PRIMARY KEY" : "";
-    const ai = field.autoIncrement && field.primaryKey ? " AUTOINCREMENT" : "";
     const uq = !field.primaryKey && field.unique ? " UNIQUE" : "";
     let ref = "";
     if (field.references) {
       validateIdentifier(field.references, "referenced table name");
       ref = ` REFERENCES ${field.references}`;
     }
-    return `${field.name} ${sqlType}${pk}${ai}${uq}${ref}`;
+    if (isSerial) {
+      return `${field.name} ${sqlType}${pk}${ref}`;
+    }
+    return `${field.name} ${sqlType}${pk}${uq}${ref}`;
   });
 
   return `CREATE TABLE IF NOT EXISTS ${name} (${columns.join(", ")})`;
 }
 
-/**
- * Generate INSERT statements for data rows
- */
 export function generateInsertSQL(
   tableName: string,
   data: Record<string, unknown>[]
@@ -149,37 +147,148 @@ export function generateInsertSQL(
 
   validateIdentifier(tableName, "table name");
 
-  // Get column names from first row
   const columns = Object.keys(data[0]);
   for (const col of columns) {
     validateIdentifier(col, "column name");
   }
   const placeholders = columns.map(() => "?").join(", ");
   const sql = `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES (${placeholders})`;
-
-  // Extract values for each row
   const params = data.map((row) => columns.map((col) => row[col]));
 
   return { sql, params };
 }
 
-/**
- * Extract the primary key field from a schema.
- */
-export function getPrimaryKeyField(schema: Schema): Field | null {
-  return schema.fields.find((f) => f.primaryKey === true) ?? null;
+export function generatePutRowSQL(
+  schema: Schema,
+  columns: readonly string[],
+  pkField: Field | null
+): string {
+  validateIdentifier(schema.name, "table name");
+  const placeholders = columns.map(() => "?").join(", ");
+
+  if (!pkField) {
+    return `INSERT INTO ${schema.name} (${columns.join(", ")}) VALUES (${placeholders})`;
+  }
+
+  const updates = columns
+    .filter((column) => column !== pkField.name)
+    .map((column) => `${column} = EXCLUDED.${column}`)
+    .join(", ");
+
+  return `INSERT INTO ${schema.name} (${columns.join(", ")}) VALUES (${placeholders}) ON CONFLICT (${pkField.name}) DO UPDATE SET ${updates}`;
 }
 
-/**
- * Check if a table exists in SQLite
- */
+export function getPrimaryKeyField(schema: Schema): Field | null {
+  return schema.fields.find((field) => field.primaryKey === true) ?? null;
+}
+
 export function generateCheckTableExistsSQL(tableName: string): {
   sql: string;
   params: string[];
 } {
   validateIdentifier(tableName, "table name");
   return {
-    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+    sql: `SELECT table_name AS name FROM information_schema.tables
+      WHERE table_schema = current_schema()
+        AND table_type = 'BASE TABLE'
+        AND table_name = ?`,
     params: [tableName],
   };
+}
+
+export function generateListTablesSQL(): { sql: string; params: [] } {
+  return {
+    sql: `SELECT table_name AS name FROM information_schema.tables
+      WHERE table_schema = current_schema()
+        AND table_type = 'BASE TABLE'
+      ORDER BY table_name`,
+    params: [],
+  };
+}
+
+export function generateDescribeTableColumnsSQL(tableName: string): {
+  sql: string;
+  params: string[];
+} {
+  validateIdentifier(tableName, "table name");
+  return {
+    sql: `SELECT c.column_name AS name,
+             c.data_type AS type,
+             CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS notnull,
+             c.column_default AS dflt_value,
+             CASE WHEN pk.column_name IS NOT NULL THEN 1 ELSE 0 END AS pk
+      FROM information_schema.columns c
+      LEFT JOIN (
+        SELECT kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+          AND tc.table_schema = current_schema()
+          AND tc.table_name = ?
+      ) pk ON pk.column_name = c.column_name
+      WHERE c.table_schema = current_schema()
+        AND c.table_name = ?
+      ORDER BY c.ordinal_position`,
+    params: [tableName, tableName],
+  };
+}
+
+export function generateUniqueColumnNamesSQL(tableName: string): {
+  sql: string;
+  params: string[];
+} {
+  validateIdentifier(tableName, "table name");
+  return {
+    sql: `WITH single_column_unique AS (
+        SELECT tc.constraint_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+        WHERE tc.constraint_type = 'UNIQUE'
+          AND tc.table_schema = current_schema()
+          AND tc.table_name = ?
+        GROUP BY tc.constraint_name
+        HAVING COUNT(*) = 1
+      )
+      SELECT kcu.column_name AS name
+      FROM single_column_unique scu
+      JOIN information_schema.key_column_usage kcu
+        ON kcu.constraint_name = scu.constraint_name
+       AND kcu.table_schema = current_schema()
+      WHERE kcu.table_name = ?`,
+    params: [tableName, tableName],
+  };
+}
+
+export function generateForeignKeysSQL(tableName: string): {
+  sql: string;
+  params: string[];
+} {
+  validateIdentifier(tableName, "table name");
+  return {
+    sql: `SELECT kcu.column_name AS "from",
+             ccu.table_name AS "table",
+             ccu.column_name AS "to"
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu
+        ON tc.constraint_name = kcu.constraint_name
+       AND tc.table_schema = kcu.table_schema
+      JOIN information_schema.constraint_column_usage ccu
+        ON ccu.constraint_name = tc.constraint_name
+       AND ccu.table_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY'
+        AND tc.table_schema = current_schema()
+        AND tc.table_name = ?`,
+    params: [tableName],
+  };
+}
+
+export function columnHasAutoIncrement(defaultValue: string | null): boolean {
+  if (!defaultValue) {
+    return false;
+  }
+  return /nextval\(/i.test(defaultValue);
 }

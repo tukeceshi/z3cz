@@ -58,7 +58,7 @@ adminUsersRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { page, limit, search } = c.req.valid("query");
     const offset = (page - 1) * limit;
 
@@ -133,7 +133,7 @@ adminUsersRoutes.get(
  * Get details for a specific user including their organization memberships
  */
 adminUsersRoutes.get("/:id", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   try {
@@ -201,7 +201,7 @@ adminUsersRoutes.get("/:id", async (c) => {
  * admin UI can reuse the same usage card.
  */
 adminUsersRoutes.get("/:id/billing", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   const [user] = await db
@@ -255,7 +255,7 @@ adminUsersRoutes.get("/:id/billing", async (c) => {
  * signup flow). Surfaces a structured error if the user has no email on file.
  */
 adminUsersRoutes.post("/:id/welcome-email", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   const [user] = await db

@@ -53,7 +53,7 @@ feedbackRoutes.post(
   async (c) => {
     const organizationId = c.get("organizationId")!;
     const body = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Verify the workflow belongs to the caller's organization
     const workflow = await db.query.workflows.findFirst({
@@ -101,7 +101,7 @@ feedbackRoutes.post(
  */
 feedbackRoutes.get("/criteria", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const rows = await db.query.feedbackCriteria.findMany({
     where: eq(feedbackCriteria.organizationId, organizationId),
@@ -121,7 +121,7 @@ feedbackRoutes.get("/criteria", async (c) => {
 feedbackRoutes.get("/criteria/workflow/:workflowId", async (c) => {
   const organizationId = c.get("organizationId")!;
   const workflowId = c.req.param("workflowId");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const rows = await db.query.feedbackCriteria.findMany({
     where: and(
@@ -155,7 +155,7 @@ feedbackRoutes.patch(
     const organizationId = c.get("organizationId")!;
     const id = c.req.param("id");
     const body = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const existing = await db.query.feedbackCriteria.findFirst({
       where: and(
@@ -194,7 +194,7 @@ feedbackRoutes.patch(
 feedbackRoutes.delete("/criteria/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const existing = await db.query.feedbackCriteria.findFirst({
     where: and(
@@ -236,7 +236,7 @@ feedbackRoutes.put(
     const userId = jwtPayload.sub;
     const body = c.req.valid("json");
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const executionStore = new CloudflareExecutionStore(c.env);
 
     // Verify execution exists
@@ -335,7 +335,7 @@ feedbackRoutes.post(
     const userId = jwtPayload.sub;
     const { executionId, responses } = c.req.valid("json");
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const executionStore = new CloudflareExecutionStore(c.env);
 
     // Verify execution exists
@@ -402,7 +402,7 @@ feedbackRoutes.post(
 feedbackRoutes.get("/execution/:executionId", async (c) => {
   const organizationId = c.get("organizationId")!;
   const executionId = c.req.param("executionId");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const rows = await db.query.feedback.findMany({
     where: and(
@@ -428,7 +428,7 @@ feedbackRoutes.get("/execution/:executionId", async (c) => {
  */
 feedbackRoutes.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const {
     workflowId,
@@ -480,7 +480,7 @@ feedbackRoutes.get("/", async (c) => {
 feedbackRoutes.delete("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   const existing = await db.query.feedback.findFirst({
     where: and(

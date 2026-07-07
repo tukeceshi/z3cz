@@ -41,7 +41,7 @@ queueRoutes.use("*", jwtMiddleware);
  * List all queues for the current organization
  */
 queueRoutes.get("/", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const allQueues = await getQueues(db, organizationId);
@@ -65,7 +65,7 @@ queueRoutes.post(
     const data = c.req.valid("json");
     const now = new Date();
     const organizationId = c.get("organizationId")!;
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const queueId = uuid();
     const queueName = data.name || "Untitled Queue";
@@ -94,7 +94,7 @@ queueRoutes.post(
  */
 queueRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const queue = await getQueue(db, id, organizationId);
@@ -125,7 +125,7 @@ queueRoutes.put(
   ),
   async (c) => {
     const id = c.req.param("id");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.get("organizationId")!;
 
     const existingQueue = await getQueue(db, id, organizationId);
@@ -157,7 +157,7 @@ queueRoutes.put(
  */
 queueRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.get("organizationId")!;
 
   const existingQueue = await getQueue(db, id, organizationId);
@@ -189,7 +189,7 @@ queueRoutes.post(
   async (c) => {
     const queueId = c.req.param("queueId");
     const { payload } = c.req.valid("json");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Get auth context from either JWT or API key
     const { organizationId } = getAuthContext(c);

@@ -55,7 +55,7 @@ organizationRoutes.get("/", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const organizations = await getUserOrganizations(db, jwtPayload.sub);
@@ -86,7 +86,7 @@ organizationRoutes.post(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { name } = c.req.valid("json");
 
     try {
@@ -120,7 +120,7 @@ organizationRoutes.delete("/:id", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
 
   try {
@@ -157,7 +157,7 @@ organizationRoutes.get("/:id/memberships", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
 
   if (!(await isOrganizationMember(db, jwtPayload.sub, organizationId))) {
@@ -199,7 +199,7 @@ organizationRoutes.post(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.req.param("id");
     const { email, role } = c.req.valid("json");
 
@@ -247,7 +247,7 @@ organizationRoutes.put(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.req.param("id");
     const { email, role } = c.req.valid("json");
 
@@ -292,7 +292,7 @@ organizationRoutes.delete(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.req.param("id");
     const { email } = c.req.valid("json");
 
@@ -332,7 +332,7 @@ organizationRoutes.get("/:id/invitations", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
 
   if (!(await isOrganizationMember(db, jwtPayload.sub, organizationId))) {
@@ -378,7 +378,7 @@ organizationRoutes.post(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const organizationId = c.req.param("id");
     const { email, role } = c.req.valid("json");
 
@@ -471,7 +471,7 @@ organizationRoutes.delete("/:id/invitations/:invitationId", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const organizationId = c.req.param("id");
   const invitationId = c.req.param("invitationId");
 

@@ -1,4 +1,3 @@
-import { EmailMessage } from "cloudflare:email";
 import { v7 as uuidv7 } from "uuid";
 
 import type { Bindings } from "../context";
@@ -166,8 +165,15 @@ export class EmailService {
     });
 
     try {
-      const message = new EmailMessage(from, to, rawMime);
-      await this.binding.send(message);
+      if (this.env.RUNTIME === "node") {
+        const outboxDir =
+          this.env.NODE_OUTBOX_DIR ?? "/app/data/storage/outbound-emails";
+        const { sendRawMimeEmailNode } = await import("./node-send-email-binding");
+        await sendRawMimeEmailNode(outboxDir, from, to, rawMime);
+      } else {
+        const { sendRawMimeEmail } = await import("./email-threaded-cloudflare");
+        await sendRawMimeEmail(this.binding, from, to, rawMime);
+      }
       return { success: true, rfc822MessageId, rawMime };
     } catch (error) {
       console.error("Email Service sendThreaded error:", error);

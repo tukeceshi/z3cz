@@ -2,9 +2,8 @@
  * Abstract database access for workflow nodes.
  *
  * Hides ownership verification and connection routing behind a simple
- * resolve → query/execute flow. Nodes never touch D1 or Durable Objects
- * directly — they receive a pre-bound DatabaseConnection scoped to the
- * resolved database.
+ * resolve → query/execute flow. Nodes receive a pre-bound DatabaseConnection
+ * scoped to the resolved database.
  */
 
 export interface QueryResult {

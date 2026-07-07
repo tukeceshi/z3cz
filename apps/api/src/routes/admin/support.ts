@@ -49,7 +49,7 @@ const threadSummaryColumns = {
   organizationName: organizations.name,
 } as const;
 
-/** GET /admin/support/threads — paginated. `unread` projected per row. */
+/** GET /admin/support/threads �?paginated. `unread` projected per row. */
 adminSupportRoutes.get(
   "/threads",
   zValidator(
@@ -65,7 +65,7 @@ adminSupportRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { page, limit, view, search, userId } = c.req.valid("query");
     const offset = (page - 1) * limit;
 
@@ -127,9 +127,9 @@ adminSupportRoutes.get(
   }
 );
 
-/** GET /admin/support/unread-count — drives the sidebar badge. */
+/** GET /admin/support/unread-count �?drives the sidebar badge. */
 adminSupportRoutes.get("/unread-count", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const adminUserId = c.get("jwtPayload")?.sub;
   if (!adminUserId) return c.json({ count: 0 });
 
@@ -156,9 +156,9 @@ adminSupportRoutes.get("/unread-count", async (c) => {
   return c.json({ count: row?.count ?? 0 });
 });
 
-/** GET /admin/support/threads/:id — thread + messages + attachment metadata. */
+/** GET /admin/support/threads/:id �?thread + messages + attachment metadata. */
 adminSupportRoutes.get("/threads/:id", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const id = c.req.param("id");
 
   const [thread] = await db
@@ -206,7 +206,7 @@ adminSupportRoutes.get("/threads/:id", async (c) => {
           set: { lastReadAt: now },
         });
     } catch (error) {
-      // Read tracking is best-effort — never fail the request because the
+      // Read tracking is best-effort �?never fail the request because the
       // badge couldn't update.
       console.error("[support] failed to mark thread as read", error);
     }
@@ -227,7 +227,7 @@ adminSupportRoutes.get("/threads/:id", async (c) => {
   });
 });
 
-/** GET /admin/support/messages/:id/body?part=text|html — streams from R2. */
+/** GET /admin/support/messages/:id/body?part=text|html �?streams from R2. */
 adminSupportRoutes.get(
   "/messages/:id/body",
   zValidator(
@@ -237,7 +237,7 @@ adminSupportRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const id = c.req.param("id");
     const { part } = c.req.valid("query");
 
@@ -285,9 +285,9 @@ adminSupportRoutes.get(
   }
 );
 
-/** GET /admin/support/attachments/:id — streams from R2 with download disposition. */
+/** GET /admin/support/attachments/:id �?streams from R2 with download disposition. */
 adminSupportRoutes.get("/attachments/:id", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const id = c.req.param("id");
 
   const [att] = await db
@@ -323,7 +323,7 @@ adminSupportRoutes.get("/attachments/:id", async (c) => {
 });
 
 /**
- * POST /admin/support/threads — admin-initiated outbound thread. Creates a
+ * POST /admin/support/threads �?admin-initiated outbound thread. Creates a
  * new thread addressed to an arbitrary email and sends the first message
  * via the shared outbound path. Auto-links to a registered user when the
  * recipient's address matches `users.email`.
@@ -344,7 +344,7 @@ adminSupportRoutes.post(
       })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { toEmail, subject, text, html } = c.req.valid("json");
     const normalizedTo = toEmail.toLowerCase();
 
@@ -391,7 +391,7 @@ adminSupportRoutes.post(
   }
 );
 
-/** POST /admin/support/threads/:id/reply — threaded reply via SUPPORT_EMAIL_FROM. */
+/** POST /admin/support/threads/:id/reply �?threaded reply via SUPPORT_EMAIL_FROM. */
 adminSupportRoutes.post(
   "/threads/:id/reply",
   zValidator(
@@ -407,11 +407,11 @@ adminSupportRoutes.post(
       })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const threadId = c.req.param("id");
     const body = c.req.valid("json");
 
-    const [threadRows, lastInboundRows] = await db.batch([
+    const [threadRows, lastInboundRows] = await Promise.all([
       db
         .select({
           inboxId: threads.inboxId,
@@ -451,12 +451,12 @@ adminSupportRoutes.post(
   }
 );
 
-/** PATCH /admin/support/threads/:id — archive / unarchive. */
+/** PATCH /admin/support/threads/:id �?archive / unarchive. */
 adminSupportRoutes.patch(
   "/threads/:id",
   zValidator("json", z.object({ archived: z.boolean() })),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const id = c.req.param("id");
     const { archived } = c.req.valid("json");
 

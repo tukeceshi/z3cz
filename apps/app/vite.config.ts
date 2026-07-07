@@ -15,6 +15,17 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    host: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:3102",
+        changeOrigin: true,
+        ws: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

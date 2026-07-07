@@ -10,8 +10,6 @@ import {
   getOrganizationBillingInfo,
   resolveOrganizationBillingOptions,
 } from "../db";
-import { getAgentByName } from "../durable-objects/agent-utils";
-import { createWorkerRuntime } from "../runtime/cloudflare-worker-runtime";
 import { WorkflowStore } from "../stores/workflow-store";
 import { isCreditExhausted } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
@@ -61,7 +59,7 @@ function hexToUint8Array(hex: string): Uint8Array {
 discordWebhook.post("/webhook/:discordBotId", async (c) => {
   const discordBotId = c.req.param("discordBotId");
   console.log(`[DiscordWebhook] Received request for bot ${discordBotId}`);
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   // Look up bot to get public key from metadata
   const bot = await getBotById(db, discordBotId);
@@ -123,12 +121,12 @@ discordWebhook.post("/webhook/:discordBotId", async (c) => {
       `[DiscordWebhook] Interaction type=${interaction.type} data=${!!interaction.data}`
     );
 
-    // Type 1: PING — Discord endpoint verification handshake
+    // Type 1: PING ??Discord endpoint verification handshake
     if (interaction.type === 1) {
       return c.json({ type: 1 });
     }
 
-    // Type 2: APPLICATION_COMMAND — slash command invocation
+    // Type 2: APPLICATION_COMMAND ??slash command invocation
     if (interaction.type === 2 && interaction.data) {
       const commandName = interaction.data.name;
       const options: Record<string, string | number | boolean> = {};
@@ -163,7 +161,7 @@ discordWebhook.post("/webhook/:discordBotId", async (c) => {
       return c.json({ type: 5 });
     }
 
-    // Other interaction types — acknowledge
+    // Other interaction types ??acknowledge
     return c.json({ type: 1 });
   } catch (error) {
     console.error(
@@ -171,7 +169,7 @@ discordWebhook.post("/webhook/:discordBotId", async (c) => {
       error instanceof Error ? error.message : String(error)
     );
     // Return DEFERRED response to prevent "application did not respond" errors
-    // even when processing fails — the user will just see no follow-up
+    // even when processing fails ??the user will just see no follow-up
     return c.json({ type: 5 });
   }
 });
@@ -193,7 +191,7 @@ async function dispatchWorkflows(
   discordBotId: string,
   interaction: DiscordInteractionPayload
 ): Promise<void> {
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const allTriggers = await getBotTriggersByBot(
     db,
     discordBotId,
@@ -258,7 +256,7 @@ async function executeWorkflow(
   workflowStore: WorkflowStore,
   perBotToken: string
 ): Promise<void> {
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const organizationId = workflow.organizationId;
 
   let workflowData: Workflow;
@@ -334,19 +332,16 @@ async function executeWorkflow(
     discordBotToken: perBotToken,
   };
 
-  if (workflowData.runtime === "worker") {
-    const workerRuntime = createWorkerRuntime(env);
-    const execution = await workerRuntime.execute(executionParams);
-    console.log(
-      `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=discord status=${execution.status} error=${execution.error ?? "none"}`
-    );
-  } else {
-    const agent = await getAgentByName(env.WORKFLOW_AGENT, workflow.id);
-    const executionId = await agent.executeWorkflow(executionParams);
-    console.log(
-      `[Execution] ${executionId} workflow=${workflow.id} runtime=workflow trigger=discord`
-    );
-  }
+  const { startWorkflowExecution } = await import(
+    "../runtime/start-workflow-execution"
+  );
+  const result = await startWorkflowExecution(env, executionParams);
+  console.log(
+    `[Execution] ${result.executionId} workflow=${workflow.id} runtime=${workflowData.runtime} trigger=discord` +
+      (result.status
+        ? ` status=${result.status} error=${result.error ?? "none"}`
+        : "")
+  );
 }
 
 export default discordWebhook;

@@ -13,7 +13,7 @@ import type { Schema } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
-import { CloudflareDatabaseService } from "../runtime/cloudflare-database-service";
+import { PostgresDatabaseService } from "../runtime/postgres-database-service";
 import { CloudflareDatasetService } from "../runtime/cloudflare-dataset-service";
 import { CloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import {
@@ -36,7 +36,7 @@ export async function buildNodeToolProvider(
   );
   const credentialService = new CloudflareCredentialService(env);
   await credentialService.initialize(organizationId);
-  const databaseService = new CloudflareDatabaseService(env);
+  const databaseService = new PostgresDatabaseService(env);
   const datasetService = new CloudflareDatasetService(env);
   const queueService = new CloudflareQueueService(env);
 

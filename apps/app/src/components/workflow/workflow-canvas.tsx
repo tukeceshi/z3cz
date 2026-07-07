@@ -586,7 +586,8 @@ export function WorkflowCanvas({
 
   return (
     <TooltipProvider>
-      <ReactFlow
+      <div className="h-full w-full min-h-0">
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -612,6 +613,7 @@ export function WorkflowCanvas({
         minZoom={0.05}
         maxZoom={4}
         className={cn(
+          "h-full w-full",
           showBackground && "bg-neutral-100/50",
           disabled && "cursor-default"
         )}
@@ -745,6 +747,7 @@ export function WorkflowCanvas({
           </div>
         )}
       </ReactFlow>
+      </div>
     </TooltipProvider>
   );
 }

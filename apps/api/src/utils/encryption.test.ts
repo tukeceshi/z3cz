@@ -14,14 +14,13 @@ const createMockEnv = (masterKey?: string): Bindings => ({
       ? masterKey
       : "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
   // Other required bindings (not used in encryption tests)
-  DB: {} as D1Database,
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres",
   KV: {} as KVNamespace,
   RATE_LIMIT_DEFAULT: {} as RateLimit,
   RATE_LIMIT_AUTH: {} as RateLimit,
   RATE_LIMIT_EXECUTE: {} as RateLimit,
   EXECUTE: {} as Workflow<any>,
   WORKFLOW_AGENT: {} as DurableObjectNamespace<any>,
-  DATABASE: {} as DurableObjectNamespace<any>,
   WORKFLOW_QUEUE: {} as Queue,
   RESSOURCES: {} as R2Bucket,
   DATASETS: {} as R2Bucket,

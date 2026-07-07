@@ -26,7 +26,7 @@ adminWorkflowsRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { page, limit, search, organizationId } = c.req.valid("query");
     const offset = (page - 1) * limit;
 
@@ -97,12 +97,12 @@ adminWorkflowsRoutes.get(
  * GET /admin/workflows/:id
  *
  * Get full details for a specific workflow including nodes/edges so the
- * admin detail page can render with a single round-trip. No org filter â€”
+ * admin detail page can render with a single round-trip. No org filter â€?
  * the admin auth middleware on this router is the safety net, matching how
  * every other /admin/* endpoint exposes cross-org data.
  */
 adminWorkflowsRoutes.get("/:id", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const workflowId = c.req.param("id");
 
   try {

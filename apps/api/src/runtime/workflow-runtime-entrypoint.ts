@@ -21,7 +21,7 @@ import {
   type WorkflowRuntime,
 } from "./cloudflare-workflow-runtime";
 
-// Internal params injected by Agent.runWorkflow() â€” matches AgentWorkflowParams<T>
+// Internal params injected by Agent.runWorkflow() â€?matches AgentWorkflowParams<T>
 // from the agents SDK (not directly importable due to bundled d.ts resolution issues).
 interface WorkflowParams extends RuntimeParams {
   __agentName: string;
@@ -65,7 +65,7 @@ export class WorkflowRuntimeEntrypoint extends AgentWorkflowBase {
       // Best-effort onboarding stamp on first successful execution.
       if (result.status === "completed" && params.userId) {
         try {
-          const db = createDatabase(this.env.DB);
+          const db = createDatabase(this.env);
           await stampOnboardingStage(db, params.userId, "workflowExecutedOk");
         } catch (error) {
           console.error(

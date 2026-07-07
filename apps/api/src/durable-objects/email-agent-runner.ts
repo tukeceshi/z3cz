@@ -2,13 +2,13 @@
  * EmailAgentRunner Durable Object
  *
  * Drives an agent that pursues a goal by emailing one or more interlocutors and
- * waiting â€” for days if needed â€” for their replies. The workflow node parks once
+ * waiting â€?for days if needed â€?for their replies. The workflow node parks once
  * on `email-agent-complete-${nodeId}` with a long timeout; this DO owns the
  * multi-turn conversation in between.
  *
  * The agent's `ask_interlocutor` tool is a *suspending* tool (see
- * {@link runAgentLoop}). When the model calls it â€” possibly several times in one
- * turn, to question multiple interlocutors in parallel â€” the loop parks and this
+ * {@link runAgentLoop}). When the model calls it â€?possibly several times in one
+ * turn, to question multiple interlocutors in parallel â€?the loop parks and this
  * DO sends the emails, registers each thread for reply routing, and sets an
  * alarm per reply deadline. Replies arrive via {@link deliverReply}; once every
  * outstanding ask in the turn is settled (replied or timed out) the loop
@@ -63,7 +63,7 @@ export interface EmailInterlocutor {
 }
 
 export interface EmailAgentRunRequest {
-  /** Unique run id â€” DO instance name, `${executionId}:${nodeId}`. */
+  /** Unique run id â€?DO instance name, `${executionId}:${nodeId}`. */
   runId: string;
   executionInstanceId: string;
   nodeId: string;
@@ -151,7 +151,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     }
 
     // Resolve the sending address up-front so a misconfiguration fails fast.
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const email = await getEmail(
       db,
       request.fromEmailId,
@@ -177,7 +177,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
   /**
    * Deliver an inbound reply for one of the threads this run is waiting on.
    * Called by the inbound-mail handler. Returns whether the reply matched a
-   * pending ask (false â†’ fall through to normal handling).
+   * pending ask (false â†?fall through to normal handling).
    */
   async deliverReply(args: {
     threadId: string;
@@ -386,7 +386,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     await this.storage.put("status", "waiting" satisfies RunStatus);
 
     if (allSettled(pending)) {
-      // Nothing to wait for (all failed/invalid) â€” resume immediately.
+      // Nothing to wait for (all failed/invalid) â€?resume immediately.
       this.ctx.waitUntil(this.resumeFromPending(pending));
     } else {
       await this.storage.setAlarm(deadline);
@@ -522,7 +522,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
         `Use the ${ASK_TOOL} tool to email an interlocutor and wait for their reply. ` +
         "You may contact several interlocutors in parallel by issuing multiple " +
         `${ASK_TOOL} calls in a single turn. A reply of "${NO_REPLY_SENTINEL}" ` +
-        "means that interlocutor did not respond in time â€” decide how to proceed. " +
+        "means that interlocutor did not respond in time â€?decide how to proceed. " +
         "When you have achieved the objective, stop calling tools and give your final result.",
       `Interlocutors you may contact:\n${roster}`,
     ]
@@ -562,8 +562,8 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
   }
 
   /**
-   * Assemble the conversation transcript from the mailbox â€” the system of record
-   * for every sent message and reply â€” one entry per interlocutor thread.
+   * Assemble the conversation transcript from the mailbox â€?the system of record
+   * for every sent message and reply â€?one entry per interlocutor thread.
    */
   private async buildTranscript(
     request: EmailAgentRunRequest

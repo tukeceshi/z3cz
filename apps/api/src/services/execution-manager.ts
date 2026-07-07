@@ -44,7 +44,7 @@ export class ExecutionManager {
     executionId: string;
     execution: WorkflowExecution;
   }> {
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
 
     // Get organization info (for URL construction) and billing info in parallel
     const [organization, billingInfo] = await Promise.all([

@@ -19,7 +19,7 @@ import {
   resolveOrganizationBillingOptions,
   verifyApiKey,
 } from "../db";
-import { createRateLimitMiddleware } from "../middleware/rate-limit";
+import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
 import { isCreditExhausted } from "../utils/credits";
@@ -32,7 +32,7 @@ const httpTriggerRoutes = new Hono<ApiContext>();
 
 /**
  * The HTTP trigger node types and the runtime each one forces.
- * `http-request` → synchronous (worker); `http-webhook` → asynchronous (durable).
+ * `http-request` �?synchronous (worker); `http-webhook` �?asynchronous (durable).
  */
 const HTTP_TRIGGER_RUNTIME: Record<string, "worker" | "workflow"> = {
   "http-request": "worker",
@@ -53,10 +53,10 @@ export function findHttpTrigger(nodes: Node[]): "worker" | "workflow" | null {
 httpTriggerRoutes.on(
   ["GET", "POST"],
   "/:workflowId",
-  (c, next) => createRateLimitMiddleware(c.env.RATE_LIMIT_EXECUTE)(c, next),
+  createExecuteRateLimitMiddleware(),
   async (c) => {
     const workflowId = c.req.param("workflowId");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     const workflow = await getWorkflowByIdUnscoped(db, workflowId);
     if (!workflow || !workflow.enabled) {

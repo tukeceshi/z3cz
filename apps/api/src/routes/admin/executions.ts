@@ -128,7 +128,7 @@ adminExecutionsRoutes.get(
       const rows = result.data || [];
 
       // Get organization names for the results
-      const db = createDatabase(c.env.DB);
+      const db = createDatabase(c.env);
       const orgIds = [...new Set(rows.map((r) => r.index1))];
 
       // Fetch organization names
@@ -204,7 +204,7 @@ adminExecutionsRoutes.get(
       }
 
       // Get org name
-      const db = createDatabase(c.env.DB);
+      const db = createDatabase(c.env);
 
       const [org] = await db
         .select({ name: organizations.name })

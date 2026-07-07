@@ -71,7 +71,7 @@ adminStatsRoutes.get(
     })
   ),
   async (c) => {
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { days } = c.req.valid("query");
 
     try {
@@ -243,10 +243,10 @@ async function fetchExecutionsSeries(
   //
   // The `timestamp` column is a DateTime; comparing it against a bare
   // string literal errors with `cannot combine the DateTime and String
-  // types`. Wrap with single-arg `toDateTime(...)` â€” the two-arg form
+  // types`. Wrap with single-arg `toDateTime(...)` â€?the two-arg form
   // `toDateTime(..., 'UTC')` silently returns zero rows on CF AE.
   //
-  // CF Analytics Engine SQL also requires `COUNT()` with zero arguments â€”
+  // CF Analytics Engine SQL also requires `COUNT()` with zero arguments â€?
   // `COUNT(*)` fails with `COUNT() function must have 0 arguments`.
   const fromTs = from.toISOString().slice(0, 19).replace("T", " ");
   const aeSql = `

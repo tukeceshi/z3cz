@@ -6,8 +6,6 @@ import {
   getQueueTriggersByQueue,
   resolveOrganizationBillingOptions,
 } from "./db/queries";
-import { getAgentByName } from "./durable-objects/agent-utils";
-import { createWorkerRuntime } from "./runtime/cloudflare-worker-runtime";
 import { WorkflowStore } from "./stores/workflow-store";
 import { isCreditExhausted } from "./utils/credits";
 
@@ -71,21 +69,14 @@ async function executeWorkflow(
       },
     };
 
-    // Use WorkerRuntime for "worker" runtime (synchronous execution)
-    // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)
-    if (workflowData.runtime === "worker") {
-      const workerRuntime = createWorkerRuntime(env);
-      const execution = await workerRuntime.execute(executionParams);
-      console.log(
-        `[Execution] ${execution.id} workflow=${workflowInfo.id} runtime=worker trigger=queue`
-      );
-    } else {
-      const agent = await getAgentByName(env.WORKFLOW_AGENT, workflowInfo.id);
-      const executionId = await agent.executeWorkflow(executionParams);
-      console.log(
-        `[Execution] ${executionId} workflow=${workflowInfo.id} runtime=workflow trigger=queue`
-      );
-    }
+    const { startWorkflowExecution } = await import(
+      "./runtime/start-workflow-execution"
+    );
+    const result = await startWorkflowExecution(env, executionParams);
+    console.log(
+      `[Execution] ${result.executionId} workflow=${workflowInfo.id} runtime=${workflowData.runtime} trigger=queue` +
+        (result.status ? ` status=${result.status}` : "")
+    );
   } catch (execError) {
     console.error(`Error executing workflow ${workflowInfo.id}:`, execError);
   }
@@ -97,7 +88,7 @@ export async function handleQueueMessages(
   ctx: ExecutionContext
 ): Promise<void> {
   console.log(`Queue batch received with ${batch.messages.length} messages`);
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const workflowStore = new WorkflowStore(env);
 
   try {

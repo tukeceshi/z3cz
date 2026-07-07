@@ -1,7 +1,7 @@
 import type { SchemaService } from "@dafthunk/runtime";
 import type { Schema } from "@dafthunk/types";
 
-import type { Bindings } from "../context";
+import type { DatabaseEnv } from "../context";
 import { createDatabase, getSchema } from "../db";
 
 /**
@@ -9,13 +9,13 @@ import { createDatabase, getSchema } from "../db";
  * Resolves schema IDs to Schema definitions via D1.
  */
 export class CloudflareSchemaService implements SchemaService {
-  constructor(private env: Pick<Bindings, "DB">) {}
+  constructor(private env: DatabaseEnv) {}
 
   async resolve(
     schemaId: string,
     organizationId: string
   ): Promise<Schema | undefined> {
-    const db = createDatabase(this.env.DB);
+    const db = createDatabase(this.env);
     const row = await getSchema(db, schemaId, organizationId);
 
     if (!row) return undefined;

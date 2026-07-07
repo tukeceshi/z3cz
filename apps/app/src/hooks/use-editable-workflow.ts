@@ -5,6 +5,7 @@ import type {
   WorkflowExecution,
   WorkflowRuntime,
   WorkflowTrigger,
+  WorkflowWithMetadata,
 } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +26,7 @@ import { adaptBackendNodesToReactFlowNodes } from "@/utils/utils";
 interface UseEditableWorkflowProps {
   workflowId: string | undefined;
   nodeTypes?: NodeType[];
+  fallbackWorkflow?: WorkflowWithMetadata | null;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
 }
 
@@ -90,6 +92,7 @@ function buildWorkflowPayload(
 export function useEditableWorkflow({
   workflowId,
   nodeTypes = [],
+  fallbackWorkflow = null,
   onExecutionUpdate,
 }: UseEditableWorkflowProps) {
   const [nodes, setNodes] = useState<Node<WorkflowNodeType>[]>([]);
@@ -167,6 +170,63 @@ export function useEditableWorkflow({
     queueMicrotask(() => flushSaveRef.current());
   }, []);
 
+  const fallbackWorkflowRef = useRef(fallbackWorkflow);
+  fallbackWorkflowRef.current = fallbackWorkflow;
+
+  const applyFallbackFromHttp = useCallback(() => {
+    const fallback = fallbackWorkflowRef.current;
+    if (hasInitializedRef.current || !fallback?.id) {
+      return false;
+    }
+
+    const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+      fallback.nodes ?? [],
+      nodeTypes
+    );
+    const reactFlowEdges = (fallback.edges ?? []).map((edge) => ({
+      id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceOutput,
+      targetHandle: edge.targetInput,
+      type: "workflowEdge" as const,
+      data: {
+        isValid: true,
+        sourceType: edge.sourceOutput,
+        targetType: edge.targetInput,
+      },
+    }));
+
+    setWorkflowMetadata({
+      id: fallback.id,
+      name: fallback.name || "",
+      description: fallback.description,
+      trigger: fallback.trigger || "manual",
+      runtime: fallback.runtime as WorkflowRuntime | undefined,
+    });
+    nodesRef.current = reactFlowNodes;
+    edgesRef.current = reactFlowEdges;
+    lastSavedSerializedRef.current = JSON.stringify(
+      buildWorkflowPayload(reactFlowNodes, reactFlowEdges)
+    );
+    setNodes(reactFlowNodes);
+    setEdges(reactFlowEdges);
+    hasInitializedRef.current = true;
+    setIsInitializing(false);
+    return true;
+  }, [nodeTypes]);
+
+  const applyFallbackFromHttpRef = useRef(applyFallbackFromHttp);
+  applyFallbackFromHttpRef.current = applyFallbackFromHttp;
+
+  // Apply HTTP workflow data as soon as it arrives (don't wait for WS timeout).
+  useEffect(() => {
+    if (hasInitializedRef.current || !fallbackWorkflow?.id) {
+      return;
+    }
+    applyFallbackFromHttpRef.current();
+  }, [fallbackWorkflow, nodeTypes]);
+
   // WebSocket connection effect
   useEffect(() => {
     if (!workflowId || !organization?.id) {
@@ -182,14 +242,14 @@ export function useEditableWorkflow({
     setIsInitializing(true);
 
     // Add a small delay to avoid race conditions during React strict mode double-mount
+    let cancelled = false;
+
     const timeoutId = setTimeout(() => {
-      // Double-check we're not already connected after the delay
       if (wsRef.current?.isConnected()) {
         return;
       }
 
       const applyRemoteState = (state: WorkflowState) => {
-        // Store workflow metadata
         if (state.id && state.trigger) {
           setWorkflowMetadata({
             id: state.id,
@@ -200,7 +260,6 @@ export function useEditableWorkflow({
           });
         }
 
-        // Convert to ReactFlow format
         const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
           state.nodes,
           nodeTypes
@@ -219,9 +278,6 @@ export function useEditableWorkflow({
           },
         }));
 
-        // Mark this graph as the last-saved baseline BEFORE pushing it into
-        // state, so the persistence echo it triggers is recognised as a
-        // no-op rather than bounced back to the server.
         nodesRef.current = reactFlowNodes;
         edgesRef.current = reactFlowEdges;
         lastSavedSerializedRef.current = JSON.stringify(
@@ -237,70 +293,87 @@ export function useEditableWorkflow({
           applyRemoteState(state);
         } catch (error) {
           console.error("Error processing WebSocket state:", error);
-          // State processing error - close connection to force reconnect
           wsRef.current?.disconnect();
         }
       };
 
-      const ws = connectWorkflowWS(organization.id, workflowId, {
-        // Message-level callbacks (happy path)
-        onInit: (state: WorkflowState) => {
-          if (!hasInitializedRef.current) {
-            // First load: take server state as the source of truth.
-            handleStateUpdate(state);
-            hasInitializedRef.current = true;
-            setIsInitializing(false);
-            return;
-          }
+      void (async () => {
+        const ws = await connectWorkflowWS(organization.id, workflowId, {
+          onInit: (state: WorkflowState) => {
+            if (!hasInitializedRef.current) {
+              handleStateUpdate(state);
+              hasInitializedRef.current = true;
+              setIsInitializing(false);
+              return;
+            }
 
-          // Reconnection: preserve any local edits made while disconnected.
-          // If the local graph diverges from what the server last had, resend
-          // it (last-write-wins) instead of letting server state clobber it.
-          const localSerialized = JSON.stringify(
-            buildWorkflowPayload(nodesRef.current, edgesRef.current)
-          );
-          if (localSerialized !== lastSavedSerializedRef.current) {
-            flushSaveRef.current();
-          } else {
-            handleStateUpdate(state);
-          }
-        },
-        onUpdate: (state: WorkflowState) => {
-          handleStateUpdate(state);
-        },
-        onExecutionUpdate: (execution: WorkflowExecution) => {
-          // Forward execution updates to parent component
-          // Note: execution.error is just a summary, not an error to display
-          onExecutionUpdate?.(execution);
-        },
-
-        // Connection-level callbacks (problems)
-        onConnectionOpen: () => {
-          setIsWSConnected(true);
-          setConnectionError(null);
-        },
-        onConnectionClose: (event) => {
-          setIsWSConnected(false);
-          setIsInitializing(false);
-          // Only set connection error for abnormal closures
-          if (!event.wasClean && event.code !== 1000 && event.code !== 1001) {
-            setConnectionError(
-              `Connection closed unexpectedly (code: ${event.code})`
+            const localSerialized = JSON.stringify(
+              buildWorkflowPayload(nodesRef.current, edgesRef.current)
             );
-          }
-        },
-        onConnectionError: (event) => {
-          console.error("Connection error:", event);
-          setConnectionError("Connection error occurred");
-          setIsInitializing(false);
-        },
-      });
+            if (localSerialized !== lastSavedSerializedRef.current) {
+              flushSaveRef.current();
+            } else {
+              handleStateUpdate(state);
+            }
+          },
+          onUpdate: (state: WorkflowState) => {
+            handleStateUpdate(state);
+          },
+          onExecutionUpdate: (execution: WorkflowExecution) => {
+            onExecutionUpdate?.(execution);
+          },
+          onConnectionOpen: () => {
+            setIsWSConnected(true);
+            setConnectionError(null);
+          },
+          onConnectionClose: (event, { willReconnect }) => {
+            setIsWSConnected(false);
+            setIsInitializing(false);
+            if (!hasInitializedRef.current) {
+              applyFallbackFromHttpRef.current();
+            }
+            if (
+              !willReconnect &&
+              !event.wasClean &&
+              event.code !== 1000 &&
+              event.code !== 1001
+            ) {
+              setConnectionError(
+                `Connection closed unexpectedly (code: ${event.code})`
+              );
+            }
+          },
+          onConnectionError: (event) => {
+            console.error("Connection error:", event);
+            if (!hasInitializedRef.current) {
+              applyFallbackFromHttpRef.current();
+            }
+            if (!hasInitializedRef.current) {
+              setConnectionError("Connection error occurred");
+            }
+            setIsInitializing(false);
+          },
+        });
 
-      wsRef.current = ws;
-    }, 100); // Small delay to avoid double-mount issues
+        if (cancelled) {
+          ws.disconnect();
+          return;
+        }
+
+        wsRef.current = ws;
+      })();
+    }, 100);
+
+    const fallbackTimeoutId = setTimeout(() => {
+      if (!hasInitializedRef.current) {
+        applyFallbackFromHttpRef.current();
+      }
+    }, 2000);
 
     return () => {
+      cancelled = true;
       clearTimeout(timeoutId);
+      clearTimeout(fallbackTimeoutId);
       // Best-effort flush of any pending edit before tearing down the socket.
       flushSaveRef.current();
       if (wsRef.current) {
@@ -310,7 +383,7 @@ export function useEditableWorkflow({
     };
   }, [workflowId, organization?.id]);
 
-  // Flush pending edits on tab close / refresh. React Router navigation does
+  // Flush pending edits on tab close / refresh.
   // not fire this; the connection effect cleanup covers that case instead.
   useEffect(() => {
     const handleBeforeUnload = () => flushSaveRef.current();

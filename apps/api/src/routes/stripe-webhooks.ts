@@ -49,7 +49,7 @@ stripeWebhooks.post("/", async (c) => {
     return c.json({ error: "Invalid signature" }, 400);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     switch (event.type) {
@@ -183,7 +183,7 @@ async function handleSubscriptionDeleted(
   }
 
   // Without clearing the cache here, a Pro+overage-exhausted org at
-  // cancellation time would stay locked out forever â€” no further webhook
+  // cancellation time would stay locked out forever â€?no further webhook
   // would fire to clear the flag.
   await db
     .update(organizations)

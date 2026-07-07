@@ -1,170 +1,140 @@
-# Docker 本地开发
+# Docker 开发与自托管
 
-使用 Docker 在容器内运行完整开发栈，无需在宿主机安装 Node.js 或 pnpm。
+使用 Docker 运行完整开发栈，或在单机以容器构建方式运行实验性生产栈。本地默认 **Node API + Postgres + 本地文件存储**，无需在宿主机安装 Node.js。
+
+## 更新说明
+
+| 日期 | 说明 |
+|------|------|
+| 2026-07-07 | **Cloudflare → Node 本地/自托管迁移**：API 改为 `@hono/node-server`；数据库改为 Postgres；对象存储改为本地 FS；Durable Object / Queue / 持久化工作流等改为进程内实现；入站邮件改为 HTTP webhook + SMTP 网关；新增 `docker-compose.prod.yml`（www Node SSR + app + API + SMTP）。 |
+| 2026-07-06 | 修复 Node 启动问题（`setNodeBindings` 导入）；生产 compose 与 `pnpm prod:up` 脚本。 |
+| 2026-07-05 | 初始 Docker 开发编排（`supabase-db` + 三端口 dev 容器）。 |
 
 ## 前置要求
 
 - [Docker](https://docs.docker.com/get-docker/) 24+
 - [Docker Compose](https://docs.docker.com/compose/) v2
 - Git
-- Cloudflare 账号（使用 AI、远程 preview 等功能时需要）
+- Cloudflare 账号（可选，仅 AI / 远程 preview 等功能需要）
 
-## 初始化流程
+## 开发模式
 
-### 1. 克隆仓库
-
-```bash
-git clone https://github.com/dafthunk-com/dafthunk.git
-cd dafthunk
-```
-
-### 2. 准备 Docker 环境变量
+### 1. 初始化
 
 ```bash
 cp .env.docker.example .env.docker
-```
-
-`.env.docker` 中可调整 Node / pnpm 版本、Cloudflare 凭证、是否在启动时执行 D1 迁移等。
-
-### 3. 准备 API 密钥配置
-
-```bash
 cp apps/api/.dev.vars.example apps/api/.dev.vars
+docker compose run --rm -e RUN_DB_MIGRATE=false dev node apps/api/scripts/generate-master-key.js
 ```
 
-编辑 `apps/api/.dev.vars`，至少填写以下必填项：
+将输出的 `JWT_SECRET`、`SECRET_MASTER_KEY` 写入 `apps/api/.dev.vars`，并确认：
 
 ```env
 WEB_HOST=http://localhost:3101
 WEBSITE_URL=http://localhost:3100
-CLOUDFLARE_ENV=development
-
-JWT_SECRET=至少_32_个字符的随机字符串
-SECRET_MASTER_KEY=64位十六进制字符串
+DATABASE_URL=postgresql://postgres:postgres@supabase-db:5432/postgres
 ```
 
-生成 `SECRET_MASTER_KEY`：
+### 2. 启动
 
 ```bash
-docker compose run --rm dev node apps/api/scripts/generate-master-key.js
+docker compose --env-file .env.docker up -d
 ```
 
-将输出值写入 `apps/api/.dev.vars` 中的 `SECRET_MASTER_KEY`。
+容器会自动：启动 Postgres → 同步依赖 → 执行数据库迁移 → 并行启动 www / app / api。
 
-`JWT_SECRET` 可使用任意 32 字符以上的随机字符串。
+> API 首次启动约需 **2–3 分钟**（WASM 初始化），看到日志 `[api] Node server listening` 后即可访问。
 
-> 首次启动时，若 `apps/api/.dev.vars` 不存在，入口脚本会自动从示例文件创建，但仍需手动填入密钥后重启。
-
-### 4. 启动开发栈
-
-```bash
-docker compose --env-file .env.docker up --build
-```
-
-容器启动时会自动：
-
-1. 安装 pnpm 依赖（首次或 `node_modules` 为空时）
-2. 执行本地 D1 数据库迁移（`RUN_DB_MIGRATE=true` 时）
-
-### 5. 访问服务
+### 3. 访问地址
 
 | 地址 | 服务 |
 |------|------|
-| http://localhost:3100 | 营销站（`@dafthunk/www`） |
-| http://localhost:3101 | 产品应用（`@dafthunk/app`） |
-| http://localhost:3102 | API（`@dafthunk/api`，wrangler dev） |
+| http://localhost:3100 | 营销站 `@dafthunk/www` |
+| http://localhost:3101 | 产品应用 `@dafthunk/app` |
+| http://localhost:3102 | API `@dafthunk/api`（Node + Hono） |
+| localhost:5432 | Postgres（用户/密码/库均为 `postgres`） |
 
-> 本地开发统一使用 **3100 / 3101 / 3102** 三个端口。
-
-### 6. 配置 OAuth（可选）
-
-登录与第三方集成需要在 `apps/api/.dev.vars` 中配置 OAuth 应用。回调地址均指向 `http://localhost:3102`。
-
-**用户登录 — GitHub**
-
-1. 前往 [GitHub OAuth Apps](https://github.com/settings/applications/new)
-2. 创建应用：
-   - Homepage URL：`http://localhost:3100`
-   - Authorization callback URL：`http://localhost:3102/auth/login/github`
-3. 写入 `.dev.vars`：
-
-```env
-GITHUB_CLIENT_ID=你的_Client_ID
-GITHUB_CLIENT_SECRET=你的_Client_Secret
-```
-
-**用户登录 — Google（可选）**
-
-1. 前往 [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. 创建 OAuth 2.0 客户端，重定向 URI：`http://localhost:3102/auth/login/google`
-3. 写入 `.dev.vars`：
-
-```env
-GOOGLE_CLIENT_ID=你的_Client_ID
-GOOGLE_CLIENT_SECRET=你的_Client_Secret
-```
-
-更多集成 OAuth（Gmail、Discord、Reddit 等）配置项见 `apps/api/.dev.vars.example`。
-
-## 常用命令
+### 4. 常用命令
 
 ```bash
-# 启动（前台）
+# 前台启动
 docker compose --env-file .env.docker up --build
-
-# 后台启动
-docker compose --env-file .env.docker up -d --build
 
 # 停止
 docker compose down
 
-# 仅启动单个服务（调试时使用）
-docker compose --profile split up app
-docker compose --profile split up api
-docker compose --profile split up www
+# 查看日志
+docker compose --env-file .env.docker logs -f dev
 
-# 在容器内执行命令
+# 容器内测试 / 迁移
 docker compose run --rm dev pnpm test
 docker compose run --rm dev pnpm --filter '@dafthunk/api' db:migrate
-docker compose run --rm dev pnpm --filter '@dafthunk/api' db:reset
-
-# CI 构建镜像
-docker build --target build -t dafthunk-build .
 ```
+
+OAuth 回调地址均为 `http://localhost:3102/...`；未配置 OAuth 时可使用登录页 **测试账户**。详见 `apps/api/.dev.vars.example`。
+
+## 实验性生产栈（容器内构建）
+
+单机自托管：`Postgres + Node API + www（SSR）+ app（Nginx）+ SMTP 网关`。
+
+```bash
+pnpm prod:env          # 从 .dev.vars 同步密钥到 .env.docker.prod
+pnpm prod:up           # 构建并启动
+pnpm prod:up -- --no-build   # 仅重启
+pnpm prod:down         # 停止
+```
+
+| 地址 | 服务 |
+|------|------|
+| http://localhost:3100 | 营销站（Node SSR） |
+| http://localhost:3101 | 产品 app（Nginx + `/api` 反代） |
+| http://localhost:3102 | API |
+| localhost:2525 | SMTP → `/inbound-email/raw` |
+
+> 生产栈与开发栈共用 **3100–3102** 端口，切换时需先停止另一方。
+
+## Node 运行时说明
+
+| Cloudflare 能力 | Node/Docker 替代 |
+|-------------------|------------------|
+| Workers API | `tsx src/server.ts` + Hono |
+| D1 | Postgres + Drizzle |
+| R2 | `LOCAL_STORAGE_PATH` 本地目录 |
+| Durable Workflow / Queue | 进程内 `node-*` 运行时 |
+| Email Routing | `POST /inbound-email` + SMTP 网关 |
+| Editor WebSocket | `ws-node.ts`（直连 `:3102` 或 app 反代） |
+
+**邮件**
+
+- 入站：`node apps/api/scripts/simulate-inbound-email.mjs --to handle@mail.dafthunk.com --from alice@example.com`
+- 出站：写入 `{LOCAL_STORAGE_PATH}/outbound-emails/*.eml`
+
+**存储**：默认本地 FS；设置 `COS_*` 将尝试 COS 适配器（尚未实现）。
 
 ## 文件说明
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 开发镜像与 CI 构建目标 |
-| `docker-compose.yml` | 本地编排（默认 `dev` 服务启动全部应用） |
-| `docker/entrypoint.sh` | 启动前依赖安装与 D1 迁移 |
-| `.env.docker.example` | Docker Compose 环境变量模板 |
-| `.dockerignore` | 构建上下文排除规则 |
-
-## 镜像说明
-
-- **基础镜像**：`node:20.19.0-bookworm-slim`
-- **包管理器**：pnpm 10.3.0（corepack）
-- **构建参数**：`NODE_VERSION`、`PNPM_VERSION`
-- **数据卷**：
-  - `dafthunk_node_modules` — 依赖缓存
-  - `dafthunk_pnpm_store` — pnpm 全局 store
-
-## 注意事项
-
-1. **生产部署不在 Docker 中**：生产环境部署至 Cloudflare Workers，见根目录 README「部署」章节。
-2. **Wrangler 本地模式**：API 使用 `wrangler dev` 本地模拟 D1 / Queue 等绑定，无需手动 `wrangler login` 或创建 D1 数据库。
-3. **Cloudflare 远程功能**：AI 推理、R2、远程 preview 等需在 `.dev.vars` 或 `.env.docker` 中配置 `CLOUDFLARE_ACCOUNT_ID` 与 `CLOUDFLARE_API_TOKEN`。
-4. **源码热更新**：项目目录挂载到 `/app`，修改代码后各 dev server 会自动重载。
-5. **队列**：`wrangler.jsonc` 已包含本地 Queue 绑定，无需额外创建 Cloudflare Queue。
+| `docker-compose.yml` | 开发编排 |
+| `docker-compose.prod.yml` | 实验性生产编排 |
+| `Dockerfile` | `dev` / `deps` / `prod-api` / `prod-app` / `prod-www` / `prod-smtp-gateway` |
+| `docker/entrypoint.sh` | 开发容器入口 |
+| `docker/prod-api-entrypoint.sh` | 生产 API 迁移入口 |
+| `docker/nginx/app.conf` | 生产 app 反代配置 |
+| `scripts/prod-up.mjs` | 生产栈启动脚本 |
+| `.env.docker.example` / `.env.docker.prod.example` | 环境变量模板 |
 
 ## 故障排查
 
-| 现象 | 处理方式 |
-|------|----------|
-| 端口被占用 | 修改 `docker-compose.yml` 中的端口映射 |
-| 依赖安装失败 | 确认 lockfile 与 pnpm 版本匹配；删除卷后重建：`docker compose down -v` |
-| OAuth 登录失败 | 检查回调 URL 是否为 `http://localhost:3102/...` |
-| API 无法访问 | 确认 `apps/api/.dev.vars` 中密钥已填写并重启容器 |
-| D1 迁移报错 | 设置 `RUN_DB_MIGRATE=false` 跳过，或手动执行 `docker compose run --rm dev pnpm --filter '@dafthunk/api' db:migrate` |
+| 现象 | 处理 |
+|------|------|
+| 端口占用 | 停止 prod/dev 另一方，或改 compose 端口映射 |
+| API 长时间无响应 | 等待 2–3 分钟；查看 `docker compose logs dev` 是否有 `listening` |
+| OAuth 失败 | 回调 URL 须为 `http://localhost:3102/...` |
+| JWT 相关 500 | 检查 `.dev.vars` 中密钥是否已填写 |
+| 邮件不触发 | 确认 DB 中 org 邮箱 handle 存在；用 simulate 脚本测试 |
+| prod 构建失败 | 确认 lockfile 已更新：`docker compose run --rm dev pnpm install` |
+
+## Cloudflare 生产部署
+
+线上 Cloudflare Workers + Supabase Hyperdrive 部署说明见根目录 [README.md](../README.md#部署)。

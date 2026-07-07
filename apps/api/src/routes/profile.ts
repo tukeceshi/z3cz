@@ -34,7 +34,7 @@ profile.get("/", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
 
   try {
     const [user] = await db
@@ -101,7 +101,7 @@ profile.patch(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
     const { developerMode, tourCompleted } = c.req.valid("json");
 
     try {

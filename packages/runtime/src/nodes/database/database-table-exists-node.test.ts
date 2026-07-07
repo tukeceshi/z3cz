@@ -48,7 +48,7 @@ describe("DatabaseTableExistsNode", () => {
     expect(result.status).toBe("completed");
     expect(result.outputs?.exists).toBe(true);
     expect(connection.query).toHaveBeenCalledWith(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      expect.stringContaining("information_schema.tables"),
       ["users"]
     );
   });

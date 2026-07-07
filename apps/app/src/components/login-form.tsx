@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buildApiUrl } from "@/config/api";
 import { cn } from "@/utils/utils";
 
 import { useAuth } from "./auth-context";
@@ -22,6 +23,14 @@ export function LoginForm({ className, returnTo, ...props }: LoginFormProps) {
 
   const handleLoginClick = async (provider: "github" | "google") => {
     await login(provider, returnTo);
+  };
+
+  const handleDevLoginClick = () => {
+    const loginUrl = new URL(buildApiUrl("/auth/login/dev"));
+    if (returnTo) {
+      loginUrl.searchParams.set("returnTo", returnTo);
+    }
+    window.location.href = loginUrl.toString();
   };
 
   return (
@@ -63,6 +72,15 @@ export function LoginForm({ className, returnTo, ...props }: LoginFormProps) {
                 <FontAwesomeIcon icon={faGithub} className="w-5 h-5 mr-2" />
                 Login with GitHub
               </Button>
+              {import.meta.env.DEV && (
+                <Button
+                  onClick={handleDevLoginClick}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  测试账户登录 (Dev)
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>

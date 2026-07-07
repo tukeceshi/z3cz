@@ -24,16 +24,18 @@ export function AppLayout({ children, sidebar, className }: AppLayoutProps) {
       <div className="flex h-screen w-screen overflow-hidden flex-col">
         <AppHeader />
         <Toaster />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {sidebar ? (
-            <Sidebar.SidebarProvider>
+            <Sidebar.SidebarProvider className="flex h-full min-h-0 w-full flex-1">
               <AppSidebar
                 title={sidebar.title}
                 groups={sidebar.groups}
                 footerItems={sidebar.footerItems}
               />
-              <Sidebar.SidebarInset className="bg-neutral-50 dark:bg-neutral-800">
-                <div className="h-full w-full overflow-y-auto">{children}</div>
+              <Sidebar.SidebarInset className="flex min-h-0 flex-1 flex-col bg-neutral-50 dark:bg-neutral-800">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                  {children}
+                </div>
               </Sidebar.SidebarInset>
             </Sidebar.SidebarProvider>
           ) : (

@@ -1,8 +1,8 @@
+import { BaseNodeRegistry } from "@dafthunk/runtime";
 import {
-  BaseNodeRegistry,
   FailingMultiStepNode,
   MultiStepAdditionNode,
-} from "@dafthunk/runtime";
+} from "@dafthunk/runtime/specification/test-nodes";
 import { CgsApplyMaterialNode } from "@dafthunk/runtime/nodes/3d/cgs-apply-material-node";
 import { CgsApplyTextureNode } from "@dafthunk/runtime/nodes/3d/cgs-apply-texture-node";
 import { CgsConeNode } from "@dafthunk/runtime/nodes/3d/cgs-cone-node";

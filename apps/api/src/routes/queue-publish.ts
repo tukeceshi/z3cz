@@ -11,7 +11,7 @@ const queuePublishRoutes = new Hono<ApiContext>();
 /**
  * Publish a message to a queue.
  * Authentication via API key validated against the queue's organization.
- * No organization ID required in the URL â€” derived from the queue record.
+ * No organization ID required in the URL â€?derived from the queue record.
  */
 queuePublishRoutes.post(
   "/:queueId/publish",
@@ -23,7 +23,7 @@ queuePublishRoutes.post(
   ),
   async (c) => {
     const queueId = c.req.param("queueId");
-    const db = createDatabase(c.env.DB);
+    const db = createDatabase(c.env);
 
     // Look up queue by ID (globally unique)
     const queue = await getQueueById(db, queueId);

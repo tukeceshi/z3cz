@@ -10,9 +10,7 @@ import {
   getOrganizationBillingInfo,
   resolveOrganizationBillingOptions,
 } from "./db";
-import { getAgentByName } from "./durable-objects/agent-utils";
 import { parseAndStageEmail } from "./mailbox-staging";
-import { createWorkerRuntime } from "./runtime/cloudflare-worker-runtime";
 import { WorkflowStore } from "./stores/workflow-store";
 import { handleSupportEmail, isAuthenticated } from "./support-email";
 import { verifyReplyToken } from "./support-reply-token";
@@ -56,7 +54,7 @@ export async function handleIncomingEmail(
 ): Promise<void> {
   const { from, to, headers, raw } = message;
 
-  // Lowercase defensively — MTAs may case-fold local parts in transit.
+  // Lowercase defensively �?MTAs may case-fold local parts in transit.
   const localPart = to.split("@")[0]?.toLowerCase();
 
   if (!localPart) {
@@ -84,7 +82,7 @@ export async function handleIncomingEmail(
     return;
   }
 
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
   const workflowStore = new WorkflowStore(env);
 
   const email = await getEmailByHandle(db, handle);
@@ -96,8 +94,8 @@ export async function handleIncomingEmail(
   const organizationId = email.organizationId;
 
   // Read the raw stream once (it can only be consumed once) and persist the
-  // message to the org's mailbox. This happens for EVERY inbound message —
-  // even when no workflow is subscribed — so the mailbox is a complete record.
+  // message to the org's mailbox. This happens for EVERY inbound message �?
+  // even when no workflow is subscribed �?so the mailbox is a complete record.
   const rawBytes = await streamToBytes(raw);
   const rawContent = new TextDecoder().decode(rawBytes);
   const headersRecord = headersToRecord(headers);
@@ -173,7 +171,7 @@ export async function handleIncomingEmail(
 /**
  * Parse + stage the inbound message to R2 and index it in the org's Mailbox
  * Durable Object. Returns the thread/message ids so a triggered workflow can
- * thread replies and read history. Failures are logged, never thrown — a
+ * thread replies and read history. Failures are logged, never thrown �?a
  * persistence error must not bounce legitimate mail or block the trigger.
  */
 async function persistInboundEmail({
@@ -241,7 +239,7 @@ async function persistInboundEmail({
 /**
  * Deliver a reply to the EmailAgentRunner that owns its thread (best effort).
  * The caller has already decided the thread is agent-owned, so the message is
- * treated as handled regardless of the outcome — re-triggering workflows for an
+ * treated as handled regardless of the outcome �?re-triggering workflows for an
  * agent-owned thread would be wrong even if the specific ask already settled.
  */
 async function deliverReplyToEmailAgent(
@@ -287,7 +285,7 @@ async function triggerWorkflowForEmail({
   rawContent: string;
   mailbox: { threadId: string; messageId: string } | undefined;
 }): Promise<void> {
-  const db = createDatabase(env.DB);
+  const db = createDatabase(env);
 
   let workflowData: Workflow;
 
@@ -365,19 +363,12 @@ async function triggerWorkflowForEmail({
     },
   };
 
-  // Use WorkerRuntime for "worker" runtime (synchronous execution)
-  // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)
-  if (workflowData.runtime === "worker") {
-    const workerRuntime = createWorkerRuntime(env);
-    const execution = await workerRuntime.execute(executionParams);
-    console.log(
-      `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=email`
-    );
-  } else {
-    const agent = await getAgentByName(env.WORKFLOW_AGENT, workflow.id);
-    const executionId = await agent.executeWorkflow(executionParams);
-    console.log(
-      `[Execution] ${executionId} workflow=${workflow.id} runtime=workflow trigger=email`
-    );
-  }
+  const { startWorkflowExecution } = await import(
+    "./runtime/start-workflow-execution"
+  );
+  const result = await startWorkflowExecution(env, executionParams);
+  console.log(
+    `[Execution] ${result.executionId} workflow=${workflow.id} runtime=${workflowData.runtime} trigger=email` +
+      (result.status ? ` status=${result.status}` : "")
+  );
 }

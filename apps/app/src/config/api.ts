@@ -36,3 +36,19 @@ export function getApiBaseUrl(): string {
   }
   return apiBaseUrlSingleton!;
 }
+
+export function buildApiUrl(path: string): string {
+  const base = getApiBaseUrl().replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const combined = `${base}${normalizedPath}`;
+
+  if (combined.startsWith("http://") || combined.startsWith("https://")) {
+    return combined;
+  }
+
+  if (typeof window !== "undefined") {
+    return new URL(combined, window.location.origin).href;
+  }
+
+  return combined;
+}

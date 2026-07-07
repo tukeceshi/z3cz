@@ -3,15 +3,6 @@
   "name": "dafthunk-api-test",
   "compatibility_date": "2024-10-22",
   "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "dafthunk-test",
-      "database_id": "test-db-id",
-      "preview_database_id": "test-db-id",
-      "migrations_dir": "./src/db/migrations"
-    }
-  ],
   "kv_namespaces": [
     {
       "binding": "KV",
@@ -106,11 +97,19 @@
     ]
   },
   "worker_loaders": [{ "binding": "LOADER" }],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000-0000-0000-0000-000000000002",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+    }
+  ],
   "vars": {
     "WEB_HOST": "https://test.dafthunk.com",
     "WEBSITE_URL": "https://www.dafthunk.com",
     "CLOUDFLARE_ENV": "test",
     "CLOUDFLARE_ACCOUNT_ID": "test-account-id",
-    "CLOUDFLARE_API_TOKEN": "test-api-token"
+    "CLOUDFLARE_API_TOKEN": "test-api-token",
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
   }
 }

@@ -28,7 +28,7 @@ const FUNNEL_STAGE_LABEL = {
   workflow_executed: "Executed a workflow but never had a successful run",
 } as const;
 
-// Users idle â‰¥ this many days are surfaced as "dormant" instead of stuck:
+// Users idle â‰?this many days are surfaced as "dormant" instead of stuck:
 // stage-specific nudges feel stale, so the prompt switches to a
 // re-engagement tone and past correspondence is omitted.
 const DORMANCY_DAYS = 30;
@@ -58,7 +58,7 @@ interface DraftContext {
   daysSinceAdvance: number;
   // Workflows visible to this user via their org. The `workflows` table is
   // scoped per org (no per-user authorship column), so in a multi-member
-  // org these may include workflows authored by teammates â€” the prompt
+  // org these may include workflows authored by teammates â€?the prompt
   // surfaces them as "in your workspace", not "you created".
   orgWorkflowNames: string[];
   // Most-recent-first snippets from the user's past support threads
@@ -112,7 +112,7 @@ function tokenize(text: string): string[] {
 
 // Pick the template with the highest tag+keyword overlap against the user's
 // workflow names and error messages. Cheap heuristic that runs against the
-// in-memory template list â€” no R2 reads needed.
+// in-memory template list â€?no R2 reads needed.
 function pickTemplate(
   templates: WorkflowTemplate[],
   ctx: DraftContext
@@ -140,7 +140,7 @@ function pickTemplate(
     }
   }
   // Require at least 2 overlapping non-stoplist tokens. Single-token
-  // matches were observed to be coincidental in early testing â€” common
+  // matches were observed to be coincidental in early testing â€?common
   // category words (which slip past the 3-char filter) anchor too many
   // templates to too many users.
   return best && best.score >= 2 ? best : null;
@@ -290,7 +290,7 @@ function buildPrompt(
   ].join("\n");
 
   // Dormant users signed up a long time ago and almost certainly don't
-  // remember Dafthunk specifically â€” past sessions, errors, even the
+  // remember Dafthunk specifically â€?past sessions, errors, even the
   // platform's value prop are gone from memory. Treat this as a soft
   // re-introduction, not a nudge: mirror the welcome email's tone (warm,
   // one open question, a one-sentence reminder of what Dafthunk is, a
@@ -369,7 +369,7 @@ function buildPrompt(
   } else {
     lines.push("");
     lines.push(
-      "No relevant template found â€” ask the user what they are trying to automate."
+      "No relevant template found â€?ask the user what they are trying to automate."
     );
   }
 
@@ -416,7 +416,7 @@ function coerceDraftPayload(raw: unknown): {
  * reviews and edits the draft client-side before calling the send endpoint.
  */
 adminOnboardingMessageRoutes.post("/users/:id/draft-message", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   const [user] = await db
@@ -491,7 +491,7 @@ adminOnboardingMessageRoutes.post("/users/:id/draft-message", async (c) => {
   };
 
   // Template scoring matches workflow-name tokens, which we don't have
-  // for dormant users â€” and a 350-day-old "Test" workflow wouldn't yield
+  // for dormant users â€?and a 350-day-old "Test" workflow wouldn't yield
   // a useful suggestion anyway.
   const template = isDormant ? null : pickTemplate(workflowTemplates, draftCtx);
   const { system, user: userPrompt } = buildPrompt(
@@ -589,7 +589,7 @@ function bodyToHtml(
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
     .join("\n");
   const cta = template
-    ? `\n<p><a href="${escapeHtml(template.tryUrl)}">Try the ${escapeHtml(template.name)} template â†’</a></p>`
+    ? `\n<p><a href="${escapeHtml(template.tryUrl)}">Try the ${escapeHtml(template.name)} template â†?/a></p>`
     : "";
   return `${paragraphs}${cta}`;
 }
@@ -603,13 +603,13 @@ function bodyToHtml(
  * outbound support pipeline. Rolls back the thread if the send fails.
  */
 adminOnboardingMessageRoutes.post("/users/:id/send-message", async (c) => {
-  const db = createDatabase(c.env.DB);
+  const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   const body = await c.req.json().catch(() => null);
   const parsed = z
     .object({
-      // Subject becomes a MIME header â€” reject CR/LF to prevent header
+      // Subject becomes a MIME header â€?reject CR/LF to prevent header
       // injection upstream of email-service.ts:buildThreadedMime.
       subject: z
         .string()

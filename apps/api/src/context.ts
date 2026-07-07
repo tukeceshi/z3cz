@@ -3,20 +3,21 @@ import { JWTTokenPayload } from "@dafthunk/types";
 import type { FFmpegContainer } from "./containers/ffmpeg-container";
 import type { LanguageSandbox } from "./containers/language-sandbox";
 import type { AgentRunner } from "./durable-objects/agent-runner";
-import { DatabaseDO } from "./durable-objects/database-do";
 import type { EmailAgentRunner } from "./durable-objects/email-agent-runner";
 import type { MailboxDO } from "./durable-objects/mailbox-do";
 import type { WorkflowAgent } from "./durable-objects/workflow-agent";
 
+export type DatabaseEnv = Pick<Bindings, "DATABASE_URL" | "HYPERDRIVE">;
+
 export interface Bindings {
-  DB: D1Database;
+  HYPERDRIVE?: Hyperdrive;
+  DATABASE_URL?: string;
   KV: KVNamespace;
   RATE_LIMIT_DEFAULT: RateLimit;
   RATE_LIMIT_AUTH: RateLimit;
   RATE_LIMIT_EXECUTE: RateLimit;
   EXECUTE: Workflow<RuntimeParams>;
   WORKFLOW_AGENT: DurableObjectNamespace<WorkflowAgent>;
-  DATABASE: DurableObjectNamespace<DatabaseDO>;
   AGENT_RUNNER: DurableObjectNamespace<AgentRunner>;
   EMAIL_AGENT_RUNNER: DurableObjectNamespace<EmailAgentRunner>;
   MAILBOX: DurableObjectNamespace<MailboxDO>;
@@ -40,6 +41,7 @@ export interface Bindings {
   EMAIL_DOMAIN: string;
   JWT_SECRET: string;
   CLOUDFLARE_ENV: string;
+  RUNTIME?: "node" | "workers";
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN: string;
   CLOUDFLARE_AI_GATEWAY_ID?: string;
@@ -68,6 +70,10 @@ export interface Bindings {
   TWILIO_PHONE_NUMBER?: string;
   SEND_EMAIL?: SendEmail;
   SEND_EMAIL_FROM?: string;
+  /** Local outbox directory for Node outbound email (`.eml` files). */
+  NODE_OUTBOX_DIR?: string;
+  /** Shared secret for POST /inbound-email on Node (optional in development). */
+  INBOUND_EMAIL_SECRET?: string;
   SUPPORT_EMAIL_HANDLE?: string;
   SUPPORT_EMAIL_FROM?: string;
   HUGGINGFACE_API_KEY?: string;

@@ -39,34 +39,33 @@ describe("DatabaseDescribeTableNode", () => {
 
   it("should return schema with fields", async () => {
     const connection = createMockConnection();
-    connection.query.mockResolvedValue({
-      results: [
-        {
-          cid: 0,
-          name: "id",
-          type: "INTEGER",
-          notnull: 1,
-          dflt_value: null,
-          pk: 1,
-        },
-        {
-          cid: 1,
-          name: "name",
-          type: "TEXT",
-          notnull: 0,
-          dflt_value: null,
-          pk: 0,
-        },
-        {
-          cid: 2,
-          name: "score",
-          type: "REAL",
-          notnull: 0,
-          dflt_value: null,
-          pk: 0,
-        },
-      ],
-    });
+    connection.query
+      .mockResolvedValueOnce({
+        results: [
+          {
+            name: "id",
+            type: "integer",
+            notnull: 1,
+            dflt_value: null,
+            pk: 1,
+          },
+          {
+            name: "name",
+            type: "text",
+            notnull: 0,
+            dflt_value: null,
+            pk: 0,
+          },
+          {
+            name: "score",
+            type: "double precision",
+            notnull: 0,
+            dflt_value: null,
+            pk: 0,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ results: [] });
     const node = createNode();
     const result = await node.execute(
       createContext({ database: "db-1", table: "users" }, connection)
@@ -81,31 +80,34 @@ describe("DatabaseDescribeTableNode", () => {
         { name: "score", type: "number" },
       ],
     });
-    expect(connection.query).toHaveBeenCalledWith("PRAGMA table_info(users)");
+    expect(connection.query).toHaveBeenCalledWith(
+      expect.stringContaining("information_schema.columns"),
+      ["users", "users"]
+    );
   });
 
   it("should map primary key correctly", async () => {
     const connection = createMockConnection();
-    connection.query.mockResolvedValue({
-      results: [
-        {
-          cid: 0,
-          name: "slug",
-          type: "TEXT",
-          notnull: 0,
-          dflt_value: null,
-          pk: 1,
-        },
-        {
-          cid: 1,
-          name: "title",
-          type: "TEXT",
-          notnull: 0,
-          dflt_value: null,
-          pk: 0,
-        },
-      ],
-    });
+    connection.query
+      .mockResolvedValueOnce({
+        results: [
+          {
+            name: "slug",
+            type: "text",
+            notnull: 0,
+            dflt_value: null,
+            pk: 1,
+          },
+          {
+            name: "title",
+            type: "text",
+            notnull: 0,
+            dflt_value: null,
+            pk: 0,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ results: [] });
     const node = createNode();
     const result = await node.execute(
       createContext({ database: "db-1", table: "posts" }, connection)
