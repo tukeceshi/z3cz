@@ -3,6 +3,7 @@ import { createNodeWebSocket } from "@hono/node-ws";
 
 import { createApp } from "./app";
 import type { Bindings } from "./context";
+import { ensureAiInterfaceBootstrap } from "./ai-interface/bootstrap-seeds";
 import { createNodeBindings } from "./env/create-node-bindings";
 import { registerNodeWsRoutes } from "./routes/ws-node";
 import { handleScheduledEvent } from "./scheduled";
@@ -13,6 +14,9 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
   const wsListenHost = hostname === "0.0.0.0" ? "localhost" : hostname;
 
   const bindings: Bindings = await createNodeBindings(envVars);
+  await ensureAiInterfaceBootstrap(bindings).catch((error) => {
+    console.error("[api] AI interface bootstrap failed:", error);
+  });
   const app = createApp({ runtime: "node" });
   const honoFetch = app.fetch.bind(app);
 

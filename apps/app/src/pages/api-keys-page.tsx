@@ -3,13 +3,13 @@ import { ColumnDef } from "@tanstack/react-table";
 import Copy from "lucide-react/icons/copy";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +29,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import type { TranslateFn } from "@/i18n";
 import {
   createApiKey,
   deleteApiKey,
@@ -38,17 +40,17 @@ import {
 } from "@/services/api-keys-service";
 import { formatDate } from "@/utils/date";
 
-const columns: ColumnDef<ApiKey>[] = [
+const createColumns = (t: TranslateFn): ColumnDef<ApiKey>[] => [
   {
     accessorKey: "name",
-    header: "Name",
+    header: t("common.name"),
     cell: ({ row }) => (
       <div className="font-medium">{row.getValue("name")}</div>
     ),
   },
   {
     accessorKey: "createdAt",
-    header: "Created",
+    header: t("pages.apiKeys.created"),
     cell: ({ row }) => {
       const date = row.getValue("createdAt") as Date;
       return <div>{formatDate(date)}</div>;
@@ -64,7 +66,7 @@ const columns: ColumnDef<ApiKey>[] = [
             <DropdownMenuTrigger asChild>
               <Button aria-haspopup="true" size="icon" variant="ghost">
                 <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Toggle menu</span>
+                <span className="sr-only">{t("common.openMenu")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -77,7 +79,7 @@ const columns: ColumnDef<ApiKey>[] = [
                   )
                 }
               >
-                Roll Key
+                {t("pages.apiKeys.rollKey")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
@@ -88,7 +90,7 @@ const columns: ColumnDef<ApiKey>[] = [
                   )
                 }
               >
-                Delete Key
+                {t("pages.apiKeys.deleteKey")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -99,6 +101,8 @@ const columns: ColumnDef<ApiKey>[] = [
 ];
 
 export function ApiKeysPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { apiKeys, apiKeysError, isApiKeysLoading, mutateApiKeys } =
     useApiKeys();
@@ -114,9 +118,11 @@ export function ApiKeysPage() {
   const [createdKeyToShow, setCreatedKeyToShow] = useState<string | null>(null);
   const [isShowKeyDialogOpen, setIsShowKeyDialogOpen] = useState(false);
 
+  const columns = useMemo(() => createColumns(t), [t]);
+
   useEffect(() => {
-    setBreadcrumbs([{ label: "API Keys" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.apiKeys") }]);
+  }, [setBreadcrumbs, t]);
 
   useEffect(() => {
     const handleDeleteEvent = (e: Event) => {
@@ -146,17 +152,17 @@ export function ApiKeysPage() {
     setIsProcessing(true);
     try {
       await deleteApiKey(tokenToDelete, organization.id);
-      toast.success("API key deleted successfully");
+      appToast.success("pages.apiKeys.deletedToast");
       await mutateApiKeys();
     } catch (error) {
-      toast.error("Failed to delete API key. Please try again.");
+      appToast.error("pages.apiKeys.deleteFailed");
       console.error("Delete API Key Error:", error);
     } finally {
       setIsDeleteDialogOpen(false);
       setTokenToDelete(null);
       setIsProcessing(false);
     }
-  }, [tokenToDelete, organization?.id, mutateApiKeys]);
+  }, [tokenToDelete, organization?.id, mutateApiKeys, appToast]);
 
   const handleRollKey = useCallback(async (): Promise<void> => {
     if (!tokenToRoll || !organization?.id) return;
@@ -166,20 +172,20 @@ export function ApiKeysPage() {
       setCreatedKeyToShow(rolledKey.apiKey);
       setIsRollDialogOpen(false);
       setIsShowKeyDialogOpen(true);
-      toast.success("API key rolled successfully");
+      appToast.success("pages.apiKeys.rolledToast");
       await mutateApiKeys();
     } catch (error) {
-      toast.error("Failed to roll API key. Please try again.");
+      appToast.error("pages.apiKeys.rollFailed");
       console.error("Roll API Key Error:", error);
     } finally {
       setTokenToRoll(null);
       setIsProcessing(false);
     }
-  }, [tokenToRoll, organization?.id, mutateApiKeys]);
+  }, [tokenToRoll, organization?.id, mutateApiKeys, appToast]);
 
   const handleCreateKey = useCallback(async (): Promise<void> => {
     if (!newKeyName.trim() || !organization?.id) {
-      toast.error("Key name is required");
+      appToast.error("pages.apiKeys.nameRequired");
       return;
     }
     setIsProcessing(true);
@@ -189,15 +195,15 @@ export function ApiKeysPage() {
       setIsCreateDialogOpen(false);
       setIsShowKeyDialogOpen(true);
       setNewKeyName("");
-      toast.success("API key created");
+      appToast.success("pages.apiKeys.createdToast");
       await mutateApiKeys();
     } catch (error) {
-      toast.error("Failed to create API key. Please try again.");
+      appToast.error("pages.apiKeys.createFailed");
       console.error("Create API Key Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [newKeyName, organization?.id, mutateApiKeys]);
+  }, [newKeyName, organization?.id, mutateApiKeys, appToast]);
 
   const handleShowKeyDialogClose = useCallback((open: boolean) => {
     setIsShowKeyDialogOpen(open);
@@ -209,32 +215,37 @@ export function ApiKeysPage() {
   const handleCopyKey = useCallback(async (): Promise<void> => {
     if (!createdKeyToShow) return;
     await navigator.clipboard.writeText(createdKeyToShow);
-    toast.success("API key copied to clipboard");
-  }, [createdKeyToShow]);
+    appToast.success("pages.apiKeys.copiedToast");
+  }, [createdKeyToShow, appToast]);
 
   if (isApiKeysLoading && !apiKeys) {
-    return <InsetLoading title="API Keys" />;
+    return <InsetLoading title={t("pages.apiKeys.title")} />;
   } else if (apiKeysError) {
-    return <InsetError title="API Keys" errorMessage={apiKeysError.message} />;
+    return (
+      <InsetError
+        title={t("pages.apiKeys.title")}
+        errorMessage={apiKeysError.message}
+      />
+    );
   }
 
   return (
-    <InsetLayout title="API Keys">
+    <InsetLayout title={t("pages.apiKeys.title")}>
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Manage API keys to access your workflows programmatically.
+          {t("pages.apiKeys.description")}
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create API Key
+          {t("pages.apiKeys.createButton")}
         </Button>
       </div>
       <DataTable
         columns={columns}
         data={apiKeys || []}
         emptyState={{
-          title: "No API keys found",
-          description: "Create your first key to get started.",
+          title: t("pages.apiKeys.emptyTitle"),
+          description: t("pages.apiKeys.emptyDescription"),
         }}
       />
       <AlertDialog
@@ -243,14 +254,14 @@ export function ApiKeysPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Name your API key</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.apiKeys.nameDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Enter a descriptive name to help you identify this key later.
+              {t("pages.apiKeys.nameDialogDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
             autoFocus
-            placeholder="Key name"
+            placeholder={t("pages.apiKeys.keyNamePlaceholder")}
             value={newKeyName}
             onChange={(e) => setNewKeyName(e.target.value)}
             disabled={isProcessing}
@@ -258,14 +269,14 @@ export function ApiKeysPage() {
           />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setNewKeyName("")}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCreateKey}
               disabled={isProcessing || !newKeyName.trim()}
               className="bg-primary hover:bg-primary/90"
             >
-              {isProcessing ? "Creating..." : "Create"}
+              {isProcessing ? t("common.loading") : t("common.create")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -276,15 +287,14 @@ export function ApiKeysPage() {
       >
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>API Key Created</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.apiKeys.showDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This is your new API key.
+              {t("pages.apiKeys.showDialogDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Warning</AlertTitle>
             <AlertDescription>
-              Copy it now—you won't be able to see it again!
+              {t("pages.apiKeys.showDialogWarning")}
             </AlertDescription>
           </Alert>
           <div className="flex items-center gap-2 bg-muted rounded px-3 py-2 font-mono text-sm select-all overflow-x-auto w-full">
@@ -299,12 +309,12 @@ export function ApiKeysPage() {
               className="ml-2"
             >
               <Copy className="w-4 h-4" />
-              <span className="sr-only">Copy key</span>
+              <span className="sr-only">{t("pages.apiKeys.copyKey")}</span>
             </Button>
           </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setIsShowKeyDialogOpen(false)}>
-              Done
+              {t("pages.apiKeys.done")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -312,22 +322,21 @@ export function ApiKeysPage() {
       <AlertDialog open={isRollDialogOpen} onOpenChange={setIsRollDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Roll API Key?</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.apiKeys.rollDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will generate a new secret for this API key. The old secret
-              will stop working immediately.
+              {t("pages.apiKeys.rollDialogDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTokenToRoll(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRollKey}
               disabled={isProcessing}
               className="bg-primary hover:bg-primary/90"
             >
-              {isProcessing ? "Rolling..." : "Roll Key"}
+              {isProcessing ? t("common.loading") : t("pages.apiKeys.rollKey")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -338,22 +347,21 @@ export function ApiKeysPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.apiKeys.deleteKey")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              API key.
+              {t("pages.apiKeys.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTokenToDelete(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteKey}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Deleting..." : "Delete"}
+              {isProcessing ? t("common.loading") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

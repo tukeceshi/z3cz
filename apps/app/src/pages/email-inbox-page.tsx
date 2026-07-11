@@ -10,6 +10,7 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
+import { useTranslation } from "@/components/locale-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -25,6 +26,7 @@ import {
 import { cn } from "@/utils/utils";
 
 export function EmailInboxPage() {
+  const { t } = useTranslation();
   const { emailId } = useParams<{ emailId: string }>();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -44,25 +46,27 @@ export function EmailInboxPage() {
   } = useMailboxThreads(emailId || null, search || undefined);
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  // Default the selection to the most recent conversation in the current
-  // result set once threads load.
   const activeThreadId = selectedThreadId ?? threads[0]?.id ?? null;
 
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Emails", to: `/org/${orgId}/emails` },
-      { label: email?.name || "Inbox" },
+      { label: t("sidebar.emails"), to: `/org/${orgId}/emails` },
+      { label: email?.name || t("pages.emailInbox.title") },
     ]);
-  }, [setBreadcrumbs, orgId, email?.name]);
+  }, [setBreadcrumbs, orgId, email?.name, t]);
 
   if (emailError) {
-    return <InsetError title="Inbox" errorMessage={emailError.message} />;
+    return (
+      <InsetError
+        title={t("pages.emailInbox.title")}
+        errorMessage={emailError.message}
+      />
+    );
   }
 
   const runSearch = () => {
     setSearch(searchInput);
-    // Drop the prior selection so the view lands on the first match.
     setSelectedThreadId(null);
   };
 
@@ -84,13 +88,13 @@ export function EmailInboxPage() {
         >
           <div className="flex-1">
             <SearchInput
-              placeholder="Search by subject or sender…"
+              placeholder={t("pages.emailInbox.searchPlaceholder")}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
           <Button type="submit" variant="outline" className="h-10">
-            Search
+            {t("pages.emailInbox.search")}
           </Button>
           {search && (
             <Button
@@ -99,7 +103,7 @@ export function EmailInboxPage() {
               className="h-10"
               onClick={clearSearch}
             >
-              Clear
+              {t("pages.emailInbox.clear")}
             </Button>
           )}
         </form>
@@ -152,22 +156,26 @@ function ThreadList({
   activeThreadId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-col overflow-hidden lg:border-r">
       <div className="flex-1 overflow-y-auto">
         {isLoading && threads.length === 0 && (
           <div className="p-6 text-sm text-muted-foreground">
-            Loading conversations…
+            {t("pages.emailInbox.loadingConversations")}
           </div>
         )}
         {error && (
           <div className="p-6 text-sm text-destructive">
-            Failed to load conversations: {error.message}
+            {t("pages.emailInbox.loadConversationsFailed", {
+              message: error.message,
+            })}
           </div>
         )}
         {!isLoading && !error && threads.length === 0 && (
           <div className="p-6 text-sm text-muted-foreground text-center">
-            No conversations
+            {t("pages.emailInbox.noConversations")}
           </div>
         )}
         <ul>
@@ -199,7 +207,7 @@ function ThreadList({
                         </span>
                       </div>
                       <div className="text-sm truncate text-muted-foreground">
-                        {thread.subject || "(no subject)"}
+                        {thread.subject || t("pages.emailInbox.noSubject")}
                       </div>
                     </div>
                   </div>
@@ -208,14 +216,13 @@ function ThreadList({
             );
           })}
         </ul>
-        {/* Sentinel: scrolling this into view loads the next page. */}
         {threads.length > 0 && !isReachingEnd && (
           <div
             ref={observerTargetRef}
             className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"
           >
             {isLoadingMore && <Spinner className="size-3" />}
-            {isLoadingMore ? "Loading more…" : ""}
+            {isLoadingMore ? t("pages.emailInbox.loadingMore") : ""}
           </div>
         )}
       </div>
@@ -232,6 +239,7 @@ function ThreadDetail({
   emailId: string;
   threadId: string;
 }) {
+  const { t } = useTranslation();
   const { thread, messages, isThreadLoading, threadError } = useMailboxThread(
     emailId || null,
     threadId
@@ -240,7 +248,7 @@ function ThreadDetail({
   if (isThreadLoading && !thread) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
-        Loading conversation…
+        {t("pages.emailInbox.loadingConversation")}
       </div>
     );
   }
@@ -259,7 +267,7 @@ function ThreadDetail({
         <SenderAvatar name={thread.fromEmail} className="h-10 w-10 shrink-0" />
         <div className="min-w-0 h-10 flex flex-col justify-center leading-tight">
           <h2 className="font-semibold truncate">
-            {thread.subject || "(no subject)"}
+            {thread.subject || t("pages.emailInbox.noSubject")}
           </h2>
           <p className="text-sm text-muted-foreground truncate font-mono">
             {thread.fromEmail}
@@ -290,6 +298,7 @@ function MessageCard({
   orgId: string;
   emailId: string;
 }) {
+  const { t } = useTranslation();
   const isInbound = message.direction === "inbound";
   const [body, setBody] = useState<string | null>(null);
   const [bodyError, setBodyError] = useState<string | null>(null);
@@ -328,7 +337,9 @@ function MessageCard({
     <div className={cn("pl-4", !isInbound && "border-l-2 border-l-primary")}>
       <div className="flex items-baseline justify-between gap-2 mb-1">
         <span className="font-medium text-sm">
-          {isInbound ? message.fromEmail : `${message.fromEmail} (sent)`}
+          {isInbound
+            ? message.fromEmail
+            : t("pages.emailInbox.sentLabel", { email: message.fromEmail })}
         </span>
         <span className="text-xs text-muted-foreground shrink-0">
           {formatDate(message.createdAt)}
@@ -338,16 +349,18 @@ function MessageCard({
       <div className="text-sm">
         {bodyError && (
           <p className="text-muted-foreground italic text-xs" title={bodyError}>
-            Message body unavailable
+            {t("pages.emailInbox.bodyUnavailable")}
           </p>
         )}
         {!bodyError && !preferredPart && (
-          <p className="text-muted-foreground italic text-xs">(no body)</p>
+          <p className="text-muted-foreground italic text-xs">
+            {t("pages.emailInbox.noBody")}
+          </p>
         )}
         {!bodyError && preferredPart === "text" && (
           <>
             <pre className="whitespace-pre-wrap font-sans">
-              {body === null ? "Loading…" : visible}
+              {body === null ? t("pages.emailInbox.loading") : visible}
             </pre>
             {quoted && (
               <>
@@ -357,8 +370,8 @@ function MessageCard({
                   className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showQuoted
-                    ? "‹ Hide trimmed content"
-                    : "› Show trimmed content"}
+                    ? t("pages.emailInbox.hideTrimmed")
+                    : t("pages.emailInbox.showTrimmed")}
                 </button>
                 {showQuoted && (
                   <pre className="whitespace-pre-wrap font-sans text-muted-foreground mt-2 border-l-2 border-l-neutral-200 dark:border-l-neutral-700 pl-3">
@@ -398,14 +411,18 @@ function MessageCard({
 }
 
 function HtmlBodyFrame({ html }: { html: string | null }) {
+  const { t } = useTranslation();
+
   if (html === null) {
-    return <p className="text-muted-foreground text-xs">Loading…</p>;
+    return (
+      <p className="text-muted-foreground text-xs">
+        {t("pages.emailInbox.loading")}
+      </p>
+    );
   }
-  // Email HTML is untrusted; render in a fully sandboxed iframe so it can
-  // neither run scripts nor escape into the app.
   return (
     <iframe
-      title="Email HTML body"
+      title={t("pages.emailInbox.htmlBodyTitle")}
       sandbox=""
       srcDoc={html}
       className="w-full min-h-[200px] border-0"
@@ -429,10 +446,12 @@ function SenderAvatar({
 }
 
 function EmptyState() {
+  const { t } = useTranslation();
+
   return (
     <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
       <Inbox className="h-8 w-8" />
-      <p className="text-sm">Select a conversation to read it</p>
+      <p className="text-sm">{t("pages.emailInbox.selectConversation")}</p>
     </div>
   );
 }
@@ -450,15 +469,9 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Matches Gmail-style attribution lines across the common locales we see.
 const ATTRIBUTION_RE =
   /^On .+ (wrote|écrivait|schrieb|escribió|skrev|scrisse|napisał|napisał\(a\)):\s*$/m;
 
-/**
- * Split an email body into the new content and the quoted tail so the UI can
- * collapse the latter behind a toggle. Falls back to the first run of two or
- * more consecutive `>`-prefixed lines when no attribution line is present.
- */
 function splitQuotedText(body: string): { visible: string; quoted: string } {
   const attribution = body.match(ATTRIBUTION_RE);
   if (attribution && attribution.index !== undefined) {

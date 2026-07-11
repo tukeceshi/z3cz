@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useDeleteFeedback,
@@ -29,6 +30,7 @@ export function WorkflowFeedbackSection({
   workflowId,
   disabled = false,
 }: WorkflowFeedbackSectionProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isDeveloperMode = user?.developerMode ?? false;
 
@@ -48,10 +50,10 @@ export function WorkflowFeedbackSection({
         await deleteFeedback(feedbackId);
         await mutateFeedback();
       } catch {
-        toast.error("Failed to delete feedback");
+        toast.error(t("workflow.feedbackSection.deleteFailed"));
       }
     },
-    [deleteFeedback, mutateFeedback]
+    [deleteFeedback, mutateFeedback, t]
   );
 
   const handleUpsert = useCallback(
@@ -69,10 +71,10 @@ export function WorkflowFeedbackSection({
         });
         await mutateFeedback();
       } catch {
-        toast.error("Failed to save feedback");
+        toast.error(t("workflow.feedbackSection.saveFailed"));
       }
     },
-    [executionId, upsertFeedback, mutateFeedback]
+    [executionId, upsertFeedback, mutateFeedback, t]
   );
 
   if (!isDeveloperMode) return null;
@@ -85,7 +87,9 @@ export function WorkflowFeedbackSection({
         onClick={() => setExpanded(!expanded)}
         className="group w-full px-4 py-3 flex items-center justify-between"
       >
-        <h2 className="text-base font-semibold text-foreground">Feedback</h2>
+        <h2 className="text-base font-semibold text-foreground">
+          {t("workflow.feedbackSection.title")}
+        </h2>
         <ChevronDownIcon
           className={cn(
             "h-4 w-4 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300",
@@ -97,11 +101,11 @@ export function WorkflowFeedbackSection({
       {expanded && (
         <div className="px-4 pb-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Rate this execution on each criterion.
+            {t("workflow.feedbackSection.description")}
           </p>
           {noCriteria ? (
             <p className="text-sm text-muted-foreground">
-              No evaluation criteria configured.
+              {t("workflow.feedbackSection.noCriteria")}
             </p>
           ) : (
             <div className="space-y-1">
@@ -146,6 +150,7 @@ function CriterionRow({
   onDelete?: () => void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const [showComment, setShowComment] = useState(!!submitted?.comment);
   const [comment, setComment] = useState(submitted?.comment ?? "");
   const commentTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -238,7 +243,7 @@ function CriterionRow({
       {showComment && (
         <div className="px-3 pb-2">
           <Textarea
-            placeholder="Optional comment..."
+            placeholder={t("workflow.feedbackSection.commentPlaceholder")}
             value={comment}
             onChange={(e) => handleCommentChange(e.target.value)}
             rows={2}

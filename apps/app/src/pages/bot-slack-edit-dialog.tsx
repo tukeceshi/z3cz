@@ -1,6 +1,7 @@
 import type { BotResponse } from "@dafthunk/types";
 import { useState } from "react";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ export function BotSlackEditDialog({
   onOpenChange,
   onUpdated,
 }: BotSlackEditDialogProps) {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const [name, setName] = useState(bot.name);
   const [botToken, setBotToken] = useState("");
@@ -55,7 +57,9 @@ export function BotSlackEditDialog({
       onUpdated();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update bot");
+      setError(
+        err instanceof Error ? err.message : t("pages.bots.updateFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -75,13 +79,15 @@ export function BotSlackEditDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Slack Bot</DialogTitle>
-          <DialogDescription>Update your Slack bot settings.</DialogDescription>
+          <DialogTitle>{t("pages.bots.editSlackTitle")}</DialogTitle>
+          <DialogDescription>
+            {t("pages.bots.editSlackDescription")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-name">Name</Label>
+            <Label htmlFor="edit-name">{t("common.name")}</Label>
             <Input
               id="edit-name"
               value={name}
@@ -90,24 +96,26 @@ export function BotSlackEditDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-bot-token">Bot Token</Label>
+            <Label htmlFor="edit-bot-token">{t("pages.bots.botToken")}</Label>
             <Input
               id="edit-bot-token"
               type="password"
               value={botToken}
               onChange={(e) => setBotToken(e.target.value)}
-              placeholder="Leave empty to keep current token"
+              placeholder={t("pages.bots.tokenKeepPlaceholder")}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-signing-secret">Signing Secret</Label>
+            <Label htmlFor="edit-signing-secret">
+              {t("pages.bots.signingSecret")}
+            </Label>
             <Input
               id="edit-signing-secret"
               type="password"
               value={signingSecret}
               onChange={(e) => setSigningSecret(e.target.value)}
-              placeholder="Leave empty to keep current secret"
+              placeholder={t("pages.bots.secretKeepPlaceholder")}
             />
           </div>
 
@@ -124,14 +132,14 @@ export function BotSlackEditDialog({
             onClick={() => handleOpenChange(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || name.trim() === ""}
           >
             {isSubmitting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Save Changes
+            {t("pages.bots.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -69,8 +69,11 @@ export async function closeDatabaseConnections(): Promise<void> {
   await Promise.all([...nodeClients.values()].map((client) => client.end()));
   nodeClients.clear();
 }
+export * from "./platform-relay-account-queries";
+export * from "./ai-interface-queries";
 export * from "./onboarding";
 export * from "./platform-settings-queries";
+export * from "./workflow-scheme-queries";
 export * from "./queries";
 export * from "./schema";
 export * from "./support-queries";

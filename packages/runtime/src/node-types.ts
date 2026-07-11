@@ -237,6 +237,8 @@ export interface NodeEnv {
   SEND_EMAIL_FROM?: string;
   HUGGINGFACE_API_KEY?: string;
   REPLICATE_API_TOKEN?: string;
+  NEWAPI_BASE_URL?: string;
+  NEWAPI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
   TAVILY_API_KEY?: string;
   WEB_HOST?: string;
@@ -282,6 +284,20 @@ export interface NodeContext {
   // Callback-based access to sensitive data (improves security and isolation)
   getSecret?: (secretName: string) => Promise<string | undefined>;
   getIntegration: (integrationId: string) => Promise<IntegrationInfo>;
+  /** Resolve a platform relay account (DB-backed with env fallback). */
+  resolveRelayAccount?: (
+    accountId?: string,
+    provider?: import("@dafthunk/types").RelayAccountProvider
+  ) => Promise<
+    import("./relay-account-service").ResolvedRelayAccount | undefined
+  >;
+  /** Resolve an organization AI interface (template + credentials). */
+  resolveAiInterface?: (params: {
+    interfaceId?: string;
+    templateId?: string;
+  }) => Promise<
+    import("@dafthunk/types").ResolvedOrgAiInterface | undefined
+  >;
   env: NodeEnv;
   // Multi-step execution primitives (populated for MultiStepNode instances)
   sleep?: (durationMs: number) => Promise<void>;

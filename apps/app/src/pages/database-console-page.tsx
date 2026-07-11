@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import { useDatabase } from "@/services/database-service";
 import { makeOrgRequest } from "@/services/utils";
 
 export function DatabaseConsolePage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -34,12 +36,12 @@ export function DatabaseConsolePage() {
   useEffect(() => {
     if (database) {
       setBreadcrumbs([
-        { label: "Databases", to: "/databases" },
+        { label: t("sidebar.databases"), to: "/databases" },
         { label: database.name, to: `/databases/${id}` },
-        { label: "Console" },
+        { label: t("pages.databaseConsole.console") },
       ]);
     }
-  }, [setBreadcrumbs, database, id]);
+  }, [setBreadcrumbs, database, id, t]);
 
   const handleChange = (value: string) => {
     sqlRef.current = value;
@@ -73,32 +75,35 @@ export function DatabaseConsolePage() {
   };
 
   if (isDatabaseLoading) {
-    return <InsetLoading title="Database Console" />;
+    return <InsetLoading title={t("pages.databaseConsole.title")} />;
   }
 
   if (databaseError || !database) {
     return (
       <InsetError
-        title="Database Console"
-        errorMessage={databaseError?.message || "Database not found"}
+        title={t("pages.databaseConsole.title")}
+        errorMessage={
+          databaseError?.message || t("pages.databaseConsole.notFound")
+        }
       />
     );
   }
 
   return (
-    <InsetLayout title={`${database.name} - Console`}>
+    <InsetLayout
+      title={t("pages.databaseConsole.titleWithName", { name: database.name })}
+    >
       <div className="space-y-6">
-        {/* SQL Editor */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="sql">SQL Query</Label>
+            <Label htmlFor="sql">{t("pages.databaseConsole.sqlQuery")}</Label>
             <Button onClick={handleExecute} disabled={isExecuting} size="sm">
               {isExecuting ? (
                 <Spinner className="h-4 w-4 mr-2" />
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Execute
+              {t("pages.databaseConsole.execute")}
             </Button>
           </div>
           <div className="h-[300px] border rounded-md overflow-hidden">
@@ -106,10 +111,11 @@ export function DatabaseConsolePage() {
           </div>
         </div>
 
-        {/* Results */}
         {error && (
           <div className="border border-red-200 bg-red-50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-red-900 mb-2">Error</h3>
+            <h3 className="text-sm font-semibold text-red-900 mb-2">
+              {t("pages.databaseConsole.error")}
+            </h3>
             <pre className="text-xs text-red-800 whitespace-pre-wrap font-mono">
               {error}
             </pre>
@@ -119,14 +125,24 @@ export function DatabaseConsolePage() {
         {result && (
           <div className="border rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Results</h3>
+              <h3 className="text-sm font-semibold">
+                {t("pages.databaseConsole.results")}
+              </h3>
               {result.meta && (
                 <div className="text-xs text-muted-foreground space-x-4">
                   {result.meta.rowsAffected !== undefined && (
-                    <span>Rows affected: {result.meta.rowsAffected}</span>
+                    <span>
+                      {t("pages.databaseConsole.rowsAffected", {
+                        count: result.meta.rowsAffected,
+                      })}
+                    </span>
                   )}
                   {result.meta.lastInsertRowid !== undefined && (
-                    <span>Last insert ID: {result.meta.lastInsertRowid}</span>
+                    <span>
+                      {t("pages.databaseConsole.lastInsertId", {
+                        id: result.meta.lastInsertRowid,
+                      })}
+                    </span>
                   )}
                 </div>
               )}
@@ -153,7 +169,7 @@ export function DatabaseConsolePage() {
                         {Object.values(row as object).map((value, j) => (
                           <td key={j} className="px-3 py-2 text-xs font-mono">
                             {value === null
-                              ? "NULL"
+                              ? t("pages.databaseConsole.nullValue")
                               : typeof value === "object"
                                 ? JSON.stringify(value)
                                 : String(value)}
@@ -164,12 +180,14 @@ export function DatabaseConsolePage() {
                   </tbody>
                 </table>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {result.results.length} row(s) returned
+                  {t("pages.databaseConsole.rowsReturned", {
+                    count: result.results.length,
+                  })}
                 </div>
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
-                Query executed successfully. No rows returned.
+                {t("pages.databaseConsole.noRowsReturned")}
               </div>
             )}
           </div>

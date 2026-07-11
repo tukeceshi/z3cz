@@ -38,6 +38,32 @@ export type {
   DatasetService,
 } from "./dataset-service";
 export { computeDefinitionHash } from "./definition-hash";
+export { externalEventContinuation } from "./heartbeat/continuation-store";
+export {
+  buildExecutionEventEnvelope,
+  createMemoryExecutionEventInbox,
+  getMultiplexEventType,
+  wrapMultiplexWorkflowEvent,
+  type ExecutionEventInbox,
+} from "./heartbeat/execution-event-protocol";
+export {
+  runWorkflowHeartbeat,
+  type RuntimeHeartbeatHost,
+} from "./heartbeat/workflow-heartbeat";
+export {
+  createPollContinuationHandler,
+  noopPollContinuationHandler,
+  type PollContinuationHandler,
+} from "./heartbeat/poll-continuation-handler";
+export { upstreamPollContinuation } from "./upstream/upstream-types";
+export { REPLICATE_PROVIDER } from "./upstream/replicate-upstream";
+export { NEWAPI_RELAY_PROVIDER } from "./upstream/newapi-relay-upstream";
+export type {
+  RelayAccountService,
+  ResolvedRelayAccount,
+} from "./relay-account-service";
+export type { AiInterfaceService } from "./ai-interface-service";
+export { SEEDANCE_2_0_T2V_PROFILE } from "./upstream/upstream-param-profiles";
 export {
   isSubscriptionRequiredError,
   nodeNotFoundMessage,
@@ -147,6 +173,11 @@ export {
   type ColumnInfoRow,
   validateIdentifier,
 } from "./utils/database-table";
+export {
+  buildAllowedNodeTypeSet,
+  filterNodeTypesByScheme,
+  isSchemeNodeCatalogUnrestricted,
+} from "./filter-node-types-by-scheme";
 // Validation
 export {
   detectCycles,

@@ -7,11 +7,11 @@ import ThumbsDown from "lucide-react/icons/thumbs-down";
 import ThumbsUp from "lucide-react/icons/thumbs-up";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { toast } from "sonner";
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { DataTable } from "@/components/ui/data-table";
@@ -28,6 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAppToast } from "@/hooks/use-app-toast";
+import type { TranslateFn } from "@/i18n";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
@@ -40,11 +42,12 @@ import { formatDate } from "@/utils/date";
 import { cn } from "@/utils/utils";
 
 export const createColumns = (
-  getOrgUrl: (path: string) => string
+  getOrgUrl: (path: string) => string,
+  t: TranslateFn
 ): ColumnDef<ExecutionFeedback>[] => [
   {
     accessorKey: "workflowName",
-    header: "Workflow",
+    header: t("pages.feedback.columns.workflow"),
     cell: ({ row }) => {
       const workflowId = row.original.workflowId;
       const workflowName = row.getValue("workflowName") as string | undefined;
@@ -61,7 +64,7 @@ export const createColumns = (
   },
   {
     accessorKey: "criterionQuestion",
-    header: "Criterion",
+    header: t("pages.feedback.columns.criterion"),
     cell: ({ row }) => {
       const question = row.getValue("criterionQuestion") as string | undefined;
       if (!question) return <span className="text-muted-foreground">-</span>;
@@ -74,7 +77,7 @@ export const createColumns = (
   },
   {
     accessorKey: "executionId",
-    header: "Execution",
+    header: t("pages.feedback.columns.execution"),
     cell: ({ row }) => {
       const executionId = row.getValue("executionId") as string;
       return (
@@ -89,7 +92,7 @@ export const createColumns = (
   },
   {
     accessorKey: "sentiment",
-    header: "Rating",
+    header: t("pages.feedback.columns.rating"),
     cell: ({ row }) => {
       const sentiment = row.getValue("sentiment") as "positive" | "negative";
       return sentiment === "positive" ? (
@@ -101,7 +104,7 @@ export const createColumns = (
   },
   {
     accessorKey: "comment",
-    header: "Comment",
+    header: t("pages.feedback.columns.comment"),
     cell: ({ row }) => {
       const comment = row.getValue("comment") as string | undefined;
       if (!comment) return <span className="text-muted-foreground">-</span>;
@@ -114,7 +117,7 @@ export const createColumns = (
   },
   {
     accessorKey: "createdAt",
-    header: "Created",
+    header: t("pages.feedback.columns.created"),
     cell: ({ row }) => {
       const date = row.getValue("createdAt") as Date | string;
       try {
@@ -128,12 +131,13 @@ export const createColumns = (
 ];
 
 export function FeedbackPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
   const { organization } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
 
-  // Filters
   const [searchParams, setSearchParams] = useSearchParams();
   const workflowId = searchParams.get("workflowId") ?? undefined;
   const setWorkflowId = (id: string | undefined) => {
@@ -166,34 +170,34 @@ export function FeedbackPage() {
     feedbackObserverTargetRef,
   } = usePaginatedFeedback(filters);
 
-  // Fetch workflows and criteria for filter dropdowns
   const { workflows } = useWorkflows();
   const { criteria } = useAllCriteria();
 
-  // Filter criteria by selected workflow (if any)
   const filteredCriteria = workflowId
     ? criteria.filter((c) => c.workflowId === workflowId)
     : criteria;
 
+  const columns = useMemo(
+    () => createColumns(getOrgUrl, t),
+    [getOrgUrl, t]
+  );
+
   const errorMessage = feedbackError
     ? feedbackError instanceof Error
       ? feedbackError.message
-      : "Unknown error"
+      : t("common.unknownError")
     : "";
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Feedback" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.feedback") }]);
+  }, [setBreadcrumbs, t]);
 
   useEffect(() => {
     if (feedbackError) {
-      toast.error(
-        `Failed to fetch feedback: ${errorMessage}. Please try again.`
-      );
+      appToast.errorRaw(t("pages.feedback.fetchFailed", { message: errorMessage }));
     }
-  }, [feedbackError, errorMessage]);
+  }, [feedbackError, errorMessage, appToast, t]);
 
-  // Clear criterion filter when workflow changes
   useEffect(() => {
     setCriterionId(undefined);
   }, [workflowId]);
@@ -204,25 +208,26 @@ export function FeedbackPage() {
     try {
       await exportFeedbackCsv(organization.id, filters);
     } catch {
-      toast.error("Failed to export feedback");
+      appToast.error("pages.feedback.exportFailed");
     } finally {
       setIsExporting(false);
     }
-  }, [organization?.id, filters]);
+  }, [organization?.id, filters, appToast]);
 
   if (isFeedbackInitialLoading) {
-    return <InsetLoading title="Feedback" />;
+    return <InsetLoading title={t("pages.feedback.title")} />;
   } else if (feedbackError) {
-    return <InsetError title="Feedback" errorMessage={errorMessage} />;
+    return (
+      <InsetError title={t("pages.feedback.title")} errorMessage={errorMessage} />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Feedback">
+      <InsetLayout title={t("pages.feedback.title")}>
         <div className="mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            View and analyze user feedback on workflow executions across all
-            evaluation criteria.
+            {t("pages.feedback.description")}
           </div>
         </div>
 
@@ -232,10 +237,10 @@ export function FeedbackPage() {
             onValueChange={(v) => setWorkflowId(v === "all" ? undefined : v)}
           >
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="All workflows" />
+              <SelectValue placeholder={t("pages.executions.allWorkflows")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All workflows</SelectItem>
+              <SelectItem value="all">{t("pages.executions.allWorkflows")}</SelectItem>
               {workflows.map((w) => (
                 <SelectItem key={w.id} value={w.id}>
                   {w.name}
@@ -250,10 +255,10 @@ export function FeedbackPage() {
             disabled={!workflowId}
           >
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="All criteria" />
+              <SelectValue placeholder={t("pages.feedback.allCriteria")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All criteria</SelectItem>
+              <SelectItem value="all">{t("pages.feedback.allCriteria")}</SelectItem>
               {filteredCriteria.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.question}
@@ -273,7 +278,7 @@ export function FeedbackPage() {
                 )}
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                {startDate ? formatDate(startDate) : "Start date"}
+                {startDate ? formatDate(startDate) : t("pages.feedback.startDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -297,7 +302,7 @@ export function FeedbackPage() {
                 )}
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                {endDate ? formatDate(endDate) : "End date"}
+                {endDate ? formatDate(endDate) : t("pages.feedback.endDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -318,25 +323,25 @@ export function FeedbackPage() {
               disabled={isExporting || feedbackList.length === 0}
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
-              {isExporting ? "Exporting..." : "Export CSV"}
+              {isExporting ? t("pages.feedback.exporting") : t("pages.feedback.exportCsv")}
             </Button>
           </div>
         </div>
 
         <DataTable
-          columns={createColumns(getOrgUrl)}
+          columns={columns}
           data={feedbackList}
           emptyState={{
             title: feedbackError
-              ? "Error"
+              ? t("pages.feedback.empty.error")
               : feedbackList.length === 0
-                ? "No feedback"
-                : "No results",
+                ? t("pages.feedback.empty.none")
+                : t("common.noResults"),
             description: feedbackError
               ? errorMessage
               : feedbackList.length === 0
-                ? "No feedback has been submitted yet."
-                : "No feedback matches your filters.",
+                ? t("pages.feedback.empty.noneDescription")
+                : t("pages.feedback.empty.noMatchDescription"),
           }}
         />
         {!isFeedbackReachingEnd && !isFeedbackInitialLoading && (

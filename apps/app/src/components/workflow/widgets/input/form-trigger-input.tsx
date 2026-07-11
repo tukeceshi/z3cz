@@ -7,6 +7,7 @@ import { useCallback, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { SchemaDialog } from "@/components/schema-dialog";
 import {
   AlertDialog,
@@ -80,6 +81,7 @@ function FormTriggerInputWidget({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { schemas, isSchemasLoading, mutateSchemas } = useSchemas();
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
   const { id: workflowId } = useParams<{ id: string }>();
 
@@ -203,7 +205,7 @@ function FormTriggerInputWidget({
             onClick={() => window.open(formUrl, "_blank", "noopener")}
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Open
+            {t("common.open")}
           </Button>
           <Button
             variant="outline"
@@ -212,7 +214,7 @@ function FormTriggerInputWidget({
             onClick={() => navigator.clipboard.writeText(formUrl)}
           >
             <Copy className="h-3.5 w-3.5" />
-            Copy
+            {t("common.copy")}
           </Button>
         </div>
       )}
@@ -227,10 +229,10 @@ function FormTriggerInputWidget({
             <SelectValue
               placeholder={
                 isLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : schemas?.length === 0
-                    ? "No schemas"
-                    : "Select schema"
+                    ? t("workflow.widgets.schema.noSchemas")
+                    : t("workflow.widgets.schema.selectSchema")
               }
             >
               {selectedName}
@@ -244,7 +246,7 @@ function FormTriggerInputWidget({
             ))}
             <SelectSeparator />
             <SelectItem value={CREATE_NEW} className="text-xs">
-              + New Schema
+              {t("workflow.widgets.schema.newSchema")}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -254,8 +256,8 @@ function FormTriggerInputWidget({
           disabled={disabled || isLoading || !schemaId}
           title={
             isStale
-              ? "Schema changed — reload to sync outputs"
-              : "Reload schema"
+              ? t("workflow.widgets.schema.reloadStaleOutputs")
+              : t("workflow.widgets.schema.reload")
           }
           className={cn("h-auto px-2 shrink-0", isStale && "border-amber-500")}
         >
@@ -271,23 +273,22 @@ function FormTriggerInputWidget({
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onSubmit={handleCreate}
-        title="Create New Schema"
-        submitLabel="Create Schema"
+        title={t("pages.schemas.createDialogTitle")}
+        submitLabel={t("pages.schemas.createSchema")}
       />
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.schema.reloadTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will rebuild the outputs from the schema and remove all
-              connected edges. This action cannot be undone.
+              {t("workflow.widgets.schema.reloadOutputsDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

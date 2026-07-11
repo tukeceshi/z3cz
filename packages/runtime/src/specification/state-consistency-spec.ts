@@ -13,7 +13,7 @@ export function testStateConsistency(
 ) {
   describe(`${runtimeName}: state consistency`, () => {
     it("should maintain consistent state throughout execution", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-consistency",
         name: "Consistency Check Workflow",
         trigger: "manual",
@@ -75,7 +75,7 @@ export function testStateConsistency(
     });
 
     it("should never mark nodes as both executed and errored", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-state-isolation",
         name: "State Isolation Workflow",
         trigger: "manual",

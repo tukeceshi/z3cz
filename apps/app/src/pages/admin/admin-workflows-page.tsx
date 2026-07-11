@@ -8,12 +8,14 @@ import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAdminSearch } from "@/hooks/use-admin-search";
+import type { TranslateFn } from "@/i18n";
 import {
   type AdminWorkflow,
   useAdminWorkflows,
@@ -21,12 +23,13 @@ import {
 import { formatDate } from "@/utils/date";
 
 function createColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminWorkflow>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("admin.common.name"),
       cell: ({ row }) => (
         <Link
           to={`/admin/workflows/${row.original.id}`}
@@ -38,7 +41,7 @@ function createColumns(
     },
     {
       accessorKey: "organizationName",
-      header: "Organization",
+      header: t("admin.common.organization"),
       cell: ({ row }) => (
         <Link
           to={`/admin/organizations/${row.original.organizationId}`}
@@ -50,31 +53,31 @@ function createColumns(
     },
     {
       accessorKey: "trigger",
-      header: "Trigger",
+      header: t("admin.common.trigger"),
       cell: ({ row }) => (
         <Badge variant="outline">{row.original.trigger}</Badge>
       ),
     },
     {
       accessorKey: "runtime",
-      header: "Runtime",
+      header: t("admin.common.runtime"),
       cell: ({ row }) => (
         <Badge variant="secondary">{row.original.runtime}</Badge>
       ),
     },
     {
       accessorKey: "enabled",
-      header: "Enabled",
+      header: t("admin.common.enabled"),
       cell: ({ row }) =>
         row.original.enabled ? (
-          <Badge variant="default">Yes</Badge>
+          <Badge variant="default">{t("admin.common.yes")}</Badge>
         ) : (
-          <Badge variant="secondary">No</Badge>
+          <Badge variant="secondary">{t("admin.common.no")}</Badge>
         ),
     },
     {
       accessorKey: "updatedAt",
-      header: "Updated",
+      header: t("admin.common.updated"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.updatedAt)}
@@ -88,21 +91,21 @@ function createColumns(
           <DropdownMenuItem
             onClick={() => navigate(`/admin/workflows/${row.original.id}`)}
           >
-            View workflow
+            {t("admin.common.viewWorkflow")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
               navigate(`/admin/executions?workflowId=${row.original.id}`)
             }
           >
-            View executions
+            {t("admin.common.viewExecution")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
               navigate(`/admin/organizations/${row.original.organizationId}`)
             }
           >
-            View organization
+            {t("admin.common.viewOrganization")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -117,35 +120,39 @@ export function AdminWorkflowsPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Workflows" }]);
+    setBreadcrumbs([{ label: t("sidebar.workflows") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const organizationId = searchParams.get("organizationId") || undefined;
 
   const { workflows, pagination, workflowsError, isWorkflowsLoading } =
     useAdminWorkflows(page, limit, search || undefined, organizationId);
 
-  const columns = useMemo(() => createColumns(navigate), [navigate]);
+  const columns = useMemo(
+    () => createColumns(navigate, t),
+    [navigate, t]
+  );
 
   if (isWorkflowsLoading) {
-    return <InsetLoading title="Workflows" />;
+    return <InsetLoading title={t("admin.workflows.title")} />;
   }
 
   if (workflowsError) {
     return (
-      <InsetError title="Workflows" errorMessage={workflowsError.message} />
+      <InsetError
+        title={t("admin.workflows.title")}
+        errorMessage={workflowsError.message}
+      />
     );
   }
 
   return (
-    <InsetLayout title="Workflows">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name..."
-        search={formProps}
-      >
+    <InsetLayout title={t("admin.workflows.title")}>
+      <AdminTableToolbar search={formProps}>
         {organizationId && (
           <Button
             type="button"
@@ -155,7 +162,7 @@ export function AdminWorkflowsPage() {
               setPage(1);
             }}
           >
-            Clear organization filter
+            {t("admin.common.clearOrgFilter")}
           </Button>
         )}
       </AdminTableToolbar>
@@ -164,10 +171,10 @@ export function AdminWorkflowsPage() {
         columns={columns}
         data={workflows}
         emptyState={{
-          title: "No workflows found",
+          title: t("admin.workflows.emptyTitle"),
           description: search
-            ? "No workflows match your search."
-            : "No workflows have been created yet.",
+            ? t("admin.workflows.emptySearch")
+            : t("admin.workflows.emptyDefault"),
         }}
       />
 
@@ -177,7 +184,7 @@ export function AdminWorkflowsPage() {
         itemCount={workflows.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="workflows"
+        itemLabel={t("admin.pagination.workflows")}
         onPageChange={setPage}
       />
     </InsetLayout>

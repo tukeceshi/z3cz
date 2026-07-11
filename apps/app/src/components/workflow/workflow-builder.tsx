@@ -1,5 +1,8 @@
 import type {
+  Node as BackendNode,
   ObjectReference,
+  Parameter,
+  WorkflowBillingMode,
   WorkflowRuntime,
   WorkflowTrigger,
 } from "@dafthunk/types";
@@ -10,6 +13,9 @@ import type {
 } from "@xyflow/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState } from "react";
+
+import { useTranslation } from "@/components/locale-provider";
+import { useAppToast } from "@/hooks/use-app-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
 import { ExecutionEmailDialog } from "./execution-email-dialog";
@@ -41,6 +48,7 @@ import { useWorkflowState } from "./use-workflow-state";
 import { WorkflowCanvas } from "./workflow-canvas";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowNodeSelector } from "./workflow-node-selector";
+import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
 import type {
   NodeType,
@@ -48,6 +56,46 @@ import type {
   WorkflowExecution,
   WorkflowNodeType,
 } from "./workflow-types";
+
+/** Serialize a React Flow node into the backend Node shape (unsaved editor values). */
+function serializeNodeSnapshot(
+  node: ReactFlowNode<WorkflowNodeType>,
+  edges: ReactFlowEdge<WorkflowEdgeType>[]
+): BackendNode {
+  const incomingEdges = edges.filter((edge) => edge.target === node.id);
+  return {
+    id: node.id,
+    name: node.data.name,
+    type: node.data.nodeType || "default",
+    position: node.position,
+    icon: node.data.icon,
+    functionCalling: node.data.functionCalling,
+    ...(node.data.metadata ? { metadata: { ...node.data.metadata } } : {}),
+    inputs: node.data.inputs.map((input) => {
+      const isConnected = incomingEdges.some(
+        (edge) => edge.targetHandle === input.id
+      );
+      const { id: _id, value: inputValue, ...rest } = input;
+      const parameter = {
+        ...rest,
+        name: input.id,
+        description: input.name,
+      } as Parameter & { value?: unknown };
+      if (!isConnected && typeof inputValue !== "undefined") {
+        parameter.value = inputValue;
+      }
+      return parameter as Parameter;
+    }),
+    outputs: node.data.outputs.map((output) => {
+      const { id: _id, value: _value, ...rest } = output;
+      return {
+        ...rest,
+        name: output.id,
+        description: output.name,
+      } as Parameter;
+    }),
+  };
+}
 
 /**
  * Controls the builder's interaction level:
@@ -61,6 +109,7 @@ export interface WorkflowBuilderProps {
   workflowId: string;
   workflowTrigger?: WorkflowTrigger;
   workflowRuntime?: WorkflowRuntime;
+  workflowBillingMode?: WorkflowBillingMode;
   initialNodes?: ReactFlowNode<WorkflowNodeType>[];
   initialEdges?: ReactFlowEdge<WorkflowEdgeType>[];
   nodeTypes?: NodeType[];
@@ -83,7 +132,8 @@ export interface WorkflowBuilderProps {
     name: string,
     description?: string,
     trigger?: WorkflowTrigger,
-    runtime?: WorkflowRuntime
+    runtime?: WorkflowRuntime,
+    billingMode?: WorkflowBillingMode
   ) => void;
   orgId: string;
   wsExecuteWorkflow?: (options?: {
@@ -95,12 +145,15 @@ export interface WorkflowBuilderProps {
   isTogglingEnabled?: boolean;
   onToggleEnabled?: (checked: boolean) => void;
   fitViewPadding?: number;
+  workflowSettingsOpen?: boolean;
+  onWorkflowSettingsOpenChange?: (open: boolean) => void;
 }
 
 export function WorkflowBuilder({
   workflowId,
   workflowTrigger,
   workflowRuntime,
+  workflowBillingMode = "platform",
   initialNodes = [],
   initialEdges = [],
   nodeTypes = [],
@@ -124,7 +177,11 @@ export function WorkflowBuilder({
   isTogglingEnabled,
   onToggleEnabled,
   fitViewPadding = 0.25,
+  workflowSettingsOpen = false,
+  onWorkflowSettingsOpenChange,
 }: WorkflowBuilderProps) {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const readOnly = mode !== "edit";
   const interactive = mode !== "preview";
   const sidebarEnabled = showSidebar ?? interactive;
@@ -135,6 +192,8 @@ export function WorkflowBuilder({
     edges,
     selectedNodes,
     selectedEdges,
+    soleSelectedNodeId,
+    connectedHandles,
     isNodeSelectorOpen,
     setIsNodeSelectorOpen,
     onNodesChange,
@@ -162,6 +221,7 @@ export function WorkflowBuilder({
     hasClipboardData,
     onNodeDragStart,
     onNodeDragStop,
+    isDraggingRef,
     addTriggerNodes,
     removeTriggerNodes,
   } = useWorkflowState({
@@ -190,8 +250,16 @@ export function WorkflowBuilder({
     deselectAll,
   });
 
-  // Sidebar
-  const sidebar = useResizableSidebar({ initialVisible: sidebarEnabled });
+  // Sidebar (Agent panel) — collapsed by default; user opens via toggle
+  const sidebar = useResizableSidebar({ initialVisible: false });
+
+  const handleQuickAddAiNode = useCallback(
+    (nodeType: "ai-text" | "ai-image" | "ai-video") => {
+      const template = nodeTypes.find((item) => item.type === nodeType);
+      if (template) handleNodeSelect(template);
+    },
+    [handleNodeSelect, nodeTypes]
+  );
 
   // Keyboard shortcuts (Cmd+C/X/V/D + Cmd+Enter)
   const handleActionButtonClick =
@@ -220,10 +288,6 @@ export function WorkflowBuilder({
     });
   }, [reactFlowInstance, fitViewPadding]);
 
-  const handleNodeDoubleClick = useCallback(() => {
-    sidebar.setIsSidebarVisible(true);
-  }, [sidebar]);
-
   // Check if workflow already contains a trigger node
   const hasTriggerNode = useMemo(() => {
     if (!nodeTypes) return false;
@@ -247,7 +311,8 @@ export function WorkflowBuilder({
         workflowName || "",
         workflowDescription || undefined,
         newTrigger,
-        workflowRuntime
+        workflowRuntime,
+        workflowBillingMode
       );
     },
     [
@@ -257,6 +322,7 @@ export function WorkflowBuilder({
       workflowName,
       workflowDescription,
       workflowRuntime,
+      workflowBillingMode,
     ]
   );
 
@@ -265,6 +331,60 @@ export function WorkflowBuilder({
     setTriggerConfirmOpen(true);
   }, []);
 
+  // Single-node run: send unsaved editor snapshot, write results back to canvas.
+  const handleRunNode = useCallback(
+    async (nodeId: string) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) {
+        appToast.error("errors.nodeNotFound");
+        return;
+      }
+
+      updateNodeExecution(nodeId, {
+        state: "executing",
+        outputs: {},
+        error: undefined,
+      });
+
+      try {
+        const snapshot = serializeNodeSnapshot(node, edges);
+        const response = await executeWorkflowNode(
+          workflowId,
+          nodeId,
+          orgId,
+          snapshot
+        );
+        const nodeExecution = response.nodeExecutions?.find(
+          (ne) => ne.nodeId === nodeId
+        );
+        if (nodeExecution) {
+          updateNodeExecution(nodeId, {
+            state: nodeExecution.status,
+            outputs: nodeExecution.outputs || {},
+            error: nodeExecution.error,
+          });
+        } else {
+          updateNodeExecution(nodeId, {
+            state: response.status === "completed" ? "completed" : "error",
+            error:
+              response.status === "completed"
+                ? undefined
+                : t("errors.noExecutionResult"),
+          });
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : t("errors.runNodeFailed");
+        updateNodeExecution(nodeId, {
+          state: "error",
+          error: message,
+        });
+        appToast.errorRaw(message);
+      }
+    },
+    [nodes, edges, workflowId, orgId, updateNodeExecution, appToast, t]
+  );
+
   return (
     <ReactFlowProvider>
       <WorkflowProvider
@@ -272,10 +392,13 @@ export function WorkflowBuilder({
         updateEdgeData={readOnly ? undefined : updateEdgeData}
         deleteEdge={readOnly ? undefined : deleteEdge}
         edges={edges}
+        connectedHandles={connectedHandles}
+        soleSelectedNodeId={soleSelectedNodeId}
         disabled={readOnly}
         expandedOutputs={expandedOutputs}
         nodeTypes={nodeTypes}
         workflowTrigger={workflowTrigger}
+        onRunNode={readOnly ? undefined : handleRunNode}
       >
         <div className="w-full h-full min-h-0 flex">
           <div
@@ -295,11 +418,12 @@ export function WorkflowBuilder({
               onConnect={onConnect}
               onConnectStart={onConnectStart}
               onConnectEnd={onConnectEnd}
-              onNodeDoubleClick={handleNodeDoubleClick}
               onNodeDragStart={onNodeDragStart}
               onNodeDragStop={onNodeDragStop}
+              isDraggingRef={isDraggingRef}
               onInit={setReactFlowInstance}
               onAddNode={readOnly ? undefined : handleAddNode}
+              onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
               onAction={handleActionButtonClick}
               workflowStatus={execution.workflowStatus}
               workflowErrorMessage={execution.workflowErrorMessage}
@@ -338,27 +462,10 @@ export function WorkflowBuilder({
               />
               <div style={{ width: `${sidebar.sidebarWidth}px` }}>
                 <WorkflowSidebar
-                  nodes={nodes}
                   selectedNodes={selectedNodes}
                   selectedEdges={selectedEdges}
-                  onNodeUpdate={readOnly ? undefined : updateNodeData}
                   onEdgeUpdate={readOnly ? undefined : updateEdgeData}
-                  createObjectUrl={createObjectUrl}
                   disabledWorkflow={readOnly}
-                  disabledFeedback={disabledFeedback}
-                  workflowId={workflowId}
-                  workflowName={workflowName}
-                  workflowDescription={workflowDescription}
-                  workflowTrigger={workflowTrigger}
-                  workflowRuntime={workflowRuntime}
-                  onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
-                  workflowStatus={execution.workflowStatus}
-                  workflowErrorMessage={execution.workflowErrorMessage}
-                  executionId={execution.currentExecutionId}
-                  isEnabled={isEnabled}
-                  isTogglingEnabled={isTogglingEnabled}
-                  onToggleEnabled={readOnly ? undefined : onToggleEnabled}
-                  onTriggerChange={readOnly ? undefined : handleTriggerChange}
                 />
               </div>
             </>
@@ -372,6 +479,27 @@ export function WorkflowBuilder({
             workflowName={workflowName}
             workflowDescription={workflowDescription}
             hasTriggerNode={hasTriggerNode}
+          />
+
+          <WorkflowSettingsDialog
+            open={workflowSettingsOpen}
+            onOpenChange={onWorkflowSettingsOpenChange ?? (() => {})}
+            workflowId={workflowId}
+            workflowName={workflowName}
+            workflowDescription={workflowDescription}
+            workflowTrigger={workflowTrigger}
+            workflowRuntime={workflowRuntime}
+            workflowBillingMode={workflowBillingMode}
+            onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
+            disabledWorkflow={readOnly}
+            disabledFeedback={disabledFeedback}
+            workflowStatus={execution.workflowStatus}
+            workflowErrorMessage={execution.workflowErrorMessage}
+            executionId={execution.currentExecutionId}
+            isEnabled={isEnabled}
+            isTogglingEnabled={isTogglingEnabled}
+            onToggleEnabled={readOnly ? undefined : onToggleEnabled}
+            onTriggerChange={readOnly ? undefined : handleTriggerChange}
           />
         </div>
 
@@ -402,16 +530,14 @@ export function WorkflowBuilder({
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Workflow Execution Error</DialogTitle>
+              <DialogTitle>{t("workflow.execution.errorTitle")}</DialogTitle>
               <DialogDescription>
-                You have run out of compute credits. Thanks for checking out the
-                preview. The code is available at
-                https://github.com/dafthunk-com/dafthunk.
+                {t("workflow.execution.errorDescription")}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button onClick={() => execution.setErrorDialogOpen(false)}>
-                Close
+                {t("workflow.execution.close")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -430,10 +556,9 @@ export function WorkflowBuilder({
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Change Trigger Type</AlertDialogTitle>
+              <AlertDialogTitle>{t("workflow.triggerConfirm.title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                The current trigger node has configured inputs that will be
-                lost. Are you sure you want to change the trigger type?
+                {t("workflow.triggerConfirm.description")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -443,7 +568,7 @@ export function WorkflowBuilder({
                   setTriggerConfirmOpen(false);
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
@@ -454,7 +579,7 @@ export function WorkflowBuilder({
                   setTriggerConfirmOpen(false);
                 }}
               >
-                Change Trigger
+                {t("workflow.triggerConfirm.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

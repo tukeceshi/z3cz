@@ -7,6 +7,7 @@ import {
 import { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -37,11 +38,13 @@ export function DataTableCard<TData, TValue>({
   viewAllLink,
   columns,
   data,
-  emptyState = {
-    title: "No results",
-    description: "No data available.",
-  },
+  emptyState,
 }: DataTableCardProps<TData, TValue>) {
+  const { t } = useTranslation();
+  const resolvedEmptyState = emptyState ?? {
+    title: t("common.noResults"),
+    description: t("common.noData"),
+  };
   const table = useReactTable({
     data,
     columns,
@@ -92,10 +95,10 @@ export function DataTableCard<TData, TValue>({
                 >
                   <div className="flex flex-col items-center justify-center py-8">
                     <h3 className="font-semibold text-lg">
-                      {emptyState.title}
+                      {resolvedEmptyState.title}
                     </h3>
                     <p className="text-muted-foreground mt-1">
-                      {emptyState.description}
+                      {resolvedEmptyState.description}
                     </p>
                   </div>
                 </TableCell>

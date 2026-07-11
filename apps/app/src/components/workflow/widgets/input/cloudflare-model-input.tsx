@@ -7,6 +7,7 @@ import RotateCw from "lucide-react/icons/rotate-cw";
 import Search from "lucide-react/icons/search";
 import { useCallback, useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,7 @@ function CloudflareModelInputWidget({
     null
   );
   const [showReloadConfirm, setShowReloadConfirm] = useState(false);
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   // Reconstruct the model info for the currently-selected model from the
@@ -90,8 +92,7 @@ function CloudflareModelInputWidget({
           id: "model",
           name: "model",
           type: "string",
-          description:
-            "Cloudflare Workers AI model identifier (e.g., @cf/meta/llama-3.2-3b-instruct)",
+          description: t("workflow.widgets.model.cloudflareModelDescription"),
           required: true,
           hidden: true,
           value: info.name,
@@ -130,13 +131,13 @@ function CloudflareModelInputWidget({
         }));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load model schema"
+          err instanceof Error ? err.message : t("workflow.widgets.model.loadFailed")
         );
       } finally {
         setLoading(false);
       }
     },
-    [updateNodeData, edges, deleteEdge, nodeId]
+    [updateNodeData, edges, deleteEdge, nodeId, t]
   );
 
   const handleSelect = useCallback(
@@ -185,7 +186,7 @@ function CloudflareModelInputWidget({
           className="h-auto flex-1 justify-between px-2 py-1.5 text-xs font-mono"
         >
           <span className={cn("truncate", !model && "text-muted-foreground")}>
-            {model ? shortName(model) : "Select a model…"}
+            {model ? shortName(model) : t("workflow.widgets.model.selectModel")}
           </span>
           {loading ? (
             <LoaderCircle className="ml-1 h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -197,7 +198,7 @@ function CloudflareModelInputWidget({
           variant="outline"
           onClick={handleReload}
           disabled={disabled || loading || !model}
-          title="Reload model schema"
+          title={t("workflow.widgets.model.reloadButton")}
           className="h-auto px-2 shrink-0"
         >
           <RotateCw className="h-3.5 w-3.5" />
@@ -219,18 +220,17 @@ function CloudflareModelInputWidget({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Replace model schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.model.replaceTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Switching to{" "}
-              <code className="font-mono">{pendingModel?.name}</code> will
-              replace all current parameters and remove connected edges. This
-              cannot be undone.
+              {t("workflow.widgets.model.replaceDescription", {
+                name: pendingModel?.name ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -239,16 +239,15 @@ function CloudflareModelInputWidget({
       <AlertDialog open={showReloadConfirm} onOpenChange={setShowReloadConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload model schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.model.reloadTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will replace all current parameters and remove all connected
-              edges. This action cannot be undone.
+              {t("workflow.widgets.model.reloadDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleReloadConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 import { FieldPlaceholder } from "./field-placeholder";
@@ -6,13 +7,8 @@ import {
   getObjectUrl,
   useFileUpload,
 } from "./file-field-primitives";
-import { fileValidators } from "./file-upload-handler";
+import { createFileValidators } from "./file-upload-handler";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  validateFile: fileValidators.image,
-  errorMessage: "Failed to upload image",
-} as const;
 
 export interface ImageFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -27,8 +23,13 @@ export function ImageField({
   parameter,
   value,
 }: ImageFieldProps) {
+  const { t } = useTranslation();
+  const fileValidators = createFileValidators(t);
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    {
+      validateFile: fileValidators.image,
+      errorMessage: t("workflow.fields.uploadFailedImage"),
+    },
     onChange
   );
   const objectUrl = getObjectUrl(value, createObjectUrl);
@@ -39,7 +40,7 @@ export function ImageField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No image"
+        label={t("workflow.fields.noImage")}
       />
     );
   }

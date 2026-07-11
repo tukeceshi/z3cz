@@ -2,16 +2,17 @@ import type { NodeExecution, WorkflowExecution } from "@dafthunk/types";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import type {
   WorkflowExecution as WorkflowBuilderExecution,
   WorkflowNodeExecution,
 } from "@/components/workflow/workflow-types";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useExecution } from "@/services/execution-service";
@@ -23,6 +24,8 @@ import {
 } from "@/services/workflow-service";
 
 export function ExecutionDetailPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { executionId } = useParams<{ executionId: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
@@ -37,10 +40,8 @@ export function ExecutionDetailPage() {
 
   const { createObjectUrl } = useObjectService();
 
-  // Use empty node templates array since we're in readonly mode
   const nodeTypes = [];
 
-  // Fetch workflow metadata for name/description and structure
   const {
     workflow: workflowMetadata,
     isWorkflowLoading: isWorkflowStructureLoading,
@@ -55,19 +56,19 @@ export function ExecutionDetailPage() {
   useEffect(() => {
     if (executionId) {
       setBreadcrumbs([
-        { label: "Executions", to: getOrgUrl("executions") },
+        { label: t("sidebar.executions"), to: getOrgUrl("executions") },
         { label: executionId },
       ]);
     }
-  }, [executionId, setBreadcrumbs, getOrgUrl]);
+  }, [executionId, setBreadcrumbs, getOrgUrl, t]);
 
   useEffect(() => {
     if (executionDetailsError) {
-      toast.error(
-        `Failed to fetch execution details: ${executionDetailsError.message}`
-      );
+      appToast.error("pages.executionDetail.fetchFailed", {
+        message: executionDetailsError.message,
+      });
     }
-  }, [executionDetailsError]);
+  }, [executionDetailsError, appToast]);
 
   useEffect(() => {
     if (finalStructure && execution?.nodeExecutions) {
@@ -139,11 +140,11 @@ export function ExecutionDetailPage() {
   );
 
   if (isExecutionDetailsLoading || isStructureOverallLoading) {
-    return <InsetLoading title="Execution Details" />;
+    return <InsetLoading title={t("pages.executionDetail.title")} />;
   } else if (executionDetailsError) {
     return (
       <InsetError
-        title="Execution Details"
+        title={t("pages.executionDetail.title")}
         errorMessage={executionDetailsError.message}
       />
     );
@@ -153,7 +154,7 @@ export function ExecutionDetailPage() {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <p className="text-lg text-muted-foreground">
-          Execution not found or an error occurred.
+          {t("pages.executionDetail.notFound")}
         </p>
       </div>
     );
@@ -185,8 +186,8 @@ export function ExecutionDetailPage() {
             <div className="flex flex-col items-center justify-center h-full">
               <p className="text-muted-foreground">
                 {isStructureOverallLoading
-                  ? "Loading workflow data..."
-                  : "No workflow structure available or still loading components."}
+                  ? t("pages.executionDetail.loadingWorkflow")
+                  : t("pages.executionDetail.noStructure")}
               </p>
             </div>
           )}

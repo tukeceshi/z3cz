@@ -1,4 +1,5 @@
 import type { NodeExecution, NodeType } from "@dafthunk/types";
+import { externalEventContinuation } from "../../heartbeat/continuation-store";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
 
@@ -58,6 +59,11 @@ export class WaitForFormNode extends ExecutableNode {
         type: `form-response-${token}`,
         timeout: "24 hours",
       },
+      pendingContinuation: externalEventContinuation(
+        this.node.id,
+        `form-response-${token}`,
+        "24 hours"
+      ),
     };
   }
 }

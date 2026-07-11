@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,20 +17,6 @@ import { createTelegramBot } from "@/services/bot-service";
 
 type Step = "name" | "bot-token" | "setup";
 
-const STEP_TITLES: Record<Step, string> = {
-  name: "Create a Telegram Bot",
-  "bot-token": "Bot Token",
-  setup: "Setup",
-};
-
-const STEP_DESCRIPTIONS: Record<Step, string> = {
-  name: "Choose a display name to identify this Telegram bot in Dafthunk.",
-  "bot-token":
-    "Create a new bot with @BotFather on Telegram, then copy the bot token it gives you.",
-  setup:
-    "Your bot is ready. The webhook will be auto-registered when you enable the workflow.",
-};
-
 interface TelegramBotCreateDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,6 +29,7 @@ export function TelegramBotCreateDialog({
   onCreated,
 }: TelegramBotCreateDialogProps) {
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [botToken, setBotToken] = useState("");
@@ -82,7 +70,7 @@ export function TelegramBotCreateDialog({
       setStep("setup");
       onCreated(response.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create bot");
+      setError(err instanceof Error ? err.message : t("pages.bots.wizard.createBotFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -93,10 +81,18 @@ export function TelegramBotCreateDialog({
       <DialogContent className="max-w-[450px]">
         <div>
           <DialogTitle className="text-base font-semibold">
-            {STEP_TITLES[step]}
+            {step === "name"
+              ? t("pages.bots.wizard.telegram.steps.name.title")
+              : step === "bot-token"
+                ? t("pages.bots.wizard.telegram.steps.botToken.title")
+                : t("pages.bots.wizard.telegram.steps.setup.title")}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground mt-1">
-            {STEP_DESCRIPTIONS[step]}
+            {step === "name"
+              ? t("pages.bots.wizard.telegram.steps.name.description")
+              : step === "bot-token"
+                ? t("pages.bots.wizard.telegram.steps.botToken.description")
+                : t("pages.bots.wizard.telegram.steps.setup.description")}
             {step === "bot-token" && (
               <>
                 {" "}
@@ -106,7 +102,7 @@ export function TelegramBotCreateDialog({
                   rel="noopener noreferrer"
                   className="text-primary hover:underline inline-flex items-center gap-0.5"
                 >
-                  Open @BotFather
+                  {t("pages.bots.wizard.telegram.openBotFather")}
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </>
@@ -117,28 +113,27 @@ export function TelegramBotCreateDialog({
         {step === "name" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="telegram-name">Name</Label>
+              <Label htmlFor="telegram-name">{t("common.name")}</Label>
               <Input
                 id="telegram-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Telegram Bot"
+                placeholder={t("pages.bots.wizard.placeholders.telegramBot")}
               />
               <p className="text-xs text-muted-foreground">
-                A display name for this bot in Dafthunk. This is not visible to
-                your Telegram users.
+                {t("pages.bots.wizard.botNameHint", { platform: "Telegram" })}
               </p>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={() => setStep("bot-token")}
                 disabled={name.trim() === ""}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -147,16 +142,16 @@ export function TelegramBotCreateDialog({
         {step === "bot-token" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="telegram-token">Bot Token</Label>
+              <Label htmlFor="telegram-token">{t("pages.bots.botToken")}</Label>
               <Input
                 id="telegram-token"
                 type="password"
                 value={botToken}
                 onChange={(e) => setBotToken(e.target.value)}
-                placeholder="Paste your bot token here"
+                placeholder={t("pages.bots.wizard.placeholders.botToken")}
               />
               <p className="text-xs text-muted-foreground">
-                Copy the token from{" "}
+                {t("pages.bots.wizard.telegram.botTokenHint")}{" "}
                 <a
                   href="https://t.me/BotFather"
                   target="_blank"
@@ -165,8 +160,7 @@ export function TelegramBotCreateDialog({
                 >
                   @BotFather
                   <ExternalLink className="w-2.5 h-2.5" />
-                </a>{" "}
-                on Telegram. Use /newbot to create one if needed.
+                </a>
               </p>
             </div>
 
@@ -186,7 +180,7 @@ export function TelegramBotCreateDialog({
                 }}
                 disabled={isSubmitting}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={handleSubmit}
@@ -195,10 +189,10 @@ export function TelegramBotCreateDialog({
                 {isSubmitting ? (
                   <>
                     <Spinner className="h-4 w-4 mr-1" />
-                    Connecting...
+                    {t("common.connecting")}
                   </>
                 ) : (
-                  "Next"
+                  t("common.next")
                 )}
               </Button>
             </div>
@@ -209,7 +203,7 @@ export function TelegramBotCreateDialog({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-md font-medium">
-                Created
+                {t("common.created")}
               </span>
               <span className="font-medium">
                 {name}
@@ -223,19 +217,10 @@ export function TelegramBotCreateDialog({
             </div>
 
             <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1.5">
+              <li>{t("pages.bots.telegramSetup1")}</li>
+              <li>{t("pages.bots.telegramSetup2")}</li>
               <li>
-                Create a workflow with a{" "}
-                <span className="font-medium text-foreground">
-                  Receive Telegram Message
-                </span>{" "}
-                trigger and select this bot.
-              </li>
-              <li>
-                Enable the workflow. The webhook will be registered
-                automatically with Telegram.
-              </li>
-              <li>
-                Send a message to{" "}
+                {t("pages.bots.telegramSetup3Before")}{" "}
                 {createdBotUsername ? (
                   <a
                     href={`https://t.me/${createdBotUsername}`}
@@ -247,14 +232,14 @@ export function TelegramBotCreateDialog({
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 ) : (
-                  "your bot"
+                  t("pages.bots.yourBot")
                 )}{" "}
-                on Telegram to trigger the workflow.
+                {t("pages.bots.telegramSetup3After")}
               </li>
             </ol>
 
             <div className="flex justify-end">
-              <Button onClick={handleClose}>Done</Button>
+              <Button onClick={handleClose}>{t("common.done")}</Button>
             </div>
           </div>
         )}

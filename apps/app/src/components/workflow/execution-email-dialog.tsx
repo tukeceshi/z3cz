@@ -1,6 +1,7 @@
 import { Paperclip, X } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ export function ExecutionEmailDialog({
   onSubmit,
   onCancel,
 }: ExecutionEmailDialogProps) {
+  const { t } = useTranslation();
   const [from, setFrom] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -60,7 +62,6 @@ export function ExecutionEmailDialog({
     }
     setAttachments((prev) => [...prev, ...newAttachments]);
 
-    // Reset file input so the same file can be selected again
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -100,44 +101,52 @@ export function ExecutionEmailDialog({
       <DialogContent className="max-w-[500px] max-h-[80vh] flex flex-col gap-0 p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <DialogTitle className="text-base font-semibold">
-            Simulate Email Trigger
+            {t("workflow.widgets.executionEmail.title")}
           </DialogTitle>
         </div>
 
         <div className="p-4 space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="from">From</Label>
+            <Label htmlFor="from">
+              {t("workflow.widgets.executionEmail.from")}
+            </Label>
             <Input
               id="from"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              placeholder="sender@example.com"
+              placeholder={t("workflow.widgets.executionEmail.fromPlaceholder")}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="subject">Subject</Label>
+            <Label htmlFor="subject">
+              {t("workflow.widgets.executionEmail.subject")}
+            </Label>
             <Input
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email Subject"
+              placeholder={t(
+                "workflow.widgets.executionEmail.subjectPlaceholder"
+              )}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="body">Body</Label>
+            <Label htmlFor="body">
+              {t("workflow.widgets.executionEmail.body")}
+            </Label>
             <Textarea
               id="body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Email body content..."
+              placeholder={t("workflow.widgets.executionEmail.bodyPlaceholder")}
               className="min-h-[100px] resize-none"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Attachments</Label>
+            <Label>{t("workflow.widgets.executionEmail.attachments")}</Label>
             <input
               ref={fileInputRef}
               type="file"
@@ -154,7 +163,7 @@ export function ExecutionEmailDialog({
               className="w-full"
             >
               <Paperclip className="w-4 h-4 mr-2" />
-              Add Attachments
+              {t("workflow.widgets.executionEmail.addAttachments")}
             </Button>
             {attachments.length > 0 && (
               <div className="space-y-1 mt-2">
@@ -184,10 +193,10 @@ export function ExecutionEmailDialog({
 
         <div className="flex justify-end gap-2 px-4 py-3 border-t bg-muted/30">
           <Button variant="ghost" size="sm" onClick={onCancel || handleClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={!isValid}>
-            Send & Run
+            {t("workflow.widgets.executionEmail.sendAndRun")}
           </Button>
         </div>
       </DialogContent>
@@ -200,7 +209,6 @@ function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Remove data URL prefix (e.g., "data:application/pdf;base64,")
       const commaIndex = result.indexOf(",");
       if (commaIndex === -1) {
         reject(new Error("Unexpected FileReader result format"));

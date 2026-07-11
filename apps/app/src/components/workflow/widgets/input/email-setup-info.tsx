@@ -1,3 +1,5 @@
+import { useTranslation } from "@/components/locale-provider";
+
 import { CopyableValue } from "./copyable-value";
 
 interface EmailSetupInfoProps {
@@ -5,22 +7,27 @@ interface EmailSetupInfoProps {
 }
 
 export function EmailSetupInfo({ emailAddress }: EmailSetupInfoProps) {
+  const { t } = useTranslation();
+  const triggerLabel = t("workflow.emailSetup.receiveEmailTrigger");
+
   return (
     <div className="space-y-2 text-sm">
       <div className="space-y-1">
-        <p className="font-medium text-foreground">Email Address</p>
+        <p className="font-medium text-foreground">
+          {t("workflow.emailSetup.addressLabel")}
+        </p>
         <CopyableValue value={emailAddress} />
       </div>
       <div className="space-y-1">
-        <p className="font-medium text-foreground">Next Steps</p>
+        <p className="font-medium text-foreground">
+          {t("workflow.emailSetup.nextSteps")}
+        </p>
         <ol className="list-decimal list-inside space-y-1.5 text-xs text-muted-foreground">
           <li>
-            Create a workflow with a{" "}
-            <span className="font-medium text-foreground">Receive Email</span>{" "}
-            trigger and select this email.
+            {t("workflow.emailSetup.step1", { trigger: triggerLabel })}
           </li>
-          <li>Enable the workflow.</li>
-          <li>Send an email to the address above to trigger the workflow.</li>
+          <li>{t("workflow.emailSetup.step2")}</li>
+          <li>{t("workflow.emailSetup.step3")}</li>
         </ol>
       </div>
     </div>

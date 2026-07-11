@@ -8,7 +8,8 @@ export interface ValidationError {
     | "DUPLICATE_CONNECTION"
     | "DUPLICATE_NODE_ID"
     | "DUPLICATE_TRIGGER"
-    | "EMPTY_WORKFLOW";
+    | "EMPTY_WORKFLOW"
+    | "DISALLOWED_NODE_TYPE";
   message: string;
   details: {
     nodeId?: string;
@@ -148,9 +149,22 @@ export function validateTypeCompatibility(
  */
 export function validateWorkflow(
   workflow: Workflow,
-  nodeTypes?: NodeType[]
+  nodeTypes?: NodeType[],
+  allowedNodeTypes?: ReadonlySet<string>
 ): ValidationError[] {
   const errors: ValidationError[] = [];
+
+  if (allowedNodeTypes) {
+    for (const node of workflow.nodes) {
+      if (!allowedNodeTypes.has(node.type)) {
+        errors.push({
+          type: "DISALLOWED_NODE_TYPE",
+          message: `Node type "${node.type}" is not allowed in this workflow scheme`,
+          details: { nodeId: node.id },
+        });
+      }
+    }
+  }
 
   // Check for multiple trigger nodes
   if (nodeTypes) {

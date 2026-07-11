@@ -12,8 +12,8 @@ export function testSuccessfulExecution(
   createRuntime: RuntimeFactory
 ) {
   describe(`${runtimeName}: successful execution`, () => {
-    it("should execute simple linear workflow (number-input â†’ addition â†’ multiplication)", async () => {
-      const workflow: Workflow = {
+    it("should execute simple linear workflow (number-input â†?addition â†?multiplication)", async () => {
+      const workflow = {
         id: "test-workflow-1",
         name: "Linear Math Workflow",
         trigger: "manual",
@@ -109,7 +109,7 @@ export function testSuccessfulExecution(
     });
 
     it("should execute parallel workflow with multiple independent branches", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-2",
         name: "Parallel Math Workflow",
         trigger: "manual",
@@ -262,7 +262,7 @@ export function testSuccessfulExecution(
     });
 
     it("should execute workflow with chained operations", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-3",
         name: "Chained Operations Workflow",
         trigger: "manual",

@@ -1,4 +1,5 @@
 import { ExecutableNode, type NodeContext } from "@dafthunk/runtime";
+import { externalEventContinuation } from "@dafthunk/runtime/heartbeat/continuation-store";
 import type { NodeExecution, NodeType } from "@dafthunk/types";
 import { calculateTokenUsage, type TokenPricing } from "../../utils/usage";
 
@@ -289,7 +290,7 @@ export abstract class BaseAgentNode extends ExecutableNode {
         );
       }
 
-      // Return pending — the runtime will waitForEvent
+      // Return pending — the heartbeat will wait on a multiplex event
       return {
         nodeId: this.node.id,
         status: "pending",
@@ -298,6 +299,11 @@ export abstract class BaseAgentNode extends ExecutableNode {
           type: `agent-complete-${context.nodeId}`,
           timeout: "30 minutes",
         },
+        pendingContinuation: externalEventContinuation(
+          this.node.id,
+          `agent-complete-${context.nodeId}`,
+          "30 minutes"
+        ),
       };
     } catch (error) {
       console.error(error);

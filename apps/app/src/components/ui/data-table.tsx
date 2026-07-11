@@ -8,6 +8,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Table,
   TableBody,
@@ -30,12 +31,14 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  emptyState = {
-    title: "No results",
-    description: "No data available.",
-  },
+  emptyState,
   bare = false,
 }: DataTableProps<TData, TValue>) {
+  const { t } = useTranslation();
+  const resolvedEmptyState = emptyState ?? {
+    title: t("common.noResults"),
+    description: t("common.noData"),
+  };
   const table = useReactTable({
     data,
     columns,
@@ -49,9 +52,9 @@ export function DataTable<TData, TValue>({
           <TableRow>
             <TableCell colSpan={columns.length} className="h-24 text-center">
               <div className="flex flex-col items-center justify-center py-8">
-                <h3 className="font-semibold text-lg">{emptyState.title}</h3>
+                <h3 className="font-semibold text-lg">{resolvedEmptyState.title}</h3>
                 <p className="text-muted-foreground mt-1">
-                  {emptyState.description}
+                  {resolvedEmptyState.description}
                 </p>
               </div>
             </TableCell>

@@ -6,6 +6,7 @@ import Loader2 from "lucide-react/icons/loader-2";
 import Wand from "lucide-react/icons/wand";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,6 @@ export interface ImportTemplateDialogProps {
   onImportTemplate: (template: WorkflowTemplate) => Promise<void>;
 }
 
-// Helper function to highlight matching text
 function highlightMatch(text: string, searchTerm: string) {
   if (!searchTerm.trim()) return text;
 
@@ -57,6 +57,7 @@ export function ImportTemplateDialog({
   onOpenChange,
   onImportTemplate,
 }: ImportTemplateDialogProps) {
+  const { t } = useTranslation();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [importingTemplateId, setImportingTemplateId] = useState<string | null>(
@@ -64,11 +65,8 @@ export function ImportTemplateDialog({
   );
 
   const { templates, isTemplatesLoading, templatesError } = useTemplates();
-
-  // Get tag counts
   const tagCounts = useTagCounts(templates);
 
-  // Filter and score templates
   const filteredTemplates = useMemo(() => {
     const rawSearchTerm = searchQuery.toLowerCase().trim();
 
@@ -88,12 +86,10 @@ export function ImportTemplateDialog({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [templates, selectedTag, searchQuery]);
 
-  // Handle tag change
   const handleTagChange = (tag: string | null) => {
     setSelectedTag(tag);
   };
 
-  // Use keyboard navigation hook
   const {
     activeElement,
     focusedIndex,
@@ -137,14 +133,15 @@ export function ImportTemplateDialog({
         onKeyDown={handleKeyDown}
         tabIndex={-1}
       >
-        <DialogTitle className="sr-only">Import Workflow Template</DialogTitle>
+        <DialogTitle className="sr-only">
+          {t("workflow.importTemplate.title")}
+        </DialogTitle>
 
-        {/* Search */}
         <div className="relative px-4 pt-4">
           <Wand className="absolute left-8 top-9 h-6 w-6 text-muted-foreground" />
           <Input
             ref={searchInputRef}
-            placeholder="Search templates..."
+            placeholder={t("workflow.importTemplate.searchPlaceholder")}
             className={cn(
               "pl-14 text-xl h-16 border rounded-lg bg-accent",
               activeElement === "search"
@@ -159,7 +156,6 @@ export function ImportTemplateDialog({
         </div>
 
         <div className="flex-1 flex gap-2 px-4 pb-4 min-h-0">
-          {/* Templates */}
           <ScrollArea className="flex-1">
             {isTemplatesLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -169,7 +165,7 @@ export function ImportTemplateDialog({
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                  Failed to load templates
+                  {t("workflow.importTemplate.loadFailed")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {templatesError.message}
@@ -178,7 +174,7 @@ export function ImportTemplateDialog({
             ) : filteredTemplates.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p className="text-sm">
-                  No templates found matching your search
+                  {t("workflow.importTemplate.emptySearch")}
                 </p>
               </div>
             ) : (
@@ -241,8 +237,10 @@ export function ImportTemplateDialog({
                           ))}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {template.nodes.length} nodes •{" "}
-                          {template.edges.length} connections
+                          {t("workflow.importTemplate.nodesConnections", {
+                            nodes: template.nodes.length,
+                            connections: template.edges.length,
+                          })}
                         </div>
                       </div>
                     </div>
@@ -252,7 +250,6 @@ export function ImportTemplateDialog({
             )}
           </ScrollArea>
 
-          {/* Tags */}
           {tagCounts.length > 0 && !isTemplatesLoading && (
             <div className="w-80 shrink-0 flex flex-col">
               <div className="sticky top-0 flex-1">
@@ -269,7 +266,10 @@ export function ImportTemplateDialog({
                 />
               </div>
               <div className="text-xs text-muted-foreground/60 pt-4 text-right">
-                {filteredTemplates.length} of {templates.length} templates
+                {t("workflow.importTemplate.count", {
+                  filtered: filteredTemplates.length,
+                  total: templates.length,
+                })}
               </div>
             </div>
           )}

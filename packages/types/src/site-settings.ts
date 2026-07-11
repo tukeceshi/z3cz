@@ -1,3 +1,5 @@
+import type { PlatformFeatureConfig } from "./platform-features";
+
 export const APP_LOCALES = ["en", "zh"] as const;
 
 export type AppLocale = (typeof APP_LOCALES)[number];
@@ -7,6 +9,7 @@ export interface PublicSiteSettings {
   siteTagline: string;
   defaultLocale: AppLocale;
   supportEmail: string | null;
+  featureConfig: PlatformFeatureConfig;
 }
 
 export interface SiteSettings extends PublicSiteSettings {
@@ -19,4 +22,8 @@ export interface UpdateSiteSettingsRequest {
   siteTagline?: string;
   defaultLocale?: AppLocale;
   supportEmail?: string | null;
+}
+
+export interface UpdateFeatureConfigRequest {
+  featureConfig: PlatformFeatureConfig;
 }

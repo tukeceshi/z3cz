@@ -2,6 +2,7 @@ import Globe from "lucide-react/icons/globe";
 import { useState } from "react";
 import { useParams } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import { CodeBlock } from "@/components/docs/code-block";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ function HttpTriggerInputWidget({
   className,
   disabled = false,
 }: HttpTriggerInputProps) {
+  const { t } = useTranslation();
   const { id: workflowId } = useParams<{ id: string }>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -54,19 +56,18 @@ function HttpTriggerInputWidget({
         onClick={() => setIsDialogOpen(true)}
       >
         <Globe className="h-3 w-3" />
-        Integrate
+        {t("workflow.httpTrigger.integrate")}
       </Button>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl overflow-hidden">
           <DialogHeader>
-            <DialogTitle>HTTP Trigger</DialogTitle>
+            <DialogTitle>{t("workflow.httpTrigger.title")}</DialogTitle>
             <DialogDescription>
               {mode === "webhook"
-                ? "Executes asynchronously and returns an execution ID. Poll the status endpoint for results."
-                : "Executes synchronously and returns the execution result, including each node's output."}{" "}
-              Authenticate with an API key from your account settings. Enable
-              the workflow before calling it.
+                ? t("workflow.httpTrigger.descriptionWebhook")
+                : t("workflow.httpTrigger.descriptionRequest")}{" "}
+              {t("workflow.httpTrigger.authNote")}
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="curl" className="w-full min-w-0">

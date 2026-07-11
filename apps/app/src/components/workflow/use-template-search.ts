@@ -137,7 +137,9 @@ export function useTagFiltering(
   const overallTagCounts = useTagCounts(searchResults);
   const filteredTagCounts = useTagCounts(filteredTemplates);
 
-  const tagCounts = filteredTagCounts.slice(0, 20).map(({ tag }) => {
+  // Show every tag present in the current result set (not a top-N slice),
+  // so niche tags like "newai" remain discoverable in the selector.
+  const tagCounts = filteredTagCounts.map(({ tag }) => {
     const overallCount =
       overallTagCounts.find((tc) => tc.tag === tag)?.count ?? 0;
     return { tag, count: overallCount };

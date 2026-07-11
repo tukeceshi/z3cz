@@ -13,7 +13,7 @@ export function testStatusComputation(
 ) {
   describe(`${runtimeName}: status computation`, () => {
     it("should compute 'executing' when not all nodes visited", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-status-executing",
         name: "Status Executing",
         trigger: "manual",
@@ -54,7 +54,7 @@ export function testStatusComputation(
     });
 
     it("should compute 'completed' when all nodes executed with no errors", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-status-completed",
         name: "Status Completed",
         trigger: "manual",
@@ -87,7 +87,7 @@ export function testStatusComputation(
     });
 
     it("should compute 'error' when nodes fail", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-status-error",
         name: "Status Error",
         trigger: "manual",
@@ -156,7 +156,7 @@ export function testStatusComputation(
     it("should compute 'completed' when nodes are conditionally skipped (not error)", async () => {
       // This tests that conditional branching with skipped nodes is NOT an error
       // The workflow should complete successfully when nodes are skipped due to conditional logic
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-status-conditional-skip",
         name: "Status Conditional Skip",
         trigger: "manual",
@@ -282,7 +282,7 @@ export function testStatusComputation(
     });
 
     it("should handle mixed executed, skipped, and errored nodes", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-status-mixed",
         name: "Status Mixed",
         trigger: "manual",

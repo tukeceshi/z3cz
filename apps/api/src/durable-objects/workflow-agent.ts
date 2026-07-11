@@ -37,6 +37,7 @@ import { Agent } from "agents";
 import type { Connection, ConnectionContext } from "partyserver";
 
 import type { Bindings } from "../context";
+import { buildMultiplexWorkflowSendEvent } from "../runtime/workflow-event-utils";
 import { ExecutionManager } from "../services/execution-manager";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
@@ -363,6 +364,8 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       id: workflowId,
       name: workflow.name,
       description: workflow.description ?? undefined,
+      schemeId: workflow.schemeId,
+      billingMode: workflow.billingMode ?? "platform",
       trigger: workflow.trigger,
       runtime: workflow.runtime,
       nodes: [],
@@ -373,6 +376,9 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       id: workflowId,
       name: workflowData.name,
       description: workflowData.description,
+      schemeId: workflowData.schemeId,
+      billingMode:
+        workflowData.billingMode ?? workflow.billingMode ?? "platform",
       trigger: workflowData.trigger as WorkflowState["trigger"],
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,
@@ -666,13 +672,16 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
     try {
       const instance = await this.env.EXECUTE.get(executionId);
-      await instance.sendEvent({
-        type: `form-response-${token}`,
-        payload: {
-          outputs: { response },
-          usage: 0,
-        },
-      });
+      await instance.sendEvent(
+        buildMultiplexWorkflowSendEvent(
+          executionId,
+          `form-response-${token}`,
+          {
+            outputs: { response },
+            usage: 0,
+          }
+        )
+      );
       return { success: true };
     } catch (error) {
       console.error("Failed to send form event:", error);
@@ -769,6 +778,8 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         id: pending.workflowState.id,
         name: pending.workflowState.name,
         description: pending.workflowState.description,
+        schemeId: pending.workflowState.schemeId,
+        billingMode: pending.workflowState.billingMode ?? "platform",
         trigger: pending.workflowState.trigger,
         runtime: pending.workflowState.runtime,
         organizationId: pending.organizationId,
@@ -781,6 +792,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         workflowStore.update(pending.workflowState.id, pending.organizationId, {
           name: pending.workflowState.name,
           description: pending.workflowState.description ?? null,
+          billingMode: pending.workflowState.billingMode ?? "platform",
           trigger: pending.workflowState.trigger,
           runtime: pending.workflowState.runtime,
         }),

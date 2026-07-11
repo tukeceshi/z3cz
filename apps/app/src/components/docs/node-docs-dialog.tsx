@@ -4,6 +4,7 @@ import { ExternalLink, X } from "lucide-react";
 import { DynamicIcon } from "lucide-react/dynamic.mjs";
 import Markdown from "react-markdown";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,8 @@ export function NodeDocsDialog({
   isOpen,
   onOpenChange,
 }: NodeDocsDialogProps) {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="w-[80vw] max-w-[1400px] max-h-[80vh] flex flex-col gap-0">
@@ -34,7 +37,7 @@ export function NodeDocsDialog({
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("workflow.docs.close")}</span>
         </button>
         <DialogHeader className="shrink-0 pb-4 text-left">
           <DialogTitle className="flex items-center gap-2 min-w-0">
@@ -66,7 +69,9 @@ export function NodeDocsDialog({
           <div className="space-y-4 py-4">
             {nodeType.documentation && (
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold">Documentation</h4>
+                <h4 className="text-sm font-semibold">
+                  {t("workflow.docs.documentation")}
+                </h4>
                 <div className="md">
                   <Markdown
                     components={{
@@ -94,7 +99,7 @@ export function NodeDocsDialog({
                       className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
                       <ExternalLink className="size-4" />
-                      View reference
+                      {t("workflow.docs.viewReference")}
                     </a>
                   </div>
                 )}
@@ -103,11 +108,15 @@ export function NodeDocsDialog({
 
             <>
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold">Parameters</h4>
+                <h4 className="text-sm font-semibold">
+                  {t("workflow.docs.parameters")}
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Inputs ({nodeType.inputs?.length || 0})
+                      {t("workflow.docs.inputsHeading", {
+                        count: nodeType.inputs?.length || 0,
+                      })}
                     </h5>
                     {nodeType.inputs && nodeType.inputs.length > 0 ? (
                       <div className="space-y-2">
@@ -123,16 +132,16 @@ export function NodeDocsDialog({
                                   {input.required ? (
                                     <span
                                       className="text-red-500 ml-1"
-                                      title="Required"
+                                      title={t("workflow.docs.required")}
                                     >
                                       *
                                     </span>
                                   ) : (
                                     <span
                                       className="text-xs text-muted-foreground ml-1"
-                                      title="Optional"
+                                      title={t("workflow.docs.optional")}
                                     >
-                                      (optional)
+                                      {t("workflow.docs.optional")}
                                     </span>
                                   )}
                                 </span>
@@ -151,14 +160,16 @@ export function NodeDocsDialog({
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">
-                        No inputs
+                        {t("workflow.panel.noInputs")}
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
                     <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Outputs ({nodeType.outputs?.length || 0})
+                      {t("workflow.docs.outputsHeading", {
+                        count: nodeType.outputs?.length || 0,
+                      })}
                     </h5>
                     {nodeType.outputs && nodeType.outputs.length > 0 ? (
                       <div className="space-y-2">
@@ -187,7 +198,7 @@ export function NodeDocsDialog({
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">
-                        No outputs
+                        {t("workflow.panel.noOutputs")}
                       </p>
                     )}
                   </div>

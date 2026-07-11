@@ -14,7 +14,7 @@ export function testMultiStepExecution(
 ) {
   describe(`${runtimeName}: multi-step execution`, () => {
     it("should execute a multi-step node with doStep and sleep", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-multi-step-basic",
         name: "Multi-Step Basic",
         trigger: "manual",
@@ -78,8 +78,8 @@ export function testMultiStepExecution(
     });
 
     it("should chain a multi-step node's output into a regular node", async () => {
-      // multi-step-addition → regular addition
-      const workflow: Workflow = {
+      // multi-step-addition �?regular addition
+      const workflow = {
         id: "test-multi-step-chain-out",
         name: "Multi-Step Chain Out",
         trigger: "manual",
@@ -165,8 +165,8 @@ export function testMultiStepExecution(
     });
 
     it("should chain a regular node's output into a multi-step node", async () => {
-      // regular addition → multi-step-addition
-      const workflow: Workflow = {
+      // regular addition �?multi-step-addition
+      const workflow = {
         id: "test-multi-step-chain-in",
         name: "Multi-Step Chain In",
         trigger: "manual",
@@ -266,10 +266,10 @@ export function testMultiStepExecution(
     });
 
     it("should skip a multi-step node when upstream fails", async () => {
-      //   num(10) → division(÷0) → multi-step-addition
-      //                                ↑
+      //   num(10) �?division(÷0) �?multi-step-addition
+      //                                �?
       //                              num(5)
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-multi-step-skip",
         name: "Multi-Step Skip",
         trigger: "manual",
@@ -358,7 +358,7 @@ export function testMultiStepExecution(
     });
 
     it("should propagate errors from a failing multi-step node", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-multi-step-error",
         name: "Multi-Step Error",
         trigger: "manual",
@@ -425,10 +425,10 @@ export function testMultiStepExecution(
     });
 
     it("should execute multiple multi-step nodes in parallel", async () => {
-      //   num1(3) ─┬─ ms-add-A(a=3, b=2) ─┐
-      //            │                        ├─ regular-add(a + b)
-      //   num2(5) ─┴─ ms-add-B(a=5, b=4) ─┘
-      const workflow: Workflow = {
+      //   num1(3) ─┬─ ms-add-A(a=3, b=2) ─�?
+      //            �?                       ├─ regular-add(a + b)
+      //   num2(5) ─┴─ ms-add-B(a=5, b=4) ─�?
+      const workflow = {
         id: "test-multi-step-parallel",
         name: "Multi-Step Parallel",
         trigger: "manual",

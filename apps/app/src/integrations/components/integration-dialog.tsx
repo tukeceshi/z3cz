@@ -2,6 +2,7 @@ import type { IntegrationProvider } from "@dafthunk/types";
 import ExternalLink from "lucide-react/icons/external-link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +35,7 @@ export function IntegrationDialog({
   open,
   onOpenChange,
 }: IntegrationDialogProps) {
+  const { t } = useTranslation();
   const { isProcessing, connectOAuth, createManual } = useIntegrationActions();
   const { providers: availableProviderIds, isLoading: isLoadingProviders } =
     useAvailableProviders();
@@ -43,7 +45,6 @@ export function IntegrationDialog({
   const [integrationName, setIntegrationName] = useState("");
   const [apiKey, setApiKey] = useState("");
 
-  // Memoize providers list
   const providers = useMemo(
     () =>
       availableProviderIds && availableProviderIds.length > 0
@@ -52,20 +53,17 @@ export function IntegrationDialog({
     [availableProviderIds]
   );
 
-  // Memoize current provider
   const currentProvider = useMemo(
     () => providers.find((p) => p.id === selectedProvider),
     [providers, selectedProvider]
   );
 
-  // Set default provider when providers load
   useEffect(() => {
     if (!selectedProvider && providers.length > 0) {
       setSelectedProvider(providers[0].id);
     }
   }, [providers, selectedProvider]);
 
-  // Reset form state
   const resetForm = () => {
     setIntegrationName("");
     setApiKey("");
@@ -95,34 +93,39 @@ export function IntegrationDialog({
     }
   };
 
-  // Determine dialog content based on state
   let content: React.ReactNode;
   let footer: React.ReactNode;
 
   if (isLoadingProviders) {
     content = (
-      <DialogDescription>Loading available providers...</DialogDescription>
+      <DialogDescription>{t("pages.integrations.dialog.loading")}</DialogDescription>
     );
   } else if (providers.length === 0) {
     content = (
       <DialogDescription>
-        No integration providers are currently configured. Please contact your
-        administrator.
+        {t("pages.integrations.dialog.noProviders")}
       </DialogDescription>
     );
-    footer = <Button onClick={handleClose}>Close</Button>;
+    footer = (
+      <Button onClick={handleClose}>{t("pages.integrations.dialog.close")}</Button>
+    );
   } else {
     const isOAuth = currentProvider?.supportsOAuth;
     const canSubmit = isOAuth || (integrationName && apiKey);
+    const providerLabel = selectedProvider
+      ? getProviderLabel(selectedProvider)
+      : "...";
 
     content = (
       <>
         <DialogDescription>
-          Connect a third-party service to your organization.
+          {t("pages.integrations.dialog.description")}
         </DialogDescription>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="provider">Provider</Label>
+            <Label htmlFor="provider">
+              {t("pages.integrations.dialog.provider")}
+            </Label>
             <Select
               value={selectedProvider || undefined}
               onValueChange={(value) =>
@@ -163,7 +166,7 @@ export function IntegrationDialog({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Get API Key
+                        {t("pages.integrations.dialog.getApiKey")}
                         <ExternalLink className="ml-1 h-3 w-3" />
                       </a>
                     </Button>
@@ -171,27 +174,32 @@ export function IntegrationDialog({
                 </div>
               )}
               <div>
-                <Label htmlFor="integration-name">Integration Name</Label>
+                <Label htmlFor="integration-name">
+                  {t("pages.integrations.dialog.integrationName")}
+                </Label>
                 <Input
                   id="integration-name"
-                  placeholder="e.g., Production Key"
+                  placeholder={t(
+                    "pages.integrations.dialog.integrationNamePlaceholder"
+                  )}
                   value={integrationName}
                   onChange={(e) => setIntegrationName(e.target.value)}
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Will be saved as:{" "}
-                  {selectedProvider
-                    ? getProviderLabel(selectedProvider)
-                    : "..."}{" "}
-                  - {integrationName || "..."}
+                  {t("pages.integrations.dialog.savedAs", {
+                    provider: providerLabel,
+                    name: integrationName || "...",
+                  })}
                 </p>
               </div>
               <div>
-                <Label htmlFor="api-key">API Key</Label>
+                <Label htmlFor="api-key">
+                  {t("pages.integrations.dialog.apiKey")}
+                </Label>
                 <Input
                   id="api-key"
                   type="password"
-                  placeholder="Enter your API key"
+                  placeholder={t("pages.integrations.dialog.apiKeyPlaceholder")}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
@@ -205,14 +213,14 @@ export function IntegrationDialog({
     footer = (
       <>
         <Button variant="outline" onClick={handleClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button onClick={handleConnect} disabled={isProcessing || !canSubmit}>
           {isProcessing
-            ? "Processing..."
+            ? t("pages.integrations.dialog.processing")
             : isOAuth
-              ? "Connect"
-              : "Add Integration"}
+              ? t("pages.integrations.dialog.connect")
+              : t("pages.integrations.dialog.addIntegration")}
         </Button>
       </>
     );
@@ -222,7 +230,7 @@ export function IntegrationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Integration</DialogTitle>
+          <DialogTitle>{t("pages.integrations.dialog.title")}</DialogTitle>
           {content}
         </DialogHeader>
         {footer && <DialogFooter>{footer}</DialogFooter>}

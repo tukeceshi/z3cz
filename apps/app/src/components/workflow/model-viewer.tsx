@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+import { useTranslation } from "@/components/locale-provider";
 
 import type { WorkflowParameter } from "./workflow-types";
 
-// Model viewer component wrapper
 const ModelViewerElement = React.forwardRef<HTMLElement, any>((props, ref) => {
   return React.createElement("model-viewer", { ...props, ref });
 });
@@ -12,25 +13,25 @@ export interface ModelViewerProps {
   objectUrl: string;
 }
 
-// Custom hook to handle model-viewer loading
-function useModelViewer() {
+function useModelViewer(onViewerLoadFailed: () => string) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Only load model-viewer on the client side
     if (typeof window !== "undefined") {
       import("@google/model-viewer")
         .then(() => setIsLoaded(true))
-        .catch(() => setLoadError("Failed to load 3D viewer"));
+        .catch(() => setLoadError(onViewerLoadFailed()));
     }
-  }, []);
+  }, [onViewerLoadFailed]);
 
   return { isLoaded, loadError };
 }
 
-// Custom hook to handle authenticated model loading
-function useAuthenticatedModelUrl(url: string) {
+function useAuthenticatedModelUrl(
+  url: string,
+  onModelLoadFailed: () => string
+) {
   const [authenticatedUrl, setAuthenticatedUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +64,7 @@ function useAuthenticatedModelUrl(url: string) {
         setAuthenticatedUrl(blobUrl);
       } catch (err) {
         if (!isCancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load model");
+          setError(err instanceof Error ? err.message : onModelLoadFailed());
         }
       } finally {
         if (!isCancelled) {
@@ -81,34 +82,47 @@ function useAuthenticatedModelUrl(url: string) {
         blobUrlRef.current = null;
       }
     };
-  }, [url]);
+  }, [url, onModelLoadFailed]);
 
   return { authenticatedUrl, isLoading, error };
 }
 
 export const ModelViewer = React.memo(
   ({ parameter, objectUrl }: ModelViewerProps) => {
-    const { isLoaded: isModelViewerLoaded, loadError } = useModelViewer();
-    const { authenticatedUrl, isLoading, error } =
-      useAuthenticatedModelUrl(objectUrl);
+    const { t } = useTranslation();
+    const loadViewerFailed = useCallback(
+      () => t("workflow.widgets.modelViewer.loadViewerFailed"),
+      [t]
+    );
+    const loadModelFailed = useCallback(
+      () => t("workflow.widgets.modelViewer.loadModelFailed"),
+      [t]
+    );
+    const { isLoaded: isModelViewerLoaded, loadError } =
+      useModelViewer(loadViewerFailed);
+    const { authenticatedUrl, isLoading, error } = useAuthenticatedModelUrl(
+      objectUrl,
+      loadModelFailed
+    );
+
+    const mimeType =
+      parameter.type === "gltf"
+        ? (parameter.value?.mimeType ?? "model/gltf-binary")
+        : "model/gltf-binary";
 
     if (error || loadError) {
       return (
         <div className="space-y-2">
           <div className="p-3 bg-red-50 dark:bg-red-900/20">
             <div className="text-sm text-red-800 dark:text-red-200">
-              3D Model Error
+              {t("workflow.widgets.modelViewer.errorTitle")}
             </div>
             <div className="text-xs text-red-700 dark:text-red-300">
               {error || loadError}
             </div>
           </div>
           <div className="text-xs text-neutral-500">
-            glTF Model (
-            {parameter.type === "gltf"
-              ? (parameter.value?.mimeType ?? "model/gltf-binary")
-              : "model/gltf-binary"}
-            )
+            {t("workflow.widgets.modelViewer.gltfModelLabel", { mimeType })}
           </div>
           <a
             href={objectUrl}
@@ -116,7 +130,7 @@ export const ModelViewer = React.memo(
             rel="noopener noreferrer"
             className="text-sm text-blue-500 hover:underline"
           >
-            Download GLB File
+            {t("workflow.widgets.modelViewer.downloadGlb")}
           </a>
         </div>
       );
@@ -127,8 +141,8 @@ export const ModelViewer = React.memo(
         <div className="w-full h-full flex items-center justify-center bg-neutral-100/50 dark:bg-neutral-900">
           <span className="text-xs text-neutral-500">
             {!isModelViewerLoaded
-              ? "Loading 3D Viewer..."
-              : "Loading 3D Model..."}
+              ? t("workflow.widgets.modelViewer.loadingViewer")
+              : t("workflow.widgets.modelViewer.loadingModel")}
           </span>
         </div>
       );

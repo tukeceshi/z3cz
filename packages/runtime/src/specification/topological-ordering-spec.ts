@@ -16,7 +16,7 @@ export function testTopologicalOrdering(
       // Note: In a real Runtime, topological ordering is computed from edges.
       // TestRuntime uses workflow.nodes order, so we define them in dependency order here.
       // The test verifies that execution respects dependencies.
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-order-linear",
         name: "Linear Order",
         trigger: "manual",
@@ -81,9 +81,9 @@ export function testTopologicalOrdering(
     });
 
     it("should handle diamond dependency pattern", async () => {
-      // Pattern: A â†’ B â†’ D
-      //          A â†’ C â†’ D
-      const workflow: Workflow = {
+      // Pattern: A â†?B â†?D
+      //          A â†?C â†?D
+      const workflow = {
         id: "test-workflow-diamond",
         name: "Diamond Pattern",
         trigger: "manual",
@@ -169,7 +169,7 @@ export function testTopologicalOrdering(
       //   C   D
       //    \ /
       //     E
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-complex",
         name: "Complex Dependencies",
         trigger: "manual",

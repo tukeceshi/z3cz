@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/utils/utils";
 
@@ -15,6 +16,8 @@ export function TextField({
   value,
   autoFocus,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   // Convert to string and check for meaningful value (empty strings are considered "no value")
   const stringValue = String(value ?? "");
   const hasValue = value !== undefined && value !== "";
@@ -25,7 +28,7 @@ export function TextField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No text"
+        label={t("workflow.fields.noText")}
       />
     );
   }
@@ -36,7 +39,7 @@ export function TextField({
       <Textarea
         value={stringValue}
         onChange={(e) => onChange(e.target.value || undefined)}
-        placeholder={connected ? "Connected" : "Enter text"}
+        placeholder={connected ? t("workflow.fields.connected") : t("workflow.fields.enterText")}
         className="resize-y rounded-md border border-neutral-300 dark:border-neutral-700"
         disabled={disabled}
         readOnly={disabled}
@@ -45,7 +48,7 @@ export function TextField({
       {clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear text"
+          label={t("workflow.fields.clearText")}
           className="absolute top-2 right-1"
           disabled={disabled}
         />

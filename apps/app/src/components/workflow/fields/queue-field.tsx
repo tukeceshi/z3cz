@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function QueueField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { queues, isQueuesLoading, mutateQueues } = useQueues();
   const { organization } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -62,9 +64,15 @@ export function QueueField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No queue"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.queue.none")
+              }
             >
-              {connected ? "Connected" : label || "No queue"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.queue.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -83,12 +91,12 @@ export function QueueField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isQueuesLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : queues?.length === 0
-                    ? "No queues"
-                    : "Select queue"
+                    ? t("workflow.fields.queue.empty")
+                    : t("workflow.fields.queue.select")
             }
           />
         </SelectTrigger>
@@ -100,7 +108,7 @@ export function QueueField({
           ))}
           <SelectSeparator />
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Queue
+            {t("workflow.fields.queue.new")}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -108,7 +116,7 @@ export function QueueField({
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Queue</DialogTitle>
+            <DialogTitle>{t("pages.queues.createDialogTitle")}</DialogTitle>
           </DialogHeader>
           <form
             onSubmit={async (e) => {
@@ -120,11 +128,11 @@ export function QueueField({
             className="space-y-4"
           >
             <div>
-              <Label htmlFor="name">Queue Name</Label>
+              <Label htmlFor="name">{t("pages.queues.queueName")}</Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="Enter queue name"
+                placeholder={t("workflow.fields.queue.enterName")}
                 className="mt-2"
               />
             </div>
@@ -134,9 +142,9 @@ export function QueueField({
                 type="button"
                 onClick={() => setIsCreateDialogOpen(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
-              <Button type="submit">Create Queue</Button>
+              <Button type="submit">{t("pages.queues.createQueue")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

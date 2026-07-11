@@ -9,8 +9,10 @@
     "cloudflare:email": "./src/shims/cloudflare-email.ts"
   },
   "scripts": {
+    "extract-nodes": "pnpm --filter '@dafthunk/www' extract-nodes",
+    "predev": "pnpm run extract-nodes",
     "dev": "tsx watch --import ./src/shims/cloudflare-register.mjs --env-file=.dev.vars src/server.ts",
-    "dev:docker": "tsx watch --import ./src/shims/cloudflare-register.mjs --env-file=.dev.vars src/server.ts",
+    "dev:docker": "pnpm run extract-nodes && tsx watch --import ./src/shims/cloudflare-register.mjs --env-file=.dev.vars src/server.ts",
     "start:node": "tsx --import ./src/shims/cloudflare-register.mjs src/server.ts",
     "dev:workers": "wrangler dev --local --live-reload --port 3102 --ip 0.0.0.0 --enable-containers=false",
     "dev:preview": "wrangler dev --remote --port 3102",

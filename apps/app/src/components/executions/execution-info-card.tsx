@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/components/locale-provider";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { formatDate } from "@/utils/date";
 
@@ -36,22 +37,29 @@ export function ExecutionInfoCard({
   workflowId,
   workflowName,
   error,
-  title = "Execution Information",
-  description = "Details about this workflow execution",
+  title,
+  description,
 }: ExecutionInfoCardProps) {
+  const { t } = useTranslation();
   const { getOrgUrl } = useOrgUrl();
+  const cardTitle = title ?? t("pages.executionDetail.infoCard.title");
+  const cardDescription =
+    description ?? t("pages.executionDetail.infoCard.description");
+
   const formatDateOrNA = (dateString?: string | Date) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return t("pages.executionDetail.infoCard.notAvailable");
     return formatDate(dateString);
   };
 
   const calculateDuration = (
-    startedAt?: string | Date,
-    endedAt?: string | Date
+    started?: string | Date,
+    ended?: string | Date
   ) => {
-    if (!startedAt || !endedAt) return "N/A";
-    const start = new Date(startedAt);
-    const end = endedAt ? new Date(endedAt) : new Date();
+    if (!started || !ended) {
+      return t("pages.executionDetail.infoCard.notAvailable");
+    }
+    const start = new Date(started);
+    const end = ended ? new Date(ended) : new Date();
     const durationMs = end.getTime() - start.getTime();
     const seconds = Math.floor(durationMs / 1000);
     if (seconds < 60) return `${seconds}s`;
@@ -65,8 +73,8 @@ export function ExecutionInfoCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
+            <CardTitle className="text-xl">{cardTitle}</CardTitle>
+            <CardDescription>{cardDescription}</CardDescription>
           </div>
           <div className="flex items-center space-x-2">
             <ExecutionStatusBadge status={status as any} />
@@ -75,11 +83,11 @@ export function ExecutionInfoCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* First Column - References */}
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <Workflow className="mr-1 h-4 w-4" /> Workflow Name
+                <Workflow className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.workflowName")}
               </p>
               <p className="mt-1">
                 {workflowName ? (
@@ -96,7 +104,8 @@ export function ExecutionInfoCard({
             </div>
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <IdCard className="mr-1 h-4 w-4" /> Workflow UUID
+                <IdCard className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.workflowUuid")}
               </p>
               <p className="mt-1">
                 <Link
@@ -109,7 +118,8 @@ export function ExecutionInfoCard({
             </div>
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <IdCard className="mr-1 h-4 w-4" /> Execution UUID
+                <IdCard className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.executionUuid")}
               </p>
               <p className="mt-1">
                 <Link
@@ -122,23 +132,25 @@ export function ExecutionInfoCard({
             </div>
           </div>
 
-          {/* Second Column - Timing */}
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <Clock className="mr-1 h-4 w-4" /> Started At
+                <Clock className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.startedAt")}
               </p>
               <p className="mt-1">{formatDateOrNA(startedAt)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <Clock className="mr-1 h-4 w-4" /> Completed At
+                <Clock className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.completedAt")}
               </p>
               <p className="mt-1">{formatDateOrNA(endedAt)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <Clock className="mr-1 h-4 w-4" /> Duration
+                <Clock className="mr-1 h-4 w-4" />{" "}
+                {t("pages.executionDetail.infoCard.duration")}
               </p>
               <p className="mt-1">{calculateDuration(startedAt, endedAt)}</p>
             </div>
@@ -149,7 +161,9 @@ export function ExecutionInfoCard({
             <div className="flex items-start">
               <AlertCircle className="h-5 w-5 text-destructive mr-2 mt-0.5" />
               <div>
-                <p className="font-semibold text-destructive">Error</p>
+                <p className="font-semibold text-destructive">
+                  {t("pages.executionDetail.infoCard.error")}
+                </p>
                 <p className="text-sm font-mono whitespace-pre-wrap">{error}</p>
               </div>
             </div>

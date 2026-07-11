@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { LocaleProvider } from "@/components/locale-provider";
 
 import App, { FallbackErrorUI } from "./app";
 import { routes } from "./routes";
@@ -18,7 +19,9 @@ const rootRouter = createBrowserRouter([
     errorElement: (
       <StrictMode>
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-          <FallbackErrorUI />
+          <LocaleProvider>
+            <FallbackErrorUI />
+          </LocaleProvider>
         </ThemeProvider>
       </StrictMode>
     ),

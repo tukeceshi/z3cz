@@ -26,10 +26,12 @@ import {
   updateBot,
 } from "../db";
 import { encryptSecret } from "../utils/encryption";
+import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 
 const botRoutes = new Hono<ApiContext>();
 
 botRoutes.use("*", jwtMiddleware);
+botRoutes.use("*", createRequireFeatureMiddleware("bots"));
 
 function toBotResponse(bot: {
   id: string;

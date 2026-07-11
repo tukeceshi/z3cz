@@ -163,6 +163,8 @@ export type NodeExecutionResult =
       eventType: string;
       /** How long to wait before timing out (e.g., "30 minutes") */
       timeout: string;
+      /** Heartbeat continuation — source of truth for async resume */
+      continuation?: import("@dafthunk/types").PendingContinuation;
     };
 
 /**

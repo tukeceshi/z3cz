@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ import {
 } from "@/services/organizations-service";
 
 export function OrganizationSwitcher() {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const { organizations: orgList, mutateOrganizations } = useOrganizations();
 
@@ -42,7 +44,7 @@ export function OrganizationSwitcher() {
   const currentOrgId = params.organizationId || organization?.id;
   const currentOrg =
     orgList?.find((org) => org.id === currentOrgId) || organization;
-  const currentOrgName = currentOrg?.name || "Personal";
+  const currentOrgName = currentOrg?.name || t("common.personal");
   const orgs = orgList || [];
   const isOrgScope = !!params.organizationId;
 
@@ -53,7 +55,7 @@ export function OrganizationSwitcher() {
   const handleCreateOrganization = useCallback(async (): Promise<void> => {
     const name = newOrgName.trim();
     if (!name) {
-      toast.error("Organization name is required");
+      toast.error(t("pages.organizations.nameRequired"));
       return;
     }
     setIsProcessing(true);
@@ -61,19 +63,17 @@ export function OrganizationSwitcher() {
       const response = await createOrganization({ name });
       const newOrg = response.organization;
       navigate(`/org/${newOrg.id}/workflows`);
-      toast.success(
-        "Organization created successfully and navigated to workflows"
-      );
+      toast.success(t("pages.organizations.createdToast"));
       setIsCreateDialogOpen(false);
       setNewOrgName("");
       await mutateOrganizations();
     } catch (error) {
-      toast.error("Failed to create organization. Please try again.");
+      toast.error(t("pages.organizations.createFailed"));
       console.error("Create Organization Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [newOrgName, mutateOrganizations, navigate]);
+  }, [newOrgName, mutateOrganizations, navigate, t]);
 
   return (
     <>
@@ -115,7 +115,7 @@ export function OrganizationSwitcher() {
             }}
           >
             <PlusCircle className="mr-2 size-4" />
-            Create
+            {t("common.create")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -129,18 +129,21 @@ export function OrganizationSwitcher() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Create New Organization</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.organizations.createDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Create a new organization to manage your workflows and team
-              members.
+              {t("pages.organizations.createDialogDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="org-switcher-name">Organization Name</Label>
+              <Label htmlFor="org-switcher-name">
+                {t("pages.organizations.organizationName")}
+              </Label>
               <Input
                 id="org-switcher-name"
-                placeholder="My Company"
+                placeholder={t("pages.organizations.organizationNamePlaceholder")}
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 disabled={isProcessing}
@@ -150,14 +153,16 @@ export function OrganizationSwitcher() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setNewOrgName("")}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCreateOrganization}
               disabled={isProcessing || !newOrgName.trim()}
               className="bg-primary hover:bg-primary/90"
             >
-              {isProcessing ? "Creating..." : "Create Organization"}
+              {isProcessing
+                ? t("common.creating")
+                : t("pages.organizations.createOrganization")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

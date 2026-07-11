@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { SchemaDialog } from "@/components/schema-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -28,6 +29,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import type { TranslateFn } from "@/i18n";
 import {
   createSchema,
   deleteSchema,
@@ -36,6 +38,7 @@ import {
 } from "@/services/schema-service";
 
 function useSchemaActions() {
+  const { t } = useTranslation();
   const { mutateSchemas } = useSchemas();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -63,10 +66,11 @@ function useSchemaActions() {
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Schema</DialogTitle>
+          <DialogTitle>{t("pages.schemas.deleteTitle")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "{schemaToDelete?.name}"? This
-            action cannot be undone.
+            {t("pages.schemas.deleteConfirm", {
+              name: schemaToDelete?.name ?? "",
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -75,7 +79,7 @@ function useSchemaActions() {
             onClick={() => setDeleteDialogOpen(false)}
             disabled={isDeleting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -83,7 +87,7 @@ function useSchemaActions() {
             disabled={isDeleting}
           >
             {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -101,19 +105,20 @@ function useSchemaActions() {
 
 function createColumns(
   openDeleteDialog: (schema: SchemaEntity) => void,
-  openEditDialog: (schema: SchemaEntity) => void
+  openEditDialog: (schema: SchemaEntity) => void,
+  t: TranslateFn
 ): ColumnDef<SchemaEntity>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue("name")}</span>
       ),
     },
     {
       accessorKey: "description",
-      header: "Description",
+      header: t("pages.schemas.columns.description"),
       cell: ({ row }) => (
         <span className="text-muted-foreground truncate max-w-xs block">
           {row.getValue("description") || "—"}
@@ -122,7 +127,7 @@ function createColumns(
     },
     {
       accessorKey: "fields",
-      header: "Fields",
+      header: t("pages.schemas.columns.fields"),
       cell: ({ row }) => {
         const fields = row.getValue("fields") as Field[];
         return <span className="text-muted-foreground">{fields.length}</span>;
@@ -137,16 +142,16 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => openEditDialog(schema)}>
-                  Edit Schema
+                  {t("pages.schemas.editSchema")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(schema)}>
-                  Delete Schema
+                  {t("pages.schemas.deleteSchema")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -158,6 +163,7 @@ function createColumns(
 }
 
 export function SchemasPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editSchema, setEditSchema] = useState<SchemaEntity | null>(null);
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -170,12 +176,12 @@ export function SchemasPage() {
   const { deleteDialog, openDeleteDialog } = useSchemaActions();
 
   const columns = createColumns(openDeleteDialog, (schema) =>
-    setEditSchema(schema)
+    setEditSchema(schema), t
   );
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Schemas" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.schemas") }]);
+  }, [setBreadcrumbs, t]);
 
   const handleCreate = async (data: {
     name: string;
@@ -198,30 +204,34 @@ export function SchemasPage() {
   };
 
   if (isSchemasLoading) {
-    return <InsetLoading title="Schemas" />;
+    return <InsetLoading title={t("pages.schemas.title")} />;
   } else if (schemasError) {
-    return <InsetError title="Schemas" errorMessage={schemasError.message} />;
+    return (
+      <InsetError
+        title={t("pages.schemas.title")}
+        errorMessage={schemasError.message}
+      />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Schemas">
+      <InsetLayout title={t("pages.schemas.title")}>
         <div className="flex items-center justify-between mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Define reusable schemas to validate and enforce record shapes across
-            your workflows.
+            {t("pages.schemas.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create New Schema
+            {t("pages.schemas.createButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={schemas || []}
           emptyState={{
-            title: "No schemas found",
-            description: "Create a new schema to get started.",
+            title: t("pages.schemas.emptyTitle"),
+            description: t("pages.schemas.emptyDescription"),
           }}
         />
         <SchemaDialog
@@ -229,8 +239,8 @@ export function SchemasPage() {
           onOpenChange={setIsCreateDialogOpen}
           schemas={schemas}
           onSubmit={handleCreate}
-          title="Create New Schema"
-          submitLabel="Create Schema"
+          title={t("pages.schemas.createDialogTitle")}
+          submitLabel={t("pages.schemas.createSchema")}
         />
         <SchemaDialog
           open={editSchema !== null}
@@ -240,8 +250,8 @@ export function SchemasPage() {
           schema={editSchema}
           schemas={schemas}
           onSubmit={handleEdit}
-          title="Edit Schema"
-          submitLabel="Save Changes"
+          title={t("pages.schemas.editDialogTitle")}
+          submitLabel={t("pages.schemas.saveChanges")}
         />
         {deleteDialog}
       </InsetLayout>

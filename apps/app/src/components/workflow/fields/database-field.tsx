@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function DatabaseField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { databases, isDatabasesLoading, mutateDatabases } = useDatabases();
   const { organization } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -62,9 +64,15 @@ export function DatabaseField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No database"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.database.none")
+              }
             >
-              {connected ? "Connected" : label || "No database"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.database.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -83,12 +91,12 @@ export function DatabaseField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isDatabasesLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : databases?.length === 0
-                    ? "No databases"
-                    : "Select database"
+                    ? t("workflow.fields.database.empty")
+                    : t("workflow.fields.database.select")
             }
           />
         </SelectTrigger>
@@ -104,7 +112,7 @@ export function DatabaseField({
           ))}
           <SelectSeparator />
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Database
+            {t("workflow.fields.database.new")}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -112,7 +120,7 @@ export function DatabaseField({
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Database</DialogTitle>
+            <DialogTitle>{t("pages.databases.createDialogTitle")}</DialogTitle>
           </DialogHeader>
           <form
             onSubmit={async (e) => {
@@ -124,11 +132,11 @@ export function DatabaseField({
             className="space-y-4"
           >
             <div>
-              <Label htmlFor="name">Database Name</Label>
+              <Label htmlFor="name">{t("pages.databases.databaseName")}</Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="Enter database name"
+                placeholder={t("workflow.fields.database.enterName")}
                 className="mt-2"
               />
             </div>
@@ -138,9 +146,9 @@ export function DatabaseField({
                 type="button"
                 onClick={() => setIsCreateDialogOpen(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
-              <Button type="submit">Create Database</Button>
+              <Button type="submit">{t("pages.databases.createDatabase")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

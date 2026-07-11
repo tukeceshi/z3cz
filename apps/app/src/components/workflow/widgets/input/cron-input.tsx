@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,18 +19,18 @@ interface CronExpressionWidgetProps extends BaseWidgetProps {
   value: string;
 }
 
-const PRESETS = [
-  { label: "Every minute", value: "* * * * *" },
-  { label: "Every 5 minutes", value: "*/5 * * * *" },
-  { label: "Every 15 minutes", value: "*/15 * * * *" },
-  { label: "Every 30 minutes", value: "*/30 * * * *" },
-  { label: "Every hour", value: "0 * * * *" },
-  { label: "Every day at midnight", value: "0 0 * * *" },
-  { label: "Every day at 9am", value: "0 9 * * *" },
-  { label: "Every Monday at 9am", value: "0 9 * * 1" },
-  { label: "Every 1st of month", value: "0 0 1 * *" },
-  { label: "Custom", value: "custom" },
-];
+const PRESET_VALUES = [
+  "* * * * *",
+  "*/5 * * * *",
+  "*/15 * * * *",
+  "*/30 * * * *",
+  "0 * * * *",
+  "0 0 * * *",
+  "0 9 * * *",
+  "0 9 * * 1",
+  "0 0 1 * *",
+  "custom",
+] as const;
 
 function parseCronExpression(expr: string): {
   minute: string;
@@ -82,6 +83,37 @@ function CronExpressionWidget({
   className,
   disabled = false,
 }: CronExpressionWidgetProps) {
+  const { t } = useTranslation();
+  const presets = useMemo(
+    () => [
+      { label: t("workflow.widgets.cron.everyMinute"), value: PRESET_VALUES[0] },
+      { label: t("workflow.widgets.cron.every5Minutes"), value: PRESET_VALUES[1] },
+      {
+        label: t("workflow.widgets.cron.every15Minutes"),
+        value: PRESET_VALUES[2],
+      },
+      {
+        label: t("workflow.widgets.cron.every30Minutes"),
+        value: PRESET_VALUES[3],
+      },
+      { label: t("workflow.widgets.cron.everyHour"), value: PRESET_VALUES[4] },
+      {
+        label: t("workflow.widgets.cron.everyDayMidnight"),
+        value: PRESET_VALUES[5],
+      },
+      { label: t("workflow.widgets.cron.everyDay9am"), value: PRESET_VALUES[6] },
+      {
+        label: t("workflow.widgets.cron.everyMonday9am"),
+        value: PRESET_VALUES[7],
+      },
+      {
+        label: t("workflow.widgets.cron.everyFirstOfMonth"),
+        value: PRESET_VALUES[8],
+      },
+      { label: t("workflow.widgets.cron.custom"), value: PRESET_VALUES[9] },
+    ],
+    [t]
+  );
   const [cronParts, setCronParts] = useState(() => parseCronExpression(value));
   const [selectedPreset, setSelectedPreset] = useState<string>("");
 
@@ -89,14 +121,14 @@ function CronExpressionWidget({
 
   // Check if current value matches a preset
   useEffect(() => {
-    const preset = PRESETS.find((p) => p.value === value);
+    const preset = presets.find((p) => p.value === value);
     if (preset && preset.value !== "custom") {
       setSelectedPreset(preset.value);
     } else {
       setSelectedPreset("custom");
     }
     setCronParts(parseCronExpression(value));
-  }, [value]);
+  }, [value, presets]);
 
   const handlePresetChange = (presetValue: string) => {
     if (presetValue === "custom") {
@@ -132,10 +164,10 @@ function CronExpressionWidget({
         disabled={disabled}
       >
         <SelectTrigger className="h-6 text-xs">
-          <SelectValue placeholder="Choose preset" />
+          <SelectValue placeholder={t("workflow.widgets.cron.choosePreset")} />
         </SelectTrigger>
         <SelectContent>
-          {PRESETS.map((preset) => (
+          {presets.map((preset) => (
             <SelectItem key={preset.label} value={preset.value}>
               {preset.label}
             </SelectItem>
@@ -147,7 +179,7 @@ function CronExpressionWidget({
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground w-20 shrink-0">
-            Minute
+            {t("workflow.widgets.cron.minute")}
           </Label>
           <Input
             value={cronParts.minute}
@@ -159,7 +191,7 @@ function CronExpressionWidget({
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground w-20 shrink-0">
-            Hour
+            {t("workflow.widgets.cron.hour")}
           </Label>
           <Input
             value={cronParts.hour}
@@ -171,7 +203,7 @@ function CronExpressionWidget({
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground w-20 shrink-0">
-            Day
+            {t("workflow.widgets.cron.day")}
           </Label>
           <Input
             value={cronParts.dayOfMonth}
@@ -183,7 +215,7 @@ function CronExpressionWidget({
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground w-20 shrink-0">
-            Month
+            {t("workflow.widgets.cron.month")}
           </Label>
           <Input
             value={cronParts.month}
@@ -195,7 +227,7 @@ function CronExpressionWidget({
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground w-20 shrink-0">
-            Day of week
+            {t("workflow.widgets.cron.dayOfWeek")}
           </Label>
           <Input
             value={cronParts.dayOfWeek}

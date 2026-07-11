@@ -7,6 +7,10 @@ export interface ObjectReference {
   filename?: string;
 }
 
+import type { WorkflowBillingMode } from "./workflow-billing";
+export type { WorkflowBillingMode } from "./workflow-billing";
+export { ALL_WORKFLOW_BILLING_MODES } from "./workflow-billing";
+
 /**
  * Workflow trigger types
  */
@@ -240,6 +244,19 @@ export type ParameterType =
 export type ParameterValue = ParameterType["value"];
 
 /**
+ * Resolved node outputs/inputs keyed by parameter name (API wire format).
+ */
+export type NodeRuntimeState = Record<
+  string,
+  ParameterValue | readonly ParameterValue[]
+>;
+
+/**
+ * Workflow execution state keyed by node id.
+ */
+export type WorkflowRuntimeState = Record<string, NodeRuntimeState>;
+
+/**
  * Represents a parameter with metadata and type information
  */
 export type Parameter = {
@@ -343,6 +360,10 @@ export interface Workflow {
   id: string;
   name: string;
   description?: string;
+  /** Workflow scheme (方案) — determines allowed triggers, runtimes, and nodes */
+  schemeId: string;
+  /** Credit enforcement mode — platform credits vs upstream relay billing */
+  billingMode?: WorkflowBillingMode;
   trigger: WorkflowTrigger;
   runtime?: WorkflowRuntime;
   nodes: Node[];
@@ -369,6 +390,8 @@ export type NodeExecutionStatus =
   | "skipped"
   | "pending";
 
+import type { PendingContinuation } from "./workflow-continuation";
+
 /**
  * Represents the execution state of a single node
  */
@@ -381,6 +404,8 @@ export interface NodeExecution {
   usage: number;
   /** Present when status is "pending" — describes the event the runtime should wait for */
   pendingEvent?: { type: string; timeout?: string };
+  /** Heartbeat continuation — source of truth for pending async work */
+  pendingContinuation?: PendingContinuation;
 }
 
 /**
@@ -404,6 +429,8 @@ export interface WorkflowExecution {
   workflowId: string;
   workflowName?: string;
   status: WorkflowExecutionStatus;
+  /** Monotonic heartbeat tick counter while executing */
+  heartbeatTick?: number;
   error?: string;
   nodeExecutions: NodeExecution[];
   /** Timestamp when execution actually started */
@@ -428,6 +455,7 @@ export interface WorkflowExecution {
 export interface CreateWorkflowRequest {
   name: string;
   description?: string;
+  schemeId: string;
   trigger: WorkflowTrigger;
   runtime?: WorkflowRuntime;
   nodes: Node[];
@@ -457,6 +485,7 @@ export type GetWorkflowResponse = WorkflowWithMetadata;
 export interface UpdateWorkflowRequest {
   name: string;
   description?: string;
+  billingMode?: WorkflowBillingMode;
   trigger?: WorkflowTrigger;
   runtime?: WorkflowRuntime;
   nodes: Node[];

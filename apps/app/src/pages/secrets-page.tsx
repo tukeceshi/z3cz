@@ -2,12 +2,13 @@ import { Secret } from "@dafthunk/types";
 import { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { ResourceFeatureBanner } from "@/components/resource-feature-banner";
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +37,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useAppToast } from "@/hooks/use-app-toast";
+import type { TranslateFn } from "@/i18n";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   createSecret,
@@ -46,75 +50,79 @@ import {
 } from "@/services/secrets-service";
 import { formatDate } from "@/utils/date";
 
-const columns: ColumnDef<Secret>[] = [
-  {
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("name")}</div>
-    ),
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Created",
-    cell: ({ row }) => {
-      const date = row.getValue("createdAt") as Date;
-      return <div>{formatDate(date)}</div>;
+function createColumns(t: TranslateFn): ColumnDef<Secret>[] {
+  return [
+    {
+      accessorKey: "name",
+      header: t("common.name"),
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("name")}</div>
+      ),
     },
-  },
-  {
-    accessorKey: "updatedAt",
-    header: "Updated",
-    cell: ({ row }) => {
-      const date = row.getValue("updatedAt") as Date;
-      return <div>{formatDate(date)}</div>;
+    {
+      accessorKey: "createdAt",
+      header: t("pages.secrets.created"),
+      cell: ({ row }) => {
+        const date = row.getValue("createdAt") as Date;
+        return <div>{formatDate(date)}</div>;
+      },
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const secret = row.original;
-      return (
-        <div className="text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button aria-haspopup="true" size="icon" variant="ghost">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() =>
-                  document.dispatchEvent(
-                    new CustomEvent("editSecretTrigger", {
-                      detail: secret,
-                    })
-                  )
-                }
-              >
-                Edit Secret
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  document.dispatchEvent(
-                    new CustomEvent("deleteSecretTrigger", {
-                      detail: secret.id,
-                    })
-                  )
-                }
-              >
-                Delete Secret
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
+    {
+      accessorKey: "updatedAt",
+      header: t("pages.secrets.updated"),
+      cell: ({ row }) => {
+        const date = row.getValue("updatedAt") as Date;
+        return <div>{formatDate(date)}</div>;
+      },
     },
-  },
-];
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const secret = row.original;
+        return (
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button aria-haspopup="true" size="icon" variant="ghost">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">{t("common.openMenu")}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    document.dispatchEvent(
+                      new CustomEvent("editSecretTrigger", {
+                        detail: secret,
+                      })
+                    )
+                  }
+                >
+                  {t("pages.secrets.editSecret")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    document.dispatchEvent(
+                      new CustomEvent("deleteSecretTrigger", {
+                        detail: secret.id,
+                      })
+                    )
+                  }
+                >
+                  {t("pages.secrets.deleteSecret")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+}
 
 export function SecretsPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { secrets, secretsError, isSecretsLoading, mutateSecrets } =
     useSecrets();
@@ -131,9 +139,11 @@ export function SecretsPage() {
   const [editSecretValue, setEditSecretValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const columns = useMemo(() => createColumns(t), [t]);
+
   useEffect(() => {
-    setBreadcrumbs([{ label: "Secrets" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.secrets") }]);
+  }, [setBreadcrumbs, t]);
 
   useEffect(() => {
     const handleDeleteEvent = (e: Event) => {
@@ -149,7 +159,7 @@ export function SecretsPage() {
       if (custom.detail) {
         setEditingSecret(custom.detail);
         setEditSecretName(custom.detail.name);
-        setEditSecretValue(""); // Don't pre-fill the value for security
+        setEditSecretValue("");
         setIsEditDialogOpen(true);
       }
     };
@@ -168,21 +178,21 @@ export function SecretsPage() {
     setIsProcessing(true);
     try {
       await deleteSecret(secretToDelete, organization.id);
-      toast.success("Secret deleted successfully");
+      appToast.success("pages.secrets.deleteSuccess");
       await mutateSecrets();
     } catch (error) {
-      toast.error("Failed to delete secret. Please try again.");
+      appToast.error("pages.secrets.deleteFailed");
       console.error("Delete Secret Error:", error);
     } finally {
       setIsDeleteDialogOpen(false);
       setSecretToDelete(null);
       setIsProcessing(false);
     }
-  }, [secretToDelete, organization?.id, mutateSecrets]);
+  }, [secretToDelete, organization?.id, mutateSecrets, appToast]);
 
   const handleCreateSecret = useCallback(async (): Promise<void> => {
     if (!newSecretName.trim() || !newSecretValue.trim() || !organization?.id) {
-      toast.error("Secret name and value are required");
+      appToast.error("pages.secrets.nameValueRequired");
       return;
     }
     setIsProcessing(true);
@@ -195,15 +205,15 @@ export function SecretsPage() {
       setIsCreateDialogOpen(false);
       setNewSecretName("");
       setNewSecretValue("");
-      toast.success("Secret created successfully");
+      appToast.success("pages.secrets.createSuccess");
       await mutateSecrets();
     } catch (error) {
-      toast.error("Failed to create secret. Please try again.");
+      appToast.error("pages.secrets.createFailed");
       console.error("Create Secret Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [newSecretName, newSecretValue, organization?.id, mutateSecrets]);
+  }, [newSecretName, newSecretValue, organization?.id, mutateSecrets, appToast]);
 
   const handleUpdateSecret = useCallback(async (): Promise<void> => {
     if (!editingSecret || !organization?.id) return;
@@ -217,7 +227,7 @@ export function SecretsPage() {
     }
 
     if (Object.keys(updates).length === 0) {
-      toast.error("No changes to save");
+      appToast.error("pages.secrets.noChanges");
       return;
     }
 
@@ -228,10 +238,10 @@ export function SecretsPage() {
       setEditingSecret(null);
       setEditSecretName("");
       setEditSecretValue("");
-      toast.success("Secret updated successfully");
+      appToast.success("pages.secrets.updateSuccess");
       await mutateSecrets();
     } catch (error) {
-      toast.error("Failed to update secret. Please try again.");
+      appToast.error("pages.secrets.updateFailed");
       console.error("Update Secret Error:", error);
     } finally {
       setIsProcessing(false);
@@ -242,49 +252,52 @@ export function SecretsPage() {
     editSecretValue,
     organization?.id,
     mutateSecrets,
+    appToast,
   ]);
 
   if (isSecretsLoading && !secrets) {
-    return <InsetLoading title="Secrets" />;
+    return <InsetLoading title={t("pages.secrets.title")} />;
   } else if (secretsError) {
-    return <InsetError title="Secrets" errorMessage={secretsError.message} />;
+    return (
+      <InsetError title={t("pages.secrets.title")} errorMessage={secretsError.message} />
+    );
   }
 
   return (
-    <InsetLayout title="Secrets">
+    <InsetLayout title={t("pages.secrets.title")}>
+      <ResourceFeatureBanner />
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Store encrypted secrets for your workflows.
+          {t("pages.secrets.description")}
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create Secret
+          {t("pages.secrets.createButton")}
         </Button>
       </div>
       <DataTable
         columns={columns}
         data={secrets || []}
         emptyState={{
-          title: "No secrets found",
-          description: "Create your first secret to get started.",
+          title: t("pages.secrets.emptyTitle"),
+          description: t("pages.secrets.emptyDescription"),
         }}
       />
 
-      {/* Create Secret Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Secret</DialogTitle>
+            <DialogTitle>{t("pages.secrets.createDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Add a new encrypted secret to your organization.
+              {t("pages.secrets.createDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="secret-name">Name</Label>
+              <Label htmlFor="secret-name">{t("common.name")}</Label>
               <Input
                 id="secret-name"
-                placeholder="Secret name"
+                placeholder={t("pages.secrets.namePlaceholder")}
                 value={newSecretName}
                 onChange={(e) => setNewSecretName(e.target.value)}
                 disabled={isProcessing}
@@ -292,10 +305,12 @@ export function SecretsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="secret-value">Value</Label>
+              <Label htmlFor="secret-value">
+                {t("pages.secrets.valuePlaceholder")}
+              </Label>
               <Textarea
                 id="secret-value"
-                placeholder="Secret value"
+                placeholder={t("pages.secrets.valuePlaceholder")}
                 value={newSecretValue}
                 onChange={(e) => setNewSecretValue(e.target.value)}
                 disabled={isProcessing}
@@ -312,7 +327,7 @@ export function SecretsPage() {
                 setNewSecretValue("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleCreateSecret}
@@ -320,27 +335,28 @@ export function SecretsPage() {
                 isProcessing || !newSecretName.trim() || !newSecretValue.trim()
               }
             >
-              {isProcessing ? "Creating..." : "Create Secret"}
+              {isProcessing
+                ? t("pages.secrets.creating")
+                : t("pages.secrets.createSecret")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Secret Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Secret</DialogTitle>
+            <DialogTitle>{t("pages.secrets.editDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Update the name or value of this secret.
+              {t("pages.secrets.editDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-secret-name">Name</Label>
+              <Label htmlFor="edit-secret-name">{t("common.name")}</Label>
               <Input
                 id="edit-secret-name"
-                placeholder="Secret name"
+                placeholder={t("pages.secrets.namePlaceholder")}
                 value={editSecretName}
                 onChange={(e) => setEditSecretName(e.target.value)}
                 disabled={isProcessing}
@@ -349,11 +365,11 @@ export function SecretsPage() {
             </div>
             <div>
               <Label htmlFor="edit-secret-value">
-                Value (leave empty to keep current value)
+                {t("pages.secrets.valueKeepHint")}
               </Label>
               <Textarea
                 id="edit-secret-value"
-                placeholder="New secret value"
+                placeholder={t("pages.secrets.newValuePlaceholder")}
                 value={editSecretValue}
                 onChange={(e) => setEditSecretValue(e.target.value)}
                 disabled={isProcessing}
@@ -371,38 +387,39 @@ export function SecretsPage() {
                 setEditSecretValue("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleUpdateSecret} disabled={isProcessing}>
-              {isProcessing ? "Updating..." : "Update Secret"}
+              {isProcessing
+                ? t("pages.secrets.updating")
+                : t("pages.secrets.updateSecret")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Secret Dialog */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.secrets.deleteSecret")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              secret and any workflows using it may fail.
+              {t("pages.secrets.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSecretToDelete(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteSecret}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Deleting..." : "Delete"}
+              {isProcessing ? <Spinner className="h-4 w-4 mr-2" /> : null}
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -13,7 +13,7 @@ export function testConditionalBranching(
 ) {
   describe(`${runtimeName}: conditional branching`, () => {
     it("should execute true branch when condition is true", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-fork-true",
         name: "Conditional Fork True",
         trigger: "manual",
@@ -105,7 +105,7 @@ export function testConditionalBranching(
     });
 
     it("should execute false branch when condition is false", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-fork-false",
         name: "Conditional Fork False",
         trigger: "manual",
@@ -202,7 +202,7 @@ export function testConditionalBranching(
     });
 
     it("should handle fork-join pattern (true branch)", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-fork-join-true",
         name: "Fork-Join True",
         trigger: "manual",
@@ -315,7 +315,7 @@ export function testConditionalBranching(
     });
 
     it("should handle fork-join pattern (false branch)", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-fork-join-false",
         name: "Fork-Join False",
         trigger: "manual",
@@ -433,7 +433,7 @@ export function testConditionalBranching(
     });
 
     it("should handle chained nodes after conditional fork", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-fork-chain",
         name: "Fork with Chain",
         trigger: "manual",
@@ -547,7 +547,7 @@ export function testConditionalBranching(
     });
 
     it("should error when join receives both inputs", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-join-both",
         name: "Join Both Inputs Error",
         trigger: "manual",
@@ -619,7 +619,7 @@ export function testConditionalBranching(
     });
 
     it("should error when join receives neither input", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-join-neither",
         name: "Join Neither Input Error",
         trigger: "manual",

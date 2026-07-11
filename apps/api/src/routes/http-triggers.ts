@@ -22,7 +22,7 @@ import {
 import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
-import { isCreditExhausted } from "../utils/credits";
+import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
 import {
   isExecutionPreparationError,
   prepareWorkflowExecution,
@@ -95,7 +95,10 @@ httpTriggerRoutes.on(
     if (!billingInfo) {
       return c.json({ error: "Organization not found" }, 404);
     }
-    if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
+    if (
+      !shouldSkipPlatformCreditCheck(workflowWithData.billingMode) &&
+      isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
+    ) {
       return c.json({ error: "Insufficient compute credits" }, 402 as const);
     }
 
@@ -111,6 +114,7 @@ httpTriggerRoutes.on(
       workflow: {
         id: workflow.id,
         name: workflow.name,
+        billingMode: workflowWithData.billingMode,
         trigger: workflowData.trigger,
         runtime,
         nodes: workflowData.nodes,

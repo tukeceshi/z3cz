@@ -19,7 +19,9 @@ import { createToolContext } from "../runtime/tool-context";
 
 const playgroundRoutes = new Hono<ApiContext>();
 
-playgroundRoutes.post("/", jwtMiddleware, async (c) => {
+playgroundRoutes.use("*", jwtMiddleware);
+
+playgroundRoutes.post("/", async (c) => {
   const organizationId = c.get("organizationId")!;
 
   // Parse and validate request body

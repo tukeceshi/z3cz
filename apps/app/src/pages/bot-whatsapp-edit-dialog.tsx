@@ -1,6 +1,7 @@
 import type { BotResponse } from "@dafthunk/types";
 import { useState } from "react";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ export function BotWhatsAppEditDialog({
   onOpenChange,
   onUpdated,
 }: BotWhatsAppEditDialogProps) {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const meta = (account.metadata ?? {}) as Record<string, string | undefined>;
   const [name, setName] = useState(account.name);
@@ -61,7 +63,9 @@ export function BotWhatsAppEditDialog({
       onUpdated();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update account");
+      setError(
+        err instanceof Error ? err.message : t("pages.bots.updateAccountFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -83,84 +87,84 @@ export function BotWhatsAppEditDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit WhatsApp Account</DialogTitle>
+          <DialogTitle>{t("pages.bots.editWhatsAppTitle")}</DialogTitle>
           <DialogDescription>
-            Update your WhatsApp Business API settings.
+            {t("pages.bots.editWhatsAppDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-name">Name</Label>
+            <Label htmlFor="edit-name">{t("common.name")}</Label>
             <Input
               id="edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              A display name for this account in Dafthunk.
+              {t("pages.bots.displayNameHint")}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-app-secret">App Secret</Label>
+            <Label htmlFor="edit-app-secret">{t("pages.bots.appSecret")}</Label>
             <Input
               id="edit-app-secret"
               type="password"
               value={appSecret}
               onChange={(e) => setAppSecret(e.target.value)}
-              placeholder="Leave empty to keep current secret"
+              placeholder={t("pages.bots.secretKeepPlaceholder")}
             />
             <p className="text-xs text-muted-foreground">
-              Found at Apps &gt; App Settings &gt; Basic in the Meta Developer
-              Portal.
+              {t("pages.bots.appSecretHint")}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-access-token">Access Token</Label>
+            <Label htmlFor="edit-access-token">
+              {t("pages.bots.accessToken")}
+            </Label>
             <Input
               id="edit-access-token"
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Leave empty to keep current token"
+              placeholder={t("pages.bots.tokenKeepPlaceholder")}
             />
             <p className="text-xs text-muted-foreground">
-              Found at Apps &gt; Use cases &gt; WhatsApp &gt; API Setup, or via
-              Business Settings &gt; System Users for a permanent token.
+              {t("pages.bots.accessTokenHint")}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-phone-number-id">Phone Number ID</Label>
+            <Label htmlFor="edit-phone-number-id">
+              {t("pages.bots.phoneNumberId")}
+            </Label>
             <Input
               id="edit-phone-number-id"
               value={phoneNumberId}
               onChange={(e) => setPhoneNumberId(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Found at Apps &gt; Use cases &gt; WhatsApp &gt; API Setup under
-              the phone number dropdown.
+              {t("pages.bots.phoneNumberIdHint")}
             </p>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="edit-waba-id">
-              WhatsApp Business Account ID{" "}
+              {t("pages.bots.wabaId")}{" "}
               <span className="text-muted-foreground font-normal">
-                (optional)
+                {t("pages.bots.optional")}
               </span>
             </Label>
             <Input
               id="edit-waba-id"
               value={wabaId}
               onChange={(e) => setWabaId(e.target.value)}
-              placeholder="WhatsApp Business Account ID"
+              placeholder={t("pages.bots.wabaIdPlaceholder")}
             />
             <p className="text-xs text-muted-foreground">
-              The WhatsApp Business Account ID, found on the same page. Stored
-              for reference only.
+              {t("pages.bots.wabaIdHint")}
             </p>
           </div>
 
@@ -177,14 +181,14 @@ export function BotWhatsAppEditDialog({
             onClick={() => handleOpenChange(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || name.trim() === ""}
           >
             {isSubmitting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Save Changes
+            {t("pages.bots.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

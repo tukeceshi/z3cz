@@ -1,5 +1,6 @@
 import type { NodeExecution, NodeType } from "@dafthunk/types";
 
+import { externalEventContinuation } from "../../heartbeat/continuation-store";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
 import type { TokenPricing } from "../../utils/usage";
@@ -268,14 +269,21 @@ export abstract class BaseEmailAgentNode extends ExecutableNode {
       MAX_BACKSTOP_MS
     );
 
+    const backstopTimeout = formatDuration(backstopMs);
+
     return {
       nodeId: this.node.id,
       status: "pending",
       usage: 0,
       pendingEvent: {
         type: `email-agent-complete-${context.nodeId}`,
-        timeout: formatDuration(backstopMs),
+        timeout: backstopTimeout,
       },
+      pendingContinuation: externalEventContinuation(
+        this.node.id,
+        `email-agent-complete-${context.nodeId}`,
+        backstopTimeout
+      ),
     };
   }
 }

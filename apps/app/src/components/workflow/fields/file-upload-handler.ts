@@ -1,5 +1,7 @@
 import type React from "react";
 
+import type { TranslateFn } from "@/i18n";
+
 export interface FileUploadConfig {
   validateFile?: (file: File) => void;
   getMimeType?: (file: File) => string;
@@ -24,12 +26,10 @@ export function createFileUploadHandler(
       setUploadError(null);
       setIsUploading(true);
 
-      // Validate file if validator provided
       if (config.validateFile) {
         config.validateFile(file);
       }
 
-      // Get MIME type (use custom detector or default to file.type)
       const mimeType = config.getMimeType
         ? config.getMimeType(file)
         : file.type;
@@ -45,30 +45,31 @@ export function createFileUploadHandler(
   };
 }
 
-// Pre-configured validators and MIME type detectors
-export const fileValidators = {
-  image: (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      throw new Error("Please select a valid image file");
-    }
-  },
-  audio: (file: File) => {
-    if (!file.type.startsWith("audio/")) {
-      throw new Error("Please select a valid audio file");
-    }
-  },
-  video: (file: File) => {
-    if (!file.type.startsWith("video/")) {
-      throw new Error("Please select a valid video file");
-    }
-  },
-  gltf: (file: File) => {
-    const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith(".gltf") && !fileName.endsWith(".glb")) {
-      throw new Error("Please select a valid GLTF (.gltf or .glb) file");
-    }
-  },
-};
+export function createFileValidators(t: TranslateFn) {
+  return {
+    image: (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error(t("workflow.fields.invalidImageFile"));
+      }
+    },
+    audio: (file: File) => {
+      if (!file.type.startsWith("audio/")) {
+        throw new Error(t("workflow.fields.invalidAudioFile"));
+      }
+    },
+    video: (file: File) => {
+      if (!file.type.startsWith("video/")) {
+        throw new Error(t("workflow.fields.invalidVideoFile"));
+      }
+    },
+    gltf: (file: File) => {
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith(".gltf") && !fileName.endsWith(".glb")) {
+        throw new Error(t("workflow.fields.invalidGltfFile"));
+      }
+    },
+  };
+}
 
 export const mimeTypeDetectors = {
   document: (file: File): string => {

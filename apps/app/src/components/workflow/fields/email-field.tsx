@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ export function EmailField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { emails, isEmailsLoading, mutateEmails } = useEmails();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
@@ -49,9 +51,15 @@ export function EmailField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No email"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.email.none")
+              }
             >
-              {connected ? "Connected" : label || "No email"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.email.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -70,12 +78,12 @@ export function EmailField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isEmailsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : emails?.length === 0
-                    ? "No emails"
-                    : "Select email"
+                    ? t("workflow.fields.email.empty")
+                    : t("workflow.fields.email.select")
             }
           />
         </SelectTrigger>

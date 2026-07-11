@@ -6,6 +6,7 @@ import LoaderCircle from "lucide-react/icons/loader-circle";
 import RotateCw from "lucide-react/icons/rotate-cw";
 import { useCallback, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +56,7 @@ function CloudflareGatewayModelInputWidget({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   // Sync local value when model prop changes externally.
@@ -67,7 +69,7 @@ function CloudflareGatewayModelInputWidget({
   const applySchema = useCallback(
     async (modelId: string) => {
       if (!isValidModelId(modelId)) {
-        setError("Enter a valid identifier (e.g., xai/grok-imagine-video)");
+        setError(t("workflow.widgets.model.invalidGatewayModelId"));
         return;
       }
       const [author, name] = modelId.split("/");
@@ -86,8 +88,7 @@ function CloudflareGatewayModelInputWidget({
           id: "model",
           name: "model",
           type: "string",
-          description:
-            "Cloudflare unified model identifier in the format author/model",
+          description: t("workflow.widgets.model.cloudflareGatewayModelDescription"),
           required: true,
           hidden: true,
           value: modelId,
@@ -108,7 +109,9 @@ function CloudflareGatewayModelInputWidget({
                 id: CLOUDFLARE_GATEWAY_UPLOAD_INPUT_NAME,
                 name: CLOUDFLARE_GATEWAY_UPLOAD_INPUT_NAME,
                 type: "string",
-                description: "Internal: presigned output upload destination",
+                description: t(
+                  "workflow.widgets.model.cloudflareGatewayUploadDescription"
+                ),
                 hidden: true,
                 value: "",
               },
@@ -145,13 +148,13 @@ function CloudflareGatewayModelInputWidget({
         }));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load model schema"
+          err instanceof Error ? err.message : t("workflow.widgets.model.loadFailed")
         );
       } finally {
         setLoading(false);
       }
     },
-    [updateNodeData, edges, deleteEdge, nodeId]
+    [updateNodeData, edges, deleteEdge, nodeId, t]
   );
 
   const handleLoad = useCallback(() => {
@@ -159,7 +162,7 @@ function CloudflareGatewayModelInputWidget({
     if (!trimmed || disabled || !updateNodeData) return;
 
     if (!isValidModelId(trimmed)) {
-      setError("Enter a valid identifier (e.g., xai/grok-imagine-video)");
+      setError(t("workflow.widgets.model.invalidGatewayModelId"));
       return;
     }
 
@@ -168,7 +171,7 @@ function CloudflareGatewayModelInputWidget({
     } else {
       applySchema(trimmed);
     }
-  }, [value, disabled, updateNodeData, hasSchemaParams, applySchema]);
+  }, [value, disabled, updateNodeData, hasSchemaParams, applySchema, t]);
 
   const handleConfirm = useCallback(() => {
     setShowConfirm(false);
@@ -189,7 +192,7 @@ function CloudflareGatewayModelInputWidget({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="author/model"
+          placeholder={t("workflow.widgets.model.gatewayPlaceholder")}
           disabled={disabled || loading}
           className="h-auto text-xs font-mono"
         />
@@ -211,16 +214,15 @@ function CloudflareGatewayModelInputWidget({
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload model schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.model.reloadTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will replace all current parameters and remove all connected
-              edges. This action cannot be undone.
+              {t("workflow.widgets.model.reloadDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -13,7 +13,7 @@ export function testSkipLogic(
 ) {
   describe(`${runtimeName}: skip logic and conditional execution`, () => {
     it("should execute nodes even when required inputs are missing", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-skip-missing",
         name: "Execute with Missing Input",
         trigger: "manual",
@@ -71,7 +71,7 @@ export function testSkipLogic(
     });
 
     it("should recursively skip downstream nodes when upstream node fails", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-recursive-skip",
         name: "Recursive Skip",
         trigger: "manual",

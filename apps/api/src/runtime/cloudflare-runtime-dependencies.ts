@@ -30,6 +30,8 @@ import { CloudflareQueueService } from "./cloudflare-queue-service";
 import { CloudflareSchemaService } from "./cloudflare-schema-service";
 import { CloudflareToolRegistry } from "./cloudflare-tool-registry";
 import { createCodeModeExecutor } from "./code-mode-executor";
+import { CloudflareRelayAccountService } from "./cloudflare-relay-account-service";
+import { CloudflareAiInterfaceService } from "./cloudflare-ai-interface-service";
 import { createSandboxExecutor } from "./sandbox-executor";
 import { createToolContext } from "./tool-context";
 import { runtimeVersion } from "./version";
@@ -87,6 +89,8 @@ export function buildDependencies(
     mailboxService,
     codeModeExecutor,
     sandboxExecutor,
+    relayAccountService: new CloudflareRelayAccountService(env),
+    aiInterfaceService: new CloudflareAiInterfaceService(env),
     runtimeVersion,
   };
 }

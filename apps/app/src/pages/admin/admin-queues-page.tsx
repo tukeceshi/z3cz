@@ -7,6 +7,7 @@ import { createOrgScopedColumns } from "@/components/admin/org-scoped-columns";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -20,11 +21,12 @@ export function AdminQueuesPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Queues" }]);
+    setBreadcrumbs([{ label: t("sidebar.queues") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const organizationId = searchParams.get("organizationId") || undefined;
 
@@ -36,24 +38,26 @@ export function AdminQueuesPage() {
   );
 
   const columns = useMemo(
-    () => createOrgScopedColumns<AdminQueue>(navigate),
-    [navigate]
+    () => createOrgScopedColumns<AdminQueue>(navigate, t),
+    [navigate, t]
   );
 
   if (isQueuesLoading) {
-    return <InsetLoading title="Queues" />;
+    return <InsetLoading title={t("admin.queues.title")} />;
   }
 
   if (queuesError) {
-    return <InsetError title="Queues" errorMessage={queuesError.message} />;
+    return (
+      <InsetError
+        title={t("admin.queues.title")}
+        errorMessage={queuesError.message}
+      />
+    );
   }
 
   return (
-    <InsetLayout title="Queues">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name..."
-        search={formProps}
-      >
+    <InsetLayout title={t("admin.queues.title")}>
+      <AdminTableToolbar search={formProps}>
         {organizationId && (
           <Button
             type="button"
@@ -63,7 +67,7 @@ export function AdminQueuesPage() {
               setPage(1);
             }}
           >
-            Clear organization filter
+            {t("admin.common.clearOrgFilter")}
           </Button>
         )}
       </AdminTableToolbar>
@@ -72,10 +76,10 @@ export function AdminQueuesPage() {
         columns={columns}
         data={queues}
         emptyState={{
-          title: "No queues found",
+          title: t("admin.queues.emptyTitle"),
           description: search
-            ? "No queues match your search."
-            : "No queues have been created yet.",
+            ? t("admin.queues.emptySearch")
+            : t("admin.queues.emptyDefault"),
         }}
       />
 
@@ -85,7 +89,7 @@ export function AdminQueuesPage() {
         itemCount={queues.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="queues"
+        itemLabel={t("admin.pagination.queues")}
         onPageChange={setPage}
       />
     </InsetLayout>

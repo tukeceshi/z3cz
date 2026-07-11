@@ -4,6 +4,7 @@ import { DynamicIcon, type IconName } from "lucide-react/dynamic.mjs";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -50,9 +51,9 @@ const TASK_ICONS: Record<string, IconName> = {
  * Extract the provider segment from a model identifier.
  * `@cf/meta/llama-3.2-3b-instruct` → `Meta`.
  */
-function providerFromId(id: string): string {
+function providerFromId(id: string, unknownLabel: string): string {
   const match = id.match(/^@[a-z]+\/([^/]+)\//i);
-  if (!match) return "Unknown";
+  if (!match) return unknownLabel;
   return match[1]
     .split(/[-_]/)
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
@@ -76,6 +77,7 @@ export function CloudflareModelDialog({
   onSelect,
   currentModel,
 }: CloudflareModelDialogProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
 
@@ -90,9 +92,9 @@ export function CloudflareModelDialog({
     return data.models.map((info) => ({
       info,
       task: info.task?.name ?? null,
-      provider: providerFromId(info.name),
+      provider: providerFromId(info.name, t("workflow.widgets.model.unknownProvider")),
     }));
-  }, [data]);
+  }, [data, t]);
 
   const searchResults = useMemo(
     () => models.filter((m) => matchesSearch(m, searchTerm)),
@@ -141,11 +143,11 @@ export function CloudflareModelDialog({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="w-[80vw] h-[80vh] max-w-[1400px] flex flex-col p-0">
-        <DialogTitle className="sr-only">Select a Cloudflare model</DialogTitle>
+        <DialogTitle className="sr-only">{t("workflow.widgets.model.dialogTitle")}</DialogTitle>
         <div className="relative px-4 pt-4">
           <Wand className="absolute left-8 top-9 h-6 w-6 text-muted-foreground" />
           <Input
-            placeholder="Search models..."
+            placeholder={t("workflow.widgets.model.searchPlaceholder")}
             className="pl-14 text-xl h-16 border rounded-lg bg-accent border-primary/20"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -158,12 +160,14 @@ export function CloudflareModelDialog({
             <div className="space-y-3 pr-4">
               {error && (
                 <div className="text-center py-12 text-destructive text-sm">
-                  Failed to load catalog: {error.message}
+                  {t("workflow.widgets.model.catalogLoadFailed", {
+                    message: error.message,
+                  })}
                 </div>
               )}
               {!data && !error && (
                 <div className="text-center py-12 text-muted-foreground text-sm">
-                  Loading catalog…
+                  {t("workflow.widgets.model.catalogLoading")}
                 </div>
               )}
               {filteredModels.map((model) => {
@@ -224,7 +228,7 @@ export function CloudflareModelDialog({
               })}
               {data && filteredModels.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-sm">No models match your search</p>
+                  <p className="text-sm">{t("workflow.widgets.model.emptySearch")}</p>
                 </div>
               )}
             </div>
@@ -242,7 +246,10 @@ export function CloudflareModelDialog({
                 />
               </div>
               <div className="text-xs text-muted-foreground/60 pt-4 text-right">
-                {filteredModels.length} of {models.length} models
+                {t("workflow.widgets.model.modelCount", {
+                  filtered: filteredModels.length,
+                  total: models.length,
+                })}
               </div>
             </div>
           )}

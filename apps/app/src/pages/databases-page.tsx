@@ -2,13 +2,14 @@ import { IDENTIFIER_PATTERN } from "@dafthunk/types";
 import { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -29,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { TranslateFn } from "@/i18n";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   createDatabase,
@@ -38,6 +40,7 @@ import {
 import { cn } from "@/utils/utils";
 
 function useDatabaseActions() {
+  const { t } = useTranslation();
   const { mutateDatabases } = useDatabases();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -63,11 +66,11 @@ function useDatabaseActions() {
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Database</DialogTitle>
+          <DialogTitle>{t("pages.databases.deleteTitle")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "
-            {databaseToDelete?.name || "Untitled Database"}"? This action cannot
-            be undone and all data in this database will be lost.
+            {t("pages.databases.deleteConfirm", {
+              name: databaseToDelete?.name || t("pages.databases.untitled"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -76,7 +79,7 @@ function useDatabaseActions() {
             onClick={() => setDeleteDialogOpen(false)}
             disabled={isDeleting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -84,7 +87,7 @@ function useDatabaseActions() {
             disabled={isDeleting}
           >
             {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -102,16 +105,19 @@ function useDatabaseActions() {
 
 function createColumns(
   openDeleteDialog: (database: any) => void,
-  orgId: string
+  orgId: string,
+  t: TranslateFn
 ): ColumnDef<any>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => {
         const name = row.getValue("name") as string;
         return (
-          <span className="font-medium">{name || "Untitled Database"}</span>
+          <span className="font-medium">
+            {name || t("pages.databases.untitled")}
+          </span>
         );
       },
     },
@@ -124,23 +130,23 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
                   <Link to={`/org/${orgId}/databases/${database.id}/explorer`}>
-                    Open Explorer
+                    {t("pages.databases.openExplorer")}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to={`/org/${orgId}/databases/${database.id}/console`}>
-                    Open Console
+                    {t("pages.databases.openConsole")}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(database)}>
-                  Delete Database
+                  {t("pages.databases.deleteDatabase")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -152,6 +158,7 @@ function createColumns(
 }
 
 export function DatabasesPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newDatabaseName, setNewDatabaseName] = useState("");
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -163,11 +170,14 @@ export function DatabasesPage() {
 
   const { deleteDialog, openDeleteDialog } = useDatabaseActions();
 
-  const columns = createColumns(openDeleteDialog, orgId);
+  const columns = useMemo(
+    () => createColumns(openDeleteDialog, orgId, t),
+    [openDeleteDialog, orgId, t]
+  );
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Databases" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.databases") }]);
+  }, [setBreadcrumbs, t]);
 
   const handleCreateDatabase = async (name: string) => {
     if (!orgId) return;
@@ -182,31 +192,31 @@ export function DatabasesPage() {
   };
 
   if (isDatabasesLoading) {
-    return <InsetLoading title="Databases" />;
+    return <InsetLoading title={t("pages.databases.title")} />;
   } else if (databasesError) {
     return (
-      <InsetError title="Databases" errorMessage={databasesError.message} />
+      <InsetError title={t("pages.databases.title")} errorMessage={databasesError.message} />
     );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Databases">
+      <InsetLayout title={t("pages.databases.title")}>
         <div className="flex items-center justify-between mb-6  min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Create and manage Postgres databases for your workflows.
+            {t("pages.databases.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create New Database
+            {t("pages.databases.createButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={databases || []}
           emptyState={{
-            title: "No databases found",
-            description: "Create a new database to get started.",
+            title: t("pages.databases.emptyTitle"),
+            description: t("pages.databases.emptyDescription"),
           }}
         />
         <Dialog
@@ -218,7 +228,7 @@ export function DatabasesPage() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Database</DialogTitle>
+              <DialogTitle>{t("pages.databases.createDialogTitle")}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={async (e) => {
@@ -229,13 +239,13 @@ export function DatabasesPage() {
               className="space-y-4"
             >
               <div>
-                <Label htmlFor="name">Database Name</Label>
+                <Label htmlFor="name">{t("pages.databases.databaseName")}</Label>
                 <Input
                   id="name"
                   name="name"
                   value={newDatabaseName}
                   onChange={(e) => setNewDatabaseName(e.target.value)}
-                  placeholder="Enter database name"
+                  placeholder={t("pages.databases.databaseNamePlaceholder")}
                   className={cn(
                     "mt-2",
                     newDatabaseName.trim().length > 0 &&
@@ -246,7 +256,7 @@ export function DatabasesPage() {
                 {newDatabaseName.trim().length > 0 &&
                   !IDENTIFIER_PATTERN.test(newDatabaseName.trim()) && (
                     <p className="text-xs text-destructive mt-1">
-                      Letters, digits, and underscores only (e.g. my_database)
+                      {t("pages.databases.nameValidation")}
                     </p>
                   )}
               </div>
@@ -256,7 +266,7 @@ export function DatabasesPage() {
                   type="button"
                   onClick={() => setIsCreateDialogOpen(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -265,7 +275,7 @@ export function DatabasesPage() {
                     !IDENTIFIER_PATTERN.test(newDatabaseName.trim())
                   }
                 >
-                  Create Database
+                  {t("pages.databases.createDatabase")}
                 </Button>
               </DialogFooter>
             </form>

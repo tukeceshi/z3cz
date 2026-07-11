@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,28 +26,6 @@ type Step =
   | "command"
   | "invite";
 
-const STEP_TITLES: Record<Step, string> = {
-  name: "Create a Discord Bot",
-  application: "Application Info",
-  "bot-token": "Bot Token",
-  webhook: "Interactions Endpoint",
-  command: "Slash Command",
-  invite: "Add Bot to Server",
-};
-
-const STEP_DESCRIPTIONS: Record<Step, string> = {
-  name: "Choose a display name to identify this Discord bot in Dafthunk.",
-  application:
-    "Copy the Application ID and Public Key from the General Information page in the Discord Developer Portal.",
-  "bot-token":
-    "Copy the token from the Bot page in the Discord Developer Portal.",
-  webhook:
-    "Copy the webhook URL below and paste it as the Interactions Endpoint URL in the Discord Developer Portal.",
-  command:
-    "Choose a name for the slash command that will trigger this workflow.",
-  invite: "Add the bot to a Discord server so it can receive slash commands.",
-};
-
 interface DiscordBotCreateDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,6 +42,7 @@ export function DiscordBotCreateDialog({
   showCommandStep = true,
 }: DiscordBotCreateDialogProps) {
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [applicationId, setApplicationId] = useState("");
@@ -104,7 +84,9 @@ export function DiscordBotCreateDialog({
       setStep("webhook");
       onCreated(response.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create bot");
+      setError(
+        err instanceof Error ? err.message : t("pages.bots.wizard.createBotFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -138,10 +120,30 @@ export function DiscordBotCreateDialog({
       <DialogContent className="max-w-[450px]">
         <div>
           <DialogTitle className="text-base font-semibold">
-            {STEP_TITLES[step]}
+            {step === "name"
+              ? t("pages.bots.wizard.discord.steps.name.title")
+              : step === "application"
+                ? t("pages.bots.wizard.discord.steps.application.title")
+                : step === "bot-token"
+                  ? t("pages.bots.wizard.discord.steps.botToken.title")
+                  : step === "webhook"
+                    ? t("pages.bots.wizard.discord.steps.webhook.title")
+                    : step === "command"
+                      ? t("pages.bots.wizard.discord.steps.command.title")
+                      : t("pages.bots.wizard.discord.steps.invite.title")}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground mt-1">
-            {STEP_DESCRIPTIONS[step]}
+            {step === "name"
+              ? t("pages.bots.wizard.discord.steps.name.description")
+              : step === "application"
+                ? t("pages.bots.wizard.discord.steps.application.description")
+                : step === "bot-token"
+                  ? t("pages.bots.wizard.discord.steps.botToken.description")
+                  : step === "webhook"
+                    ? t("pages.bots.wizard.discord.steps.webhook.description")
+                    : step === "command"
+                      ? t("pages.bots.wizard.discord.steps.command.description")
+                      : t("pages.bots.wizard.discord.steps.invite.description")}
             {(step === "application" || step === "webhook") && (
               <>
                 {" "}
@@ -151,7 +153,7 @@ export function DiscordBotCreateDialog({
                   rel="noopener noreferrer"
                   className="text-primary hover:underline inline-flex items-center gap-0.5"
                 >
-                  Open Discord Developer Portal
+                  {t("pages.bots.openDiscordDevPortal")}
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </>
@@ -165,7 +167,7 @@ export function DiscordBotCreateDialog({
                   rel="noopener noreferrer"
                   className="text-primary hover:underline inline-flex items-center gap-0.5"
                 >
-                  Open Discord Developer Portal
+                  {t("pages.bots.openDiscordDevPortal")}
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </>
@@ -176,28 +178,27 @@ export function DiscordBotCreateDialog({
         {step === "name" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="discord-name">Name</Label>
+              <Label htmlFor="discord-name">{t("common.name")}</Label>
               <Input
                 id="discord-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Discord Bot"
+                placeholder={t("pages.bots.wizard.placeholders.discordBot")}
               />
               <p className="text-xs text-muted-foreground">
-                A display name for this bot in Dafthunk. This is not visible to
-                your Discord users.
+                {t("pages.bots.wizard.botNameHint", { platform: "Discord" })}
               </p>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={() => setStep("application")}
                 disabled={name.trim() === ""}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -206,36 +207,32 @@ export function DiscordBotCreateDialog({
         {step === "application" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="discord-app-id">Application ID</Label>
+              <Label htmlFor="discord-app-id">
+                {t("pages.bots.applicationId")}
+              </Label>
               <Input
                 id="discord-app-id"
                 value={applicationId}
                 onChange={(e) => setApplicationId(e.target.value)}
-                placeholder="123456789012345678"
+                placeholder={t("pages.bots.wizard.placeholders.applicationId")}
               />
               <p className="text-xs text-muted-foreground">
-                Copy from the{" "}
-                <span className="font-medium text-foreground">
-                  General Information
-                </span>{" "}
-                page in the Discord Developer Portal.
+                {t("pages.bots.wizard.discord.applicationIdHint")}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="discord-public-key">Public Key</Label>
+              <Label htmlFor="discord-public-key">
+                {t("pages.bots.publicKey")}
+              </Label>
               <Input
                 id="discord-public-key"
                 value={publicKey}
                 onChange={(e) => setPublicKey(e.target.value)}
-                placeholder="abc123..."
+                placeholder={t("pages.bots.wizard.placeholders.publicKey")}
               />
               <p className="text-xs text-muted-foreground">
-                Copy from the same{" "}
-                <span className="font-medium text-foreground">
-                  General Information
-                </span>{" "}
-                page. Used to verify interaction signatures.
+                {t("pages.bots.wizard.discord.publicKeyHint")}
               </p>
             </div>
 
@@ -245,7 +242,7 @@ export function DiscordBotCreateDialog({
                 variant="outline"
                 onClick={() => setStep("name")}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={() => setStep("bot-token")}
@@ -253,7 +250,7 @@ export function DiscordBotCreateDialog({
                   applicationId.trim() === "" || publicKey.trim() === ""
                 }
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -262,18 +259,16 @@ export function DiscordBotCreateDialog({
         {step === "bot-token" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="discord-token">Bot Token</Label>
+              <Label htmlFor="discord-token">{t("pages.bots.botToken")}</Label>
               <Input
                 id="discord-token"
                 type="password"
                 value={botToken}
                 onChange={(e) => setBotToken(e.target.value)}
-                placeholder="Paste your bot token here"
+                placeholder={t("pages.bots.wizard.placeholders.botToken")}
               />
               <p className="text-xs text-muted-foreground">
-                Copy the token from the{" "}
-                <span className="font-medium text-foreground">Bot</span> page in
-                the Discord Developer Portal.
+                {t("pages.bots.wizard.discord.botTokenHint")}
               </p>
             </div>
 
@@ -293,7 +288,7 @@ export function DiscordBotCreateDialog({
                 }}
                 disabled={isSubmitting}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={handleSubmit}
@@ -302,10 +297,10 @@ export function DiscordBotCreateDialog({
                 {isSubmitting ? (
                   <>
                     <Spinner className="h-4 w-4 mr-1" />
-                    Connecting...
+                    {t("common.connecting")}
                   </>
                 ) : (
-                  "Next"
+                  t("common.next")
                 )}
               </Button>
             </div>
@@ -316,7 +311,7 @@ export function DiscordBotCreateDialog({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-md font-medium">
-                Created
+                {t("common.created")}
               </span>
               <span className="font-medium">{name}</span>
             </div>
@@ -324,21 +319,11 @@ export function DiscordBotCreateDialog({
             <div className="space-y-2 text-sm">
               <div className="space-y-1">
                 <p className="font-medium text-foreground">
-                  Interactions Endpoint URL
+                  {t("pages.bots.wizard.discord.interactionsEndpointUrl")}
                 </p>
                 <CopyableValue value={webhookUrl} />
                 <p className="text-muted-foreground text-xs">
-                  Paste this as the Interactions Endpoint URL in the{" "}
-                  <a
-                    href={generalInfoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline inline-flex items-center gap-0.5"
-                  >
-                    General Information
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>{" "}
-                  page of your Discord application.
+                  {t("pages.bots.wizard.discord.webhookPasteHint")}
                 </p>
               </div>
             </div>
@@ -347,7 +332,7 @@ export function DiscordBotCreateDialog({
               <Button
                 onClick={() => setStep(showCommandStep ? "command" : "invite")}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -356,20 +341,23 @@ export function DiscordBotCreateDialog({
         {step === "command" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="discord-command">Command Name</Label>
+              <Label htmlFor="discord-command">
+                {t("pages.bots.wizard.discord.commandName")}
+              </Label>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-muted-foreground">/</span>
                 <Input
                   id="discord-command"
                   value={commandName}
                   onChange={(e) => setCommandName(e.target.value)}
-                  placeholder="ask"
+                  placeholder={t("pages.bots.wizard.placeholders.commandName")}
                   className="font-mono"
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Users will type /{commandName || "command"} in Discord to
-                trigger this workflow.
+                {t("pages.bots.wizard.discord.commandHint", {
+                  command: commandName || "command",
+                })}
               </p>
             </div>
 
@@ -379,13 +367,13 @@ export function DiscordBotCreateDialog({
                 variant="outline"
                 onClick={() => setStep("webhook")}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={handleCommandNext}
                 disabled={commandName.trim() === ""}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -401,11 +389,11 @@ export function DiscordBotCreateDialog({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                 >
-                  Add {name} to a Server
+                  {t("pages.bots.wizard.discord.addToServer", { name })}
                   <ExternalLink className="w-3 h-3" />
                 </a>
                 <p className="text-xs text-muted-foreground mt-1">
-                  This will request the bot and slash commands permissions.
+                  {t("pages.bots.wizard.discord.invitePermissionsHint")}
                 </p>
               </div>
             )}
@@ -416,9 +404,9 @@ export function DiscordBotCreateDialog({
                 variant="outline"
                 onClick={() => setStep(showCommandStep ? "command" : "webhook")}
               >
-                Back
+                {t("common.back")}
               </Button>
-              <Button onClick={handleClose}>Done</Button>
+              <Button onClick={handleClose}>{t("common.done")}</Button>
             </div>
           </div>
         )}

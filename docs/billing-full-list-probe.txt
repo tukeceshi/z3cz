@@ -1,0 +1,214 @@
+######## FULL LIST (ResourceType=Package) ########
+pages=4 total=55
+
+--- By Product ---
+ark_bd: 34
+ark_open_source_llm: 11
+Doubao-image-generation: 4
+TOS-Package: 3
+ark_ym_sanfang: 1
+ark_sm_sanfang: 1
+Doubao-Seedream: 1
+
+--- By Status ---
+Effective: 55
+
+--- Full ark_bd + image/seed packages ---
+Effective	ark_bd	Doubao_Seed3D_2.0_pack_free_infer	Doubao-Seed3D-2.0免费在线推理资源包	2000000/2000000	token	rpi-20260704131438-7zpck
+Effective	ark_bd	Doubao_Seed_2.1_pro_free_infer_res_pack	Doubao-Seed-2.1-pro免费在线推理资源包	500000/500000	token	rpi-20260704131417-wrg6n
+Effective	ark_open_source_llm	DeepSeek_V4_pro_free_inference_resource_pack	DeepSeek-V4-pro-免费在线推理资源包	499940/500000	token	rpi-20260704131417-nj9h8
+Effective	ark_open_source_llm	DeepSeek_V4_flash_free_inference_resource_pack	DeepSeek-V4-flash-免费在线推理资源包	499818/500000	token	rpi-20260704131417-9ftrx
+Effective	ark_bd	Doubao_Seed_2.1_turbo_free_infer_res_pack	Doubao-Seed-2.1-turbo免费在线推理资源包	500000/500000	token	rpi-20260704131417-qxt7n
+Effective	ark_bd	Doubao_Seedance_2.0_pack_free_infer	Doubao-Seedance-2.0免费在线推理资源包	2174952/2262252	token	rpi-20260411135215-fqzrq
+Effective	ark_bd	Doubao_Seed_2.0_lite_free_infer_res_pack	Doubao-Seed-2.0-lite免费在线推理资源包	500000/500000	token	rpi-20260411135215-twbj4
+Effective	ark_bd	Doubao_Seed3D_1.0_pack_free_infer	Doubao-Seed3D-1.0免费在线推理资源包	2000000/2000000	token	rpi-20260411135215-6wqfw
+Effective	ark_bd	Doubao_Seedance_2.0_fast_pack_free_infer	Doubao-Seedance-2.0-fast免费在线推理资源包	4912700/5000000	token	rpi-20260411135215-6ng7x
+Effective	ark_bd	Doubao_Seed_1.6_thinking_free_infer_res_pack	Doubao-Seed-1.6-thinking免费在线推理资源包	500000/500000	token	rpi-20260411135212-xqvjg
+Effective	ark_bd	Doubao1.5-vision-pro-free-infer-res-pack	Doubao1.5-vision-pro免费在线推理资源包	500000/500000	token	rpi-20260411135212-q7hr7
+Effective	ark_bd	Doubao1.5-vision-pro-32k-free-infer-res-pack	Doubao1.5-vision-pro-32k免费在线推理资源包	500000/500000	token	rpi-20260411135212-spnfs
+Effective	ark_bd	Doubao-emb-vision-free-inference-res-pack	Doubao-embedding-vision免费在线推理资源包	500000/500000	token	rpi-20260411135211-ttkjn
+Effective	ark_bd	Doubao_Seed_2.0_pro_free_infer_res_pack	Doubao-Seed-2.0-pro免费在线推理资源包	500000/500000	token	rpi-20260411135211-z47vj
+Effective	ark_bd	Doubao_Seed_1.8_pack_free_infer	Doubao-Seed-1.8免费在线推理资源包	500000/500000	token	rpi-20260411135211-rv2xs
+Effective	ark_bd	Doubao1.5-UI-TARS-free-infer-res-pack	Doubao1.5-UI-TARS免费在线推理资源包	500000/500000	token	rpi-20260411135212-lgqxp
+Effective	ark_bd	Doubao_Seed_Character_pack_free_infer	Doubao-Seed-Character免费在线推理资源包	500000/500000	token	rpi-20260411135211-vkmph
+Effective	ark_bd	Doubao_Seed_1.6_lite_pack_free_infer	Doubao-Seed-1.6-lite免费在线推理资源包	500000/500000	token	rpi-20260411135212-9dk7x
+Effective	ark_bd	Doubao1.5-thinking-vision-pro-free-infer-res-pack	Doubao1.5-thinking-vision-pro免费在线推理资源包	500000/500000	token	rpi-20260411135212-6xm5v
+Effective	ark_bd	Doubao1.5-think-pro-free-infer-res-pack	Doubao1.5-think-pro免费在线推理资源包	500000/500000	token	rpi-20260411135212-ddv75
+Effective	ark_bd	Doubao_Seed_Code_pack_free_infer	Doubao-Seed-Code免费在线推理资源包	500000/500000	token	rpi-20260411135211-49tnw
+Effective	ark_bd	Doubao_Seed_2.0_mini_free_infer_res_pack	Doubao-Seed-2.0-mini免费在线推理资源包	500000/500000	token	rpi-20260411135211-nlz94
+Effective	ark_bd	Doubao_Seed_Translation_infer_res_pack	Doubao-Seed-Translation免费在线推理资源包	500000/500000	token	rpi-20260411135211-7btgg
+Effective	ark_bd	Doubao_Seed_1.6_vision_free_infer_res_pack	Doubao-Seed-1.6-vision免费在线推理资源包	500000/500000	token	rpi-20260411135211-w7hr5
+Effective	ark_bd	Doubao1.5-pro-32k-free-inference-res-pack	Doubao1.5-pro-32k免费在线推理资源包	500000/500000	token	rpi-20260411135211-nfbs6
+Effective	ark_bd	Doubao_Seed_1.6_flash_free_infer_res_pack	Doubao-Seed-1.6-flash免费在线推理资源包	500000/500000	token	rpi-20260411135211-lx4fs
+Effective	ark_bd	Doubao1.5-pro-256k-free-infer-res-pack	Doubao1.5-pro-256k免费在线推理资源包	500000/500000	token	rpi-20260411135211-t9k7c
+Effective	ark_bd	Doubao1.5-vision-lite-free-infer-res-pack	Doubao1.5-vision-lite免费在线推理资源包	500000/500000	token	rpi-20260411135211-lm4g9
+Effective	ark_bd	Doubao1.5-lite-32k-free-inference-res-pack	Doubao1.5-lite-32k免费在线推理资源包	500000/500000	token	rpi-20260411135211-2tg2b
+Effective	ark_bd	Doubao_Seed_1.6_free_infer_res_pack	Doubao-Seed-1.6免费在线推理资源包	500000/500000	token	rpi-20260411135211-b4vxw
+Effective	ark_bd	Doubao_Seed_2.0_code_pack_free_infer	Doubao-Seed-2.0-code免费在线推理资源包	500000/500000	token	rpi-20260411135211-2gtx7
+Effective	ark_open_source_llm	DeepSeek_V3.1_free_inference_resource_pack	DeepSeek-V3.1免费在线推理资源包	500000/500000	token	rpi-20260411135210-vlrw6
+Effective	ark_open_source_llm	DeepSeek_V3.2_free_inference_resource_pack	DeepSeek-V3.2免费在线推理资源包	500000/500000	token	rpi-20260411135210-qxp6r
+Effective	ark_open_source_llm	DeepSeek-R1-free-infer-res-pack	DeepSeek-R1免费在线推理资源包	500000/500000	token	rpi-20260411135210-82q6c
+Effective	ark_open_source_llm	DeepSeek-R1-D-Qwen32B-free-infer-res-pack	DeepSeek-R1-Distill-Qwen-32B免费在线推理资源包	500000/500000	token	rpi-20260411135210-bjsxr
+Effective	ark_open_source_llm	DeepSeek-V3-free-infer-res-pack	DeepSeek-V3免费在线推理资源包	500000/500000	token	rpi-20260411135210-498qk
+Effective	ark_open_source_llm	DeepSeek-R1-D-Qwen7B-free-infer-res-pack	DeepSeek-R1-Distill-Qwen-7B免费在线推理资源包	500000/500000	token	rpi-20260411135210-bk5bn
+Effective	Doubao-image-generation	Doubao-Seedream3.0-t2i-free-infer-res-pack	Doubao-Seedream3.0-文生图免费在线推理资源包	200/200	张	rpi-20260411135202-wmfr6
+Effective	Doubao-image-generation	Doubao-Seedream4.0-free-infer-res-pack	Doubao-Seedream4.0免费在线推理资源包	200/200	张	rpi-20260411135201-npvm4
+Effective	ark_bd	Doubao_Seedance_1.5_pro_pack_free_infer	Doubao-Seedance-1.5-pro免费在线推理资源包	2000000/2000000	token	rpi-20260411135201-9qnrj
+Effective	Doubao-image-generation	Doubao_Seedream_4.5_pack_free_infer	Doubao-Seedream 4.5-免费在线推理资源包	200/200	张	rpi-20260411135201-8l5d4
+Effective	ark_bd	Doubao-Seedance-1.0-lite-t2v-free-infer-pack	Doubao-Seedance-1.0-lite-t2v免费在线推理资源包	2000000/2000000	token	rpi-20260411135201-nhsdw
+Effective	ark_bd	Doubao_Seedance_1.0_pro_fast_pack_free_infer	Doubao-Seedance-1.0-pro-fast免费在线推理资源包	2000000/2000000	token	rpi-20260411135201-hnsgg
+Effective	ark_bd	Doubao_Seedance_1.0_pro_free_infer_res_pack	Doubao-Seedance-1.0-pro免费在线推理资源包	2000000/2000000	token	rpi-20260411135201-dkklg
+Effective	Doubao-image-generation	Doubao-SeedEdit3.0-i2i-free-infer-res-pack	Doubao-SeedEdit3.0-图像编辑免费在线推理资源包	200/200	张	rpi-20260411135201-9ctfs
+Effective	Doubao-Seedream	Doubao_Seedream_5.0_pack_free_infer	Doubao-Seedream-5.0-Lite-免费在线推理资源包	50/50	张	rpi-20260411135201-mth8d
+Effective	ark_bd	Doubao-Seedance-1.0-lite-i2v-free-infer-pack	Doubao-Seedance-1.0-lite-i2v免费在线推理资源包	2000000/2000000	token	rpi-20260411135201-4m9kh
+
+######## CATALOG MATCH (multi-package aggregate) ########
+
+--- doubao-seed-evolving (doubao-seed-evolving) ---
+matches=0 effective=0 aggEffective={"quota":0,"remaining":0,"used":0,"unit":null,"count":0}
+  => NO PACKAGE (candidate: not provisioned / not enabled)
+
+--- deepseek-v4-pro (deepseek-v4-pro-260425) ---
+matches=1 effective=1 aggEffective={"quota":500000,"remaining":499940,"used":60,"unit":"token","count":1}
+  [Effective] DeepSeek_V4_pro_free_inference_resource_pack | DeepSeek-V4-pro-免费在线推理资源包 | 499940/500000 token | rpi-20260704131417-nj9h8
+
+--- deepseek-v4-flash (deepseek-v4-flash-260425) ---
+matches=1 effective=1 aggEffective={"quota":500000,"remaining":499818,"used":182,"unit":"token","count":1}
+  [Effective] DeepSeek_V4_flash_free_inference_resource_pack | DeepSeek-V4-flash-免费在线推理资源包 | 499818/500000 token | rpi-20260704131417-9ftrx
+
+--- doubao-seedance-2 (doubao-seedance-2-0-260128) ---
+matches=1 effective=1 aggEffective={"quota":2262252,"remaining":2174952,"used":87300,"unit":"token","count":1}
+  [Effective] Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token | rpi-20260411135215-fqzrq
+
+--- doubao-seedance-2-fast (doubao-seedance-2-0-fast-260128) ---
+matches=1 effective=1 aggEffective={"quota":5000000,"remaining":4912700,"used":87300,"unit":"token","count":1}
+  [Effective] Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token | rpi-20260411135215-6ng7x
+
+--- doubao-seedance-2-mini (doubao-seedance-2-0-mini-260615) ---
+matches=0 effective=0 aggEffective={"quota":0,"remaining":0,"used":0,"unit":null,"count":0}
+  => NO PACKAGE (candidate: not provisioned / not enabled)
+
+--- doubao-seedream-5-pro (doubao-seedream-5-0-pro-260628) ---
+matches=0 effective=0 aggEffective={"quota":0,"remaining":0,"used":0,"unit":null,"count":0}
+  => NO PACKAGE (candidate: not provisioned / not enabled)
+
+--- doubao-seedream-5 (doubao-seedream-5-0-260128) ---
+matches=1 effective=1 aggEffective={"quota":50,"remaining":50,"used":0,"unit":"张","count":1}
+  [Effective] Doubao_Seedream_5.0_pack_free_infer | Doubao-Seedream-5.0-Lite-免费在线推理资源包 | 50/50 张 | rpi-20260411135201-mth8d
+
+######## SEARCH TERMS IN FULL LIST ########
+
+term="mini" hits=1
+  Doubao_Seed_2.0_mini_free_infer_res_pack | Doubao-Seed-2.0-mini免费在线推理资源包 | Effective
+
+term="seedream-5" hits=1
+  Doubao_Seedream_5.0_pack_free_infer | Doubao-Seedream-5.0-Lite-免费在线推理资源包 | Effective
+
+term="deepseek-v4" hits=2
+  DeepSeek_V4_pro_free_inference_resource_pack | DeepSeek-V4-pro-免费在线推理资源包 | Effective
+  DeepSeek_V4_flash_free_inference_resource_pack | DeepSeek-V4-flash-免费在线推理资源包 | Effective
+
+######## FILTER / QUERY VARIANTS ########
+
+[base] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[Status=Effective] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[Product=ark_bd] pages=3 total=34 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[Product=Doubao-Seedream] pages=2 total=1 err=none seedance+mini=0
+
+[Product=Doubao-image-generation] pages=2 total=4 err=none seedance+mini=0
+
+[ConfigurationName exact DeepSeek] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[ConfigurationName partial Seedance mini] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[ConfigurationName partial mini] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[ModelName filter guess] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[FoundationModelName filter guess] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[Filter.ConfigurationName guess] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[Keyword guess] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token
+
+[InstanceName guess] pages=4 total=55 err=none seedance+mini=7
+  Doubao_Seedance_2.0_pack_free_infer | Doubao-Seedance-2.0免费在线推理资源包 | 2174952/2262252 token
+  Doubao_Seedance_2.0_fast_pack_free_infer | Doubao-Seedance-2.0-fast免费在线推理资源包 | 4912700/5000000 token
+  Doubao_Seedance_1.5_pro_pack_free_infer | Doubao-Seedance-1.5-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-t2v-free-infer-pack | Doubao-Seedance-1.0-lite-t2v免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_fast_pack_free_infer | Doubao-Seedance-1.0-pro-fast免费在线推理资源包 | 2000000/2000000 token
+  Doubao_Seedance_1.0_pro_free_infer_res_pack | Doubao-Seedance-1.0-pro免费在线推理资源包 | 2000000/2000000 token
+  Doubao-Seedance-1.0-lite-i2v-free-infer-pack | Doubao-Seedance-1.0-lite-i2v免费在线推理资源包 | 2000000/2000000 token

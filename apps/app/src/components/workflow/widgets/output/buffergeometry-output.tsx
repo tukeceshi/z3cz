@@ -1,6 +1,7 @@
 import type { ObjectReference } from "@dafthunk/types";
 import Box from "lucide-react/icons/box";
 
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -15,6 +16,7 @@ function BufferGeometryOutputWidget({
   value,
   className,
 }: BufferGeometryOutputWidgetProps) {
+  const { t } = useTranslation();
   const hasValue = value !== undefined && isObjectReference(value);
   const objectRef = hasValue ? (value as ObjectReference) : null;
 
@@ -24,12 +26,16 @@ function BufferGeometryOutputWidget({
         {hasValue && objectRef ? (
           <div className="flex flex-col items-center justify-center gap-2">
             <Box className="h-8 w-8 text-neutral-400" />
-            <span className="text-xs font-medium">Buffer Geometry</span>
+            <span className="text-xs font-medium">
+              {t("workflow.widgets.bufferGeometry.title")}
+            </span>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full min-h-[80px] bg-muted/30">
             <Box className="h-8 w-8 text-neutral-400 mb-2" />
-            <span className="text-xs text-muted-foreground">No geometry</span>
+            <span className="text-xs text-muted-foreground">
+              {t("workflow.widgets.bufferGeometry.noGeometry")}
+            </span>
           </div>
         )}
       </div>

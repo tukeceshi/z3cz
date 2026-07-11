@@ -4,6 +4,7 @@ import Trash2 from "lucide-react/icons/trash-2";
 import { useEffect, useRef, useState } from "react";
 
 import { isObjectReference, useObjectService } from "@/services/object-service";
+import { useTranslation } from "@/components/locale-provider";
 
 import type { BaseWidgetProps } from "../widget";
 import { createWidget, getInputValue } from "../widget";
@@ -19,6 +20,7 @@ function AudioRecorderWidget({
   onChange,
   disabled = false,
 }: AudioRecorderWidgetProps) {
+  const { t } = useTranslation();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -81,7 +83,9 @@ function AudioRecorderWidget({
           setError(null);
         } catch (err) {
           setError(
-            err instanceof Error ? err.message : "Failed to upload audio"
+            err instanceof Error
+              ? err.message
+              : t("workflow.fields.uploadFailedAudio")
           );
           setIsUploading(false);
         }
@@ -92,7 +96,9 @@ function AudioRecorderWidget({
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to access microphone"
+        err instanceof Error
+          ? err.message
+          : t("workflow.widgets.audioRecorder.accessFailed")
       );
     }
   };
@@ -124,7 +130,7 @@ function AudioRecorderWidget({
             <button
               onClick={clearRecording}
               className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
-              aria-label="Clear recording"
+              aria-label={t("workflow.widgets.audioRecorder.clearRecording")}
               disabled={isUploading || disabled}
             >
               <Trash2 className="size-3!" />
@@ -133,7 +139,7 @@ function AudioRecorderWidget({
             <button
               onClick={stopRecording}
               className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-red-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
-              aria-label="Stop recording"
+              aria-label={t("workflow.widgets.audioRecorder.stopRecording")}
               disabled={isUploading || disabled}
             >
               <Square className="size-3!" />
@@ -142,7 +148,7 @@ function AudioRecorderWidget({
             <button
               onClick={startRecording}
               className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
-              aria-label="Start recording"
+              aria-label={t("workflow.widgets.audioRecorder.startRecording")}
               disabled={isUploading || disabled}
             >
               <Mic className="size-3!" />

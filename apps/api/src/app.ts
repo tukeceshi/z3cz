@@ -4,6 +4,7 @@ import auth from "./auth";
 import type { ApiContext } from "./context";
 import { corsMiddleware } from "./middleware/cors";
 import { createNodeRateLimitMiddleware } from "./middleware/rate-limit-node";
+import aiInterfaceRoutes from "./routes/ai-interfaces";
 import adminRoutes from "./routes/admin";
 import apiKeyRoutes from "./routes/api-keys";
 import billingRoutes from "./routes/billing";
@@ -45,6 +46,7 @@ import templateRoutes from "./routes/templates";
 import typeRoutes from "./routes/types";
 import usageRoutes from "./routes/usage";
 import whatsappWebhook from "./routes/whatsapp-webhook";
+import workflowSchemeRoutes from "./routes/workflow-schemes";
 import workflowRoutes from "./routes/workflows";
 import wsRoutes from "./routes/ws";
 
@@ -117,6 +119,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/form-triggers", formTriggerRoutes);
   app.route("/feedback-forms", feedbackFormRoutes);
   app.route("/templates", templateRoutes);
+  app.route("/workflow-schemes", workflowSchemeRoutes);
   app.route("/types", typeRoutes);
   app.route("/:organizationId/api-keys", apiKeyRoutes);
   app.route("/:organizationId/billing", billingRoutes);
@@ -131,6 +134,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/:organizationId/queues", queueRoutes);
   app.route("/:organizationId/schemas", schemaRoutes);
   app.route("/:organizationId/secrets", secretRoutes);
+  app.route("/:organizationId/ai-interfaces", aiInterfaceRoutes);
   app.route("/:organizationId/workflows", workflowRoutes);
   app.route("/:organizationId/objects", objectRoutes);
   app.route("/:organizationId/playground", playgroundRoutes);

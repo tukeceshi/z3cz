@@ -4,6 +4,8 @@ import {
   replicateOwnerName,
 } from "@dafthunk/types";
 
+import type { TranslateFn } from "@/i18n";
+
 export type { ReplicateModelMeta } from "@dafthunk/types";
 export {
   encodeReplicateModelMeta,
@@ -13,11 +15,6 @@ export {
   replicateOwnerName,
 } from "@dafthunk/types";
 
-/**
- * Best-effort parse of a stored `_rp_meta` value (from `node.metadata`).
- * Returns an empty object when the value is missing or malformed so callers
- * can safely spread the result.
- */
 export function decodeReplicateModelMeta(value: unknown): ReplicateModelMeta {
   if (typeof value !== "string" || value.length === 0) return {};
   try {
@@ -31,25 +28,22 @@ export function decodeReplicateModelMeta(value: unknown): ReplicateModelMeta {
   }
 }
 
-/**
- * Build the docs-dialog override fields for a Replicate-model node from the
- * model identifier and metadata persisted alongside it. Works whether
- * metadata is present or not so docs stay useful even on older nodes
- * created before the metadata input existed.
- */
 export function deriveReplicateModelDocs(
   modelId: string,
-  meta: ReplicateModelMeta
+  meta: ReplicateModelMeta,
+  t: TranslateFn
 ): { description: string; documentation: string; referenceUrl: string } {
   const referenceUrl = replicateModelUrl(modelId);
   const ownerName = replicateOwnerName(modelId);
 
-  const description = meta.description ?? `Replicate model: ${ownerName}`;
+  const description =
+    meta.description ??
+    t("workflow.widgets.model.docs.replicateDescriptionFallback", { ownerName });
 
   const lines: string[] = [
-    "### Selected model",
+    t("workflow.widgets.model.docs.selectedModelHeading"),
     "",
-    `- **Identifier**: \`${modelId}\``,
+    t("workflow.widgets.model.docs.identifierLine", { modelId }),
   ];
   if (meta.description) {
     lines.push("");
@@ -57,15 +51,15 @@ export function deriveReplicateModelDocs(
   }
   lines.push("");
   lines.push(
-    `See the [Replicate model page](${referenceUrl}) for detailed parameter descriptions and usage examples.`
+    t("workflow.widgets.model.docs.replicateSeeModelPage", { url: referenceUrl })
   );
   lines.push("");
-  lines.push(
-    "Paste a different identifier and click reload to rebuild the inputs and outputs from its schema. Reloading clears connected edges."
-  );
+  lines.push(t("workflow.widgets.model.docs.replicateReloadHint"));
   lines.push("");
   lines.push(
-    "Browse the [Replicate model collection](https://replicate.com/explore) to find another model."
+    t("workflow.widgets.model.docs.replicateBrowseCollection", {
+      url: "https://replicate.com/explore",
+    })
   );
 
   return { description, documentation: lines.join("\n"), referenceUrl };

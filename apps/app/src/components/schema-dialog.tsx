@@ -14,6 +14,7 @@ import PlusCircle from "lucide-react/icons/plus-circle";
 import Trash2 from "lucide-react/icons/trash-2";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,6 +54,8 @@ interface FieldEditorProps {
 }
 
 function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
+  const { t } = useTranslation();
+
   const addField = () => {
     onChange([...fields, { name: "", type: "string" }]);
   };
@@ -76,15 +79,15 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label>Fields</Label>
+        <Label>{t("pages.schemas.schemaDialog.fields")}</Label>
         <Button type="button" variant="outline" size="sm" onClick={addField}>
           <PlusCircle className="mr-1 h-3 w-3" />
-          Add Field
+          {t("pages.schemas.schemaDialog.addField")}
         </Button>
       </div>
       {fields.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          No fields defined. Add at least one field.
+          {t("pages.schemas.schemaDialog.noFields")}
         </p>
       )}
       {fields.map((field, index) => {
@@ -97,7 +100,7 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
           <div key={index} className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <Input
-                placeholder="Name"
+                placeholder={t("pages.schemas.schemaDialog.fieldName")}
                 value={field.name}
                 onChange={(e) => updateField(index, { name: e.target.value })}
                 className={cn(
@@ -106,12 +109,12 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
               />
               {isInvalidName && (
                 <p className="text-xs text-destructive mt-1">
-                  Letters, digits, and underscores only
+                  {t("pages.schemas.schemaDialog.nameValidation")}
                 </p>
               )}
             </div>
             <Input
-              placeholder="Label"
+              placeholder={t("pages.schemas.schemaDialog.fieldLabel")}
               value={field.label ?? ""}
               onChange={(e) =>
                 updateField(index, {
@@ -121,7 +124,7 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
               className="flex-1 min-w-0"
             />
             <Input
-              placeholder="Default value"
+              placeholder={t("pages.schemas.schemaDialog.defaultValue")}
               value={field.defaultValue ?? ""}
               onChange={(e) =>
                 updateField(index, {
@@ -189,8 +192,8 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                 </TooltipTrigger>
                 <TooltipContent>
                   {field.primaryKey
-                    ? "Remove primary key"
-                    : "Set as primary key"}
+                    ? t("pages.schemas.schemaDialog.removePrimaryKey")
+                    : t("pages.schemas.schemaDialog.setPrimaryKey")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -221,8 +224,8 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                 </TooltipTrigger>
                 <TooltipContent>
                   {field.autoIncrement
-                    ? "Remove autoincrement"
-                    : "Set as autoincrement"}
+                    ? t("pages.schemas.schemaDialog.removeAutoincrement")
+                    : t("pages.schemas.schemaDialog.setAutoincrement")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -252,7 +255,9 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {field.unique ? "Remove unique constraint" : "Set as unique"}
+                  {field.unique
+                    ? t("pages.schemas.schemaDialog.removeUnique")
+                    : t("pages.schemas.schemaDialog.setUnique")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -281,7 +286,9 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {field.required ? "Set as optional" : "Set as required"}
+                  {field.required
+                    ? t("pages.schemas.schemaDialog.setOptional")
+                    : t("pages.schemas.schemaDialog.setRequired")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -310,8 +317,10 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                     </TooltipTrigger>
                     <TooltipContent>
                       {field.references
-                        ? `References ${field.references}`
-                        : "Set foreign key reference"}
+                        ? t("pages.schemas.schemaDialog.references", {
+                            name: field.references,
+                          })
+                        : t("pages.schemas.schemaDialog.setForeignKey")}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -326,7 +335,7 @@ function FieldEditor({ fields, onChange, schemas }: FieldEditorProps) {
                       updateField(index, { references: undefined })
                     }
                   >
-                    None
+                    {t("pages.schemas.schemaDialog.none")}
                   </button>
                   {schemas
                     .filter((s) => s.fields.some((f) => f.primaryKey))
@@ -387,6 +396,7 @@ export function SchemaDialog({
   title,
   submitLabel,
 }: SchemaDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [fields, setFields] = useState<Field[]>([]);
@@ -433,12 +443,12 @@ export function SchemaDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="schema-name">Name</Label>
+            <Label htmlFor="schema-name">{t("common.name")}</Label>
             <Input
               id="schema-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter schema name"
+              placeholder={t("pages.schemas.schemaDialog.namePlaceholder")}
               className={cn(
                 "mt-2",
                 name.trim().length > 0 &&
@@ -449,17 +459,19 @@ export function SchemaDialog({
             {name.trim().length > 0 &&
               !IDENTIFIER_PATTERN.test(name.trim()) && (
                 <p className="text-xs text-destructive mt-1">
-                  Letters, digits, and underscores only (e.g. my_schema)
+                  {t("pages.schemas.schemaDialog.nameValidationExample")}
                 </p>
               )}
           </div>
           <div>
-            <Label htmlFor="schema-description">Description</Label>
+            <Label htmlFor="schema-description">
+              {t("pages.schemas.schemaDialog.description")}
+            </Label>
             <Textarea
               id="schema-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
+              placeholder={t("pages.schemas.schemaDialog.descriptionPlaceholder")}
               className="mt-2"
               rows={2}
             />
@@ -472,7 +484,7 @@ export function SchemaDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting || !isValid}>
               {isSubmitting ? <Spinner className="h-4 w-4 mr-2" /> : null}

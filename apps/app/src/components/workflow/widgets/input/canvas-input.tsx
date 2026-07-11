@@ -3,6 +3,7 @@ import Save from "lucide-react/icons/save";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference, useObjectService } from "@/services/object-service";
 
 import type { BaseWidgetProps } from "../widget";
@@ -33,6 +34,7 @@ function CanvasDoodleWidget({
   onChange,
   disabled = false,
 }: CanvasDoodleWidgetProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -103,7 +105,10 @@ function CanvasDoodleWidget({
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))),
+          (b) =>
+            b
+              ? resolve(b)
+              : reject(new Error(t("workflow.widgets.canvas.createBlobFailed"))),
           "image/png",
           1.0
         );
@@ -207,7 +212,7 @@ function CanvasDoodleWidget({
             onClick={handleClear}
             className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
             disabled={isUploading || disabled}
-            aria-label="Clear"
+            aria-label={t("workflow.widgets.canvas.clear")}
           >
             <Trash2 className="size-3!" />
           </button>
@@ -215,7 +220,7 @@ function CanvasDoodleWidget({
             onClick={saveCanvas}
             className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
             disabled={isUploading || disabled}
-            aria-label="Save"
+            aria-label={t("workflow.widgets.canvas.save")}
           >
             <Save className="size-3!" />
           </button>

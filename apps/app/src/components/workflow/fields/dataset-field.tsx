@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ export function DatasetField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { datasets, isDatasetsLoading } = useDatasets();
 
   const stringValue = String(value ?? "");
@@ -28,9 +30,15 @@ export function DatasetField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No dataset"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.dataset.none")
+              }
             >
-              {connected ? "Connected" : label || "No dataset"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.dataset.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -49,12 +57,12 @@ export function DatasetField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isDatasetsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : datasets?.length === 0
-                    ? "No datasets"
-                    : "Select dataset"
+                    ? t("workflow.fields.dataset.empty")
+                    : t("workflow.fields.dataset.select")
             }
           />
         </SelectTrigger>

@@ -23,6 +23,7 @@ import {
   getSchemas,
   updateSchemaRecord,
 } from "../db";
+import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 
 const identifierMessage =
   "Must start with a letter or underscore, and contain only letters, digits, or underscores";
@@ -57,6 +58,7 @@ const autoIncrementValid = (fields: z.infer<typeof fieldSchema>[]) => {
 const schemaRoutes = new Hono<ApiContext>();
 
 schemaRoutes.use("*", jwtMiddleware);
+schemaRoutes.use("*", createRequireFeatureMiddleware("schemas"));
 
 function toSchemaEntity(row: {
   id: string;

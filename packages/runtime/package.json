@@ -6,7 +6,10 @@
     ".": "./src/index.ts",
     "./specification": "./src/specification/index.ts",
     "./specification/test-nodes": "./src/specification/multi-step-test-nodes.ts",
+    "./ai-interface/*": "./src/ai-interface/*.ts",
     "./nodes/*": "./src/nodes/*.ts",
+    "./heartbeat/*": "./src/heartbeat/*.ts",
+    "./upstream/*": "./src/upstream/*.ts",
     "./utils/*": "./src/utils/*.ts",
     "./node-utils": "./src/node-utils.ts"
   },

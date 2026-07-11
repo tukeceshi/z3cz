@@ -2,6 +2,7 @@ import type {
   Parameter,
   Edge as WorkflowBackendEdge,
   Node as WorkflowBackendNode,
+  WorkflowBillingMode,
   WorkflowExecution,
   WorkflowRuntime,
   WorkflowTrigger,
@@ -106,8 +107,10 @@ export function useEditableWorkflow({
     id: string;
     name: string;
     description?: string;
+    schemeId: string;
     trigger: string;
     runtime?: WorkflowRuntime;
+    billingMode?: WorkflowBillingMode;
   } | null>(null);
 
   const { organization } = useAuth();
@@ -201,8 +204,10 @@ export function useEditableWorkflow({
       id: fallback.id,
       name: fallback.name || "",
       description: fallback.description,
+      schemeId: fallback.schemeId,
       trigger: fallback.trigger || "manual",
       runtime: fallback.runtime as WorkflowRuntime | undefined,
+      billingMode: fallback.billingMode ?? "platform",
     });
     nodesRef.current = reactFlowNodes;
     edgesRef.current = reactFlowEdges;
@@ -255,8 +260,10 @@ export function useEditableWorkflow({
             id: state.id,
             name: state.name || "",
             description: state.description,
+            schemeId: state.schemeId,
             trigger: state.trigger,
             runtime: state.runtime as WorkflowRuntime | undefined,
+            billingMode: state.billingMode ?? "platform",
           });
         }
 
@@ -424,6 +431,7 @@ export function useEditableWorkflow({
       description?: string;
       trigger?: WorkflowTrigger;
       runtime?: WorkflowRuntime;
+      billingMode?: WorkflowBillingMode;
     }) => {
       if (!wsRef.current?.isConnected()) {
         console.warn("WebSocket is not connected, cannot update metadata");
@@ -442,6 +450,9 @@ export function useEditableWorkflow({
           }),
           ...(metadata.trigger !== undefined && { trigger: metadata.trigger }),
           ...(metadata.runtime !== undefined && { runtime: metadata.runtime }),
+          ...(metadata.billingMode !== undefined && {
+            billingMode: metadata.billingMode,
+          }),
         };
       });
     },

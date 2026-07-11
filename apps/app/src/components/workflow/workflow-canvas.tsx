@@ -2,6 +2,7 @@ import "@xyflow/react/dist/style.css";
 
 import type {
   IsValidConnection,
+  NodeChange,
   OnConnect,
   OnConnectEnd,
   OnConnectStart,
@@ -12,16 +13,19 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import {
+  applyNodeChanges,
   Background,
   BackgroundVariant,
   ConnectionMode,
   Controls,
   ReactFlow,
 } from "@xyflow/react";
-import { PanelRightClose, PanelRightOpen, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import Bot from "lucide-react/icons/bot";
 import ClipboardPaste from "lucide-react/icons/clipboard-paste";
 import Clock from "lucide-react/icons/clock";
 import Copy from "lucide-react/icons/copy";
+import Image from "lucide-react/icons/image";
 import Layers2 from "lucide-react/icons/layers-2";
 import Maximize from "lucide-react/icons/maximize";
 import Network from "lucide-react/icons/network";
@@ -29,11 +33,15 @@ import Play from "lucide-react/icons/play";
 import Scissors from "lucide-react/icons/scissors";
 import Square from "lucide-react/icons/square";
 import Trash2 from "lucide-react/icons/trash-2";
+import Type from "lucide-react/icons/type";
+import Video from "lucide-react/icons/video";
 import X from "lucide-react/icons/x";
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useTranslation } from "@/components/locale-provider";
+import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey, getModifierSymbol } from "@/utils/utils";
 
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
@@ -62,50 +70,55 @@ interface StatusBarProps {
 }
 
 function StatusBar({ workflowStatus, errorMessage }: StatusBarProps) {
-  const statusConfig = {
+  const { t } = useTranslation();
+
+  const statusStyles: Record<
+    WorkflowExecutionStatus,
+    { color: string; bg: string; labelKey: TranslationKey }
+  > = {
     idle: {
       color: "text-neutral-600 dark:text-neutral-400",
       bg: "bg-neutral-200 dark:bg-neutral-700",
-      label: "Idle",
+      labelKey: "workflow.status.idle",
     },
     submitted: {
       color: "text-orange-600 dark:text-orange-400",
       bg: "bg-orange-200 dark:bg-orange-900/50",
-      label: "Submitted",
+      labelKey: "workflow.status.submitted",
     },
     executing: {
       color: "text-yellow-600 dark:text-yellow-400",
       bg: "bg-yellow-400 dark:bg-yellow-500",
-      label: "Executing",
+      labelKey: "workflow.status.executing",
     },
     completed: {
       color: "text-green-600 dark:text-green-400",
       bg: "bg-green-200 dark:bg-green-900/50",
-      label: "Completed",
+      labelKey: "workflow.status.completed",
     },
     error: {
       color: "text-red-600 dark:text-red-400",
       bg: "bg-red-200 dark:bg-red-900/50",
-      label: "Error",
+      labelKey: "workflow.status.error",
     },
     cancelled: {
       color: "text-neutral-600 dark:text-neutral-400",
       bg: "bg-neutral-200 dark:bg-neutral-700",
-      label: "Cancelled",
+      labelKey: "workflow.status.cancelled",
     },
     paused: {
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-200 dark:bg-blue-900/50",
-      label: "Paused",
+      labelKey: "workflow.status.paused",
     },
     exhausted: {
       color: "text-red-600 dark:text-red-400",
       bg: "bg-red-200 dark:bg-red-900/50",
-      label: "Exhausted",
+      labelKey: "workflow.status.exhausted",
     },
   };
 
-  const config = statusConfig[workflowStatus] || statusConfig.idle;
+  const config = statusStyles[workflowStatus] || statusStyles.idle;
 
   return (
     <div className="absolute bottom-4 left-4 flex items-center gap-3 z-50">
@@ -115,7 +128,7 @@ function StatusBar({ workflowStatus, errorMessage }: StatusBarProps) {
             <div className={cn("w-full h-full rounded-full")} />
           </div>
           <span className={cn("text-sm font-medium", config.color)}>
-            {config.label}
+            {t(config.labelKey)}
           </span>
         </div>
 
@@ -146,6 +159,7 @@ export interface WorkflowCanvasProps {
     event: React.MouseEvent,
     node: ReactFlowNode<WorkflowNodeType>
   ) => void;
+  isDraggingRef?: React.RefObject<boolean>;
   onNodeDoubleClick?: (event: React.MouseEvent) => void;
   onInit: (
     instance: ReactFlowInstance<
@@ -154,6 +168,7 @@ export interface WorkflowCanvasProps {
     >
   ) => void;
   onAddNode?: () => void;
+  onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video") => void;
   onAction?: (e: React.MouseEvent) => void;
   workflowStatus?: WorkflowExecutionStatus;
   workflowErrorMessage?: string;
@@ -194,49 +209,50 @@ export function ActionButton({
   text = "",
   showTooltip = true,
 }: ActionButtonProps) {
+  const { t } = useTranslation();
   const modifierSymbol = getModifierSymbol();
   const shortcut = `${modifierSymbol}⏎`;
 
   const statusConfig = {
     idle: {
       icon: <Play className="size-4!" />,
-      title: "Execute Workflow",
+      titleKey: "workflow.canvas.execute" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-green-500 hover:text-green-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-green-400 dark:hover:text-green-300",
     },
     submitted: {
       icon: <Square className="size-4!" />,
-      title: "Stop Execution",
+      titleKey: "workflow.canvas.stopExecution" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-red-500 hover:text-red-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-red-400 dark:hover:text-red-300",
     },
     executing: {
       icon: <Square className="size-4!" />,
-      title: "Stop Execution",
+      titleKey: "workflow.canvas.stopExecution" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-red-500 hover:text-red-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-red-400 dark:hover:text-red-300",
     },
     completed: {
       icon: <X className="size-4!" />,
-      title: "Clear Outputs & Reset",
+      titleKey: "workflow.canvas.clearOutputs" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
     },
     error: {
       icon: <X className="size-4!" />,
-      title: "Clear Errors & Reset",
+      titleKey: "workflow.canvas.clearErrors" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
     },
     cancelled: {
       icon: <X className="size-4!" />,
-      title: "Clear Outputs & Reset",
+      titleKey: "workflow.canvas.clearOutputs" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
     },
     paused: {
       icon: <Play className="size-4!" />,
-      title: "Resume Workflow",
+      titleKey: "workflow.canvas.resume" as TranslationKey,
       className:
         "bg-white hover:bg-neutral-50 text-sky-500 hover:text-sky-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-sky-400 dark:hover:text-sky-300",
     },
@@ -254,7 +270,7 @@ export function ActionButton({
       tooltip={
         showTooltip && (
           <div className="flex items-center gap-2">
-            <span>{config.title}</span>
+            <span>{t(config.titleKey)}</span>
             <div className="flex items-center gap-1">
               {shortcut.split("").map((key, index) => (
                 <kbd
@@ -281,18 +297,18 @@ interface SidebarToggleProps {
 }
 
 function SidebarToggle({ onClick, isSidebarVisible }: SidebarToggleProps) {
+  const { t } = useTranslation();
   return (
     <ActionBarButton
       onClick={onClick}
       tooltipSide="bottom"
-      tooltip={isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"}
+      tooltip={
+        isSidebarVisible ? t("workflow.canvas.hideAgent") : t("workflow.canvas.showAgent")
+      }
       className={actionBarButtonOutlineClassName}
     >
-      {isSidebarVisible ? (
-        <PanelRightClose className="size-4!" />
-      ) : (
-        <PanelRightOpen className="size-4!" />
-      )}
+      <Bot className="size-4!" />
+      <span className="text-sm font-medium">{t("workflow.canvas.agent")}</span>
     </ActionBarButton>
   );
 }
@@ -302,12 +318,13 @@ function FitToScreenButton({
 }: {
   onClick: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <ActionBarButton
       onClick={onClick}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
-      tooltip="Fit to Screen"
+      tooltipSide="top"
+      tooltip={t("workflow.canvas.fitToScreen")}
     >
       <Maximize className="size-4!" />
     </ActionBarButton>
@@ -321,15 +338,16 @@ function DeleteButton({
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
+      tooltipSide="top"
       tooltip={
         <div className="flex items-center gap-2">
-          <span>Delete</span>
+          <span>{t("workflow.canvas.delete")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
               ⌫
@@ -350,16 +368,17 @@ function DuplicateButton({
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const modifierKey = getModifierKey();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
+      tooltipSide="top"
       tooltip={
         <div className="flex items-center gap-2">
-          <span>Duplicate</span>
+          <span>{t("workflow.canvas.duplicate")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
               {modifierKey}
@@ -383,13 +402,14 @@ function ApplyLayoutButton({
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
-      tooltip={<p>Reorganize Layout</p>}
+      tooltipSide="top"
+      tooltip={<p>{t("workflow.canvas.reorganizeLayout")}</p>}
     >
       <Network className="size-4!" />
     </ActionBarButton>
@@ -403,18 +423,43 @@ function AddNodeButton({
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
-      tooltip="Add Node"
+      tooltip={t("workflow.canvas.addNode")}
       className={cn(
         actionBarButtonOutlineClassName,
         "size-10 p-0! text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
       )}
-      tooltipSide="right"
+      tooltipSide="top"
     >
       <Plus className="size-5!" />
+    </ActionBarButton>
+  );
+}
+
+function QuickAddAiNodeButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <ActionBarButton
+      onClick={onClick}
+      disabled={disabled}
+      tooltip={label}
+      className={actionBarButtonOutlineClassName}
+      tooltipSide="top"
+    >
+      {icon}
     </ActionBarButton>
   );
 }
@@ -424,7 +469,7 @@ export function SetScheduleButton({
   disabled,
   className = "",
   text = "",
-  tooltip = "Set Schedule",
+  tooltip,
 }: {
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
@@ -432,13 +477,15 @@ export function SetScheduleButton({
   text?: string;
   tooltip?: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={cn(actionBarButtonOutlineClassName, className)}
       tooltipSide="bottom"
-      tooltip={tooltip}
+      tooltip={tooltip ?? t("workflow.canvas.setSchedule")}
     >
       <Clock className="size-4!" />
       {text}
@@ -453,16 +500,17 @@ function CopyButton({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const modifierKey = getModifierKey();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
+      tooltipSide="top"
       tooltip={
         <div className="flex items-center gap-2">
-          <span>Copy</span>
+          <span>{t("workflow.canvas.copy")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
               {modifierKey}
@@ -486,16 +534,17 @@ function CutButton({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const modifierKey = getModifierKey();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
+      tooltipSide="top"
       tooltip={
         <div className="flex items-center gap-2">
-          <span>Cut</span>
+          <span>{t("workflow.canvas.cut")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
               {modifierKey}
@@ -519,16 +568,17 @@ function PasteButton({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const modifierKey = getModifierKey();
   return (
     <ActionBarButton
       onClick={onClick}
       disabled={disabled}
       className={actionBarButtonOutlineClassName}
-      tooltipSide="right"
+      tooltipSide="top"
       tooltip={
         <div className="flex items-center gap-2">
-          <span>Paste</span>
+          <span>{t("workflow.canvas.paste")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
               {modifierKey}
@@ -556,8 +606,10 @@ export function WorkflowCanvas({
   onNodeDoubleClick,
   onNodeDragStart,
   onNodeDragStop,
+  isDraggingRef,
   onInit,
   onAddNode,
+  onQuickAddAiNode,
   onAction,
   workflowStatus = "idle",
   workflowErrorMessage,
@@ -579,6 +631,26 @@ export function WorkflowCanvas({
   showBackground = true,
   fitViewPadding = 0.25,
 }: WorkflowCanvasProps) {
+  const { t } = useTranslation();
+  const [displayNodes, setDisplayNodes] =
+    useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
+
+  useEffect(() => {
+    if (!isDraggingRef?.current) {
+      setDisplayNodes(nodes);
+    }
+  }, [nodes, isDraggingRef]);
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<ReactFlowNode<WorkflowNodeType>>[]) => {
+      if (isDraggingRef?.current) {
+        setDisplayNodes((current) => applyNodeChanges(changes, current));
+      }
+      onNodesChange(changes);
+    },
+    [onNodesChange, isDraggingRef]
+  );
+
   // Get selected elements for button states
   const hasSelectedElements =
     selectedNodes.length > 0 || selectedEdges.length > 0;
@@ -588,9 +660,9 @@ export function WorkflowCanvas({
     <TooltipProvider>
       <div className="h-full w-full min-h-0">
         <ReactFlow
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectStart={onConnectStart}
@@ -617,6 +689,7 @@ export function WorkflowCanvas({
           showBackground && "bg-neutral-100/50",
           disabled && "cursor-default"
         )}
+        onlyRenderVisibleElements
         nodesDraggable={!disabled && showControls}
         nodesConnectable={!disabled && showControls}
         elementsSelectable={showControls}
@@ -686,60 +759,64 @@ export function WorkflowCanvas({
           )}
 
         {showControls && (
-          <div
-            className={cn(
-              "absolute top-4 left-4 z-50 flex flex-col items-center gap-2"
-            )}
-          >
-            {/* Node-related buttons group */}
-            <ActionBarGroup vertical>
-              {onAddNode && (
-                <AddNodeButton onClick={onAddNode} disabled={disabled} />
+          <div className="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-row items-center gap-2">
+            <ActionBarGroup>
+              {onAddNode && <AddNodeButton onClick={onAddNode} disabled={disabled} />}
+              {onQuickAddAiNode && (
+                <>
+                  <QuickAddAiNodeButton
+                    label={t("workflow.canvas.aiText")}
+                    icon={<Type className="size-4!" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddAiNode("ai-text");
+                    }}
+                    disabled={disabled}
+                  />
+                  <QuickAddAiNodeButton
+                    label={t("workflow.canvas.aiImage")}
+                    icon={<Image className="size-4!" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddAiNode("ai-image");
+                    }}
+                    disabled={disabled}
+                  />
+                  <QuickAddAiNodeButton
+                    label={t("workflow.canvas.aiVideo")}
+                    icon={<Video className="size-4!" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddAiNode("ai-video");
+                    }}
+                    disabled={disabled}
+                  />
+                </>
               )}
             </ActionBarGroup>
 
-            {/* Edit operations group */}
-            <ActionBarGroup vertical>
+            <ActionBarGroup>
               {onCopySelected && (
-                <CopyButton
-                  onClick={onCopySelected}
-                  disabled={disabled || !hasSelectedNodes}
-                />
+                <CopyButton onClick={onCopySelected} disabled={disabled || !hasSelectedNodes} />
               )}
               {onCutSelected && (
-                <CutButton
-                  onClick={onCutSelected}
-                  disabled={disabled || !hasSelectedNodes}
-                />
+                <CutButton onClick={onCutSelected} disabled={disabled || !hasSelectedNodes} />
               )}
               {onPasteFromClipboard && (
-                <PasteButton
-                  onClick={onPasteFromClipboard}
-                  disabled={disabled || !hasClipboardData}
-                />
+                <PasteButton onClick={onPasteFromClipboard} disabled={disabled || !hasClipboardData} />
               )}
               {onDuplicateSelected && (
-                <DuplicateButton
-                  onClick={onDuplicateSelected}
-                  disabled={disabled || !hasSelectedNodes}
-                />
+                <DuplicateButton onClick={onDuplicateSelected} disabled={disabled || !hasSelectedNodes} />
               )}
               {onDeleteSelected && (
-                <DeleteButton
-                  onClick={onDeleteSelected}
-                  disabled={disabled || !hasSelectedElements}
-                />
+                <DeleteButton onClick={onDeleteSelected} disabled={disabled || !hasSelectedElements} />
               )}
             </ActionBarGroup>
 
-            {/* Workflow-related buttons group - hidden in read-only mode */}
             {!disabled && (onApplyLayout || onFitToScreen) && (
-              <ActionBarGroup vertical>
+              <ActionBarGroup>
                 {onApplyLayout && (
-                  <ApplyLayoutButton
-                    onClick={() => onApplyLayout()}
-                    disabled={disabled || nodes.length === 0}
-                  />
+                  <ApplyLayoutButton onClick={() => onApplyLayout()} disabled={disabled || nodes.length === 0} />
                 )}
                 {onFitToScreen && <FitToScreenButton onClick={onFitToScreen} />}
               </ActionBarGroup>

@@ -4,6 +4,7 @@ import RotateCw from "lucide-react/icons/rotate-cw";
 import { useCallback, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { SchemaDialog } from "@/components/schema-dialog";
 import {
   AlertDialog,
@@ -71,6 +72,7 @@ function SchemaComposeInputWidget({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { schemas, isSchemasLoading, mutateSchemas } = useSchemas();
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   const applySchema = useCallback(
@@ -206,10 +208,10 @@ function SchemaComposeInputWidget({
             <SelectValue
               placeholder={
                 isLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : schemas?.length === 0
-                    ? "No schemas"
-                    : "Select schema"
+                    ? t("workflow.widgets.schema.noSchemas")
+                    : t("workflow.widgets.schema.selectSchema")
               }
             >
               {selectedName}
@@ -223,7 +225,7 @@ function SchemaComposeInputWidget({
             ))}
             <SelectSeparator />
             <SelectItem value={CREATE_NEW} className="text-xs">
-              + New Schema
+              {t("workflow.widgets.schema.newSchema")}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -232,7 +234,9 @@ function SchemaComposeInputWidget({
           onClick={handleReload}
           disabled={disabled || isLoading || !schemaId}
           title={
-            isStale ? "Schema changed — reload to sync inputs" : "Reload schema"
+            isStale
+              ? t("workflow.widgets.schema.reloadStaleInputs")
+              : t("workflow.widgets.schema.reload")
           }
           className={cn("h-auto px-2 shrink-0", isStale && "border-amber-500")}
         >
@@ -248,23 +252,22 @@ function SchemaComposeInputWidget({
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onSubmit={handleCreate}
-        title="Create New Schema"
-        submitLabel="Create Schema"
+        title={t("pages.schemas.createDialogTitle")}
+        submitLabel={t("pages.schemas.createSchema")}
       />
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.schema.reloadTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will rebuild the inputs from the schema and remove all
-              connected edges. This action cannot be undone.
+              {t("workflow.widgets.schema.reloadInputsDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

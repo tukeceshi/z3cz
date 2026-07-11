@@ -7,13 +7,13 @@ import PenSquare from "lucide-react/icons/pen-square";
 import Sparkles from "lucide-react/icons/sparkles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { toast } from "sonner";
 import { OnboardingFunnel } from "@/components/admin/onboarding-funnel";
 import { RoleBadge } from "@/components/admin/role-badge";
 import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import {
   AlertDialog,
@@ -49,6 +49,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useAppToast } from "@/hooks/use-app-toast";
+import type { TranslateFn } from "@/i18n";
 import {
   type AdminOnboardingDraft,
   type AdminThreadSummary,
@@ -64,11 +66,11 @@ import {
 } from "@/services/admin-service";
 import { formatDate } from "@/utils/date";
 
-function createThreadColumns(): ColumnDef<AdminThreadSummary>[] {
+function createThreadColumns(t: TranslateFn): ColumnDef<AdminThreadSummary>[] {
   return [
     {
       accessorKey: "subject",
-      header: "Subject",
+      header: t("admin.support.subject"),
       cell: ({ row }) => {
         const thread = row.original;
         const href = `/admin/support?userId=${encodeURIComponent(thread.userId ?? "")}&threadId=${thread.id}`;
@@ -77,15 +79,15 @@ function createThreadColumns(): ColumnDef<AdminThreadSummary>[] {
             {thread.unread && (
               <span
                 className="h-2 w-2 rounded-full bg-blue-600 shrink-0"
-                aria-label="Unread"
+                aria-label={t("admin.support.unread")}
               />
             )}
             <Link
               to={href}
               className="font-medium hover:underline truncate"
-              title={thread.subject || "(no subject)"}
+              title={thread.subject || t("admin.support.noSubject")}
             >
-              {thread.subject || "(no subject)"}
+              {thread.subject || t("admin.support.noSubject")}
             </Link>
           </div>
         );
@@ -93,20 +95,20 @@ function createThreadColumns(): ColumnDef<AdminThreadSummary>[] {
     },
     {
       accessorKey: "archivedAt",
-      header: "Status",
+      header: t("admin.support.status"),
       cell: ({ row }) =>
         row.original.archivedAt ? (
           <Badge variant="secondary" className="gap-1">
             <Archive className="h-3 w-3" />
-            Archived
+            {t("admin.support.archived")}
           </Badge>
         ) : (
-          <Badge variant="outline">Open</Badge>
+          <Badge variant="outline">{t("admin.support.open")}</Badge>
         ),
     },
     {
       accessorKey: "lastMessageAt",
-      header: "Last message",
+      header: t("admin.support.lastMessage"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.lastMessageAt)}
@@ -117,12 +119,13 @@ function createThreadColumns(): ColumnDef<AdminThreadSummary>[] {
 }
 
 function createMembershipColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminUserMembership>[] {
   return [
     {
       accessorKey: "organizationName",
-      header: "Organization",
+      header: t("admin.common.organization"),
       cell: ({ row }) => (
         <Link
           to={`/admin/organizations/${row.original.organizationId}`}
@@ -134,12 +137,12 @@ function createMembershipColumns(
     },
     {
       accessorKey: "role",
-      header: "Role",
+      header: t("admin.common.role"),
       cell: ({ row }) => <RoleBadge role={row.original.role} />,
     },
     {
       accessorKey: "joinedAt",
-      header: "Joined",
+      header: t("admin.userDetail.joined"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.joinedAt)}
@@ -155,7 +158,7 @@ function createMembershipColumns(
               navigate(`/admin/organizations/${row.original.organizationId}`)
             }
           >
-            View organization
+            {t("admin.userDetail.viewOrganization")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -178,6 +181,8 @@ export function AdminUserDetailPage() {
     isThreadsLoading: isRecentThreadsLoading,
   } = useAdminSupportThreads(1, 5, "all", undefined, userId);
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const [resendOpen, setResendOpen] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -195,10 +200,10 @@ export function AdminUserDetailPage() {
   const autoOpenAttemptedRef = useRef(false);
 
   const membershipColumns = useMemo(
-    () => createMembershipColumns(navigate),
-    [navigate]
+    () => createMembershipColumns(navigate, t),
+    [navigate, t]
   );
-  const threadColumns = useMemo(() => createThreadColumns(), []);
+  const threadColumns = useMemo(() => createThreadColumns(t), [t]);
   const supportFilterHref = userId
     ? `/admin/support?userId=${encodeURIComponent(userId)}`
     : "/admin/support";
@@ -208,11 +213,11 @@ export function AdminUserDetailPage() {
     setIsResending(true);
     try {
       await resendAdminUserWelcomeEmail(userId);
-      toast.success("Welcome email sent");
+      appToast.success("admin.userDetail.welcomeSent");
       setResendOpen(false);
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Failed to send welcome email"
+      appToast.errorRaw(
+        e instanceof Error ? e.message : t("admin.userDetail.welcomeSendFailed")
       );
     } finally {
       setIsResending(false);
@@ -237,7 +242,9 @@ export function AdminUserDetailPage() {
       setDraftBody(result.draft.body);
     } catch (e) {
       if (requestId !== draftRequestIdRef.current) return;
-      toast.error(e instanceof Error ? e.message : "Failed to draft message");
+      appToast.errorRaw(
+        e instanceof Error ? e.message : t("admin.userDetail.draftFailed")
+      );
       setDraftOpen(false);
     } finally {
       if (requestId === draftRequestIdRef.current) {
@@ -257,10 +264,12 @@ export function AdminUserDetailPage() {
         includeTemplateLink:
           Boolean(draft.suggestedTemplate) && includeTemplateLink,
       });
-      toast.success("Onboarding message sent");
+      appToast.success("admin.userDetail.messageSent");
       setDraftOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to send message");
+      appToast.errorRaw(
+        e instanceof Error ? e.message : t("admin.userDetail.messageSendFailed")
+      );
     } finally {
       setIsSending(false);
     }
@@ -286,22 +295,32 @@ export function AdminUserDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Users", to: "/admin/users" },
-      { label: user?.name || "User Details" },
+      { label: t("sidebar.users"), to: "/admin/users" },
+      { label: user?.name || t("admin.userDetail.title") },
     ]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs, user?.name]);
+  }, [setBreadcrumbs, t, user?.name]);
 
   if (isUserLoading) {
-    return <InsetLoading title="User Details" />;
+    return <InsetLoading title={t("admin.userDetail.title")} />;
   }
 
   if (userError) {
-    return <InsetError title="User Details" errorMessage={userError.message} />;
+    return (
+      <InsetError
+        title={t("admin.userDetail.title")}
+        errorMessage={userError.message}
+      />
+    );
   }
 
   if (!user) {
-    return <InsetError title="User Details" errorMessage="User not found" />;
+    return (
+      <InsetError
+        title={t("admin.userDetail.title")}
+        errorMessage={t("admin.userDetail.notFound")}
+      />
+    );
   }
 
   const hasEmail = Boolean(user.email);
@@ -310,48 +329,48 @@ export function AdminUserDetailPage() {
     : "/admin/support";
 
   return (
-    <InsetLayout title="User Details">
+    <InsetLayout title={t("admin.userDetail.title")}>
       <div className="flex flex-wrap gap-2 mb-6">
         <Button
           variant="outline"
           onClick={openDraft}
           disabled={!hasEmail || isDrafting}
-          title={hasEmail ? undefined : "User has no email on file"}
+          title={hasEmail ? undefined : t("admin.userDetail.noEmailHint")}
         >
           <Sparkles className="h-4 w-4 mr-2" />
-          Draft personalized message
+          {t("admin.userDetail.draftMessage")}
         </Button>
         <Button
           variant="outline"
           onClick={() => setResendOpen(true)}
           disabled={!hasEmail}
-          title={hasEmail ? undefined : "User has no email on file"}
+          title={hasEmail ? undefined : t("admin.userDetail.noEmailHint")}
         >
           <Mail className="h-4 w-4 mr-2" />
-          Resend welcome email
+          {t("admin.userDetail.resendWelcome")}
         </Button>
         <Button
           variant="outline"
           asChild={hasEmail}
           disabled={!hasEmail}
-          title={hasEmail ? undefined : "User has no email on file"}
+          title={hasEmail ? undefined : t("admin.userDetail.noEmailHint")}
         >
           {hasEmail ? (
             <Link to={composeHref}>
               <PenSquare className="h-4 w-4 mr-2" />
-              Start new thread
+              {t("admin.userDetail.startThread")}
             </Link>
           ) : (
             <span>
               <PenSquare className="h-4 w-4 mr-2" />
-              Start new thread
+              {t("admin.userDetail.startThread")}
             </span>
           )}
         </Button>
         <Button variant="outline" asChild>
           <Link to={supportFilterHref}>
             <Inbox className="h-4 w-4 mr-2" />
-            View support threads
+            {t("admin.userDetail.viewThreads")}
           </Link>
         </Button>
       </div>
@@ -359,25 +378,22 @@ export function AdminUserDetailPage() {
       <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Draft personalized onboarding message</DialogTitle>
+            <DialogTitle>{t("admin.userDetail.draftTitle")}</DialogTitle>
             <DialogDescription>
-              Workers AI drafts a message from the user's funnel stage, recent
-              errors, and the workflows they tried. Edit before sending — the
-              email opens a new support thread, so any reply will land in
-              /admin/support.
+              {t("admin.userDetail.draftDescription")}
             </DialogDescription>
           </DialogHeader>
 
           {isDrafting && (
             <p className="text-sm text-muted-foreground">
-              Drafting with Workers AI…
+              {t("admin.userDetail.drafting")}
             </p>
           )}
 
           {!isDrafting && draft && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="draft-subject">Subject</Label>
+                <Label htmlFor="draft-subject">{t("admin.userDetail.subject")}</Label>
                 <Input
                   id="draft-subject"
                   value={draftSubject}
@@ -385,7 +401,7 @@ export function AdminUserDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="draft-body">Message</Label>
+                <Label htmlFor="draft-body">{t("admin.userDetail.message")}</Label>
                 <Textarea
                   id="draft-body"
                   rows={12}
@@ -399,7 +415,9 @@ export function AdminUserDetailPage() {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <div className="text-sm font-medium">
-                        Suggested template: {draft.suggestedTemplate.name}
+                        {t("admin.userDetail.suggestedTemplate", {
+                          name: draft.suggestedTemplate.name,
+                        })}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {draft.suggestedTemplate.description}
@@ -415,7 +433,7 @@ export function AdminUserDetailPage() {
                         htmlFor="include-template"
                         className="text-xs cursor-pointer"
                       >
-                        Include link
+                        {t("admin.userDetail.includeLink")}
                       </Label>
                     </div>
                   </div>
@@ -424,28 +442,29 @@ export function AdminUserDetailPage() {
 
               <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-1">
                 <div className="font-medium text-foreground">
-                  What the model saw
+                  {t("admin.userDetail.modelContext")}
                 </div>
                 <div>
-                  {draft.context.isDormant ? "Dormant" : "Stuck"} at{" "}
-                  <span className="font-medium">
-                    {draft.context.furthestStage}
-                  </span>{" "}
-                  for {draft.context.daysSinceAdvance} day
-                  {draft.context.daysSinceAdvance === 1 ? "" : "s"}.
+                  {t("admin.userDetail.stuckAt", {
+                    status: draft.context.isDormant
+                      ? t("admin.userDetail.dormant")
+                      : t("admin.userDetail.stuck"),
+                    stage: draft.context.furthestStage,
+                    days: draft.context.daysSinceAdvance,
+                  })}
                 </div>
                 {draft.context.orgWorkflowNames.length > 0 && (
                   <div>
-                    Workflows in workspace (may be teammates'):{" "}
-                    {draft.context.orgWorkflowNames.slice(0, 5).join(", ")}
+                    {t("admin.userDetail.orgWorkflows", {
+                      names: draft.context.orgWorkflowNames.slice(0, 5).join(", "),
+                    })}
                   </div>
                 )}
                 {draft.context.pastSupportMessages.length > 0 && (
                   <div>
-                    Past support: {draft.context.pastSupportMessages.length}{" "}
-                    message
-                    {draft.context.pastSupportMessages.length === 1 ? "" : "s"}{" "}
-                    considered.
+                    {t("admin.userDetail.pastSupport", {
+                      count: draft.context.pastSupportMessages.length,
+                    })}
                   </div>
                 )}
               </div>
@@ -458,7 +477,7 @@ export function AdminUserDetailPage() {
               onClick={() => setDraftOpen(false)}
               disabled={isSending}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={onSendDraft}
@@ -469,7 +488,7 @@ export function AdminUserDetailPage() {
                 !draftBody.trim()
               }
             >
-              {isSending ? "Sending…" : "Send"}
+              {isSending ? t("common.sending") : t("common.send")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -478,16 +497,17 @@ export function AdminUserDetailPage() {
       <AlertDialog open={resendOpen} onOpenChange={setResendOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Resend welcome email?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.userDetail.resendTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              A fresh support thread will be created and the welcome email sent
-              to <strong>{user.email}</strong>.
+              {t("admin.userDetail.resendDescription", { email: user.email ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isResending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction onClick={onConfirmResend} disabled={isResending}>
-              {isResending ? "Sending…" : "Send"}
+              {isResending ? t("common.sending") : t("common.send")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -506,7 +526,7 @@ export function AdminUserDetailPage() {
               <div>
                 <div>{user.name}</div>
                 <div className="text-sm font-normal text-muted-foreground">
-                  {user.email || "No email"}
+                  {user.email || t("common.noEmail")}
                 </div>
               </div>
             </CardTitle>
@@ -521,20 +541,28 @@ export function AdminUserDetailPage() {
               >
                 {user.role}
               </Badge>
-              {user.developerMode && <Badge variant="outline">Developer</Badge>}
+              {user.developerMode && (
+                <Badge variant="outline">{t("admin.userDetail.developer")}</Badge>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-muted-foreground">User ID</div>
+                <div className="text-muted-foreground">
+                  {t("admin.userDetail.userId")}
+                </div>
                 <div className="font-mono text-xs">{user.id}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">Created</div>
+                <div className="text-muted-foreground">
+                  {t("admin.common.created")}
+                </div>
                 <div>{formatDate(user.createdAt)}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">Updated</div>
+                <div className="text-muted-foreground">
+                  {t("admin.common.updated")}
+                </div>
                 <div>{formatDate(user.updatedAt)}</div>
               </div>
             </div>
@@ -543,17 +571,21 @@ export function AdminUserDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Authentication Providers</CardTitle>
-            <CardDescription>Connected authentication methods</CardDescription>
+            <CardTitle>{t("admin.userDetail.authProviders")}</CardTitle>
+            <CardDescription>
+              {t("admin.userDetail.authProvidersDesc")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
               <Github className="h-5 w-5" />
-              <span>GitHub</span>
+              <span>{t("admin.userDetail.github")}</span>
               {user.githubId ? (
-                <Badge variant="default">Connected</Badge>
+                <Badge variant="default">{t("admin.userDetail.connected")}</Badge>
               ) : (
-                <Badge variant="secondary">Not connected</Badge>
+                <Badge variant="secondary">
+                  {t("admin.userDetail.notConnected")}
+                </Badge>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -575,11 +607,13 @@ export function AdminUserDetailPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              <span>Google</span>
+              <span>{t("admin.userDetail.google")}</span>
               {user.googleId ? (
-                <Badge variant="default">Connected</Badge>
+                <Badge variant="default">{t("admin.userDetail.connected")}</Badge>
               ) : (
-                <Badge variant="secondary">Not connected</Badge>
+                <Badge variant="secondary">
+                  {t("admin.userDetail.notConnected")}
+                </Badge>
               )}
             </div>
           </CardContent>
@@ -588,9 +622,11 @@ export function AdminUserDetailPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Organization Memberships</CardTitle>
+          <CardTitle>{t("admin.userDetail.orgMemberships")}</CardTitle>
           <CardDescription>
-            Organizations this user belongs to ({memberships.length})
+            {t("admin.userDetail.orgMembershipsDesc", {
+              count: memberships.length,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -599,8 +635,8 @@ export function AdminUserDetailPage() {
             columns={membershipColumns}
             data={memberships}
             emptyState={{
-              title: "No organizations",
-              description: "This user is not a member of any organizations.",
+              title: t("admin.userDetail.noOrgs"),
+              description: t("admin.userDetail.noOrgsDesc"),
             }}
           />
         </CardContent>
@@ -611,8 +647,8 @@ export function AdminUserDetailPage() {
           return (
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Usage</CardTitle>
-                <CardDescription>Loading…</CardDescription>
+                <CardTitle>{t("admin.userDetail.usage")}</CardTitle>
+                <CardDescription>{t("common.loading")}</CardDescription>
               </CardHeader>
             </Card>
           );
@@ -633,22 +669,26 @@ export function AdminUserDetailPage() {
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                Usage
+                {t("admin.userDetail.usage")}
                 <Badge variant={isPro ? "default" : "secondary"}>
-                  {isPro ? "Early Adopter" : "Trial"}
+                  {isPro
+                    ? t("admin.userDetail.earlyAdopter")
+                    : t("admin.userDetail.trial")}
                 </Badge>
               </CardTitle>
               <CardDescription>
                 {isPro
-                  ? "Monthly credits reset each billing period"
-                  : "One-time credits for Trial accounts"}
+                  ? t("admin.userDetail.monthlyCreditsDesc")
+                  : t("admin.userDetail.trialCreditsDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">
-                    {isPro ? "Included Usage" : "Available Usage"}
+                    {isPro
+                      ? t("admin.userDetail.includedUsage")
+                      : t("admin.userDetail.availableUsage")}
                   </span>
                   <span>
                     {Math.min(
@@ -666,17 +706,21 @@ export function AdminUserDetailPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {usagePercent < 100
-                    ? `${(includedCredits - usageThisPeriod).toLocaleString()} remaining`
+                    ? t("admin.userDetail.remaining", {
+                        count: (includedCredits - usageThisPeriod).toLocaleString(),
+                      })
                     : isPro
-                      ? "Included usage exhausted"
-                      : "Usage exhausted"}
+                      ? t("admin.userDetail.includedExhausted")
+                      : t("admin.userDetail.usageExhausted")}
                 </p>
               </div>
 
               {isPro && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium">Additional Usage</span>
+                    <span className="font-medium">
+                      {t("admin.userDetail.additionalUsage")}
+                    </span>
                     <span>
                       {currentOverage.toLocaleString()}
                       {hasOverageLimit && ` / ${overageLimit.toLocaleString()}`}
@@ -697,11 +741,13 @@ export function AdminUserDetailPage() {
                   <p className="text-xs text-muted-foreground">
                     {currentOverage > 0
                       ? isOverageAtLimit
-                        ? "Limit reached - executions will be blocked"
-                        : "Billed at the end of the billing period"
+                        ? t("admin.userDetail.limitReached")
+                        : t("admin.userDetail.billedEndOfPeriod")
                       : hasOverageLimit
-                        ? `Limit: ${overageLimit.toLocaleString()} credits`
-                        : "No overage charges yet"}
+                        ? t("admin.userDetail.limitCredits", {
+                            count: overageLimit.toLocaleString(),
+                          })
+                        : t("admin.userDetail.noOverageYet")}
                   </p>
                 </div>
               )}
@@ -722,18 +768,20 @@ export function AdminUserDetailPage() {
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-start justify-between gap-2">
           <div>
-            <CardTitle>Recent Support Threads</CardTitle>
+            <CardTitle>{t("admin.userDetail.recentThreads")}</CardTitle>
             <CardDescription>
               {isRecentThreadsLoading
-                ? "Loading…"
+                ? t("common.loading")
                 : threadsPagination
-                  ? `${threadsPagination.total} total (including archived)`
-                  : "Including archived threads"}
+                  ? t("admin.userDetail.threadsTotal", {
+                      total: threadsPagination.total,
+                    })
+                  : t("admin.userDetail.threadsIncludingArchived")}
             </CardDescription>
           </div>
           {threadsPagination && threadsPagination.total > 0 && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={supportFilterHref}>View all</Link>
+              <Link to={supportFilterHref}>{t("admin.userDetail.viewAll")}</Link>
             </Button>
           )}
         </CardHeader>
@@ -743,8 +791,8 @@ export function AdminUserDetailPage() {
             columns={threadColumns}
             data={recentThreads}
             emptyState={{
-              title: "No support threads",
-              description: "This user has no support threads on file.",
+              title: t("admin.userDetail.noThreads"),
+              description: t("admin.userDetail.noThreadsDesc"),
             }}
           />
         </CardContent>

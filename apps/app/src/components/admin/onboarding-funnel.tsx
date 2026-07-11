@@ -1,6 +1,7 @@
 import CheckCircle2 from "lucide-react/icons/check-circle-2";
 import Circle from "lucide-react/icons/circle";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -10,11 +11,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getOnboardingStageLabel } from "@/i18n/admin-labels";
 import {
   type AdminUserExecutionsSummary,
   type AdminUserFunnel,
   type AdminUserFunnelStage,
-  ONBOARDING_STAGE_LABEL,
   ONBOARDING_STAGES,
   type OnboardingStage,
 } from "@/services/admin-service";
@@ -69,12 +70,16 @@ export function OnboardingFunnel({
   executionsSummary,
   isExecutionsSummaryLoading,
 }: OnboardingFunnelProps) {
+  const { t } = useTranslation();
+
   if (isFunnelLoading || !funnel) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Onboarding</CardTitle>
-          <CardDescription>Funnel progress for this user.</CardDescription>
+          <CardTitle>{t("admin.userDetail.funnel.title")}</CardTitle>
+          <CardDescription>
+            {t("admin.userDetail.funnel.loadingDescription")}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {ONBOARDING_STAGES.map((stage) => (
@@ -88,24 +93,27 @@ export function OnboardingFunnel({
     );
   }
 
-  // Build descriptions per stage. workflow_executed and workflow_executed_ok
-  // are now D1-stamped, but execution counts/error breakdowns still come from
-  // AE — surface them inline once loaded.
+  const loadingExecutions = t("admin.userDetail.funnel.loadingExecutions");
   const executionsDescription = executionsSummary
-    ? `${executionsSummary.totalExecutions} total execution(s)`
+    ? t("admin.userDetail.funnel.totalExecutions", {
+        count: executionsSummary.totalExecutions,
+      })
     : isExecutionsSummaryLoading
-      ? "Loading execution stats…"
+      ? loadingExecutions
       : "—";
   const successDescription = executionsSummary
-    ? `${executionsSummary.successCount} succeeded · ${executionsSummary.errorCount} failed`
+    ? t("admin.userDetail.funnel.successBreakdown", {
+        success: executionsSummary.successCount,
+        failed: executionsSummary.errorCount,
+      })
     : isExecutionsSummaryLoading
-      ? "Loading execution stats…"
+      ? loadingExecutions
       : "—";
 
   const descriptions: Record<OnboardingStage, string> = {
-    signed_up: "Account created",
-    tour_completed: "Completed the in-app tour",
-    workflow_created: "Created their first workflow",
+    signed_up: t("admin.userDetail.funnel.signedUpDesc"),
+    tour_completed: t("admin.userDetail.funnel.tourCompletedDesc"),
+    workflow_created: t("admin.userDetail.funnel.workflowCreatedDesc"),
     workflow_executed: executionsDescription,
     workflow_executed_ok: successDescription,
   };
@@ -127,17 +135,15 @@ export function OnboardingFunnel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Onboarding</CardTitle>
-        <CardDescription>
-          Funnel progress for this user. Stages are stamped in D1 on first
-          occurrence; execution counts come from Analytics Engine.
-        </CardDescription>
+        <CardTitle>{t("admin.userDetail.funnel.title")}</CardTitle>
+        <CardDescription>{t("admin.userDetail.funnel.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="space-y-4">
           {stages.map((row, index) => {
             const isFurthest = index === furthestReachedIndex;
             const Icon = row.stage.reached ? CheckCircle2 : Circle;
+            const days = funnel.daysSinceAdvance;
 
             return (
               <li key={row.key} className="flex items-start gap-3">
@@ -157,12 +163,17 @@ export function OnboardingFunnel({
                         !row.stage.reached && "text-muted-foreground"
                       )}
                     >
-                      {ONBOARDING_STAGE_LABEL[row.key]}
+                      {getOnboardingStageLabel(t, row.key)}
                     </span>
-                    {isFurthest && funnel.daysSinceAdvance > 0 && (
+                    {isFurthest && days > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        {funnel.daysSinceAdvance} day
-                        {funnel.daysSinceAdvance === 1 ? "" : "s"} at this stage
+                        {days === 1
+                          ? t("admin.userDetail.funnel.dayAtStage", {
+                              count: days,
+                            })
+                          : t("admin.userDetail.funnel.daysAtStage", {
+                              count: days,
+                            })}
                       </Badge>
                     )}
                   </div>

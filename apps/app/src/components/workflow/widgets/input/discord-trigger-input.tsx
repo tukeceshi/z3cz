@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,6 +44,7 @@ function DiscordTriggerInputWidget({
   className,
   disabled = false,
 }: DiscordTriggerInputProps) {
+  const { t } = useTranslation();
   const { discordBots, isDiscordBotsLoading, mutateDiscordBots } =
     useDiscordBots();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
@@ -133,10 +135,12 @@ function DiscordTriggerInputWidget({
     try {
       await syncDiscordTrigger(workflowId, orgId);
       await mutateDiscordTrigger();
-      toast.success("Slash command synced with Discord");
+      toast.success(t("workflow.widgets.triggers.discord.syncSuccess"));
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to sync slash command"
+        err instanceof Error
+          ? err.message
+          : t("workflow.widgets.triggers.discord.syncFailed")
       );
     } finally {
       setIsSyncing(false);
@@ -153,7 +157,11 @@ function DiscordTriggerInputWidget({
         >
           <SelectTrigger className="h-6 text-xs">
             <SelectValue
-              placeholder={isDiscordBotsLoading ? "Loading..." : "Select a bot"}
+              placeholder={
+                isDiscordBotsLoading
+                  ? t("common.loading")
+                  : t("workflow.widgets.triggers.selectBot")
+              }
             />
           </SelectTrigger>
           <SelectContent>
@@ -163,7 +171,9 @@ function DiscordTriggerInputWidget({
               </SelectItem>
             ))}
             <SelectSeparator />
-            <SelectItem value={CREATE_NEW_SENTINEL}>+ New Bot</SelectItem>
+            <SelectItem value={CREATE_NEW_SENTINEL}>
+              {t("workflow.widgets.triggers.newBot")}
+            </SelectItem>
           </SelectContent>
         </Select>
         {inviteUrl && (
@@ -177,7 +187,7 @@ function DiscordTriggerInputWidget({
               href={inviteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title="Invite bot to server"
+              title={t("workflow.widgets.triggers.discord.inviteBot")}
             >
               <SquareArrowOutUpRight className="h-3 w-3" />
             </a>
@@ -188,7 +198,7 @@ function DiscordTriggerInputWidget({
         <Input
           value={localCommand}
           onChange={(e) => handleCommandChange(e.target.value)}
-          placeholder="command"
+          placeholder={t("workflow.widgets.triggers.discord.commandPlaceholder")}
           disabled={disabled}
           className={cn(
             "h-6 text-xs px-1.5 font-mono",
@@ -206,8 +216,8 @@ function DiscordTriggerInputWidget({
           onClick={handleSync}
           title={
             isOutOfSync
-              ? "Command not synced with Discord — click to sync"
-              : "Sync slash command with Discord"
+              ? t("workflow.widgets.triggers.discord.syncStale")
+              : t("workflow.widgets.triggers.discord.sync")
           }
         >
           {isOutOfSync ? (

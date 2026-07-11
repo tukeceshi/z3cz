@@ -13,7 +13,7 @@ export function testMonitoringUpdates(
 ) {
   describe(`${runtimeName}: monitoring and updates`, () => {
     it("should send initial update with submitted status", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-monitor-initial",
         name: "Monitor Initial",
         trigger: "manual",
@@ -45,7 +45,7 @@ export function testMonitoringUpdates(
     });
 
     it("should send progress updates after each node execution", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-monitor-progress",
         name: "Monitor Progress",
         trigger: "manual",
@@ -118,7 +118,7 @@ export function testMonitoringUpdates(
     });
 
     it("should include node outputs in monitoring updates", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-monitor-outputs",
         name: "Monitor Outputs",
         trigger: "manual",
@@ -153,7 +153,7 @@ export function testMonitoringUpdates(
     });
 
     it("should include error details in monitoring updates", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-monitor-errors",
         name: "Monitor Errors",
         trigger: "manual",
@@ -220,7 +220,7 @@ export function testMonitoringUpdates(
     });
 
     it("should mark final update status as 'completed' for successful workflow", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-final-completed",
         name: "Final Completed",
         trigger: "manual",
@@ -249,7 +249,7 @@ export function testMonitoringUpdates(
     });
 
     it("should mark final update status as 'error' for workflow with failures", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-final-error",
         name: "Final Error",
         trigger: "manual",

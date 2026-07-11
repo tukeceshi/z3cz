@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslation } from "@/components/locale-provider";
 import { useWhatsAppAccounts } from "@/services/bot-service";
 import { cn } from "@/utils/utils";
 import { updateNodeInput, useWorkflow } from "../../workflow-context";
@@ -32,6 +33,7 @@ function WhatsAppTriggerInputWidget({
   className,
   disabled = false,
 }: WhatsAppTriggerInputProps) {
+  const { t } = useTranslation();
   const {
     whatsappAccounts,
     isWhatsAppAccountsLoading,
@@ -80,7 +82,9 @@ function WhatsAppTriggerInputWidget({
         <SelectTrigger className="h-6 text-xs">
           <SelectValue
             placeholder={
-              isWhatsAppAccountsLoading ? "Loading..." : "Select an account"
+              isWhatsAppAccountsLoading
+                ? t("common.loading")
+                : t("workflow.widgets.triggers.whatsapp.selectAccount")
             }
           />
         </SelectTrigger>
@@ -91,7 +95,9 @@ function WhatsAppTriggerInputWidget({
             </SelectItem>
           ))}
           <SelectSeparator />
-          <SelectItem value={CREATE_NEW_SENTINEL}>+ New Account</SelectItem>
+          <SelectItem value={CREATE_NEW_SENTINEL}>
+            {t("workflow.widgets.triggers.whatsapp.newAccount")}
+          </SelectItem>
         </SelectContent>
       </Select>
       <WhatsAppAccountCreateDialog

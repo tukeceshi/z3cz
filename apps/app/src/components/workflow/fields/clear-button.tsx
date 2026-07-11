@@ -1,5 +1,6 @@
 import { Trash2Icon } from "lucide-react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 interface ClearButtonProps {
@@ -11,10 +12,13 @@ interface ClearButtonProps {
 
 export function ClearButton({
   onClick,
-  label = "Clear value",
+  label,
   className = "",
   disabled = false,
 }: ClearButtonProps) {
+  const { t } = useTranslation();
+  const ariaLabel = label ?? t("workflow.fields.clearValue");
+
   return (
     <button
       onClick={onClick}
@@ -24,7 +28,7 @@ export function ClearButton({
           "opacity-50 cursor-not-allowed hover:text-neutral-400 dark:hover:text-neutral-400",
         className
       )}
-      aria-label={label}
+      aria-label={ariaLabel}
       type="button"
       disabled={disabled}
     >

@@ -6,6 +6,7 @@ import TrashIcon from "lucide-react/icons/trash-2";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,6 +24,7 @@ interface WorkflowCriteriaManagerProps {
 export function WorkflowCriteriaManager({
   workflowId,
 }: WorkflowCriteriaManagerProps) {
+  const { t } = useTranslation();
   const { criteria, mutateCriteria } = useWorkflowCriteria(workflowId);
   const { createCriterion, isCreating } = useCreateCriterion();
   const { updateCriterion } = useUpdateCriterion();
@@ -47,7 +49,7 @@ export function WorkflowCriteriaManager({
       setNewQuestion("");
       await mutateCriteria();
     } catch {
-      toast.error("Failed to add criterion");
+      toast.error(t("workflow.criteria.addFailed"));
     }
   };
 
@@ -70,7 +72,7 @@ export function WorkflowCriteriaManager({
       setEditingId(null);
       await mutateCriteria();
     } catch {
-      toast.error("Failed to update criterion");
+      toast.error(t("workflow.criteria.updateFailed"));
     } finally {
       isSavingRef.current = false;
     }
@@ -81,7 +83,7 @@ export function WorkflowCriteriaManager({
       await deleteCriterion(id);
       await mutateCriteria();
     } catch {
-      toast.error("Failed to delete criterion");
+      toast.error(t("workflow.criteria.deleteFailed"));
     }
   };
 
@@ -92,7 +94,7 @@ export function WorkflowCriteriaManager({
         className="group w-full px-4 py-3 flex items-center justify-between"
       >
         <h2 className="text-base font-semibold text-foreground">
-          Evaluation Criteria
+          {t("workflow.criteria.title")}
         </h2>
         <ChevronDownIcon
           className={cn(
@@ -105,13 +107,12 @@ export function WorkflowCriteriaManager({
       {expanded && (
         <div className="px-4 pb-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Define binary evaluation questions for this workflow. These are
-            frozen when you enable it.
+            {t("workflow.criteria.description")}
           </p>
 
           {criteria.length === 0 && (
             <p className="text-sm text-muted-foreground italic">
-              No criteria configured yet.
+              {t("workflow.criteria.empty")}
             </p>
           )}
 
@@ -157,7 +158,7 @@ export function WorkflowCriteriaManager({
             <Input
               value={newQuestion}
               onChange={(e) => setNewQuestion(e.target.value)}
-              placeholder="Add evaluation question..."
+              placeholder={t("workflow.criteria.addPlaceholder")}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAdd();
               }}

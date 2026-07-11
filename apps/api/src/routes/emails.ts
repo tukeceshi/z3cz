@@ -32,6 +32,7 @@ import {
   generateEmailHandle,
   isUniqueHandleError,
 } from "../utils/email-handle";
+import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 
 // Extend the ApiContext with our custom variable
 type ExtendedApiContext = ApiContext & {
@@ -46,6 +47,7 @@ const emailRoutes = new Hono<ExtendedApiContext>();
 
 // Apply JWT middleware to all email routes
 emailRoutes.use("*", jwtMiddleware);
+emailRoutes.use("*", createRequireFeatureMiddleware("emails"));
 
 const nameSchema = z.string().trim().min(1, "Email name is required").max(120);
 

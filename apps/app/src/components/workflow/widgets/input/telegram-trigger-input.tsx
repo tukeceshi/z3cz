@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -34,6 +35,7 @@ function TelegramTriggerInputWidget({
   className,
   disabled = false,
 }: TelegramTriggerInputProps) {
+  const { t } = useTranslation();
   const { telegramBots, isTelegramBotsLoading, mutateTelegramBots } =
     useTelegramBots();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
@@ -96,7 +98,11 @@ function TelegramTriggerInputWidget({
       >
         <SelectTrigger className="h-6 text-xs">
           <SelectValue
-            placeholder={isTelegramBotsLoading ? "Loading..." : "Select a bot"}
+            placeholder={
+              isTelegramBotsLoading
+                ? t("common.loading")
+                : t("workflow.widgets.triggers.selectBot")
+            }
           />
         </SelectTrigger>
         <SelectContent>
@@ -106,13 +112,15 @@ function TelegramTriggerInputWidget({
             </SelectItem>
           ))}
           <SelectSeparator />
-          <SelectItem value={CREATE_NEW_SENTINEL}>+ New Bot</SelectItem>
+          <SelectItem value={CREATE_NEW_SENTINEL}>
+            {t("workflow.widgets.triggers.newBot")}
+          </SelectItem>
         </SelectContent>
       </Select>
       <Input
         value={localChatId}
         onChange={(e) => handleChatIdChange(e.target.value)}
-        placeholder="Chat ID (optional)"
+        placeholder={t("workflow.widgets.triggers.telegram.chatIdPlaceholder")}
         disabled={disabled}
         className="h-6 text-xs px-1.5 font-mono"
       />

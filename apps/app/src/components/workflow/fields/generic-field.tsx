@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/utils";
 
@@ -14,6 +15,8 @@ export function GenericField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   // Check for meaningful value (empty strings are considered "no value")
   const hasValue = value !== undefined && value !== "";
 
@@ -23,7 +26,7 @@ export function GenericField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No value"
+        label={t("workflow.fields.noValue")}
       />
     );
   }
@@ -43,14 +46,14 @@ export function GenericField({
       <Input
         value={value !== undefined ? String(value) : ""}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Enter value"
+        placeholder={t("workflow.fields.enterValue")}
         disabled={disabled}
         className="rounded-md border border-neutral-300 dark:border-neutral-700"
       />
       {!disabled && clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear value"
+          label={t("workflow.fields.clearValue")}
           className="absolute top-2 right-1"
         />
       )}

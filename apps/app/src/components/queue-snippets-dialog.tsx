@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { CodeBlock } from "@/components/docs/code-block";
 import {
   Dialog,
@@ -23,6 +24,7 @@ export function QueueSnippetsDialog({
   queueName,
   queueId,
 }: QueueSnippetsDialogProps) {
+  const { t } = useTranslation();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
   const publishUrl = `${baseUrl}/queues/${queueId}/publish`;
 
@@ -30,17 +32,24 @@ export function QueueSnippetsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{queueName || "Untitled Queue"}</DialogTitle>
+          <DialogTitle>
+            {queueName || t("pages.queues.untitled")}
+          </DialogTitle>
           <DialogDescription>
-            Publish a message to this queue. All workflows with a queue trigger
-            connected to this queue will be executed with the message payload.
+            {t("pages.queues.snippets.description")}
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="curl" className="w-full min-w-0">
           <TabsList>
-            <TabsTrigger value="curl">cURL</TabsTrigger>
-            <TabsTrigger value="javascript">JavaScript</TabsTrigger>
-            <TabsTrigger value="python">Python</TabsTrigger>
+            <TabsTrigger value="curl">
+              {t("pages.queues.snippets.curl")}
+            </TabsTrigger>
+            <TabsTrigger value="javascript">
+              {t("pages.queues.snippets.javascript")}
+            </TabsTrigger>
+            <TabsTrigger value="python">
+              {t("pages.queues.snippets.python")}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="curl" className="mt-4 min-w-0">
             <CodeBlock language="bash">

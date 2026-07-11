@@ -1,13 +1,15 @@
 import { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { ResourceFeatureBanner } from "@/components/resource-feature-banner";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -28,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { TranslateFn } from "@/i18n";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
@@ -37,6 +40,7 @@ import {
 } from "@/services/dataset-service";
 
 function useDatasetActions() {
+  const { t } = useTranslation();
   const { mutateDatasets } = useDatasets();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -62,11 +66,11 @@ function useDatasetActions() {
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Dataset</DialogTitle>
+          <DialogTitle>{t("pages.datasets.deleteTitle")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "
-            {datasetToDelete?.name || "Untitled Dataset"}"? This action cannot
-            be undone.
+            {t("pages.datasets.deleteConfirm", {
+              name: datasetToDelete?.name || t("pages.datasets.untitled"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -75,7 +79,7 @@ function useDatasetActions() {
             onClick={() => setDeleteDialogOpen(false)}
             disabled={isDeleting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -83,7 +87,7 @@ function useDatasetActions() {
             disabled={isDeleting}
           >
             {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -102,12 +106,13 @@ function useDatasetActions() {
 function createColumns(
   openDeleteDialog: (dataset: any) => void,
   navigate: ReturnType<typeof useNavigate>,
-  getOrgUrl: (path: string) => string
+  getOrgUrl: (path: string) => string,
+  t: TranslateFn
 ): ColumnDef<any>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => {
         const name = row.getValue("name") as string;
         const datasetId = row.original.id;
@@ -116,7 +121,9 @@ function createColumns(
             to={getOrgUrl(`datasets/${datasetId}`)}
             className="hover:underline"
           >
-            <div className="font-medium">{name || "Untitled Dataset"}</div>
+            <div className="font-medium">
+              {name || t("pages.datasets.untitled")}
+            </div>
           </Link>
         );
       },
@@ -130,7 +137,7 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -138,10 +145,10 @@ function createColumns(
                 <DropdownMenuItem
                   onClick={() => navigate(getOrgUrl(`datasets/${dataset.id}`))}
                 >
-                  View Dataset
+                  {t("pages.datasets.viewDataset")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(dataset)}>
-                  Delete Dataset
+                  {t("pages.datasets.deleteDataset")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -153,6 +160,7 @@ function createColumns(
 }
 
 export function DatasetsPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -165,11 +173,14 @@ export function DatasetsPage() {
 
   const { deleteDialog, openDeleteDialog } = useDatasetActions();
 
-  const columns = createColumns(openDeleteDialog, navigate, getOrgUrl);
+  const columns = useMemo(
+    () => createColumns(openDeleteDialog, navigate, getOrgUrl, t),
+    [openDeleteDialog, navigate, getOrgUrl, t]
+  );
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Datasets" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.datasets") }]);
+  }, [setBreadcrumbs, t]);
 
   const handleCreateDataset = async (name: string) => {
     if (!orgId) return;
@@ -184,35 +195,38 @@ export function DatasetsPage() {
   };
 
   if (isDatasetsLoading) {
-    return <InsetLoading title="Datasets" />;
+    return <InsetLoading title={t("pages.datasets.title")} />;
   } else if (datasetsError) {
-    return <InsetError title="Datasets" errorMessage={datasetsError.message} />;
+    return (
+      <InsetError title={t("pages.datasets.title")} errorMessage={datasetsError.message} />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Datasets">
+      <InsetLayout title={t("pages.datasets.title")}>
+        <ResourceFeatureBanner />
         <div className="flex items-center justify-between mb-6  min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Create and manage datasets for your workflows.
+            {t("pages.datasets.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create New Dataset
+            {t("pages.datasets.createButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={datasets || []}
           emptyState={{
-            title: "No datasets found",
-            description: "Create a new dataset to get started.",
+            title: t("pages.datasets.emptyTitle"),
+            description: t("pages.datasets.emptyDescription"),
           }}
         />
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Dataset</DialogTitle>
+              <DialogTitle>{t("pages.datasets.createDialogTitle")}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={async (e) => {
@@ -225,11 +239,11 @@ export function DatasetsPage() {
               className="space-y-4"
             >
               <div>
-                <Label htmlFor="name">Dataset Name</Label>
+                <Label htmlFor="name">{t("pages.datasets.datasetName")}</Label>
                 <Input
                   id="name"
                   name="name"
-                  placeholder="Enter dataset name"
+                  placeholder={t("pages.datasets.datasetNamePlaceholder")}
                   className="mt-2"
                 />
               </div>
@@ -239,9 +253,9 @@ export function DatasetsPage() {
                   type="button"
                   onClick={() => setIsCreateDialogOpen(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
-                <Button type="submit">Create Dataset</Button>
+                <Button type="submit">{t("pages.datasets.createDataset")}</Button>
               </DialogFooter>
             </form>
           </DialogContent>

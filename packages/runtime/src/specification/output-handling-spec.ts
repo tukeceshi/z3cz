@@ -13,7 +13,7 @@ export function testOutputHandling(
 ) {
   describe(`${runtimeName}: output handling`, () => {
     it("should store outputs from successful nodes", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-outputs",
         name: "Node Outputs",
         trigger: "manual",
@@ -48,7 +48,7 @@ export function testOutputHandling(
     });
 
     it("should not store outputs from failed nodes", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-no-outputs-on-error",
         name: "No Outputs on Error",
         trigger: "manual",
@@ -115,7 +115,7 @@ export function testOutputHandling(
     });
 
     it("should handle nodes with multiple outputs", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-multiple-outputs",
         name: "Multiple Outputs",
         trigger: "manual",

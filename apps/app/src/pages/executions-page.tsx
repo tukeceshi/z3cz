@@ -9,7 +9,6 @@ import CalendarIcon from "lucide-react/icons/calendar";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { toast } from "sonner";
 import { ExecutionStatusBadge } from "@/components/executions/execution-status-badge";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
@@ -36,6 +35,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useTranslation } from "@/components/locale-provider";
+import type { TranslateFn } from "@/i18n";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
@@ -46,20 +48,21 @@ import { useWorkflows } from "@/services/workflow-service";
 import { formatDate } from "@/utils/date";
 import { cn } from "@/utils/utils";
 
-const STATUS_OPTIONS: { value: ExecutionStatusType; label: string }[] = [
-  { value: "started", label: "Started" },
-  { value: "executing", label: "Executing" },
-  { value: "completed", label: "Completed" },
-  { value: "error", label: "Error" },
-  { value: "cancelled", label: "Cancelled" },
-];
+const EXECUTION_STATUS_LABELS = {
+  started: "pages.executions.status.started",
+  executing: "pages.executions.status.executing",
+  completed: "pages.executions.status.completed",
+  error: "pages.executions.status.error",
+  cancelled: "pages.executions.status.cancelled",
+} as const;
 
 export const createColumns = (
-  getOrgUrl: (path: string) => string
+  getOrgUrl: (path: string) => string,
+  t: TranslateFn
 ): ColumnDef<ListExecutionsResponse["executions"][0]>[] => [
   {
     accessorKey: "workflowName",
-    header: "Workflow",
+    header: t("pages.executions.columns.workflow"),
     cell: ({ row }) => {
       const workflowName = row.getValue("workflowName") as string;
       const execution = row.original as WorkflowExecution;
@@ -75,7 +78,7 @@ export const createColumns = (
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: t("pages.executions.columns.status"),
     cell: ({ row }) => {
       const status = row.getValue("status") as WorkflowExecution["status"];
       return <ExecutionStatusBadge status={status} />;
@@ -83,7 +86,7 @@ export const createColumns = (
   },
   {
     accessorKey: "startedAt",
-    header: "Started",
+    header: t("pages.executions.columns.started"),
     cell: ({ row }) => {
       const date = row.getValue("startedAt") as Date | string | undefined;
       if (!date) return <div className="font-medium">-</div>;
@@ -97,7 +100,7 @@ export const createColumns = (
   },
   {
     accessorKey: "endedAt",
-    header: "Ended",
+    header: t("pages.executions.columns.ended"),
     cell: ({ row }) => {
       const date = row.getValue("endedAt") as Date | string | undefined | null;
       if (!date) return <div className="font-medium">-</div>;
@@ -111,7 +114,7 @@ export const createColumns = (
   },
   {
     accessorKey: "duration",
-    header: "Duration",
+    header: t("pages.executions.columns.duration"),
     cell: ({ row }) => {
       const execution = row.original as WorkflowExecution;
       const { startedAt, endedAt } = execution;
@@ -139,7 +142,7 @@ export const createColumns = (
   },
   {
     accessorKey: "usage",
-    header: "Usage",
+    header: t("pages.executions.columns.usage"),
     cell: ({ row }) => {
       const usage = row.getValue("usage") as number | undefined;
       return <span>{(usage ?? 0).toLocaleString()}</span>;
@@ -155,13 +158,15 @@ export const createColumns = (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">{t("common.openMenu")}</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link to={getOrgUrl(`executions/${execution.id}`)}>View</Link>
+                <Link to={getOrgUrl(`executions/${execution.id}`)}>
+                  {t("common.view")}
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -172,6 +177,8 @@ export const createColumns = (
 ];
 
 export function ExecutionsPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -208,37 +215,41 @@ export function ExecutionsPage() {
     executionsObserverTargetRef,
   } = usePaginatedExecutions(filters);
 
-  // Get error message in a type-safe way
+  const columns = useMemo(
+    () => createColumns(getOrgUrl, t),
+    [getOrgUrl, t]
+  );
+
   const errorMessage = executionsError
     ? executionsError instanceof Error
       ? executionsError.message
-      : "Unknown error"
+      : t("common.unknownError")
     : "";
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Executions" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.executions") }]);
+  }, [setBreadcrumbs, t]);
 
   useEffect(() => {
     if (executionsError) {
-      toast.error(
-        `Failed to fetch executions: ${errorMessage}. Please try again.`
-      );
+      appToast.errorRaw(t("pages.executions.fetchFailed", { message: errorMessage }));
     }
-  }, [executionsError, errorMessage]);
+  }, [executionsError, errorMessage, appToast, t]);
 
   if (isExecutionsInitialLoading) {
-    return <InsetLoading title="Executions" />;
+    return <InsetLoading title={t("pages.executions.title")} />;
   } else if (executionsError) {
-    return <InsetError title="Executions" errorMessage={errorMessage} />;
+    return (
+      <InsetError title={t("pages.executions.title")} errorMessage={errorMessage} />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Executions">
+      <InsetLayout title={t("pages.executions.title")}>
         <div className="mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Monitor the executions of your workflows.
+            {t("pages.executions.description")}
           </div>
         </div>
 
@@ -248,10 +259,10 @@ export function ExecutionsPage() {
             onValueChange={(v) => setWorkflowId(v === "all" ? undefined : v)}
           >
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="All workflows" />
+              <SelectValue placeholder={t("pages.executions.allWorkflows")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All workflows</SelectItem>
+              <SelectItem value="all">{t("pages.executions.allWorkflows")}</SelectItem>
               {workflows.map((w) => (
                 <SelectItem key={w.id} value={w.id}>
                   {w.name}
@@ -267,15 +278,17 @@ export function ExecutionsPage() {
             }
           >
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="All statuses" />
+              <SelectValue placeholder={t("pages.executions.allStatuses")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+              <SelectItem value="all">{t("pages.executions.allStatuses")}</SelectItem>
+              {(Object.keys(EXECUTION_STATUS_LABELS) as ExecutionStatusType[]).map(
+                (value) => (
+                <SelectItem key={value} value={value}>
+                  {t(EXECUTION_STATUS_LABELS[value])}
                 </SelectItem>
-              ))}
+              )
+              )}
             </SelectContent>
           </Select>
 
@@ -290,7 +303,7 @@ export function ExecutionsPage() {
                 )}
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                {startDate ? formatDate(startDate) : "Start date"}
+                {startDate ? formatDate(startDate) : t("pages.executions.startDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -314,7 +327,7 @@ export function ExecutionsPage() {
                 )}
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                {endDate ? formatDate(endDate) : "End date"}
+                {endDate ? formatDate(endDate) : t("pages.executions.endDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -329,19 +342,19 @@ export function ExecutionsPage() {
         </div>
 
         <DataTable
-          columns={createColumns(getOrgUrl)}
+          columns={columns}
           data={paginatedExecutions}
           emptyState={{
             title: executionsError
-              ? "Error"
+              ? t("pages.executions.empty.error")
               : paginatedExecutions.length === 0
-                ? "No executions"
-                : "No results",
+                ? t("pages.executions.empty.none")
+                : t("common.noResults"),
             description: executionsError
               ? errorMessage
               : paginatedExecutions.length === 0
-                ? "No executions found."
-                : "No executions match your criteria.",
+                ? t("pages.executions.empty.noneDescription")
+                : t("pages.executions.empty.noMatchDescription"),
           }}
         />
         {!isExecutionsReachingEnd && !isExecutionsInitialLoading && (

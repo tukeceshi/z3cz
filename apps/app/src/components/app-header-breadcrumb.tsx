@@ -29,7 +29,10 @@ export function AppHeaderBreadcrumb() {
             <React.Fragment key={`${item.label}-${index}`}>
               <BreadcrumbItem>
                 {isLast || !item.to ? (
-                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  <span className="inline-flex items-center gap-1.5">
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                    {item.trailing}
+                  </span>
                 ) : (
                   <BreadcrumbLink asChild>
                     <RouterLink to={item.to}>{item.label}</RouterLink>

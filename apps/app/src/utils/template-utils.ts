@@ -16,7 +16,6 @@ export function convertTemplateNodeToReactFlowNode(
     id: node.id,
     type: "workflowNode",
     position: node.position,
-    dragHandle: ".workflow-node-drag-handle",
     data: {
       name: node.name,
       icon: node.icon || nodeTypeDef?.icon || "box",

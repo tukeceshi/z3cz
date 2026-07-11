@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/utils";
 
@@ -25,6 +26,8 @@ export function NumberField({
   value,
   autoFocus,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   const hasValue = value !== undefined && value !== "";
 
   // Local string state so intermediate values like "3." aren't destroyed
@@ -79,7 +82,7 @@ export function NumberField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No number"
+        label={t("workflow.fields.noNumber")}
       />
     );
   }
@@ -93,7 +96,7 @@ export function NumberField({
         value={localValue}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder={connected ? "Connected" : "Enter number"}
+        placeholder={connected ? t("workflow.fields.connected") : t("workflow.fields.enterNumber")}
         disabled={disabled}
         className="rounded-md border border-neutral-300 dark:border-neutral-700"
         autoFocus={autoFocus}
@@ -101,7 +104,7 @@ export function NumberField({
       {clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear number"
+          label={t("workflow.fields.clearNumber")}
           className="absolute top-2 right-1"
           disabled={disabled}
         />

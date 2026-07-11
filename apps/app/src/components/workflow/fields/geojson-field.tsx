@@ -1,6 +1,7 @@
 import { type GeoJSONSvgOptions, geojsonToSvg } from "@dafthunk/utils";
 import { useMemo } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { cn } from "@/utils/utils";
@@ -18,6 +19,8 @@ export function GeoJSONField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   // GeoJSON fields check for null explicitly (null is a valid but empty GeoJSON)
   const hasValue = value !== undefined && value !== null;
 
@@ -87,10 +90,13 @@ export function GeoJSONField({
       console.error("Error rendering GeoJSON:", err);
       return {
         svg: "",
-        error: `Error rendering GeoJSON: ${err instanceof Error ? err.message : "Unknown error"}`,
+        error: t("workflow.fields.geojsonRenderError", {
+          message:
+            err instanceof Error ? err.message : t("common.unknownError"),
+        }),
       };
     }
-  }, [value, hasValue]);
+  }, [value, hasValue, t]);
 
   const handleChange = (newValue: string) => {
     if (!newValue) {
@@ -116,12 +122,12 @@ export function GeoJSONField({
         <FieldPlaceholder
           className="h-[200px] items-start"
           connected={connected}
-          label="No preview"
+          label={t("workflow.fields.noPreview")}
         />
         <FieldPlaceholder
           className="h-[200px] items-start"
           connected={connected}
-          label="No GeoJSON"
+          label={t("workflow.fields.noGeoJson")}
         />
       </div>
     );
@@ -144,7 +150,7 @@ export function GeoJSONField({
       ) : (
         <div className="h-[200px] border border-border bg-background flex items-center justify-center rounded-md">
           <span className="text-neutral-500 dark:text-neutral-400 text-xs">
-            {hasValue ? "No geometries to display" : "No GeoJSON"}
+            {hasValue ? t("workflow.fields.noGeometries") : t("workflow.fields.noGeoJson")}
           </span>
         </div>
       )}
@@ -172,13 +178,13 @@ export function GeoJSONField({
             className="absolute top-1 right-1 h-6 px-2 text-xs text-muted-foreground z-10"
             onClick={formatJson}
           >
-            Format
+            {t("workflow.fields.format")}
           </Button>
         )}
         {!disabled && !readonly && clearable && hasValue && (
           <ClearButton
             onClick={onClear}
-            label="Clear GeoJSON"
+            label={t("workflow.fields.clearGeoJson")}
             className="absolute top-1 right-16 z-10"
           />
         )}

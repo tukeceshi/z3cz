@@ -42,6 +42,10 @@ import { textInputWidget } from "./input/text-input";
 import { videoInputWidget } from "./input/video-input";
 import { webcamInputWidget } from "./input/webcam-input";
 import { whatsappTriggerInputWidget } from "./input/whatsapp-trigger-input";
+// AI generative widgets
+import { aiTextWidget } from "./ai/ai-text-widget";
+import { aiImageWidget } from "./ai/ai-image-widget";
+import { aiVideoWidget } from "./ai/ai-video-widget";
 // Output widgets
 import { audioOutputWidget } from "./output/audio-output";
 import { blobOutputWidget } from "./output/blob-output";
@@ -61,6 +65,11 @@ import { registry } from "./registry";
 
 // Register all widgets
 const widgets = [
+  // AI generative node widgets
+  aiTextWidget,
+  aiImageWidget,
+  aiVideoWidget,
+
   // Simple input widgets (one per parameter type)
   textInputWidget,
   numberInputWidget,

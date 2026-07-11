@@ -8,6 +8,7 @@ import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,19 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { TranslateFn } from "@/i18n";
 import {
   type AdminExecution,
   useAdminExecutions,
 } from "@/services/admin-service";
 import { formatDate } from "@/utils/date";
-
-const statusOptions = [
-  { value: "all", label: "All Statuses" },
-  { value: "running", label: "Running" },
-  { value: "completed", label: "Completed" },
-  { value: "error", label: "Error" },
-  { value: "cancelled", label: "Cancelled" },
-];
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -50,12 +44,13 @@ function getStatusVariant(status: string) {
 }
 
 function createColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminExecution>[] {
   return [
     {
       accessorKey: "workflowName",
-      header: "Workflow",
+      header: t("admin.common.workflow"),
       cell: ({ row }) => (
         <Link
           to={`/admin/executions/${row.original.id}?organizationId=${row.original.organizationId}`}
@@ -67,7 +62,7 @@ function createColumns(
     },
     {
       accessorKey: "organizationName",
-      header: "Organization",
+      header: t("admin.common.organization"),
       cell: ({ row }) => (
         <Link
           to={`/admin/organizations/${row.original.organizationId}`}
@@ -79,7 +74,7 @@ function createColumns(
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: t("admin.common.status"),
       cell: ({ row }) => (
         <Badge variant={getStatusVariant(row.original.status)}>
           {row.original.status}
@@ -88,11 +83,11 @@ function createColumns(
     },
     {
       accessorKey: "usage",
-      header: "Usage",
+      header: t("admin.common.usage"),
     },
     {
       accessorKey: "startedAt",
-      header: "Started",
+      header: t("admin.common.started"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.startedAt)}
@@ -101,7 +96,7 @@ function createColumns(
     },
     {
       accessorKey: "endedAt",
-      header: "Ended",
+      header: t("admin.common.ended"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {row.original.endedAt ? formatDate(row.original.endedAt) : "-"}
@@ -119,21 +114,21 @@ function createColumns(
               )
             }
           >
-            View execution
+            {t("admin.common.viewExecution")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
               navigate(`/admin/workflows/${row.original.workflowId}`)
             }
           >
-            View workflow
+            {t("admin.common.viewWorkflow")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
               navigate(`/admin/organizations/${row.original.organizationId}`)
             }
           >
-            View organization
+            {t("admin.common.viewOrganization")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -148,11 +143,12 @@ export function AdminExecutionsPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Executions" }]);
+    setBreadcrumbs([{ label: t("sidebar.executions") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const organizationId = searchParams.get("organizationId") || undefined;
   const workflowId = searchParams.get("workflowId") || undefined;
@@ -166,6 +162,17 @@ export function AdminExecutionsPage() {
       status === "all" ? undefined : status
     );
 
+  const statusOptions = useMemo(
+    () => [
+      { value: "all", label: t("admin.executions.allStatuses") },
+      { value: "running", label: t("admin.executions.statusRunning") },
+      { value: "completed", label: t("admin.executions.statusCompleted") },
+      { value: "error", label: t("admin.executions.statusError") },
+      { value: "cancelled", label: t("admin.executions.statusCancelled") },
+    ],
+    [t]
+  );
+
   const clearParam = (key: string) => {
     const next = new URLSearchParams(searchParams);
     next.delete(key);
@@ -173,20 +180,26 @@ export function AdminExecutionsPage() {
     setPage(1);
   };
 
-  const columns = useMemo(() => createColumns(navigate), [navigate]);
+  const columns = useMemo(
+    () => createColumns(navigate, t),
+    [navigate, t]
+  );
 
   if (isExecutionsLoading) {
-    return <InsetLoading title="Executions" />;
+    return <InsetLoading title={t("admin.executions.title")} />;
   }
 
   if (executionsError) {
     return (
-      <InsetError title="Executions" errorMessage={executionsError.message} />
+      <InsetError
+        title={t("admin.executions.title")}
+        errorMessage={executionsError.message}
+      />
     );
   }
 
   return (
-    <InsetLayout title="Executions">
+    <InsetLayout title={t("admin.executions.title")}>
       <AdminTableToolbar>
         <Select
           value={status}
@@ -196,7 +209,7 @@ export function AdminExecutionsPage() {
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t("admin.executions.filterByStatus")} />
           </SelectTrigger>
           <SelectContent>
             {statusOptions.map((opt) => (
@@ -211,12 +224,12 @@ export function AdminExecutionsPage() {
             variant="outline"
             onClick={() => clearParam("organizationId")}
           >
-            Clear organization filter
+            {t("admin.common.clearOrgFilter")}
           </Button>
         )}
         {workflowId && (
           <Button variant="outline" onClick={() => clearParam("workflowId")}>
-            Clear workflow filter
+            {t("admin.common.clearWorkflowFilter")}
           </Button>
         )}
       </AdminTableToolbar>
@@ -225,8 +238,8 @@ export function AdminExecutionsPage() {
         columns={columns}
         data={executions}
         emptyState={{
-          title: "No executions found",
-          description: "No executions match the current filters.",
+          title: t("admin.executions.emptyTitle"),
+          description: t("admin.executions.emptyDesc"),
         }}
       />
 
@@ -234,7 +247,7 @@ export function AdminExecutionsPage() {
         page={page}
         limit={limit}
         itemCount={executions.length}
-        itemLabel="executions"
+        itemLabel={t("admin.pagination.executions")}
         onPageChange={setPage}
       />
     </InsetLayout>

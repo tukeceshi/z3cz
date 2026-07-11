@@ -6,6 +6,7 @@ import { useParams } from "react-router";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -15,6 +16,7 @@ import { useTelegramBot } from "@/services/bot-service";
 import { BotTelegramEditDialog } from "./bot-telegram-edit-dialog";
 
 export function BotTelegramDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
@@ -29,23 +31,31 @@ export function BotTelegramDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Bots", to: getOrgUrl("bots") },
+      { label: t("sidebar.bots"), to: getOrgUrl("bots") },
       { label: telegramBot?.name || id || "" },
     ]);
-  }, [id, telegramBot?.name, setBreadcrumbs, getOrgUrl]);
+  }, [id, telegramBot?.name, setBreadcrumbs, getOrgUrl, t]);
 
   if (isTelegramBotLoading) {
-    return <InsetLoading title="Bot Details" />;
+    return <InsetLoading title={t("pages.bots.detailTitle")} />;
   } else if (telegramBotError) {
     return (
-      <InsetError title="Bot Details" errorMessage={telegramBotError.message} />
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={telegramBotError.message}
+      />
     );
   } else if (!telegramBot) {
-    return <InsetError title="Bot Details" errorMessage="Bot not found" />;
+    return (
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={t("pages.bots.notFound")}
+      />
+    );
   }
 
   return (
-    <InsetLayout title="Bot Details">
+    <InsetLayout title={t("pages.bots.detailTitle")}>
       <div className="space-y-8">
         <div className="flex justify-end">
           <Button
@@ -54,26 +64,29 @@ export function BotTelegramDetailPage() {
             onClick={() => setIsEditOpen(true)}
           >
             <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Edit
+            {t("pages.bots.edit")}
           </Button>
         </div>
         <div className="space-y-4">
-          <DetailRow label="Name" value={telegramBot.name || "Untitled Bot"} />
           <DetailRow
-            label="Bot Username"
+            label={t("common.name")}
+            value={telegramBot.name || t("pages.bots.untitled")}
+          />
+          <DetailRow
+            label={t("pages.bots.botUsername")}
             value={
               telegramBot.botUsername ? `@${telegramBot.botUsername}` : "---"
             }
           />
           <DetailRow
-            label="Token"
+            label={t("pages.bots.token")}
             value={`****${telegramBot.tokenLastFour}`}
             mono
           />
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">Links</h3>
+          <h3 className="text-sm font-medium">{t("pages.bots.links")}</h3>
           <div className="flex flex-col gap-2">
             {telegramBot.botUsername && (
               <a
@@ -83,7 +96,9 @@ export function BotTelegramDetailPage() {
                 className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                Open @{telegramBot.botUsername} on Telegram
+                {t("pages.bots.openTelegramBot", {
+                  username: telegramBot.botUsername,
+                })}
               </a>
             )}
             <a
@@ -93,7 +108,7 @@ export function BotTelegramDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Open @BotFather on Telegram
+              {t("pages.bots.openBotFather")}
             </a>
             <a
               href="https://core.telegram.org/bots/api"
@@ -102,27 +117,20 @@ export function BotTelegramDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Telegram Bot API Documentation
+              {t("pages.bots.telegramApiDocs")}
             </a>
           </div>
         </div>
 
         <div className="rounded-lg border p-4 space-y-3">
-          <h3 className="text-sm font-medium">Setup Instructions</h3>
+          <h3 className="text-sm font-medium">
+            {t("pages.bots.setupInstructions")}
+          </h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+            <li>{t("pages.bots.telegramSetup1")}</li>
+            <li>{t("pages.bots.telegramSetup2")}</li>
             <li>
-              Create a workflow with a{" "}
-              <span className="font-medium text-foreground">
-                Receive Telegram Message
-              </span>{" "}
-              trigger and select this bot.
-            </li>
-            <li>
-              Enable the workflow. The webhook will be registered automatically
-              with Telegram.
-            </li>
-            <li>
-              Send a message to{" "}
+              {t("pages.bots.telegramSetup3Before")}{" "}
               {telegramBot.botUsername ? (
                 <a
                   href={`https://t.me/${telegramBot.botUsername}`}
@@ -134,9 +142,9 @@ export function BotTelegramDetailPage() {
                   <ExternalLink className="h-3 w-3" />
                 </a>
               ) : (
-                "your bot"
+                t("pages.bots.yourBot")
               )}{" "}
-              on Telegram to trigger the workflow.
+              {t("pages.bots.telegramSetup3After")}
             </li>
           </ol>
         </div>

@@ -7,6 +7,7 @@ import { useNavigate, useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
@@ -21,6 +22,7 @@ import {
 } from "@/utils/template-utils";
 
 export function TemplateDetailPage() {
+  const { t } = useTranslation();
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -38,10 +40,10 @@ export function TemplateDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Workflows", to: getOrgUrl("workflows") },
-      { label: template?.name || "Loading..." },
+      { label: t("sidebar.workflows"), to: getOrgUrl("workflows") },
+      { label: template?.name || t("pages.templateDetail.loading") },
     ]);
-  }, [setBreadcrumbs, getOrgUrl, template?.name]);
+  }, [setBreadcrumbs, getOrgUrl, template?.name, t]);
 
   const { nodes, edges } = useMemo(() => {
     if (!template || nodeTypes.length === 0) {
@@ -77,15 +79,25 @@ export function TemplateDetailPage() {
   };
 
   if (isTemplateLoading || isNodeTypesLoading) {
-    return <InsetLoading title="Template" />;
+    return <InsetLoading title={t("pages.templateDetail.title")} />;
   }
 
   if (templateError) {
-    return <InsetError title="Template" errorMessage={templateError.message} />;
+    return (
+      <InsetError
+        title={t("pages.templateDetail.title")}
+        errorMessage={templateError.message}
+      />
+    );
   }
 
   if (!template) {
-    return <InsetError title="Template" errorMessage="Template not found" />;
+    return (
+      <InsetError
+        title={t("pages.templateDetail.title")}
+        errorMessage={t("pages.templateDetail.notFound")}
+      />
+    );
   }
 
   return (
@@ -103,7 +115,7 @@ export function TemplateDetailPage() {
           ) : (
             <Import className="h-4 w-4 mr-2" />
           )}
-          Create Workflow
+          {t("pages.templateDetail.createWorkflow")}
         </Button>
       </div>
       <div className="flex-1 min-h-0">

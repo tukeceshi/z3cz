@@ -4,6 +4,7 @@ import { Wrench } from "lucide-react";
 import { DynamicIcon } from "lucide-react/dynamic.mjs";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -38,6 +39,7 @@ export function WorkflowToolSelector({
   workflowName,
   workflowDescription,
 }: WorkflowToolSelectorProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
 
   const toolTemplates = useMemo(() => {
@@ -95,14 +97,14 @@ export function WorkflowToolSelector({
         tabIndex={-1}
       >
         <DialogHeader className="px-4 pt-4">
-          <DialogTitle>Select Tools</DialogTitle>
+          <DialogTitle>{t("workflow.toolSelector.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="relative px-4">
           <Wrench className="absolute left-8 top-5 h-6 w-6 text-muted-foreground" />
           <Input
             ref={searchInputRef}
-            placeholder="Search tools..."
+            placeholder={t("workflow.toolSelector.searchPlaceholder")}
             className={cn(
               "pl-14 text-xl h-16 border rounded-lg bg-accent",
               activeElement === "search"
@@ -181,7 +183,7 @@ export function WorkflowToolSelector({
               })}
               {filteredTemplates.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-sm">No tools found matching your search</p>
+                  <p className="text-sm">{t("workflow.toolSelector.emptySearch")}</p>
                 </div>
               )}
             </div>
@@ -203,7 +205,10 @@ export function WorkflowToolSelector({
                 />
               </div>
               <div className="text-xs text-muted-foreground/60 pt-4 text-right">
-                {filteredTemplates.length} of {toolTemplates.length} tools
+                {t("workflow.toolSelector.count", {
+                  filtered: filteredTemplates.length,
+                  total: toolTemplates.length,
+                })}
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ export function TelegramBotField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { telegramBots, isTelegramBotsLoading, mutateTelegramBots } =
     useTelegramBots();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -39,9 +41,15 @@ export function TelegramBotField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No Telegram bot"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.telegramBot.none")
+              }
             >
-              {connected ? "Connected" : label || "No Telegram bot"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.telegramBot.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -68,12 +76,12 @@ export function TelegramBotField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isTelegramBotsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : telegramBots?.length === 0
-                    ? "No Telegram bots"
-                    : "Select Telegram bot"
+                    ? t("workflow.fields.telegramBot.empty")
+                    : t("workflow.fields.telegramBot.select")
             }
           />
         </SelectTrigger>
@@ -89,7 +97,7 @@ export function TelegramBotField({
           ))}
           {(telegramBots?.length ?? 0) > 0 && <SelectSeparator />}
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Bot
+            {t("workflow.widgets.triggers.newBot")}
           </SelectItem>
         </SelectContent>
       </Select>

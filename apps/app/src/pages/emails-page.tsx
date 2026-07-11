@@ -1,13 +1,14 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -29,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailCreateDialog } from "@/components/workflow/widgets/input/email-create-dialog";
+import type { TranslateFn } from "@/i18n";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { deleteEmail, updateEmail, useEmails } from "@/services/email-service";
 
@@ -41,8 +43,8 @@ interface EmailRow {
   updatedAt: Date;
 }
 
-function downloadVCard(email: EmailRow) {
-  const rawName = email.name || "Untitled Email";
+function downloadVCard(email: EmailRow, t: TranslateFn) {
+  const rawName = email.name || t("pages.emails.untitled");
   const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
   const emailAddress = email.address;
   const fullName = `Dafthunk (${displayName})`;
@@ -68,15 +70,16 @@ function downloadVCard(email: EmailRow) {
 function createColumns(
   orgId: string,
   openEditDialog: (email: EmailRow) => void,
-  openDeleteDialog: (email: EmailRow) => void
+  openDeleteDialog: (email: EmailRow) => void,
+  t: TranslateFn
 ): ColumnDef<EmailRow>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => {
         const email = row.original;
-        const name = email.name || "Untitled Email";
+        const name = email.name || t("pages.emails.untitled");
         return (
           <Link
             to={`/org/${orgId}/emails/${email.id}`}
@@ -89,7 +92,7 @@ function createColumns(
     },
     {
       id: "emailAddress",
-      header: "Email",
+      header: t("pages.emails.email"),
       cell: ({ row }) => {
         const email = row.original;
         return (
@@ -111,24 +114,24 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
                   <Link to={`/org/${orgId}/emails/${email.id}`}>
-                    View messages
+                    {t("pages.emails.viewMessages")}
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => downloadVCard(email)}>
-                  Save to Address Book
+                <DropdownMenuItem onClick={() => downloadVCard(email, t)}>
+                  {t("pages.emails.saveToAddressBook")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openEditDialog(email)}>
-                  Edit
+                  {t("common.edit")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(email)}>
-                  Delete
+                  {t("common.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -140,6 +143,7 @@ function createColumns(
 }
 
 export function EmailsPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -156,8 +160,8 @@ export function EmailsPage() {
   const { emails, emailsError, isEmailsLoading, mutateEmails } = useEmails();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Emails" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.emails") }]);
+  }, [setBreadcrumbs, t]);
 
   const openDeleteDialog = (email: EmailRow) => {
     setEmailToDelete(email);
@@ -201,33 +205,37 @@ export function EmailsPage() {
     setIsCreateDialogOpen(false);
   };
 
-  const columns = createColumns(orgId, openEditDialog, openDeleteDialog);
+  const columns = useMemo(
+    () => createColumns(orgId, openEditDialog, openDeleteDialog, t),
+    [orgId, openEditDialog, openDeleteDialog, t]
+  );
 
   if (isEmailsLoading) {
-    return <InsetLoading title="Emails" />;
+    return <InsetLoading title={t("pages.emails.title")} />;
   } else if (emailsError) {
-    return <InsetError title="Emails" errorMessage={emailsError.message} />;
+    return (
+      <InsetError title={t("pages.emails.title")} errorMessage={emailsError.message} />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Emails">
+      <InsetLayout title={t("pages.emails.title")}>
         <div className="flex items-center justify-between mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Create and manage emails for sending and receiving in your
-            workflows.
+            {t("pages.emails.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create Email
+            {t("pages.emails.createButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={(emails as EmailRow[]) || []}
           emptyState={{
-            title: "No emails found",
-            description: "Create a new email to get started.",
+            title: t("pages.emails.emptyTitle"),
+            description: t("pages.emails.emptyDescription"),
           }}
         />
         <EmailCreateDialog
@@ -238,11 +246,13 @@ export function EmailsPage() {
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Email</DialogTitle>
-              <DialogDescription>Rename your email.</DialogDescription>
+              <DialogTitle>{t("pages.emails.editDialogTitle")}</DialogTitle>
+              <DialogDescription>
+                {t("pages.emails.editDialogDescription")}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="edit-email-name">Name</Label>
+              <Label htmlFor="edit-email-name">{t("common.name")}</Label>
               <Input
                 id="edit-email-name"
                 value={editName}
@@ -252,10 +262,9 @@ export function EmailsPage() {
                 editName.trim() !== "" &&
                 editName.trim() !== emailToEdit.name && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-md">
-                    Renaming will replace the email address (currently{" "}
-                    <span className="font-medium">{emailToEdit.address}</span>).
-                    Senders using the old address will no longer reach this
-                    email.
+                    {t("pages.emails.renameWarning", {
+                      address: emailToEdit.address,
+                    })}
                   </p>
                 )}
             </div>
@@ -265,14 +274,14 @@ export function EmailsPage() {
                 onClick={() => setEditDialogOpen(false)}
                 disabled={isEditing}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleEditEmail}
                 disabled={isEditing || editName.trim() === ""}
               >
                 {isEditing ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                Save
+                {t("common.save")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -280,11 +289,11 @@ export function EmailsPage() {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Email</DialogTitle>
+              <DialogTitle>{t("pages.emails.deleteTitle")}</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "
-                {emailToDelete?.name || "Untitled Email"}"? This action cannot
-                be undone.
+                {t("pages.emails.deleteConfirm", {
+                  name: emailToDelete?.name || t("pages.emails.untitled"),
+                })}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -293,7 +302,7 @@ export function EmailsPage() {
                 onClick={() => setDeleteDialogOpen(false)}
                 disabled={isDeleting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -301,7 +310,7 @@ export function EmailsPage() {
                 disabled={isDeleting}
               >
                 {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                Delete
+                {t("common.delete")}
               </Button>
             </DialogFooter>
           </DialogContent>

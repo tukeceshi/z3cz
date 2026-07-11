@@ -1,4 +1,5 @@
 import type { ObjectReference, ToolReference } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -17,6 +18,7 @@ import HashIcon from "lucide-react/icons/hash";
 import ImageIcon from "lucide-react/icons/image";
 import LayersIcon from "lucide-react/icons/layers";
 import LinkIcon from "lucide-react/icons/link";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import LockIcon from "lucide-react/icons/lock";
 import MailIcon from "lucide-react/icons/mail";
 import MusicIcon from "lucide-react/icons/music";
@@ -26,11 +28,13 @@ import TrashIcon from "lucide-react/icons/trash-2";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import WrenchIcon from "lucide-react/icons/wrench";
-import { createElement, memo, useState } from "react";
+import { createElement, memo, useMemo, useState } from "react";
 
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
+import { useTranslation } from "@/components/locale-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
@@ -58,9 +62,11 @@ import {
 import {
   clearNodeInput,
   convertValueByType,
+  isWorkflowHandleConnected,
   updateNodeInput,
   useWorkflow,
 } from "./workflow-context";
+import { WorkflowNodeBottomPanel } from "./workflow-node-bottom-panel";
 import { WorkflowToolSelector } from "./workflow-tool-selector";
 import {
   InputOutputType,
@@ -77,25 +83,26 @@ import {
 function deriveDocOverridesForNode(
   nodeType: string,
   inputs: WorkflowParameter[],
-  metadata?: Record<string, string>
+  metadata: Record<string, string> | undefined,
+  t: TranslateFn
 ): { description?: string; documentation?: string; referenceUrl?: string } {
   if (nodeType === CLOUDFLARE_MODEL_NODE_TYPE) {
     const modelId = inputs.find((i) => i.id === "model")?.value;
     if (typeof modelId !== "string" || !modelId) return {};
     const meta = decodeCloudflareModelMeta(metadata?.[CF_META_KEY]);
-    return deriveCloudflareModelDocs(modelId, meta);
+    return deriveCloudflareModelDocs(modelId, meta, t);
   }
   if (nodeType === REPLICATE_MODEL_NODE_TYPE) {
     const modelId = inputs.find((i) => i.id === "model")?.value;
     if (typeof modelId !== "string" || !modelId) return {};
     const meta = decodeReplicateModelMeta(metadata?.[RP_META_KEY]);
-    return deriveReplicateModelDocs(modelId, meta);
+    return deriveReplicateModelDocs(modelId, meta, t);
   }
   if (nodeType === CLOUDFLARE_GATEWAY_MODEL_NODE_TYPE) {
     const modelId = inputs.find((i) => i.id === "model")?.value;
     if (typeof modelId !== "string" || !modelId) return {};
     const meta = decodeCloudflareGatewayModelMeta(metadata?.[CFG_META_KEY]);
-    return deriveCloudflareGatewayModelDocs(modelId, meta);
+    return deriveCloudflareGatewayModelDocs(modelId, meta, t);
   }
   return {};
 }
@@ -110,38 +117,39 @@ export interface WorkflowNodeType {
   icon: string;
   functionCalling?: boolean;
   asTool?: boolean;
-  dragHandle?: string;
   /** Editor-/runtime-internal flags that round-trip through save/load. */
   metadata?: Record<string, string>;
   createObjectUrl: (objectReference: ObjectReference) => string;
 }
 
-export const TypeBadge = ({
-  type,
-  position,
-  id,
-  nodeId,
-  parameter,
-  onInputClick,
-  onOutputClick,
-  disabled,
-  className,
-  executionState = "idle",
-  selected = false,
-}: {
-  type: InputOutputType;
-  position: Position;
-  id: string;
-  nodeId: string;
-  parameter?: WorkflowParameter;
-  onInputClick?: (param: WorkflowParameter, element: HTMLElement) => void;
-  onOutputClick?: (param: WorkflowParameter, element: HTMLElement) => void;
-  disabled?: boolean;
-  className?: string;
-  executionState?: NodeExecutionState;
-  selected?: boolean;
-}) => {
-  const { edges = [] } = useWorkflow();
+export const TypeBadge = memo(
+  ({
+    type,
+    position,
+    id,
+    nodeId,
+    parameter,
+    onInputClick,
+    onOutputClick,
+    disabled,
+    className,
+    executionState = "idle",
+    selected = false,
+    isConnected = false,
+  }: {
+    type: InputOutputType;
+    position: Position;
+    id: string;
+    nodeId: string;
+    parameter?: WorkflowParameter;
+    onInputClick?: (param: WorkflowParameter, element: HTMLElement) => void;
+    onOutputClick?: (param: WorkflowParameter, element: HTMLElement) => void;
+    disabled?: boolean;
+    className?: string;
+    executionState?: NodeExecutionState;
+    selected?: boolean;
+    isConnected?: boolean;
+  }) => {
   const iconSize = "size-2.5!";
 
   const icon: Record<InputOutputType, React.ReactNode> = {
@@ -184,12 +192,6 @@ export const TypeBadge = ({
 
   // Check if the parameter has a value set
   const hasValue = parameter && parameter.value !== undefined;
-  // Check if the parameter is connected (computed from edges)
-  const isConnected = edges.some(
-    (edge) =>
-      (edge.target === nodeId && edge.targetHandle === id) ||
-      (edge.source === nodeId && edge.sourceHandle === id)
-  );
   const isActive = hasValue || isConnected;
   // Determine if this is an input parameter
   const isInput = position === Position.Left;
@@ -268,32 +270,42 @@ export const TypeBadge = ({
       </Handle>
     </div>
   );
-};
+  }
+);
+
+TypeBadge.displayName = "TypeBadge";
 
 export const WorkflowNode = memo(
   ({
     data,
     selected,
     id,
+    dragging = false,
   }: {
     data: WorkflowNodeType;
     selected?: boolean;
     id: string;
+    dragging?: boolean;
   }) => {
-    const { updateNodeData, disabled, nodeTypes, edges = [] } = useWorkflow();
+    const {
+      updateNodeData,
+      disabled,
+      nodeTypes,
+      connectedHandles = new Set(),
+      soleSelectedNodeId = null,
+    } = useWorkflow();
+    const { t } = useTranslation();
+    const isSoleSelected = soleSelectedNodeId === id;
+    const isDragging = dragging;
     const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
     const [isDocsOpen, setIsDocsOpen] = useState(false);
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [activeOutputId, setActiveOutputId] = useState<string | null>(null);
     const [configToolId, setConfigToolId] = useState<string | null>(null);
 
-    // Get node type
     const nodeType = data.nodeType || "";
 
-    // Resolve node type from templates for docs, merging live inputs and
-    // outputs plus any per-node-type overrides that generic model nodes
-    // derive from their persisted metadata.
-    const resolvedNodeType = (() => {
+    const resolvedNodeType = useMemo(() => {
       if (!nodeTypes || nodeTypes.length === 0) return null;
       let template = nodeType
         ? nodeTypes.find((t) => t.type === nodeType)
@@ -306,7 +318,8 @@ export const WorkflowNode = memo(
       const overrides = deriveDocOverridesForNode(
         nodeType,
         data.inputs,
-        data.metadata
+        data.metadata,
+        t
       );
 
       return {
@@ -315,12 +328,15 @@ export const WorkflowNode = memo(
         inputs: data.inputs ?? template.inputs,
         outputs: data.outputs ?? template.outputs,
       };
-    })();
+    }, [nodeTypes, nodeType, data.name, data.inputs, data.outputs, data.metadata, t]);
 
-    // Get widget for this node type
-    const widget = nodeType
-      ? registry.for(nodeType, id, data.inputs, data.outputs, data.metadata)
-      : null;
+    const widget = useMemo(
+      () =>
+        nodeType
+          ? registry.for(nodeType, id, data.inputs, data.outputs, data.metadata)
+          : null,
+      [nodeType, id, data.inputs, data.outputs, data.metadata]
+    );
 
     const handleWidgetChange = (value: any) => {
       if (disabled || !updateNodeData || !widget) return;
@@ -331,21 +347,22 @@ export const WorkflowNode = memo(
       }
     };
 
-    // Find hidden inputs with resource types to render as inline selectors
-    const resourceTypes = new Set([
-      "database",
-      "dataset",
-      "queue",
-      "schema",
-      "email",
-      "integration",
-      "discord",
-      "telegram",
-    ]);
-    const resourceInputs = data.inputs.filter(
-      (input) =>
-        resourceTypes.has(input.type) && !widget?.managedFields.has(input.id)
-    );
+    const resourceInputs = useMemo(() => {
+      const resourceTypes = new Set([
+        "database",
+        "dataset",
+        "queue",
+        "schema",
+        "email",
+        "integration",
+        "discord",
+        "telegram",
+      ]);
+      return data.inputs.filter(
+        (input) =>
+          resourceTypes.has(input.type) && !widget?.managedFields.has(input.id)
+      );
+    }, [data.inputs, widget]);
 
     const handleToolSelectorClose = () => {
       setIsToolSelectorOpen(false);
@@ -454,11 +471,10 @@ export const WorkflowNode = memo(
       _element: HTMLElement
     ) => {
       if (disabled) return;
-      // Don't allow clicking on connected inputs
-      const isConnected = edges.some(
-        (edge) =>
-          (edge.target === id && edge.targetHandle === param.id) ||
-          (edge.source === id && edge.sourceHandle === param.id)
+      const isConnected = isWorkflowHandleConnected(
+        connectedHandles,
+        id,
+        param.id
       );
       if (isConnected) return;
       // Open dialog for this input
@@ -475,15 +491,70 @@ export const WorkflowNode = memo(
       setActiveOutputId(param.id);
     };
 
+    const isAiGenerative = (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType);
+    const isExecuting =
+      data.executionState === "executing" ||
+      data.executionState === "pending";
+    const isError = data.executionState === "error" && !!data.error;
+
     return (
       <TooltipProvider>
+        <div className="relative">
+        {/* Floating mini header — icon + name */}
         <div
-          className={cn("bg-card shadow-xs w-[220px] rounded-md border", {
+          className={cn(
+            "absolute -top-5 left-0 z-10",
+            "flex items-center gap-1 px-1 py-0.5 rounded-sm",
+            "bg-card/40 backdrop-blur-sm"
+          )}
+        >
+          <DynamicIcon
+            name={data.icon as any}
+            className={cn(
+              "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
+              resolvedNodeType?.trigger || resolvedNodeType?.responder
+                ? "text-emerald-500/70"
+                : "text-blue-500/70"
+            )}
+          />
+          <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
+            {data.name}
+          </span>
+          {resolvedNodeType?.subscription && (
+            <SubscriptionBadge variant="muted" size="sm" />
+          )}
+        </div>
+
+        {/* Docs button — absolute top-right, always visible, faded */}
+        <button
+          type="button"
+          className={cn(
+            "nodrag absolute -top-5 right-0 z-10 p-0.5 rounded-sm",
+            "text-muted-foreground/50 hover:text-muted-foreground",
+            "bg-card/40 backdrop-blur-sm"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!resolvedNodeType) return;
+            setIsDocsOpen(true);
+          }}
+          aria-label={t("workflow.node.openDocsAria")}
+          title={
+            resolvedNodeType
+              ? t("workflow.node.openDocs")
+              : t("workflow.node.docsUnavailable")
+          }
+          disabled={!resolvedNodeType}
+        >
+          <CircleHelp className="h-2.5 w-2.5" />
+        </button>
+
+        <div
+          className={cn("bg-card shadow-xs rounded-md border relative", {
+            "w-[220px]": !isAiGenerative,
+            "w-[280px]": isAiGenerative,
             "border-border": !selected && data.executionState === "idle",
-            "border-yellow-400":
-              !selected &&
-              (data.executionState === "executing" ||
-                data.executionState === "pending"),
+            "border-yellow-400": !selected && isExecuting,
             "border-green-500":
               !selected && data.executionState === "completed",
             "border-red-500": !selected && data.executionState === "error",
@@ -491,50 +562,21 @@ export const WorkflowNode = memo(
             "border-blue-500": selected,
           })}
         >
-          {/* Header */}
-          <div
-            className={cn(
-              "px-1 py-1 flex justify-between items-center hover:cursor-grab active:cursor-grabbing border-b",
-              "workflow-node-drag-handle"
-            )}
-          >
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <DynamicIcon
-                name={data.icon as any}
-                className={cn(
-                  "mx-1 h-3 w-3 shrink-0",
-                  resolvedNodeType?.trigger || resolvedNodeType?.responder
-                    ? "text-emerald-500"
-                    : "text-blue-500"
-                )}
-              />
-              <h3 className="text-xs font-bold truncate">{data.name}</h3>
+          {/* Execution overlay */}
+          {isExecuting && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-card/70 backdrop-blur-[1px]">
+              <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
             </div>
-            {resolvedNodeType?.subscription && (
-              <SubscriptionBadge variant="muted" size="sm" />
-            )}
-            <button
-              type="button"
-              className={cn(
-                "nodrag p-1 rounded",
-                "text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!resolvedNodeType) return;
-                setIsDocsOpen(true);
-              }}
-              aria-label="Open node documentation"
-              title={
-                resolvedNodeType
-                  ? "Open documentation"
-                  : "Documentation unavailable"
-              }
-              disabled={!resolvedNodeType}
-            >
-              <CircleHelp className="h-3 w-3" />
-            </button>
-          </div>
+          )}
+
+          {/* Error overlay */}
+          {isError && (
+            <div className="absolute inset-0 z-10 flex items-start justify-start rounded-md bg-red-500/10 p-2">
+              <p className="text-[10px] text-red-600 dark:text-red-400 line-clamp-3">
+                {data.error}
+              </p>
+            </div>
+          )}
 
           {/* Widget */}
           {widget && (
@@ -552,8 +594,10 @@ export const WorkflowNode = memo(
           {resourceInputs.length > 0 && (
             <div className="px-2 py-2 nodrag border-b space-y-1 [&_button]:text-xs [&_button]:h-7">
               {resourceInputs.map((input) => {
-                const isConnected = edges.some(
-                  (edge) => edge.target === id && edge.targetHandle === input.id
+                const isConnected = isWorkflowHandleConnected(
+                  connectedHandles,
+                  id,
+                  input.id
                 );
                 return (
                   <Field
@@ -654,7 +698,7 @@ export const WorkflowNode = memo(
                                 setConfigToolId(tool.identifier);
                               }}
                               disabled={disabled}
-                              aria-label="Configure tool"
+                              aria-label={t("workflow.node.configureTool")}
                             >
                               <SettingsIcon className="h-3 w-3" />
                             </button>
@@ -666,7 +710,7 @@ export const WorkflowNode = memo(
                                 handleRemoveTool(tool.identifier);
                               }}
                               disabled={disabled}
-                              aria-label="Remove tool"
+                              aria-label={t("workflow.node.removeTool")}
                             >
                               <TrashIcon className="h-3 w-3" />
                             </button>
@@ -680,7 +724,7 @@ export const WorkflowNode = memo(
           )}
 
           {/* Parameters */}
-          <div className="py-2 grid grid-cols-2 justify-between gap-3 nodrag">
+          <div className="py-2 grid grid-cols-2 justify-between gap-3">
             {/* Input Parameters */}
             <div className="flex flex-col gap-1 flex-1">
               {data.inputs
@@ -700,6 +744,11 @@ export const WorkflowNode = memo(
                       disabled={disabled}
                       executionState={data.executionState}
                       selected={selected}
+                      isConnected={isWorkflowHandleConnected(
+                        connectedHandles,
+                        id,
+                        input.id
+                      )}
                     />
                     <span className="text-xs text-foreground font-medium font-mono truncate">
                       {input.name}
@@ -730,12 +779,25 @@ export const WorkflowNode = memo(
                       disabled={disabled}
                       executionState={data.executionState}
                       selected={selected}
+                      isConnected={isWorkflowHandleConnected(
+                        connectedHandles,
+                        id,
+                        output.id
+                      )}
                     />
                   </div>
                 ))}
             </div>
           </div>
         </div>
+
+        {isSoleSelected && !isDragging ? (
+          <WorkflowNodeBottomPanel
+            nodeId={id}
+            data={data}
+            createObjectUrl={data.createObjectUrl}
+          />
+        ) : null}
 
         <WorkflowToolSelector
           open={data.functionCalling ? isToolSelectorOpen : false}
@@ -784,7 +846,7 @@ export const WorkflowNode = memo(
           >
             <DialogTitle className="sr-only">
               {data.inputs.find((i) => i.id === activeInputId)?.name ||
-                "Edit Input"}
+                t("workflow.node.editInput")}
             </DialogTitle>
             {(() => {
               const activeInput = data.inputs.find(
@@ -792,11 +854,10 @@ export const WorkflowNode = memo(
               );
               if (!activeInput) return null;
 
-              const isInputConnected = edges.some(
-                (edge) =>
-                  (edge.target === id &&
-                    edge.targetHandle === activeInput.id) ||
-                  (edge.source === id && edge.sourceHandle === activeInput.id)
+              const isInputConnected = isWorkflowHandleConnected(
+                connectedHandles,
+                id,
+                activeInput.id
               );
 
               return (
@@ -855,7 +916,7 @@ export const WorkflowNode = memo(
           >
             <DialogTitle className="sr-only">
               {data.outputs.find((o) => o.id === activeOutputId)?.name ||
-                "View Output"}
+                t("workflow.node.viewOutput")}
             </DialogTitle>
             {(() => {
               const activeOutput = data.outputs.find(
@@ -863,11 +924,10 @@ export const WorkflowNode = memo(
               );
               if (!activeOutput) return null;
 
-              const isOutputConnected = edges.some(
-                (edge) =>
-                  (edge.target === id &&
-                    edge.targetHandle === activeOutput.id) ||
-                  (edge.source === id && edge.sourceHandle === activeOutput.id)
+              const isOutputConnected = isWorkflowHandleConnected(
+                connectedHandles,
+                id,
+                activeOutput.id
               );
 
               return (
@@ -896,6 +956,7 @@ export const WorkflowNode = memo(
             })()}
           </DialogContent>
         </Dialog>
+        </div>
       </TooltipProvider>
     );
   }

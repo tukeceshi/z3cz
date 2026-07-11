@@ -18,3 +18,6 @@ tsconfig.tsbuildinfo
 # Font binaries are fetched on demand (pnpm --filter '@dafthunk/runtime' fonts:fetch),
 # not committed. Keep the README; ignore the per-family TTF/license dirs.
 packages/runtime/src/fonts/*/
+
+# Local AI interface template artifacts (object storage mirror for dev)
+data/ai-interface-templates/

@@ -117,3 +117,6 @@ export async function decryptSecret(
   const decoder = new TextDecoder();
   return decoder.decode(decrypted);
 }
+
+/** Scope for platform-wide secrets (relay API keys, etc.). */
+export const PLATFORM_ENCRYPTION_SCOPE = "__platform__";

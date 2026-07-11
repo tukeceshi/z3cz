@@ -21,7 +21,7 @@ export function testParallelExecution(
       //
       // Level 0: [A]
       // Level 1: [B, C, D] - these should run in parallel
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-parallel-branches",
         name: "Parallel Branches",
         trigger: "manual",
@@ -112,7 +112,7 @@ export function testParallelExecution(
       // Level 0: [A, B] - parallel inputs
       // Level 1: [C, D] - parallel processing
       // Level 2: [E] - merge
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-state-isolation",
         name: "State Isolation",
         trigger: "manual",
@@ -210,7 +210,7 @@ export function testParallelExecution(
     it("should handle wide parallel execution (many independent nodes)", async () => {
       // Pattern: Single source feeding 5 parallel nodes
       // This tests that wide parallelism works correctly
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-wide-parallel",
         name: "Wide Parallel",
         trigger: "manual",
@@ -272,7 +272,7 @@ export function testParallelExecution(
       //     E       F       Level 1 (2 parallel merges)
       //      \     /
       //        G           Level 2 (final merge)
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-multi-level-parallel",
         name: "Multi-Level Parallel",
         trigger: "manual",
@@ -387,7 +387,7 @@ export function testParallelExecution(
       //   E  F  G
       //
       // C will fail (division by zero), but B and D should complete
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-parallel-error",
         name: "Parallel Error",
         trigger: "manual",

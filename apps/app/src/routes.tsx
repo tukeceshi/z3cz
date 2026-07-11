@@ -3,10 +3,11 @@ import type { RouteObject, RouterState } from "react-router";
 import { Navigate } from "react-router";
 
 import { AdminProtectedRoute } from "./components/admin-protected-route";
-import { HeadSeo } from "./components/head-seo";
+import { createRouteHead } from "./components/route-head";
 import { AdminLayout } from "./components/layouts/admin-layout";
 import { AppLayout } from "./components/layouts/app-layout";
 import { OrgLayout } from "./components/org-layout";
+import { OrgFeatureRoute } from "./components/org-feature-route";
 import { HomeRedirect } from "./components/home-redirect";
 import { OrgRedirect } from "./components/org-redirect";
 import { ProtectedRoute } from "./components/protected-route";
@@ -21,8 +22,12 @@ import { AdminOrganizationDetailPage } from "./pages/admin/admin-organization-de
 import { AdminOrganizationsPage } from "./pages/admin/admin-organizations-page";
 import { AdminQueuesPage } from "./pages/admin/admin-queues-page";
 import { AdminSettingsPage } from "./pages/admin/admin-settings-page";
+import { AdminFeatureSettingsPage } from "./pages/admin/admin-feature-settings-page";
 import { AdminStuckUsersPage } from "./pages/admin/admin-stuck-users-page";
 import { AdminSupportPage } from "./pages/admin/admin-support-page";
+import { AdminPlatformRelayAccountsPage } from "./pages/admin/admin-platform-relay-accounts-page";
+import { AdminAiInterfaceTemplatesPage } from "./pages/admin/admin-ai-interface-templates-page";
+import { AdminWorkflowSchemesPage } from "./pages/admin/admin-workflow-schemes-page";
 import { AdminUserDetailPage } from "./pages/admin/admin-user-detail-page";
 import { AdminUsersPage } from "./pages/admin/admin-users-page";
 import { AdminWorkflowDetailPage } from "./pages/admin/admin-workflow-detail-page";
@@ -62,6 +67,7 @@ import { ProfilePage } from "./pages/profile-page";
 import { QueuesPage } from "./pages/queues-page";
 import { SchemasPage } from "./pages/schemas-page";
 import { SecretsPage } from "./pages/secrets-page";
+import { OrganizationAiInterfacesPage } from "./pages/organization-ai-interfaces-page";
 import { TemplateDetailPage } from "./pages/template-detail-page";
 import { TemplatePreviewPage } from "./pages/template-preview-page";
 import { TemplateTryPage } from "./pages/template-try-page";
@@ -93,9 +99,7 @@ export const routes: AppRouteObject[] = [
     path: "/login",
     element: <LoginPage />,
     handle: {
-      head: (
-        <HeadSeo title="Login - Dafthunk" description="Login to Dafthunk." />
-      ),
+      head: createRouteHead("seo.routes.login", "seo.routes.loginDescription"),
     },
   },
   {
@@ -111,7 +115,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </SettingsLayout>
     ),
-    handle: { head: <HeadSeo title="Profile - Settings - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.profile") },
   },
   // Admin routes
   {
@@ -123,7 +127,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Admin Dashboard - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminDashboard") },
   },
   {
     path: "/admin/users",
@@ -134,7 +138,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Users - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminUsers") },
   },
   {
     path: "/admin/onboarding",
@@ -146,7 +150,7 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: {
-      head: <HeadSeo title="Stuck in Funnel - Admin - Dafthunk" />,
+      head: createRouteHead("seo.routes.adminStuckUsers"),
     },
   },
   {
@@ -158,7 +162,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="User Details - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminUserDetail") },
   },
   {
     path: "/admin/organizations",
@@ -169,7 +173,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Organizations - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminOrganizations") },
   },
   {
     path: "/admin/organizations/:organizationId",
@@ -181,7 +185,7 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: {
-      head: <HeadSeo title="Organization Details - Admin - Dafthunk" />,
+      head: createRouteHead("seo.routes.adminOrganizationDetail"),
     },
   },
   {
@@ -193,7 +197,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Workflows - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminWorkflows") },
   },
   {
     path: "/admin/workflows/:workflowId",
@@ -205,7 +209,7 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: {
-      head: <HeadSeo title="Workflow Details - Admin - Dafthunk" />,
+      head: createRouteHead("seo.routes.adminWorkflowDetail"),
     },
   },
 
@@ -218,7 +222,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Executions - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminExecutions") },
   },
   {
     path: "/admin/executions/:executionId",
@@ -230,7 +234,7 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: {
-      head: <HeadSeo title="Execution Details - Admin - Dafthunk" />,
+      head: createRouteHead("seo.routes.adminExecutionDetail"),
     },
   },
   {
@@ -242,7 +246,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Emails - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminEmails") },
   },
   {
     path: "/admin/support",
@@ -253,7 +257,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Support - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminSupport") },
   },
   {
     path: "/admin/queues",
@@ -264,7 +268,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Queues - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminQueues") },
   },
   {
     path: "/admin/datasets",
@@ -275,7 +279,18 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Datasets - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminDatasets") },
+  },
+  {
+    path: "/admin/feature-settings",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminFeatureSettingsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminFeatureSettings") },
   },
   {
     path: "/admin/settings",
@@ -286,7 +301,42 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Site Settings - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminSettings") },
+  },
+  {
+    path: "/admin/workflow-schemes",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminWorkflowSchemesPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminWorkflowSchemes") },
+  },
+  {
+    path: "/admin/platform-relay-accounts",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminPlatformRelayAccountsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminRelayAccounts") },
+  },
+  {
+    path: "/admin/ai-interface-templates",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminAiInterfaceTemplatesPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: {
+      head: createRouteHead("seo.routes.adminAiTemplates"),
+    },
   },
   {
     path: "/admin/databases",
@@ -297,7 +347,7 @@ export const routes: AppRouteObject[] = [
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: <HeadSeo title="Databases - Admin - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.adminDatabases") },
   },
   {
     path: "/org",
@@ -312,7 +362,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </SettingsLayout>
     ),
-    handle: { head: <HeadSeo title="Organizations - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.organizations") },
   },
   {
     path: "/settings/invitations",
@@ -323,7 +373,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </SettingsLayout>
     ),
-    handle: { head: <HeadSeo title="Invitations - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.invitations") },
   },
   {
     path: "/org/:organizationId/dashboard",
@@ -334,7 +384,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Dashboard - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.dashboard") },
   },
   {
     path: "/workflows",
@@ -349,7 +399,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Workflows - Workflows - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.workflows") },
   },
   {
     path: "/templates",
@@ -364,7 +414,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Templates - Workflows - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.templates") },
   },
   {
     path: "/templates/:templateId",
@@ -379,7 +429,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Template Details - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.templateDetail") },
   },
   {
     path: "/templates/:templateId/try",
@@ -396,7 +446,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Creating Workflow - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.templateTry") },
   },
   {
     path: "/executions",
@@ -411,7 +461,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Executions - Workflows - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.executions") },
   },
   {
     path: "/datasets",
@@ -420,13 +470,11 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/datasets",
     element: (
-      <OrgLayout title="Datasets">
-        <ProtectedRoute>
-          <DatasetsPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="datasets" title="Datasets">
+        <DatasetsPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Datasets - Datasets - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.datasets") },
   },
   {
     path: "/feedback",
@@ -441,7 +489,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Feedback - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.feedback") },
   },
   {
     path: "/api-keys",
@@ -460,7 +508,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="API Keys - Settings - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.apiKeys") },
   },
   {
     path: "/billing",
@@ -475,7 +523,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Billing - Settings - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.billing") },
   },
   {
     path: "/org/:organizationId/members",
@@ -486,7 +534,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Members - Organization - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.members") },
   },
   {
     path: "/secrets",
@@ -495,13 +543,20 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/secrets",
     element: (
-      <OrgLayout title="Settings">
-        <ProtectedRoute>
-          <SecretsPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="secrets" title="Settings">
+        <SecretsPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Secrets - Settings - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.secrets") },
+  },
+  {
+    path: "/org/:organizationId/ai-interfaces",
+    element: (
+      <OrgFeatureRoute feature="ai-interfaces" title="Settings">
+        <OrganizationAiInterfacesPage />
+      </OrgFeatureRoute>
+    ),
+    handle: { head: createRouteHead("seo.routes.aiInterfaces") },
   },
   {
     path: "/integrations",
@@ -510,24 +565,20 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/integrations",
     element: (
-      <OrgLayout title="Settings">
-        <ProtectedRoute>
-          <IntegrationsPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="integrations" title="Settings">
+        <IntegrationsPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Integrations - Settings - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.integrations") },
   },
   {
     path: "/org/:organizationId/datasets/:datasetId",
     element: (
-      <OrgLayout title="Datasets">
-        <ProtectedRoute>
-          <DatasetDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="datasets" title="Datasets">
+        <DatasetDetailPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Dataset Details - Datasets - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.datasetDetail") },
   },
   {
     path: "/databases",
@@ -536,35 +587,29 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/databases",
     element: (
-      <OrgLayout title="Databases">
-        <ProtectedRoute>
-          <DatabasesPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="databases" title="Databases">
+        <DatabasesPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Databases - Databases - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.databases") },
   },
   {
     path: "/org/:organizationId/databases/:id/console",
     element: (
-      <OrgLayout title="Database Console">
-        <ProtectedRoute>
-          <DatabaseConsolePage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="databases" title="Database Console">
+        <DatabaseConsolePage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Console - Database - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.databaseConsole") },
   },
   {
     path: "/org/:organizationId/databases/:id/explorer",
     element: (
-      <OrgLayout title="Database Explorer">
-        <ProtectedRoute>
-          <DatabaseExplorerPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="databases" title="Database Explorer">
+        <DatabaseExplorerPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Explorer - Database - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.databaseExplorer") },
   },
   {
     path: "/schemas",
@@ -573,13 +618,11 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/schemas",
     element: (
-      <OrgLayout title="Schemas">
-        <ProtectedRoute>
-          <SchemasPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="schemas" title="Schemas">
+        <SchemasPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Schemas - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.schemas") },
   },
   {
     path: "/queues",
@@ -588,13 +631,11 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/queues",
     element: (
-      <OrgLayout title="Queues">
-        <ProtectedRoute>
-          <QueuesPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="queues" title="Queues">
+        <QueuesPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Queues - Queues - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.queues") },
   },
   {
     path: "/emails",
@@ -603,24 +644,20 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/emails",
     element: (
-      <OrgLayout title="Emails">
-        <ProtectedRoute>
-          <EmailsPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="emails" title="Emails">
+        <EmailsPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Emails - Emails - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.emails") },
   },
   {
     path: "/org/:organizationId/emails/:emailId",
     element: (
-      <OrgLayout title="Emails">
-        <ProtectedRoute>
-          <EmailInboxPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="emails" title="Emails">
+        <EmailInboxPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Inbox - Emails - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.emailInbox") },
   },
   {
     path: "/bots",
@@ -645,57 +682,47 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/bots",
     element: (
-      <OrgLayout title="Bots">
-        <ProtectedRoute>
-          <BotsPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="bots" title="Bots">
+        <BotsPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Bots - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.bots") },
   },
   {
     path: "/org/:organizationId/bots/discord/:id",
     element: (
-      <OrgLayout title="Bots">
-        <ProtectedRoute>
-          <BotDiscordDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="bots" title="Bots">
+        <BotDiscordDetailPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Bot Details - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.botDetail") },
   },
   {
     path: "/org/:organizationId/bots/telegram/:id",
     element: (
-      <OrgLayout title="Bots">
-        <ProtectedRoute>
-          <BotTelegramDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="bots" title="Bots">
+        <BotTelegramDetailPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Bot Details - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.botDetail") },
   },
   {
     path: "/org/:organizationId/bots/slack/:id",
     element: (
-      <OrgLayout title="Bots">
-        <ProtectedRoute>
-          <BotSlackDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="bots" title="Bots">
+        <BotSlackDetailPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Bot Details - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.botDetail") },
   },
   {
     path: "/org/:organizationId/bots/whatsapp/:id",
     element: (
-      <OrgLayout title="Bots">
-        <ProtectedRoute>
-          <BotWhatsAppDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <OrgFeatureRoute feature="bots" title="Bots">
+        <BotWhatsAppDetailPage />
+      </OrgFeatureRoute>
     ),
-    handle: { head: <HeadSeo title="Account Details - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.botAccountDetail") },
   },
 
   {
@@ -708,7 +735,7 @@ export const routes: AppRouteObject[] = [
       </OrgLayout>
     ),
     handle: {
-      head: <HeadSeo title="Execution Details - Workflows - Dafthunk" />,
+      head: createRouteHead("seo.routes.executionDetail"),
     },
   },
   {
@@ -728,7 +755,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Playground - Workflows - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.playground") },
   },
   {
     path: "/org/:organizationId/playground/:nodeType",
@@ -739,7 +766,7 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Playground - Workflows - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.playground") },
   },
   {
     path: "/org/:organizationId/workflows/:id",
@@ -750,34 +777,34 @@ export const routes: AppRouteObject[] = [
         </ProtectedRoute>
       </OrgLayout>
     ),
-    handle: { head: <HeadSeo title="Edit Workflow - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.editor") },
   },
   {
     path: "/form/:signedToken",
     element: <FormPage />,
     handle: {
-      head: <HeadSeo title="Form - Dafthunk" />,
+      head: createRouteHead("seo.routes.form"),
     },
   },
   {
     path: "/forms/:workflowId",
     element: <FormTriggerPage />,
     handle: {
-      head: <HeadSeo title="Form - Dafthunk" />,
+      head: createRouteHead("seo.routes.form"),
     },
   },
   {
     path: "/feedback/:signedToken",
     element: <FeedbackFormPage />,
     handle: {
-      head: <HeadSeo title="Feedback - Dafthunk" />,
+      head: createRouteHead("seo.routes.feedbackForm"),
     },
   },
   {
     path: "/embed/templates/:templateId",
     element: <TemplatePreviewPage />,
     handle: {
-      head: <HeadSeo title="Template Preview - Dafthunk" />,
+      head: createRouteHead("seo.routes.templatePreview"),
     },
   },
   {
@@ -787,6 +814,6 @@ export const routes: AppRouteObject[] = [
         <NotFoundPage />
       </AppLayout>
     ),
-    handle: { head: <HeadSeo title="Page Not Found - Dafthunk" /> },
+    handle: { head: createRouteHead("seo.routes.notFound") },
   },
 ];

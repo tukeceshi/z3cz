@@ -3,14 +3,15 @@ import ExternalLink from "lucide-react/icons/external-link";
 import Pencil from "lucide-react/icons/pencil";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
 
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { getApiBaseUrl } from "@/config/api";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useDiscordBot } from "@/services/bot-service";
@@ -18,6 +19,8 @@ import { useDiscordBot } from "@/services/bot-service";
 import { BotDiscordEditDialog } from "./bot-discord-edit-dialog";
 
 export function BotDiscordDetailPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
@@ -28,32 +31,40 @@ export function BotDiscordDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Bots", to: getOrgUrl("bots") },
+      { label: t("sidebar.bots"), to: getOrgUrl("bots") },
       { label: discordBot?.name || id || "" },
     ]);
-  }, [id, discordBot?.name, setBreadcrumbs, getOrgUrl]);
+  }, [id, discordBot?.name, setBreadcrumbs, getOrgUrl, t]);
 
   if (isDiscordBotLoading) {
-    return <InsetLoading title="Bot Details" />;
+    return <InsetLoading title={t("pages.bots.detailTitle")} />;
   } else if (discordBotError) {
     return (
-      <InsetError title="Bot Details" errorMessage={discordBotError.message} />
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={discordBotError.message}
+      />
     );
   } else if (!discordBot) {
-    return <InsetError title="Bot Details" errorMessage="Bot not found" />;
+    return (
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={t("pages.bots.notFound")}
+      />
+    );
   }
 
   const webhookUrl = `${getApiBaseUrl()}/discord/webhook/${discordBot.id}`;
   const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${discordBot.applicationId}&scope=bot+applications.commands&permissions=2048`;
   const devPortalUrl = `https://discord.com/developers/applications/${discordBot.applicationId}`;
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = (text: string, labelKey: "pages.bots.webhookUrl") => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
+    appToast.success("pages.bots.copiedToast", { label: t(labelKey) });
   };
 
   return (
-    <InsetLayout title="Bot Details">
+    <InsetLayout title={t("pages.bots.detailTitle")}>
       <div className="space-y-8">
         <div className="flex justify-end">
           <Button
@@ -62,25 +73,32 @@ export function BotDiscordDetailPage() {
             onClick={() => setIsEditOpen(true)}
           >
             <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Edit
+            {t("pages.bots.edit")}
           </Button>
         </div>
         <div className="space-y-4">
-          <DetailRow label="Name" value={discordBot.name || "Untitled Bot"} />
           <DetailRow
-            label="Application ID"
+            label={t("common.name")}
+            value={discordBot.name || t("pages.bots.untitled")}
+          />
+          <DetailRow
+            label={t("pages.bots.applicationId")}
             value={discordBot.applicationId}
             mono
           />
-          <DetailRow label="Public Key" value={discordBot.publicKey} mono />
           <DetailRow
-            label="Token"
+            label={t("pages.bots.publicKey")}
+            value={discordBot.publicKey}
+            mono
+          />
+          <DetailRow
+            label={t("pages.bots.token")}
             value={`****${discordBot.tokenLastFour}`}
             mono
           />
           <div className="grid grid-cols-[180px_1fr] gap-2 items-start">
             <span className="text-sm font-medium text-muted-foreground">
-              Webhook URL
+              {t("pages.bots.webhookUrl")}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-sm font-mono break-all">{webhookUrl}</span>
@@ -88,7 +106,7 @@ export function BotDiscordDetailPage() {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}
+                onClick={() => copyToClipboard(webhookUrl, "pages.bots.webhookUrl")}
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -97,7 +115,7 @@ export function BotDiscordDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">Links</h3>
+          <h3 className="text-sm font-medium">{t("pages.bots.links")}</h3>
           <div className="flex flex-col gap-2">
             <a
               href={inviteUrl}
@@ -106,7 +124,7 @@ export function BotDiscordDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Invite Bot to a Server
+              {t("pages.bots.inviteDiscordBot")}
             </a>
             <a
               href={devPortalUrl}
@@ -115,27 +133,28 @@ export function BotDiscordDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Open Discord Developer Portal
+              {t("pages.bots.openDiscordDevPortal")}
             </a>
           </div>
         </div>
 
         <div className="rounded-lg border p-4 space-y-3">
-          <h3 className="text-sm font-medium">Setup Instructions</h3>
+          <h3 className="text-sm font-medium">
+            {t("pages.bots.setupInstructions")}
+          </h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
             <li>
-              Copy the Webhook URL above and paste it as the Interactions
-              Endpoint URL in the{" "}
+              {t("pages.bots.discordSetup1Before")}{" "}
               <a
                 href={`${devPortalUrl}/information`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline inline-flex items-center gap-0.5"
               >
-                General Information
+                {t("pages.bots.generalInformation")}
                 <ExternalLink className="h-3 w-3" />
               </a>{" "}
-              page.
+              {t("pages.bots.discordSetup1After")}
             </li>
             <li>
               <a
@@ -144,18 +163,12 @@ export function BotDiscordDetailPage() {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline inline-flex items-center gap-0.5"
               >
-                Invite the bot
+                {t("pages.bots.inviteTheBot")}
                 <ExternalLink className="h-3 w-3" />
               </a>{" "}
-              to a Discord server.
+              {t("pages.bots.discordSetup2After")}
             </li>
-            <li>
-              Create a workflow with a{" "}
-              <span className="font-medium text-foreground">
-                Receive Discord Message
-              </span>{" "}
-              trigger, select this bot, and enable it.
-            </li>
+            <li>{t("pages.bots.discordSetup3")}</li>
           </ol>
         </div>
       </div>

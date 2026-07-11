@@ -1,6 +1,7 @@
 import type { BotResponse } from "@dafthunk/types";
 import { useState } from "react";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ export function BotDiscordEditDialog({
   onOpenChange,
   onUpdated,
 }: BotDiscordEditDialogProps) {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const meta = (bot.metadata ?? {}) as Record<string, string | undefined>;
   const [name, setName] = useState(bot.name);
@@ -55,7 +57,9 @@ export function BotDiscordEditDialog({
       onUpdated();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update bot");
+      setError(
+        err instanceof Error ? err.message : t("pages.bots.updateFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -75,15 +79,15 @@ export function BotDiscordEditDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Discord Bot</DialogTitle>
+          <DialogTitle>{t("pages.bots.editDiscordTitle")}</DialogTitle>
           <DialogDescription>
-            Update your Discord bot settings.
+            {t("pages.bots.editDiscordDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-name">Name</Label>
+            <Label htmlFor="edit-name">{t("common.name")}</Label>
             <Input
               id="edit-name"
               value={name}
@@ -92,15 +96,15 @@ export function BotDiscordEditDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Application ID</Label>
+            <Label>{t("pages.bots.applicationId")}</Label>
             <Input value={meta.applicationId ?? ""} disabled />
             <p className="text-xs text-muted-foreground">
-              Application ID cannot be changed.
+              {t("pages.bots.applicationIdImmutable")}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-public-key">Public Key</Label>
+            <Label htmlFor="edit-public-key">{t("pages.bots.publicKey")}</Label>
             <Input
               id="edit-public-key"
               value={publicKey}
@@ -109,13 +113,13 @@ export function BotDiscordEditDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-bot-token">Bot Token</Label>
+            <Label htmlFor="edit-bot-token">{t("pages.bots.botToken")}</Label>
             <Input
               id="edit-bot-token"
               type="password"
               value={botToken}
               onChange={(e) => setBotToken(e.target.value)}
-              placeholder="Leave empty to keep current token"
+              placeholder={t("pages.bots.tokenKeepPlaceholder")}
             />
           </div>
 
@@ -132,14 +136,14 @@ export function BotDiscordEditDialog({
             onClick={() => handleOpenChange(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || name.trim() === ""}
           >
             {isSubmitting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Save Changes
+            {t("pages.bots.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

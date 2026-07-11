@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ export function SlackBotField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { slackBots, isSlackBotsLoading, mutateSlackBots } = useSlackBots();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -35,9 +37,15 @@ export function SlackBotField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No Slack bot"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.slackBot.none")
+              }
             >
-              {connected ? "Connected" : label || "No Slack bot"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.slackBot.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -64,12 +72,12 @@ export function SlackBotField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isSlackBotsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : slackBots?.length === 0
-                    ? "No Slack bots"
-                    : "Select Slack bot"
+                    ? t("workflow.fields.slackBot.empty")
+                    : t("workflow.fields.slackBot.select")
             }
           />
         </SelectTrigger>
@@ -81,7 +89,7 @@ export function SlackBotField({
           ))}
           {(slackBots?.length ?? 0) > 0 && <SelectSeparator />}
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Bot
+            {t("workflow.widgets.triggers.newBot")}
           </SelectItem>
         </SelectContent>
       </Select>

@@ -8,6 +8,7 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,6 +22,7 @@ import { executeNode } from "@/services/playground-service";
 import { useNodeTypes } from "@/services/type-service";
 
 export function PlaygroundExecutePage() {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
   const { nodeType: nodeTypeParam } = useParams<{ nodeType: string }>();
@@ -36,10 +38,10 @@ export function PlaygroundExecutePage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Playground", to: getOrgUrl("playground") },
+      { label: t("pages.playground.title"), to: getOrgUrl("playground") },
       { label: selectedNodeType?.name ?? nodeTypeParam ?? "" },
     ]);
-  }, [setBreadcrumbs, getOrgUrl, selectedNodeType?.name, nodeTypeParam]);
+  }, [setBreadcrumbs, getOrgUrl, selectedNodeType?.name, nodeTypeParam, t]);
 
   const [inputValues, setInputValues] = useState<Record<string, unknown>>({});
   const [defaultsInitialized, setDefaultsInitialized] = useState(false);
@@ -47,7 +49,6 @@ export function PlaygroundExecutePage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ExecuteNodeResponse | null>(null);
 
-  // Initialize default values once the node type is loaded
   if (selectedNodeType && !defaultsInitialized) {
     const defaults: Record<string, unknown> = {};
     for (const input of selectedNodeType.inputs) {
@@ -128,7 +129,10 @@ export function PlaygroundExecutePage() {
     } catch (error) {
       setResult({
         status: "error",
-        error: error instanceof Error ? error.message : "Execution failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : t("pages.playgroundExecute.executionFailed"),
         usage: 0,
       });
     } finally {
@@ -138,7 +142,7 @@ export function PlaygroundExecutePage() {
 
   if (isNodeTypesLoading) {
     return (
-      <InsetLayout title="Playground">
+      <InsetLayout title={t("pages.playground.title")}>
         <div className="flex items-center justify-center py-16">
           <Spinner />
         </div>
@@ -148,10 +152,12 @@ export function PlaygroundExecutePage() {
 
   if (!selectedNodeType) {
     return (
-      <InsetLayout title="Playground">
+      <InsetLayout title={t("pages.playground.title")}>
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-sm">
-            Node type &ldquo;{nodeTypeParam}&rdquo; not found.
+            {t("pages.playgroundExecute.nodeNotFound", {
+              type: nodeTypeParam ?? "",
+            })}
           </p>
         </div>
       </InsetLayout>
@@ -161,9 +167,8 @@ export function PlaygroundExecutePage() {
   const visibleInputs = workflowInputs;
 
   return (
-    <InsetLayout title="Playground">
+    <InsetLayout title={t("pages.playground.title")}>
       <div className="space-y-6">
-        {/* Selected node header with execute action */}
         <div className="flex items-center gap-3 border rounded-lg p-4 bg-card">
           <DynamicIcon
             name={
@@ -183,28 +188,29 @@ export function PlaygroundExecutePage() {
           </div>
           <Button variant="outline" onClick={() => setIsDocsOpen(true)}>
             <CircleHelp className="mr-2 size-4" />
-            Help
+            {t("pages.playgroundExecute.help")}
           </Button>
           <Button onClick={handleExecute} disabled={isExecuting}>
             {isExecuting ? (
               <>
                 <Spinner className="mr-2" />
-                Executing...
+                {t("pages.playgroundExecute.executing")}
               </>
             ) : (
               <>
                 <Play className="mr-2 size-4" />
-                Execute
+                {t("pages.playgroundExecute.execute")}
               </>
             )}
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Inputs */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Inputs</CardTitle>
+              <CardTitle className="text-base">
+                {t("pages.playgroundExecute.inputs")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {visibleInputs.length > 0 ? (
@@ -244,16 +250,17 @@ export function PlaygroundExecutePage() {
                 )
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  This node has no inputs.
+                  {t("pages.playgroundExecute.noInputs")}
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Outputs */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Outputs</CardTitle>
+              <CardTitle className="text-base">
+                {t("pages.playgroundExecute.outputs")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {workflowOutputs.length > 0 ? (
@@ -270,17 +277,18 @@ export function PlaygroundExecutePage() {
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  This node has no outputs.
+                  {t("pages.playgroundExecute.noOutputs")}
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Error - only show when there's an error */}
           {result?.status === "error" && result.error && (
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Error</CardTitle>
+                <CardTitle className="text-base">
+                  {t("pages.playgroundExecute.error")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-red-600 dark:text-red-400">

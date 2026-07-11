@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ export function DiscordBotField({
   onChange,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { discordBots, isDiscordBotsLoading, mutateDiscordBots } =
     useDiscordBots();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -36,9 +38,15 @@ export function DiscordBotField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No Discord bot"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.discordBot.none")
+              }
             >
-              {connected ? "Connected" : label || "No Discord bot"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.discordBot.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -65,12 +73,12 @@ export function DiscordBotField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isDiscordBotsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : discordBots?.length === 0
-                    ? "No Discord bots"
-                    : "Select Discord bot"
+                    ? t("workflow.fields.discordBot.empty")
+                    : t("workflow.fields.discordBot.select")
             }
           />
         </SelectTrigger>
@@ -82,7 +90,7 @@ export function DiscordBotField({
           ))}
           {(discordBots?.length ?? 0) > 0 && <SelectSeparator />}
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Bot
+            {t("workflow.widgets.triggers.newBot")}
           </SelectItem>
         </SelectContent>
       </Select>

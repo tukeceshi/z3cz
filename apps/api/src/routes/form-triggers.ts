@@ -24,7 +24,7 @@ import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-lim
 import { CloudflareObjectStore } from "../runtime/cloudflare-object-store";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
-import { isCreditExhausted } from "../utils/credits";
+import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
 import {
   type FormTriggerInfo,
   findFormResponse,
@@ -169,7 +169,10 @@ formTriggerRoutes.post(
     if (!billingInfo) {
       return c.json({ error: "Organization not found" }, 404);
     }
-    if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
+    if (
+      !shouldSkipPlatformCreditCheck(workflow.billingMode) &&
+      isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
+    ) {
       return c.json({ error: "Insufficient compute credits" }, 402 as const);
     }
 
@@ -210,6 +213,7 @@ formTriggerRoutes.post(
       workflow: {
         id: workflow.id,
         name: workflow.name,
+        billingMode: workflow.billingMode,
         trigger: workflowData.trigger,
         runtime,
         nodes: workflowData.nodes,

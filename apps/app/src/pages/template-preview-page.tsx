@@ -2,6 +2,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { useTemplate } from "@/services/template-service";
 import { useNodeTypes } from "@/services/type-service";
@@ -15,6 +16,7 @@ import {
  * No authentication required
  */
 export function TemplatePreviewPage() {
+  const { t } = useTranslation();
   const { templateId } = useParams<{ templateId: string }>();
   const [searchParams] = useSearchParams();
   const showBackground = searchParams.get("bg") !== "false";
@@ -29,8 +31,6 @@ export function TemplatePreviewPage() {
     revalidateOnFocus: false,
   });
 
-  // When embedded without background, make html/body transparent so the
-  // host page's background shows through the iframe.
   useEffect(() => {
     if (showBackground) return;
     const { documentElement, body } = document;
@@ -44,7 +44,6 @@ export function TemplatePreviewPage() {
     };
   }, [showBackground]);
 
-  // Convert template to React Flow nodes and edges
   const { nodes, edges } = useMemo(() => {
     if (!template || nodeTypes.length === 0) {
       return { nodes: [], edges: [] };
@@ -59,20 +58,20 @@ export function TemplatePreviewPage() {
     return { nodes: convertedNodes, edges: convertedEdges };
   }, [template, nodeTypes]);
 
-  // Loading state
   if (isTemplateLoading || isNodeTypesLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-neutral-50">
-        <div className="animate-pulse text-neutral-400">Loading...</div>
+        <div className="animate-pulse text-neutral-400">
+          {t("pages.templatePreview.loading")}
+        </div>
       </div>
     );
   }
 
-  // Template not found
   if (!template) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-neutral-50">
-        <div className="text-neutral-500">Template not found</div>
+        <div className="text-neutral-500">{t("pages.templatePreview.notFound")}</div>
       </div>
     );
   }

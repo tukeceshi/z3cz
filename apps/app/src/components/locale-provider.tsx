@@ -1,4 +1,5 @@
 import type { AppLocale, PublicSiteSettings } from "@dafthunk/types";
+import { DEFAULT_PLATFORM_FEATURE_CONFIG } from "@dafthunk/types";
 import {
   createContext,
   useCallback,
@@ -11,6 +12,7 @@ import useSWR from "swr";
 
 import {
   createTranslator,
+  detectBrowserLocale,
   LOCALE_STORAGE_KEY,
   readStoredLocale,
   resolveInitialLocale,
@@ -29,8 +31,9 @@ interface LocaleContextValue {
 const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   siteName: "Dafthunk",
   siteTagline: "Build serverless workflows visually.",
-  defaultLocale: "en",
+  defaultLocale: "zh",
   supportEmail: null,
+  featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
@@ -48,7 +51,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const siteSettings = data ?? DEFAULT_SITE_SETTINGS;
 
   const [locale, setLocaleState] = useState<AppLocale>(() =>
-    resolveInitialLocale(DEFAULT_SITE_SETTINGS.defaultLocale)
+    resolveInitialLocale(readStoredLocale() ?? detectBrowserLocale())
   );
 
   useEffect(() => {

@@ -2,13 +2,13 @@
  * EmailAgentRunner Durable Object
  *
  * Drives an agent that pursues a goal by emailing one or more interlocutors and
- * waiting �?for days if needed �?for their replies. The workflow node parks once
+ * waiting �?for days if needed �?for their replies. The workflow node parks once
  * on `email-agent-complete-${nodeId}` with a long timeout; this DO owns the
  * multi-turn conversation in between.
  *
  * The agent's `ask_interlocutor` tool is a *suspending* tool (see
- * {@link runAgentLoop}). When the model calls it �?possibly several times in one
- * turn, to question multiple interlocutors in parallel �?the loop parks and this
+ * {@link runAgentLoop}). When the model calls it �?possibly several times in one
+ * turn, to question multiple interlocutors in parallel �?the loop parks and this
  * DO sends the emails, registers each thread for reply routing, and sets an
  * alarm per reply deadline. Replies arrive via {@link deliverReply}; once every
  * outstanding ask in the turn is settled (replied or timed out) the loop
@@ -30,6 +30,7 @@ import type { TokenPricing } from "@dafthunk/runtime/utils/usage";
 import { calculateTokenUsage } from "@dafthunk/runtime/utils/usage";
 
 import type { Bindings } from "../context";
+import { buildMultiplexWorkflowSendEvent } from "../runtime/workflow-event-utils";
 import { createDatabase, getEmail } from "../db";
 import { CloudflareMailboxService } from "../runtime/cloudflare-mailbox-service";
 import { callAgentLLM } from "./agent-llm";
@@ -52,7 +53,7 @@ import type { MailboxMessageRow } from "./mailbox-do";
 const ASK_TOOL = "ask_interlocutor";
 const NO_REPLY_SENTINEL = "(no reply received before the deadline)";
 
-// ── Request type ─────────────────────────────────────────────────────────────
+// ?? Request type ?????????????????????????????????????????????????????????????
 
 export interface EmailInterlocutor {
   /** Stable id the agent uses to address this interlocutor. */
@@ -63,7 +64,7 @@ export interface EmailInterlocutor {
 }
 
 export interface EmailAgentRunRequest {
-  /** Unique run id �?DO instance name, `${executionId}:${nodeId}`. */
+  /** Unique run id �?DO instance name, `${executionId}:${nodeId}`. */
   runId: string;
   executionInstanceId: string;
   nodeId: string;
@@ -92,7 +93,7 @@ export interface EmailAgentRunRequest {
   schema?: Record<string, unknown>;
 }
 
-// ── Internal persisted shapes ────────────────────────────────────────────────
+// ?? Internal persisted shapes ????????????????????????????????????????????????
 
 interface ThreadRef {
   threadId: string;
@@ -110,14 +111,14 @@ interface TranscriptThread {
 
 type RunStatus = "running" | "waiting" | "completed" | "error";
 
-// ── Durable Object ───────────────────────────────────────────────────────────
+// ?? Durable Object ???????????????????????????????????????????????????????????
 
 export class EmailAgentRunner extends DurableObject<Bindings> {
   private get storage(): DurableObjectStorage {
     return this.ctx.storage;
   }
 
-  // ── Public RPC ─────────────────────────────────────────────────────────
+  // ?? Public RPC ?????????????????????????????????????????????????????????
 
   /**
    * HTTP entry used by the workflow node (which lives in a package that can't
@@ -177,7 +178,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
   /**
    * Deliver an inbound reply for one of the threads this run is waiting on.
    * Called by the inbound-mail handler. Returns whether the reply matched a
-   * pending ask (false �?fall through to normal handling).
+   * pending ask (false �?fall through to normal handling).
    */
   async deliverReply(args: {
     threadId: string;
@@ -216,7 +217,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     }
   }
 
-  // ── Loop driver ──────────────────────────────────────────────────────────
+  // ?? Loop driver ??????????????????????????????????????????????????????????
 
   /** Run the agent loop forward until it suspends on asks or completes. */
   private async runLoop(resume?: ResolvedToolResult[]): Promise<void> {
@@ -386,7 +387,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     await this.storage.put("status", "waiting" satisfies RunStatus);
 
     if (allSettled(pending)) {
-      // Nothing to wait for (all failed/invalid) �?resume immediately.
+      // Nothing to wait for (all failed/invalid) �?resume immediately.
       this.ctx.waitUntil(this.resumeFromPending(pending));
     } else {
       await this.storage.setAlarm(deadline);
@@ -401,7 +402,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     await this.runLoop(resume);
   }
 
-  // ── Completion / failure ─────────────────────────────────────────────────
+  // ?? Completion / failure ?????????????????????????????????????????????????
 
   private async complete(
     request: EmailAgentRunRequest,
@@ -425,10 +426,14 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     }
     try {
       const instance = await this.env.EXECUTE.get(request.executionInstanceId);
-      await instance.sendEvent({
-        type: `email-agent-complete-${request.nodeId}`,
-        payload: { outputs: {}, usage: 0, error: message },
-      });
+      await instance.sendEvent(
+        buildMultiplexWorkflowSendEvent(
+          request.executionInstanceId,
+          `email-agent-complete-${request.nodeId}`,
+          { outputs: {}, usage: 0, error: message },
+          request.nodeId
+        )
+      );
     } catch (error) {
       console.error("EmailAgentRunner failed to send error event:", error);
     }
@@ -439,26 +444,30 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
     completion: EmailCompletion
   ): Promise<void> {
     const instance = await this.env.EXECUTE.get(request.executionInstanceId);
-    await instance.sendEvent({
-      type: `email-agent-complete-${request.nodeId}`,
-      payload: {
-        outputs: {
-          result: completion.result,
-          transcript: completion.transcript,
-          rounds: completion.rounds,
-          finish_reason: completion.finishReason,
-          usage_metadata: {
-            totalInputTokens: completion.totalInputTokens,
-            totalOutputTokens: completion.totalOutputTokens,
+    await instance.sendEvent(
+      buildMultiplexWorkflowSendEvent(
+        request.executionInstanceId,
+        `email-agent-complete-${request.nodeId}`,
+        {
+          outputs: {
+            result: completion.result,
+            transcript: completion.transcript,
+            rounds: completion.rounds,
+            finish_reason: completion.finishReason,
+            usage_metadata: {
+              totalInputTokens: completion.totalInputTokens,
+              totalOutputTokens: completion.totalOutputTokens,
+            },
           },
+          usage: completion.usage,
+          ...(completion.error ? { error: completion.error } : {}),
         },
-        usage: completion.usage,
-        ...(completion.error ? { error: completion.error } : {}),
-      },
-    });
+        request.nodeId
+      )
+    );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────
+  // ?? Helpers ????????????????????????????????????????????????????????????
 
   private async buildTools(
     request: EmailAgentRunRequest
@@ -522,7 +531,7 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
         `Use the ${ASK_TOOL} tool to email an interlocutor and wait for their reply. ` +
         "You may contact several interlocutors in parallel by issuing multiple " +
         `${ASK_TOOL} calls in a single turn. A reply of "${NO_REPLY_SENTINEL}" ` +
-        "means that interlocutor did not respond in time �?decide how to proceed. " +
+        "means that interlocutor did not respond in time �?decide how to proceed. " +
         "When you have achieved the objective, stop calling tools and give your final result.",
       `Interlocutors you may contact:\n${roster}`,
     ]
@@ -562,8 +571,8 @@ export class EmailAgentRunner extends DurableObject<Bindings> {
   }
 
   /**
-   * Assemble the conversation transcript from the mailbox �?the system of record
-   * for every sent message and reply �?one entry per interlocutor thread.
+   * Assemble the conversation transcript from the mailbox �?the system of record
+   * for every sent message and reply �?one entry per interlocutor thread.
    */
   private async buildTranscript(
     request: EmailAgentRunRequest

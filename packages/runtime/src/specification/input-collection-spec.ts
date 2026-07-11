@@ -13,7 +13,7 @@ export function testInputCollection(
 ) {
   describe(`${runtimeName}: input collection`, () => {
     it("should collect inputs from node static values", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-static-inputs",
         name: "Static Inputs",
         trigger: "manual",
@@ -46,7 +46,7 @@ export function testInputCollection(
     });
 
     it("should collect inputs from edges", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-edge-inputs",
         name: "Edge Inputs",
         trigger: "manual",
@@ -108,7 +108,7 @@ export function testInputCollection(
     });
 
     it("should override static values with edge inputs (edge takes precedence)", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-override",
         name: "Input Override",
         trigger: "manual",
@@ -161,7 +161,7 @@ export function testInputCollection(
     });
 
     it("should handle multiple edges to same input (last edge wins)", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-multiple-edges",
         name: "Multiple Edges Same Input",
         trigger: "manual",
@@ -245,7 +245,7 @@ export function testInputCollection(
     });
 
     it("should handle mixed static and edge inputs", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-mixed-inputs",
         name: "Mixed Inputs",
         trigger: "manual",

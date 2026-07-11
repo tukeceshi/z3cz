@@ -3,6 +3,7 @@ import List from "lucide-react/icons/list";
 import Loader2 from "lucide-react/icons/loader-2";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,6 +50,7 @@ function highlightMatch(text: string, searchTerm: string) {
 }
 
 export function NodesBrowser() {
+  const { t } = useTranslation();
   const { nodeTypes, isNodeTypesLoading, nodeTypesError } = useNodeTypes();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -207,7 +209,7 @@ export function NodesBrowser() {
     return (
       <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4">
         <p className="text-sm text-destructive">
-          Failed to load node types. Please try again later.
+          {t("pages.nodeBrowser.loadError")}
         </p>
       </div>
     );
@@ -220,7 +222,7 @@ export function NodesBrowser() {
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex-1 min-w-0">
             <SearchInput
-              placeholder="Search nodes by name, description, or tag..."
+              placeholder={t("pages.nodeBrowser.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full max-w-lg"
@@ -236,11 +238,11 @@ export function NodesBrowser() {
             <TabsList>
               <TabsTrigger value="card" className="flex items-center gap-2">
                 <Grid className="size-4" />
-                Cards
+                {t("pages.nodeBrowser.cards")}
               </TabsTrigger>
               <TabsTrigger value="list" className="flex items-center gap-2">
                 <List className="size-4" />
-                List
+                {t("pages.nodeBrowser.list")}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -260,7 +262,9 @@ export function NodesBrowser() {
       {isNodeTypesLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Loading nodes...</span>
+          <span className="ml-2 text-muted-foreground">
+            {t("pages.nodeBrowser.loading")}
+          </span>
         </div>
       )}
 
@@ -270,15 +274,18 @@ export function NodesBrowser() {
           {/* Results Count */}
           <div className="text-sm text-muted-foreground">
             {filteredNodes.length === nodeTypes.length
-              ? `Showing all ${nodeTypes.length} nodes`
-              : `Showing ${filteredNodes.length} of ${nodeTypes.length} nodes`}
+              ? t("pages.nodeBrowser.showingAll", { count: nodeTypes.length })
+              : t("pages.nodeBrowser.showingFiltered", {
+                  filtered: filteredNodes.length,
+                  total: nodeTypes.length,
+                })}
           </div>
 
           {/* No Results */}
           {filteredNodes.length === 0 && !isNodeTypesLoading && (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                No nodes found matching your search criteria.
+                {t("pages.nodeBrowser.noResults")}
               </p>
               <Button
                 variant="outline"
@@ -289,7 +296,7 @@ export function NodesBrowser() {
                   setSelectedTags([]);
                 }}
               >
-                Clear filters
+                {t("pages.nodeBrowser.clearFilters")}
               </Button>
             </div>
           )}

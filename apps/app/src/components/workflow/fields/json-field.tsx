@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { cn } from "@/utils/utils";
@@ -17,6 +18,8 @@ export function JsonField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   // Check for meaningful value (empty strings are considered "no value")
   const hasValue = value !== undefined && value !== "";
 
@@ -65,7 +68,7 @@ export function JsonField({
       <FieldPlaceholder
         className={cn("h-[200px] items-start", className)}
         connected={connected}
-        label="No value"
+        label={t("workflow.fields.noValue")}
       />
     );
   }
@@ -93,13 +96,13 @@ export function JsonField({
           className="absolute top-1 right-1 h-6 px-2 text-xs text-muted-foreground z-10"
           onClick={formatJson}
         >
-          Format
+          {t("workflow.fields.format")}
         </Button>
       )}
       {!disabled && !readonly && clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear JSON"
+          label={t("workflow.fields.clearJson")}
           className="absolute top-1 right-16 z-10"
         />
       )}

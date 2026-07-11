@@ -13,11 +13,15 @@ import {
   type GetWorkflowResponse,
   type JWTTokenPayload,
   type ListWorkflowsResponse,
+  type Node,
   type UpdateWorkflowRequest,
   type UpdateWorkflowResponse,
   type UpsertQueueTriggerRequest,
   type UpsertQueueTriggerResponse,
   type WorkflowWithMetadata,
+  WORKFLOW_SCHEME_OMNIPOTENT_ID,
+  ALL_WORKFLOW_BILLING_MODES,
+  type WorkflowBillingMode,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
@@ -35,9 +39,11 @@ import {
   getBotTrigger,
   getBotTriggersByBot,
   getEmailTrigger,
+  getEnabledWorkflowSchemeById,
   getOrganizationBillingInfo,
   getQueue,
   getQueueTrigger,
+  getDefaultWorkflowScheme,
   resolveOrganizationBillingOptions,
   stampOnboardingStage,
   upsertQueueTrigger as upsertDbQueueTrigger,
@@ -46,12 +52,18 @@ import {
 import { getAgentByName } from "../durable-objects/agent-utils";
 import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
-import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
+import { executeSingleNodeWorkflow } from "../services/single-node-executor";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
 import { getAuthContext } from "../utils/auth-context";
-import { isCreditExhausted } from "../utils/credits";
+import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
+import { getAllNodeTypes } from "../utils/node-types";
+import {
+  assertRuntimeAllowedByScheme,
+  assertTriggerAllowedByScheme,
+  getAllowedNodeTypesForScheme,
+} from "../utils/workflow-scheme";
 import {
   isExecutionPreparationError,
   prepareWorkflowExecution,
@@ -67,6 +79,13 @@ type ExtendedApiContext = ApiContext & {
 };
 
 const workflowRoutes = new Hono<ExtendedApiContext>();
+
+const workflowBillingModeSchema = z.enum(
+  ALL_WORKFLOW_BILLING_MODES as unknown as [
+    WorkflowBillingMode,
+    ...WorkflowBillingMode[],
+  ]
+);
 
 /**
  * List all workflows for the current organization
@@ -84,6 +103,8 @@ workflowRoutes.get("/", jwtMiddleware, async (c) => {
       id: workflow.id,
       name: workflow.name,
       description: workflow.description ?? undefined,
+      schemeId: workflow.schemeId,
+      billingMode: workflow.billingMode,
       trigger: workflow.trigger,
       runtime: workflow.runtime,
       enabled: workflow.enabled,
@@ -109,6 +130,8 @@ workflowRoutes.post(
     z.object({
       name: z.string().min(1, "Workflow name is required"),
       description: z.string().optional(),
+      schemeId: z.string().min(1).optional(),
+      billingMode: workflowBillingModeSchema.optional(),
       trigger: z.string(),
       runtime: z.enum(["worker", "workflow"]).optional().default("workflow"),
       nodes: z.array(z.any()).optional(),
@@ -121,6 +144,25 @@ workflowRoutes.post(
 
     const organizationId = c.get("organizationId")!;
     const userId = c.var.jwtPayload?.sub;
+    const db = createDatabase(c.env);
+
+    const schemeId = data.schemeId ?? WORKFLOW_SCHEME_OMNIPOTENT_ID;
+    const scheme =
+      (await getEnabledWorkflowSchemeById(db, schemeId)) ??
+      (await getDefaultWorkflowScheme(db));
+    if (!scheme) {
+      return c.json({ error: "Workflow scheme not found" }, 400);
+    }
+
+    try {
+      assertTriggerAllowedByScheme(scheme, data.trigger);
+      assertRuntimeAllowedByScheme(scheme, data.runtime || "workflow");
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : "Invalid scheme selection" },
+        400
+      );
+    }
 
     const workflowId = uuid();
     const workflowName = data.name || "Untitled Workflow";
@@ -138,15 +180,20 @@ workflowRoutes.post(
     const workflowData = {
       id: workflowId,
       name: workflowName,
+      schemeId: scheme.id,
       trigger: data.trigger,
       runtime: data.runtime || "workflow",
       nodes,
       edges,
     };
 
-    const registry = await createCloudflareNodeRegistry(c.env, false);
-    const nodeTypes = registry.getNodeTypes();
-    const validationErrors = validateWorkflow(workflowData, nodeTypes);
+    const allNodeTypes = await getAllNodeTypes(c.env, c.executionCtx);
+    const allowedNodeTypes = getAllowedNodeTypesForScheme(allNodeTypes, scheme);
+    const validationErrors = validateWorkflow(
+      workflowData,
+      allNodeTypes,
+      allowedNodeTypes
+    );
     if (validationErrors.length > 0) {
       return c.json({ errors: validationErrors }, 400);
     }
@@ -158,6 +205,8 @@ workflowRoutes.post(
       id: workflowData.id,
       name: workflowData.name,
       description: data.description,
+      schemeId: scheme.id,
+      billingMode: data.billingMode ?? "platform",
       trigger: workflowData.trigger,
       runtime: workflowData.runtime,
       organizationId: organizationId,
@@ -182,6 +231,8 @@ workflowRoutes.post(
       id: savedWorkflow.id,
       name: savedWorkflow.name,
       description: savedWorkflow.description,
+      schemeId: scheme.id,
+      billingMode: data.billingMode ?? "platform",
       trigger: savedWorkflow.trigger,
       runtime: savedWorkflow.runtime,
       createdAt: now,
@@ -219,6 +270,8 @@ workflowRoutes.get("/:id", jwtMiddleware, async (c) => {
       id: workflow.id,
       name: workflow.name,
       description: workflow.description ?? undefined,
+      schemeId: workflow.schemeId,
+      billingMode: workflow.billingMode,
       trigger: workflow.trigger,
       runtime: workflow.runtime,
       enabled: workflow.enabled,
@@ -246,6 +299,7 @@ workflowRoutes.put(
     z.object({
       name: z.string().min(1, "Workflow name is required"),
       description: z.string().optional(),
+      billingMode: workflowBillingModeSchema.optional(),
       trigger: z.string().optional(),
       runtime: z.enum(["worker", "workflow"]).optional(),
       nodes: z.array(z.any()).optional(),
@@ -308,18 +362,42 @@ workflowRoutes.put(
         )
       : existingWorkflowData.edges;
 
+    const nextTrigger = data.trigger || existingWorkflowData.trigger;
+    const nextRuntime = data.runtime || existingWorkflow.runtime;
+
+    const db = createDatabase(c.env);
+    const scheme =
+      (await getEnabledWorkflowSchemeById(db, existingWorkflow.schemeId)) ??
+      (await getDefaultWorkflowScheme(db));
+    if (!scheme) {
+      return c.json({ error: "Workflow scheme not found" }, 400);
+    }
+
+    try {
+      assertTriggerAllowedByScheme(scheme, nextTrigger);
+      assertRuntimeAllowedByScheme(scheme, nextRuntime);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : "Invalid scheme selection" },
+        400
+      );
+    }
+
     const workflowToValidate = {
       id: existingWorkflow.id,
       name: data.name ?? existingWorkflow.name,
-      trigger: data.trigger || existingWorkflowData.trigger,
+      schemeId: existingWorkflow.schemeId,
+      trigger: nextTrigger,
+      runtime: nextRuntime,
       nodes: sanitizedNodes,
       edges: sanitizedEdges,
     };
-    const updateRegistry = await createCloudflareNodeRegistry(c.env, false);
-    const updateNodeTypes = updateRegistry.getNodeTypes();
+    const allNodeTypes = await getAllNodeTypes(c.env, c.executionCtx);
+    const allowedNodeTypes = getAllowedNodeTypesForScheme(allNodeTypes, scheme);
     const validationErrors = validateWorkflow(
       workflowToValidate,
-      updateNodeTypes
+      allNodeTypes,
+      allowedNodeTypes
     );
     if (validationErrors.length > 0) {
       return c.json({ errors: validationErrors }, 400);
@@ -331,8 +409,11 @@ workflowRoutes.put(
       name: data.name ?? existingWorkflow.name,
       description:
         data.description ?? existingWorkflow.description ?? undefined,
-      trigger: data.trigger || existingWorkflowData.trigger,
-      runtime: data.runtime || existingWorkflow.runtime,
+      schemeId: existingWorkflow.schemeId,
+      billingMode:
+        data.billingMode ?? existingWorkflow.billingMode ?? "platform",
+      trigger: nextTrigger,
+      runtime: nextRuntime,
       organizationId: organizationId,
       nodes: sanitizedNodes,
       edges: sanitizedEdges,
@@ -345,6 +426,9 @@ workflowRoutes.put(
       id: updatedWorkflowData.id,
       name: updatedWorkflowData.name,
       description: updatedWorkflowData.description ?? undefined,
+      schemeId: existingWorkflow.schemeId,
+      billingMode:
+        data.billingMode ?? existingWorkflow.billingMode ?? "platform",
       trigger: updatedWorkflowData.trigger,
       runtime: updatedWorkflowData.runtime,
       enabled: existingWorkflow.enabled,
@@ -382,7 +466,7 @@ workflowRoutes.delete("/:id", jwtMiddleware, async (c) => {
  */
 async function executeWorkflow(
   c: Context<ExtendedApiContext>,
-  workflow: { id: string; name: string },
+  workflow: { id: string; name: string; billingMode?: WorkflowBillingMode },
   workflowData: any
 ): Promise<Response> {
   const db = createDatabase(c.env);
@@ -394,7 +478,13 @@ async function executeWorkflow(
     return c.json({ error: "Organization not found" }, 404);
   }
 
-  if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
+  const billingMode =
+    workflow.billingMode ?? workflowData.billingMode ?? "platform";
+
+  if (
+    !shouldSkipPlatformCreditCheck(billingMode) &&
+    isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
+  ) {
     return c.json({ error: "Insufficient compute credits" }, 402 as const);
   }
 
@@ -411,6 +501,7 @@ async function executeWorkflow(
     workflow: {
       id: workflow.id,
       name: workflow.name,
+      billingMode,
       trigger: workflowData.trigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,
@@ -481,7 +572,10 @@ workflowRoutes.on(
       );
     }
 
-    return executeWorkflow(c, workflowWithData, workflowWithData.data);
+    return executeWorkflow(c, workflowWithData, {
+      ...workflowWithData.data,
+      billingMode: workflowWithData.billingMode,
+    });
   }
 );
 
@@ -520,7 +614,109 @@ workflowRoutes.on(
       return c.json({ error: "Workflow not found" }, 404);
     }
 
-    return executeWorkflow(c, workflowWithData, workflowWithData.data);
+    return executeWorkflow(c, workflowWithData, {
+      ...workflowWithData.data,
+      billingMode: workflowWithData.billingMode,
+    });
+  }
+);
+
+/**
+ * Execute a single node in isolation (AI panel "Run" button).
+ * Prefers the node snapshot from the request body (unsaved editor values);
+ * falls back to the persisted workflow node. Runs a 1-node worker workflow.
+ */
+workflowRoutes.post(
+  "/:workflowId/nodes/:nodeId/execute",
+  jwtMiddleware,
+  async (c) => {
+    const workflowId = c.req.param("workflowId")!;
+    const nodeId = c.req.param("nodeId")!;
+    const { organizationId, userId } = getAuthContext(c);
+
+    let bodyNode: Node | undefined;
+    try {
+      const body = await c.req.json<{ node?: Node }>();
+      if (body?.node && body.node.id === nodeId) {
+        bodyNode = body.node;
+      }
+    } catch {
+      // Body is optional — fall back to persisted workflow node.
+    }
+
+    const workflowStore = new WorkflowStore(c.env);
+    const db = createDatabase(c.env);
+
+    const workflowWithData = await workflowStore.getWithData(
+      workflowId,
+      organizationId
+    );
+
+    if (!workflowWithData?.data) {
+      return c.json({ error: "Workflow not found" }, 404);
+    }
+
+    const persistedNode = workflowWithData.data.nodes.find(
+      (n) => n.id === nodeId
+    );
+    const node = bodyNode ?? persistedNode;
+    if (!node) {
+      return c.json({ error: "Node not found" }, 404);
+    }
+
+    const billingInfo = await getOrganizationBillingInfo(db, organizationId);
+    if (!billingInfo) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const billingMode = workflowWithData.billingMode ?? "platform";
+
+    if (
+      !shouldSkipPlatformCreditCheck(billingMode) &&
+      isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
+    ) {
+      return c.json({ error: "Insufficient compute credits" }, 402 as const);
+    }
+
+    try {
+      await stampOnboardingStage(db, userId, "workflowExecuted");
+    } catch (error) {
+      console.error("Failed to stamp workflow_executed onboarding:", error);
+    }
+
+    const runtimeParams = WorkflowExecutor.buildRuntimeParams({
+      workflow: {
+        id: workflowWithData.id,
+        name: workflowWithData.name,
+        billingMode,
+        trigger: workflowWithData.data.trigger,
+        nodes: [node],
+        edges: [],
+      },
+      userId,
+      organizationId,
+      ...resolveOrganizationBillingOptions(billingInfo, c.env.CLOUDFLARE_ENV),
+      env: c.env,
+    });
+
+    const execution = await executeSingleNodeWorkflow(c.env, runtimeParams);
+
+    if (execution.status === "completed") {
+      try {
+        await stampOnboardingStage(db, userId, "workflowExecutedOk");
+      } catch (error) {
+        console.error("Failed to stamp workflow_executed_ok onboarding:", error);
+      }
+    }
+
+    const response: ExecuteWorkflowResponse = {
+      id: execution.id,
+      workflowId: execution.workflowId,
+      status: execution.status,
+      nodeExecutions: execution.nodeExecutions,
+    };
+
+    return c.json(response, 201);
   }
 );
 

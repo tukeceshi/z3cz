@@ -1,12 +1,13 @@
 import { DatasetFile } from "@dafthunk/types";
 import { useEffect, useRef } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
@@ -19,6 +20,8 @@ import {
 import { formatDate } from "@/utils/date";
 
 export function DatasetDetailPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { datasetId } = useParams<{ datasetId: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { organization } = useAuth();
@@ -36,23 +39,27 @@ export function DatasetDetailPage() {
   useEffect(() => {
     if (datasetId) {
       setBreadcrumbs([
-        { label: "Datasets", to: getOrgUrl("datasets") },
+        { label: t("sidebar.datasets"), to: getOrgUrl("datasets") },
         { label: dataset?.name || datasetId },
       ]);
     }
-  }, [datasetId, dataset?.name, setBreadcrumbs, getOrgUrl]);
+  }, [datasetId, dataset?.name, setBreadcrumbs, getOrgUrl, t]);
 
   useEffect(() => {
     if (datasetError) {
-      toast.error(`Failed to fetch dataset details: ${datasetError.message}`);
+      appToast.error("pages.datasetDetail.fetchDetailsFailed", {
+        message: datasetError.message,
+      });
     }
-  }, [datasetError]);
+  }, [datasetError, appToast]);
 
   useEffect(() => {
     if (filesError) {
-      toast.error(`Failed to fetch dataset files: ${filesError.message}`);
+      appToast.error("pages.datasetDetail.fetchFilesFailed", {
+        message: filesError.message,
+      });
     }
-  }, [filesError]);
+  }, [filesError, appToast]);
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -60,7 +67,6 @@ export function DatasetDetailPage() {
     const files = event.target.files;
     if (!files || !datasetId || !organization?.id) return;
 
-    // Convert FileList to array
     const fileArray = Array.from(files);
 
     try {
@@ -70,25 +76,27 @@ export function DatasetDetailPage() {
         organization.id
       );
 
-      // Show success message for successful uploads
       if (result.success.length > 0) {
         if (result.success.length === 1) {
-          toast.success(`File "${result.success[0]}" uploaded successfully`);
+          appToast.success("pages.datasetDetail.uploadOneSuccess", {
+            file: result.success[0],
+          });
         } else {
-          toast.success(`${result.success.length} files uploaded successfully`);
+          appToast.success("pages.datasetDetail.uploadManySuccess", {
+            count: result.success.length,
+          });
         }
       }
 
-      // Show error messages for failed uploads
       if (result.errors.length > 0) {
         result.errors.forEach(({ file, error }) => {
-          toast.error(`Failed to upload "${file}": ${error}`);
+          appToast.error("pages.datasetDetail.uploadFailed", { file, error });
         });
       }
 
       mutateFiles();
     } catch (error) {
-      toast.error("Failed to upload files");
+      appToast.error("pages.datasetDetail.uploadGenericFailed");
       console.error("Upload error:", error);
     }
   };
@@ -102,10 +110,10 @@ export function DatasetDetailPage() {
         file.key.split("/").pop() || "",
         organization.id
       );
-      toast.success("File deleted successfully");
+      appToast.success("pages.datasetDetail.deleteFileSuccess");
       mutateFiles();
     } catch (error) {
-      toast.error("Failed to delete file");
+      appToast.error("pages.datasetDetail.deleteFileFailed");
       console.error("Delete error:", error);
     }
   };
@@ -120,24 +128,27 @@ export function DatasetDetailPage() {
         organization.id
       );
     } catch (error) {
-      toast.error("Failed to download file");
+      appToast.error("pages.datasetDetail.downloadFailed");
       console.error("Download error:", error);
     }
   };
 
   if (isDatasetLoading) {
-    return <InsetLoading title="Dataset Details" />;
+    return <InsetLoading title={t("pages.datasetDetail.title")} />;
   } else if (datasetError) {
     return (
-      <InsetError title="Dataset Details" errorMessage={datasetError.message} />
+      <InsetError
+        title={t("pages.datasetDetail.title")}
+        errorMessage={datasetError.message}
+      />
     );
   }
 
   if (!dataset) {
     return (
-      <InsetLayout title="Dataset Not Found">
+      <InsetLayout title={t("pages.datasetDetail.notFoundTitle")}>
         <div className="text-center py-10">
-          <p className="text-lg">Dataset not found or an error occurred.</p>
+          <p className="text-lg">{t("pages.datasetDetail.notFound")}</p>
         </div>
       </InsetLayout>
     );
@@ -148,24 +159,30 @@ export function DatasetDetailPage() {
       <div className="space-y-6">
         <div className="rounded-lg border bg-card text-card-foreground shadow-xs p-6">
           <h3 className="font-semibold leading-none tracking-tight mb-4">
-            Dataset Information
+            {t("pages.datasetDetail.infoTitle")}
           </h3>
           <div className="space-y-4">
             <div>
-              <span className="text-sm text-muted-foreground">Name:</span>
+              <span className="text-sm text-muted-foreground">
+                {t("pages.datasetDetail.infoName")}
+              </span>
               <p className="font-medium">{dataset.name}</p>
             </div>
             <div>
-              <span className="text-sm text-muted-foreground">ID:</span>
+              <span className="text-sm text-muted-foreground">
+                {t("pages.datasetDetail.infoId")}
+              </span>
               <p className="font-mono text-sm">{dataset.id}</p>
             </div>
             <div>
-              <span className="text-sm text-muted-foreground">Created:</span>
+              <span className="text-sm text-muted-foreground">
+                {t("pages.datasetDetail.infoCreated")}
+              </span>
               <p className="font-medium">{formatDate(dataset.createdAt)}</p>
             </div>
             <div>
               <span className="text-sm text-muted-foreground">
-                Last Updated:
+                {t("pages.datasetDetail.infoUpdated")}
               </span>
               <p className="font-medium">{formatDate(dataset.updatedAt)}</p>
             </div>
@@ -176,10 +193,10 @@ export function DatasetDetailPage() {
           <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="font-semibold leading-none tracking-tight">
-                Files
+                {t("pages.datasetDetail.filesTitle")}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Select multiple files to upload at once
+                {t("pages.datasetDetail.filesMultiHint")}
               </p>
             </div>
             <div className="flex gap-2">
@@ -194,22 +211,24 @@ export function DatasetDetailPage() {
                 onClick={() => fileInputRef.current?.click()}
                 variant="outline"
               >
-                Upload Files
+                {t("pages.datasetDetail.uploadFiles")}
               </Button>
             </div>
           </div>
 
           {isFilesLoading ? (
-            <div className="text-center py-4">Loading files...</div>
+            <div className="text-center py-4">
+              {t("pages.datasetDetail.filesLoading")}
+            </div>
           ) : filesError ? (
             <div className="text-center py-4 text-destructive">
-              Failed to load files
+              {t("pages.datasetDetail.filesLoadFailed")}
             </div>
           ) : files.length === 0 ? (
             <div className="text-center py-4 text-muted-foreground">
-              <p>No files uploaded yet</p>
+              <p>{t("pages.datasetDetail.filesEmpty")}</p>
               <p className="text-xs mt-1">
-                You can select multiple files at once
+                {t("pages.datasetDetail.filesEmptyHint")}
               </p>
             </div>
           ) : (
@@ -234,7 +253,7 @@ export function DatasetDetailPage() {
                       size="sm"
                       onClick={() => handleFileDownload(file)}
                     >
-                      Download
+                      {t("pages.datasetDetail.download")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -242,7 +261,7 @@ export function DatasetDetailPage() {
                       onClick={() => handleFileDelete(file)}
                       className="text-destructive hover:text-destructive"
                     >
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </div>
                 </div>

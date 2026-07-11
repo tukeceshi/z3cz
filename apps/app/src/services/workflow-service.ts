@@ -10,6 +10,7 @@ import {
   GetEmailTriggerResponse,
   GetWorkflowResponse,
   ListWorkflowsResponse,
+  Node,
   UpdateWorkflowRequest,
   UpdateWorkflowResponse,
   WorkflowExecution,
@@ -201,6 +202,27 @@ export const getWorkflow = async (
     orgId,
     API_ENDPOINT_BASE,
     `/${id}`
+  );
+};
+
+/**
+ * Execute a single node of a workflow in isolation (dev / AI panel "Run").
+ * Returns the full workflow execution record including node outputs.
+ */
+export const executeWorkflowNode = async (
+  workflowId: string,
+  nodeId: string,
+  orgId: string,
+  node?: Node
+): Promise<ExecuteWorkflowResponse> => {
+  return await makeOrgRequest<ExecuteWorkflowResponse>(
+    orgId,
+    API_ENDPOINT_BASE,
+    `/${workflowId}/nodes/${nodeId}/execute`,
+    {
+      method: "POST",
+      body: JSON.stringify(node ? { node } : {}),
+    }
   );
 };
 

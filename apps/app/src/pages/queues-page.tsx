@@ -1,12 +1,13 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { QueueSnippetsDialog } from "@/components/queue-snippets-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -28,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { TranslateFn } from "@/i18n";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   createQueue,
@@ -46,20 +48,25 @@ interface QueueRow {
 function createColumns(
   openSnippetsDialog: (queue: QueueRow) => void,
   openEditDialog: (queue: QueueRow) => void,
-  openDeleteDialog: (queue: QueueRow) => void
+  openDeleteDialog: (queue: QueueRow) => void,
+  t: TranslateFn
 ): ColumnDef<QueueRow>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => {
         const name = row.getValue("name") as string;
-        return <span className="font-medium">{name || "Untitled Queue"}</span>;
+        return (
+          <span className="font-medium">
+            {name || t("pages.queues.untitled")}
+          </span>
+        );
       },
     },
     {
       id: "endpoint",
-      header: "Endpoint",
+      header: t("pages.queues.endpoint"),
       cell: ({ row }) => {
         const queue = row.original;
         const endpoint = `/api/queues/${queue.id}/publish`;
@@ -79,19 +86,19 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => openSnippetsDialog(queue)}>
-                  Integrate
+                  {t("pages.queues.integrate")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openEditDialog(queue)}>
-                  Edit
+                  {t("common.edit")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(queue)}>
-                  Delete
+                  {t("common.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -103,6 +110,7 @@ function createColumns(
 }
 
 export function QueuesPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [snippetsDialogOpen, setSnippetsDialogOpen] = useState(false);
   const [queueForSnippets, setQueueForSnippets] = useState<QueueRow | null>(
@@ -123,8 +131,8 @@ export function QueuesPage() {
   const { queues, queuesError, isQueuesLoading, mutateQueues } = useQueues();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Queues" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.queues") }]);
+  }, [setBreadcrumbs, t]);
 
   const openSnippetsDialog = (queue: QueueRow) => {
     setQueueForSnippets(queue);
@@ -178,43 +186,43 @@ export function QueuesPage() {
     }
   };
 
-  const columns = createColumns(
-    openSnippetsDialog,
-    openEditDialog,
-    openDeleteDialog
+  const columns = useMemo(
+    () => createColumns(openSnippetsDialog, openEditDialog, openDeleteDialog, t),
+    [openSnippetsDialog, openEditDialog, openDeleteDialog, t]
   );
 
   if (isQueuesLoading) {
-    return <InsetLoading title="Queues" />;
+    return <InsetLoading title={t("pages.queues.title")} />;
   } else if (queuesError) {
-    return <InsetError title="Queues" errorMessage={queuesError.message} />;
+    return (
+      <InsetError title={t("pages.queues.title")} errorMessage={queuesError.message} />
+    );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Queues">
+      <InsetLayout title={t("pages.queues.title")}>
         <div className="flex items-center justify-between mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Create and manage message queues to trigger your workflows from
-            external events.
+            {t("pages.queues.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Create Queue
+            {t("pages.queues.createButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={(queues as QueueRow[]) || []}
           emptyState={{
-            title: "No queues found",
-            description: "Create a new queue to get started.",
+            title: t("pages.queues.emptyTitle"),
+            description: t("pages.queues.emptyDescription"),
           }}
         />
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Queue</DialogTitle>
+              <DialogTitle>{t("pages.queues.createDialogTitle")}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={async (e) => {
@@ -226,11 +234,11 @@ export function QueuesPage() {
               className="space-y-4"
             >
               <div>
-                <Label htmlFor="name">Queue Name</Label>
+                <Label htmlFor="name">{t("pages.queues.queueName")}</Label>
                 <Input
                   id="name"
                   name="name"
-                  placeholder="Enter queue name"
+                  placeholder={t("pages.queues.queueNamePlaceholder")}
                   className="mt-2"
                 />
               </div>
@@ -240,9 +248,9 @@ export function QueuesPage() {
                   type="button"
                   onClick={() => setIsCreateDialogOpen(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
-                <Button type="submit">Create Queue</Button>
+                <Button type="submit">{t("pages.queues.createQueue")}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -258,11 +266,13 @@ export function QueuesPage() {
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Queue</DialogTitle>
-              <DialogDescription>Rename your queue.</DialogDescription>
+              <DialogTitle>{t("pages.queues.editDialogTitle")}</DialogTitle>
+              <DialogDescription>
+                {t("pages.queues.editDialogDescription")}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="edit-queue-name">Name</Label>
+              <Label htmlFor="edit-queue-name">{t("common.name")}</Label>
               <Input
                 id="edit-queue-name"
                 value={editName}
@@ -275,14 +285,14 @@ export function QueuesPage() {
                 onClick={() => setEditDialogOpen(false)}
                 disabled={isEditing}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleEditQueue}
                 disabled={isEditing || editName.trim() === ""}
               >
                 {isEditing ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                Save
+                {t("common.save")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -290,11 +300,11 @@ export function QueuesPage() {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Queue</DialogTitle>
+              <DialogTitle>{t("pages.queues.deleteTitle")}</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "
-                {queueToDelete?.name || "Untitled Queue"}"? This action cannot
-                be undone.
+                {t("pages.queues.deleteConfirm", {
+                  name: queueToDelete?.name || t("pages.queues.untitled"),
+                })}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -303,7 +313,7 @@ export function QueuesPage() {
                 onClick={() => setDeleteDialogOpen(false)}
                 disabled={isDeleting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -311,7 +321,7 @@ export function QueuesPage() {
                 disabled={isDeleting}
               >
                 {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                Delete
+                {t("common.delete")}
               </Button>
             </DialogFooter>
           </DialogContent>

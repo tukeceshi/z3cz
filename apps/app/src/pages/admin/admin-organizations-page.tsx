@@ -8,11 +8,13 @@ import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAdminSearch } from "@/hooks/use-admin-search";
+import type { TranslateFn } from "@/i18n";
 import {
   type AdminOrganization,
   useAdminOrganizations,
@@ -20,12 +22,13 @@ import {
 import { formatDate } from "@/utils/date";
 
 function createColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminOrganization>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("admin.common.name"),
       cell: ({ row }) => (
         <Link
           to={`/admin/organizations/${row.original.id}`}
@@ -37,15 +40,15 @@ function createColumns(
     },
     {
       accessorKey: "memberCount",
-      header: "Members",
+      header: t("admin.common.members"),
     },
     {
       accessorKey: "workflowCount",
-      header: "Workflows",
+      header: t("admin.common.workflows"),
     },
     {
       accessorKey: "subscriptionStatus",
-      header: "Status",
+      header: t("admin.common.status"),
       cell: ({ row }) => (
         <div className="flex flex-wrap gap-1">
           {row.original.subscriptionStatus ? (
@@ -59,17 +62,19 @@ function createColumns(
               {row.original.subscriptionStatus}
             </Badge>
           ) : (
-            <Badge variant="outline">trial</Badge>
+            <Badge variant="outline">{t("admin.common.trial")}</Badge>
           )}
           {row.original.creditsExhausted && (
-            <Badge variant="destructive">credits exhausted</Badge>
+            <Badge variant="destructive">
+              {t("admin.common.creditsExhausted")}
+            </Badge>
           )}
         </div>
       ),
     },
     {
       accessorKey: "createdAt",
-      header: "Created",
+      header: t("admin.common.created"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.createdAt)}
@@ -83,7 +88,7 @@ function createColumns(
           <DropdownMenuItem
             onClick={() => navigate(`/admin/organizations/${row.original.id}`)}
           >
-            View
+            {t("admin.common.view")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -97,11 +102,12 @@ export function AdminOrganizationsPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Organizations" }]);
+    setBreadcrumbs([{ label: t("sidebar.organizations") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const {
     organizations,
@@ -110,36 +116,36 @@ export function AdminOrganizationsPage() {
     isOrganizationsLoading,
   } = useAdminOrganizations(page, limit, search || undefined);
 
-  const columns = useMemo(() => createColumns(navigate), [navigate]);
+  const columns = useMemo(
+    () => createColumns(navigate, t),
+    [navigate, t]
+  );
 
   if (isOrganizationsLoading) {
-    return <InsetLoading title="Organizations" />;
+    return <InsetLoading title={t("admin.organizations.title")} />;
   }
 
   if (organizationsError) {
     return (
       <InsetError
-        title="Organizations"
+        title={t("admin.organizations.title")}
         errorMessage={organizationsError.message}
       />
     );
   }
 
   return (
-    <InsetLayout title="Organizations">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name..."
-        search={formProps}
-      />
+    <InsetLayout title={t("admin.organizations.title")}>
+      <AdminTableToolbar search={formProps} />
 
       <DataTable
         columns={columns}
         data={organizations}
         emptyState={{
-          title: "No organizations found",
+          title: t("admin.organizations.emptyTitle"),
           description: search
-            ? "No organizations match your search."
-            : "No organizations have been created yet.",
+            ? t("admin.organizations.emptySearch")
+            : t("admin.organizations.emptyDefault"),
         }}
       />
 
@@ -149,7 +155,7 @@ export function AdminOrganizationsPage() {
         itemCount={organizations.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="organizations"
+        itemLabel={t("admin.pagination.organizations")}
         onPageChange={setPage}
       />
     </InsetLayout>

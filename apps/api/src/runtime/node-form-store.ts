@@ -1,6 +1,7 @@
 import type { WorkflowExecution } from "@dafthunk/types";
 
 import { nodeWorkflowEventHub } from "./node-workflow-event-hub";
+import { buildMultiplexWorkflowSendEvent } from "./workflow-event-utils";
 
 interface FormSubmissionRecord {
   readonly submitted: boolean;
@@ -83,20 +84,17 @@ class NodeFormStore {
 
     this.forms.set(token, { submitted: true, submittedAt: Date.now() });
 
-    const delivered = nodeWorkflowEventHub.sendEvent(executionId, {
-      type: `form-response-${token}`,
-      payload: {
-        outputs: { response },
-        usage: 0,
-      },
-    });
-
-    if (!delivered) {
-      return {
-        success: false,
-        error: "Failed to resume workflow. The execution may have expired.",
-      };
-    }
+    nodeWorkflowEventHub.sendEvent(
+      executionId,
+      buildMultiplexWorkflowSendEvent(
+        executionId,
+        `form-response-${token}`,
+        {
+          outputs: { response },
+          usage: 0,
+        }
+      )
+    );
 
     return { success: true };
   }

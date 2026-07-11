@@ -158,25 +158,12 @@ export function PropertyField({
               <DownloadIcon className="h-3 w-3 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300" />
             </a>
           )}
-          {copyableValue !== null && (
-            <CopyButton
-              value={copyableValue}
-              label={`Copy ${parameter.name} value`}
-            />
-          )}
+          {copyableValue !== null && <CopyButton value={copyableValue} />}
           {connected && onDisconnect ? (
-            <UnplugButton
-              onClick={onDisconnect}
-              label={`Disconnect ${parameter.name}`}
-              disabled={disabled}
-            />
+            <UnplugButton onClick={onDisconnect} disabled={disabled} />
           ) : (
             value !== undefined && (
-              <ClearButton
-                onClick={onClear}
-                label={`Clear ${parameter.name} value`}
-                disabled={disabled}
-              />
+              <ClearButton onClick={onClear} disabled={disabled} />
             )
           )}
           {onToggleVisibility && (

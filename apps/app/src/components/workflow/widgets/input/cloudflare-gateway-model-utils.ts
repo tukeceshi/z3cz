@@ -6,6 +6,8 @@ import {
   encodeCloudflareGatewayModelMeta,
 } from "@dafthunk/types";
 
+import type { TranslateFn } from "@/i18n";
+
 export type { CloudflareGatewayModelMeta } from "@dafthunk/types";
 export {
   CFG_META_KEY,
@@ -14,11 +16,6 @@ export {
   encodeCloudflareGatewayModelMeta,
 };
 
-/**
- * Best-effort parse of a stored `_cfg_meta` value (from `node.metadata`).
- * Returns an empty object when the value is missing or malformed so callers
- * can safely spread the result.
- */
 export function decodeCloudflareGatewayModelMeta(
   value: unknown
 ): CloudflareGatewayModelMeta {
@@ -34,22 +31,21 @@ export function decodeCloudflareGatewayModelMeta(
   }
 }
 
-/**
- * Build the docs-dialog override fields for a Cloudflare Gateway model node from
- * the model identifier and metadata persisted alongside it.
- */
 export function deriveCloudflareGatewayModelDocs(
   modelId: string,
-  meta: CloudflareGatewayModelMeta
+  meta: CloudflareGatewayModelMeta,
+  t: TranslateFn
 ): { description: string; documentation: string; referenceUrl: string } {
   const referenceUrl = cloudflareGatewayModelUrl(modelId);
+
   const description =
-    meta.description ?? `Cloudflare Gateway model: ${modelId}`;
+    meta.description ??
+    t("workflow.widgets.model.docs.gatewayDescriptionFallback", { modelId });
 
   const lines: string[] = [
-    "### Selected model",
+    t("workflow.widgets.model.docs.selectedModelHeading"),
     "",
-    `- **Identifier**: \`${modelId}\``,
+    t("workflow.widgets.model.docs.identifierLine", { modelId }),
   ];
   if (meta.description) {
     lines.push("");
@@ -57,15 +53,15 @@ export function deriveCloudflareGatewayModelDocs(
   }
   lines.push("");
   lines.push(
-    `See the [Cloudflare model page](${referenceUrl}) for detailed parameter descriptions and usage.`
+    t("workflow.widgets.model.docs.gatewaySeeModelPage", { url: referenceUrl })
   );
   lines.push("");
-  lines.push(
-    "Paste a different identifier and click reload to rebuild the inputs and outputs from its schema. Reloading clears connected edges."
-  );
+  lines.push(t("workflow.widgets.model.docs.gatewayReloadHint"));
   lines.push("");
   lines.push(
-    "Browse the [Cloudflare model catalog](https://developers.cloudflare.com/ai/models/) to find another model."
+    t("workflow.widgets.model.docs.gatewayBrowseCatalog", {
+      url: "https://developers.cloudflare.com/ai/models/",
+    })
   );
 
   return { description, documentation: lines.join("\n"), referenceUrl };

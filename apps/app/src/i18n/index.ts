@@ -74,6 +74,12 @@ export function readStoredLocale(): AppLocale | null {
   return null;
 }
 
+export function detectBrowserLocale(): AppLocale {
+  if (typeof navigator === "undefined") return "zh";
+  const lang = navigator.language.toLowerCase();
+  return lang.startsWith("zh") ? "zh" : "en";
+}
+
 export function resolveInitialLocale(defaultLocale: AppLocale): AppLocale {
   return readStoredLocale() ?? defaultLocale;
 }

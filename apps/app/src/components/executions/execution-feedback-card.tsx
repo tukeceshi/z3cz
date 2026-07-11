@@ -6,6 +6,7 @@ import ThumbsUp from "lucide-react/icons/thumbs-up";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ export function ExecutionFeedbackCard({
   executionId,
   workflowId,
 }: ExecutionFeedbackCardProps) {
+  const { t } = useTranslation();
   const { criteria } = useWorkflowCriteria(workflowId || null);
   const { feedbackList, mutateFeedback } = useFeedback(executionId);
   const { upsertFeedback } = useUpsertFeedback();
@@ -47,26 +49,28 @@ export function ExecutionFeedbackCard({
         await upsertFeedback({ executionId, criterionId, sentiment, comment });
         await mutateFeedback();
       } catch {
-        toast.error("Failed to save feedback");
+        toast.error(t("pages.executionDetail.feedbackCard.saveFailed"));
       }
     },
-    [executionId, upsertFeedback, mutateFeedback]
+    [executionId, upsertFeedback, mutateFeedback, t]
   );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Execution Feedback</CardTitle>
+        <CardTitle className="text-xl">
+          {t("pages.executionDetail.feedbackCard.title")}
+        </CardTitle>
         <CardDescription>
           {noCriteria
-            ? "No evaluation criteria configured"
-            : "Rate this execution on each criterion"}
+            ? t("pages.executionDetail.feedbackCard.noCriteriaHint")
+            : t("pages.executionDetail.feedbackCard.rateDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
         {noCriteria ? (
           <p className="text-sm text-muted-foreground">
-            No evaluation criteria have been configured for this workflow.
+            {t("pages.executionDetail.feedbackCard.noCriteriaBody")}
           </p>
         ) : (
           criteria.map((criterion) => (
@@ -75,6 +79,9 @@ export function ExecutionFeedbackCard({
               criterion={criterion}
               submitted={feedbackMap.get(criterion.id)}
               onUpsert={handleUpsert}
+              commentPlaceholder={t(
+                "pages.executionDetail.feedbackCard.commentPlaceholder"
+              )}
             />
           ))
         )}
@@ -87,6 +94,7 @@ function CriterionInputCard({
   criterion,
   submitted,
   onUpsert,
+  commentPlaceholder,
 }: {
   criterion: FeedbackCriterion;
   submitted?: { sentiment: string; comment?: string };
@@ -95,6 +103,7 @@ function CriterionInputCard({
     sentiment: FeedbackSentimentType,
     comment?: string
   ) => Promise<void>;
+  commentPlaceholder: string;
 }) {
   const [showComment, setShowComment] = useState(!!submitted?.comment);
   const [comment, setComment] = useState(submitted?.comment ?? "");
@@ -163,7 +172,7 @@ function CriterionInputCard({
       {showComment && (
         <div className="px-3 pb-2">
           <Textarea
-            placeholder="Optional comment..."
+            placeholder={commentPlaceholder}
             value={comment}
             onChange={(e) => handleCommentChange(e.target.value)}
             rows={2}

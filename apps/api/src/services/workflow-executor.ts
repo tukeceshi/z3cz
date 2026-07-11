@@ -5,8 +5,8 @@
  * Handles parameter processing, execution creation, and persistence.
  */
 
-import type { BlobParameter } from "@dafthunk/runtime";
-import type { Node, WorkflowExecution, WorkflowRuntime } from "@dafthunk/types";
+import type { BlobParameter, RuntimeParams } from "@dafthunk/runtime";
+import type { Node, WorkflowExecution, WorkflowRuntime, WorkflowBillingMode } from "@dafthunk/types";
 import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
 import { createSimulatedEmailMessage } from "../utils/email";
@@ -16,6 +16,7 @@ export interface WorkflowExecutorOptions {
   workflow: {
     id: string;
     name: string;
+    billingMode?: WorkflowBillingMode;
     trigger: string;
     runtime?: WorkflowRuntime;
     nodes: Node[];
@@ -62,12 +63,7 @@ export interface WorkflowExecutorResult {
 }
 
 export class WorkflowExecutor {
-  /**
-   * Execute a workflow with the given options
-   */
-  static async execute(
-    options: WorkflowExecutorOptions
-  ): Promise<WorkflowExecutorResult> {
+  static buildRuntimeParams(options: WorkflowExecutorOptions): RuntimeParams {
     const {
       workflow,
       userId,
@@ -81,22 +77,13 @@ export class WorkflowExecutor {
       env,
     } = options;
 
-    // Best-effort onboarding stamp: capture "this user attempted an execution"
-    // regardless of whether it ultimately succeeds. The ok-stamp happens after
-    // execution finalizes (worker path below, or in WorkflowRuntimeEntrypoint).
-    try {
-      const db = createDatabase(env);
-      await stampOnboardingStage(db, userId, "workflowExecuted");
-    } catch (error) {
-      console.error("Failed to stamp workflow_executed onboarding:", error);
-    }
-
-    // Build base execution parameters
     const baseExecutionParams = {
       workflow: {
         id: workflow.id,
         name: workflow.name,
+        billingMode: workflow.billingMode,
         trigger: workflow.trigger,
+        runtime: workflow.runtime,
         nodes: workflow.nodes,
         edges: workflow.edges,
       },
@@ -109,11 +96,8 @@ export class WorkflowExecutor {
       ...(userPlan && { userPlan }),
     };
 
-    // Build type-specific execution parameters
-    let finalExecutionParams: any;
-
     if (workflow.trigger === "email_message") {
-      finalExecutionParams = {
+      return {
         ...baseExecutionParams,
         emailMessage: createSimulatedEmailMessage({
           from: parameters?.from,
@@ -124,11 +108,13 @@ export class WorkflowExecutor {
           emailDomain: env.EMAIL_DOMAIN,
         }),
       };
-    } else if (
+    }
+
+    if (
       workflow.trigger === "http_webhook" ||
       workflow.trigger === "http_request"
     ) {
-      finalExecutionParams = {
+      return {
         ...baseExecutionParams,
         httpRequest: createSimulatedHttpRequest({
           url: parameters?.url,
@@ -138,32 +124,51 @@ export class WorkflowExecutor {
           body: parameters?.body,
         }),
       };
-    } else if (
+    }
+
+    if (
       workflow.trigger === "form_request" ||
       workflow.trigger === "form_webhook"
     ) {
-      // The public form route validates the submission against the trigger
-      // node's schema and passes it as `formRecord`. Sync vs async is decided
-      // by the runtime the route forces (worker for request, workflow for webhook).
-      finalExecutionParams = {
+      return {
         ...baseExecutionParams,
         formSubmission: {
           record: parameters?.formRecord ?? {},
           timestamp: Date.now(),
         },
       };
-    } else {
-      // For other workflow types, provide basic HTTP context without payload
-      finalExecutionParams = {
-        ...baseExecutionParams,
-        httpRequest: createSimulatedHttpRequest({
-          url: parameters?.url,
-          method: parameters?.method,
-          headers: parameters?.headers,
-          query: parameters?.query,
-        }),
-      };
     }
+
+    return {
+      ...baseExecutionParams,
+      httpRequest: createSimulatedHttpRequest({
+        url: parameters?.url,
+        method: parameters?.method,
+        headers: parameters?.headers,
+        query: parameters?.query,
+      }),
+    };
+  }
+
+  /**
+   * Execute a workflow with the given options
+   */
+  static async execute(
+    options: WorkflowExecutorOptions
+  ): Promise<WorkflowExecutorResult> {
+    const { workflow, userId, env } = options;
+
+    // Best-effort onboarding stamp: capture "this user attempted an execution"
+    // regardless of whether it ultimately succeeds. The ok-stamp happens after
+    // execution finalizes (worker path below, or in WorkflowRuntimeEntrypoint).
+    try {
+      const db = createDatabase(env);
+      await stampOnboardingStage(db, userId, "workflowExecuted");
+    } catch (error) {
+      console.error("Failed to stamp workflow_executed onboarding:", error);
+    }
+
+    const finalExecutionParams = WorkflowExecutor.buildRuntimeParams(options);
 
     // Use WorkerRuntime for "worker" runtime (synchronous execution)
     // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)

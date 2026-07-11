@@ -4,6 +4,7 @@ import Trash2 from "lucide-react/icons/trash-2";
 import Upload from "lucide-react/icons/upload";
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { mimeTypeDetectors } from "@/components/workflow/fields/file-upload-handler";
 import { ModelViewer } from "@/components/workflow/model-viewer";
@@ -18,6 +19,7 @@ interface FileWidgetProps extends BaseWidgetProps {
 }
 
 function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const { uploadBinaryData, createObjectUrl } = useObjectService();
@@ -55,7 +57,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
       setIsUploading(false);
     } catch (err) {
       setIsUploading(false);
-      setError(err instanceof Error ? err.message : "Failed to upload file");
+      setError(err instanceof Error ? err.message : t("workflow.widgets.file.uploadFailed"));
     }
   };
 
@@ -93,7 +95,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
     mimeType === "model/gltf+json" || mimeType === "model/gltf-binary";
 
   const getMimeTypeDisplay = (mime: string | null): string => {
-    if (!mime) return "Unknown";
+    if (!mime) return t("workflow.widgets.file.unknown");
     const parts = mime.split("/");
     return parts[parts.length - 1].toUpperCase();
   };
@@ -114,7 +116,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
                     onClick={downloadFile}
                     className="h-8 w-8 bg-white/75 hover:bg-white dark:bg-neutral-900/75 dark:hover:bg-neutral-900 border border-neutral-200 dark:border-neutral-700"
                     disabled={disabled}
-                    title="Download file"
+                    title={t("workflow.widgets.file.download")}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -124,7 +126,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
                     onClick={clearFile}
                     className="h-8 w-8 bg-white/75 hover:bg-white dark:bg-neutral-900/75 dark:hover:bg-neutral-900 border border-neutral-200 dark:border-neutral-700"
                     disabled={disabled}
-                    title="Remove file"
+                    title={t("workflow.widgets.file.remove")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -168,7 +170,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
                         onClick={downloadFile}
                         className="h-8 w-8 bg-white/75 hover:bg-white dark:bg-neutral-900/75 dark:hover:bg-neutral-900 border border-neutral-200 dark:border-neutral-700"
                         disabled={disabled}
-                        title="Download file"
+                        title={t("workflow.widgets.file.download")}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -178,7 +180,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
                         onClick={clearFile}
                         className="h-8 w-8 bg-white/75 hover:bg-white dark:bg-neutral-900/75 dark:hover:bg-neutral-900 border border-neutral-200 dark:border-neutral-700"
                         disabled={disabled}
-                        title="Remove file"
+                        title={t("workflow.widgets.file.remove")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -199,7 +201,7 @@ function FileWidget({ value, onChange, disabled = false }: FileWidgetProps) {
             <div className="w-full flex items-center justify-center gap-2 border border-dashed border-neutral-300 dark:border-neutral-700 rounded-lg px-4 py-2">
               <Upload className="h-4 w-4 text-neutral-400 shrink-0" />
               <div className="text-xs text-blue-500 hover:text-blue-600">
-                {isUploading ? "Uploading..." : "Upload"}
+                {isUploading ? t("workflow.widgets.file.uploading") : t("workflow.widgets.file.upload")}
               </div>
             </div>
             <input

@@ -14,15 +14,19 @@ import { Button } from "./components/ui/button";
 import { RouteHandle } from "./routes";
 
 export function FallbackErrorUI() {
+  const { t } = useTranslation();
+
   return (
     <main className="h-screen w-screen flex items-center justify-center">
       <div className="relative h-full p-6 overflow-auto">
         <div className="flex flex-col items-center justify-center h-full">
-          <h1 className="text-2xl font-bold">Unexpected Error</h1>
+          <h1 className="text-2xl font-bold">{t("error.unexpectedTitle")}</h1>
           <p className="text-neutral-500 text-lg mt-2 mb-6">
-            Something went wrong. Please try refreshing the page.
+            {t("error.unexpectedDescription")}
           </p>
-          <Button onClick={() => window.location.reload()}>Refresh</Button>
+          <Button onClick={() => window.location.reload()}>
+            {t("error.refresh")}
+          </Button>
         </div>
       </div>
     </main>

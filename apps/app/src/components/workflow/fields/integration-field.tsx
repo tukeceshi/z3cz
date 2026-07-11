@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ export function IntegrationField({
   parameter,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { integrations, isLoading } = useIntegrations();
 
   // Narrow the parameter type to access `provider`
@@ -33,9 +35,15 @@ export function IntegrationField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No integration"}
+              placeholder={
+                connected
+                  ? t("workflow.fields.connected")
+                  : label || t("workflow.fields.integration.none")
+              }
             >
-              {connected ? "Connected" : label || "No integration"}
+              {connected
+                ? t("workflow.fields.connected")
+                : label || t("workflow.fields.integration.none")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -54,12 +62,12 @@ export function IntegrationField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : filtered?.length === 0
-                    ? "No integrations"
-                    : "Select integration"
+                    ? t("workflow.fields.integration.empty")
+                    : t("workflow.fields.integration.select")
             }
           />
         </SelectTrigger>

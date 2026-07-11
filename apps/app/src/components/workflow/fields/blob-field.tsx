@@ -1,5 +1,6 @@
 import File from "lucide-react/icons/file";
 
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -11,10 +12,6 @@ import {
   useFileUpload,
 } from "./file-field-primitives";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  errorMessage: "Failed to upload file",
-} as const;
 
 export interface BlobFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -29,8 +26,9 @@ export function BlobField({
   parameter,
   value,
 }: BlobFieldProps) {
+  const { t } = useTranslation();
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    { errorMessage: t("workflow.fields.uploadFailedFile") },
     onChange
   );
 
@@ -44,7 +42,7 @@ export function BlobField({
         <FieldPlaceholder
           className={className}
           connected={connected}
-          label="No files"
+          label={t("workflow.fields.noFiles")}
         />
       );
     }
@@ -86,7 +84,7 @@ export function BlobField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No file"
+        label={t("workflow.fields.noFile")}
       />
     );
   }
@@ -94,7 +92,7 @@ export function BlobField({
   if (hasRef) {
     if (!objectUrl) {
       return (
-        <FieldPlaceholder className={className} label="No preview available" />
+        <FieldPlaceholder className={className} label={t("workflow.fields.noPreviewAvailable")} />
       );
     }
 

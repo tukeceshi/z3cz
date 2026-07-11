@@ -13,6 +13,7 @@ import { useParams } from "react-router";
 import { AdminDetailContextBar } from "@/components/admin/admin-detail-context-bar";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { useAdminWorkflowDetail } from "@/services/admin-service";
@@ -27,14 +28,15 @@ export function AdminWorkflowDetailPage() {
   const { workflow, workflowError, isWorkflowLoading } =
     useAdminWorkflowDetail(workflowId);
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const { t } = useTranslation();
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Workflows", to: "/admin/workflows" },
-      { label: workflow?.name || "Workflow Details" },
+      { label: t("sidebar.workflows"), to: "/admin/workflows" },
+      { label: workflow?.name || t("admin.workflowDetail.title") },
     ]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs, workflow?.name]);
+  }, [setBreadcrumbs, t, workflow?.name]);
 
   // Workflows don't carry execution outputs, but WorkflowBuilder always
   // requires createObjectUrl. Scope to the workflow's org so any node
@@ -90,13 +92,13 @@ export function AdminWorkflowDetailPage() {
   );
 
   if (isWorkflowLoading) {
-    return <InsetLoading title="Workflow Details" />;
+    return <InsetLoading title={t("admin.workflowDetail.title")} />;
   }
 
   if (workflowError) {
     return (
       <InsetError
-        title="Workflow Details"
+        title={t("admin.workflowDetail.title")}
         errorMessage={workflowError.message}
       />
     );
@@ -104,7 +106,10 @@ export function AdminWorkflowDetailPage() {
 
   if (!workflow) {
     return (
-      <InsetError title="Workflow Details" errorMessage="Workflow not found" />
+      <InsetError
+        title={t("admin.workflowDetail.title")}
+        errorMessage={t("admin.workflowDetail.notFound")}
+      />
     );
   }
 
@@ -120,7 +125,7 @@ export function AdminWorkflowDetailPage() {
             },
             {
               icon: PlayCircle,
-              label: "View executions",
+              label: t("admin.workflowDetail.viewExecutions"),
               to: `/admin/executions?workflowId=${workflow.id}&organizationId=${workflow.organizationId}`,
             },
             {

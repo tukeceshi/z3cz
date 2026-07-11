@@ -1,5 +1,7 @@
 import { type CloudflareModelMeta, cloudflareDocsUrl } from "@dafthunk/types";
 
+import type { TranslateFn } from "@/i18n";
+
 export type { CloudflareModelMeta } from "@dafthunk/types";
 export {
   CF_LOCKED_KEY,
@@ -10,11 +12,6 @@ export {
   shortName,
 } from "@dafthunk/types";
 
-/**
- * Best-effort parse of a stored `_cf_meta` value (from `node.metadata`).
- * Returns an empty object when the value is missing or malformed so callers
- * can safely spread the result.
- */
 export function decodeCloudflareModelMeta(value: unknown): CloudflareModelMeta {
   if (typeof value !== "string" || value.length === 0) return {};
   try {
@@ -30,42 +27,44 @@ export function decodeCloudflareModelMeta(value: unknown): CloudflareModelMeta {
   }
 }
 
-/**
- * Build the docs-dialog override fields for a Cloudflare-model node from
- * the model identifier and the metadata persisted alongside it. Works
- * whether metadata is present or not so docs stay useful even on older
- * nodes created before the metadata input existed.
- */
 export function deriveCloudflareModelDocs(
   modelId: string,
-  meta: CloudflareModelMeta
+  meta: CloudflareModelMeta,
+  t: TranslateFn
 ): { description: string; documentation: string; referenceUrl: string } {
   const referenceUrl = cloudflareDocsUrl(modelId);
 
   const description =
     meta.description ??
     (meta.taskName
-      ? `${meta.taskName}: ${modelId}`
-      : `Cloudflare Workers AI model: ${modelId}`);
+      ? t("workflow.widgets.model.docs.cloudflareDescriptionWithTask", {
+          taskName: meta.taskName,
+          modelId,
+        })
+      : t("workflow.widgets.model.docs.cloudflareDescriptionFallback", {
+          modelId,
+        }));
 
   const lines: string[] = [
-    "### Selected model",
+    t("workflow.widgets.model.docs.selectedModelHeading"),
     "",
-    `- **Identifier**: \`${modelId}\``,
+    t("workflow.widgets.model.docs.identifierLine", { modelId }),
   ];
-  if (meta.taskName) lines.push(`- **Task**: ${meta.taskName}`);
+  if (meta.taskName) {
+    lines.push(
+      t("workflow.widgets.model.docs.taskLine", { taskName: meta.taskName })
+    );
+  }
   if (meta.description) {
     lines.push("");
     lines.push(meta.description);
   }
   lines.push("");
   lines.push(
-    `See the [Cloudflare model page](${referenceUrl}) for detailed parameter descriptions and usage examples.`
+    t("workflow.widgets.model.docs.cloudflareSeeModelPage", { url: referenceUrl })
   );
   lines.push("");
-  lines.push(
-    "Pick a different model from the search dialog on the node to rebuild the inputs and outputs from its schema. Switching models clears connected edges."
-  );
+  lines.push(t("workflow.widgets.model.docs.cloudflareSwitchModelHint"));
 
   return { description, documentation: lines.join("\n"), referenceUrl };
 }

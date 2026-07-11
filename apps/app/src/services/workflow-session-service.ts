@@ -3,6 +3,7 @@ import type {
   Edge,
   Node,
   ServerMessage,
+  WorkflowBillingMode,
   WorkflowExecution,
   WorkflowRuntime,
   WorkflowState,
@@ -275,6 +276,7 @@ export class WorkflowWebSocket {
     description?: string;
     trigger?: WorkflowTrigger;
     runtime?: WorkflowRuntime;
+    billingMode?: WorkflowBillingMode;
   }): void {
     if (!this.currentState) {
       console.warn(
@@ -291,6 +293,9 @@ export class WorkflowWebSocket {
       }),
       ...(metadata.trigger !== undefined && { trigger: metadata.trigger }),
       ...(metadata.runtime !== undefined && { runtime: metadata.runtime }),
+      ...(metadata.billingMode !== undefined && {
+        billingMode: metadata.billingMode,
+      }),
       timestamp: Date.now(),
     };
 

@@ -7,6 +7,7 @@ import type { WorkflowExecution } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { buildDependencies } from "./cloudflare-runtime-dependencies";
+import type { ExecutionEventInbox } from "@dafthunk/runtime/heartbeat/execution-event-protocol";
 import { nodeWorkflowEventHub } from "./node-workflow-event-hub";
 
 /**
@@ -61,6 +62,14 @@ class NodeDurableWorkflowRuntime extends Runtime<Bindings> {
       eventType,
       timeout
     );
+  }
+
+  protected override getExecutionEventInbox(_executionId: string): ExecutionEventInbox {
+    return {
+      drain: (executionId) => nodeWorkflowEventHub.drainInbox(executionId),
+      push: (executionId, envelope) =>
+        nodeWorkflowEventHub.pushInbox(executionId, envelope),
+    };
   }
 }
 

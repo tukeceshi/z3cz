@@ -1,5 +1,6 @@
 import { type FieldType, isBlobFieldType } from "@dafthunk/types";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -82,6 +83,7 @@ export function SchemaFieldInput({
   onChange: (value: unknown) => void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const displayLabel = field.label || field.name;
 
   if (isBlobFieldType(field.type as FieldType)) {
@@ -180,7 +182,7 @@ export function SchemaFieldInput({
           </Label>
           <Textarea
             id={field.name}
-            placeholder="Enter JSON..."
+            placeholder={t("pages.schemaForm.enterJson")}
             value={(value as string) ?? ""}
             onChange={(e) => onChange(e.target.value || undefined)}
             rows={3}

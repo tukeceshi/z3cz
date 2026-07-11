@@ -33,6 +33,13 @@ pnpm --filter '@dafthunk/api' db:generate      # Generate new migrations
 pnpm --filter '@dafthunk/api' db:prod:migrate  # Apply to production
 ```
 
+## Frontend i18n (apps/app)
+
+- User-visible UI strings must use `useTranslation()` and keys in `apps/app/src/i18n/locales/en.ts` / `zh.ts` (keep both in sync).
+- Toast messages: prefer `useAppToast()` from `hooks/use-app-toast.ts`.
+- Node display names/descriptions: add entries to `i18n/locales/zh/nodes.ts`; `useNodeTypes` applies `localizeNodeTypes` automatically. Do not change runtime node `type` IDs or API field names.
+- Default locale is `zh`; new node types should include Chinese labels when added to the catalog.
+
 ## Architecture
 
 ### Backend: API (`apps/api/`)

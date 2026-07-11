@@ -1,6 +1,7 @@
 import { CircleDollarSign } from "lucide-react";
 import { Link } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Tooltip,
   TooltipContent,
@@ -15,15 +16,12 @@ interface SubscriptionBadgeProps {
   size?: "sm" | "md" | "lg";
 }
 
-/**
- * Badge indicating a feature requires a paid subscription.
- * Clicking navigates to the billing page.
- */
 export function SubscriptionBadge({
   className,
   variant = "default",
   size = "md",
 }: SubscriptionBadgeProps) {
+  const { t } = useTranslation();
   const { getOrgUrl } = useOrgUrl();
 
   return (
@@ -56,7 +54,7 @@ export function SubscriptionBadge({
         </Link>
       </TooltipTrigger>
       <TooltipContent side="top">
-        <p className="text-xs">Subscription required</p>
+        <p className="text-xs">{t("workflow.subscription.required")}</p>
       </TooltipContent>
     </Tooltip>
   );

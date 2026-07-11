@@ -2,6 +2,7 @@ import { type Field, isBlobFieldType } from "@dafthunk/types";
 import { useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { SchemaDialog } from "@/components/schema-dialog";
 import { CodeEditor } from "@/components/ui/code-editor";
 import {
@@ -29,6 +30,7 @@ export function SchemaField({
 }: FieldProps) {
   const { schemas, isSchemasLoading, mutateSchemas } = useSchemas();
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Structured-output inputs (LLM nodes) can't accept schemas with blob fields —
@@ -97,9 +99,15 @@ export function SchemaField({
         <Select value={stringValue} disabled>
           <SelectTrigger>
             <SelectValue
-              placeholder={connected ? "Connected" : label || "No schema"}
+              placeholder={
+                connected
+                  ? t("workflow.widgets.schema.connected")
+                  : label || t("workflow.widgets.schema.noSchema")
+              }
             >
-              {connected ? "Connected" : label || "No schema"}
+              {connected
+                ? t("workflow.widgets.schema.connected")
+                : label || t("workflow.widgets.schema.noSchema")}
             </SelectValue>
           </SelectTrigger>
         </Select>
@@ -118,12 +126,12 @@ export function SchemaField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.widgets.schema.connected")
                 : isSchemasLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : visibleSchemas?.length === 0
-                    ? "No schemas"
-                    : "Select schema"
+                    ? t("workflow.widgets.schema.noSchemas")
+                    : t("workflow.widgets.schema.selectSchema")
             }
           />
         </SelectTrigger>
@@ -135,7 +143,7 @@ export function SchemaField({
           ))}
           <SelectSeparator />
           <SelectItem value={CREATE_NEW} className="text-xs">
-            + New Schema
+            {t("workflow.widgets.schema.newSchema")}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -144,8 +152,8 @@ export function SchemaField({
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onSubmit={handleCreate}
-        title="Create New Schema"
-        submitLabel="Create Schema"
+        title={t("pages.schemas.createDialogTitle")}
+        submitLabel={t("pages.schemas.createSchema")}
       />
     </div>
   );

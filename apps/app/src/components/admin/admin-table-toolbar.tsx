@@ -1,6 +1,7 @@
-import type { FormEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/locale-provider";
 import { SearchInput } from "@/components/ui/search-input";
 
 interface AdminTableToolbarProps {
@@ -16,11 +17,15 @@ interface AdminTableToolbarProps {
 }
 
 export function AdminTableToolbar({
-  searchPlaceholder = "Search...",
+  searchPlaceholder,
   search,
   children,
 }: AdminTableToolbarProps) {
-  const handleSubmit = (e: FormEvent) => {
+  const { t } = useTranslation();
+  const resolvedPlaceholder =
+    searchPlaceholder ?? t("admin.toolbar.searchPlaceholder");
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     search?.onSubmit();
   };
@@ -31,17 +36,17 @@ export function AdminTableToolbar({
         <form onSubmit={handleSubmit} className="flex gap-2 flex-1 min-w-0">
           <div className="flex-1 max-w-sm">
             <SearchInput
-              placeholder={searchPlaceholder}
+              placeholder={resolvedPlaceholder}
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}
             />
           </div>
           <Button type="submit" variant="outline">
-            Search
+            {t("admin.toolbar.search")}
           </Button>
           {search.showClear && search.onClear && (
             <Button type="button" variant="ghost" onClick={search.onClear}>
-              Clear
+              {t("admin.toolbar.clear")}
             </Button>
           )}
         </form>

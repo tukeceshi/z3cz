@@ -3,10 +3,8 @@ import type {
   WorkflowRuntime,
   WorkflowTrigger,
 } from "@dafthunk/types";
-import FileDown from "lucide-react/icons/file-down";
 import Logs from "lucide-react/icons/logs";
-import MapIcon from "lucide-react/icons/map";
-import PlusCircle from "lucide-react/icons/plus-circle";
+import Plug from "lucide-react/icons/plug";
 import Workflow from "lucide-react/icons/workflow";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -14,7 +12,7 @@ import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
-import { useTour } from "@/components/tour";
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +30,12 @@ import { useBilling } from "@/services/billing-service";
 import { useDashboard } from "@/services/dashboard-service";
 import { useNodeTypes } from "@/services/type-service";
 import { createWorkflow, useWorkflows } from "@/services/workflow-service";
+import { useOrganizationAiInterfaces } from "@/services/organization-ai-interface-service";
+
+const AI_SETUP_DISMISS_KEY = "dafthunk:dashboard-ai-setup-dismissed";
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -44,14 +46,23 @@ export function DashboardPage() {
   const { organization } = useAuth();
   const orgId = organization?.id || "";
   const { mutateWorkflows } = useWorkflows();
-  const { nodeTypes } = useNodeTypes({ revalidateOnFocus: false });
-  const { start: startTour } = useTour();
+  const { nodeTypes } = useNodeTypes(undefined, { revalidateOnFocus: false });
+  const { interfaces, isInterfacesLoading } = useOrganizationAiInterfaces(orgId || undefined);
+  const [setupDismissed, setSetupDismissed] = useState(() => {
+    if (!orgId) return false;
+    try {
+      return localStorage.getItem(`${AI_SETUP_DISMISS_KEY}:${orgId}`) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Dashboard" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.dashboard") }]);
+  }, [setBreadcrumbs, t]);
 
   const handleCreateWorkflow = async (
+    schemeId: string,
     name: string,
     trigger: WorkflowTrigger,
     description?: string,
@@ -64,6 +75,7 @@ export function DashboardPage() {
       const request: CreateWorkflowRequest = {
         name,
         description,
+        schemeId,
         trigger,
         runtime,
         nodes: initialNodes,
@@ -79,16 +91,16 @@ export function DashboardPage() {
     }
   };
 
-  if (isDashboardStatsLoading || isBillingLoading) {
-    return <InsetLoading title="Dashboard" />;
+  if (isDashboardStatsLoading || isBillingLoading || isInterfacesLoading) {
+    return <InsetLoading title={t("pages.dashboard.title")} />;
   } else if (dashboardStatsError || billingError) {
     return (
       <InsetError
-        title="Dashboard"
+        title={t("pages.dashboard.title")}
         errorMessage={
           dashboardStatsError?.message ||
           billingError?.message ||
-          "An error occurred"
+          t("common.errorOccurred")
         }
       />
     );
@@ -96,9 +108,9 @@ export function DashboardPage() {
 
   if (!dashboardStats) {
     return (
-      <InsetLayout title="Dashboard">
+      <InsetLayout title={t("pages.dashboard.title")}>
         <div className="flex flex-1 items-center justify-center">
-          No dashboard data available.
+          {t("pages.dashboard.noData")}
         </div>
       </InsetLayout>
     );
@@ -115,45 +127,56 @@ export function DashboardPage() {
   const isOverageAtLimit =
     hasOverageLimit && currentOverage >= billing!.overageLimit!;
 
+  const showAiSetupBanner =
+    interfaces.length === 0 && !setupDismissed;
+
+  const dismissAiSetupBanner = () => {
+    setSetupDismissed(true);
+    if (!orgId) return;
+    try {
+      localStorage.setItem(`${AI_SETUP_DISMISS_KEY}:${orgId}`, "1");
+    } catch {
+      // ignore
+    }
+  };
+
   return (
-    <InsetLayout title="Dashboard">
-      {/* Getting Started */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Getting Started</CardTitle>
-          <CardDescription>
-            Create your first workflow or explore templates
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Button variant="default" onClick={startTour}>
-            <MapIcon className="mr-2 size-4" />
-            Take a Tour
-          </Button>
-          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-            <PlusCircle className="mr-2 size-4" />
-            Create Workflow
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to={getOrgUrl("templates")}>
-              <FileDown className="mr-2 size-4" />
-              Browse Templates
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+    <InsetLayout title={t("pages.dashboard.title")}>
+      {showAiSetupBanner ? (
+        <Card className="mb-6 border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle>{t("pages.dashboard.gettingStarted.title")}</CardTitle>
+            <CardDescription>
+              {t("pages.dashboard.gettingStarted.description")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button variant="default" asChild>
+              <Link to={getOrgUrl("ai-interfaces")}>
+                <Plug className="mr-2 size-4" />
+                {t("pages.dashboard.gettingStarted.configureInterfaces")}
+              </Link>
+            </Button>
+            <Button variant="ghost" onClick={dismissAiSetupBanner}>
+              {t("pages.dashboard.gettingStarted.dismiss")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 mb-6">
         <Card data-tour="workflows-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xl">Workflows</CardTitle>
+            <CardTitle className="text-xl">
+              {t("pages.dashboard.workflows.title")}
+            </CardTitle>
             <Workflow className="size-8 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold">{dashboardStats.workflows}</div>
             <p className="text-xs text-muted-foreground pt-1">
-              Number of workflows
+              {t("pages.dashboard.workflows.countLabel")}
             </p>
             <Button
               variant="outline"
@@ -161,13 +184,17 @@ export function DashboardPage() {
               className="mt-4 text-xs h-8"
               asChild
             >
-              <Link to={getOrgUrl("workflows")}>View Workflows</Link>
+              <Link to={getOrgUrl("workflows")}>
+                {t("pages.dashboard.workflows.viewAll")}
+              </Link>
             </Button>
           </CardContent>
         </Card>
         <Card data-tour="executions-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xl">Executions</CardTitle>
+            <CardTitle className="text-xl">
+              {t("pages.dashboard.executions.title")}
+            </CardTitle>
             <Logs className="size-8 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -175,7 +202,7 @@ export function DashboardPage() {
               {dashboardStats.executions.total}
             </div>
             <p className="text-xs text-muted-foreground pt-1">
-              Number of executions
+              {t("pages.dashboard.executions.countLabel")}
             </p>
             <Button
               variant="outline"
@@ -183,7 +210,9 @@ export function DashboardPage() {
               className="mt-4 text-xs h-8"
               asChild
             >
-              <Link to={getOrgUrl("executions")}>View Executions</Link>
+              <Link to={getOrgUrl("executions")}>
+                {t("pages.dashboard.executions.viewAll")}
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -195,19 +224,23 @@ export function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
-                Usage
+                {t("pages.dashboard.usage.title")}
                 <Badge variant={isPro ? "default" : "secondary"}>
-                  {isPro ? "Early Adopter" : "Trial"}
+                  {isPro
+                    ? t("pages.dashboard.usage.earlyAdopter")
+                    : t("pages.dashboard.usage.trial")}
                 </Badge>
               </CardTitle>
               <CardDescription>
                 {isPro
-                  ? "Monthly credits reset each billing period"
-                  : "One-time credits for Trial accounts"}
+                  ? t("pages.dashboard.usage.proDescription")
+                  : t("pages.dashboard.usage.trialDescription")}
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link to={getOrgUrl("billing")}>Manage Billing</Link>
+              <Link to={getOrgUrl("billing")}>
+                {t("pages.dashboard.usage.manageBilling")}
+              </Link>
             </Button>
           </div>
         </CardHeader>
@@ -216,7 +249,9 @@ export function DashboardPage() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="font-medium">
-                {isPro ? "Included Usage" : "Available Usage"}
+                {isPro
+                  ? t("pages.dashboard.usage.includedUsage")
+                  : t("pages.dashboard.usage.availableUsage")}
               </span>
               <span>
                 {Math.min(usageThisPeriod, includedCredits).toLocaleString()} /{" "}
@@ -231,10 +266,14 @@ export function DashboardPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               {usagePercent < 100
-                ? `${(includedCredits - usageThisPeriod).toLocaleString()} remaining`
+                ? t("pages.dashboard.usage.remaining", {
+                    count: (
+                      includedCredits - usageThisPeriod
+                    ).toLocaleString(),
+                  })
                 : isPro
-                  ? "Included usage exhausted"
-                  : "Usage exhausted"}
+                  ? t("pages.dashboard.usage.includedExhausted")
+                  : t("pages.dashboard.usage.exhausted")}
             </p>
           </div>
 
@@ -242,7 +281,9 @@ export function DashboardPage() {
           {isPro && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="font-medium">Additional Usage</span>
+                <span className="font-medium">
+                  {t("pages.dashboard.usage.additionalUsage")}
+                </span>
                 <span>
                   {currentOverage.toLocaleString()}
                   {hasOverageLimit &&
@@ -264,11 +305,13 @@ export function DashboardPage() {
               <p className="text-xs text-muted-foreground">
                 {currentOverage > 0
                   ? isOverageAtLimit
-                    ? "Limit reached - executions will be blocked"
-                    : "Billed at the end of your billing period"
+                    ? t("pages.dashboard.usage.limitReached")
+                    : t("pages.dashboard.usage.billedEndOfPeriod")
                   : hasOverageLimit
-                    ? `Limit: ${billing!.overageLimit!.toLocaleString()} credits`
-                    : "No overage charges yet"}
+                    ? t("pages.dashboard.usage.limitCredits", {
+                        count: billing!.overageLimit!.toLocaleString(),
+                      })
+                    : t("pages.dashboard.usage.noOverageYet")}
               </p>
             </div>
           )}

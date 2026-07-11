@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
@@ -22,6 +23,7 @@ function isExcluded(nodeType: NodeType): boolean {
 }
 
 export function PlaygroundPage() {
+  const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
   const navigate = useNavigate();
@@ -29,8 +31,8 @@ export function PlaygroundPage() {
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Playground" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.playground") }]);
+  }, [setBreadcrumbs, t]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -93,13 +95,13 @@ export function PlaygroundPage() {
   };
 
   return (
-    <InsetLayout title="Playground" childrenClassName="flex flex-col h-full">
+    <InsetLayout title={t("pages.playground.title")} childrenClassName="flex flex-col h-full">
       <div className="flex flex-col gap-4 min-h-0 flex-1">
         {/* Search */}
         <div className="relative shrink-0">
           <Input
             ref={searchInputRef}
-            placeholder="Search nodes..."
+            placeholder={t("pages.playground.searchPlaceholder")}
             className="pl-4 text-base h-12"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -151,9 +153,7 @@ export function PlaygroundPage() {
                   ))}
                   {filteredNodeTypes.length === 0 && (
                     <div className="text-center py-12 text-muted-foreground">
-                      <p className="text-sm">
-                        No nodes found matching your search.
-                      </p>
+                      <p className="text-sm">{t("pages.playground.empty")}</p>
                     </div>
                   )}
                 </div>
@@ -172,7 +172,10 @@ export function PlaygroundPage() {
                 totalCount={searchFilteredNodeTypes.length}
               />
               <div className="text-xs text-muted-foreground/60 pt-3 text-right">
-                {filteredNodeTypes.length} of {executableNodeTypes.length} nodes
+                {t("pages.playground.count", {
+                  filtered: filteredNodeTypes.length,
+                  total: executableNodeTypes.length,
+                })}
               </div>
             </div>
           )}

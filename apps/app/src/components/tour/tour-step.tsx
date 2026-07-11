@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 import type { TourStep } from "./tour-steps";
@@ -24,6 +25,8 @@ export function TourStepPopover({
   isFirst,
   isLast,
 }: TourStepPopoverProps) {
+  const { t } = useTranslation();
+
   return (
     <div
       className={cn(
@@ -59,15 +62,17 @@ export function TourStepPopover({
             onClick={onSkip}
             className="text-muted-foreground hover:text-foreground"
           >
-            Skip tour
+            {t("tour.skip")}
           </Button>
           <div className="flex gap-2">
             {!isFirst && (
               <Button variant="outline" onClick={onPrev}>
-                Previous
+                {t("tour.previous")}
               </Button>
             )}
-            <Button onClick={onNext}>{isLast ? "Finish" : "Next"}</Button>
+            <Button onClick={onNext}>
+              {isLast ? t("tour.finish") : t("common.next")}
+            </Button>
           </div>
         </div>
       </div>

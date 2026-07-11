@@ -56,6 +56,10 @@ import { CloudflareBrowserScreenshotNode } from "@dafthunk/runtime/nodes/browser
 import { CloudflareBrowserSnapshotNode } from "@dafthunk/runtime/nodes/browser/cloudflare-browser-snapshot-node";
 import { CloudflareGatewayModelNode } from "@dafthunk/runtime/nodes/cloudflare/cloudflare-gateway-model-node";
 import { CloudflareModelNode } from "@dafthunk/runtime/nodes/cloudflare/cloudflare-model-node";
+import { AiInterfaceNode } from "@dafthunk/runtime/nodes/ai-interface/ai-interface-node";
+import { AiTextNode } from "@dafthunk/runtime/nodes/ai/ai-text-node";
+import { AiImageNode } from "@dafthunk/runtime/nodes/ai/ai-image-node";
+import { AiVideoNode } from "@dafthunk/runtime/nodes/ai/ai-video-node";
 import { CsvExtractColumnNode } from "@dafthunk/runtime/nodes/csv/csv-extract-column-node";
 import { CsvFilterRowsNode } from "@dafthunk/runtime/nodes/csv/csv-filter-rows-node";
 import { CsvParseNode } from "@dafthunk/runtime/nodes/csv/csv-parse-node";
@@ -402,6 +406,7 @@ import { SharePostRedditNode } from "@dafthunk/runtime/nodes/reddit/share-post-r
 import { SubmitCommentRedditNode } from "@dafthunk/runtime/nodes/reddit/submit-comment-reddit-node";
 import { VoteRedditNode } from "@dafthunk/runtime/nodes/reddit/vote-reddit-node";
 import { ReplicateModelNode } from "@dafthunk/runtime/nodes/replicate/replicate-model-node";
+import { RelayAiNode } from "@dafthunk/runtime/nodes/relay/relay-ai-node";
 import { BashNode } from "@dafthunk/runtime/nodes/sandbox/bash-node";
 import { CNode } from "@dafthunk/runtime/nodes/sandbox/c-node";
 import { GoNode } from "@dafthunk/runtime/nodes/sandbox/go-node";
@@ -683,9 +688,14 @@ export class CloudflareNodeRegistry extends BaseNodeRegistry<Bindings> {
 
     // Generic Replicate model node
     this.registerImplementation(ReplicateModelNode);
+    this.registerImplementation(RelayAiNode);
 
     // Generic Cloudflare Workers AI model node
     this.registerImplementation(CloudflareModelNode);
+    this.registerImplementation(AiInterfaceNode);
+    this.registerImplementation(AiTextNode);
+    this.registerImplementation(AiImageNode);
+    this.registerImplementation(AiVideoNode);
 
     // Generic Cloudflare Gateway (unified author/model) node
     this.registerImplementation(CloudflareGatewayModelNode);

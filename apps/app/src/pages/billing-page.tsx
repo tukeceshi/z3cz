@@ -5,8 +5,8 @@ import Sparkles from "lucide-react/icons/sparkles";
 import X from "lucide-react/icons/x";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { toast } from "sonner";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   createBillingPortal,
@@ -30,6 +31,8 @@ import {
 import { formatDate } from "@/utils/date";
 
 export function BillingPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { billing, billingError, isBillingLoading, mutateBilling } =
     useBilling();
@@ -43,17 +46,16 @@ export function BillingPage() {
   const [isSavingLimit, setIsSavingLimit] = useState(false);
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Billing" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.billing") }]);
+  }, [setBreadcrumbs, t]);
 
-  // Refetch billing data when returning from Stripe checkout
   useEffect(() => {
     if (searchParams.get("checkout") === "success") {
       mutateBilling();
       setSearchParams({}, { replace: true });
-      toast.success("Subscription activated! Welcome to Pro.");
+      appToast.success("pages.billing.checkoutSuccess");
     }
-  }, [searchParams, setSearchParams, mutateBilling]);
+  }, [searchParams, setSearchParams, mutateBilling, appToast]);
 
   const handleUpgrade = useCallback(async () => {
     if (!organization?.id) return;
@@ -70,11 +72,11 @@ export function BillingPage() {
       );
       window.location.href = checkoutUrl;
     } catch (error) {
-      toast.error("Failed to start checkout. Please try again.");
+      appToast.error("pages.billing.checkoutFailed");
       console.error("Checkout error:", error);
       setIsUpgrading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, appToast]);
 
   const handleManageSubscription = useCallback(async () => {
     if (!organization?.id) return;
@@ -85,11 +87,11 @@ export function BillingPage() {
       const portalUrl = await createBillingPortal(organization.id, returnUrl);
       window.location.href = portalUrl;
     } catch (error) {
-      toast.error("Failed to open billing portal. Please try again.");
+      appToast.error("pages.billing.portalFailed");
       console.error("Portal error:", error);
       setIsOpeningPortal(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, appToast]);
 
   const handleStartEditLimit = useCallback(() => {
     setLimitInput(billing?.overageLimit?.toString() ?? "");
@@ -108,25 +110,27 @@ export function BillingPage() {
     try {
       const newLimit = limitInput.trim() === "" ? null : parseInt(limitInput);
       if (newLimit !== null && (isNaN(newLimit) || newLimit < 0)) {
-        toast.error("Please enter a valid number (0 or greater)");
+        appToast.error("pages.billing.invalidNumber");
         setIsSavingLimit(false);
         return;
       }
       await updateOverageLimit(organization.id, newLimit);
       await mutateBilling();
       setIsEditingLimit(false);
-      toast.success(
-        newLimit === null
-          ? "Additional usage limit removed"
-          : `Additional usage limit set to ${newLimit.toLocaleString()}`
-      );
+      if (newLimit === null) {
+        appToast.success("pages.billing.limitRemoved");
+      } else {
+        appToast.success("pages.billing.limitSetToast", {
+          count: newLimit.toLocaleString(),
+        });
+      }
     } catch (error) {
-      toast.error("Failed to update limit. Please try again.");
+      appToast.error("pages.billing.limitUpdateFailed");
       console.error("Update limit error:", error);
     } finally {
       setIsSavingLimit(false);
     }
-  }, [organization?.id, limitInput, mutateBilling]);
+  }, [organization?.id, limitInput, mutateBilling, appToast]);
 
   const handleRemoveLimit = useCallback(async () => {
     if (!organization?.id) return;
@@ -136,21 +140,26 @@ export function BillingPage() {
       await updateOverageLimit(organization.id, null);
       await mutateBilling();
       setIsEditingLimit(false);
-      toast.success("Additional usage limit removed");
+      appToast.success("pages.billing.limitRemoved");
     } catch (error) {
-      toast.error("Failed to remove limit. Please try again.");
+      appToast.error("pages.billing.limitRemoveFailed");
       console.error("Remove limit error:", error);
     } finally {
       setIsSavingLimit(false);
     }
-  }, [organization?.id, mutateBilling]);
+  }, [organization?.id, mutateBilling, appToast]);
 
   if (isBillingLoading && !billing) {
-    return <InsetLoading title="Billing" />;
+    return <InsetLoading title={t("pages.billing.title")} />;
   }
 
   if (billingError) {
-    return <InsetError title="Billing" errorMessage={billingError.message} />;
+    return (
+      <InsetError
+        title={t("pages.billing.title")}
+        errorMessage={billingError.message}
+      />
+    );
   }
 
   const isPro = billing?.plan === "pro";
@@ -167,45 +176,48 @@ export function BillingPage() {
   const isOverageAtLimit =
     hasOverageLimit && currentOverage >= billing!.overageLimit!;
 
-  // Helper to get plan description
   const getPlanDescription = () => {
     if (isPro && isCanceled) {
-      return "Your subscription has been canceled but you have access until the end of your billing period";
+      return t("pages.billing.canceledDescription");
     }
     if (isPro && isActive) {
-      return "$10/month base + pay-as-you-go for usage beyond included credits";
+      return t("pages.billing.proDescription");
     }
-    return "Upgrade to Early Adopter plan for included monthly credits and usage-based billing";
+    return t("pages.billing.trialDescription");
   };
 
-  // Helper to get status line
   const getStatusLine = () => {
     if (!billing?.currentPeriodEnd) return null;
     const endDate = formatDate(new Date(billing.currentPeriodEnd));
 
     if (isCanceled) {
-      return `Access ends ${endDate}`;
+      return t("pages.billing.accessEnds", { date: endDate });
     }
     if (isActive) {
-      return `Renews ${endDate}`;
+      return t("pages.billing.renews", { date: endDate });
     }
     return null;
   };
 
   return (
-    <InsetLayout title="Billing">
+    <InsetLayout title={t("pages.billing.title")}>
       <div className="space-y-6">
-        {/* Current Plan */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <CardTitle className="flex items-center gap-2">
-                  Current Plan
+                  {t("pages.billing.currentPlan")}
                   <Badge variant={isPro ? "default" : "secondary"}>
-                    {isPro ? "Early Adopter" : "Trial"}
+                    {isPro
+                      ? t("pages.dashboard.usage.earlyAdopter")
+                      : t("pages.dashboard.usage.trial")}
                   </Badge>
-                  {isCanceled && <Badge variant="destructive">Canceled</Badge>}
+                  {isCanceled && (
+                    <Badge variant="destructive">
+                      {t("pages.executions.status.cancelled")}
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>{getPlanDescription()}</CardDescription>
                 {getStatusLine() && (
@@ -215,7 +227,6 @@ export function BillingPage() {
                 )}
               </div>
               <div className="flex gap-2">
-                {/* Show Manage button for active Pro users */}
                 {isPro && isActive && (
                   <Button
                     variant="outline"
@@ -223,24 +234,26 @@ export function BillingPage() {
                     disabled={isOpeningPortal}
                   >
                     <CreditCard className="mr-2 h-4 w-4" />
-                    {isOpeningPortal ? "Opening..." : "Manage Subscription"}
+                    {isOpeningPortal
+                      ? t("common.loading")
+                      : t("pages.billing.manageSubscription")}
                     <ExternalLink className="ml-2 h-3 w-3" />
                   </Button>
                 )}
-                {/* Show Resubscribe for canceled Pro users */}
                 {isPro && isCanceled && (
                   <Button onClick={handleUpgrade} disabled={isUpgrading}>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    {isUpgrading ? "Redirecting..." : "Resubscribe"}
+                    {isUpgrading
+                      ? t("common.loading")
+                      : t("pages.billing.resubscribe")}
                   </Button>
                 )}
-                {/* Show Upgrade for Trial users */}
                 {!isPro && (
                   <Button onClick={handleUpgrade} disabled={isUpgrading}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     {isUpgrading
-                      ? "Redirecting..."
-                      : "Upgrade to Early Adopter"}
+                      ? t("common.loading")
+                      : t("pages.billing.upgrade")}
                   </Button>
                 )}
               </div>
@@ -248,11 +261,10 @@ export function BillingPage() {
           </CardHeader>
         </Card>
 
-        {/* Usage - shown for Pro users (active or canceled with access) */}
         {isPro && (
           <Card>
             <CardHeader>
-              <CardTitle>Usage</CardTitle>
+              <CardTitle>{t("pages.dashboard.usage.title")}</CardTitle>
               <CardDescription>
                 {billing?.currentPeriodStart && billing?.currentPeriodEnd && (
                   <>
@@ -263,10 +275,11 @@ export function BillingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Included Usage Gauge */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">Included Usage</span>
+                  <span className="font-medium">
+                    {t("pages.dashboard.usage.includedUsage")}
+                  </span>
                   <span>
                     {Math.min(
                       billing?.usageThisPeriod ?? 0,
@@ -283,15 +296,21 @@ export function BillingPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {usagePercent < 100
-                    ? `${((billing?.includedCredits ?? 0) - (billing?.usageThisPeriod ?? 0)).toLocaleString()} remaining`
-                    : "Included usage exhausted"}
+                    ? t("pages.dashboard.usage.remaining", {
+                        count: (
+                          (billing?.includedCredits ?? 0) -
+                          (billing?.usageThisPeriod ?? 0)
+                        ).toLocaleString(),
+                      })
+                    : t("pages.dashboard.usage.includedExhausted")}
                 </p>
               </div>
 
-              {/* Overage Section */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">Additional Usage</span>
+                  <span className="font-medium">
+                    {t("pages.dashboard.usage.additionalUsage")}
+                  </span>
                   <span>
                     {currentOverage.toLocaleString()}
                     {hasOverageLimit &&
@@ -313,23 +332,24 @@ export function BillingPage() {
                 <p className="text-xs text-muted-foreground">
                   {currentOverage > 0
                     ? isOverageAtLimit
-                      ? "Limit reached - executions will be blocked"
-                      : "Billed at the end of your billing period"
-                    : "No overage charges yet"}
+                      ? t("pages.dashboard.usage.limitReached")
+                      : t("pages.dashboard.usage.billedEndOfPeriod")
+                    : t("pages.dashboard.usage.noOverageYet")}
                 </p>
               </div>
 
-              {/* Overage Limit Setting */}
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      Additional Usage Limit
+                      {t("pages.billing.overageLimitTitle")}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {hasOverageLimit
-                        ? `Limit set to ${billing!.overageLimit!.toLocaleString()} credits`
-                        : "No limit set - unlimited additional usage"}
+                        ? t("pages.billing.limitSet", {
+                            count: billing!.overageLimit!.toLocaleString(),
+                          })
+                        : t("pages.billing.unlimitedOverage")}
                     </p>
                   </div>
                   {isEditingLimit ? (
@@ -337,7 +357,7 @@ export function BillingPage() {
                       <Input
                         type="number"
                         min="0"
-                        placeholder="No limit"
+                        placeholder={t("pages.billing.noLimitPlaceholder")}
                         value={limitInput}
                         onChange={(e) => setLimitInput(e.target.value)}
                         className="w-32 h-8"
@@ -348,7 +368,7 @@ export function BillingPage() {
                         onClick={handleSaveLimit}
                         disabled={isSavingLimit}
                       >
-                        {isSavingLimit ? "Saving..." : "Save"}
+                        {isSavingLimit ? t("common.saving") : t("common.save")}
                       </Button>
                       <Button
                         size="sm"
@@ -368,7 +388,7 @@ export function BillingPage() {
                           onClick={handleRemoveLimit}
                           disabled={isSavingLimit}
                         >
-                          Remove Limit
+                          {t("pages.billing.removeLimit")}
                         </Button>
                       )}
                       <Button
@@ -378,7 +398,9 @@ export function BillingPage() {
                         disabled={isSavingLimit}
                       >
                         <Pencil className="mr-2 h-3 w-3" />
-                        {hasOverageLimit ? "Change" : "Set Limit"}
+                        {hasOverageLimit
+                          ? t("pages.billing.changeLimit")
+                          : t("pages.billing.setLimit")}
                       </Button>
                     </div>
                   )}
@@ -388,13 +410,12 @@ export function BillingPage() {
           </Card>
         )}
 
-        {/* Pro Features - shown for Trial users */}
         {!isPro && (
           <Card>
             <CardHeader>
-              <CardTitle>Early Adopter Plan</CardTitle>
+              <CardTitle>{t("pages.billing.planFeaturesTitle")}</CardTitle>
               <CardDescription>
-                $10/month base subscription with usage-based billing
+                {t("pages.billing.planFeaturesDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -402,20 +423,22 @@ export function BillingPage() {
                 <li className="flex items-start gap-2">
                   <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                   <div>
-                    <span className="font-medium">Included monthly usage</span>
+                    <span className="font-medium">
+                      {t("pages.billing.includedUsageFeature")}
+                    </span>
                     <p className="text-muted-foreground">
-                      Get a monthly allowance of compute usage with your
-                      subscription
+                      {t("pages.billing.includedUsageFeatureDesc")}
                     </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-2">
                   <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                   <div>
-                    <span className="font-medium">Pay-as-you-go overage</span>
+                    <span className="font-medium">
+                      {t("pages.billing.overageFeature")}
+                    </span>
                     <p className="text-muted-foreground">
-                      Only pay for additional usage beyond your included
-                      allowance
+                      {t("pages.billing.overageFeatureDesc")}
                     </p>
                   </div>
                 </li>

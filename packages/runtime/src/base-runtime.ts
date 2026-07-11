@@ -54,10 +54,23 @@ import { MultiStepNode } from "./node-types";
 import type { ObjectStore } from "./object-store";
 import { apiToNodeParameter, nodeToApiParameter } from "./parameter-mapper";
 import type { QueueService } from "./queue-service";
+import type { AiInterfaceService } from "./ai-interface-service";
+import type { RelayAccountService } from "./relay-account-service";
 import type { SchemaService } from "./schema-service";
 import type { CodeModeExecutor } from "./utils/code-mode";
 import type { SandboxExecutor } from "./utils/sandbox-mode";
 import { validateWorkflow } from "./validate-workflow";
+import { externalEventContinuation } from "./heartbeat/continuation-store";
+import {
+  createMemoryExecutionEventInbox,
+  type ExecutionEventInbox,
+} from "./heartbeat/execution-event-protocol";
+import { createPollContinuationHandler } from "./heartbeat/poll-continuation-handler";
+import {
+  pendingNodeExecutionsFromContinuations,
+  runWorkflowHeartbeat,
+  type RuntimeHeartbeatHost,
+} from "./heartbeat/workflow-heartbeat";
 
 export interface RuntimeParams {
   readonly workflow: Workflow;
@@ -108,6 +121,10 @@ export interface RuntimeDependencies<Env = unknown> {
   codeModeExecutor?: CodeModeExecutor;
   /** Multi-language sandbox executor (Cloudflare Containers in production). */
   sandboxExecutor?: SandboxExecutor;
+  /** Platform NewAPI relay account resolver (DB with env fallback). */
+  relayAccountService?: RelayAccountService;
+  /** Organization AI interface resolver (compiled templates + org credentials). */
+  aiInterfaceService?: AiInterfaceService;
   runtimeVersion?: string;
 }
 
@@ -144,6 +161,8 @@ export abstract class Runtime<Env = unknown> {
   protected mailboxService?: MailboxService;
   protected codeModeExecutor?: CodeModeExecutor;
   protected sandboxExecutor?: SandboxExecutor;
+  protected relayAccountService?: RelayAccountService;
+  protected aiInterfaceService?: AiInterfaceService;
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -152,6 +171,11 @@ export abstract class Runtime<Env = unknown> {
   protected whatsappAccessToken?: string;
   protected whatsappPhoneNumberId?: string;
   protected slackBotToken?: string;
+
+  private readonly executionEventInboxStore = new Map<
+    string,
+    import("@dafthunk/types").ExecutionEventEnvelope[]
+  >();
 
   /** Whether this runtime supports async node execution via waitForEvent */
   protected readonly supportsAsync: boolean = false;
@@ -172,6 +196,8 @@ export abstract class Runtime<Env = unknown> {
     this.mailboxService = dependencies.mailboxService;
     this.codeModeExecutor = dependencies.codeModeExecutor;
     this.sandboxExecutor = dependencies.sandboxExecutor;
+    this.relayAccountService = dependencies.relayAccountService;
+    this.aiInterfaceService = dependencies.aiInterfaceService;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -404,22 +430,30 @@ export abstract class Runtime<Env = unknown> {
       // ========================================================================
       // STEP 2: Check compute credit availability
       // ========================================================================
-      const hasCredits = await this.creditService.hasEnoughCredits({
-        organizationId,
-        computeCredits,
-        subscriptionStatus,
-        overageLimit,
-        unlimitedUsage,
-      });
+      const usesUpstreamBilling =
+        context.workflow.billingMode === "upstream";
 
-      if (!hasCredits) {
-        // Fall through to the finally block so the exhausted record is
-        // persisted and the returned record matches what was stored.
-        isExhausted = true;
-        executionRecord.status = "exhausted";
-        executionRecord.error = "Insufficient compute credits";
-        await this.monitoringService.sendUpdate(executionRecord);
-      } else {
+      let canExecute = usesUpstreamBilling;
+      if (!usesUpstreamBilling) {
+        canExecute = await this.creditService.hasEnoughCredits({
+          organizationId,
+          computeCredits,
+          subscriptionStatus,
+          overageLimit,
+          unlimitedUsage,
+        });
+
+        if (!canExecute) {
+          // Fall through to the finally block so the exhausted record is
+          // persisted and the returned record matches what was stored.
+          isExhausted = true;
+          executionRecord.status = "exhausted";
+          executionRecord.error = "Insufficient compute credits";
+          await this.monitoringService.sendUpdate(executionRecord);
+        }
+      }
+
+      if (canExecute) {
         // ======================================================================
         // STEP 3: Preload organization resources (secrets + integrations)
         // ======================================================================
@@ -434,14 +468,20 @@ export abstract class Runtime<Env = unknown> {
         await this.monitoringService.sendUpdate(executionRecord);
 
         // ======================================================================
-        // STEP 4: Execute workflow nodes via dependency-driven scheduling
+        // STEP 4: Execute workflow nodes via heartbeat or legacy graph scheduling
         // ======================================================================
         const { state: finalState, record: finalRecord } =
-          await this.executeWorkflowGraph(
-            executionContext,
-            executionState,
-            executionRecord
-          );
+          this.supportsAsync
+            ? await this.executeWorkflowWithHeartbeat(
+                executionContext,
+                executionState,
+                executionRecord
+              )
+            : await this.executeWorkflowGraphLegacy(
+                executionContext,
+                executionState,
+                executionRecord
+              );
 
         executionState = finalState;
         executionRecord = finalRecord;
@@ -571,7 +611,67 @@ export abstract class Runtime<Env = unknown> {
    * under a stable step name (`run node <id>` / `wait for <id>`); Cloudflare
    * Workflows caches step results by name, independent of completion order.
    */
-  private async executeWorkflowGraph(
+  private createPollContinuationHandler(): import("./heartbeat/poll-continuation-handler").PollContinuationHandler {
+    return createPollContinuationHandler({
+      objectStore: this.objectStore,
+      env: this.env as NodeEnv,
+      relayAccountService: this.relayAccountService,
+      findNode: (workflowContext, nodeId) =>
+        workflowContext.workflow.nodes.find((node) => node.id === nodeId),
+    });
+  }
+
+  private async executeWorkflowWithHeartbeat(
+    context: WorkflowExecutionContext,
+    state: ExecutionState,
+    executionRecord: WorkflowExecution
+  ): Promise<{ state: ExecutionState; record: WorkflowExecution }> {
+    const host = this.createHeartbeatHost();
+    return runWorkflowHeartbeat(
+      host,
+      context,
+      state,
+      executionRecord,
+      this.createPollContinuationHandler(),
+      {
+        executeStep: this.executeStep.bind(this),
+        executeSleep: this.executeSleep.bind(this),
+        waitForNodeEvent: this.waitForNodeEvent.bind(this),
+        sendProgress: async (record) => {
+          await this.monitoringService.sendUpdate(record);
+        },
+      }
+    );
+  }
+
+  private createHeartbeatHost(): RuntimeHeartbeatHost {
+    return {
+      invokeNode: (context, executionState, nodeId) =>
+        this.executeSingleNode(context, executionState, nodeId),
+      transformExternalEvent: (context, nodeId, payload) =>
+        this.transformExternalEventPayload(context, nodeId, payload),
+      buildNodeExecutions: (context, executionState, continuations) =>
+        this.buildNodeExecutions(
+          context.workflow,
+          context,
+          executionState,
+          undefined,
+          pendingNodeExecutionsFromContinuations(continuations),
+          continuations
+        ),
+      getEventInbox: (executionId) => this.getExecutionEventInbox(executionId),
+    };
+  }
+
+  protected getExecutionEventInbox(executionId: string): ExecutionEventInbox {
+    return createMemoryExecutionEventInbox(this.executionEventInboxStore);
+  }
+
+  /**
+   * Legacy dependency-driven graph execution with per-node event waits.
+   * Kept for worker runtime paths and reference tests.
+   */
+  private async executeWorkflowGraphLegacy(
     context: WorkflowExecutionContext,
     state: ExecutionState,
     executionRecord: WorkflowExecution
@@ -685,6 +785,70 @@ export abstract class Runtime<Env = unknown> {
     return { state, record: currentRecord };
   }
 
+  private async transformExternalEventPayload(
+    context: WorkflowExecutionContext,
+    nodeId: string,
+    event: {
+      outputs: Record<string, unknown>;
+      usage: number;
+      error?: string;
+    }
+  ): Promise<NodeExecutionResult> {
+    if (event.error) {
+      return {
+        nodeId,
+        status: "error",
+        error: event.error,
+        usage: event.usage,
+      };
+    }
+
+    const node = context.workflow.nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      return {
+        nodeId,
+        status: "error",
+        error: `Node ${nodeId} not found in workflow`,
+      };
+    }
+
+    const outputsForRuntime: Record<string, RuntimeValue> = {};
+    for (const [name, value] of Object.entries(event.outputs)) {
+      const output = node.outputs.find((o) => o.name === name);
+      const parameterType = output?.type ?? "string";
+
+      if (output?.repeated && Array.isArray(value)) {
+        const transformedArray = await Promise.all(
+          value.map((v) =>
+            nodeToApiParameter(
+              parameterType,
+              v,
+              this.objectStore,
+              context.organizationId,
+              context.executionId
+            )
+          )
+        );
+        outputsForRuntime[name] = transformedArray;
+      } else {
+        outputsForRuntime[name] = await nodeToApiParameter(
+          parameterType,
+          value,
+          this.objectStore,
+          context.organizationId,
+          context.executionId
+        );
+      }
+    }
+
+    return {
+      nodeId,
+      status: "completed",
+      outputs: outputsForRuntime as NodeRuntimeValues,
+      usage: event.usage,
+    };
+  }
+
   /**
    * Resolves an async (pending) node by waiting for its completion event.
    * Transforms the event payload into a standard NodeExecutionResult.
@@ -704,63 +868,11 @@ export abstract class Runtime<Env = unknown> {
         pendingResult.timeout
       );
 
-      if (event.error) {
-        return {
-          nodeId: pendingResult.nodeId,
-          status: "error",
-          error: event.error,
-          usage: event.usage,
-        };
-      }
-
-      // Find the node definition to transform outputs to runtime format
-      const node = context.workflow.nodes.find(
-        (n) => n.id === pendingResult.nodeId
+      return this.transformExternalEventPayload(
+        context,
+        pendingResult.nodeId,
+        event
       );
-      if (!node) {
-        return {
-          nodeId: pendingResult.nodeId,
-          status: "error",
-          error: `Node ${pendingResult.nodeId} not found in workflow`,
-        };
-      }
-
-      // Transform outputs from node-native format to runtime format
-      const outputsForRuntime: Record<string, RuntimeValue> = {};
-      for (const [name, value] of Object.entries(event.outputs)) {
-        const output = node.outputs.find((o) => o.name === name);
-        const parameterType = output?.type ?? "string";
-
-        if (output?.repeated && Array.isArray(value)) {
-          const transformedArray = await Promise.all(
-            value.map((v) =>
-              nodeToApiParameter(
-                parameterType,
-                v,
-                this.objectStore,
-                context.organizationId,
-                context.executionId
-              )
-            )
-          );
-          outputsForRuntime[name] = transformedArray;
-        } else {
-          outputsForRuntime[name] = await nodeToApiParameter(
-            parameterType,
-            value,
-            this.objectStore,
-            context.organizationId,
-            context.executionId
-          );
-        }
-      }
-
-      return {
-        nodeId: pendingResult.nodeId,
-        status: "completed",
-        outputs: outputsForRuntime as NodeRuntimeValues,
-        usage: event.usage,
-      };
     } catch (error) {
       return {
         nodeId: pendingResult.nodeId,
@@ -1093,6 +1205,17 @@ export abstract class Runtime<Env = unknown> {
           this.credentialProvider.getSecret(secretName),
         getIntegration: (integrationId: string) =>
           this.credentialProvider.getIntegration(integrationId),
+        resolveRelayAccount: this.relayAccountService
+          ? (accountId?: string) => this.relayAccountService!.resolve(accountId)
+          : undefined,
+        resolveAiInterface: this.aiInterfaceService
+          ? (params) =>
+              this.aiInterfaceService!.resolveOrgInterface({
+                organizationId: context.organizationId,
+                interfaceId: params.interfaceId,
+                templateId: params.templateId,
+              })
+          : undefined,
         env: this.env as NodeEnv,
       };
 
@@ -1113,13 +1236,26 @@ export abstract class Runtime<Env = unknown> {
 
       const result = await executable.execute(nodeContext);
 
-      // Node signalled async work — return pending for the runtime to wait on
-      if (result.status === "pending" && result.pendingEvent) {
+      // Node signalled async work — return pending for the heartbeat to track
+      if (result.status === "pending" && (result.pendingEvent || result.pendingContinuation)) {
+        const eventType =
+          result.pendingContinuation?.kind === "external_event"
+            ? result.pendingContinuation.eventType
+            : result.pendingEvent!.type;
+        const timeout =
+          result.pendingContinuation?.kind === "external_event"
+            ? result.pendingContinuation.timeout
+            : (result.pendingEvent!.timeout ?? "30 minutes");
+        const continuation =
+          result.pendingContinuation ??
+          externalEventContinuation(node.id, eventType, timeout);
+
         return {
           nodeId: node.id,
           status: "pending",
-          eventType: result.pendingEvent.type,
-          timeout: result.pendingEvent.timeout ?? "30 minutes",
+          eventType,
+          timeout,
+          continuation,
         };
       }
 
@@ -1253,21 +1389,36 @@ export abstract class Runtime<Env = unknown> {
     context: WorkflowExecutionContext,
     state: ExecutionState,
     overrideStatus?: import("@dafthunk/types").WorkflowExecutionStatus,
-    pendingNodes?: Map<string, { type: string; timeout: string }>
+    pendingNodes?: Map<string, { type: string; timeout: string }>,
+    pendingContinuations?: Map<
+      string,
+      import("@dafthunk/types").PendingContinuation
+    >
   ) {
     // Determine if workflow is still running
     const isStillRunning =
       (overrideStatus ?? getExecutionStatus(context, state)) === "executing";
 
     return workflow.nodes.map((node) => {
-      // Check for pending nodes (e.g. waiting for human input) before other states
-      const pendingEvent = pendingNodes?.get(node.id);
-      if (pendingEvent) {
+      const pendingContinuation = pendingContinuations?.get(node.id);
+      const pendingEvent =
+        pendingNodes?.get(node.id) ??
+        (pendingContinuation
+          ? pendingContinuation.kind === "external_event"
+            ? {
+                type: pendingContinuation.eventType,
+                timeout: pendingContinuation.timeout,
+              }
+            : undefined
+          : undefined);
+
+      if (pendingEvent || pendingContinuation) {
         return {
           nodeId: node.id,
           status: "pending" as const,
           usage: 0,
           pendingEvent,
+          pendingContinuation,
         };
       }
       if (state.executedNodes.includes(node.id)) {

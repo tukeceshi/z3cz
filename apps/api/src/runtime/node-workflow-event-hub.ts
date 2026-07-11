@@ -1,3 +1,10 @@
+import type { ExecutionEventEnvelope } from "@dafthunk/types";
+
+import {
+  getMultiplexEventType,
+  normalizeWorkflowEvent,
+} from "@dafthunk/runtime/heartbeat/execution-event-protocol";
+
 interface PendingEventWait {
   readonly resolve: (payload: unknown) => void;
   readonly reject: (error: Error) => void;
@@ -27,9 +34,25 @@ function parseTimeoutMs(timeout: string): number | undefined {
  */
 class NodeWorkflowEventHub {
   private readonly waits = new Map<string, PendingEventWait>();
+  private readonly inboxes = new Map<string, ExecutionEventEnvelope[]>();
 
   private waitKey(executionId: string, eventType: string): string {
     return `${executionId}:${eventType}`;
+  }
+
+  drainInbox(executionId: string): ExecutionEventEnvelope[] {
+    const queued = this.inboxes.get(executionId);
+    if (!queued || queued.length === 0) {
+      return [];
+    }
+    this.inboxes.delete(executionId);
+    return queued;
+  }
+
+  pushInbox(executionId: string, envelope: ExecutionEventEnvelope): void {
+    const queued = this.inboxes.get(executionId) ?? [];
+    queued.push(envelope);
+    this.inboxes.set(executionId, queued);
   }
 
   waitForEvent<T>(
@@ -73,17 +96,32 @@ class NodeWorkflowEventHub {
     executionId: string,
     event: { type: string; payload: unknown }
   ): boolean {
-    const key = this.waitKey(executionId, event.type);
-    const wait = this.waits.get(key);
-    if (!wait) {
-      return false;
+    const envelope = normalizeWorkflowEvent(event, executionId);
+    const multiplexType = getMultiplexEventType(executionId);
+
+    const multiplexKey = this.waitKey(executionId, multiplexType);
+    const multiplexWait = this.waits.get(multiplexKey);
+    if (multiplexWait) {
+      if (multiplexWait.timer) {
+        clearTimeout(multiplexWait.timer);
+      }
+      this.waits.delete(multiplexKey);
+      multiplexWait.resolve(envelope);
+      return true;
     }
 
-    if (wait.timer) {
-      clearTimeout(wait.timer);
+    const directKey = this.waitKey(executionId, event.type);
+    const directWait = this.waits.get(directKey);
+    if (directWait) {
+      if (directWait.timer) {
+        clearTimeout(directWait.timer);
+      }
+      this.waits.delete(directKey);
+      directWait.resolve(event.payload);
+      return true;
     }
-    this.waits.delete(key);
-    wait.resolve(event.payload);
+
+    this.pushInbox(executionId, envelope);
     return true;
   }
 
@@ -99,6 +137,7 @@ class NodeWorkflowEventHub {
       wait.reject(new Error("Execution cancelled"));
       this.waits.delete(key);
     }
+    this.inboxes.delete(executionId);
   }
 }
 

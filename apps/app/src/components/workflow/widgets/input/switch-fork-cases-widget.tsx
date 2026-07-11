@@ -4,6 +4,8 @@ import { useCallback } from "react";
 
 import { cn } from "@/utils/utils";
 
+import { useTranslation } from "@/components/locale-provider";
+
 import { useWorkflow } from "../../workflow-context";
 import type { WorkflowParameter } from "../../workflow-types";
 import type { BaseWidgetProps } from "../widget";
@@ -24,6 +26,7 @@ function SwitchForkCasesWidget({
   className,
   disabled = false,
 }: SwitchForkCasesWidgetProps) {
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   const canRemove = caseCount > minCount;
@@ -115,7 +118,7 @@ function SwitchForkCasesWidget({
         )}
         onClick={handleRemove}
         disabled={disabled || !canRemove}
-        aria-label="Remove case"
+        aria-label={t("workflow.widgets.switchFork.removeCase")}
       >
         <MinusIcon className="h-3 w-3" />
       </button>
@@ -132,7 +135,7 @@ function SwitchForkCasesWidget({
         )}
         onClick={handleAdd}
         disabled={disabled}
-        aria-label="Add case"
+        aria-label={t("workflow.widgets.switchFork.addCase")}
       >
         <PlusIcon className="h-3 w-3" />
       </button>

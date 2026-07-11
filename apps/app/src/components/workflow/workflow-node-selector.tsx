@@ -2,6 +2,8 @@ import { Wand } from "lucide-react";
 import { DynamicIcon, iconNames } from "lucide-react/dynamic.mjs";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
+
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -63,6 +65,7 @@ export function WorkflowNodeSelector({
   workflowDescription,
   hasTriggerNode,
 }: WorkflowNodeSelectorProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
 
   // Responder nodes are auto-added with their trigger; never list them.
@@ -125,12 +128,12 @@ export function WorkflowNodeSelector({
         onKeyDown={handleKeyDown}
         tabIndex={-1}
       >
-        <DialogTitle className="sr-only">Select a node</DialogTitle>
+        <DialogTitle className="sr-only">{t("workflow.nodeSelector.title")}</DialogTitle>
         <div className="relative px-4 pt-4">
           <Wand className="absolute left-8 top-9 h-6 w-6 text-muted-foreground" />
           <Input
             ref={searchInputRef}
-            placeholder="Search nodes..."
+            placeholder={t("workflow.nodeSelector.searchPlaceholder")}
             className={cn(
               "pl-14 text-xl h-16 border rounded-lg bg-accent",
               activeElement === "search"
@@ -219,7 +222,7 @@ export function WorkflowNodeSelector({
               })}
               {filteredTemplates.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-sm">No nodes found matching your search</p>
+                  <p className="text-sm">{t("workflow.nodeSelector.emptySearch")}</p>
                 </div>
               )}
             </div>
@@ -241,7 +244,10 @@ export function WorkflowNodeSelector({
                 />
               </div>
               <div className="text-xs text-muted-foreground/60 pt-4 text-right">
-                {filteredTemplates.length} of {compatibleTemplates.length} nodes
+                {t("workflow.nodeSelector.count", {
+                  filtered: filteredTemplates.length,
+                  total: compatibleTemplates.length,
+                })}
               </div>
             </div>
           )}

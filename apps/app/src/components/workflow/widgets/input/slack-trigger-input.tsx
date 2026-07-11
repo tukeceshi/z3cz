@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -34,6 +35,7 @@ function SlackTriggerInputWidget({
   className,
   disabled = false,
 }: SlackTriggerInputProps) {
+  const { t } = useTranslation();
   const { slackBots, isSlackBotsLoading, mutateSlackBots } = useSlackBots();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
   const [localChannelId, setLocalChannelId] = useState(channelId ?? "");
@@ -94,7 +96,11 @@ function SlackTriggerInputWidget({
       >
         <SelectTrigger className="h-6 text-xs">
           <SelectValue
-            placeholder={isSlackBotsLoading ? "Loading..." : "Select a bot"}
+            placeholder={
+              isSlackBotsLoading
+                ? t("common.loading")
+                : t("workflow.widgets.triggers.selectBot")
+            }
           />
         </SelectTrigger>
         <SelectContent>
@@ -104,13 +110,15 @@ function SlackTriggerInputWidget({
             </SelectItem>
           ))}
           <SelectSeparator />
-          <SelectItem value={CREATE_NEW_SENTINEL}>+ New Bot</SelectItem>
+          <SelectItem value={CREATE_NEW_SENTINEL}>
+            {t("workflow.widgets.triggers.newBot")}
+          </SelectItem>
         </SelectContent>
       </Select>
       <Input
         value={localChannelId}
         onChange={(e) => handleChannelIdChange(e.target.value)}
-        placeholder="Channel ID (optional)"
+        placeholder={t("workflow.widgets.triggers.slack.channelIdPlaceholder")}
         disabled={disabled}
         className="h-6 text-xs px-1.5 font-mono"
       />

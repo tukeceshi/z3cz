@@ -1,6 +1,7 @@
 import { File as FileIcon, PlusCircle, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -66,11 +67,13 @@ function KeyValueEditor({
   onChange,
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
+  addLabel = "Add",
 }: {
   items: KeyValue[];
   onChange: (items: KeyValue[]) => void;
   keyPlaceholder?: string;
   valuePlaceholder?: string;
+  addLabel?: string;
 }) {
   const addRow = () => onChange([...items, { key: "", value: "" }]);
   const removeRow = (index: number) =>
@@ -116,7 +119,7 @@ function KeyValueEditor({
         onClick={addRow}
       >
         <PlusCircle className="w-4 h-4 mr-1" />
-        Add
+        {addLabel}
       </Button>
     </div>
   );
@@ -127,6 +130,7 @@ export function HttpRequestConfigDialog({
   onClose,
   onSubmit,
 }: HttpRequestConfigDialogProps) {
+  const { t } = useTranslation();
   const [method, setMethod] = useState<"GET" | "POST">("GET");
   const [headers, setHeaders] = useState<KeyValue[]>([]);
   const [queryParams, setQueryParams] = useState<KeyValue[]>([]);
@@ -148,7 +152,7 @@ export function HttpRequestConfigDialog({
       JSON.parse(value);
       setJsonError(null);
     } catch (e) {
-      setJsonError(e instanceof Error ? e.message : "Invalid JSON");
+      setJsonError(e instanceof Error ? e.message : t("workflow.httpRequestDialog.invalidJson"));
     }
   };
 
@@ -204,7 +208,7 @@ export function HttpRequestConfigDialog({
           config.contentType = "application/json";
         } catch (e) {
           // Invalid JSON - show error and don't submit
-          setJsonError(e instanceof Error ? e.message : "Invalid JSON");
+          setJsonError(e instanceof Error ? e.message : t("workflow.httpRequestDialog.invalidJson"));
           return;
         }
       } else if (bodyType === "form-data") {
@@ -231,7 +235,7 @@ export function HttpRequestConfigDialog({
       <DialogContent className="max-w-[550px] max-h-[80vh] flex flex-col gap-0 p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <DialogTitle className="text-base font-semibold">
-            Execute Workflow
+            {t("workflow.httpRequestDialog.title")}
           </DialogTitle>
           <ToggleButtons
             value={method}
@@ -247,23 +251,25 @@ export function HttpRequestConfigDialog({
           <div className="p-4 space-y-4">
             {/* Headers */}
             <div className="space-y-2">
-              <Label>Headers</Label>
+              <Label>{t("workflow.httpRequestDialog.headers")}</Label>
               <KeyValueEditor
                 items={headers}
                 onChange={setHeaders}
-                keyPlaceholder="Header name"
-                valuePlaceholder="Value"
+                keyPlaceholder={t("workflow.httpRequestDialog.headerName")}
+                valuePlaceholder={t("workflow.httpRequestDialog.value")}
+                addLabel={t("workflow.httpRequestDialog.add")}
               />
             </div>
 
             {/* Query Parameters */}
             <div className="space-y-2">
-              <Label>Query Parameters</Label>
+              <Label>{t("workflow.httpRequestDialog.queryParameters")}</Label>
               <KeyValueEditor
                 items={queryParams}
                 onChange={setQueryParams}
-                keyPlaceholder="Parameter"
-                valuePlaceholder="Value"
+                keyPlaceholder={t("workflow.httpRequestDialog.parameter")}
+                valuePlaceholder={t("workflow.httpRequestDialog.value")}
+                addLabel={t("workflow.httpRequestDialog.add")}
               />
             </div>
 
@@ -271,15 +277,15 @@ export function HttpRequestConfigDialog({
             {method === "POST" && (
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <Label>Body</Label>
+                  <Label>{t("workflow.httpRequestDialog.body")}</Label>
                   <ToggleButtons
                     value={bodyType}
                     options={[
-                      { value: "none", label: "None" },
-                      { value: "text", label: "Text" },
-                      { value: "json", label: "JSON" },
-                      { value: "form-data", label: "Form" },
-                      { value: "file", label: "File" },
+                      { value: "none", label: t("workflow.httpRequestDialog.bodyNone") },
+                      { value: "text", label: t("workflow.httpRequestDialog.bodyText") },
+                      { value: "json", label: t("workflow.httpRequestDialog.bodyJson") },
+                      { value: "form-data", label: t("workflow.httpRequestDialog.bodyForm") },
+                      { value: "file", label: t("workflow.httpRequestDialog.bodyFile") },
                     ]}
                     onChange={setBodyType}
                   />
@@ -316,7 +322,7 @@ export function HttpRequestConfigDialog({
                           className="absolute top-1 right-1 h-6 px-2 text-xs text-muted-foreground"
                           onClick={formatJson}
                         >
-                          Format
+                          {t("workflow.httpRequestDialog.format")}
                         </Button>
                       )}
                     </div>
@@ -330,8 +336,9 @@ export function HttpRequestConfigDialog({
                   <KeyValueEditor
                     items={formData}
                     onChange={setFormData}
-                    keyPlaceholder="Field"
-                    valuePlaceholder="Value"
+                    keyPlaceholder={t("workflow.httpRequestDialog.field")}
+                    valuePlaceholder={t("workflow.httpRequestDialog.value")}
+                    addLabel={t("workflow.httpRequestDialog.add")}
                   />
                 )}
 
@@ -360,7 +367,7 @@ export function HttpRequestConfigDialog({
                       <label className="flex items-center justify-center gap-2 p-3 border border-dashed rounded-md cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition">
                         <Upload className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">
-                          Upload file
+                          {t("workflow.httpRequestDialog.uploadFile")}
                         </span>
                         <input
                           ref={fileInputRef}
@@ -379,10 +386,10 @@ export function HttpRequestConfigDialog({
 
         <div className="flex justify-end gap-2 px-4 py-3 border-t bg-muted/30">
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button size="sm" onClick={handleSubmit}>
-            Execute
+            {t("workflow.httpRequestDialog.execute")}
           </Button>
         </div>
       </DialogContent>

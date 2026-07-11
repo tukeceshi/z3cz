@@ -3,6 +3,7 @@ import LoaderCircle from "lucide-react/icons/loader-circle";
 import RotateCw from "lucide-react/icons/rotate-cw";
 import { useCallback, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +47,7 @@ function ReplicateModelInputWidget({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   // Sync local value when model prop changes externally (e.g., from canvas widget)
@@ -61,7 +63,7 @@ function ReplicateModelInputWidget({
       const [ownerName] = modelId.split(":");
       const parts = ownerName.split("/");
       if (parts.length !== 2 || !parts[0] || !parts[1]) {
-        setError("Enter a valid model identifier (e.g., google/veo-3)");
+        setError(t("workflow.widgets.model.invalidModelId"));
         return;
       }
 
@@ -88,8 +90,7 @@ function ReplicateModelInputWidget({
           id: "model",
           name: "model",
           type: "string",
-          description:
-            "Replicate model identifier in the format provider/model or provider/model:version",
+          description: t("workflow.widgets.model.replicateModelDescription"),
           required: true,
           hidden: true,
           value: versionedModelId,
@@ -137,13 +138,13 @@ function ReplicateModelInputWidget({
         }));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load model schema"
+          err instanceof Error ? err.message : t("workflow.widgets.model.loadFailed")
         );
       } finally {
         setLoading(false);
       }
     },
-    [updateNodeData, edges, deleteEdge, nodeId]
+    [updateNodeData, edges, deleteEdge, nodeId, t]
   );
 
   const handleLoad = useCallback(() => {
@@ -154,7 +155,7 @@ function ReplicateModelInputWidget({
     const [ownerName] = trimmed.split(":");
     const parts = ownerName.split("/");
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      setError("Enter a valid model identifier (e.g., google/veo-3)");
+      setError(t("workflow.widgets.model.invalidModelId"));
       return;
     }
 
@@ -164,7 +165,7 @@ function ReplicateModelInputWidget({
     } else {
       applySchema(trimmed);
     }
-  }, [value, disabled, updateNodeData, hasSchemaParams, applySchema]);
+  }, [value, disabled, updateNodeData, hasSchemaParams, applySchema, t]);
 
   const handleConfirm = useCallback(() => {
     setShowConfirm(false);
@@ -185,7 +186,7 @@ function ReplicateModelInputWidget({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="provider/model"
+          placeholder={t("workflow.widgets.model.replicatePlaceholder")}
           disabled={disabled || loading}
           className="h-auto text-xs font-mono"
         />
@@ -207,16 +208,15 @@ function ReplicateModelInputWidget({
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload model schema?</AlertDialogTitle>
+            <AlertDialogTitle>{t("workflow.widgets.model.reloadTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will replace all current parameters and remove all connected
-              edges. This action cannot be undone.
+              {t("workflow.widgets.model.reloadDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

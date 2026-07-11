@@ -1,8 +1,15 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useState,
+} from "react";
 
 export type BreadcrumbItem = {
   label: string;
   to?: string;
+  /** Optional control rendered after the label (e.g. settings button). */
+  trailing?: ReactNode;
 };
 
 type PageContextType = {

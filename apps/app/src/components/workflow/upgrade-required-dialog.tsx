@@ -4,6 +4,7 @@ import { DynamicIcon } from "lucide-react/dynamic.mjs";
 import Sparkles from "lucide-react/icons/sparkles";
 import { useNavigate } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,9 +19,7 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 export interface UpgradeRequiredDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Node types (with `subscription: true`) that triggered the prompt. */
   gatedNodeTypes: NodeType[];
-  /** When true, the prompt is reacting to a failed run rather than a pre-flight gate. */
   variant?: "preflight" | "post-failure";
 }
 
@@ -30,6 +29,7 @@ export function UpgradeRequiredDialog({
   gatedNodeTypes,
   variant = "preflight",
 }: UpgradeRequiredDialogProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { getOrgUrl } = useOrgUrl();
 
@@ -40,15 +40,15 @@ export function UpgradeRequiredDialog({
 
   const title =
     variant === "post-failure"
-      ? "Upgrade to run this workflow"
-      : "Upgrade to use these nodes";
+      ? t("workflow.upgradeRequired.titlePostFailure")
+      : t("workflow.upgradeRequired.titlePreflight");
 
   const description =
     variant === "post-failure"
-      ? "This workflow uses nodes that require the Early Adopter plan. Upgrade to run it."
+      ? t("workflow.upgradeRequired.descriptionPostFailure")
       : gatedNodeTypes.length === 1
-        ? "This node requires the Early Adopter plan to execute."
-        : "These nodes require the Early Adopter plan to execute.";
+        ? t("workflow.upgradeRequired.descriptionPreflightOne")
+        : t("workflow.upgradeRequired.descriptionPreflightMany");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,9 +93,11 @@ export function UpgradeRequiredDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Not now
+            {t("workflow.upgradeRequired.notNow")}
           </Button>
-          <Button onClick={handleUpgrade}>Upgrade to Early Adopter</Button>
+          <Button onClick={handleUpgrade}>
+            {t("workflow.upgradeRequired.upgrade")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

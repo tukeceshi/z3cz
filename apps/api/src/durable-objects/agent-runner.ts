@@ -22,6 +22,7 @@ import { calculateTokenUsage } from "@dafthunk/runtime/utils/usage";
 import { Agent } from "agents";
 
 import type { Bindings } from "../context";
+import { buildMultiplexWorkflowSendEvent } from "../runtime/workflow-event-utils";
 import { callAgentLLM } from "./agent-llm";
 import {
   applyCodeMode,
@@ -418,17 +419,21 @@ export class AgentRunner extends Agent<Bindings, AgentRunnerState> {
       if (executionInstanceId && nodeId) {
         try {
           const instance = await this.env.EXECUTE.get(executionInstanceId);
-          await instance.sendEvent({
-            type: `agent-complete-${nodeId}`,
-            payload: {
-              outputs: {},
-              usage: 0,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Agent execution failed",
-            },
-          });
+          await instance.sendEvent(
+            buildMultiplexWorkflowSendEvent(
+              executionInstanceId,
+              `agent-complete-${nodeId}`,
+              {
+                outputs: {},
+                usage: 0,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Agent execution failed",
+              },
+              nodeId
+            )
+          );
         } catch (sendError) {
           console.error("Failed to send error event to workflow:", sendError);
         }
@@ -446,28 +451,32 @@ export class AgentRunner extends Agent<Bindings, AgentRunnerState> {
     usage: number
   ): Promise<void> {
     const instance = await this.env.EXECUTE.get(executionInstanceId);
-    await instance.sendEvent({
-      type: `agent-complete-${nodeId}`,
-      payload: {
-        outputs: {
-          text: response.text,
-          steps: response.steps,
-          total_steps: response.totalSteps,
-          finish_reason: response.finishReason,
-          usage_metadata: {
-            totalInputTokens: response.totalInputTokens,
-            totalOutputTokens: response.totalOutputTokens,
+    await instance.sendEvent(
+      buildMultiplexWorkflowSendEvent(
+        executionInstanceId,
+        `agent-complete-${nodeId}`,
+        {
+          outputs: {
+            text: response.text,
+            steps: response.steps,
+            total_steps: response.totalSteps,
+            finish_reason: response.finishReason,
+            usage_metadata: {
+              totalInputTokens: response.totalInputTokens,
+              totalOutputTokens: response.totalOutputTokens,
+            },
+            ...(response.agentMessages && {
+              agent_messages: response.agentMessages,
+            }),
           },
-          ...(response.agentMessages && {
-            agent_messages: response.agentMessages,
+          usage,
+          ...(response.finishReason === "error" && {
+            error: response.text || "Agent execution failed",
           }),
         },
-        usage,
-        ...(response.finishReason === "error" && {
-          error: response.text || "Agent execution failed",
-        }),
-      },
-    });
+        nodeId
+      )
+    );
   }
 
   // ── Conversation state helpers ───────────────────────────────────────

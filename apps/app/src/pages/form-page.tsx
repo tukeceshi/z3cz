@@ -9,6 +9,7 @@ import {
   type SchemaFormField,
   submitSchemaForm,
 } from "@/components/forms/schema-form";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,8 +20,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getApiBaseUrl } from "@/config/api";
-
-// ── Types ───────────────────────────────────────────────────────────────
 
 interface FormConfig {
   title: string;
@@ -37,20 +36,19 @@ type FormState =
   | { status: "already_submitted" }
   | { status: "error"; message: string };
 
-// ── Form Page ───────────────────────────────────────────────────────────
-
 /**
  * Public form page for human-in-the-loop workflow input.
  * No authentication required — the signed token in the URL IS the authorization.
  */
 export function FormPage() {
+  const { t } = useTranslation();
   const { signedToken } = useParams<{ signedToken: string }>();
   const [state, setState] = useState<FormState>({ status: "loading" });
   const [values, setValues] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     if (!signedToken) {
-      setState({ status: "error", message: "Invalid form link" });
+      setState({ status: "error", message: t("pages.form.invalidLink") });
       return;
     }
 
@@ -60,7 +58,7 @@ export function FormPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(
-            (data as { error?: string }).error || "Failed to load form"
+            (data as { error?: string }).error || t("pages.form.loadFailed")
           );
         }
         return res.json();
@@ -82,7 +80,7 @@ export function FormPage() {
       .catch((err: Error) => {
         setState({ status: "error", message: err.message });
       });
-  }, [signedToken]);
+  }, [signedToken, t]);
 
   const handleSubmit = useCallback(async () => {
     if (state.status !== "ready") return;
@@ -97,7 +95,7 @@ export function FormPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const error =
-          (data as { error?: string }).error || "Failed to submit form";
+          (data as { error?: string }).error || t("pages.form.submitFailed");
         if (res.status === 409) {
           setState({ status: "already_submitted" });
         } else {
@@ -110,10 +108,10 @@ export function FormPage() {
     } catch (err) {
       setState({
         status: "error",
-        message: err instanceof Error ? err.message : "Failed to submit form",
+        message: err instanceof Error ? err.message : t("pages.form.submitFailed"),
       });
     }
-  }, [state, signedToken, values]);
+  }, [state, signedToken, values, t]);
 
   const isSubmitting = state.status === "submitting";
 
@@ -135,16 +133,16 @@ export function FormPage() {
 
         {state.status === "error" && (
           <CardHeader>
-            <CardTitle>Something went wrong</CardTitle>
+            <CardTitle>{t("pages.form.errorTitle")}</CardTitle>
             <CardDescription>{state.message}</CardDescription>
           </CardHeader>
         )}
 
         {state.status === "already_submitted" && (
           <CardHeader>
-            <CardTitle>Already Submitted</CardTitle>
+            <CardTitle>{t("pages.form.alreadySubmittedTitle")}</CardTitle>
             <CardDescription>
-              This form has already been completed. No further action is needed.
+              {t("pages.form.alreadySubmittedDescription")}
             </CardDescription>
           </CardHeader>
         )}
@@ -154,11 +152,8 @@ export function FormPage() {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
               <Check className="h-5 w-5 text-green-600" />
             </div>
-            <CardTitle>Response Submitted</CardTitle>
-            <CardDescription>
-              Thank you. Your response has been recorded and the workflow will
-              continue.
-            </CardDescription>
+            <CardTitle>{t("pages.form.successTitle")}</CardTitle>
+            <CardDescription>{t("pages.form.successDescription")}</CardDescription>
           </CardHeader>
         )}
 
@@ -192,7 +187,7 @@ export function FormPage() {
                 {isSubmitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Submit
+                {t("pages.form.submit")}
               </Button>
             </CardFooter>
           </>

@@ -1,5 +1,6 @@
-import type { OrganizationInfo } from "@dafthunk/types";
+import type { OrganizationInfo, PlatformFeatureConfig, ResourceFeatureId } from "@dafthunk/types";
 import Bot from "lucide-react/icons/bot";
+import Cpu from "lucide-react/icons/cpu";
 import CreditCard from "lucide-react/icons/credit-card";
 import Database from "lucide-react/icons/database";
 import FlaskConical from "lucide-react/icons/flask-conical";
@@ -25,6 +26,7 @@ import { AppLayout } from "@/components/layouts/app-layout";
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
 import { TourProvider } from "@/components/tour";
+import { isPlatformFeatureEnabled } from "@/hooks/use-feature-config";
 import { useOrganizations } from "@/services/organizations-service";
 
 interface OrgLayoutProps {
@@ -32,9 +34,114 @@ interface OrgLayoutProps {
   title: string;
 }
 
-export const getDashboardSidebarGroups = (
+function buildWorkflowSidebarItems(
   orgId: string,
   t: (key: TranslationKey) => string
+) {
+  return [
+    {
+      id: "workflows",
+      title: t("sidebar.workflows"),
+      url: `/org/${orgId}/workflows`,
+      icon: SquareTerminal,
+    },
+    {
+      id: "executions",
+      title: t("sidebar.executions"),
+      url: `/org/${orgId}/executions`,
+      icon: Logs,
+    },
+    {
+      id: "feedback",
+      title: t("sidebar.feedback"),
+      url: `/org/${orgId}/feedback`,
+      icon: MessageSquareText,
+    },
+    {
+      id: "templates",
+      title: t("sidebar.templates"),
+      url: `/org/${orgId}/templates`,
+      icon: Wand,
+    },
+    {
+      id: "playground",
+      title: t("sidebar.playground"),
+      url: `/org/${orgId}/playground`,
+      icon: FlaskConical,
+    },
+  ];
+}
+
+function buildResourceSidebarItems(
+  orgId: string,
+  t: (key: TranslationKey) => string,
+  featureConfig: PlatformFeatureConfig
+) {
+  const isEnabled = (id: ResourceFeatureId) =>
+    isPlatformFeatureEnabled(featureConfig, id);
+
+  return [
+    {
+      id: "schemas",
+      title: t("sidebar.schemas"),
+      url: `/org/${orgId}/schemas`,
+      icon: TableProperties,
+    },
+    {
+      id: "databases",
+      title: t("sidebar.databases"),
+      url: `/org/${orgId}/databases`,
+      icon: Database,
+    },
+    {
+      id: "datasets",
+      title: t("sidebar.datasets"),
+      url: `/org/${orgId}/datasets`,
+      icon: Folder,
+    },
+    {
+      id: "integrations",
+      title: t("sidebar.integrations"),
+      url: `/org/${orgId}/integrations`,
+      icon: Plug,
+    },
+    {
+      id: "secrets",
+      title: t("sidebar.secrets"),
+      url: `/org/${orgId}/secrets`,
+      icon: Lock,
+    },
+    {
+      id: "ai-interfaces",
+      title: t("sidebar.aiInterfaces"),
+      url: `/org/${orgId}/ai-interfaces`,
+      icon: Cpu,
+    },
+    {
+      id: "emails",
+      title: t("sidebar.emails"),
+      url: `/org/${orgId}/emails`,
+      icon: Mail,
+    },
+    {
+      id: "queues",
+      title: t("sidebar.queues"),
+      url: `/org/${orgId}/queues`,
+      icon: Inbox,
+    },
+    {
+      id: "bots",
+      title: t("sidebar.bots"),
+      url: `/org/${orgId}/bots`,
+      icon: Bot,
+    },
+  ].filter((item) => isEnabled(item.id as ResourceFeatureId));
+}
+
+export const getDashboardSidebarGroups = (
+  orgId: string,
+  t: (key: TranslationKey) => string,
+  featureConfig: PlatformFeatureConfig
 ) => {
   const groups = [
     {
@@ -49,91 +156,11 @@ export const getDashboardSidebarGroups = (
     },
     {
       label: t("sidebar.workflows"),
-      items: [
-        {
-          id: "workflows",
-          title: t("sidebar.workflows"),
-          url: `/org/${orgId}/workflows`,
-          icon: SquareTerminal,
-        },
-        {
-          id: "executions",
-          title: t("sidebar.executions"),
-          url: `/org/${orgId}/executions`,
-          icon: Logs,
-        },
-        {
-          id: "feedback",
-          title: t("sidebar.feedback"),
-          url: `/org/${orgId}/feedback`,
-          icon: MessageSquareText,
-        },
-        {
-          id: "templates",
-          title: t("sidebar.templates"),
-          url: `/org/${orgId}/templates`,
-          icon: Wand,
-        },
-        {
-          id: "playground",
-          title: t("sidebar.playground"),
-          url: `/org/${orgId}/playground`,
-          icon: FlaskConical,
-        },
-      ],
+      items: buildWorkflowSidebarItems(orgId, t),
     },
     {
       label: t("sidebar.resources"),
-      items: [
-        {
-          id: "schemas",
-          title: t("sidebar.schemas"),
-          url: `/org/${orgId}/schemas`,
-          icon: TableProperties,
-        },
-        {
-          id: "databases",
-          title: t("sidebar.databases"),
-          url: `/org/${orgId}/databases`,
-          icon: Database,
-        },
-        {
-          id: "datasets",
-          title: t("sidebar.datasets"),
-          url: `/org/${orgId}/datasets`,
-          icon: Folder,
-        },
-        {
-          id: "integrations",
-          title: t("sidebar.integrations"),
-          url: `/org/${orgId}/integrations`,
-          icon: Plug,
-        },
-        {
-          id: "secrets",
-          title: t("sidebar.secrets"),
-          url: `/org/${orgId}/secrets`,
-          icon: Lock,
-        },
-        {
-          id: "emails",
-          title: t("sidebar.emails"),
-          url: `/org/${orgId}/emails`,
-          icon: Mail,
-        },
-        {
-          id: "queues",
-          title: t("sidebar.queues"),
-          url: `/org/${orgId}/queues`,
-          icon: Inbox,
-        },
-        {
-          id: "bots",
-          title: t("sidebar.bots"),
-          url: `/org/${orgId}/bots`,
-          icon: Bot,
-        },
-      ],
+      items: buildResourceSidebarItems(orgId, t, featureConfig),
     },
   ];
 
@@ -161,14 +188,14 @@ export const getDashboardSidebarGroups = (
     ],
   });
 
-  return groups;
+  return groups.filter((group) => group.items.length > 0);
 };
 
 export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
   const params = useParams<{ organizationId: string }>();
   const { organization, setSelectedOrganization } = useAuth();
   const { organizations: orgList } = useOrganizations();
-  const { t } = useTranslation();
+  const { t, siteSettings } = useTranslation();
 
   useEffect(() => {
     if (params.organizationId && organization?.id && orgList.length > 0) {
@@ -197,7 +224,11 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
     return <div>{t("common.loading")}</div>;
   }
 
-  const sidebarGroups = getDashboardSidebarGroups(organization.id, t);
+  const sidebarGroups = getDashboardSidebarGroups(
+    organization.id,
+    t,
+    siteSettings.featureConfig
+  );
 
   return (
     <AppLayout

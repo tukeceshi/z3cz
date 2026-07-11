@@ -18,7 +18,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ALL_TRIGGER_NODE_TYPE_IDS,
@@ -168,6 +168,8 @@ export interface UseGraphOperationsReturn {
   edges: ReactFlowEdge<WorkflowEdgeType>[];
   selectedNodes: ReactFlowNode<WorkflowNodeType>[];
   selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
+  soleSelectedNodeId: string | null;
+  connectedHandles: ReadonlySet<string>;
   reactFlowInstance: ReactFlowInstance<
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
@@ -252,8 +254,54 @@ export function useGraphOperations({
   const edgesRef = useRef(initialEdges);
   const isDraggingRef = useRef(false);
 
-  const selectedNodes = nodes.filter((node) => node.selected);
-  const selectedEdges = edges.filter((edge) => edge.selected);
+  const selectionFingerprint = useMemo(() => {
+    const parts: string[] = [];
+    for (const node of nodes) {
+      if (node.selected) parts.push(node.id);
+    }
+    return parts.join(",");
+  }, [nodes]);
+
+  const selectedNodes = useMemo(
+    () => nodes.filter((node) => node.selected),
+    [nodes, selectionFingerprint]
+  );
+
+  const edgeSelectionFingerprint = useMemo(() => {
+    const parts: string[] = [];
+    for (const edge of edges) {
+      if (edge.selected) parts.push(edge.id);
+    }
+    return parts.join(",");
+  }, [edges]);
+
+  const selectedEdges = useMemo(
+    () => edges.filter((edge) => edge.selected),
+    [edges, edgeSelectionFingerprint]
+  );
+
+  const soleSelectedNodeId = useMemo(() => {
+    let found: string | null = null;
+    for (const node of nodes) {
+      if (!node.selected) continue;
+      if (found !== null) return null;
+      found = node.id;
+    }
+    return found;
+  }, [nodes, selectionFingerprint]);
+
+  const connectedHandles = useMemo(() => {
+    const set = new Set<string>();
+    for (const edge of edges) {
+      if (edge.targetHandle) {
+        set.add(`${edge.target}:${edge.targetHandle}`);
+      }
+      if (edge.sourceHandle) {
+        set.add(`${edge.source}:${edge.sourceHandle}`);
+      }
+    }
+    return set;
+  }, [edges]);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -265,6 +313,10 @@ export function useGraphOperations({
 
   // Sync initialNodes prop
   useEffect(() => {
+    if (isDraggingRef.current) {
+      return;
+    }
+
     const newNodesWithCreateObjectUrl = initialNodes.map((node) => ({
       ...node,
       data: {
@@ -309,8 +361,6 @@ export function useGraphOperations({
             ...newNode,
             selected: currentNode.selected,
             dragging: currentNode.dragging,
-            // Preserve the user's active drag position instead of snapping to server state
-            ...(currentNode.dragging && { position: currentNode.position }),
           };
         }
         return newNode;
@@ -345,6 +395,9 @@ export function useGraphOperations({
       }
 
       const filtered = changes.filter((change) => {
+        if (isDraggingRef.current && change.type === "position") {
+          return false;
+        }
         if (change.type !== "remove") return true;
         const node = nodesRef.current.find((n) => n.id === change.id);
         return !(
@@ -742,6 +795,8 @@ export function useGraphOperations({
     edges,
     selectedNodes,
     selectedEdges,
+    soleSelectedNodeId,
+    connectedHandles,
     reactFlowInstance,
     isNodeSelectorOpen,
     connectionValidationState,
@@ -761,8 +816,20 @@ export function useGraphOperations({
     }, []),
     onNodeDragStop: useCallback(() => {
       isDraggingRef.current = false;
-      setNodes((nodes) => [...nodes]);
-    }, [setNodes]),
+      if (!reactFlowInstance) return;
+
+      const liveNodes = reactFlowInstance.getNodes();
+      const posById = new Map(liveNodes.map((n) => [n.id, n.position]));
+
+      setNodes((prev) => {
+        const updated = prev.map((n) => {
+          const pos = posById.get(n.id);
+          return pos ? { ...n, position: pos } : n;
+        });
+        nodesRef.current = updated;
+        return updated;
+      });
+    }, [reactFlowInstance, setNodes, nodesRef]),
     isDraggingRef,
     isValidConnection,
     handleAddNode,

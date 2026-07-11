@@ -28,6 +28,8 @@ import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
+import type { TranslationKey } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
@@ -65,23 +67,59 @@ import {
 } from "@/services/workflow-service";
 import { formatRelativeDate } from "@/utils/date";
 
-const triggerMeta: Record<
+function useTriggerMeta(): Record<
   WorkflowTrigger,
-  { label: string; icon: LucideIcon }
-> = {
-  manual: { label: "Manual", icon: Play },
-  scheduled: { label: "Scheduled", icon: Clock },
-  http_webhook: { label: "HTTP Webhook", icon: Webhook },
-  http_request: { label: "HTTP Request", icon: Globe },
-  form_webhook: { label: "Form Webhook", icon: ClipboardList },
-  form_request: { label: "Form Request", icon: FileText },
-  email_message: { label: "Email Message", icon: Mail },
-  queue_message: { label: "Queue Message", icon: Inbox },
-  discord_event: { label: "Discord Event", icon: MessageSquare },
-  telegram_event: { label: "Telegram Event", icon: Send },
-  whatsapp_event: { label: "WhatsApp Event", icon: MessageCircle },
-  slack_event: { label: "Slack Event", icon: Hash },
-};
+  { labelKey: TranslationKey; icon: LucideIcon }
+> {
+  const { t: _t } = useTranslation();
+  return useMemo(
+    () => ({
+      manual: { labelKey: "pages.workflows.triggers.manual", icon: Play },
+      scheduled: { labelKey: "pages.workflows.triggers.scheduled", icon: Clock },
+      http_webhook: {
+        labelKey: "pages.workflows.triggers.http_webhook",
+        icon: Webhook,
+      },
+      http_request: {
+        labelKey: "pages.workflows.triggers.http_request",
+        icon: Globe,
+      },
+      form_webhook: {
+        labelKey: "pages.workflows.triggers.form_webhook",
+        icon: ClipboardList,
+      },
+      form_request: {
+        labelKey: "pages.workflows.triggers.form_request",
+        icon: FileText,
+      },
+      email_message: {
+        labelKey: "pages.workflows.triggers.email_message",
+        icon: Mail,
+      },
+      queue_message: {
+        labelKey: "pages.workflows.triggers.queue_message",
+        icon: Inbox,
+      },
+      discord_event: {
+        labelKey: "pages.workflows.triggers.discord_event",
+        icon: MessageSquare,
+      },
+      telegram_event: {
+        labelKey: "pages.workflows.triggers.telegram_event",
+        icon: Send,
+      },
+      whatsapp_event: {
+        labelKey: "pages.workflows.triggers.whatsapp_event",
+        icon: MessageCircle,
+      },
+      slack_event: {
+        labelKey: "pages.workflows.triggers.slack_event",
+        icon: Hash,
+      },
+    }),
+    []
+  );
+}
 
 function highlightMatch(text: string, searchTerm: string) {
   if (!searchTerm.trim()) return text;
@@ -113,6 +151,7 @@ function highlightMatch(text: string, searchTerm: string) {
 }
 
 function useWorkflowActions() {
+  const { t } = useTranslation();
   const { mutateWorkflows } = useWorkflows();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
@@ -175,11 +214,12 @@ function useWorkflowActions() {
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Workflow</DialogTitle>
+          <DialogTitle>{t("pages.workflows.deleteTitle")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "
-            {workflowToDelete?.name || "Untitled Workflow"}"? This action cannot
-            be undone.
+            {t("pages.workflows.deleteConfirm", {
+              name:
+                workflowToDelete?.name || t("pages.workflows.untitled"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -188,7 +228,7 @@ function useWorkflowActions() {
             onClick={() => setDeleteDialogOpen(false)}
             disabled={isDeleting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -196,7 +236,7 @@ function useWorkflowActions() {
             disabled={isDeleting}
           >
             {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-            Delete
+            {t("adminWorkflowSchemes.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -207,26 +247,28 @@ function useWorkflowActions() {
     <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Metadata</DialogTitle>
+          <DialogTitle>{t("pages.workflows.renameTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleRenameWorkflow} className="space-y-4">
           <div>
-            <Label htmlFor="rename-name">Workflow Name</Label>
+            <Label htmlFor="rename-name">{t("workflowScheme.workflowName")}</Label>
             <Input
               id="rename-name"
               value={renameWorkflowName}
               onChange={(e) => setRenameWorkflowName(e.target.value)}
-              placeholder="Enter workflow name"
+              placeholder={t("workflowScheme.workflowNamePlaceholder")}
               className="mt-2"
             />
           </div>
           <div>
-            <Label htmlFor="rename-description">Description (Optional)</Label>
+            <Label htmlFor="rename-description">
+              {t("workflowScheme.workflowDescription")}
+            </Label>
             <Textarea
               id="rename-description"
               value={renameWorkflowDescription}
               onChange={(e) => setRenameWorkflowDescription(e.target.value)}
-              placeholder="Describe what you are building"
+              placeholder={t("workflowScheme.workflowDescriptionPlaceholder")}
               className="mt-2"
               maxLength={256}
               rows={3}
@@ -239,11 +281,11 @@ function useWorkflowActions() {
               onClick={() => setRenameDialogOpen(false)}
               disabled={isRenaming}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isRenaming}>
               {isRenaming ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Save
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </form>
@@ -268,6 +310,7 @@ function useWorkflowActions() {
 }
 
 export function WorkflowsPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
@@ -279,14 +322,14 @@ export function WorkflowsPage() {
 
   const { workflows, workflowsError, isWorkflowsLoading, mutateWorkflows } =
     useWorkflows();
-  const { nodeTypes } = useNodeTypes({ revalidateOnFocus: false });
+  const { nodeTypes } = useNodeTypes(undefined, { revalidateOnFocus: false });
 
   const { deleteDialog, renameDialog, openDeleteDialog, openRenameDialog } =
     useWorkflowActions();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Workflows" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("pages.workflows.title") }]);
+  }, [setBreadcrumbs, t]);
 
   const searchFilteredWorkflows = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
@@ -320,6 +363,7 @@ export function WorkflowsPage() {
   }, [searchFilteredWorkflows]);
 
   const handleCreateWorkflow = async (
+    schemeId: string,
     name: string,
     trigger: WorkflowTrigger,
     description?: string,
@@ -332,6 +376,7 @@ export function WorkflowsPage() {
       const request: CreateWorkflowRequest = {
         name,
         description,
+        schemeId,
         trigger,
         runtime,
         nodes: initialNodes,
@@ -348,29 +393,32 @@ export function WorkflowsPage() {
   };
 
   if (isWorkflowsLoading) {
-    return <InsetLoading title="Workflows" />;
+    return <InsetLoading title={t("pages.workflows.title")} />;
   } else if (workflowsError) {
     return (
-      <InsetError title="Workflows" errorMessage={workflowsError.message} />
+      <InsetError
+        title={t("pages.workflows.title")}
+        errorMessage={workflowsError.message}
+      />
     );
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Workflows" childrenClassName="flex flex-col h-full">
+      <InsetLayout title={t("pages.workflows.title")} childrenClassName="flex flex-col h-full">
         <div className="flex items-center justify-between mb-4 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Build and test your workflows.
+            {t("pages.workflows.description")}
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <PlusCircle className="mr-2 size-4" />
-              Create Workflow
+              {t("pages.workflows.create")}
             </Button>
             <Button asChild>
               <Link to={getOrgUrl("templates")}>
                 <FileDown className="mr-2 size-4" />
-                Browse Templates
+                {t("pages.workflows.browseTemplates")}
               </Link>
             </Button>
           </div>
@@ -379,7 +427,7 @@ export function WorkflowsPage() {
         <div className="flex flex-col gap-4 min-h-0 flex-1">
           <div className="relative shrink-0">
             <Input
-              placeholder="Search workflows..."
+              placeholder={t("pages.workflows.searchPlaceholder")}
               className="pl-4 text-base h-12"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -394,8 +442,8 @@ export function WorkflowsPage() {
                     <Wand className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-sm">
                       {workflows.length === 0
-                        ? "No workflows found. Create a new workflow to get started."
-                        : "No workflows match your search."}
+                        ? t("pages.workflows.emptyAll")
+                        : t("pages.workflows.emptySearch")}
                     </p>
                   </div>
                 ) : (
@@ -433,7 +481,10 @@ export function WorkflowsPage() {
                   totalCount={searchFilteredWorkflows.length}
                 />
                 <div className="text-xs text-muted-foreground/60 pt-3 text-right">
-                  {filteredWorkflows.length} of {workflows.length} workflows
+                  {t("pages.workflows.count", {
+                    filtered: filteredWorkflows.length,
+                    total: workflows.length,
+                  })}
                 </div>
               </div>
             )}
@@ -469,15 +520,17 @@ function WorkflowCard({
   onRename: (workflow: WorkflowWithMetadata) => void;
   onDelete: (workflow: WorkflowWithMetadata) => void;
 }) {
+  const { t } = useTranslation();
+  const triggerMeta = useTriggerMeta();
   const meta = triggerMeta[workflow.trigger];
   const Icon = meta.icon;
-  const workflowName = workflow.name || "Untitled Workflow";
+  const workflowName = workflow.name || t("pages.workflows.untitled");
 
   return (
     <Card className="relative group hover:border-primary/50 transition-colors">
       <Link
         to={href}
-        aria-label={`Open ${workflowName}`}
+        aria-label={t("pages.workflows.openWorkflow", { name: workflowName })}
         className="absolute inset-0 rounded-lg"
       />
       <CardContent className="relative flex items-start gap-4 p-4 min-w-0 pointer-events-none">
@@ -495,10 +548,12 @@ function WorkflowCard({
       </CardContent>
       <CardFooter className="relative justify-between gap-3 px-4 py-2 border-t bg-muted/50 rounded-b-lg text-xs text-muted-foreground pointer-events-none">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="truncate">{meta.label}</span>
+          <span className="truncate">{t(meta.labelKey)}</span>
           <span aria-hidden="true">·</span>
           <span className="truncate">
-            Updated {formatRelativeDate(workflow.updatedAt)}
+            {t("pages.workflows.updated", {
+              date: formatRelativeDate(workflow.updatedAt),
+            })}
           </span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -506,14 +561,14 @@ function WorkflowCard({
             to={executionsHref}
             className="hover:text-foreground hover:underline pointer-events-auto"
           >
-            Executions
+            {t("pages.workflows.executions")}
           </Link>
           <span aria-hidden="true">·</span>
           <Link
             to={feedbackHref}
             className="hover:text-foreground hover:underline pointer-events-auto"
           >
-            Feedback
+            {t("pages.workflows.feedback")}
           </Link>
         </div>
       </CardFooter>
@@ -528,19 +583,19 @@ function WorkflowCard({
                 e.stopPropagation();
               }}
             >
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">{t("pages.workflows.openMenu")}</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem asChild>
-              <Link to={href}>Edit Workflow</Link>
+              <Link to={href}>{t("pages.workflows.editWorkflow")}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onRename(workflow)}>
-              Edit Metadata
+              {t("pages.workflows.editMetadata")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDelete(workflow)}>
-              Delete Workflow
+              {t("pages.workflows.deleteWorkflow")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -68,6 +68,21 @@ export const WorkflowRuntime = {
 export type WorkflowRuntimeType =
   (typeof WorkflowRuntime)[keyof typeof WorkflowRuntime];
 
+export const WorkflowBillingMode = {
+  PLATFORM: "platform",
+  UPSTREAM: "upstream",
+} as const;
+
+export type WorkflowBillingModeType =
+  (typeof WorkflowBillingMode)[keyof typeof WorkflowBillingMode];
+
+export const RelayAccountProvider = {
+  NEWAPI: "newapi",
+} as const;
+
+export type RelayAccountProviderType =
+  (typeof RelayAccountProvider)[keyof typeof RelayAccountProvider];
+
 // Bot provider types
 export const BotProvider = {
   DISCORD: "discord",
@@ -231,6 +246,8 @@ export const users = pgTable(
 
 export const PLATFORM_SETTINGS_ID = "default";
 
+export const WORKFLOW_SCHEME_OMNIPOTENT_ID = "omnipotent";
+
 export const platformSettings = pgTable("platform_settings", {
   id: text("id").primaryKey(),
   siteName: text("site_name").notNull().default("Dafthunk"),
@@ -239,6 +256,7 @@ export const platformSettings = pgTable("platform_settings", {
     .default("Build serverless workflows visually."),
   defaultLocale: text("default_locale").notNull().default("en"),
   supportEmail: text("support_email"),
+  featureConfig: text("feature_config"),
   updatedAt: createUpdatedAt(),
   updatedBy: text("updated_by").references(() => users.id),
 });
@@ -289,6 +307,137 @@ export const apiKeys = pgTable(
   ]
 );
 
+// Workflow schemes (方案) — platform-level node/trigger/runtime catalogs
+export const workflowSchemes = pgTable(
+  "workflow_schemes",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    icon: text("icon"),
+    allowedTriggers: text("allowed_triggers").notNull(),
+    allowedRuntimes: text("allowed_runtimes").notNull(),
+    includeTags: text("include_tags"),
+    includeNodeTypes: text("include_node_types"),
+    excludeNodeTypes: text("exclude_node_types"),
+    alwaysIncludeNodeTypes: text("always_include_node_types"),
+    isDefault: boolean("is_default").notNull().default(false),
+    isSystem: boolean("is_system").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    updatedBy: text("updated_by").references(() => users.id),
+  },
+  (table) => [
+    index("workflow_schemes_enabled_idx").on(table.enabled),
+    index("workflow_schemes_sort_order_idx").on(table.sortOrder),
+    index("workflow_schemes_is_default_idx").on(table.isDefault),
+  ]
+);
+
+export const platformRelayAccounts = pgTable(
+  "platform_relay_accounts",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider")
+      .$type<RelayAccountProviderType>()
+      .notNull()
+      .default(RelayAccountProvider.NEWAPI),
+    baseUrl: text("base_url").notNull(),
+    apiKeyEncrypted: text("api_key_encrypted").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    updatedBy: text("updated_by").references(() => users.id),
+  },
+  (table) => [
+    index("platform_relay_accounts_provider_idx").on(table.provider),
+    index("platform_relay_accounts_enabled_idx").on(table.enabled),
+    index("platform_relay_accounts_is_default_idx").on(table.isDefault),
+  ]
+);
+
+export const aiInterfaceTemplates = pgTable(
+  "ai_interface_templates",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    provider: text("provider").notNull(),
+    executionMode: text("execution_mode").notNull().default("sync"),
+    enabled: boolean("enabled").notNull().default(true),
+    isSystem: boolean("is_system").notNull().default(false),
+    isDefault: boolean("is_default").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    specVersion: integer("spec_version").notNull().default(1),
+    artifactChecksum: text("artifact_checksum").notNull(),
+    artifactKey: text("artifact_key").notNull(),
+    sourceKey: text("source_key").notNull(),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    updatedBy: text("updated_by").references(() => users.id),
+  },
+  (table) => [
+    index("ai_interface_templates_provider_idx").on(table.provider),
+    index("ai_interface_templates_enabled_idx").on(table.enabled),
+    index("ai_interface_templates_is_default_idx").on(table.isDefault),
+  ]
+);
+
+export const aiInterfaceTemplateRevisions = pgTable(
+  "ai_interface_template_revisions",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => aiInterfaceTemplates.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    artifactChecksum: text("artifact_checksum").notNull(),
+    artifactKey: text("artifact_key").notNull(),
+    sourceKey: text("source_key").notNull(),
+    changeNote: text("change_note"),
+    createdAt: createCreatedAt(),
+    createdBy: text("created_by").references(() => users.id),
+  },
+  (table) => [
+    index("ai_interface_template_revisions_template_id_idx").on(table.templateId),
+  ]
+);
+
+export const organizationAiInterfaces = pgTable(
+  "organization_ai_interfaces",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => aiInterfaceTemplates.id),
+    templateVersion: integer("template_version"),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(),
+    baseUrl: text("base_url"),
+    selectedModel: text("selected_model"),
+    apiKeyEncrypted: text("api_key_encrypted").notNull(),
+    metadata: text("metadata"),
+    enabled: boolean("enabled").notNull().default(true),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+  },
+  (table) => [
+    index("organization_ai_interfaces_org_provider_idx").on(
+      table.organizationId,
+      table.provider
+    ),
+    index("organization_ai_interfaces_template_id_idx").on(table.templateId),
+  ]
+);
+
 // Workflows - Workflow definitions created and edited by users
 // Note: Full workflow data is stored in R2, only metadata is in the database
 export const workflows = pgTable(
@@ -297,6 +446,10 @@ export const workflows = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
+    schemeId: text("scheme_id")
+      .notNull()
+      .default(WORKFLOW_SCHEME_OMNIPOTENT_ID)
+      .references(() => workflowSchemes.id),
     trigger: text("trigger")
       .$type<WorkflowTriggerTypeType>()
       .notNull()
@@ -305,6 +458,10 @@ export const workflows = pgTable(
       .$type<WorkflowRuntimeType>()
       .notNull()
       .default(WorkflowRuntime.WORKFLOW),
+    billingMode: text("billing_mode")
+      .$type<WorkflowBillingModeType>()
+      .notNull()
+      .default(WorkflowBillingMode.PLATFORM),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -314,8 +471,10 @@ export const workflows = pgTable(
   },
   (table) => [
     index("workflows_name_idx").on(table.name),
+    index("workflows_scheme_id_idx").on(table.schemeId),
     index("workflows_trigger_idx").on(table.trigger),
     index("workflows_runtime_idx").on(table.runtime),
+    index("workflows_billing_mode_idx").on(table.billingMode),
     index("workflows_organization_id_idx").on(table.organizationId),
     index("workflows_enabled_idx").on(table.enabled),
     index("workflows_created_at_idx").on(table.createdAt),
@@ -1195,3 +1354,10 @@ export type ThreadReadInsert = typeof threadReads.$inferInsert;
 
 export type PlatformSettingsRow = typeof platformSettings.$inferSelect;
 export type PlatformSettingsInsert = typeof platformSettings.$inferInsert;
+
+export type WorkflowSchemeRow = typeof workflowSchemes.$inferSelect;
+export type WorkflowSchemeInsert = typeof workflowSchemes.$inferInsert;
+
+export type PlatformRelayAccountRow = typeof platformRelayAccounts.$inferSelect;
+export type PlatformRelayAccountInsert =
+  typeof platformRelayAccounts.$inferInsert;

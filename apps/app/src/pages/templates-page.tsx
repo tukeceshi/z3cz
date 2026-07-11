@@ -8,6 +8,7 @@ import { Link } from "react-router";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,6 +48,7 @@ function highlightMatch(text: string, searchTerm: string) {
 }
 
 export function TemplatesPage() {
+  const { t } = useTranslation();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -54,8 +56,8 @@ export function TemplatesPage() {
   const { templates, isTemplatesLoading, templatesError } = useTemplates();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Templates" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.templates") }]);
+  }, [setBreadcrumbs, t]);
 
   // Filter by search term
   const searchFilteredTemplates = useMemo(() => {
@@ -106,25 +108,30 @@ export function TemplatesPage() {
   };
 
   if (isTemplatesLoading) {
-    return <InsetLoading title="Templates" />;
+    return <InsetLoading title={t("pages.templates.title")} />;
   }
 
   if (templatesError) {
     return (
       <InsetError
-        title="Templates"
-        errorMessage={templatesError.message || "Failed to load templates"}
+        title={t("pages.templates.title")}
+        errorMessage={
+          templatesError.message || t("pages.templates.loadFailed")
+        }
       />
     );
   }
 
   return (
-    <InsetLayout title="Templates" childrenClassName="flex flex-col h-full">
+    <InsetLayout
+      title={t("pages.templates.title")}
+      childrenClassName="flex flex-col h-full"
+    >
       <div className="flex flex-col gap-4 min-h-0 flex-1">
         {/* Search */}
         <div className="relative shrink-0">
           <Input
-            placeholder="Search templates..."
+            placeholder={t("pages.templates.searchPlaceholder")}
             className="pl-4 text-base h-12"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -138,9 +145,7 @@ export function TemplatesPage() {
               {filteredTemplates.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Wand className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">
-                    No templates found matching your search
-                  </p>
+                  <p className="text-sm">{t("pages.templates.empty")}</p>
                 </div>
               ) : (
                 <div className="space-y-2 pr-4">
@@ -168,7 +173,10 @@ export function TemplatesPage() {
                 totalCount={searchFilteredTemplates.length}
               />
               <div className="text-xs text-muted-foreground/60 pt-3 text-right">
-                {filteredTemplates.length} of {templates.length} templates
+                {t("pages.templates.count", {
+                  filtered: filteredTemplates.length,
+                  total: templates.length,
+                })}
               </div>
             </div>
           )}

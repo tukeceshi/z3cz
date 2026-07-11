@@ -1,5 +1,7 @@
 import { ExternalLink } from "lucide-react";
 
+import { useTranslation } from "@/components/locale-provider";
+
 interface TelegramBotSetupInfoProps {
   botUsername: string | null;
 }
@@ -7,24 +9,19 @@ interface TelegramBotSetupInfoProps {
 export function TelegramBotSetupInfo({
   botUsername,
 }: TelegramBotSetupInfoProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-2 text-sm">
       <div className="space-y-1">
-        <p className="font-medium text-foreground">Next Steps</p>
+        <p className="font-medium text-foreground">
+          {t("workflow.emailSetup.nextSteps")}
+        </p>
         <ol className="list-decimal list-inside space-y-1.5 text-xs text-muted-foreground">
+          <li>{t("pages.bots.telegramSetup1")}</li>
+          <li>{t("pages.bots.telegramSetup2")}</li>
           <li>
-            Create a workflow with a{" "}
-            <span className="font-medium text-foreground">
-              Receive Telegram Message
-            </span>{" "}
-            trigger and select this bot.
-          </li>
-          <li>
-            Enable the workflow. The webhook will be registered automatically
-            with Telegram.
-          </li>
-          <li>
-            Send a message to{" "}
+            {t("pages.bots.telegramSetup3Before")}{" "}
             {botUsername ? (
               <a
                 href={`https://t.me/${botUsername}`}
@@ -36,9 +33,9 @@ export function TelegramBotSetupInfo({
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             ) : (
-              "your bot"
+              t("pages.bots.yourBot")
             )}{" "}
-            on Telegram to trigger the workflow.
+            {t("pages.bots.telegramSetup3After")}
           </li>
         </ol>
       </div>

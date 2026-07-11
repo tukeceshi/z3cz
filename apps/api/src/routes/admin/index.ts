@@ -11,11 +11,15 @@ import adminObjectsRoutes from "./objects";
 import adminOnboardingRoutes from "./onboarding";
 import adminOnboardingMessageRoutes from "./onboarding-message";
 import adminOrganizationsRoutes from "./organizations";
+import adminPlatformRelayAccountRoutes from "./platform-relay-accounts";
+import adminAiInterfaceTemplateRoutes from "./ai-interface-templates";
 import adminQueuesRoutes from "./queues";
 import adminSettingsRoutes from "./settings";
+import adminFeatureConfigRoutes from "./feature-config";
 import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
 import adminUsersRoutes from "./users";
+import adminWorkflowSchemesRoutes from "./workflow-schemes";
 import adminWorkflowsRoutes from "./workflows";
 
 const adminRoutes = new Hono<ApiContext>();
@@ -29,6 +33,10 @@ adminRoutes.use("*", adminMiddleware);
 // Mount admin sub-routes
 adminRoutes.route("/stats", adminStatsRoutes);
 adminRoutes.route("/settings", adminSettingsRoutes);
+adminRoutes.route("/feature-config", adminFeatureConfigRoutes);
+adminRoutes.route("/workflow-schemes", adminWorkflowSchemesRoutes);
+adminRoutes.route("/platform-relay-accounts", adminPlatformRelayAccountRoutes);
+adminRoutes.route("/ai-interface-templates", adminAiInterfaceTemplateRoutes);
 adminRoutes.route("/onboarding", adminOnboardingRoutes);
 adminRoutes.route("/onboarding", adminOnboardingMessageRoutes);
 adminRoutes.route("/users", adminUsersRoutes);

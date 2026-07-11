@@ -13,7 +13,7 @@ export function testNodeExecutionErrors(
 ) {
   describe(`${runtimeName}: node execution errors`, () => {
     it("should handle node type not found in registry", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-unknown-type",
         name: "Unknown Node Type",
         trigger: "manual",
@@ -44,7 +44,7 @@ export function testNodeExecutionErrors(
     });
 
     it("should continue execution when one node fails", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-continue-on-error",
         name: "Continue on Error",
         trigger: "manual",

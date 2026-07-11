@@ -1,6 +1,7 @@
 import Upload from "lucide-react/icons/upload";
 import { useCallback, useRef, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference, useObjectService } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -46,6 +47,7 @@ export function FileUploadZone({
   parameterId: string;
   fieldType: string;
 }) {
+  const { t } = useTranslation();
   const inputId = `${fieldType}-upload-${parameterId}`;
   return (
     <div className={cn(className)}>
@@ -63,7 +65,9 @@ export function FileUploadZone({
             (isUploading || disabled) && "opacity-50 pointer-events-none"
           )}
         >
-          {isUploading ? "Uploading..." : "Upload"}
+          {isUploading
+            ? t("workflow.widgets.file.uploading")
+            : t("workflow.widgets.file.upload")}
         </label>
         <input
           id={inputId}

@@ -72,15 +72,23 @@ function main() {
       try {
         const nodeTypeStr = nodeTypeMatch[1];
 
-        const id = extractStringField(nodeTypeStr, "id");
-        const name = extractStringField(nodeTypeStr, "name");
+        const id = extractStringField(nodeTypeStr, "id", content);
+        const name = extractStringField(nodeTypeStr, "name", content);
         if (!id || !name) continue;
 
-        const type = extractStringField(nodeTypeStr, "type");
-        const description = extractStringField(nodeTypeStr, "description");
-        const documentation = extractStringField(nodeTypeStr, "documentation");
-        const icon = extractStringField(nodeTypeStr, "icon");
-        const referenceUrl = extractStringField(nodeTypeStr, "referenceUrl");
+        const type = extractStringField(nodeTypeStr, "type", content);
+        const description = extractStringField(nodeTypeStr, "description", content);
+        const documentation = extractStringField(
+          nodeTypeStr,
+          "documentation",
+          content
+        );
+        const icon = extractStringField(nodeTypeStr, "icon", content);
+        const referenceUrl = extractStringField(
+          nodeTypeStr,
+          "referenceUrl",
+          content
+        );
         const tags = extractArrayField(nodeTypeStr, "tags");
         const usage = extractNumberField(nodeTypeStr, "usage");
         const inputs = extractParametersField(nodeTypeStr, "inputs");
@@ -111,7 +119,8 @@ function main() {
 
 function extractStringField(
   content: string,
-  field: string
+  field: string,
+  fullFileContent?: string
 ): string | undefined {
   const patterns = [
     new RegExp(`${field}:\\s*"([^"]*)"`, "s"),
@@ -123,6 +132,23 @@ function extractStringField(
     const match = content.match(pattern);
     if (match) {
       return match[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    }
+  }
+
+  // Resolve `id: SOME_CONST` / `type: SOME_CONST` via nearby
+  // `export const SOME_CONST = "literal"` declarations in the same file.
+  if (fullFileContent) {
+    const constRef = content.match(
+      new RegExp(`${field}:\\s*([A-Z][A-Z0-9_]*)`)
+    );
+    if (constRef) {
+      const constName = constRef[1];
+      const constDef = fullFileContent.match(
+        new RegExp(
+          `(?:export\\s+)?const\\s+${constName}\\s*=\\s*["'\`]([^"'\`]+)["'\`]`
+        )
+      );
+      if (constDef) return constDef[1];
     }
   }
 

@@ -9,22 +9,25 @@ import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAdminSearch } from "@/hooks/use-admin-search";
+import type { TranslateFn } from "@/i18n";
 import { type AdminUser, useAdminUsers } from "@/services/admin-service";
 import { formatDate } from "@/utils/date";
 
 function createColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminUser>[] {
   return [
     {
       accessorKey: "name",
-      header: "User",
+      header: t("admin.table.user"),
       cell: ({ row }) => (
         <Link
           to={`/admin/users/${row.original.id}`}
@@ -42,7 +45,7 @@ function createColumns(
     },
     {
       accessorKey: "email",
-      header: "Email",
+      header: t("admin.table.email"),
       cell: ({ row }) =>
         row.original.email ? (
           <Link
@@ -57,7 +60,7 @@ function createColumns(
     },
     {
       accessorKey: "plan",
-      header: "Plan",
+      header: t("admin.table.plan"),
       cell: ({ row }) => (
         <Badge variant={row.original.plan === "pro" ? "default" : "secondary"}>
           {row.original.plan}
@@ -66,7 +69,7 @@ function createColumns(
     },
     {
       accessorKey: "role",
-      header: "Role",
+      header: t("admin.common.role"),
       cell: ({ row }) => (
         <Badge
           variant={row.original.role === "admin" ? "destructive" : "outline"}
@@ -77,12 +80,12 @@ function createColumns(
     },
     {
       id: "onboarding",
-      header: "Onboarding",
+      header: t("admin.common.onboarding"),
       cell: ({ row }) => <OnboardingDots user={row.original} />,
     },
     {
       accessorKey: "createdAt",
-      header: "Created",
+      header: t("admin.common.created"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.createdAt)}
@@ -96,7 +99,7 @@ function createColumns(
           <DropdownMenuItem
             onClick={() => navigate(`/admin/users/${row.original.id}`)}
           >
-            View
+            {t("admin.common.view")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -110,11 +113,12 @@ export function AdminUsersPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Users" }]);
+    setBreadcrumbs([{ label: t("sidebar.users") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const { users, pagination, usersError, isUsersLoading } = useAdminUsers(
     page,
@@ -122,31 +126,36 @@ export function AdminUsersPage() {
     search || undefined
   );
 
-  const columns = useMemo(() => createColumns(navigate), [navigate]);
+  const columns = useMemo(
+    () => createColumns(navigate, t),
+    [navigate, t]
+  );
 
   if (isUsersLoading) {
-    return <InsetLoading title="Users" />;
+    return <InsetLoading title={t("admin.users.title")} />;
   }
 
   if (usersError) {
-    return <InsetError title="Users" errorMessage={usersError.message} />;
+    return (
+      <InsetError
+        title={t("admin.users.title")}
+        errorMessage={usersError.message}
+      />
+    );
   }
 
   return (
-    <InsetLayout title="Users">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name or email..."
-        search={formProps}
-      />
+    <InsetLayout title={t("admin.users.title")}>
+      <AdminTableToolbar search={formProps} />
 
       <DataTable
         columns={columns}
         data={users}
         emptyState={{
-          title: "No users found",
+          title: t("admin.users.emptyTitle"),
           description: search
-            ? "No users match your search."
-            : "No users have signed up yet.",
+            ? t("admin.users.emptySearch")
+            : t("admin.users.emptyDefault"),
         }}
       />
 
@@ -156,7 +165,7 @@ export function AdminUsersPage() {
         itemCount={users.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="users"
+        itemLabel={t("admin.pagination.users")}
         onPageChange={setPage}
       />
     </InsetLayout>

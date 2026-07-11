@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -7,13 +8,8 @@ import {
   getObjectUrl,
   useFileUpload,
 } from "./file-field-primitives";
-import { fileValidators } from "./file-upload-handler";
+import { createFileValidators } from "./file-upload-handler";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  validateFile: fileValidators.video,
-  errorMessage: "Failed to upload video",
-} as const;
 
 export interface VideoFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -28,8 +24,13 @@ export function VideoField({
   parameter,
   value,
 }: VideoFieldProps) {
+  const { t } = useTranslation();
+  const fileValidators = createFileValidators(t);
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    {
+      validateFile: fileValidators.video,
+      errorMessage: t("workflow.fields.uploadFailedVideo"),
+    },
     onChange
   );
   const objectUrl = getObjectUrl(value, createObjectUrl);
@@ -44,7 +45,7 @@ export function VideoField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No video"
+        label={t("workflow.fields.noVideo")}
       />
     );
   }

@@ -9,6 +9,7 @@ import { runAgentLoop } from "@dafthunk/runtime/utils/agent-loop";
 import { calculateTokenUsage } from "@dafthunk/runtime/utils/usage";
 
 import type { Bindings } from "../context";
+import { buildMultiplexWorkflowSendEvent } from "./workflow-event-utils";
 import { createDatabase, getEmail } from "../db";
 import {
   applyCodeMode,
@@ -347,10 +348,14 @@ class NodeEmailAgentRunnerInstance {
     }
     try {
       const instance = await this.env.EXECUTE.get(request.executionInstanceId);
-      await instance.sendEvent({
-        type: `email-agent-complete-${request.nodeId}`,
-        payload: { outputs: {}, usage: 0, error: message },
-      });
+      await instance.sendEvent(
+        buildMultiplexWorkflowSendEvent(
+          request.executionInstanceId,
+          `email-agent-complete-${request.nodeId}`,
+          { outputs: {}, usage: 0, error: message },
+          request.nodeId
+        )
+      );
     } catch (error) {
       console.error("NodeEmailAgentRunner failed to send error event:", error);
     }
@@ -361,23 +366,27 @@ class NodeEmailAgentRunnerInstance {
     completion: EmailCompletion
   ): Promise<void> {
     const instance = await this.env.EXECUTE.get(request.executionInstanceId);
-    await instance.sendEvent({
-      type: `email-agent-complete-${request.nodeId}`,
-      payload: {
-        outputs: {
-          result: completion.result,
-          transcript: completion.transcript,
-          rounds: completion.rounds,
-          finish_reason: completion.finishReason,
-          usage_metadata: {
-            totalInputTokens: completion.totalInputTokens,
-            totalOutputTokens: completion.totalOutputTokens,
+    await instance.sendEvent(
+      buildMultiplexWorkflowSendEvent(
+        request.executionInstanceId,
+        `email-agent-complete-${request.nodeId}`,
+        {
+          outputs: {
+            result: completion.result,
+            transcript: completion.transcript,
+            rounds: completion.rounds,
+            finish_reason: completion.finishReason,
+            usage_metadata: {
+              totalInputTokens: completion.totalInputTokens,
+              totalOutputTokens: completion.totalOutputTokens,
+            },
           },
+          usage: completion.usage,
+          ...(completion.error ? { error: completion.error } : {}),
         },
-        usage: completion.usage,
-        ...(completion.error ? { error: completion.error } : {}),
-      },
-    });
+        request.nodeId
+      )
+    );
   }
 
   private async buildTools(

@@ -3,6 +3,7 @@ import X from "lucide-react/icons/x";
 import { useEffect, useRef, useState } from "react";
 
 import { useObjectService } from "@/services/object-service";
+import { useTranslation } from "@/components/locale-provider";
 
 import type { BaseWidgetProps } from "../widget";
 import { createWidget, getInputValue } from "../widget";
@@ -18,6 +19,7 @@ function WebcamWidget({
   onChange,
   disabled = false,
 }: WebcamWidgetProps) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageReference, setImageReference] = useState<{
@@ -47,7 +49,11 @@ function WebcamWidget({
       videoRef.current.srcObject = stream;
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to access webcam");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("workflow.widgets.webcam.accessFailed")
+      );
     }
   };
 
@@ -72,12 +78,15 @@ function WebcamWidget({
       canvas.height = video.videoHeight;
 
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Could not get canvas context");
+      if (!ctx) throw new Error(t("workflow.widgets.webcam.noCanvasContext"));
 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))),
+          (b) =>
+            b
+              ? resolve(b)
+              : reject(new Error(t("workflow.widgets.webcam.createBlobFailed"))),
           "image/jpeg",
           1.0
         );
@@ -91,7 +100,11 @@ function WebcamWidget({
       stopWebcam();
       setIsUploading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to capture image");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("workflow.widgets.webcam.captureFailed")
+      );
       setIsUploading(false);
     }
   };
@@ -110,7 +123,7 @@ function WebcamWidget({
             <button
               onClick={clearImage}
               className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
-              aria-label="Clear image"
+              aria-label={t("workflow.widgets.webcam.clearImage")}
               disabled={disabled}
             >
               <X className="size-3!" />
@@ -119,7 +132,7 @@ function WebcamWidget({
             <button
               onClick={captureImage}
               className="inline-flex items-center justify-center size-6 rounded border border-neutral-200 dark:border-neutral-700 bg-white/75 hover:bg-neutral-50/75 text-neutral-600 dark:bg-neutral-900/75 dark:hover:bg-neutral-800/75 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
-              aria-label="Capture image"
+              aria-label={t("workflow.widgets.webcam.captureImage")}
               disabled={isUploading || disabled}
             >
               <Camera className="size-3!" />

@@ -1,5 +1,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
+
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -61,6 +63,8 @@ export function DateField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   // Value can be an ISO string or old format object { date: string, offset: number }
   const isoValue =
     typeof value === "string"
@@ -99,7 +103,7 @@ export function DateField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No date"
+        label={t("workflow.fields.noDate")}
       />
     );
   }
@@ -266,8 +270,8 @@ export function DateField({
               {dateValue
                 ? formatDate(getDisplayDate(dateValue))
                 : connected
-                  ? "Connected"
-                  : "Select date"}
+                  ? t("workflow.fields.connected")
+                  : t("workflow.fields.selectDate")}
               <ChevronDownIcon className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
@@ -323,7 +327,7 @@ export function DateField({
       {!disabled && clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear date"
+          label={t("workflow.fields.clearDate")}
           className="absolute -top-1 -right-1"
         />
       )}

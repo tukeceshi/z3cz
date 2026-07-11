@@ -6,6 +6,7 @@ import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,15 +24,17 @@ import {
   useAdminOrganizationDetail,
   useAdminOrganizationEntityCounts,
 } from "@/services/admin-service";
+import type { TranslateFn } from "@/i18n";
 import { formatDate } from "@/utils/date";
 
 function createMemberColumns(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<AdminOrganizationMember>[] {
   return [
     {
       accessorKey: "userName",
-      header: "User",
+      header: t("admin.table.user"),
       cell: ({ row }) => (
         <Link
           to={`/admin/users/${row.original.userId}`}
@@ -49,7 +52,7 @@ function createMemberColumns(
     },
     {
       accessorKey: "userEmail",
-      header: "Email",
+      header: t("admin.table.email"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {row.original.userEmail || "-"}
@@ -58,12 +61,12 @@ function createMemberColumns(
     },
     {
       accessorKey: "role",
-      header: "Role",
+      header: t("admin.common.role"),
       cell: ({ row }) => <RoleBadge role={row.original.role} />,
     },
     {
       accessorKey: "joinedAt",
-      header: "Joined",
+      header: t("admin.userDetail.joined"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.joinedAt)}
@@ -77,7 +80,7 @@ function createMemberColumns(
           <DropdownMenuItem
             onClick={() => navigate(`/admin/users/${row.original.userId}`)}
           >
-            View user
+            {t("admin.organizationDetail.viewUser")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -93,28 +96,29 @@ export function AdminOrganizationDetailPage() {
   const { entityCounts, isEntityCountsLoading } =
     useAdminOrganizationEntityCounts(organizationId);
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const { t } = useTranslation();
 
   const memberColumns = useMemo(
-    () => createMemberColumns(navigate),
-    [navigate]
+    () => createMemberColumns(navigate, t),
+    [navigate, t]
   );
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Organizations", to: "/admin/organizations" },
-      { label: organization?.name || "Organization Details" },
+      { label: t("sidebar.organizations"), to: "/admin/organizations" },
+      { label: organization?.name || t("admin.organizationDetail.title") },
     ]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs, organization?.name]);
+  }, [setBreadcrumbs, t, organization?.name]);
 
   if (isOrganizationLoading || isEntityCountsLoading) {
-    return <InsetLoading title="Organization Details" />;
+    return <InsetLoading title={t("admin.organizationDetail.title")} />;
   }
 
   if (organizationError) {
     return (
       <InsetError
-        title="Organization Details"
+        title={t("admin.organizationDetail.title")}
         errorMessage={organizationError.message}
       />
     );
@@ -123,14 +127,14 @@ export function AdminOrganizationDetailPage() {
   if (!organization) {
     return (
       <InsetError
-        title="Organization Details"
-        errorMessage="Organization not found"
+        title={t("admin.organizationDetail.title")}
+        errorMessage={t("admin.organizationDetail.notFound")}
       />
     );
   }
 
   return (
-    <InsetLayout title="Organization Details">
+    <InsetLayout title={t("admin.organizationDetail.title")}>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -152,32 +156,42 @@ export function AdminOrganizationDetailPage() {
                   {organization.subscriptionStatus}
                 </Badge>
               ) : (
-                <Badge variant="outline">trial</Badge>
+                <Badge variant="outline">{t("admin.organizationDetail.trial")}</Badge>
               )}
               {organization.creditsExhausted && (
-                <Badge variant="destructive">credits exhausted</Badge>
+                <Badge variant="destructive">
+                  {t("admin.organizationDetail.creditsExhausted")}
+                </Badge>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-muted-foreground">Organization ID</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.orgId")}
+                </div>
                 <div className="font-mono text-xs">{organization.id}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">Created</div>
+                <div className="text-muted-foreground">
+                  {t("admin.common.created")}
+                </div>
                 <div>{formatDate(organization.createdAt)}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">Compute Credits</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.computeCredits")}
+                </div>
                 <div>{organization.computeCredits.toLocaleString()}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">Overage Limit</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.overageLimit")}
+                </div>
                 <div>
                   {organization.overageLimit
                     ? organization.overageLimit.toLocaleString()
-                    : "Unlimited"}
+                    : t("admin.organizationDetail.unlimited")}
                 </div>
               </div>
             </div>
@@ -186,25 +200,33 @@ export function AdminOrganizationDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Billing Information</CardTitle>
-            <CardDescription>Stripe subscription details</CardDescription>
+            <CardTitle>{t("admin.organizationDetail.billingInfo")}</CardTitle>
+            <CardDescription>
+              {t("admin.organizationDetail.billingInfoDesc")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-muted-foreground">Stripe Customer ID</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.stripeCustomerId")}
+                </div>
                 <div className="font-mono text-xs">
                   {organization.stripeCustomerId || "-"}
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground">Subscription ID</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.subscriptionId")}
+                </div>
                 <div className="font-mono text-xs">
                   {organization.stripeSubscriptionId || "-"}
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground">Period Start</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.periodStart")}
+                </div>
                 <div>
                   {organization.currentPeriodStart
                     ? formatDate(organization.currentPeriodStart)
@@ -212,7 +234,9 @@ export function AdminOrganizationDetailPage() {
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground">Period End</div>
+                <div className="text-muted-foreground">
+                  {t("admin.organizationDetail.periodEnd")}
+                </div>
                 <div>
                   {organization.currentPeriodEnd
                     ? formatDate(organization.currentPeriodEnd)
@@ -226,9 +250,11 @@ export function AdminOrganizationDetailPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Members</CardTitle>
+          <CardTitle>{t("admin.organizationDetail.members")}</CardTitle>
           <CardDescription>
-            Users who belong to this organization ({members.length})
+            {t("admin.organizationDetail.membersDesc", {
+              count: members.length,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -237,8 +263,8 @@ export function AdminOrganizationDetailPage() {
             columns={memberColumns}
             data={members}
             emptyState={{
-              title: "No members",
-              description: "This organization has no members.",
+              title: t("admin.organizationDetail.noMembers"),
+              description: t("admin.organizationDetail.noMembersDesc"),
             }}
           />
         </CardContent>
@@ -251,7 +277,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Workflows</CardDescription>
+              <CardDescription>{t("sidebar.workflows")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.workflowCount ?? "-"}
               </CardTitle>
@@ -264,7 +290,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Executions</CardDescription>
+              <CardDescription>{t("sidebar.executions")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.executionCount ?? "-"}
               </CardTitle>
@@ -277,7 +303,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Emails</CardDescription>
+              <CardDescription>{t("sidebar.emails")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.emailCount ?? "-"}
               </CardTitle>
@@ -290,7 +316,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Queues</CardDescription>
+              <CardDescription>{t("sidebar.queues")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.queueCount ?? "-"}
               </CardTitle>
@@ -303,7 +329,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Datasets</CardDescription>
+              <CardDescription>{t("sidebar.datasets")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.datasetCount ?? "-"}
               </CardTitle>
@@ -316,7 +342,7 @@ export function AdminOrganizationDetailPage() {
         >
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="pb-2">
-              <CardDescription>Databases</CardDescription>
+              <CardDescription>{t("sidebar.databases")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.databaseCount ?? "-"}
               </CardTitle>

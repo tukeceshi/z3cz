@@ -7,13 +7,14 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTranslation } from "@/components/locale-provider";
 import { updateProfile, useProfile } from "@/services/profile-service";
 import { useWorkflows } from "@/services/workflow-service";
 
 import { TourSpotlight } from "./tour-spotlight";
 import { TourStepPopover } from "./tour-step";
 import type { TourStep } from "./tour-steps";
-import { TOUR_STEPS } from "./tour-steps";
+import { getTourSteps } from "./tour-steps";
 
 interface TourContextType {
   isActive: boolean;
@@ -41,6 +42,8 @@ interface TourProviderProps {
 }
 
 export function TourProvider({ children }: TourProviderProps) {
+  const { t } = useTranslation();
+  const tourSteps = useMemo(() => getTourSteps(t), [t]);
   const { profile, mutateProfile } = useProfile();
   const { workflows, isWorkflowsLoading } = useWorkflows();
 
@@ -48,8 +51,8 @@ export function TourProvider({ children }: TourProviderProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
-  const totalSteps = TOUR_STEPS.length;
-  const currentStepData = TOUR_STEPS[currentStep] ?? null;
+  const totalSteps = tourSteps.length;
+  const currentStepData = tourSteps[currentStep] ?? null;
 
   // Auto-start tour for new users with no workflows
   useEffect(() => {

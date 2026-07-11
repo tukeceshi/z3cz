@@ -5,6 +5,8 @@ import { useCallback } from "react";
 
 import { cn } from "@/utils/utils";
 
+import { useTranslation } from "@/components/locale-provider";
+
 import { useWorkflow } from "../../workflow-context";
 import type { WorkflowParameter } from "../../workflow-types";
 import type { BaseWidgetProps } from "../widget";
@@ -27,6 +29,7 @@ function DynamicInputsWidget({
   className,
   disabled = false,
 }: DynamicInputsWidgetProps) {
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge, nodeTypes } = useWorkflow();
 
   const config = nodeTypes?.find((t) => t.type === nodeType)?.dynamicInputs;
@@ -88,7 +91,7 @@ function DynamicInputsWidget({
         )}
         onClick={handleRemove}
         disabled={disabled || !canRemove}
-        aria-label="Remove input"
+        aria-label={t("workflow.widgets.dynamicInputs.removeInput")}
       >
         <MinusIcon className="h-3 w-3" />
       </button>
@@ -105,7 +108,7 @@ function DynamicInputsWidget({
         )}
         onClick={handleAdd}
         disabled={disabled}
-        aria-label="Add input"
+        aria-label={t("workflow.widgets.dynamicInputs.addInput")}
       >
         <PlusIcon className="h-3 w-3" />
       </button>

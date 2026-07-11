@@ -1,6 +1,7 @@
+import { useTranslation } from "@/components/locale-provider";
+import { getOnboardingStageLabel } from "@/i18n/admin-labels";
 import {
   type AdminUser,
-  ONBOARDING_STAGE_LABEL,
   ONBOARDING_STAGES,
   type OnboardingStage,
 } from "@/services/admin-service";
@@ -14,8 +15,6 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 
-// Map each canonical stage to the timestamp on the user record. signed_up is
-// always reached at user.createdAt — no per-stage column needed.
 function getStageDate(user: AdminUser, stage: OnboardingStage): Date | null {
   switch (stage) {
     case "signed_up":
@@ -32,6 +31,8 @@ function getStageDate(user: AdminUser, stage: OnboardingStage): Date | null {
 }
 
 export function OnboardingDots({ user }: { user: AdminUser }) {
+  const { t } = useTranslation();
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-2">
@@ -39,6 +40,7 @@ export function OnboardingDots({ user }: { user: AdminUser }) {
           {ONBOARDING_STAGES.map((stage) => {
             const date = getStageDate(user, stage);
             const reached = date !== null;
+            const label = getOnboardingStageLabel(t, stage);
             return (
               <Tooltip key={stage}>
                 <TooltipTrigger asChild>
@@ -47,15 +49,13 @@ export function OnboardingDots({ user }: { user: AdminUser }) {
                       "inline-block h-2 w-2 rounded-full",
                       reached ? "bg-primary" : "bg-muted"
                     )}
-                    aria-label={ONBOARDING_STAGE_LABEL[stage]}
+                    aria-label={label}
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <div className="font-medium">
-                    {ONBOARDING_STAGE_LABEL[stage]}
-                  </div>
+                  <div className="font-medium">{label}</div>
                   <div className="text-muted-foreground">
-                    {reached ? formatDate(date) : "Not reached"}
+                    {reached ? formatDate(date) : t("admin.common.notReached")}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -63,7 +63,7 @@ export function OnboardingDots({ user }: { user: AdminUser }) {
           })}
         </div>
         <span className="text-xs text-muted-foreground">
-          {ONBOARDING_STAGE_LABEL[user.furthestStage]}
+          {getOnboardingStageLabel(t, user.furthestStage)}
         </span>
       </div>
     </TooltipProvider>

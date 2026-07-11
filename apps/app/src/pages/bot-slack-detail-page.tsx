@@ -3,14 +3,15 @@ import ExternalLink from "lucide-react/icons/external-link";
 import Pencil from "lucide-react/icons/pencil";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
 
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { getApiBaseUrl } from "@/config/api";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useSlackBot } from "@/services/bot-service";
@@ -18,6 +19,8 @@ import { useSlackBot } from "@/services/bot-service";
 import { BotSlackEditDialog } from "./bot-slack-edit-dialog";
 
 export function BotSlackDetailPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { getOrgUrl } = useOrgUrl();
@@ -28,30 +31,38 @@ export function BotSlackDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Bots", to: getOrgUrl("bots") },
+      { label: t("sidebar.bots"), to: getOrgUrl("bots") },
       { label: slackBot?.name || id || "" },
     ]);
-  }, [id, slackBot?.name, setBreadcrumbs, getOrgUrl]);
+  }, [id, slackBot?.name, setBreadcrumbs, getOrgUrl, t]);
 
   if (isSlackBotLoading) {
-    return <InsetLoading title="Bot Details" />;
+    return <InsetLoading title={t("pages.bots.detailTitle")} />;
   } else if (slackBotError) {
     return (
-      <InsetError title="Bot Details" errorMessage={slackBotError.message} />
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={slackBotError.message}
+      />
     );
   } else if (!slackBot) {
-    return <InsetError title="Bot Details" errorMessage="Bot not found" />;
+    return (
+      <InsetError
+        title={t("pages.bots.detailTitle")}
+        errorMessage={t("pages.bots.notFound")}
+      />
+    );
   }
 
   const webhookUrl = `${getApiBaseUrl()}/slack/webhook/${slackBot.id}`;
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = (text: string, labelKey: "pages.bots.webhookUrl") => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
+    appToast.success("pages.bots.copiedToast", { label: t(labelKey) });
   };
 
   return (
-    <InsetLayout title="Bot Details">
+    <InsetLayout title={t("pages.bots.detailTitle")}>
       <div className="space-y-8">
         <div className="flex justify-end">
           <Button
@@ -60,25 +71,32 @@ export function BotSlackDetailPage() {
             onClick={() => setIsEditOpen(true)}
           >
             <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Edit
+            {t("pages.bots.edit")}
           </Button>
         </div>
         <div className="space-y-4">
-          <DetailRow label="Name" value={slackBot.name || "Untitled Bot"} />
+          <DetailRow
+            label={t("common.name")}
+            value={slackBot.name || t("pages.bots.untitled")}
+          />
           {slackBot.teamName && (
-            <DetailRow label="Workspace" value={slackBot.teamName} />
+            <DetailRow label={t("pages.bots.workspace")} value={slackBot.teamName} />
           )}
           {slackBot.appId && (
-            <DetailRow label="App ID" value={slackBot.appId} mono />
+            <DetailRow
+              label={t("pages.bots.appId")}
+              value={slackBot.appId}
+              mono
+            />
           )}
           <DetailRow
-            label="Token"
+            label={t("pages.bots.token")}
             value={`****${slackBot.tokenLastFour}`}
             mono
           />
           <div className="grid grid-cols-[180px_1fr] gap-2 items-start">
             <span className="text-sm font-medium text-muted-foreground">
-              Webhook URL
+              {t("pages.bots.webhookUrl")}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-sm font-mono break-all">{webhookUrl}</span>
@@ -86,7 +104,7 @@ export function BotSlackDetailPage() {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}
+                onClick={() => copyToClipboard(webhookUrl, "pages.bots.webhookUrl")}
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -95,7 +113,7 @@ export function BotSlackDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">Links</h3>
+          <h3 className="text-sm font-medium">{t("pages.bots.links")}</h3>
           <div className="flex flex-col gap-2">
             <a
               href="https://api.slack.com/apps"
@@ -104,49 +122,20 @@ export function BotSlackDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Open Slack API Portal
+              {t("pages.bots.openSlackApiPortal")}
             </a>
           </div>
         </div>
 
         <div className="rounded-lg border p-4 space-y-3">
-          <h3 className="text-sm font-medium">Setup Instructions</h3>
+          <h3 className="text-sm font-medium">
+            {t("pages.bots.setupInstructions")}
+          </h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            <li>
-              Under{" "}
-              <span className="font-medium text-foreground">
-                Event Subscriptions
-              </span>
-              , toggle{" "}
-              <span className="font-medium text-foreground">Enable Events</span>{" "}
-              to On. Paste the Webhook URL above as the Request URL. Under{" "}
-              <span className="font-medium text-foreground">
-                Subscribe to bot events
-              </span>
-              , add <span className="font-mono">message.channels</span> and{" "}
-              <span className="font-mono">message.groups</span>, then save.
-            </li>
-            <li>
-              Under{" "}
-              <span className="font-medium text-foreground">
-                OAuth &amp; Permissions
-              </span>
-              , verify the bot has{" "}
-              <span className="font-mono">channels:history</span>,{" "}
-              <span className="font-mono">groups:history</span>, and{" "}
-              <span className="font-mono">chat:write</span> scopes.
-            </li>
-            <li>
-              Invite the bot to a channel with{" "}
-              <span className="font-mono">/invite @{slackBot.name}</span>.
-            </li>
-            <li>
-              Create a workflow with a{" "}
-              <span className="font-medium text-foreground">
-                Receive Slack Message
-              </span>{" "}
-              trigger, select this bot, and enable it.
-            </li>
+            <li>{t("pages.bots.slackSetup1")}</li>
+            <li>{t("pages.bots.slackSetup2")}</li>
+            <li>{t("pages.bots.slackSetup3", { name: slackBot.name })}</li>
+            <li>{t("pages.bots.slackSetup4")}</li>
           </ol>
         </div>
       </div>

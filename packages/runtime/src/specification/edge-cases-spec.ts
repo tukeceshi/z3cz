@@ -13,7 +13,7 @@ export function testEdgeCases(
 ) {
   describe(`${runtimeName}: edge cases`, () => {
     it("should handle node with all optional inputs missing", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-optional",
         name: "Optional Inputs Workflow",
         trigger: "manual",
@@ -48,7 +48,7 @@ export function testEdgeCases(
     });
 
     it("should handle workflow with deep chain (10+ nodes)", async () => {
-      // Create a chain: num â†’ add1 â†’ add2 â†’ ... â†’ add10
+      // Create a chain: num â†?add1 â†?add2 â†?... â†?add10
       const nodes: Workflow["nodes"] = [
         {
           id: "num",
@@ -83,7 +83,7 @@ export function testEdgeCases(
         });
       }
 
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-deep",
         name: "Deep Chain Workflow",
         trigger: "manual",
@@ -161,7 +161,7 @@ export function testEdgeCases(
         );
       }
 
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-wide",
         name: "Wide Parallel Workflow",
         trigger: "manual",

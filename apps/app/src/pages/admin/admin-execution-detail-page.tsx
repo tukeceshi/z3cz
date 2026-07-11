@@ -15,6 +15,7 @@ import { useParams, useSearchParams } from "react-router";
 import { AdminDetailContextBar } from "@/components/admin/admin-detail-context-bar";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import type {
@@ -39,6 +40,7 @@ export function AdminExecutionDetailPage() {
   const { execution, executionError, isExecutionLoading } =
     useAdminExecutionDetail(executionId, organizationId);
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const { t } = useTranslation();
 
   // Resolve object URLs through the admin endpoint, which streams blobs from
   // any org provided we pass the right organizationId. The default
@@ -78,11 +80,14 @@ export function AdminExecutionDetailPage() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Executions", to: "/admin/executions" },
-      { label: executionId?.substring(0, 8) || "Execution Details" },
+      { label: t("sidebar.executions"), to: "/admin/executions" },
+      {
+        label:
+          executionId?.substring(0, 8) || t("admin.executionDetail.title"),
+      },
     ]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs, executionId]);
+  }, [setBreadcrumbs, t, executionId]);
 
   useEffect(() => {
     if (finalStructure && execution?.nodeExecutions) {
@@ -157,20 +162,20 @@ export function AdminExecutionDetailPage() {
   if (!organizationId) {
     return (
       <InsetError
-        title="Execution Details"
-        errorMessage="Organization ID is required"
+        title={t("admin.executionDetail.title")}
+        errorMessage={t("admin.executionDetail.orgIdRequired")}
       />
     );
   }
 
   if (isExecutionLoading || isStructureOverallLoading) {
-    return <InsetLoading title="Execution Details" />;
+    return <InsetLoading title={t("admin.executionDetail.title")} />;
   }
 
   if (executionError) {
     return (
       <InsetError
-        title="Execution Details"
+        title={t("admin.executionDetail.title")}
         errorMessage={executionError.message}
       />
     );
@@ -179,8 +184,8 @@ export function AdminExecutionDetailPage() {
   if (!execution) {
     return (
       <InsetError
-        title="Execution Details"
-        errorMessage="Execution not found"
+        title={t("admin.executionDetail.title")}
+        errorMessage={t("admin.executionDetail.notFound")}
       />
     );
   }
@@ -237,8 +242,8 @@ export function AdminExecutionDetailPage() {
             <div className="flex flex-col items-center justify-center h-full">
               <p className="text-muted-foreground">
                 {isStructureOverallLoading
-                  ? "Loading workflow data..."
-                  : "No workflow structure available or still loading components."}
+                  ? t("admin.executionDetail.loadingWorkflow")
+                  : t("admin.executionDetail.noStructure")}
               </p>
             </div>
           )}

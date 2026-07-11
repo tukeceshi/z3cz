@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/utils/utils";
 
@@ -12,6 +13,8 @@ export function BooleanField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
+
   const hasValue = value !== undefined;
   const boolValue = hasValue ? String(value) === "true" : false;
 
@@ -22,7 +25,7 @@ export function BooleanField({
       {clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear boolean"
+          label={t("workflow.fields.clearBoolean")}
           disabled={disabled}
         />
       )}

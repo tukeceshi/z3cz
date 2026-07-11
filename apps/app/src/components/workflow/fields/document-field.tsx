@@ -1,5 +1,6 @@
 import File from "lucide-react/icons/file";
 
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -11,11 +12,6 @@ import {
 } from "./file-field-primitives";
 import { mimeTypeDetectors } from "./file-upload-handler";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  getMimeType: mimeTypeDetectors.document,
-  errorMessage: "Failed to upload document",
-} as const;
 
 export interface DocumentFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -30,8 +26,12 @@ export function DocumentField({
   parameter,
   value,
 }: DocumentFieldProps) {
+  const { t } = useTranslation();
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    {
+      getMimeType: mimeTypeDetectors.document,
+      errorMessage: t("workflow.fields.uploadFailedDocument"),
+    },
     onChange
   );
   const hasRef = value !== undefined && isObjectReference(value);
@@ -45,7 +45,7 @@ export function DocumentField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No document"
+        label={t("workflow.fields.noDocument")}
       />
     );
   }
@@ -55,7 +55,7 @@ export function DocumentField({
       return (
         <FieldPlaceholder
           className={className}
-          label="No document preview available"
+          label={t("workflow.fields.noDocumentPreview")}
         />
       );
     }

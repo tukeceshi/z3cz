@@ -1,14 +1,14 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +29,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import type { TranslateFn } from "@/i18n";
 import {
   createOrganization,
   deleteOrganization,
@@ -41,9 +43,11 @@ import { formatDate } from "@/utils/date";
 function ActionsCell({
   organizationId,
   organizationName,
+  t,
 }: {
   organizationId: string;
   organizationName: string;
+  t: TranslateFn;
 }) {
   const { user } = useAuth();
   const { memberships } = useMemberships(organizationId);
@@ -62,7 +66,7 @@ function ActionsCell({
         <DropdownMenuTrigger asChild>
           <Button aria-haspopup="true" size="icon" variant="ghost">
             <MoreHorizontal className="h-4 w-4" />
-            <span className="sr-only">Toggle menu</span>
+            <span className="sr-only">{t("common.openMenu")}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -79,7 +83,7 @@ function ActionsCell({
             }
             className="text-red-600 focus:text-red-600"
           >
-            Delete Organization
+            {t("pages.organizations.deleteOrganization")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -87,7 +91,47 @@ function ActionsCell({
   );
 }
 
+const createColumns = (t: TranslateFn): ColumnDef<{
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}>[] => [
+  {
+    accessorKey: "name",
+    header: t("common.name"),
+    cell: ({ row }) => (
+      <div className="font-medium">{row.getValue("name")}</div>
+    ),
+  },
+  {
+    accessorKey: "id",
+    header: t("pages.organizations.id"),
+    cell: ({ row }) => <div>{row.getValue("id")}</div>,
+  },
+  {
+    accessorKey: "createdAt",
+    header: t("pages.organizations.created"),
+    cell: ({ row }) => {
+      const date = row.getValue("createdAt") as Date;
+      return <div>{formatDate(date)}</div>;
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <ActionsCell
+        organizationId={row.original.id}
+        organizationName={row.original.name}
+        t={t}
+      />
+    ),
+  },
+];
+
 export function OrganizationsPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const {
     organizations,
     organizationsError,
@@ -106,47 +150,11 @@ export function OrganizationsPage() {
 
   const navigate = useNavigate();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
-
-  const columns: ColumnDef<{
-    id: string;
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }>[] = [
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("name")}</div>
-      ),
-    },
-    {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => <div>{row.getValue("id")}</div>,
-    },
-    {
-      accessorKey: "createdAt",
-      header: "Created",
-      cell: ({ row }) => {
-        const date = row.getValue("createdAt") as Date;
-        return <div>{formatDate(date)}</div>;
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <ActionsCell
-          organizationId={row.original.id}
-          organizationName={row.original.name}
-        />
-      ),
-    },
-  ];
+  const columns = useMemo(() => createColumns(t), [t]);
 
   const handleCreateOrganization = useCallback(async (): Promise<void> => {
     if (!newOrgName.trim()) {
-      toast.error("Organization name is required");
+      appToast.error("pages.organizations.nameRequired");
       return;
     }
     setIsProcessing(true);
@@ -156,38 +164,35 @@ export function OrganizationsPage() {
       });
       const newOrg = response.organization;
       navigate(`/org/${newOrg.id}/workflows`);
-      toast.success(
-        "Organization created successfully and navigated to workflows"
-      );
+      appToast.success("pages.organizations.createdToast");
       setIsCreateDialogOpen(false);
       setNewOrgName("");
       await mutateOrganizations();
     } catch (error) {
-      toast.error("Failed to create organization. Please try again.");
+      appToast.error("pages.organizations.createFailed");
       console.error("Create Organization Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [newOrgName, mutateOrganizations, navigate]);
+  }, [newOrgName, mutateOrganizations, navigate, appToast]);
 
   const handleDeleteOrganization = useCallback(async (): Promise<void> => {
     if (!orgToDelete) return;
     setIsProcessing(true);
     try {
       await deleteOrganization(orgToDelete.id);
-      toast.success("Organization deleted successfully");
+      appToast.success("pages.organizations.deletedToast");
       setIsDeleteDialogOpen(false);
       setOrgToDelete(null);
       await mutateOrganizations();
     } catch (error) {
-      toast.error("Failed to delete organization. Please try again.");
+      appToast.error("pages.organizations.deleteFailed");
       console.error("Delete Organization Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [orgToDelete, mutateOrganizations]);
+  }, [orgToDelete, mutateOrganizations, appToast]);
 
-  // Handle delete events from the table
   const handleDeleteEvent = useCallback((e: Event) => {
     const custom = e as CustomEvent<{ id: string; name: string }>;
     if (custom.detail) {
@@ -196,7 +201,6 @@ export function OrganizationsPage() {
     }
   }, []);
 
-  // Add event listener for delete events
   useEffect(() => {
     document.addEventListener("deleteOrganizationTrigger", handleDeleteEvent);
     return () =>
@@ -207,29 +211,29 @@ export function OrganizationsPage() {
   }, [handleDeleteEvent]);
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Organizations" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("userMenu.organizations") }]);
+  }, [setBreadcrumbs, t]);
 
   if (isOrganizationsLoading && !organizations) {
-    return <InsetLoading title="Organizations" />;
+    return <InsetLoading title={t("pages.organizations.title")} />;
   } else if (organizationsError) {
     return (
       <InsetError
-        title="Organizations"
+        title={t("pages.organizations.title")}
         errorMessage={organizationsError.message}
       />
     );
   }
 
   return (
-    <InsetLayout title="Organizations">
+    <InsetLayout title={t("pages.organizations.title")}>
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Manage your organizations and workspaces.
+          {t("pages.organizations.description")}
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create Organization
+          {t("pages.organizations.createButton")}
         </Button>
       </div>
 
@@ -237,30 +241,32 @@ export function OrganizationsPage() {
         columns={columns}
         data={organizations || []}
         emptyState={{
-          title: "No organizations found",
-          description: "Create your first organization to get started.",
+          title: t("pages.organizations.emptyTitle"),
+          description: t("pages.organizations.emptyDescription"),
         }}
       />
 
-      {/* Create Organization Dialog */}
       <AlertDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Create New Organization</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.organizations.createDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Create a new organization to manage your workflows and team
-              members.
+              {t("pages.organizations.createDialogDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="org-name">Organization Name</Label>
+              <Label htmlFor="org-name">
+                {t("pages.organizations.organizationName")}
+              </Label>
               <Input
                 id="org-name"
-                placeholder="My Company"
+                placeholder={t("pages.organizations.organizationNamePlaceholder")}
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 disabled={isProcessing}
@@ -274,56 +280,59 @@ export function OrganizationsPage() {
                 setNewOrgName("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCreateOrganization}
               disabled={isProcessing || !newOrgName.trim()}
               className="bg-primary hover:bg-primary/90"
             >
-              {isProcessing ? "Creating..." : "Create Organization"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.organizations.createOrganization")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Organization Dialog */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.organizations.deleteOrganization")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              organization <strong>"{orgToDelete?.name}"</strong> and all of its
-              data including:
+              {t("pages.organizations.deleteDescription", {
+                name: orgToDelete?.name ?? "",
+              })}
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>All workflows</li>
-                <li>All executions and results</li>
-                <li>All API keys and secrets</li>
-                <li>All datasets</li>
+                <li>{t("pages.organizations.deleteItems.workflows")}</li>
+                <li>{t("pages.organizations.deleteItems.executions")}</li>
+                <li>{t("pages.organizations.deleteItems.keys")}</li>
+                <li>{t("pages.organizations.deleteItems.datasets")}</li>
               </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Warning</AlertTitle>
             <AlertDescription>
-              This action is irreversible and will permanently delete all
-              organization data.
+              {t("pages.organizations.deleteWarning")}
             </AlertDescription>
           </Alert>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setOrgToDelete(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteOrganization}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Deleting..." : "Delete Organization"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.organizations.deleteOrganization")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -5,10 +5,11 @@ import MessageCircle from "lucide-react/icons/message-circle";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
 import Send from "lucide-react/icons/send";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { TranslateFn } from "@/i18n";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
@@ -55,12 +57,13 @@ interface BotRow {
 
 function createColumns(
   getOrgUrl: (path: string) => string,
-  openDeleteDialog: (bot: BotRow) => void
+  openDeleteDialog: (bot: BotRow) => void,
+  t: TranslateFn
 ): ColumnDef<BotRow>[] {
   return [
     {
       accessorKey: "type",
-      header: "Type",
+      header: t("pages.bots.type"),
       cell: ({ row }) => {
         const type = row.getValue("type") as BotRow["type"];
         const Icon =
@@ -81,7 +84,7 @@ function createColumns(
     },
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("common.name"),
       cell: ({ row }) => {
         const bot = row.original;
         const detailUrl = getOrgUrl(`bots/${bot.type}/${bot.id}`);
@@ -90,14 +93,14 @@ function createColumns(
             to={detailUrl}
             className="font-medium text-primary hover:underline"
           >
-            {bot.name || "Untitled Bot"}
+            {bot.name || t("pages.bots.untitled")}
           </Link>
         );
       },
     },
     {
       accessorKey: "tokenLastFour",
-      header: "Token",
+      header: t("pages.bots.token"),
       cell: ({ row }) => {
         const lastFour = row.getValue("tokenLastFour") as string;
         return (
@@ -114,16 +117,18 @@ function createColumns(
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("common.openMenu")}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link to={getOrgUrl(`bots/${bot.type}/${bot.id}`)}>Edit</Link>
+                  <Link to={getOrgUrl(`bots/${bot.type}/${bot.id}`)}>
+                    {t("common.edit")}
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(bot)}>
-                  Delete
+                  {t("common.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -135,6 +140,7 @@ function createColumns(
 }
 
 export function BotsPage() {
+  const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [botToDelete, setBotToDelete] = useState<BotRow | null>(null);
@@ -171,8 +177,8 @@ export function BotsPage() {
   } = useWhatsAppAccounts();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Bots" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.bots") }]);
+  }, [setBreadcrumbs, t]);
 
   const isLoading =
     isDiscordBotsLoading ||
@@ -221,6 +227,11 @@ export function BotsPage() {
     setDeleteDialogOpen(true);
   };
 
+  const columns = useMemo(
+    () => createColumns(getOrgUrl, openDeleteDialog, t),
+    [getOrgUrl, t]
+  );
+
   const handleDeleteBot = async () => {
     if (!botToDelete || !orgId) return;
     setIsDeleting(true);
@@ -257,32 +268,30 @@ export function BotsPage() {
     navigate(getOrgUrl(`bots/${type}/${botId}`));
   };
 
-  const columns = createColumns(getOrgUrl, openDeleteDialog);
-
   if (isLoading) {
-    return <InsetLoading title="Bots" />;
+    return <InsetLoading title={t("pages.bots.title")} />;
   } else if (error) {
-    return <InsetError title="Bots" errorMessage={error.message} />;
+    return <InsetError title={t("pages.bots.title")} errorMessage={error.message} />;
   }
 
   return (
     <TooltipProvider>
-      <InsetLayout title="Bots">
+      <InsetLayout title={t("pages.bots.title")}>
         <div className="flex items-center justify-between mb-6 min-h-10">
           <div className="text-sm text-muted-foreground max-w-2xl">
-            Connect bots to trigger your workflows from chat messages.
+            {t("pages.bots.description")}
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Add Bot
+            {t("pages.bots.addButton")}
           </Button>
         </div>
         <DataTable
           columns={columns}
           data={rows}
           emptyState={{
-            title: "No bots configured",
-            description: "Add a bot to get started.",
+            title: t("pages.bots.emptyTitle"),
+            description: t("pages.bots.emptyDescription"),
           }}
         />
         <BotsCreateDialog
@@ -293,11 +302,11 @@ export function BotsPage() {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Bot</DialogTitle>
+              <DialogTitle>{t("pages.bots.deleteTitle")}</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "
-                {botToDelete?.name || "Untitled Bot"}"? Triggers using this bot
-                will need to be reconfigured with a different bot.
+                {t("pages.bots.deleteConfirm", {
+                  name: botToDelete?.name || t("pages.bots.untitled"),
+                })}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -306,7 +315,7 @@ export function BotsPage() {
                 onClick={() => setDeleteDialogOpen(false)}
                 disabled={isDeleting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -314,7 +323,7 @@ export function BotsPage() {
                 disabled={isDeleting}
               >
                 {isDeleting ? <Spinner className="h-4 w-4 mr-2" /> : null}
-                Delete
+                {t("common.delete")}
               </Button>
             </DialogFooter>
           </DialogContent>

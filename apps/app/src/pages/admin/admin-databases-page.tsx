@@ -7,6 +7,7 @@ import { createOrgScopedColumns } from "@/components/admin/org-scoped-columns";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -23,11 +24,12 @@ export function AdminDatabasesPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Databases" }]);
+    setBreadcrumbs([{ label: t("sidebar.databases") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const organizationId = searchParams.get("organizationId") || undefined;
 
@@ -35,26 +37,26 @@ export function AdminDatabasesPage() {
     useAdminDatabases(page, limit, search || undefined, organizationId);
 
   const columns = useMemo(
-    () => createOrgScopedColumns<AdminDatabase>(navigate),
-    [navigate]
+    () => createOrgScopedColumns<AdminDatabase>(navigate, t),
+    [navigate, t]
   );
 
   if (isDatabasesLoading) {
-    return <InsetLoading title="Databases" />;
+    return <InsetLoading title={t("admin.databases.title")} />;
   }
 
   if (databasesError) {
     return (
-      <InsetError title="Databases" errorMessage={databasesError.message} />
+      <InsetError
+        title={t("admin.databases.title")}
+        errorMessage={databasesError.message}
+      />
     );
   }
 
   return (
-    <InsetLayout title="Databases">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name..."
-        search={formProps}
-      >
+    <InsetLayout title={t("admin.databases.title")}>
+      <AdminTableToolbar search={formProps}>
         {organizationId && (
           <Button
             type="button"
@@ -64,7 +66,7 @@ export function AdminDatabasesPage() {
               setPage(1);
             }}
           >
-            Clear organization filter
+            {t("admin.common.clearOrgFilter")}
           </Button>
         )}
       </AdminTableToolbar>
@@ -73,10 +75,10 @@ export function AdminDatabasesPage() {
         columns={columns}
         data={databases}
         emptyState={{
-          title: "No databases found",
+          title: t("admin.databases.emptyTitle"),
           description: search
-            ? "No databases match your search."
-            : "No databases have been created yet.",
+            ? t("admin.databases.emptySearch")
+            : t("admin.databases.emptyDefault"),
         }}
       />
 
@@ -86,7 +88,7 @@ export function AdminDatabasesPage() {
         itemCount={databases.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="databases"
+        itemLabel={t("admin.pagination.databases")}
         onPageChange={setPage}
       />
     </InsetLayout>

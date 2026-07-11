@@ -3,7 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import Check from "lucide-react/icons/check";
 import X from "lucide-react/icons/x";
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import {
@@ -20,7 +20,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import type { TranslateFn } from "@/i18n";
 import {
   acceptInvitation,
   declineInvitation,
@@ -38,10 +40,16 @@ const getRoleBadgeVariant = (role: string) => {
   }
 };
 
-const invitationColumns: ColumnDef<UserInvitation>[] = [
+const getRoleLabel = (role: string, t: TranslateFn) => {
+  if (role === "admin") return t("pages.members.roles.admin");
+  if (role === "owner") return t("pages.members.roles.owner");
+  return t("pages.members.roles.member");
+};
+
+const createInvitationColumns = (t: TranslateFn): ColumnDef<UserInvitation>[] => [
   {
     accessorKey: "organization",
-    header: "Organization",
+    header: t("pages.invitations.organization"),
     cell: ({ row }) => {
       return (
         <div className="font-medium">{row.original.organization.name}</div>
@@ -50,19 +58,19 @@ const invitationColumns: ColumnDef<UserInvitation>[] = [
   },
   {
     accessorKey: "role",
-    header: "Role",
+    header: t("pages.members.role"),
     cell: ({ row }) => {
       const role = row.getValue("role") as string;
       return (
         <Badge variant={getRoleBadgeVariant(role)}>
-          {role.charAt(0).toUpperCase() + role.slice(1)}
+          {getRoleLabel(role, t)}
         </Badge>
       );
     },
   },
   {
     accessorKey: "expiresAt",
-    header: "Expires",
+    header: t("pages.members.expires"),
     cell: ({ row }) => {
       const date = new Date(row.getValue("expiresAt"));
       return <div>{formatDate(date)}</div>;
@@ -70,7 +78,7 @@ const invitationColumns: ColumnDef<UserInvitation>[] = [
   },
   {
     accessorKey: "inviter",
-    header: "Invited By",
+    header: t("pages.members.invitedBy"),
     cell: ({ row }) => {
       const inviter = row.original.inviter;
       return (
@@ -111,7 +119,7 @@ const invitationColumns: ColumnDef<UserInvitation>[] = [
             }
           >
             <Check className="h-4 w-4 mr-1" />
-            Accept
+            {t("pages.invitations.accept")}
           </Button>
           <Button
             variant="ghost"
@@ -128,7 +136,7 @@ const invitationColumns: ColumnDef<UserInvitation>[] = [
             }
           >
             <X className="h-4 w-4 mr-1" />
-            Decline
+            {t("pages.invitations.decline")}
           </Button>
         </div>
       );
@@ -137,15 +145,16 @@ const invitationColumns: ColumnDef<UserInvitation>[] = [
 ];
 
 export function InvitationsPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { invitations, isInvitationsLoading, mutateInvitations } =
     useUserInvitations();
   const { mutateOrganizations } = useOrganizations();
 
-  // Set breadcrumbs on component mount
   useEffect(() => {
-    setBreadcrumbs([{ label: "Invitations" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("userMenu.invitations") }]);
+  }, [setBreadcrumbs, t]);
 
   const [isAcceptDialogOpen, setIsAcceptDialogOpen] = useState(false);
   const [isDeclineDialogOpen, setIsDeclineDialogOpen] = useState(false);
@@ -155,6 +164,8 @@ export function InvitationsPage() {
     organizationName: string;
   } | null>(null);
 
+  const invitationColumns = createInvitationColumns(t);
+
   const handleAcceptInvitation = useCallback(async (): Promise<void> => {
     if (!selectedInvitation) return;
 
@@ -162,18 +173,20 @@ export function InvitationsPage() {
     try {
       await acceptInvitation(selectedInvitation.invitationId);
 
-      toast.success(`You have joined ${selectedInvitation.organizationName}!`);
+      appToast.success("pages.invitations.acceptedToast", {
+        name: selectedInvitation.organizationName,
+      });
       setIsAcceptDialogOpen(false);
       setSelectedInvitation(null);
       await mutateInvitations();
       await mutateOrganizations();
     } catch (error) {
-      toast.error("Failed to accept invitation. Please try again.");
+      appToast.error("pages.invitations.acceptFailed");
       console.error("Accept Invitation Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [selectedInvitation, mutateInvitations, mutateOrganizations]);
+  }, [selectedInvitation, mutateInvitations, mutateOrganizations, appToast]);
 
   const handleDeclineInvitation = useCallback(async (): Promise<void> => {
     if (!selectedInvitation) return;
@@ -182,19 +195,18 @@ export function InvitationsPage() {
     try {
       await declineInvitation(selectedInvitation.invitationId);
 
-      toast.success("Invitation declined");
+      appToast.success("pages.invitations.declinedToast");
       setIsDeclineDialogOpen(false);
       setSelectedInvitation(null);
       await mutateInvitations();
     } catch (error) {
-      toast.error("Failed to decline invitation. Please try again.");
+      appToast.error("pages.invitations.declineFailed");
       console.error("Decline Invitation Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [selectedInvitation, mutateInvitations]);
+  }, [selectedInvitation, mutateInvitations, appToast]);
 
-  // Handle events from the table
   const handleAcceptEvent = useCallback((e: Event) => {
     const custom = e as CustomEvent<{
       invitationId: string;
@@ -217,8 +229,6 @@ export function InvitationsPage() {
     }
   }, []);
 
-  // Add event listeners
-  // Note: Using useEffect would cause re-renders, so we add listeners directly
   if (typeof document !== "undefined") {
     document.removeEventListener("acceptInvitationTrigger", handleAcceptEvent);
     document.removeEventListener(
@@ -230,14 +240,14 @@ export function InvitationsPage() {
   }
 
   if (isInvitationsLoading && !invitations) {
-    return <InsetLoading title="Invitations" />;
+    return <InsetLoading title={t("pages.invitations.title")} />;
   }
 
   return (
-    <InsetLayout title="Invitations">
+    <InsetLayout title={t("pages.invitations.title")}>
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Organization invitations that have been sent to you.
+          {t("pages.invitations.description")}
         </div>
       </div>
 
@@ -245,63 +255,65 @@ export function InvitationsPage() {
         columns={invitationColumns}
         data={invitations || []}
         emptyState={{
-          title: "No pending invitations",
-          description:
-            "When someone invites you to join an organization, it will appear here.",
+          title: t("pages.invitations.emptyTitle"),
+          description: t("pages.invitations.emptyDescription"),
         }}
       />
 
-      {/* Accept Invitation Dialog */}
       <AlertDialog
         open={isAcceptDialogOpen}
         onOpenChange={setIsAcceptDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Accept Invitation</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.invitations.acceptTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              You are about to join{" "}
-              <strong>{selectedInvitation?.organizationName}</strong>. You will
-              have access to the organization's resources.
+              {t("pages.invitations.acceptDescription", {
+                name: selectedInvitation?.organizationName ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSelectedInvitation(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleAcceptInvitation}
               disabled={isProcessing}
             >
-              {isProcessing ? "Accepting..." : "Accept Invitation"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.invitations.acceptInvitation")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Decline Invitation Dialog */}
       <AlertDialog
         open={isDeclineDialogOpen}
         onOpenChange={setIsDeclineDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Decline Invitation</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.invitations.declineTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to decline the invitation from{" "}
-              <strong>{selectedInvitation?.organizationName}</strong>?
+              {t("pages.invitations.declineDescription", {
+                name: selectedInvitation?.organizationName ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSelectedInvitation(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeclineInvitation}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Declining..." : "Decline Invitation"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.invitations.declineInvitation")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

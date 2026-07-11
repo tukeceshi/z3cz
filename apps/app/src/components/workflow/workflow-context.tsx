@@ -1,6 +1,6 @@
 import type { WorkflowTrigger } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge } from "@xyflow/react";
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useMemo } from "react";
 
 import {
   NodeType,
@@ -20,16 +20,29 @@ type UpdateNodeDataFn = (
 ) => void;
 type UpdateEdgeFn = (edgeId: string, data: Partial<WorkflowEdgeType>) => void;
 type DeleteEdgeFn = (edgeId: string) => void;
+/** Called when the user requests a single-node run from the AI config panel. */
+type RunNodeFn = (nodeId: string) => Promise<void>;
 
 export interface WorkflowContextProps {
   updateNodeData?: UpdateNodeDataFn;
   updateEdgeData?: UpdateEdgeFn;
   deleteEdge?: DeleteEdgeFn;
   edges?: ReactFlowEdge<WorkflowEdgeType>[];
+  connectedHandles?: ReadonlySet<string>;
+  soleSelectedNodeId?: string | null;
   disabled?: boolean;
   expandedOutputs?: boolean;
   nodeTypes?: NodeType[];
   workflowTrigger?: WorkflowTrigger;
+  onRunNode?: RunNodeFn;
+}
+
+export function isWorkflowHandleConnected(
+  connectedHandles: ReadonlySet<string>,
+  nodeId: string,
+  handleId: string
+): boolean {
+  return connectedHandles.has(`${nodeId}:${handleId}`);
 }
 
 // Create the context with a default value
@@ -38,6 +51,8 @@ const WorkflowContext = createContext<WorkflowContextProps>({
   updateEdgeData: () => {},
   deleteEdge: () => {},
   edges: [],
+  connectedHandles: new Set(),
+  soleSelectedNodeId: null,
   disabled: false,
   nodeTypes: [],
 });
@@ -51,10 +66,13 @@ export interface WorkflowProviderProps {
   readonly updateEdgeData?: UpdateEdgeFn;
   readonly deleteEdge?: DeleteEdgeFn;
   readonly edges?: ReactFlowEdge<WorkflowEdgeType>[];
+  readonly connectedHandles?: ReadonlySet<string>;
+  readonly soleSelectedNodeId?: string | null;
   readonly disabled?: boolean;
   readonly expandedOutputs?: boolean;
   readonly nodeTypes?: NodeType[];
   readonly workflowTrigger?: WorkflowTrigger;
+  readonly onRunNode?: RunNodeFn;
 }
 
 export function WorkflowProvider({
@@ -63,21 +81,42 @@ export function WorkflowProvider({
   updateEdgeData = () => {},
   deleteEdge = () => {},
   edges = [],
+  connectedHandles = new Set(),
+  soleSelectedNodeId = null,
   disabled = false,
   expandedOutputs = false,
   nodeTypes = [],
   workflowTrigger,
+  onRunNode,
 }: WorkflowProviderProps) {
-  const workflowContextValue = {
-    updateNodeData,
-    updateEdgeData,
-    deleteEdge,
-    edges,
-    disabled,
-    expandedOutputs,
-    nodeTypes,
-    workflowTrigger,
-  };
+  const workflowContextValue = useMemo(
+    () => ({
+      updateNodeData,
+      updateEdgeData,
+      deleteEdge,
+      edges,
+      connectedHandles,
+      soleSelectedNodeId,
+      disabled,
+      expandedOutputs,
+      nodeTypes,
+      workflowTrigger,
+      onRunNode,
+    }),
+    [
+      updateNodeData,
+      updateEdgeData,
+      deleteEdge,
+      edges,
+      connectedHandles,
+      soleSelectedNodeId,
+      disabled,
+      expandedOutputs,
+      nodeTypes,
+      workflowTrigger,
+      onRunNode,
+    ]
+  );
 
   return (
     <WorkflowContext.Provider value={workflowContextValue}>

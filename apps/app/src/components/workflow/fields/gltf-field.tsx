@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 import { ModelViewer } from "../model-viewer";
@@ -7,13 +8,11 @@ import {
   getObjectUrl,
   useFileUpload,
 } from "./file-field-primitives";
-import { mimeTypeDetectors } from "./file-upload-handler";
+import {
+  createFileValidators,
+  mimeTypeDetectors,
+} from "./file-upload-handler";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  getMimeType: mimeTypeDetectors.gltf,
-  errorMessage: "Failed to upload glTF model",
-} as const;
 
 export interface GltfFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -28,8 +27,14 @@ export function GltfField({
   parameter,
   value,
 }: GltfFieldProps) {
+  const { t } = useTranslation();
+  const fileValidators = createFileValidators(t);
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    {
+      validateFile: fileValidators.gltf,
+      getMimeType: mimeTypeDetectors.gltf,
+      errorMessage: t("workflow.fields.uploadFailedGltf"),
+    },
     onChange
   );
   const objectUrl = getObjectUrl(value, createObjectUrl);
@@ -40,7 +45,7 @@ export function GltfField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No 3D model"
+        label={t("workflow.fields.noGltf")}
       />
     );
   }

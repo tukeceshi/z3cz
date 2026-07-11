@@ -9,6 +9,7 @@ import {
   type SchemaFormField,
   submitSchemaForm,
 } from "@/components/forms/schema-form";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getApiBaseUrl } from "@/config/api";
+import type { TranslateFn } from "@/i18n";
 
 interface FormConfig {
   title: string;
@@ -27,7 +29,6 @@ interface FormConfig {
   mode: "request" | "webhook";
 }
 
-/** Result a synchronous (request) form produces via its form-response node. */
 interface FormResponse {
   fields: SchemaFormField[];
   record: Record<string, unknown>;
@@ -40,10 +41,9 @@ type FormState =
   | { status: "success"; mode: "request" | "webhook"; response?: FormResponse }
   | { status: "error"; message: string };
 
-/** Renders a response field value as readable text. */
-function formatResponseValue(value: unknown): string {
+function formatResponseValue(value: unknown, t: TranslateFn): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? t("pages.form.yes") : t("pages.form.no");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -54,13 +54,14 @@ function formatResponseValue(value: unknown): string {
  * it can be submitted repeatedly.
  */
 export function FormTriggerPage() {
+  const { t } = useTranslation();
   const { workflowId } = useParams<{ workflowId: string }>();
   const [state, setState] = useState<FormState>({ status: "loading" });
   const [values, setValues] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     if (!workflowId) {
-      setState({ status: "error", message: "Invalid form link" });
+      setState({ status: "error", message: t("pages.form.invalidLink") });
       return;
     }
 
@@ -70,7 +71,7 @@ export function FormTriggerPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(
-            (data as { error?: string }).error || "Failed to load form"
+            (data as { error?: string }).error || t("pages.form.loadFailed")
           );
         }
         return res.json();
@@ -86,7 +87,7 @@ export function FormTriggerPage() {
       .catch((err: Error) => {
         setState({ status: "error", message: err.message });
       });
-  }, [workflowId]);
+  }, [workflowId, t]);
 
   const handleSubmit = useCallback(async () => {
     if (state.status !== "ready") return;
@@ -104,7 +105,7 @@ export function FormTriggerPage() {
         setState({
           status: "error",
           message:
-            (data as { error?: string }).error || "Failed to submit form",
+            (data as { error?: string }).error || t("pages.form.submitFailed"),
         });
         return;
       }
@@ -114,10 +115,10 @@ export function FormTriggerPage() {
     } catch (err) {
       setState({
         status: "error",
-        message: err instanceof Error ? err.message : "Failed to submit form",
+        message: err instanceof Error ? err.message : t("pages.form.submitFailed"),
       });
     }
-  }, [state, workflowId, values]);
+  }, [state, workflowId, values, t]);
 
   const isSubmitting = state.status === "submitting";
   const config =
@@ -137,7 +138,7 @@ export function FormTriggerPage() {
 
         {state.status === "error" && (
           <CardHeader>
-            <CardTitle>Something went wrong</CardTitle>
+            <CardTitle>{t("pages.form.errorTitle")}</CardTitle>
             <CardDescription>{state.message}</CardDescription>
           </CardHeader>
         )}
@@ -155,7 +156,7 @@ export function FormTriggerPage() {
                       {field.label || field.name}
                     </dt>
                     <dd className="text-sm font-medium text-right break-words">
-                      {formatResponseValue(state.response?.record[field.name])}
+                      {formatResponseValue(state.response?.record[field.name], t)}
                     </dd>
                   </div>
                 ))}
@@ -166,11 +167,11 @@ export function FormTriggerPage() {
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
                 <Check className="h-5 w-5 text-green-600" />
               </div>
-              <CardTitle>Submitted</CardTitle>
+              <CardTitle>{t("pages.form.successTitle")}</CardTitle>
               <CardDescription>
                 {state.mode === "webhook"
-                  ? "Thank you. Your submission has been received and is being processed."
-                  : "Thank you. Your submission has been processed."}
+                  ? t("pages.form.successWebhook")
+                  : t("pages.form.successRequest")}
               </CardDescription>
             </CardHeader>
           ))}
@@ -205,7 +206,7 @@ export function FormTriggerPage() {
                 {isSubmitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Submit
+                {t("pages.form.submit")}
               </Button>
             </CardFooter>
           </>

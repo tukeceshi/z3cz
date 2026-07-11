@@ -11,7 +11,7 @@ import {
   resolveOrganizationBillingOptions,
 } from "../db";
 import { WorkflowStore } from "../stores/workflow-store";
-import { isCreditExhausted } from "../utils/credits";
+import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
 
 const slackWebhook = new Hono<ApiContext>();
@@ -268,6 +268,12 @@ async function executeWorkflow(
       return;
     }
     workflowData = workflowWithData.data;
+    if (!workflowData.billingMode) {
+      workflowData = {
+        ...workflowData,
+        billingMode: workflowWithData.billingMode ?? "platform",
+      };
+    }
   } catch (error) {
     console.error(
       `[SlackWebhook] Failed to load workflow ${workflow.id}:`,
@@ -289,7 +295,12 @@ async function executeWorkflow(
     return;
   }
 
-  if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
+  const billingMode = workflowData.billingMode ?? "platform";
+
+  if (
+    !shouldSkipPlatformCreditCheck(billingMode) &&
+    isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)
+  ) {
     console.log(
       `[SlackWebhook] Skipping workflow ${workflow.id}: credits exhausted`
     );
@@ -308,6 +319,8 @@ async function executeWorkflow(
     workflow: {
       id: workflow.id,
       name: workflow.name,
+      schemeId: workflowData.schemeId,
+      billingMode,
       trigger: workflow.trigger as WorkflowTrigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,

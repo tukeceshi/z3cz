@@ -1,5 +1,6 @@
 import { UnplugIcon } from "lucide-react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 interface UnplugButtonProps {
@@ -11,10 +12,13 @@ interface UnplugButtonProps {
 
 export function UnplugButton({
   onClick,
-  label = "Disconnect",
+  label,
   className = "",
   disabled = false,
 }: UnplugButtonProps) {
+  const { t } = useTranslation();
+  const ariaLabel = label ?? t("workflow.fields.disconnect");
+
   return (
     <button
       onClick={onClick}
@@ -23,7 +27,7 @@ export function UnplugButton({
         disabled && "opacity-50 cursor-not-allowed hover:text-muted-foreground",
         className
       )}
-      aria-label={label}
+      aria-label={ariaLabel}
       type="button"
       disabled={disabled}
     >

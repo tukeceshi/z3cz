@@ -3,45 +3,78 @@ import { Hono } from "hono";
 
 import { optionalJwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
+import { createDatabase, getEnabledWorkflowSchemeById } from "../db";
 import { getCloudflareModelNodeTypes } from "../runtime/cloudflare-model-catalog";
+import { getAiInterfaceNodeTypes } from "../runtime/cloudflare-ai-interface-catalog";
 import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
 import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
+import { filterNodeTypesForScheme } from "../utils/workflow-scheme";
 
 const typeRoutes = new Hono<ApiContext>();
 
 typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
   try {
+    const schemeId = c.req.query("schemeId");
+
+    let nodeTypes: NodeType[];
     if (c.env.RUNTIME === "node") {
-      const nodeTypes = loadNodeTypesFromJson();
-      return c.json({ nodeTypes } satisfies GetNodeTypesResponse);
-    }
-
-    const jwtPayload = c.get("jwtPayload");    const registry = await createCloudflareNodeRegistry(
-      c.env,
-      jwtPayload?.developerMode ?? false
-    );
-    const staticNodeTypes = registry.getNodeTypes();
-
-    // Synthesise per-model NodeTypes from the Cloudflare catalog so each
-    // Workers AI model surfaces directly in the editor's palette. Failures
-    // (missing credentials, upstream outage, or test envs without an
-    // ExecutionContext) degrade to the static list — the generic
-    // `cloudflare-model` node remains available as a fallback.
-    let cloudflareNodeTypes: NodeType[] = [];
-    try {
-      cloudflareNodeTypes = await getCloudflareModelNodeTypes(
+      nodeTypes = loadNodeTypesFromJson();
+      try {
+        const aiNodeTypes = await getAiInterfaceNodeTypes(
+          c.env,
+          c.executionCtx
+        );
+        nodeTypes = [...nodeTypes, ...aiNodeTypes];
+      } catch (error) {
+        console.warn(
+          "[types] Skipping AI interface synthesis:",
+          error instanceof Error ? error.message : error
+        );
+      }
+    } else {
+      const jwtPayload = c.get("jwtPayload");
+      const registry = await createCloudflareNodeRegistry(
         c.env,
-        c.executionCtx
+        jwtPayload?.developerMode ?? false
       );
-    } catch (error) {
-      console.warn(
-        "[types] Skipping Cloudflare model synthesis:",
-        error instanceof Error ? error.message : error
-      );
+      const staticNodeTypes = registry.getNodeTypes();
+
+      let cloudflareNodeTypes: NodeType[] = [];
+      let aiNodeTypes: NodeType[] = [];
+      try {
+        cloudflareNodeTypes = await getCloudflareModelNodeTypes(
+          c.env,
+          c.executionCtx
+        );
+      } catch (error) {
+        console.warn(
+          "[types] Skipping Cloudflare model synthesis:",
+          error instanceof Error ? error.message : error
+        );
+      }
+
+      try {
+        aiNodeTypes = await getAiInterfaceNodeTypes(c.env, c.executionCtx);
+      } catch (error) {
+        console.warn(
+          "[types] Skipping AI interface synthesis:",
+          error instanceof Error ? error.message : error
+        );
+      }
+
+      nodeTypes = [...staticNodeTypes, ...cloudflareNodeTypes, ...aiNodeTypes];
     }
 
-    const nodeTypes = [...staticNodeTypes, ...cloudflareNodeTypes];
-    return c.json({ nodeTypes } as GetNodeTypesResponse);
+    if (schemeId) {
+      const db = createDatabase(c.env);
+      const scheme = await getEnabledWorkflowSchemeById(db, schemeId);
+      if (!scheme) {
+        return c.json({ error: "Workflow scheme not found" }, 404);
+      }
+      nodeTypes = filterNodeTypesForScheme(nodeTypes, scheme);
+    }
+
+    return c.json({ nodeTypes } satisfies GetNodeTypesResponse);
   } catch (error) {
     console.error("Error getting node types:", error);
     return c.json({ error: "Failed to get node types" }, 500);

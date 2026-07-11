@@ -9,6 +9,7 @@ import ThumbsUp from "lucide-react/icons/thumbs-up";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -66,7 +67,13 @@ type PageState =
   | { status: "already_submitted" }
   | { status: "error"; message: string };
 
-function OutputPreview({ output }: { output: VisibleOutput }) {
+function OutputPreview({
+  output,
+  emptyLabel,
+}: {
+  output: VisibleOutput;
+  emptyLabel: string;
+}) {
   if (output.url) {
     if (output.type === "image") {
       return (
@@ -120,7 +127,7 @@ function OutputPreview({ output }: { output: VisibleOutput }) {
   const value = output.value;
 
   if (value === null || value === undefined || value === "") {
-    return <span className="text-sm italic text-muted-foreground">empty</span>;
+    return <span className="text-sm italic text-muted-foreground">{emptyLabel}</span>;
   }
 
   if (typeof value === "string") {
@@ -153,11 +160,13 @@ function CriterionCard({
   response,
   onChange,
   disabled,
+  optionalCommentLabel,
 }: {
   criterion: Criterion;
   response: CriterionResponse | undefined;
   onChange: (next: CriterionResponse) => void;
   disabled: boolean;
+  optionalCommentLabel: string;
 }) {
   const [showComment, setShowComment] = useState(!!response?.comment);
 
@@ -228,7 +237,7 @@ function CriterionCard({
       {showComment && (
         <div className="px-3 pb-2">
           <Textarea
-            placeholder="Optional comment..."
+            placeholder={optionalCommentLabel}
             value={response?.comment ?? ""}
             onChange={(e) =>
               onChange({
@@ -251,6 +260,7 @@ function CriterionCard({
  * No authentication required — the signed token in the URL IS the authorization.
  */
 export function FeedbackFormPage() {
+  const { t } = useTranslation();
   const { signedToken } = useParams<{ signedToken: string }>();
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [responses, setResponses] = useState<Record<string, CriterionResponse>>(
@@ -259,7 +269,7 @@ export function FeedbackFormPage() {
 
   useEffect(() => {
     if (!signedToken) {
-      setState({ status: "error", message: "Invalid feedback link" });
+      setState({ status: "error", message: t("pages.feedbackForm.invalidLink") });
       return;
     }
 
@@ -268,7 +278,7 @@ export function FeedbackFormPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(
-            (data as { error?: string }).error || "Failed to load feedback"
+            (data as { error?: string }).error || t("pages.feedbackForm.loadFailed")
           );
         }
         return res.json();
@@ -283,7 +293,7 @@ export function FeedbackFormPage() {
       .catch((err: Error) => {
         setState({ status: "error", message: err.message });
       });
-  }, [signedToken]);
+  }, [signedToken, t]);
 
   const handleSubmit = useCallback(async () => {
     if (state.status !== "ready") return;
@@ -314,7 +324,7 @@ export function FeedbackFormPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const error =
-          (data as { error?: string }).error || "Failed to submit feedback";
+          (data as { error?: string }).error || t("pages.feedbackForm.submitFailed");
         if (res.status === 409) {
           setState({ status: "already_submitted" });
         } else {
@@ -328,10 +338,10 @@ export function FeedbackFormPage() {
       setState({
         status: "error",
         message:
-          err instanceof Error ? err.message : "Failed to submit feedback",
+          err instanceof Error ? err.message : t("pages.feedbackForm.submitFailed"),
       });
     }
-  }, [state, signedToken, responses]);
+  }, [state, signedToken, responses, t]);
 
   if (state.status === "loading") {
     return (
@@ -343,15 +353,18 @@ export function FeedbackFormPage() {
 
   if (state.status === "error") {
     return (
-      <CenteredCard title="Something went wrong" description={state.message} />
+      <CenteredCard
+        title={t("pages.feedbackForm.errorTitle")}
+        description={state.message}
+      />
     );
   }
 
   if (state.status === "already_submitted") {
     return (
       <CenteredCard
-        title="Already Submitted"
-        description="Thanks — feedback has already been recorded for this execution."
+        title={t("pages.feedbackForm.alreadySubmittedTitle")}
+        description={t("pages.feedbackForm.alreadySubmittedDescription")}
       />
     );
   }
@@ -364,8 +377,8 @@ export function FeedbackFormPage() {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
               <Check className="h-5 w-5 text-green-600" />
             </div>
-            <CardTitle>Feedback Recorded</CardTitle>
-            <CardDescription>Thank you for your evaluation.</CardDescription>
+            <CardTitle>{t("pages.feedbackForm.successTitle")}</CardTitle>
+            <CardDescription>{t("pages.feedbackForm.successDescription")}</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -393,12 +406,12 @@ export function FeedbackFormPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="space-y-4">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Workflow Outputs
+              {t("pages.feedbackForm.workflowOutputs")}
             </h2>
             {config.nodes.length === 0 ? (
               <Card>
                 <CardContent className="py-6 text-sm text-muted-foreground">
-                  No outputs available.
+                  {t("pages.feedbackForm.noOutputs")}
                 </CardContent>
               </Card>
             ) : (
@@ -425,7 +438,10 @@ export function FeedbackFormPage() {
                             </span>
                           )}
                         </div>
-                        <OutputPreview output={output} />
+                        <OutputPreview
+                          output={output}
+                          emptyLabel={t("pages.feedbackForm.emptyValue")}
+                        />
                       </div>
                     ))}
                   </CardContent>
@@ -436,14 +452,13 @@ export function FeedbackFormPage() {
 
           <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Evaluation
+              {t("pages.feedbackForm.evaluation")}
             </h2>
             <Card>
               <CardContent className="space-y-2 py-4">
                 {config.criteria.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No evaluation criteria have been configured for this
-                    workflow.
+                    {t("pages.feedbackForm.noCriteria")}
                   </p>
                 ) : (
                   config.criteria.map((criterion) => (
@@ -458,6 +473,7 @@ export function FeedbackFormPage() {
                         }))
                       }
                       disabled={isSubmitting}
+                      optionalCommentLabel={t("pages.feedbackForm.optionalComment")}
                     />
                   ))
                 )}
@@ -471,7 +487,7 @@ export function FeedbackFormPage() {
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              Submit Feedback
+              {t("pages.feedbackForm.submit")}
             </Button>
           </aside>
         </div>

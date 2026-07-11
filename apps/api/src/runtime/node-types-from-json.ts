@@ -16,6 +16,8 @@ const nodesJsonCandidates = [
 ];
 
 let cachedNodeTypes: NodeType[] | null = null;
+let cachedNodesJsonPath: string | null = null;
+let cachedNodesJsonMtimeMs = 0;
 
 function resolveNodesJsonPath(): string | null {
   for (const candidate of nodesJsonCandidates) {
@@ -27,13 +29,20 @@ function resolveNodesJsonPath(): string | null {
 }
 
 export function loadNodeTypesFromJson(): NodeType[] {
-  if (cachedNodeTypes) {
-    return cachedNodeTypes;
-  }
-
   const nodesJsonPath = resolveNodesJsonPath();
   if (!nodesJsonPath) {
-    throw new Error("nodes.json not found for Node runtime type listing");
+    throw new Error(
+      "nodes.json not found for Node runtime type listing. Run: pnpm --filter '@dafthunk/www' extract-nodes"
+    );
+  }
+
+  const mtimeMs = fs.statSync(nodesJsonPath).mtimeMs;
+  if (
+    cachedNodeTypes &&
+    cachedNodesJsonPath === nodesJsonPath &&
+    cachedNodesJsonMtimeMs === mtimeMs
+  ) {
+    return cachedNodeTypes;
   }
 
   const parsed = JSON.parse(fs.readFileSync(nodesJsonPath, "utf8")) as Record<
@@ -41,5 +50,7 @@ export function loadNodeTypesFromJson(): NodeType[] {
     NodeType
   >;
   cachedNodeTypes = Object.values(parsed);
+  cachedNodesJsonPath = nodesJsonPath;
+  cachedNodesJsonMtimeMs = mtimeMs;
   return cachedNodeTypes;
 }

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 /**
@@ -13,6 +14,8 @@ export function FieldPlaceholder({
   connected?: boolean;
   label: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div
       className={cn(
@@ -20,7 +23,7 @@ export function FieldPlaceholder({
         className
       )}
     >
-      {connected ? "Connected" : label}
+      {connected ? t("workflow.fields.connected") : label}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { format, parseISO } from "date-fns";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Card,
   CardContent,
@@ -18,31 +20,6 @@ import {
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AdminStatsTimeseries } from "@/services/admin-service";
-
-const SIGNUPS_CONFIG = {
-  count: {
-    label: "Signups",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig;
-
-const WORKFLOWS_CONFIG = {
-  count: {
-    label: "Workflows created",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig;
-
-const EXECUTIONS_CONFIG = {
-  successCount: {
-    label: "Succeeded",
-    color: "hsl(var(--chart-2))",
-  },
-  errorCount: {
-    label: "Failed",
-    color: "hsl(var(--chart-5))",
-  },
-} satisfies ChartConfig;
 
 function formatTick(value: string): string {
   try {
@@ -72,12 +49,53 @@ export function AdminTrendsCharts({
   isLoading,
   error,
 }: AdminTrendsChartsProps) {
+  const { t } = useTranslation();
+
+  const signupsConfig = useMemo(
+    () =>
+      ({
+        count: {
+          label: t("admin.trends.chartSignups"),
+          color: "hsl(var(--chart-1))",
+        },
+      }) satisfies ChartConfig,
+    [t]
+  );
+
+  const workflowsConfig = useMemo(
+    () =>
+      ({
+        count: {
+          label: t("admin.trends.chartWorkflows"),
+          color: "hsl(var(--chart-2))",
+        },
+      }) satisfies ChartConfig,
+    [t]
+  );
+
+  const executionsConfig = useMemo(
+    () =>
+      ({
+        successCount: {
+          label: t("admin.trends.chartSucceeded"),
+          color: "hsl(var(--chart-2))",
+        },
+        errorCount: {
+          label: t("admin.trends.chartFailed"),
+          color: "hsl(var(--chart-5))",
+        },
+      }) satisfies ChartConfig,
+    [t]
+  );
+
   if (error) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Trends</CardTitle>
-          <CardDescription>Unable to load dashboard trends.</CardDescription>
+          <CardTitle>{t("admin.trends.title")}</CardTitle>
+          <CardDescription>
+            {t("admin.trends.loadError")}
+          </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           {error.message}
@@ -105,18 +123,19 @@ export function AdminTrendsCharts({
   }
 
   const { signups, workflowsCreated, executions } = timeseries.series;
+  const days = String(timeseries.range.days);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card>
         <CardHeader>
-          <CardTitle>Signups</CardTitle>
+          <CardTitle>{t("admin.trends.signups")}</CardTitle>
           <CardDescription>
-            Daily new users · last {timeseries.range.days} days
+            {t("admin.trends.signupsDesc", { days })}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={SIGNUPS_CONFIG}>
+          <ChartContainer config={signupsConfig}>
             <AreaChart data={signups} margin={{ left: 4, right: 4 }}>
               <defs>
                 <linearGradient id="fillSignups" x1="0" y1="0" x2="0" y2="1">
@@ -170,13 +189,13 @@ export function AdminTrendsCharts({
 
       <Card>
         <CardHeader>
-          <CardTitle>Workflows created</CardTitle>
+          <CardTitle>{t("admin.trends.workflowsCreated")}</CardTitle>
           <CardDescription>
-            Daily workflow creations · last {timeseries.range.days} days
+            {t("admin.trends.workflowsCreatedDesc", { days })}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={WORKFLOWS_CONFIG}>
+          <ChartContainer config={workflowsConfig}>
             <AreaChart data={workflowsCreated} margin={{ left: 4, right: 4 }}>
               <defs>
                 <linearGradient id="fillWorkflows" x1="0" y1="0" x2="0" y2="1">
@@ -230,13 +249,13 @@ export function AdminTrendsCharts({
 
       <Card>
         <CardHeader>
-          <CardTitle>Executions</CardTitle>
+          <CardTitle>{t("admin.trends.executions")}</CardTitle>
           <CardDescription>
-            Daily executions by outcome · last {timeseries.range.days} days
+            {t("admin.trends.executionsDesc", { days })}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={EXECUTIONS_CONFIG}>
+          <ChartContainer config={executionsConfig}>
             <AreaChart data={executions} margin={{ left: 4, right: 4 }}>
               <defs>
                 <linearGradient id="fillSuccess" x1="0" y1="0" x2="0" y2="1">

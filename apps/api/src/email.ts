@@ -14,7 +14,7 @@ import { parseAndStageEmail } from "./mailbox-staging";
 import { WorkflowStore } from "./stores/workflow-store";
 import { handleSupportEmail, isAuthenticated } from "./support-email";
 import { verifyReplyToken } from "./support-reply-token";
-import { isCreditExhausted } from "./utils/credits";
+import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "./utils/credits";
 
 async function streamToBytes(
   stream: ReadableStream<Uint8Array>
@@ -304,6 +304,12 @@ async function triggerWorkflowForEmail({
       return;
     }
     workflowData = workflowWithData.data;
+    if (!workflowData.billingMode) {
+      workflowData = {
+        ...workflowData,
+        billingMode: workflowWithData.billingMode ?? "platform",
+      };
+    }
   } catch (error) {
     console.error(
       `Failed to load workflow data from R2 for ${workflow.id}:`,
@@ -327,7 +333,12 @@ async function triggerWorkflowForEmail({
     return;
   }
 
-  if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
+  const billingMode = workflowData.billingMode ?? "platform";
+
+  if (
+    !shouldSkipPlatformCreditCheck(billingMode) &&
+    isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)
+  ) {
     console.log(
       `Discarding email for workflow ${workflow.id}: credits exhausted`
     );
@@ -346,6 +357,8 @@ async function triggerWorkflowForEmail({
     workflow: {
       id: workflow.id,
       name: workflow.name,
+      schemeId: workflowData.schemeId,
+      billingMode,
       trigger: workflow.trigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,

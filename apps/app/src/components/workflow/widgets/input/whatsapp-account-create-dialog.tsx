@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,24 +20,15 @@ import { CopyableValue } from "./copyable-value";
 
 type Step = "name" | "app-secret" | "api-credentials" | "webhook" | "setup";
 
-const STEP_TITLES: Record<Step, string> = {
-  name: "Add a WhatsApp Account",
-  "app-secret": "App Secret",
-  "api-credentials": "WhatsApp API Credentials",
-  webhook: "Webhook Configuration",
-  setup: "Setup",
-};
-
-const STEP_DESCRIPTIONS: Record<Step, string> = {
-  name: "Choose a display name to identify this WhatsApp account in Dafthunk.",
-  "app-secret":
-    "Copy the App Secret from your Meta app. Navigate to Apps > App Settings > Basic in the Meta Developer Portal.",
-  "api-credentials":
-    "Copy your Access Token and Phone Number ID from the WhatsApp API Setup page in the Meta Developer Portal.",
-  webhook:
-    "Copy the Callback URL and Verify Token below into the webhook settings of your Meta app.",
-  setup:
-    "Verify the webhook is configured and create a workflow to start receiving messages.",
+const WHATSAPP_STEP_KEYS: Record<
+  Step,
+  "name" | "appSecret" | "apiCredentials" | "webhook" | "setup"
+> = {
+  name: "name",
+  "app-secret": "appSecret",
+  "api-credentials": "apiCredentials",
+  webhook: "webhook",
+  setup: "setup",
 };
 
 const META_PORTAL_URL = "https://developers.facebook.com/apps/";
@@ -53,6 +45,7 @@ export function WhatsAppAccountCreateDialog({
   onCreated,
 }: WhatsAppAccountCreateDialogProps) {
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [appSecret, setAppSecret] = useState("");
@@ -65,6 +58,8 @@ export function WhatsAppAccountCreateDialog({
   const [createdVerifyToken, setCreatedVerifyToken] = useState<string | null>(
     null
   );
+
+  const stepKey = WHATSAPP_STEP_KEYS[step];
 
   const resetForm = () => {
     setStep("name");
@@ -108,7 +103,11 @@ export function WhatsAppAccountCreateDialog({
       setStep("webhook");
       onCreated(response.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("pages.bots.wizard.createAccountFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -123,10 +122,10 @@ export function WhatsAppAccountCreateDialog({
       <DialogContent className="max-w-[450px]">
         <div>
           <DialogTitle className="text-base font-semibold">
-            {STEP_TITLES[step]}
+            {t(`pages.bots.wizard.whatsapp.steps.${stepKey}.title`)}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground mt-1">
-            {STEP_DESCRIPTIONS[step]}
+            {t(`pages.bots.wizard.whatsapp.steps.${stepKey}.description`)}
             {(step === "app-secret" ||
               step === "api-credentials" ||
               step === "webhook") && (
@@ -138,7 +137,7 @@ export function WhatsAppAccountCreateDialog({
                   rel="noopener noreferrer"
                   className="text-primary hover:underline inline-flex items-center gap-0.5"
                 >
-                  Open Meta Developer Portal
+                  {t("pages.bots.wizard.whatsapp.openMetaPortal")}
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </>
@@ -149,28 +148,27 @@ export function WhatsAppAccountCreateDialog({
         {step === "name" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="whatsapp-name">Name</Label>
+              <Label htmlFor="whatsapp-name">{t("common.name")}</Label>
               <Input
                 id="whatsapp-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My WhatsApp Bot"
+                placeholder={t("pages.bots.wizard.placeholders.whatsappAccount")}
               />
               <p className="text-xs text-muted-foreground">
-                A display name for this account in Dafthunk. This is not visible
-                to your WhatsApp users.
+                {t("pages.bots.wizard.accountNameHint")}
               </p>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={() => setStep("app-secret")}
                 disabled={name.trim() === ""}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -179,23 +177,18 @@ export function WhatsAppAccountCreateDialog({
         {step === "app-secret" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="whatsapp-app-secret">App Secret</Label>
+              <Label htmlFor="whatsapp-app-secret">
+                {t("pages.bots.appSecret")}
+              </Label>
               <Input
                 id="whatsapp-app-secret"
                 type="password"
                 value={appSecret}
                 onChange={(e) => setAppSecret(e.target.value)}
-                placeholder="Paste your App Secret here"
+                placeholder={t("pages.bots.wizard.placeholders.appSecret")}
               />
               <p className="text-xs text-muted-foreground">
-                Find this at{" "}
-                <span className="font-medium text-foreground">
-                  Apps &gt; App Settings &gt; Basic
-                </span>{" "}
-                in the Meta Developer Portal. Click{" "}
-                <span className="font-medium text-foreground">Show</span> next
-                to the App Secret field. Used to verify that incoming webhook
-                messages are genuinely from Meta.
+                {t("pages.bots.wizard.whatsapp.appSecretFieldHint")}
               </p>
             </div>
 
@@ -205,13 +198,13 @@ export function WhatsAppAccountCreateDialog({
                 variant="outline"
                 onClick={() => setStep("name")}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={() => setStep("api-credentials")}
                 disabled={appSecret.trim() === ""}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           </div>
@@ -220,67 +213,54 @@ export function WhatsAppAccountCreateDialog({
         {step === "api-credentials" && (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="whatsapp-token">Access Token</Label>
+              <Label htmlFor="whatsapp-token">
+                {t("pages.bots.accessToken")}
+              </Label>
               <Input
                 id="whatsapp-token"
                 type="password"
                 value={accessToken}
                 onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="Paste your access token here"
+                placeholder={t("pages.bots.wizard.placeholders.accessToken")}
               />
               <p className="text-xs text-muted-foreground">
-                Find this at{" "}
-                <span className="font-medium text-foreground">
-                  Apps &gt; Use cases &gt; WhatsApp &gt; API Setup
-                </span>{" "}
-                under the temporary access token section, or generate a
-                permanent token via{" "}
-                <span className="font-medium text-foreground">
-                  Business &gt; Settings &gt; System Users
-                </span>
-                .
+                {t("pages.bots.wizard.whatsapp.accessTokenFieldHint")}
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-md">
-                Temporary tokens from API Setup expire in 24 hours. For
-                production use, generate a permanent token from a System User in
-                Business Settings.
+                {t("pages.bots.wizard.whatsapp.temporaryTokenWarning")}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="whatsapp-phone-number-id">Phone Number ID</Label>
+              <Label htmlFor="whatsapp-phone-number-id">
+                {t("pages.bots.phoneNumberId")}
+              </Label>
               <Input
                 id="whatsapp-phone-number-id"
                 value={phoneNumberId}
                 onChange={(e) => setPhoneNumberId(e.target.value)}
-                placeholder="123456789012345"
+                placeholder={t("pages.bots.wizard.placeholders.phoneNumberId")}
               />
               <p className="text-xs text-muted-foreground">
-                Find this at{" "}
-                <span className="font-medium text-foreground">
-                  Apps &gt; Use cases &gt; WhatsApp &gt; API Setup
-                </span>
-                . Select your phone number from the dropdown — the numeric ID
-                appears below it. This is not the phone number itself.
+                {t("pages.bots.wizard.whatsapp.phoneNumberIdFieldHint")}
               </p>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="whatsapp-waba-id">
-                WhatsApp Business Account ID{" "}
+                {t("pages.bots.wabaId")}{" "}
                 <span className="text-muted-foreground font-normal">
-                  (optional)
+                  {t("pages.bots.optional")}
                 </span>
               </Label>
               <Input
                 id="whatsapp-waba-id"
                 value={wabaId}
                 onChange={(e) => setWabaId(e.target.value)}
-                placeholder="WhatsApp Business Account ID"
+                placeholder={t("pages.bots.wabaIdPlaceholder")}
               />
               <p className="text-xs text-muted-foreground">
-                The WhatsApp Business Account ID, found on the same page. Stored
-                for reference only.
+                {t("pages.bots.wabaIdHint")}
               </p>
             </div>
 
@@ -300,7 +280,7 @@ export function WhatsAppAccountCreateDialog({
                 }}
                 disabled={isSubmitting}
               >
-                Back
+                {t("common.back")}
               </Button>
               <Button
                 onClick={handleSubmit}
@@ -313,10 +293,10 @@ export function WhatsAppAccountCreateDialog({
                 {isSubmitting ? (
                   <>
                     <Spinner className="h-4 w-4 mr-1" />
-                    Connecting...
+                    {t("common.connecting")}
                   </>
                 ) : (
-                  "Next"
+                  t("common.next")
                 )}
               </Button>
             </div>
@@ -327,50 +307,47 @@ export function WhatsAppAccountCreateDialog({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-md font-medium">
-                Created
+                {t("common.created")}
               </span>
               <span className="font-medium">{name}</span>
             </div>
 
             <div className="space-y-2 text-sm">
               <div className="space-y-1">
-                <p className="font-medium text-foreground">Callback URL</p>
+                <p className="font-medium text-foreground">
+                  {t("pages.bots.callbackUrl")}
+                </p>
                 <CopyableValue value={webhookUrl} />
               </div>
 
               {createdVerifyToken && (
                 <div className="space-y-1">
-                  <p className="font-medium text-foreground">Verify Token</p>
+                  <p className="font-medium text-foreground">
+                    {t("pages.bots.verifyToken")}
+                  </p>
                   <CopyableValue value={createdVerifyToken} />
                 </div>
               )}
 
               <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1.5 mt-3">
                 <li>
-                  Go to{" "}
-                  <span className="font-medium text-foreground">
-                    Apps &gt; Use cases &gt; WhatsApp &gt; API Setup
-                  </span>{" "}
-                  and click{" "}
-                  <span className="font-medium text-foreground">Configure</span>{" "}
-                  next to Webhooks.
-                </li>
-                <li>
-                  Paste the Callback URL and Verify Token, then click{" "}
-                  <span className="font-medium text-foreground">
-                    Verify and save
-                  </span>
-                  .
-                </li>
-                <li>
-                  Subscribe to the <span className="font-mono">messages</span>{" "}
-                  webhook field.
+                  {t("pages.bots.whatsappSetup1Before")}{" "}
+                  <a
+                    href={META_PORTAL_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline inline-flex items-center gap-0.5"
+                  >
+                    {t("pages.bots.metaDeveloperPortal")}
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>{" "}
+                  {t("pages.bots.whatsappSetup1After")}
                 </li>
               </ol>
             </div>
 
             <div className="flex justify-end">
-              <Button onClick={() => setStep("setup")}>Next</Button>
+              <Button onClick={() => setStep("setup")}>{t("common.next")}</Button>
             </div>
           </div>
         )}
@@ -378,17 +355,8 @@ export function WhatsAppAccountCreateDialog({
         {step === "setup" && (
           <div className="space-y-4">
             <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1.5">
-              <li>
-                Create a workflow with a{" "}
-                <span className="font-medium text-foreground">
-                  Receive WhatsApp Message
-                </span>{" "}
-                trigger and select this account.
-              </li>
-              <li>
-                Enable the workflow, then send a WhatsApp message to your
-                business number to trigger it.
-              </li>
+              <li>{t("pages.bots.whatsappSetup2")}</li>
+              <li>{t("pages.bots.whatsappSetup3")}</li>
             </ol>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -397,9 +365,9 @@ export function WhatsAppAccountCreateDialog({
                 variant="outline"
                 onClick={() => setStep("webhook")}
               >
-                Back
+                {t("common.back")}
               </Button>
-              <Button onClick={handleClose}>Done</Button>
+              <Button onClick={handleClose}>{t("common.done")}</Button>
             </div>
           </div>
         )}

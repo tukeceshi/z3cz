@@ -13,7 +13,7 @@ export function testConcurrentErrors(
 ) {
   describe(`${runtimeName}: multiple concurrent errors`, () => {
     it("should handle multiple independent errors in parallel branches", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-multi-error",
         name: "Multiple Errors Workflow",
         trigger: "manual",
@@ -129,8 +129,8 @@ export function testConcurrentErrors(
       expect(div2Result).toBeDefined();
     });
 
-    it("should handle cascading errors (error â†’ skipped â†’ skipped)", async () => {
-      const workflow: Workflow = {
+    it("should handle cascading errors (error â†?skipped â†?skipped)", async () => {
+      const workflow = {
         id: "test-workflow-cascade",
         name: "Cascading Errors Workflow",
         trigger: "manual",

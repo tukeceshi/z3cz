@@ -13,7 +13,7 @@ export function testFailingExecution(
 ) {
   describe(`${runtimeName}: failing execution`, () => {
     it("should handle division by zero error", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-4",
         name: "Division by Zero Workflow",
         trigger: "manual",
@@ -102,7 +102,7 @@ export function testFailingExecution(
     });
 
     it("should handle missing required input", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-5",
         name: "Missing Input Workflow",
         trigger: "manual",
@@ -167,7 +167,7 @@ export function testFailingExecution(
     });
 
     it("should handle error in middle of workflow chain", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-6",
         name: "Error Chain Workflow",
         trigger: "manual",
@@ -282,9 +282,9 @@ export function testFailingExecution(
     });
 
     it("should handle workflow with error in middle node blocking dependent nodes", async () => {
-      // Graph: addition â†’ subtraction (missing input b) â†’ multiplication
+      // Graph: addition â†?subtraction (missing input b) â†?multiplication
       // Expected: subtraction executes (nodes validate their own inputs), multiplication may skip if subtraction fails
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-7",
         name: "Stuck Workflow",
         trigger: "manual",

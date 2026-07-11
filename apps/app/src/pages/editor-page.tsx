@@ -1,16 +1,21 @@
-import type {
+﻿import type {
+  WorkflowBillingMode,
   WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Settings from "lucide-react/icons/settings";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
+import { Button } from "@/components/ui/button";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
+import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-editor-sidebar-effect";
 import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
@@ -24,6 +29,8 @@ export function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { organization } = useAuth();
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const orgId = organization?.id || "";
   const { getOrgUrl } = useOrgUrl();
 
@@ -32,6 +39,7 @@ export function EditorPage() {
 
   const [isEnabled, setIsEnabled] = useState(true);
   const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
+  const [workflowSettingsOpen, setWorkflowSettingsOpen] = useState(false);
 
   const handleToggleEnabled = useCallback(
     async (checked: boolean) => {
@@ -40,21 +48,26 @@ export function EditorPage() {
       try {
         await setWorkflowEnabled(id, checked, orgId);
         setIsEnabled(checked);
-        toast.success(checked ? "Workflow enabled" : "Workflow disabled");
+        appToast.success(
+          checked ? "errors.workflowEnabled" : "errors.workflowDisabled"
+        );
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to update workflow"
+        appToast.errorRaw(
+          error instanceof Error ? error.message : t("errors.workflowUpdateFailed")
         );
       } finally {
         setIsTogglingEnabled(false);
       }
     },
-    [id, orgId]
+    [id, orgId, appToast, t]
   );
 
-  const { nodeTypes, nodeTypesError, isNodeTypesLoading } = useNodeTypes({
-    revalidateOnFocus: false,
-  });
+  const { nodeTypes, nodeTypesError, isNodeTypesLoading } = useNodeTypes(
+    httpWorkflowMetadata?.schemeId,
+    {
+      revalidateOnFocus: false,
+    }
+  );
 
   const { createObjectUrl } = useObjectService();
 
@@ -128,15 +141,41 @@ export function EditorPage() {
     fetchWorkflowMetadata();
   }, [id, orgId]);
 
+  const workflowSettingsButton = useMemo(
+    () => (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+        aria-label={t("pages.editor.workflowSettings")}
+        title={t("pages.editor.workflowSettings")}
+        onClick={() => setWorkflowSettingsOpen(true)}
+      >
+        <Settings className="h-3.5 w-3.5" />
+      </Button>
+    ),
+    [t]
+  );
+
   usePageBreadcrumbs(
     [
-      { label: "Workflows", to: getOrgUrl("workflows") },
+      { label: t("pages.workflows.title"), to: getOrgUrl("workflows") },
       {
         label:
-          httpWorkflowMetadata?.name || workflowMetadata?.name || "Workflow",
+          httpWorkflowMetadata?.name ||
+          workflowMetadata?.name ||
+          t("pages.editor.defaultName"),
+        trailing: workflowSettingsButton,
       },
     ],
-    [httpWorkflowMetadata?.name, workflowMetadata?.name]
+    [
+      httpWorkflowMetadata?.name,
+      workflowMetadata?.name,
+      workflowSettingsButton,
+      getOrgUrl,
+      t,
+    ]
   );
 
   const handleWorkflowUpdate = useCallback(
@@ -144,7 +183,8 @@ export function EditorPage() {
       name: string,
       description?: string,
       trigger?: WorkflowTrigger,
-      runtime?: WorkflowRuntime
+      runtime?: WorkflowRuntime,
+      billingMode?: WorkflowBillingMode
     ) => {
       if (!id) return;
 
@@ -154,6 +194,7 @@ export function EditorPage() {
         description,
         trigger,
         runtime,
+        billingMode,
       });
     },
     [id, wsUpdateMetadata]
@@ -161,20 +202,24 @@ export function EditorPage() {
 
   useEffect(() => {
     if (workflowSavingError) {
-      toast.error(`Workflow saving error: ${workflowSavingError}`);
+      appToast.error("errors.workflowSaveFailed", {
+        message: workflowSavingError,
+      });
     }
-  }, [workflowSavingError]);
+  }, [workflowSavingError, appToast]);
 
   useEffect(() => {
     if (workflowConnectionError) {
-      toast.error(`Connection error: ${workflowConnectionError}`);
+      appToast.error("errors.connectionFailed", {
+        message: workflowConnectionError,
+      });
     }
-  }, [workflowConnectionError]);
+  }, [workflowConnectionError, appToast]);
 
   if (nodeTypesError) {
     return (
       <WorkflowError
-        message={nodeTypesError.message || "Failed to load node types."}
+        message={nodeTypesError.message || t("errors.nodeTypesLoadFailed")}
         onRetry={() => window.location.reload()}
       />
     );
@@ -187,8 +232,10 @@ export function EditorPage() {
           id: httpWorkflowMetadata.id,
           name: httpWorkflowMetadata.name,
           description: httpWorkflowMetadata.description,
+          schemeId: httpWorkflowMetadata.schemeId,
           trigger: httpWorkflowMetadata.trigger,
           runtime: httpWorkflowMetadata.runtime,
+          billingMode: httpWorkflowMetadata.billingMode ?? "platform",
         }
       : null);
 
@@ -203,7 +250,7 @@ export function EditorPage() {
   if (!effectiveWorkflowMetadata) {
     return (
       <WorkflowError
-        message={`Workflow with ID "${id}" not found, or could not be loaded.`}
+        message={t("errors.workflowNotFound", { id: id ?? "" })}
         onRetry={() => navigate(getOrgUrl("workflows"))}
       />
     );
@@ -211,11 +258,15 @@ export function EditorPage() {
 
   return (
     <ReactFlowProvider>
+      <WorkflowEditorSidebarEffect />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkflowBuilder
           workflowId={id || ""}
           workflowTrigger={effectiveWorkflowMetadata.trigger as WorkflowTrigger}
           workflowRuntime={effectiveWorkflowMetadata.runtime}
+          workflowBillingMode={
+            effectiveWorkflowMetadata.billingMode ?? "platform"
+          }
           initialNodes={initialNodesForUI}
           initialEdges={initialEdgesForUI}
           nodeTypes={nodeTypes || []}
@@ -232,8 +283,11 @@ export function EditorPage() {
           isEnabled={isEnabled}
           isTogglingEnabled={isTogglingEnabled}
           onToggleEnabled={handleToggleEnabled}
+          workflowSettingsOpen={workflowSettingsOpen}
+          onWorkflowSettingsOpenChange={setWorkflowSettingsOpen}
         />
       </div>
     </ReactFlowProvider>
   );
 }
+

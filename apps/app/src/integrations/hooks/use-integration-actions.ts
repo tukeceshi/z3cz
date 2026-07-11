@@ -9,6 +9,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { getApiBaseUrl } from "@/config/api";
 import { makeOrgRequest } from "@/services/utils";
 
@@ -43,6 +44,7 @@ interface IntegrationActionsResult {
  */
 export function useIntegrationActions(): IntegrationActionsResult {
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const { mutate } = useIntegrations();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -50,19 +52,19 @@ export function useIntegrationActions(): IntegrationActionsResult {
     (provider: IntegrationProvider) => {
       const providerConfig = getProvider(provider);
       if (!providerConfig?.oauthEndpoint) {
-        toast.error("OAuth not supported for this provider");
+        toast.error(t("pages.integrations.oauthNotSupported"));
         return;
       }
 
       if (!organization?.id) {
-        toast.error("No organization selected");
+        toast.error(t("pages.integrations.noOrganization"));
         return;
       }
 
       const apiBaseUrl = getApiBaseUrl();
       window.location.href = `${apiBaseUrl}${providerConfig.oauthEndpoint}?organizationId=${organization.id}`;
     },
-    [organization?.id]
+    [organization?.id, t]
   );
 
   const createManual = useCallback(
@@ -93,17 +95,17 @@ export function useIntegrationActions(): IntegrationActionsResult {
           }
         );
 
-        toast.success("Integration created successfully");
+        toast.success(t("pages.integrations.createSuccess"));
         await mutate();
       } catch (error) {
-        toast.error("Failed to create integration. Please try again.");
+        toast.error(t("pages.integrations.createFailed"));
         console.error("Create Integration Error:", error);
         throw error;
       } finally {
         setIsProcessing(false);
       }
     },
-    [organization?.id, mutate]
+    [organization?.id, mutate, t]
   );
 
   const deleteIntegration = useCallback(
@@ -121,17 +123,17 @@ export function useIntegrationActions(): IntegrationActionsResult {
           }
         );
 
-        toast.success("Integration deleted successfully");
+        toast.success(t("pages.integrations.deleteSuccess"));
         await mutate();
       } catch (error) {
-        toast.error("Failed to delete integration. Please try again.");
+        toast.error(t("pages.integrations.deleteFailed"));
         console.error("Delete Integration Error:", error);
         throw error;
       } finally {
         setIsProcessing(false);
       }
     },
-    [organization?.id, mutate]
+    [organization?.id, mutate, t]
   );
 
   const updateIntegration = useCallback(
@@ -159,17 +161,17 @@ export function useIntegrationActions(): IntegrationActionsResult {
           }
         );
 
-        toast.success("Integration updated successfully");
+        toast.success(t("pages.integrations.updateSuccess"));
         await mutate();
       } catch (error) {
-        toast.error("Failed to update integration. Please try again.");
+        toast.error(t("pages.integrations.updateFailed"));
         console.error("Update Integration Error:", error);
         throw error;
       } finally {
         setIsProcessing(false);
       }
     },
-    [organization?.id, mutate]
+    [organization?.id, mutate, t]
   );
 
   return {

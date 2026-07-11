@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import { ResourceFeatureBanner } from "@/components/resource-feature-banner";
 import {
   IntegrationDialog,
   IntegrationList,
@@ -25,6 +27,7 @@ import {
 } from "@/integrations";
 
 export function IntegrationsPage() {
+  const { t } = useTranslation();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { integrations, error, isLoading, mutate } = useIntegrations();
   const { isProcessing, deleteIntegration } = useIntegrationActions();
@@ -36,8 +39,8 @@ export function IntegrationsPage() {
   );
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Integrations" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.integrations") }]);
+  }, [setBreadcrumbs, t]);
 
   useOAuthCallback({
     onSuccess: () => mutate(),
@@ -66,22 +69,25 @@ export function IntegrationsPage() {
   };
 
   if (isLoading && !integrations) {
-    return <InsetLoading title="Integrations" />;
+    return <InsetLoading title={t("pages.integrations.title")} />;
   }
 
   if (error) {
-    return <InsetError title="Integrations" errorMessage={error.message} />;
+    return (
+      <InsetError title={t("pages.integrations.title")} errorMessage={error.message} />
+    );
   }
 
   return (
-    <InsetLayout title="Integrations">
+    <InsetLayout title={t("pages.integrations.title")}>
+      <ResourceFeatureBanner />
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Connect third-party services to use in your workflows.
+          {t("pages.integrations.description")}
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add Integration
+          {t("pages.integrations.addButton")}
         </Button>
       </div>
 
@@ -101,22 +107,23 @@ export function IntegrationsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect Integration?</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.integrations.disconnectTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove this integration from your organization.
-              Workflows using this integration may fail until you reconnect.
+              {t("pages.integrations.disconnectDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleDeleteCancel}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Disconnecting..." : "Disconnect"}
+              {isProcessing
+                ? t("pages.integrations.disconnecting")
+                : t("pages.integrations.disconnect")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

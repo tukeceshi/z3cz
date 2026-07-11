@@ -13,11 +13,37 @@ const TEST_COMPUTE_CREDITS = 10000;
 export const createInstanceId = (testName: string): string =>
   `test-${testName}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
+interface TestWorkflowInput {
+  id: string;
+  name: string;
+  trigger?: string;
+  nodes: readonly unknown[];
+  edges: readonly unknown[];
+  schemeId?: string;
+  description?: string;
+  runtime?: Workflow["runtime"];
+  billingMode?: Workflow["billingMode"];
+}
+
 /**
  * Helper to create runtime params for test workflows
  */
-export const createParams = (workflow: Workflow): RuntimeParams => ({
-  workflow,
+export const createParams = (workflow: TestWorkflowInput): RuntimeParams => ({
+  workflow: {
+    schemeId: "omnipotent",
+    trigger: (workflow.trigger ?? "manual") as Workflow["trigger"],
+    nodes: workflow.nodes as Workflow["nodes"],
+    edges: workflow.edges as Workflow["edges"],
+    id: workflow.id,
+    name: workflow.name,
+    ...(workflow.description !== undefined
+      ? { description: workflow.description }
+      : {}),
+    ...(workflow.runtime !== undefined ? { runtime: workflow.runtime } : {}),
+    ...(workflow.billingMode !== undefined
+      ? { billingMode: workflow.billingMode }
+      : {}),
+  },
   userId: "test-user",
   organizationId: "test-org",
   computeCredits: TEST_COMPUTE_CREDITS,
@@ -33,6 +59,6 @@ interface TestableRuntime {
 
 /**
  * Runtime factory type for creating test runtime instances.
- * Zero-argument factory — the caller binds env before passing to specs.
+ * Zero-argument factory ??the caller binds env before passing to specs.
  */
 export type RuntimeFactory = () => TestableRuntime;

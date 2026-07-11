@@ -2,6 +2,7 @@ import CheckIcon from "lucide-react/icons/check";
 import CopyIcon from "lucide-react/icons/copy";
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 interface CopyButtonProps {
@@ -13,11 +14,13 @@ interface CopyButtonProps {
 
 export function CopyButton({
   value,
-  label = "Copy value",
+  label,
   className = "",
   disabled = false,
 }: CopyButtonProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const ariaLabel = label ?? t("workflow.fields.copyValue");
 
   const handleCopy = async () => {
     try {
@@ -38,7 +41,7 @@ export function CopyButton({
           "opacity-50 cursor-not-allowed hover:text-neutral-400 dark:hover:text-neutral-400",
         className
       )}
-      aria-label={label}
+      aria-label={ariaLabel}
       type="button"
       disabled={disabled}
     >

@@ -4,13 +4,13 @@ import Clock from "lucide-react/icons/clock";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
 import X from "lucide-react/icons/x";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
+import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
+import type { TranslateFn } from "@/i18n";
 import {
   createInvitation,
   deleteInvitation,
@@ -64,10 +66,16 @@ const getRoleBadgeVariant = (role: string) => {
   }
 };
 
-const invitationColumns: ColumnDef<Invitation>[] = [
+const getRoleLabel = (role: string, t: TranslateFn) => {
+  if (role === "owner") return t("pages.members.roles.owner");
+  if (role === "admin") return t("pages.members.roles.admin");
+  return t("pages.members.roles.member");
+};
+
+const createInvitationColumns = (t: TranslateFn): ColumnDef<Invitation>[] => [
   {
     accessorKey: "email",
-    header: "Email",
+    header: t("pages.members.email"),
     cell: ({ row }) => {
       return (
         <div className="flex items-center space-x-3">
@@ -85,19 +93,19 @@ const invitationColumns: ColumnDef<Invitation>[] = [
   },
   {
     accessorKey: "role",
-    header: "Role",
+    header: t("pages.members.role"),
     cell: ({ row }) => {
       const role = row.getValue("role") as string;
       return (
         <Badge variant={getRoleBadgeVariant(role)}>
-          {role.charAt(0).toUpperCase() + role.slice(1)}
+          {getRoleLabel(role, t)}
         </Badge>
       );
     },
   },
   {
     accessorKey: "expiresAt",
-    header: "Expires",
+    header: t("pages.members.expires"),
     cell: ({ row }) => {
       const date = new Date(row.getValue("expiresAt"));
       const now = new Date();
@@ -111,7 +119,7 @@ const invitationColumns: ColumnDef<Invitation>[] = [
   },
   {
     accessorKey: "inviter",
-    header: "Invited By",
+    header: t("pages.members.invitedBy"),
     cell: ({ row }) => {
       const inviter = row.original.inviter;
       return (
@@ -150,7 +158,7 @@ const invitationColumns: ColumnDef<Invitation>[] = [
                 })
               )
             }
-            title="Cancel invitation"
+            title={t("pages.members.cancelInvitation")}
           >
             <X className="h-4 w-4 text-muted-foreground hover:text-red-500" />
           </Button>
@@ -160,7 +168,9 @@ const invitationColumns: ColumnDef<Invitation>[] = [
   },
 ];
 
-const columns: ColumnDef<{
+const createMemberColumns = (
+  t: TranslateFn
+): ColumnDef<{
   userId: string;
   organizationId: string;
   role: "member" | "admin" | "owner";
@@ -172,10 +182,10 @@ const columns: ColumnDef<{
     email?: string;
     avatarUrl?: string;
   };
-}>[] = [
+}>[] => [
   {
     accessorKey: "user",
-    header: "Member",
+    header: t("pages.members.member"),
     cell: ({ row }) => {
       const user = row.getValue("user") as {
         id: string;
@@ -207,19 +217,19 @@ const columns: ColumnDef<{
   },
   {
     accessorKey: "role",
-    header: "Role",
+    header: t("pages.members.role"),
     cell: ({ row }) => {
       const role = row.getValue("role") as string;
       return (
         <Badge variant={getRoleBadgeVariant(role)}>
-          {role.charAt(0).toUpperCase() + role.slice(1)}
+          {getRoleLabel(role, t)}
         </Badge>
       );
     },
   },
   {
     accessorKey: "createdAt",
-    header: "Joined",
+    header: t("pages.members.joined"),
     cell: ({ row }) => {
       const date = row.getValue("createdAt") as Date;
       return <div>{formatDate(date)}</div>;
@@ -231,7 +241,6 @@ const columns: ColumnDef<{
       const membership = row.original;
       const isOwner = membership.role === "owner";
 
-      // Don't show dropdown for owners since they have no available actions
       if (isOwner) {
         return <div></div>;
       }
@@ -242,7 +251,7 @@ const columns: ColumnDef<{
             <DropdownMenuTrigger asChild>
               <Button aria-haspopup="true" size="icon" variant="ghost">
                 <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Toggle menu</span>
+                <span className="sr-only">{t("common.openMenu")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -260,7 +269,7 @@ const columns: ColumnDef<{
                   )
                 }
               >
-                Change Role
+                {t("pages.members.changeRole")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -277,7 +286,7 @@ const columns: ColumnDef<{
                 }
                 className="text-red-600 focus:text-red-600"
               >
-                Remove Member
+                {t("pages.members.removeMember")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -288,6 +297,8 @@ const columns: ColumnDef<{
 ];
 
 export function MembersPage() {
+  const { t } = useTranslation();
+  const appToast = useAppToast();
   const { organizationId } = useParams<{ organizationId: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
 
@@ -311,13 +322,11 @@ export function MembersPage() {
     useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Invite member state
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<"member" | "admin">(
     "member"
   );
 
-  // Update role state
   const [memberToUpdate, setMemberToUpdate] = useState<{
     userId: string;
     userName: string;
@@ -326,22 +335,23 @@ export function MembersPage() {
   } | null>(null);
   const [newRole, setNewRole] = useState<"member" | "admin">("member");
 
-  // Remove member state
   const [memberToRemove, setMemberToRemove] = useState<{
     userId: string;
     userName: string;
     userEmail: string;
   } | null>(null);
 
-  // Cancel invitation state
   const [invitationToCancel, setInvitationToCancel] = useState<{
     invitationId: string;
     email: string;
   } | null>(null);
 
+  const memberColumns = useMemo(() => createMemberColumns(t), [t]);
+  const invitationColumns = useMemo(() => createInvitationColumns(t), [t]);
+
   const handleInviteMember = useCallback(async (): Promise<void> => {
     if (!newMemberEmail.trim()) {
-      toast.error("Email address is required");
+      appToast.error("pages.members.emailRequired");
       return;
     }
 
@@ -352,18 +362,24 @@ export function MembersPage() {
         role: newMemberRole,
       });
 
-      toast.success("Invitation sent successfully");
+      appToast.success("pages.members.inviteSent");
       setIsInviteMemberDialogOpen(false);
       setNewMemberEmail("");
       setNewMemberRole("member");
       await mutateInvitations();
     } catch (error) {
-      toast.error("Failed to send invitation. Please try again.");
+      appToast.error("pages.members.inviteFailed");
       console.error("Send Invitation Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [newMemberEmail, newMemberRole, organizationId, mutateInvitations]);
+  }, [
+    newMemberEmail,
+    newMemberRole,
+    organizationId,
+    mutateInvitations,
+    appToast,
+  ]);
 
   const handleUpdateRole = useCallback(async (): Promise<void> => {
     if (!memberToUpdate) return;
@@ -375,18 +391,18 @@ export function MembersPage() {
         role: newRole,
       });
 
-      toast.success("Member role updated successfully");
+      appToast.success("pages.members.roleUpdated");
       setIsUpdateRoleDialogOpen(false);
       setMemberToUpdate(null);
       setNewRole("member");
       await mutateMemberships();
     } catch (error) {
-      toast.error("Failed to update member role. Please try again.");
+      appToast.error("pages.members.roleUpdateFailed");
       console.error("Update Role Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [memberToUpdate, newRole, organizationId, mutateMemberships]);
+  }, [memberToUpdate, newRole, organizationId, mutateMemberships, appToast]);
 
   const handleRemoveMember = useCallback(async (): Promise<void> => {
     if (!memberToRemove) return;
@@ -397,17 +413,17 @@ export function MembersPage() {
         email: memberToRemove.userEmail,
       });
 
-      toast.success("Member removed successfully");
+      appToast.success("pages.members.memberRemoved");
       setIsRemoveMemberDialogOpen(false);
       setMemberToRemove(null);
       await mutateMemberships();
     } catch (error) {
-      toast.error("Failed to remove member. Please try again.");
+      appToast.error("pages.members.memberRemoveFailed");
       console.error("Remove Member Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [memberToRemove, organizationId, mutateMemberships]);
+  }, [memberToRemove, organizationId, mutateMemberships, appToast]);
 
   const handleCancelInvitation = useCallback(async (): Promise<void> => {
     if (!invitationToCancel) return;
@@ -419,19 +435,18 @@ export function MembersPage() {
         invitationToCancel.invitationId
       );
 
-      toast.success("Invitation cancelled");
+      appToast.success("pages.members.inviteCancelled");
       setIsCancelInvitationDialogOpen(false);
       setInvitationToCancel(null);
       await mutateInvitations();
     } catch (error) {
-      toast.error("Failed to cancel invitation. Please try again.");
+      appToast.error("pages.members.inviteCancelFailed");
       console.error("Cancel Invitation Error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [invitationToCancel, organizationId, mutateInvitations]);
+  }, [invitationToCancel, organizationId, mutateInvitations, appToast]);
 
-  // Handle events from the table
   const handleUpdateRoleEvent = useCallback((e: Event) => {
     const custom = e as CustomEvent<{
       userId: string;
@@ -469,7 +484,6 @@ export function MembersPage() {
     }
   }, []);
 
-  // Add event listeners
   useEffect(() => {
     document.addEventListener("updateMemberRoleTrigger", handleUpdateRoleEvent);
     document.addEventListener("removeMemberTrigger", handleRemoveMemberEvent);
@@ -499,50 +513,53 @@ export function MembersPage() {
   ]);
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Members" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("sidebar.members") }]);
+  }, [setBreadcrumbs, t]);
 
   if (isMembershipsLoading && !memberships) {
-    return <InsetLoading title="Organization Members" />;
+    return <InsetLoading title={t("pages.members.loadingTitle")} />;
   } else if (membershipsError) {
     return (
       <InsetError
-        title="Organization Members"
+        title={t("pages.members.loadingTitle")}
         errorMessage={membershipsError.message}
       />
     );
   }
 
   return (
-    <InsetLayout title="Members">
+    <InsetLayout title={t("pages.members.title")}>
       <div className="flex items-center justify-between mb-6 min-h-10">
         <div className="text-sm text-muted-foreground max-w-2xl">
-          Manage organization members and invitations.
+          {t("pages.members.description")}
         </div>
         <Button onClick={() => setIsInviteMemberDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Invite Member
+          {t("pages.members.inviteButton")}
         </Button>
       </div>
 
       <Tabs defaultValue="members" className="w-full">
         <TabsList>
           <TabsTrigger value="members">
-            Members ({memberships?.length || 0})
+            {t("pages.members.tabs.members", {
+              count: memberships?.length || 0,
+            })}
           </TabsTrigger>
           <TabsTrigger value="invitations">
             <Clock className="mr-2 h-4 w-4" />
-            Invitations ({invitations?.length || 0})
+            {t("pages.members.tabs.invitations", {
+              count: invitations?.length || 0,
+            })}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="mt-4">
           <DataTable
-            columns={columns}
+            columns={memberColumns}
             data={memberships || []}
             emptyState={{
-              title: "No members found",
-              description:
-                "Invite members to your organization to get started.",
+              title: t("pages.members.emptyMembersTitle"),
+              description: t("pages.members.emptyMembersDescription"),
             }}
           />
         </TabsContent>
@@ -551,41 +568,38 @@ export function MembersPage() {
             columns={invitationColumns}
             data={invitations || []}
             emptyState={{
-              title: "No pending invitations",
-              description:
-                "Invitations you send will appear here until they are accepted or expire.",
+              title: t("pages.members.emptyInvitationsTitle"),
+              description: t("pages.members.emptyInvitationsDescription"),
             }}
           />
         </TabsContent>
       </Tabs>
 
-      {/* Invite Member Dialog */}
       <AlertDialog
         open={isInviteMemberDialogOpen}
         onOpenChange={setIsInviteMemberDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Invite New Member</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.members.inviteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Send an invitation to join your organization. The recipient will
-              need to accept the invitation to become a member.
+              {t("pages.members.inviteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="user-email">Email Address</Label>
+              <Label htmlFor="user-email">{t("pages.members.emailAddress")}</Label>
               <Input
                 id="user-email"
                 type="email"
-                placeholder="Enter email address"
+                placeholder={t("pages.members.emailPlaceholder")}
                 value={newMemberEmail}
                 onChange={(e) => setNewMemberEmail(e.target.value)}
                 disabled={isProcessing}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role">{t("pages.members.role")}</Label>
               <Select
                 value={newMemberRole}
                 onValueChange={(value: "member" | "admin") =>
@@ -597,8 +611,12 @@ export function MembersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="member">
+                    {t("pages.members.roles.member")}
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    {t("pages.members.roles.admin")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -610,33 +628,36 @@ export function MembersPage() {
                 setNewMemberRole("member");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleInviteMember}
               disabled={isProcessing || !newMemberEmail.trim()}
             >
-              {isProcessing ? "Sending..." : "Send Invitation"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.members.sendInvitation")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Update Role Dialog */}
       <AlertDialog
         open={isUpdateRoleDialogOpen}
         onOpenChange={setIsUpdateRoleDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Update Member Role</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.members.updateRoleTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Change the role for <strong>{memberToUpdate?.userName}</strong>.
+              {t("pages.members.updateRoleDescription", {
+                name: memberToUpdate?.userName ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="new-role">New Role</Label>
+              <Label htmlFor="new-role">{t("pages.members.newRole")}</Label>
               <Select
                 value={newRole}
                 onValueChange={(value: "member" | "admin") => setNewRole(value)}
@@ -646,85 +667,90 @@ export function MembersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="member">
+                    {t("pages.members.roles.member")}
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    {t("pages.members.roles.admin")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToUpdate(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleUpdateRole}
               disabled={isProcessing}
             >
-              {isProcessing ? "Updating..." : "Update Role"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.members.updateRole")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Remove Member Dialog */}
       <AlertDialog
         open={isRemoveMemberDialogOpen}
         onOpenChange={setIsRemoveMemberDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.members.removeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove{" "}
-              <strong>{memberToRemove?.userName}</strong> from this
-              organization? They will lose access to all organization resources.
+              {t("pages.members.removeDescription", {
+                name: memberToRemove?.userName ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Warning</AlertTitle>
-            <AlertDescription>
-              This action will immediately revoke the member's access to the
-              organization.
-            </AlertDescription>
+            <AlertDescription>{t("pages.members.removeWarning")}</AlertDescription>
           </Alert>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToRemove(null)}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveMember}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Removing..." : "Remove Member"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.members.removeMember")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Cancel Invitation Dialog */}
       <AlertDialog
         open={isCancelInvitationDialogOpen}
         onOpenChange={setIsCancelInvitationDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.members.cancelInviteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel the invitation to{" "}
-              <strong>{invitationToCancel?.email}</strong>?
+              {t("pages.members.cancelInviteDescription", {
+                email: invitationToCancel?.email ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setInvitationToCancel(null)}>
-              Keep Invitation
+              {t("pages.members.keepInvitation")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelInvitation}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "Cancelling..." : "Cancel Invitation"}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.members.cancelInvitationAction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

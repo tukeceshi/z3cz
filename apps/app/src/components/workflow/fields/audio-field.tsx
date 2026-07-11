@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
@@ -7,13 +8,8 @@ import {
   getObjectUrl,
   useFileUpload,
 } from "./file-field-primitives";
-import { fileValidators } from "./file-upload-handler";
+import { createFileValidators } from "./file-upload-handler";
 import type { FieldProps, ObjectReference } from "./types";
-
-const UPLOAD_CONFIG = {
-  validateFile: fileValidators.audio,
-  errorMessage: "Failed to upload audio",
-} as const;
 
 export interface AudioFieldProps extends FieldProps {
   createObjectUrl?: (objectReference: ObjectReference) => string;
@@ -28,8 +24,13 @@ export function AudioField({
   parameter,
   value,
 }: AudioFieldProps) {
+  const { t } = useTranslation();
+  const fileValidators = createFileValidators(t);
   const { isUploading, uploadError, handleUpload } = useFileUpload(
-    UPLOAD_CONFIG,
+    {
+      validateFile: fileValidators.audio,
+      errorMessage: t("workflow.fields.uploadFailedAudio"),
+    },
     onChange
   );
   const objectUrl = getObjectUrl(value, createObjectUrl);
@@ -44,7 +45,7 @@ export function AudioField({
       <FieldPlaceholder
         className={className}
         connected={connected}
-        label="No audio"
+        label={t("workflow.fields.noAudio")}
       />
     );
   }

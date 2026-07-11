@@ -7,6 +7,7 @@ import { createOrgScopedColumns } from "@/components/admin/org-scoped-columns";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -20,11 +21,12 @@ export function AdminEmailsPage() {
   const limit = 20;
   const setBreadcrumbs = useBreadcrumbsSetter();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Emails" }]);
+    setBreadcrumbs([{ label: t("sidebar.emails") }]);
     return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const organizationId = searchParams.get("organizationId") || undefined;
 
@@ -36,24 +38,26 @@ export function AdminEmailsPage() {
   );
 
   const columns = useMemo(
-    () => createOrgScopedColumns<AdminEmail>(navigate),
-    [navigate]
+    () => createOrgScopedColumns<AdminEmail>(navigate, t),
+    [navigate, t]
   );
 
   if (isEmailsLoading) {
-    return <InsetLoading title="Emails" />;
+    return <InsetLoading title={t("admin.emails.title")} />;
   }
 
   if (emailsError) {
-    return <InsetError title="Emails" errorMessage={emailsError.message} />;
+    return (
+      <InsetError
+        title={t("admin.emails.title")}
+        errorMessage={emailsError.message}
+      />
+    );
   }
 
   return (
-    <InsetLayout title="Emails">
-      <AdminTableToolbar
-        searchPlaceholder="Search by name..."
-        search={formProps}
-      >
+    <InsetLayout title={t("admin.emails.title")}>
+      <AdminTableToolbar search={formProps}>
         {organizationId && (
           <Button
             type="button"
@@ -63,7 +67,7 @@ export function AdminEmailsPage() {
               setPage(1);
             }}
           >
-            Clear organization filter
+            {t("admin.common.clearOrgFilter")}
           </Button>
         )}
       </AdminTableToolbar>
@@ -72,10 +76,10 @@ export function AdminEmailsPage() {
         columns={columns}
         data={emails}
         emptyState={{
-          title: "No emails found",
+          title: t("admin.emails.emptyTitle"),
           description: search
-            ? "No emails match your search."
-            : "No emails have been created yet.",
+            ? t("admin.emails.emptySearch")
+            : t("admin.emails.emptyDefault"),
         }}
       />
 
@@ -85,7 +89,7 @@ export function AdminEmailsPage() {
         itemCount={emails.length}
         total={pagination?.total}
         totalPages={pagination?.totalPages}
-        itemLabel="emails"
+        itemLabel={t("admin.pagination.emails")}
         onPageChange={setPage}
       />
     </InsetLayout>

@@ -5,11 +5,13 @@ import { useNavigate, useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useTemplate } from "@/services/template-service";
 import { createWorkflow } from "@/services/workflow-service";
 
 export function TemplateTryPage() {
+  const { t } = useTranslation();
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { getOrgUrl } = useOrgUrl();
@@ -45,8 +47,13 @@ export function TemplateTryPage() {
   }, [template, orgId, navigate, getOrgUrl]);
 
   if (templateError) {
-    return <InsetError title="Template" errorMessage={templateError.message} />;
+    return (
+      <InsetError
+        title={t("pages.templateTry.title")}
+        errorMessage={templateError.message}
+      />
+    );
   }
 
-  return <InsetLoading title="Creating workflow..." />;
+  return <InsetLoading title={t("pages.templateTry.creating")} />;
 }

@@ -4,6 +4,7 @@ import MessageCircle from "lucide-react/icons/message-circle";
 import Send from "lucide-react/icons/send";
 import { useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ export function BotsCreateDialog({
   onOpenChange,
   onCreated,
 }: BotsCreateDialogProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("choose-type");
 
   const handleOpenChange = (value: boolean) => {
@@ -86,9 +88,9 @@ export function BotsCreateDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Bot</DialogTitle>
+          <DialogTitle>{t("pages.bots.createTitle")}</DialogTitle>
           <DialogDescription>
-            Choose the platform for your bot.
+            {t("pages.bots.createDescription")}
           </DialogDescription>
         </DialogHeader>
 

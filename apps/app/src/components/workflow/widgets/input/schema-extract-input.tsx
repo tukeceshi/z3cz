@@ -4,6 +4,7 @@ import RotateCw from "lucide-react/icons/rotate-cw";
 import { useCallback, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { SchemaDialog } from "@/components/schema-dialog";
 import {
   AlertDialog,
@@ -72,6 +73,7 @@ function SchemaExtractInputWidget({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { schemas, isSchemasLoading, mutateSchemas } = useSchemas();
   const { organization } = useAuth();
+  const { t } = useTranslation();
   const { updateNodeData, edges, deleteEdge } = useWorkflow();
 
   const applySchema = useCallback(
@@ -202,10 +204,10 @@ function SchemaExtractInputWidget({
             <SelectValue
               placeholder={
                 isLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : schemas?.length === 0
-                    ? "No schemas"
-                    : "Select schema"
+                    ? t("workflow.widgets.schema.noSchemas")
+                    : t("workflow.widgets.schema.selectSchema")
               }
             >
               {selectedName}
@@ -219,7 +221,7 @@ function SchemaExtractInputWidget({
             ))}
             <SelectSeparator />
             <SelectItem value={CREATE_NEW} className="text-xs">
-              + New Schema
+              {t("workflow.widgets.schema.newSchema")}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -229,8 +231,8 @@ function SchemaExtractInputWidget({
           disabled={disabled || isLoading || !schemaId}
           title={
             isStale
-              ? "Schema changed — reload to sync outputs"
-              : "Reload schema"
+              ? t("workflow.widgets.schema.reloadStaleOutputs")
+              : t("workflow.widgets.schema.reload")
           }
           className={cn("h-auto px-2 shrink-0", isStale && "border-amber-500")}
         >
@@ -246,23 +248,24 @@ function SchemaExtractInputWidget({
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onSubmit={handleCreate}
-        title="Create New Schema"
-        submitLabel="Create Schema"
+        title={t("pages.schemas.createDialogTitle")}
+        submitLabel={t("pages.schemas.createSchema")}
       />
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reload schema?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("workflow.widgets.schema.reloadTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will rebuild the outputs from the schema and remove all
-              connected edges. This action cannot be undone.
+              {t("workflow.widgets.schema.reloadOutputsDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Continue
+              {t("common.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

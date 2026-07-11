@@ -28,11 +28,10 @@ import { useParams } from "react-router";
 
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
+import { useTranslation } from "@/components/locale-provider";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useDatabase, useDatabaseSchema } from "@/services/database-service";
 import { cn } from "@/utils/utils";
-
-// --- Schema Table Node ---
 
 interface SchemaTableNodeData extends Record<string, unknown> {
   tableName: string;
@@ -105,8 +104,6 @@ function SchemaTableNode({ data }: NodeProps<Node<SchemaTableNodeData>>) {
 
 const nodeTypes = { schemaTable: SchemaTableNode };
 
-// --- Layout ---
-
 function applyDagreLayout(
   nodes: Node<SchemaTableNodeData>[],
   edges: Edge[]
@@ -139,13 +136,12 @@ function applyDagreLayout(
   });
 }
 
-// --- Flow Canvas ---
-
 interface SchemaFlowCanvasProps {
   tables: DatabaseSchemaTable[];
 }
 
 function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
+  const { t } = useTranslation();
   const { fitView } = useReactFlow();
   const layoutApplied = useRef(false);
   const nodesInitialized = useNodesInitialized();
@@ -161,8 +157,6 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
     const edgeList: Edge[] = tables.flatMap((table) =>
       table.foreignKeys
         .map((fk) => {
-          // When REFERENCES omits the column, Postgres may return null;
-          // fall back to the primary key column of the referenced table.
           let targetCol = fk.referencedColumn;
           if (!targetCol) {
             const refTable = tables.find((t) => t.name === fk.referencedTable);
@@ -192,7 +186,6 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 
-  // Apply layout once after nodes are measured
   const applyLayout = useCallback(() => {
     if (layoutApplied.current) return;
     layoutApplied.current = true;
@@ -209,7 +202,7 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
   if (tables.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        This database has no tables yet.
+        {t("pages.databaseExplorer.noTables")}
       </div>
     );
   }
@@ -233,9 +226,8 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
   );
 }
 
-// --- Page ---
-
 export function DatabaseExplorerPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
 
@@ -249,22 +241,24 @@ export function DatabaseExplorerPage() {
   useEffect(() => {
     if (database) {
       setBreadcrumbs([
-        { label: "Databases", to: "/databases" },
+        { label: t("sidebar.databases"), to: "/databases" },
         { label: database.name, to: `/databases/${id}` },
-        { label: "Explorer" },
+        { label: t("pages.databaseExplorer.explorer") },
       ]);
     }
-  }, [setBreadcrumbs, database, id]);
+  }, [setBreadcrumbs, database, id, t]);
 
   if (isDatabaseLoading || isSchemaLoading) {
-    return <InsetLoading title="Database Explorer" />;
+    return <InsetLoading title={t("pages.databaseExplorer.title")} />;
   }
 
   if (databaseError || !database) {
     return (
       <InsetError
-        title="Database Explorer"
-        errorMessage={databaseError?.message || "Database not found"}
+        title={t("pages.databaseExplorer.title")}
+        errorMessage={
+          databaseError?.message || t("pages.databaseExplorer.notFound")
+        }
       />
     );
   }
@@ -272,7 +266,7 @@ export function DatabaseExplorerPage() {
   if (schemaError) {
     return (
       <InsetError
-        title="Database Explorer"
+        title={t("pages.databaseExplorer.title")}
         errorMessage={schemaError.message}
       />
     );
@@ -281,7 +275,9 @@ export function DatabaseExplorerPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b bg-neutral-50 dark:bg-neutral-800 px-6 py-4 flex items-center">
-        <h1 className="text-xl font-semibold">{database.name} - Explorer</h1>
+        <h1 className="text-xl font-semibold">
+          {t("pages.databaseExplorer.titleWithName", { name: database.name })}
+        </h1>
       </div>
       <div className="flex-1 min-h-0">
         <ReactFlowProvider>

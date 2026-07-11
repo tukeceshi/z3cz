@@ -27,6 +27,8 @@ export interface SaveWorkflowRecord {
   id: string;
   name: string;
   description?: string;
+  schemeId: string;
+  billingMode?: string;
   trigger: string;
   runtime?: string;
   organizationId: string;
@@ -626,6 +628,8 @@ export class WorkflowStore {
       id: record.id,
       name: record.name,
       description: record.description,
+      schemeId: record.schemeId,
+      billingMode: (record.billingMode as WorkflowType["billingMode"]) ?? "platform",
       trigger: record.trigger as any,
       runtime: (record.runtime as any) || "workflow",
       nodes,
@@ -689,6 +693,8 @@ export class WorkflowStore {
           id: workflow.id,
           name: workflow.name,
           description: workflow.description ?? undefined,
+          schemeId: workflow.schemeId,
+          billingMode: workflow.billingMode,
           trigger: workflow.trigger,
           runtime: workflow.runtime,
           nodes: [],
@@ -920,6 +926,8 @@ export class WorkflowStore {
           id: workflows.id,
           name: workflows.name,
           description: workflows.description,
+          schemeId: workflows.schemeId,
+          billingMode: workflows.billingMode,
           trigger: workflows.trigger,
           runtime: workflows.runtime,
           enabled: workflows.enabled,

@@ -13,7 +13,7 @@ export function testWorkflowValidation(
 ) {
   describe(`${runtimeName}: workflow validation`, () => {
     it("should handle empty workflow (no nodes)", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-empty",
         name: "Empty Workflow",
         trigger: "manual",
@@ -30,7 +30,7 @@ export function testWorkflowValidation(
     });
 
     it("should handle workflow with single isolated node", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-single",
         name: "Single Node Workflow",
         trigger: "manual",
@@ -62,7 +62,7 @@ export function testWorkflowValidation(
     });
 
     it("should handle workflow with multiple isolated nodes", async () => {
-      const workflow: Workflow = {
+      const workflow = {
         id: "test-workflow-isolated",
         name: "Isolated Nodes Workflow",
         trigger: "manual",

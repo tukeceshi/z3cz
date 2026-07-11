@@ -41,6 +41,7 @@ import {
 } from "../db";
 import { PostgresDatabaseService } from "../runtime/postgres-database-service";
 import { getAuthContext } from "../utils/auth-context";
+import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 
 type ExtendedApiContext = ApiContext & {
   Variables: {
@@ -51,6 +52,7 @@ type ExtendedApiContext = ApiContext & {
 const databaseRoutes = new Hono<ExtendedApiContext>();
 
 databaseRoutes.use("*", jwtMiddleware);
+databaseRoutes.use("*", createRequireFeatureMiddleware("databases"));
 
 databaseRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);

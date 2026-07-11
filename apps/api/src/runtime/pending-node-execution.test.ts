@@ -20,9 +20,8 @@
  *     in any order — a deeper one opens as soon as its own upstream settles,
  *     never gated by an unrelated branch. (The runtime uses dependency-driven
  *     scheduling, not topological-level barriers.)
- *  3. The runtime↔event channel does not buffer: an event is delivered only to
- *     an already-parked node. With dataflow scheduling a node parks as soon as
- *     its own upstreams settle, so that window is small and branch-local.
+ *  3. Early events are buffered in the inbox and applied once the node registers
+ *     its continuation on the same heartbeat tick.
  */
 import { env } from "cloudflare:test";
 import {
@@ -31,10 +30,14 @@ import {
   type RuntimeDependencies,
   type RuntimeParams,
 } from "@dafthunk/runtime";
+import {
+  buildExecutionEventEnvelope,
+  type ExecutionEventInbox,
+} from "@dafthunk/runtime/heartbeat/execution-event-protocol";
 import { TextInputNode } from "@dafthunk/runtime/nodes/input/text-input-node";
 import { WaitForFormNode } from "@dafthunk/runtime/nodes/logic/wait-for-form-node";
 import { StringToUpperCaseNode } from "@dafthunk/runtime/nodes/text/string-to-upper-case-node";
-import type { Workflow, WorkflowExecution } from "@dafthunk/types";
+import type { ExecutionEventEnvelope, Workflow, WorkflowExecution } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import type { Bindings } from "../context";
@@ -62,28 +65,35 @@ class HitlNodeRegistry extends BaseNodeRegistry<Bindings> {
   }
 }
 
-interface FormEventPayload {
-  outputs: Record<string, unknown>;
-  usage: number;
-  error?: string;
-}
-
 /**
- * Runtime that supports async nodes but resolves `waitForEvent` through a
- * test-controlled bus instead of Cloudflare Workflows. Durable steps are
- * pass-through — durability is irrelevant to the level/barrier logic here.
+ * Runtime that supports async nodes via the workflow heartbeat loop.
+ * Multiplex event waits and an inbox simulate production event delivery.
  */
 class ControllableHitlRuntime extends Runtime<Bindings> {
   protected override readonly supportsAsync = true;
 
-  /** Nodes currently parked on an event, keyed by nodeId. */
-  private readonly waits = new Map<
-    string,
-    { eventType: string; resolve: (payload: FormEventPayload) => void }
-  >();
-
-  /** Every nodeId that has ever parked, in registration order. */
+  private executionId = "";
+  private multiplexResolve:
+    | ((envelope: ExecutionEventEnvelope) => void)
+    | null = null;
+  private readonly inbox: ExecutionEventEnvelope[] = [];
   readonly registrationLog: string[] = [];
+  readonly pendingNodeIds: string[] = [];
+
+  async run(
+    params: RuntimeParams,
+    instanceId: string
+  ): Promise<WorkflowExecution> {
+    this.executionId = instanceId;
+    this.pendingNodeIds.length = 0;
+    this.registrationLog.length = 0;
+    try {
+      return await super.run(params, instanceId);
+    } finally {
+      this.executionId = "";
+      this.multiplexResolve = null;
+    }
+  }
 
   protected async executeStep<T>(
     _name: string,
@@ -103,36 +113,66 @@ class ControllableHitlRuntime extends Runtime<Bindings> {
     // no-op: nothing in these tests sleeps
   }
 
-  protected waitForNodeEvent<T>(name: string, eventType: string): Promise<T> {
-    // base-runtime parks with name `wait for ${nodeId}`
-    const nodeId = name.replace(/^wait for /, "");
-    this.registrationLog.push(nodeId);
+  protected waitForNodeEvent<T>(
+    _name: string,
+    eventType: string,
+    _timeout: string
+  ): Promise<T> {
+    this.registrationLog.push(eventType);
     return new Promise<T>((resolve) => {
-      this.waits.set(nodeId, {
-        eventType,
-        resolve: resolve as (payload: FormEventPayload) => void,
-      });
+      this.multiplexResolve = resolve as (
+        envelope: ExecutionEventEnvelope
+      ) => void;
     });
   }
 
-  // ---- test controls -----------------------------------------------------
+  protected override getExecutionEventInbox(
+    _executionId: string
+  ): ExecutionEventInbox {
+    return {
+      drain: () => {
+        const queued = [...this.inbox];
+        this.inbox.length = 0;
+        return queued;
+      },
+      push: (_executionId, envelope) => {
+        this.inbox.push(envelope);
+      },
+    };
+  }
 
-  /** Node IDs currently parked, sorted for stable assertions. */
-  get pendingNodeIds(): string[] {
-    return [...this.waits.keys()].sort();
+  trackPending(execution: WorkflowExecution): void {
+    this.pendingNodeIds.length = 0;
+    for (const nodeExecution of execution.nodeExecutions) {
+      if (nodeExecution.status === "pending") {
+        this.pendingNodeIds.push(nodeExecution.nodeId);
+      }
+    }
+    this.pendingNodeIds.sort();
   }
 
   /**
-   * Simulate a form submission for `nodeId`. Mirrors
-   * `WorkflowAgent.checkAndSubmitForm` → `instance.sendEvent`.
-   * Returns false if nothing is currently parked on that node — i.e. the
-   * event has no waiter and is lost (no buffering).
+   * Simulate a form submission. Events are buffered in the inbox when the
+   * heartbeat is not yet waiting, then consumed on the next tick.
    */
-  deliver(nodeId: string, response: Record<string, unknown>): boolean {
-    const wait = this.waits.get(nodeId);
-    if (!wait) return false;
-    this.waits.delete(nodeId);
-    wait.resolve({ outputs: { response }, usage: 0 });
+  deliver(
+    nodeId: string,
+    response: Record<string, unknown>,
+    eventType: string
+  ): boolean {
+    const envelope = buildExecutionEventEnvelope(
+      eventType,
+      { outputs: { response }, usage: 0 },
+      nodeId
+    );
+
+    if (this.multiplexResolve) {
+      this.multiplexResolve(envelope);
+      this.multiplexResolve = null;
+      return true;
+    }
+
+    this.inbox.push(envelope);
     return true;
   }
 }
@@ -149,13 +189,19 @@ function createRuntime(): ControllableHitlRuntime {
     buildPresignedUrlConfig(e)
   );
   const credentialProvider = new MockCredentialService();
+  const mockMonitoring = new MockMonitoringService();
+  let runtime: ControllableHitlRuntime;
 
-  // toolRegistry is omitted — no HITL node in these scenarios resolves tools.
   const dependencies: RuntimeDependencies<Bindings> = {
     nodeRegistry,
     credentialProvider,
     executionStore: new MockExecutionStore(),
-    monitoringService: new MockMonitoringService(),
+    monitoringService: {
+      async sendUpdate(execution) {
+        runtime.trackPending(execution);
+        await mockMonitoring.sendUpdate(execution);
+      },
+    },
     creditService: {
       hasEnoughCredits: async () => true,
       recordUsage: async () => {},
@@ -167,7 +213,8 @@ function createRuntime(): ControllableHitlRuntime {
     queueService: new MockQueueService(),
   };
 
-  return new ControllableHitlRuntime(e, dependencies);
+  runtime = new ControllableHitlRuntime(e, dependencies);
+  return runtime;
 }
 
 let instanceCounter = 0;
@@ -283,7 +330,9 @@ describe("Pending nodes: parallel forms on the same level", () => {
     expect(settled).toBe(false);
 
     // Activating one form resolves only that node; the other keeps waiting.
-    expect(runtime.deliver("wfA", { approved: true })).toBe(true);
+    expect(runtime.deliver("wfA", { approved: true }, "form-response-tok-a")).toBe(
+      true
+    );
     await settle();
     expect(runtime.pendingNodeIds).toEqual(["wfB"]);
 
@@ -291,7 +340,9 @@ describe("Pending nodes: parallel forms on the same level", () => {
     expect(settled).toBe(false);
 
     // Answer the second form → workflow completes.
-    expect(runtime.deliver("wfB", { approved: false })).toBe(true);
+    expect(
+      runtime.deliver("wfB", { approved: false }, "form-response-tok-b")
+    ).toBe(true);
     const execution = await run;
 
     expect(execution.status).toBe("completed");
@@ -380,13 +431,15 @@ describe("Pending nodes: parallel forms on different levels", () => {
     );
 
     // Answer the deeper form first; the shallow one keeps waiting independently.
-    expect(runtime.deliver("wfB", { ok: "b" })).toBe(true);
+    expect(runtime.deliver("wfB", { ok: "b" }, "form-response-TOK-B")).toBe(
+      true
+    );
     await settle();
     expect(runtime.pendingNodeIds).toEqual(["wfA"]);
     expect(settled).toBe(false);
 
     // Answer the remaining form → workflow completes.
-    expect(runtime.deliver("wfA", { ok: "a" })).toBe(true);
+    expect(runtime.deliver("wfA", { ok: "a" }, "form-response-tok-a")).toBe(true);
     const execution = await run;
     expect(execution.status).toBe("completed");
     expect(nodeExec(execution, "wfA")?.outputs?.response).toEqual({ ok: "a" });
@@ -398,7 +451,7 @@ describe("Pending nodes: parallel forms on different levels", () => {
 // Scenario 3 — events are delivered only to already-parked nodes
 // ---------------------------------------------------------------------------
 
-describe("Pending nodes: an event is delivered only once the node is parked", () => {
+describe("Pending nodes: buffered events before the node parks", () => {
   // A single deep branch: tB ─► up ─► wfB. wfB parks only after `up` settles.
   function makeWorkflow(): Workflow {
     return {
@@ -423,27 +476,18 @@ describe("Pending nodes: an event is delivered only once the node is parked", ()
     };
   }
 
-  it("rejects an event before the node parks, then accepts it once parked (no buffering)", async () => {
+  it("buffers an early event and applies it once the node registers a continuation", async () => {
     const runtime = createRuntime();
     const run = runtime.run(params(makeWorkflow()), nextInstanceId());
-    run.catch(() => {});
 
-    // Nothing has executed yet: wfB is not parked, so an event has no waiter.
-    // The runtime↔DO event channel does not buffer — the caller (WorkflowAgent)
-    // must ensure the node is parked before sending. With dataflow scheduling a
-    // node parks as soon as its own upstreams settle, so this window is small
-    // and never gated by unrelated branches.
-    expect(runtime.deliver("wfB", { ok: "early" })).toBe(false);
-
-    // Once the branch settles up to wfB, the node is parked and the event lands.
-    await settle();
-    expect(runtime.pendingNodeIds).toEqual(["wfB"]);
-    expect(runtime.deliver("wfB", { ok: "late" })).toBe(true);
+    expect(
+      runtime.deliver("wfB", { ok: "early" }, "form-response-TOK-B")
+    ).toBe(true);
 
     const execution = await run;
     expect(execution.status).toBe("completed");
     expect(nodeExec(execution, "wfB")?.outputs?.response).toEqual({
-      ok: "late",
+      ok: "early",
     });
   });
 });

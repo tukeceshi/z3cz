@@ -1,3 +1,4 @@
+import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,6 +22,7 @@ export function SecretField({
   onClear,
   value,
 }: FieldProps) {
+  const { t } = useTranslation();
   const { secrets, isSecretsLoading } = useSecrets();
 
   // Convert to string and check for meaningful value (empty strings are considered "no value")
@@ -37,7 +39,7 @@ export function SecretField({
           value={maskedValue}
           readOnly
           disabled
-          placeholder={connected ? "Connected" : "No secret"}
+          placeholder={connected ? t("workflow.fields.connected") : t("workflow.fields.noSecret")}
           className="rounded-md border border-neutral-300 dark:border-neutral-700"
         />
       </div>
@@ -56,12 +58,12 @@ export function SecretField({
           <SelectValue
             placeholder={
               connected
-                ? "Connected"
+                ? t("workflow.fields.connected")
                 : isSecretsLoading
-                  ? "Loading..."
+                  ? t("common.loading")
                   : secrets.length === 0
-                    ? "No secrets"
-                    : "Select secret"
+                    ? t("workflow.fields.secret.empty")
+                    : t("workflow.fields.secret.select")
             }
           />
         </SelectTrigger>
@@ -77,7 +79,7 @@ export function SecretField({
       {clearable && hasValue && (
         <ClearButton
           onClick={onClear}
-          label="Clear secret"
+          label={t("workflow.fields.clearSecret")}
           className="absolute top-2 right-8"
         />
       )}

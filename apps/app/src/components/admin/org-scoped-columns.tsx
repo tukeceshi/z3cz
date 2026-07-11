@@ -3,6 +3,7 @@ import { Link, type useNavigate } from "react-router";
 
 import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import type { TranslateFn } from "@/i18n";
 import { formatDate } from "@/utils/date";
 
 export interface OrgScopedRow {
@@ -14,17 +15,18 @@ export interface OrgScopedRow {
 }
 
 export function createOrgScopedColumns<T extends OrgScopedRow>(
-  navigate: ReturnType<typeof useNavigate>
+  navigate: ReturnType<typeof useNavigate>,
+  t: TranslateFn
 ): ColumnDef<T>[] {
   return [
     {
       accessorKey: "name",
-      header: "Name",
+      header: t("admin.common.name"),
       cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
     },
     {
       accessorKey: "organizationName",
-      header: "Organization",
+      header: t("admin.common.organization"),
       cell: ({ row }) => (
         <Link
           to={`/admin/organizations/${row.original.organizationId}`}
@@ -36,7 +38,7 @@ export function createOrgScopedColumns<T extends OrgScopedRow>(
     },
     {
       accessorKey: "createdAt",
-      header: "Created",
+      header: t("admin.common.created"),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatDate(row.original.createdAt)}
@@ -52,7 +54,7 @@ export function createOrgScopedColumns<T extends OrgScopedRow>(
               navigate(`/admin/organizations/${row.original.organizationId}`)
             }
           >
-            View organization
+            {t("admin.common.viewOrganization")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
