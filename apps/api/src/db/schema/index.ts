@@ -1,8 +1,10 @@
+import type { PlatformAiModelParameterRules } from "@dafthunk/types";
 import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -360,53 +362,6 @@ export const platformRelayAccounts = pgTable(
   ]
 );
 
-export const aiInterfaceTemplates = pgTable(
-  "ai_interface_templates",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    description: text("description"),
-    provider: text("provider").notNull(),
-    executionMode: text("execution_mode").notNull().default("sync"),
-    enabled: boolean("enabled").notNull().default(true),
-    isSystem: boolean("is_system").notNull().default(false),
-    isDefault: boolean("is_default").notNull().default(false),
-    sortOrder: integer("sort_order").notNull().default(0),
-    specVersion: integer("spec_version").notNull().default(1),
-    artifactChecksum: text("artifact_checksum").notNull(),
-    artifactKey: text("artifact_key").notNull(),
-    sourceKey: text("source_key").notNull(),
-    createdAt: createCreatedAt(),
-    updatedAt: createUpdatedAt(),
-    updatedBy: text("updated_by").references(() => users.id),
-  },
-  (table) => [
-    index("ai_interface_templates_provider_idx").on(table.provider),
-    index("ai_interface_templates_enabled_idx").on(table.enabled),
-    index("ai_interface_templates_is_default_idx").on(table.isDefault),
-  ]
-);
-
-export const aiInterfaceTemplateRevisions = pgTable(
-  "ai_interface_template_revisions",
-  {
-    id: text("id").primaryKey(),
-    templateId: text("template_id")
-      .notNull()
-      .references(() => aiInterfaceTemplates.id, { onDelete: "cascade" }),
-    version: integer("version").notNull(),
-    artifactChecksum: text("artifact_checksum").notNull(),
-    artifactKey: text("artifact_key").notNull(),
-    sourceKey: text("source_key").notNull(),
-    changeNote: text("change_note"),
-    createdAt: createCreatedAt(),
-    createdBy: text("created_by").references(() => users.id),
-  },
-  (table) => [
-    index("ai_interface_template_revisions_template_id_idx").on(table.templateId),
-  ]
-);
-
 export const organizationAiInterfaces = pgTable(
   "organization_ai_interfaces",
   {
@@ -414,9 +369,8 @@ export const organizationAiInterfaces = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    templateId: text("template_id")
-      .notNull()
-      .references(() => aiInterfaceTemplates.id),
+    /** Legacy; unused after template retirement. Kept nullable for old rows. */
+    templateId: text("template_id"),
     templateVersion: integer("template_version"),
     name: text("name").notNull(),
     provider: text("provider").notNull(),
@@ -435,6 +389,78 @@ export const organizationAiInterfaces = pgTable(
       table.provider
     ),
     index("organization_ai_interfaces_template_id_idx").on(table.templateId),
+  ]
+);
+
+export const platformAiModelGroups = pgTable("platform_ai_model_groups", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  icon: text("icon").notNull().default("sparkles"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: createCreatedAt(),
+  updatedAt: createUpdatedAt(),
+});
+
+export const platformAiModels = pgTable("platform_ai_models", {
+  canonicalId: text("canonical_id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  modality: text("modality").notNull(),
+  platformEnabled: boolean("platform_enabled").notNull().default(true),
+  providerModelId: text("provider_model_id").notNull(),
+  parameterRules: jsonb("parameter_rules")
+    .$type<PlatformAiModelParameterRules>()
+    .notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  groupId: text("group_id").references(() => platformAiModelGroups.id, {
+    onDelete: "set null",
+  }),
+  description: text("description").notNull().default(""),
+  createdAt: createCreatedAt(),
+  updatedAt: createUpdatedAt(),
+});
+
+export const aiModelInvocations = pgTable(
+  "ai_model_invocations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    canonicalId: text("canonical_id").notNull(),
+    displayName: text("display_name").notNull(),
+    interfaceId: text("interface_id"),
+    interfaceName: text("interface_name"),
+    promptExcerpt: text("prompt_excerpt").notNull().default(""),
+    content: text("content").notNull().default(""),
+    source: text("source").notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [
+    index("ai_model_invocations_org_created_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const organizationModelInterfacePriorities = pgTable(
+  "organization_model_interface_priorities",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    canonicalId: text("canonical_id").notNull(),
+    interfaceIds: jsonb("interface_ids").$type<string[]>().notNull().default([]),
+    updatedAt: createUpdatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.canonicalId],
+    }),
   ]
 );
 

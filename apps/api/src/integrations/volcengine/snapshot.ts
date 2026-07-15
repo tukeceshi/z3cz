@@ -12,19 +12,30 @@ import {
   getOrganizationAiInterfaceRow,
   updateOrganizationAiInterface,
 } from "../../db/ai-interface-queries";
-import { buildVolcanoPackageUsageMap } from "./aggregate-package-usage";
 import {
   ensureVolcanoApiKey,
   getVolcanoApiKeyStatus,
   getVolcanoCredentials,
   maskApiKey,
 } from "./ensure-api-key";
-import { fetchAllVolcanoResourcePackages } from "./list-resource-packages";
-import { isVolcanoMetadata, parseInterfaceMetadata } from "./metadata";
+import { listPlatformAiModels } from "../../db/platform-ai-model-queries";
+import {
+  ensureVolcanoModelsIncludePlatformCatalog,
+  toVolcanoCatalogEntriesFromPlatform,
+} from "../../services/resolve-text-model-interface";
+import {
+  isVolcanoMetadata,
+  parseInterfaceMetadata,
+  pruneVolcanoMetadataToCatalog,
+  serializeInterfaceMetadata,
+} from "./metadata";
 import { VOLCANO_PRICING_DOC_URL } from "./constants";
 import { queryVolcanoBalance } from "./query-balance";
 import { VolcengineApiRequestError } from "./client";
-import { indexResourcePackagesByConfigurationCode } from "./parse-resource-packages";
+import {
+  buildUsageMapsFromPackageRows,
+  resolveVolcanoPackageRows,
+} from "./resolve-package-rows";
 
 function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
   return {
@@ -47,6 +58,7 @@ export async function buildVolcanoSnapshot(params: {
   env: Bindings;
   organizationId: string;
   interfaceId: string;
+  refreshPackages?: boolean;
 }): Promise<VolcanoSnapshotResponse> {
   const db = createDatabase(params.env);
   const row = await getOrganizationAiInterfaceRow(
@@ -86,9 +98,30 @@ export async function buildVolcanoSnapshot(params: {
     throw new Error("Volcano credentials not configured");
   }
 
-  const refreshedMetadata = parseInterfaceMetadata(ensured.metadataRaw);
+  let refreshedMetadata = parseInterfaceMetadata(ensured.metadataRaw);
   if (!isVolcanoMetadata(refreshedMetadata)) {
     throw new Error("Volcano metadata not configured");
+  }
+
+  const platformModels = await listPlatformAiModels(db);
+  const platformCatalog = toVolcanoCatalogEntriesFromPlatform(platformModels);
+  const alignedMetadata = pruneVolcanoMetadataToCatalog(
+    ensureVolcanoModelsIncludePlatformCatalog(
+      refreshedMetadata,
+      platformCatalog
+    ),
+    platformCatalog
+  );
+  if (
+    JSON.stringify(alignedMetadata.models) !==
+    JSON.stringify(refreshedMetadata.models)
+  ) {
+    refreshedMetadata = alignedMetadata;
+    await updateOrganizationAiInterface(db, params.organizationId, row.id, {
+      metadata: serializeInterfaceMetadata(alignedMetadata),
+    });
+  } else {
+    refreshedMetadata = alignedMetadata;
   }
 
   let usageByModel = new Map<string, VolcanoModelUsage | null>();
@@ -97,18 +130,26 @@ export async function buildVolcanoSnapshot(params: {
     NonNullable<VolcanoSnapshotResponse["models"][number]["package"]>
   >();
   let usageFetchError: string | undefined;
+  let packageListCachedAt: string | undefined;
 
   try {
-    const packages = await fetchAllVolcanoResourcePackages({
+    const resolved = await resolveVolcanoPackageRows({
       credentials,
+      metadata: refreshedMetadata,
+      refreshPackages: params.refreshPackages === true,
+      onMetadataCacheUpdate: async (nextMetadata) => {
+        refreshedMetadata = nextMetadata;
+        await updateOrganizationAiInterface(db, params.organizationId, row.id, {
+          metadata: serializeInterfaceMetadata(nextMetadata),
+        });
+      },
     });
-    const packagesByCode = indexResourcePackagesByConfigurationCode(packages);
-    const aggregated = buildVolcanoPackageUsageMap({
-      catalog: VOLCANO_AI_MODEL_CATALOG,
-      packagesByCode,
-    });
-    usageByModel = aggregated.usageByCanonicalId;
-    packageByModel = aggregated.packageByCanonicalId;
+
+    const maps = buildUsageMapsFromPackageRows(resolved.rows);
+    usageByModel = maps.usageByModel;
+    packageByModel = maps.packageByModel;
+    usageFetchError = resolved.usageFetchError;
+    packageListCachedAt = resolved.packageListCachedAt;
   } catch (error) {
     usageFetchError =
       error instanceof VolcengineApiRequestError
@@ -120,7 +161,13 @@ export async function buildVolcanoSnapshot(params: {
 
   const activationCache = refreshedMetadata.modelActivationCache ?? {};
 
-  const modelRows = VOLCANO_AI_MODEL_CATALOG.map((entry) => {
+  const modelCatalogById = new Map(
+    [...VOLCANO_AI_MODEL_CATALOG, ...platformCatalog].map((entry) => [
+      entry.canonicalId,
+      entry,
+    ])
+  );
+  const modelRows = [...modelCatalogById.values()].map((entry) => {
     const config = refreshedMetadata.models[entry.canonicalId];
     const enabled = config?.enabled ?? false;
     const activation = activationCache[entry.canonicalId] ?? null;
@@ -175,6 +222,7 @@ export async function buildVolcanoSnapshot(params: {
     balance,
     ...(balanceError ? { balanceError } : {}),
     ...(usageFetchError ? { usageError: usageFetchError } : {}),
+    ...(packageListCachedAt ? { packageListCachedAt } : {}),
     pricing: buildPricingSection(),
     models: modelRows,
   };

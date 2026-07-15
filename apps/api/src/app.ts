@@ -4,6 +4,7 @@ import auth from "./auth";
 import type { ApiContext } from "./context";
 import { corsMiddleware } from "./middleware/cors";
 import { createNodeRateLimitMiddleware } from "./middleware/rate-limit-node";
+import platformAiRoutes from "./routes/platform-ai";
 import aiInterfaceRoutes from "./routes/ai-interfaces";
 import adminRoutes from "./routes/admin";
 import apiKeyRoutes from "./routes/api-keys";
@@ -135,6 +136,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/:organizationId/schemas", schemaRoutes);
   app.route("/:organizationId/secrets", secretRoutes);
   app.route("/:organizationId/ai-interfaces", aiInterfaceRoutes);
+  app.route("/:organizationId/platform-ai", platformAiRoutes);
   app.route("/:organizationId/workflows", workflowRoutes);
   app.route("/:organizationId/objects", objectRoutes);
   app.route("/:organizationId/playground", playgroundRoutes);

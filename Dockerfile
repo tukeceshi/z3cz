@@ -26,17 +26,57 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# --- 本地开发（默认目标）---
+# --- 本地开发（全栈单容器，profile monolith）---
 FROM base AS dev
 
+COPY docker/entrypoint-common.sh /usr/local/bin/entrypoint-common.sh
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
-  && chmod +x /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh \
+  && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh
 
 EXPOSE 3100 3101 3102
 
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["pnpm", "dev:docker"]
+
+# --- 本地开发（www）---
+FROM base AS dev-www
+
+COPY docker/entrypoint-common.sh /usr/local/bin/entrypoint-common.sh
+COPY docker/entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh \
+  && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh
+
+EXPOSE 3100
+
+ENTRYPOINT ["entrypoint-frontend.sh"]
+CMD ["pnpm", "--filter", "@dafthunk/www", "dev"]
+
+# --- 本地开发（app）---
+FROM base AS dev-app
+
+COPY docker/entrypoint-common.sh /usr/local/bin/entrypoint-common.sh
+COPY docker/entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh \
+  && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh
+
+EXPOSE 3101
+
+ENTRYPOINT ["entrypoint-frontend.sh"]
+CMD ["pnpm", "--filter", "@dafthunk/app", "dev"]
+
+# --- 本地开发（仅 API）---
+FROM base AS dev-api
+
+COPY docker/entrypoint-common.sh /usr/local/bin/entrypoint-common.sh
+COPY docker/entrypoint-api.sh /usr/local/bin/entrypoint-api.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-api.sh \
+  && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-api.sh
+
+EXPOSE 3102
+
+ENTRYPOINT ["entrypoint-api.sh"]
+CMD ["pnpm", "--filter", "@dafthunk/api", "dev:docker:api"]
 
 # --- 依赖安装（prod-api / prod-app 共用，避免重复 install）---
 FROM base AS deps

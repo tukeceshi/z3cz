@@ -1,9 +1,8 @@
 # Dafthunk 实验性生产编排（Postgres + Node API + app + www SSR + SMTP 网关）
 #
-# 准备：
-#   node scripts/sync-env-docker-prod.mjs
-# 启动（容器内构建）：
-#   docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up --build -d
+# 准备：cp .env.docker.prod.example .env.docker.prod（可选 node scripts/sync-env-docker-prod.mjs）
+# 启动：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up -d --build
+# 停止：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod down
 #
 # 访问：
 #   www  http://localhost:3100

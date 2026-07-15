@@ -23,14 +23,17 @@ export function isVolcanoMetadata(
 }
 
 export function buildDefaultVolcanoModels(
-  enabledCanonicalIds?: readonly string[]
+  enabledCanonicalIds?: readonly string[],
+  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AI_MODEL_CATALOG
 ): Record<string, VolcanoModelConfig> {
+  const catalog =
+    catalogEntries.length > 0 ? catalogEntries : VOLCANO_AI_MODEL_CATALOG;
   const enabledSet = new Set(
-    enabledCanonicalIds ?? VOLCANO_AI_MODEL_CATALOG.map((entry) => entry.canonicalId)
+    enabledCanonicalIds ?? catalog.map((entry) => entry.canonicalId)
   );
 
   return Object.fromEntries(
-    VOLCANO_AI_MODEL_CATALOG.map((entry) => [
+    catalog.map((entry) => [
       entry.canonicalId,
       {
         enabled: enabledSet.has(entry.canonicalId),
@@ -46,7 +49,13 @@ export function createVolcanoMetadata(params: {
   secretAccessKeyEncrypted: string;
   enabledModels?: readonly string[];
   arkApiKeyExpiresAt?: string;
+  /** Prefer platform_ai_models (union with static catalog). */
+  catalogEntries?: readonly AiModelCatalogEntry[];
 }): VolcanoInterfaceMetadata {
+  const catalog = mergeCatalogEntries(
+    VOLCANO_AI_MODEL_CATALOG,
+    params.catalogEntries
+  );
   return {
     credentialMode: "volcengine_iam",
     accessKeyId: params.accessKeyId,
@@ -54,25 +63,85 @@ export function createVolcanoMetadata(params: {
     arkApiKeyDurationSeconds: VOLCANO_ARK_API_KEY_DURATION_SECONDS,
     arkApiKeyExpiresAt: params.arkApiKeyExpiresAt,
     region: VOLCANO_DEFAULT_REGION,
-    models: buildDefaultVolcanoModels(params.enabledModels),
+    models: buildDefaultVolcanoModels(params.enabledModels, catalog),
+  };
+}
+
+function mergeCatalogEntries(
+  base: readonly AiModelCatalogEntry[],
+  extra?: readonly AiModelCatalogEntry[]
+): readonly AiModelCatalogEntry[] {
+  if (!extra || extra.length === 0) return base;
+  const byId = new Map(base.map((entry) => [entry.canonicalId, entry]));
+  for (const entry of extra) {
+    byId.set(entry.canonicalId, entry);
+  }
+  return [...byId.values()];
+}
+
+export function pruneVolcanoMetadataToCatalog(
+  metadata: VolcanoInterfaceMetadata,
+  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AI_MODEL_CATALOG
+): VolcanoInterfaceMetadata {
+  const catalog = mergeCatalogEntries(VOLCANO_AI_MODEL_CATALOG, catalogEntries);
+  const models = buildDefaultVolcanoModels(undefined, catalog);
+  for (const entry of catalog) {
+    const existing = metadata.models[entry.canonicalId];
+    if (existing) {
+      models[entry.canonicalId] = existing;
+    }
+  }
+
+  const catalogIds = new Set(catalog.map((entry) => entry.canonicalId));
+  const modelActivationCache = metadata.modelActivationCache
+    ? Object.fromEntries(
+        Object.entries(metadata.modelActivationCache).filter(([canonicalId]) =>
+          catalogIds.has(canonicalId)
+        )
+      )
+    : undefined;
+
+  return {
+    ...metadata,
+    models,
+    ...(modelActivationCache !== undefined ? { modelActivationCache } : {}),
   };
 }
 
 export function mergeVolcanoModelEnabled(
   metadata: VolcanoInterfaceMetadata,
-  toggles: Readonly<Record<string, boolean>>
+  toggles: Readonly<Record<string, boolean>>,
+  catalogEntries?: readonly AiModelCatalogEntry[]
 ): VolcanoInterfaceMetadata {
+  const catalog = mergeCatalogEntries(
+    VOLCANO_AI_MODEL_CATALOG,
+    catalogEntries
+  );
+  const catalogById = new Map(
+    catalog.map((entry) => [entry.canonicalId, entry])
+  );
   const models = { ...metadata.models };
   for (const [canonicalId, enabled] of Object.entries(toggles)) {
-    if (!models[canonicalId]) continue;
-    models[canonicalId] = { ...models[canonicalId], enabled };
+    const existing = models[canonicalId];
+    if (existing) {
+      models[canonicalId] = { ...existing, enabled };
+      continue;
+    }
+    const catalogEntry = catalogById.get(canonicalId);
+    if (!catalogEntry) continue;
+    models[canonicalId] = {
+      enabled,
+      providerModelId: catalogEntry.providerModelId,
+      modality: catalogEntry.modality,
+    };
   }
-  return { ...metadata, models };
+  return pruneVolcanoMetadataToCatalog({ ...metadata, models }, catalogEntries);
 }
 
 export function mergeVolcanoActivationCache(
   metadata: VolcanoInterfaceMetadata,
-  results: readonly VolcanoActivationProbeResult[]
+  results: readonly VolcanoActivationProbeResult[],
+  catalogEntries?: readonly AiModelCatalogEntry[]
 ): VolcanoInterfaceMetadata {
   const cache = { ...(metadata.modelActivationCache ?? {}) };
   for (const result of results) {
@@ -83,25 +152,44 @@ export function mergeVolcanoActivationCache(
       message: result.message,
     };
   }
-  return { ...metadata, modelActivationCache: cache };
-}
-
-export function resolveVolcanoCatalogEntries(
-  canonicalIds?: readonly string[]
-): readonly AiModelCatalogEntry[] {
-  if (!canonicalIds || canonicalIds.length === 0) {
-    return VOLCANO_AI_MODEL_CATALOG;
-  }
-  const idSet = new Set(canonicalIds);
-  return VOLCANO_AI_MODEL_CATALOG.filter((entry) =>
-    idSet.has(entry.canonicalId)
+  return pruneVolcanoMetadataToCatalog(
+    {
+      ...metadata,
+      modelActivationCache: cache,
+    },
+    catalogEntries
   );
 }
 
+export function resolveVolcanoCatalogEntries(
+  canonicalIds?: readonly string[],
+  catalogEntries?: readonly AiModelCatalogEntry[]
+): readonly AiModelCatalogEntry[] {
+  const catalog = mergeCatalogEntries(
+    VOLCANO_AI_MODEL_CATALOG,
+    catalogEntries
+  );
+  if (!canonicalIds || canonicalIds.length === 0) {
+    return catalog;
+  }
+  const idSet = new Set(canonicalIds);
+  return catalog.filter((entry) => idSet.has(entry.canonicalId));
+}
+
 export function parseInterfaceMetadata(
-  raw: string | null
+  raw:
+    | string
+    | VolcanoInterfaceMetadata
+    | Readonly<Record<string, unknown>>
+    | null
+    | undefined
 ): VolcanoInterfaceMetadata | Record<string, unknown> | null {
-  if (!raw) return null;
+  if (raw == null) return null;
+  // listOrganizationAiInterfaces already returns parsed objects — do not re-parse.
+  if (typeof raw === "object") {
+    return raw as VolcanoInterfaceMetadata | Record<string, unknown>;
+  }
+  if (typeof raw !== "string" || raw.length === 0) return null;
   try {
     return JSON.parse(raw) as VolcanoInterfaceMetadata | Record<string, unknown>;
   } catch {

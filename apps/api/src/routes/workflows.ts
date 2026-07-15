@@ -14,6 +14,7 @@ import {
   type JWTTokenPayload,
   type ListWorkflowsResponse,
   type Node,
+  type Edge,
   type UpdateWorkflowRequest,
   type UpdateWorkflowResponse,
   type UpsertQueueTriggerRequest,
@@ -635,10 +636,22 @@ workflowRoutes.post(
     const { organizationId, userId } = getAuthContext(c);
 
     let bodyNode: Node | undefined;
+    let bodyNodes: Node[] | undefined;
+    let bodyEdges: Edge[] | undefined;
     try {
-      const body = await c.req.json<{ node?: Node }>();
+      const body = await c.req.json<{
+        node?: Node;
+        nodes?: Node[];
+        edges?: Edge[];
+      }>();
       if (body?.node && body.node.id === nodeId) {
         bodyNode = body.node;
+      }
+      if (Array.isArray(body?.nodes) && body.nodes.length > 0) {
+        bodyNodes = body.nodes;
+      }
+      if (Array.isArray(body?.edges)) {
+        bodyEdges = body.edges;
       }
     } catch {
       // Body is optional — fall back to persisted workflow node.
@@ -663,6 +676,12 @@ workflowRoutes.post(
     if (!node) {
       return c.json({ error: "Node not found" }, 404);
     }
+
+    const executionNodes =
+      bodyNodes && bodyNodes.some((entry) => entry.id === nodeId)
+        ? bodyNodes
+        : [node];
+    const executionEdges = bodyEdges ?? [];
 
     const billingInfo = await getOrganizationBillingInfo(db, organizationId);
     if (!billingInfo) {
@@ -690,8 +709,8 @@ workflowRoutes.post(
         name: workflowWithData.name,
         billingMode,
         trigger: workflowWithData.data.trigger,
-        nodes: [node],
-        edges: [],
+        nodes: executionNodes,
+        edges: executionEdges,
       },
       userId,
       organizationId,

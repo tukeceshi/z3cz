@@ -12,6 +12,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { AI_TEXT_GENERATING_META_KEY } from "@/components/workflow/ai-text-node-utils";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -29,6 +30,15 @@ interface UseEditableWorkflowProps {
   nodeTypes?: NodeType[];
   fallbackWorkflow?: WorkflowWithMetadata | null;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
+}
+
+function persistableNodeMetadata(
+  metadata: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!metadata) return undefined;
+  const next = { ...metadata };
+  delete next[AI_TEXT_GENERATING_META_KEY];
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 /**
@@ -53,7 +63,10 @@ function buildWorkflowPayload(
       position: node.position,
       icon: node.data.icon,
       functionCalling: node.data.functionCalling,
-      ...(node.data.metadata ? { metadata: { ...node.data.metadata } } : {}),
+      ...(() => {
+        const metadata = persistableNodeMetadata(node.data.metadata);
+        return metadata ? { metadata } : {};
+      })(),
       inputs: node.data.inputs.map((input) => {
         const isConnected = incomingEdges.some(
           (edge) => edge.targetHandle === input.id

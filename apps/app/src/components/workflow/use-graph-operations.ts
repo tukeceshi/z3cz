@@ -24,6 +24,11 @@ import {
   ALL_TRIGGER_NODE_TYPE_IDS,
   getTriggerNodeTypes,
 } from "./trigger-node-mapping";
+import {
+  classifyReferenceFromNodeType,
+  isAiTextAllowedReferenceNodeType,
+  mergeAiTextNodeCatalogInputs,
+} from "./ai-text-node-utils";
 import type {
   ConnectionValidationState,
   NodeExecutionState,
@@ -317,13 +322,23 @@ export function useGraphOperations({
       return;
     }
 
-    const newNodesWithCreateObjectUrl = initialNodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        createObjectUrl,
-      },
-    }));
+    const newNodesWithCreateObjectUrl = initialNodes.map((node) => {
+      const catalog = nodeTypes.find((entry) => entry.type === node.data.nodeType);
+      const inputs = mergeAiTextNodeCatalogInputs(
+        node.data.nodeType,
+        node.data.inputs,
+        catalog
+      );
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          inputs,
+          createObjectUrl,
+        },
+      };
+    });
 
     if (!disabled && initialNodes.length === 0 && nodesRef.current.length > 0) {
       return;
@@ -368,7 +383,7 @@ export function useGraphOperations({
 
       setNodes(updatedNodes);
     }
-  }, [initialNodes, disabled, setNodes, createObjectUrl]);
+  }, [initialNodes, disabled, setNodes, createObjectUrl, nodeTypes]);
 
   // Sync initialEdges prop
   useEffect(() => {
@@ -492,6 +507,58 @@ export function useGraphOperations({
 
         const typesMatch = exactMatch || anyTypeMatch || blobCompatible;
 
+        if (!typesMatch) {
+          setConnectionValidationState("invalid");
+          return false;
+        }
+
+        // AI text: only AI text / AI image / AI video may connect into keywords
+        if (
+          targetNode.data.nodeType === "ai-text" &&
+          inputParam.id === "keywords"
+        ) {
+          const sourceKind = classifyReferenceFromNodeType(
+            sourceNode.data.nodeType
+          );
+          if (
+            !isAiTextAllowedReferenceNodeType(sourceNode.data.nodeType) ||
+            !sourceKind
+          ) {
+            setConnectionValidationState("invalid");
+            return false;
+          }
+
+          const meta = targetNode.data.metadata ?? {};
+          const maxText = Number(meta.refMaxText ?? 4);
+          const maxImage = Number(meta.refMaxImage ?? 0);
+          const maxVideo = Number(meta.refMaxVideo ?? 0);
+          const existing = edges.filter(
+            (edge) =>
+              edge.target === inputNodeId &&
+              edge.targetHandle === inputHandleId
+          );
+          const counts = { text: 0, image: 0, video: 0 };
+          for (const edge of existing) {
+            const src = nodes.find((node) => node.id === edge.source);
+            const kind = classifyReferenceFromNodeType(src?.data.nodeType);
+            if (kind === "text") counts.text += 1;
+            else if (kind === "image") counts.image += 1;
+            else if (kind === "video") counts.video += 1;
+          }
+          if (sourceKind === "text" && counts.text >= maxText) {
+            setConnectionValidationState("invalid");
+            return false;
+          }
+          if (sourceKind === "image" && counts.image >= maxImage) {
+            setConnectionValidationState("invalid");
+            return false;
+          }
+          if (sourceKind === "video" && counts.video >= maxVideo) {
+            setConnectionValidationState("invalid");
+            return false;
+          }
+        }
+
         if (!inputParam.repeated) {
           const hasExistingConnection = edges.some(
             (edge) =>
@@ -506,8 +573,8 @@ export function useGraphOperations({
           }
         }
 
-        setConnectionValidationState(typesMatch ? "valid" : "invalid");
-        return typesMatch && validateConnection(conn);
+        setConnectionValidationState("valid");
+        return validateConnection(conn);
       },
       [nodes, edges, validateConnection, disabled]
     );

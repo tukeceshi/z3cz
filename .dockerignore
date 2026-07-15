@@ -36,3 +36,9 @@ Thumbs.db
 Dockerfile*
 docker-compose*.yml
 .dockerignore
+
+# 文档与日志（减小 build context）
+docs/
+logs/
+**/*.md
+!README.md

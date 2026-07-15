@@ -1,0 +1,5 @@
+# 宿主机直连 Postgres（可选，覆盖 docker-compose.dev.yml 的 P1 默认不暴露端口）
+services:
+  supabase-db:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"

@@ -1,4 +1,7 @@
-import { VOLCANO_TEMPLATE_ID, type OrganizationAiInterface } from "@dafthunk/types";
+import {
+  isVolcanoAiInterfaceProvider,
+  type OrganizationAiInterface,
+} from "@dafthunk/types";
 
 import { useTranslation } from "@/components/locale-provider";
 import {
@@ -49,7 +52,7 @@ export function DeleteAiInterfaceDialog({
     }
   };
 
-  const isVolcano = iface?.templateId === VOLCANO_TEMPLATE_ID;
+  const isVolcano = iface ? isVolcanoAiInterfaceProvider(iface.provider) : false;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

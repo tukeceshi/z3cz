@@ -1,26 +1,16 @@
 # Dafthunk 本地开发编排
 #
-# 端口：营销站 3100 | 产品 3101 | API 3102 | Postgres 5432
-# 快速启动见 README.md
+# 启动：docker compose up -d --build --wait
+# 状态：docker compose ps
+# 重置：docker compose down -v
+# 单容器：docker compose --profile monolith up -d --build
+
+include:
+  - path: docker-compose.dev.yml
 
 services:
-  supabase-db:
-    image: postgres:16-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    volumes:
-      - dafthunk_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  dev:
+  monolith:
+    profiles: ["monolith"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,6 +18,7 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-22.12.0}
         PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+    container_name: dafthunk-dev-monolith
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -39,74 +30,34 @@ services:
       - "3102:3102"
     volumes:
       - .:/app
-      - dafthunk_node_modules:/app/node_modules
+      # 单容器内隔离 root / 各包 node_modules（与四服务命名区分，避免混卷）
+      - dafthunk_node_modules_mono_root:/app/node_modules
+      - dafthunk_node_modules_mono_www:/app/apps/www/node_modules
+      - dafthunk_node_modules_mono_app:/app/apps/app/node_modules
+      - dafthunk_node_modules_mono_api:/app/apps/api/node_modules
       - dafthunk_pnpm_store:/pnpm/store
       - dafthunk_local_storage:/app/data/storage
+      - dafthunk_secrets:/data/secrets
+      - ./logs:/app/logs
+    env_file:
+      - path: .env.docker
+        required: false
     environment:
-      RUN_DB_MIGRATE: ${RUN_DB_MIGRATE:-true}
-      # 容器内固定使用 compose 服务名；勿用宿主机 .env 里的 localhost
+      DAFTHUNK_SERVICE: monolith
+      RUNTIME: docker
+      SECRETS_FILE: /data/secrets/.dev.vars
       DATABASE_URL: postgresql://postgres:postgres@supabase-db:5432/postgres
       LOCAL_STORAGE_PATH: /app/data/storage
       HOST: 0.0.0.0
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      SKIP_EXTRACT_NODES: "0"
+    networks:
+      - dafthunk-network
     command: pnpm dev:docker
     stdin_open: true
     tty: true
 
-  www:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-      args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-    ports:
-      - "3100:3100"
-    volumes:
-      - .:/app
-      - dafthunk_node_modules:/app/node_modules
-      - dafthunk_pnpm_store:/pnpm/store
-    command: pnpm --filter '@dafthunk/www' dev
-
-  app:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-      args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-    ports:
-      - "3101:3101"
-    volumes:
-      - .:/app
-      - dafthunk_node_modules:/app/node_modules
-      - dafthunk_pnpm_store:/pnpm/store
-    command: pnpm --filter '@dafthunk/app' dev
-
-  api:
-    profiles: ["split"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-      args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-    ports:
-      - "3102:3102"
-    volumes:
-      - .:/app
-      - dafthunk_node_modules:/app/node_modules
-      - dafthunk_pnpm_store:/pnpm/store
-    command: pnpm --filter '@dafthunk/api' dev:docker
-
 volumes:
-  dafthunk_node_modules:
-  dafthunk_pnpm_store:
-  dafthunk_postgres_data:
-  dafthunk_local_storage:
+  dafthunk_node_modules_mono_root:
+  dafthunk_node_modules_mono_www:
+  dafthunk_node_modules_mono_app:
+  dafthunk_node_modules_mono_api:

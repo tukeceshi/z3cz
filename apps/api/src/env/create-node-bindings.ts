@@ -1,4 +1,5 @@
 import type { Bindings } from "../context";
+import { resolveSecret } from "./startup-secrets";
 import { setNodeBindings } from "./node-bindings-ref";
 import { MemoryKvNamespace } from "../storage/memory-kv";
 import { createStorageBuckets } from "../storage/storage-provider";
@@ -109,7 +110,7 @@ export async function createNodeBindings(
     WEB_HOST: env.WEB_HOST ?? "http://localhost:3101",
     WEBSITE_URL: env.WEBSITE_URL ?? "http://localhost:3100",
     EMAIL_DOMAIN: env.EMAIL_DOMAIN ?? "mail.localhost",
-    JWT_SECRET: env.JWT_SECRET ?? "dev-insecure-jwt-secret",
+    JWT_SECRET: resolveSecret(env, "JWT_SECRET", "dev-insecure-jwt-secret"),
     CLOUDFLARE_ENV: env.CLOUDFLARE_ENV ?? "development",
     RUNTIME: "node",
     CLOUDFLARE_ACCOUNT_ID: env.CLOUDFLARE_ACCOUNT_ID ?? "",
@@ -155,8 +156,11 @@ export async function createNodeBindings(
     R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID,
     R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY,
     R2_BUCKET_NAME: env.R2_BUCKET_NAME,
-    SECRET_MASTER_KEY:
-      env.SECRET_MASTER_KEY ?? "dev-insecure-secret-master-key",
+    SECRET_MASTER_KEY: resolveSecret(
+      env,
+      "SECRET_MASTER_KEY",
+      "dev-insecure-secret-master-key"
+    ),
     FORM_SIGNING_KEY: env.FORM_SIGNING_KEY ?? "dev-insecure-form-signing-key",
     STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: env.STRIPE_WEBHOOK_SECRET,

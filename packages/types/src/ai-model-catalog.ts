@@ -45,12 +45,6 @@ export const VOLCANO_AI_MODEL_CATALOG: readonly AiModelCatalogEntry[] = [
     providerModelId: "doubao-seedance-2-0-mini-260615",
   },
   {
-    canonicalId: "doubao-seedream-5-pro",
-    alias: "Seedream 5.0 Pro",
-    modality: "image",
-    providerModelId: "doubao-seedream-5-0-pro-260628",
-  },
-  {
     canonicalId: "doubao-seedream-5",
     alias: "Seedream 5.0",
     modality: "image",
@@ -58,6 +52,13 @@ export const VOLCANO_AI_MODEL_CATALOG: readonly AiModelCatalogEntry[] = [
   },
 ] as const;
 
+/** @deprecated Prefer `provider === "doubao_volcano"`. Kept for reading legacy rows. */
 export const VOLCANO_TEMPLATE_ID = "doubao-volcano-chat-v1" as const;
+
+export function isVolcanoAiInterfaceProvider(
+  provider: string | null | undefined
+): boolean {
+  return provider === "doubao_volcano";
+}
 
 export const VOLCANO_ARK_API_KEY_DURATION_SECONDS = 2_592_000 as const;

@@ -213,7 +213,8 @@ export const executeWorkflowNode = async (
   workflowId: string,
   nodeId: string,
   orgId: string,
-  node?: Node
+  node?: Node,
+  subgraph?: { nodes: Node[]; edges: Edge[] }
 ): Promise<ExecuteWorkflowResponse> => {
   return await makeOrgRequest<ExecuteWorkflowResponse>(
     orgId,
@@ -221,7 +222,13 @@ export const executeWorkflowNode = async (
     `/${workflowId}/nodes/${nodeId}/execute`,
     {
       method: "POST",
-      body: JSON.stringify(node ? { node } : {}),
+      body: JSON.stringify(
+        subgraph
+          ? { node, nodes: subgraph.nodes, edges: subgraph.edges }
+          : node
+            ? { node }
+            : {}
+      ),
     }
   );
 };

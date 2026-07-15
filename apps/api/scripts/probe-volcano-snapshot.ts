@@ -1,3 +1,4 @@
+import { loadNodeEnv } from "../src/env/load-node-env";
 import { createNodeBindings } from "../src/env/create-node-bindings";
 import { buildVolcanoSnapshot } from "../src/integrations/volcengine/snapshot";
 
@@ -7,7 +8,8 @@ async function main(): Promise<void> {
   const interfaceId =
     process.env.INTERFACE_ID ?? "40cb912f-a986-43e3-9f65-3ba3976a9ee2";
 
-  const env = await createNodeBindings(process.env as Record<string, string>);
+  const envVars = loadNodeEnv();
+  const env = await createNodeBindings(envVars);
   const snapshot = await buildVolcanoSnapshot({
     env,
     organizationId,

@@ -4,6 +4,7 @@
  */
 
 import { Bindings } from "../context";
+import { DecryptionFailedError } from "./encryption-errors";
 
 /**
  * Get the master encryption key from environment
@@ -108,14 +109,21 @@ export async function decryptSecret(
   const iv = combined.slice(0, 12);
   const encrypted = combined.slice(12);
 
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encrypted
-  );
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encrypted
+    );
 
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
+    const decoder = new TextDecoder();
+    return decoder.decode(decrypted);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "OperationError") {
+      throw new DecryptionFailedError();
+    }
+    throw error;
+  }
 }
 
 /** Scope for platform-wide secrets (relay API keys, etc.). */

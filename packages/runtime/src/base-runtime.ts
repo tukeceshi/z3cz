@@ -55,6 +55,7 @@ import type { ObjectStore } from "./object-store";
 import { apiToNodeParameter, nodeToApiParameter } from "./parameter-mapper";
 import type { QueueService } from "./queue-service";
 import type { AiInterfaceService } from "./ai-interface-service";
+import type { TextModelService } from "./text-model-service";
 import type { RelayAccountService } from "./relay-account-service";
 import type { SchemaService } from "./schema-service";
 import type { CodeModeExecutor } from "./utils/code-mode";
@@ -125,6 +126,8 @@ export interface RuntimeDependencies<Env = unknown> {
   relayAccountService?: RelayAccountService;
   /** Organization AI interface resolver (compiled templates + org credentials). */
   aiInterfaceService?: AiInterfaceService;
+  /** Platform text model resolver (canonical id → interface + provider model). */
+  textModelService?: TextModelService;
   runtimeVersion?: string;
 }
 
@@ -163,6 +166,7 @@ export abstract class Runtime<Env = unknown> {
   protected sandboxExecutor?: SandboxExecutor;
   protected relayAccountService?: RelayAccountService;
   protected aiInterfaceService?: AiInterfaceService;
+  protected textModelService?: TextModelService;
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -198,6 +202,7 @@ export abstract class Runtime<Env = unknown> {
     this.sandboxExecutor = dependencies.sandboxExecutor;
     this.relayAccountService = dependencies.relayAccountService;
     this.aiInterfaceService = dependencies.aiInterfaceService;
+    this.textModelService = dependencies.textModelService;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -1214,6 +1219,13 @@ export abstract class Runtime<Env = unknown> {
                 organizationId: context.organizationId,
                 interfaceId: params.interfaceId,
                 templateId: params.templateId,
+              })
+          : undefined,
+        resolveTextModel: this.textModelService
+          ? (canonicalId) =>
+              this.textModelService!.resolveTextModel({
+                organizationId: context.organizationId,
+                canonicalId,
               })
           : undefined,
         env: this.env as NodeEnv,

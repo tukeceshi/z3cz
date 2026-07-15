@@ -13,6 +13,7 @@ import Logs from "lucide-react/icons/logs";
 import Mail from "lucide-react/icons/mail";
 import MessageSquareText from "lucide-react/icons/message-square-text";
 import Plug from "lucide-react/icons/plug";
+import Sparkles from "lucide-react/icons/sparkles";
 import SquareTerminal from "lucide-react/icons/square-terminal";
 import TableProperties from "lucide-react/icons/table-properties";
 
@@ -50,6 +51,12 @@ function buildWorkflowSidebarItems(
       title: t("sidebar.executions"),
       url: `/org/${orgId}/executions`,
       icon: Logs,
+    },
+    {
+      id: "model-calls",
+      title: t("sidebar.modelCalls"),
+      url: `/org/${orgId}/model-calls`,
+      icon: Sparkles,
     },
     {
       id: "feedback",

@@ -30,6 +30,8 @@ export interface WorkflowContextProps {
   edges?: ReactFlowEdge<WorkflowEdgeType>[];
   connectedHandles?: ReadonlySet<string>;
   soleSelectedNodeId?: string | null;
+  /** True while the user (or fit/zoom/layout) is moving the viewport. */
+  isViewportMoving?: boolean;
   disabled?: boolean;
   expandedOutputs?: boolean;
   nodeTypes?: NodeType[];
@@ -53,6 +55,7 @@ const WorkflowContext = createContext<WorkflowContextProps>({
   edges: [],
   connectedHandles: new Set(),
   soleSelectedNodeId: null,
+  isViewportMoving: false,
   disabled: false,
   nodeTypes: [],
 });
@@ -68,6 +71,7 @@ export interface WorkflowProviderProps {
   readonly edges?: ReactFlowEdge<WorkflowEdgeType>[];
   readonly connectedHandles?: ReadonlySet<string>;
   readonly soleSelectedNodeId?: string | null;
+  readonly isViewportMoving?: boolean;
   readonly disabled?: boolean;
   readonly expandedOutputs?: boolean;
   readonly nodeTypes?: NodeType[];
@@ -83,6 +87,7 @@ export function WorkflowProvider({
   edges = [],
   connectedHandles = new Set(),
   soleSelectedNodeId = null,
+  isViewportMoving = false,
   disabled = false,
   expandedOutputs = false,
   nodeTypes = [],
@@ -97,6 +102,7 @@ export function WorkflowProvider({
       edges,
       connectedHandles,
       soleSelectedNodeId,
+      isViewportMoving,
       disabled,
       expandedOutputs,
       nodeTypes,
@@ -110,6 +116,7 @@ export function WorkflowProvider({
       edges,
       connectedHandles,
       soleSelectedNodeId,
+      isViewportMoving,
       disabled,
       expandedOutputs,
       nodeTypes,
@@ -181,6 +188,21 @@ export const clearNodeInput = (
 
   updateNodeData?.(nodeId, { inputs: updatedInputs });
   return updatedInputs;
+};
+
+export const updateNodeOutput = (
+  nodeId: string,
+  outputId: string,
+  value: unknown,
+  outputs: readonly WorkflowParameter[],
+  updateNodeData?: UpdateNodeFn
+): readonly WorkflowParameter[] => {
+  const updatedOutputs = outputs.map((output) =>
+    output.id === outputId ? ({ ...output, value } as WorkflowParameter) : output
+  );
+
+  updateNodeData?.(nodeId, { outputs: updatedOutputs });
+  return updatedOutputs;
 };
 
 export const updateNodeName = (

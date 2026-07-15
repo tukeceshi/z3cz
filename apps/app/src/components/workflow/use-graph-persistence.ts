@@ -5,7 +5,17 @@ import type {
 import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
 
+import { AI_TEXT_GENERATING_META_KEY } from "./ai-text-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+
+function stripTransientMetadata(
+  metadata: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!metadata) return undefined;
+  const next = { ...metadata };
+  delete next[AI_TEXT_GENERATING_META_KEY];
+  return Object.keys(next).length > 0 ? next : undefined;
+}
 
 // Strip execution-only fields so persistence ignores transient state
 const stripExecutionFields = (
@@ -14,10 +24,12 @@ const stripExecutionFields = (
   outputs: Omit<WorkflowNodeType["outputs"][number], "value">[];
   inputs: WorkflowNodeType["inputs"];
 } => {
-  const { executionState, error, ...rest } = data;
+  const { executionState, error, metadata: _metadata, ...rest } = data;
+  const metadata = stripTransientMetadata(data.metadata);
 
   return {
     ...rest,
+    ...(metadata ? { metadata } : {}),
     outputs: data.outputs.map(({ value, ...outputRest }) => outputRest),
     inputs: data.inputs,
   };

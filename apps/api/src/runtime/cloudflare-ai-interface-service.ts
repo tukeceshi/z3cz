@@ -1,33 +1,26 @@
 import type { AiInterfaceService } from "@dafthunk/runtime";
+import { buildBuiltinAiInterfaceArtifact } from "@dafthunk/runtime/ai-interface/builtin-artifact";
 import { mergeResolvedAiInterface } from "@dafthunk/runtime/ai-interface/execute-sync";
-import type { ResolvedOrgAiInterface } from "@dafthunk/types";
+import type {
+  AiInterfaceProvider,
+  ResolvedOrgAiInterface,
+} from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
 import {
-  getAiInterfaceTemplateRow,
   resolveOrganizationAiInterfaceRow,
   updateOrganizationAiInterface,
 } from "../db/ai-interface-queries";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
-import { isVolcanoMetadata, parseInterfaceMetadata } from "../integrations/volcengine/metadata";
-import { AiInterfaceTemplateStore } from "../stores/ai-interface-template-store";
+import {
+  isVolcanoMetadata,
+  parseInterfaceMetadata,
+} from "../integrations/volcengine/metadata";
 import { decryptSecret } from "../utils/encryption";
 
 export class CloudflareAiInterfaceService implements AiInterfaceService {
-  private readonly store: AiInterfaceTemplateStore;
-
-  constructor(private readonly env: Bindings) {
-    this.store = new AiInterfaceTemplateStore(env);
-  }
-
-  loadManifest() {
-    return this.store.loadManifest();
-  }
-
-  loadArtifact(templateId: string, version?: number) {
-    return this.store.loadArtifact(templateId, version);
-  }
+  constructor(private readonly env: Bindings) {}
 
   async resolveOrgInterface(params: {
     organizationId: string;
@@ -48,16 +41,18 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
       return undefined;
     }
 
-    const templateRow = await getAiInterfaceTemplateRow(db, row.templateId);
-    if (!templateRow?.enabled) {
-      return undefined;
-    }
-
-    const artifact = await this.store.loadArtifact(
-      row.templateId,
-      row.templateVersion ?? undefined
-    );
-    if (!artifact) {
+    const provider = row.provider as AiInterfaceProvider;
+    let artifact;
+    try {
+      artifact = buildBuiltinAiInterfaceArtifact(provider, {
+        baseUrl: row.baseUrl,
+        defaultModel: row.selectedModel,
+      });
+    } catch (error) {
+      console.error(
+        `Failed to build AI interface artifact for ${row.id}:`,
+        error instanceof Error ? error.message : error
+      );
       return undefined;
     }
 

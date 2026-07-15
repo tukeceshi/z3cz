@@ -16,6 +16,7 @@ export interface AiInterfaceSyncExecutionResult {
 export async function executeAiInterfaceSync(params: {
   resolved: ResolvedOrgAiInterface;
   inputs: Readonly<Record<string, unknown>>;
+  readonly bodyExtensions?: Readonly<Record<string, unknown>>;
 }): Promise<AiInterfaceSyncExecutionResult> {
   const { resolved, inputs } = params;
   const artifact = resolved.artifact;
@@ -57,7 +58,10 @@ export async function executeAiInterfaceSync(params: {
     const response = await fetch(url, {
       method: sync.method,
       headers,
-      body: JSON.stringify(bodyResult),
+      body: JSON.stringify({
+        ...bodyResult,
+        ...(params.bodyExtensions ?? {}),
+      }),
       signal: controller.signal,
     });
 

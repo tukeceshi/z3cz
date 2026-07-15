@@ -1,5 +1,10 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { VolcanoModelActivationCacheEntry } from "./volcano-activation";
+import type {
+  VolcanoPackageStatusBreakdown,
+  VolcanoResourcePackageFetchMode,
+  VolcanoResourcePackageRow,
+} from "./volcano-resource-package-usage";
 
 export type VolcanoApiKeyStatus =
   | "active"
@@ -13,6 +18,13 @@ export interface VolcanoModelConfig {
   readonly modality: AiModelModality;
 }
 
+export interface VolcanoPackageListCache {
+  readonly fetchedAt: string;
+  readonly mode: VolcanoResourcePackageFetchMode;
+  readonly rows: readonly VolcanoResourcePackageRow[];
+  readonly statusCounts: Readonly<Record<string, number>>;
+}
+
 export interface VolcanoInterfaceMetadata {
   readonly credentialMode: "volcengine_iam";
   readonly accessKeyId: string;
@@ -24,6 +36,7 @@ export interface VolcanoInterfaceMetadata {
   readonly modelActivationCache?: Readonly<
     Record<string, VolcanoModelActivationCacheEntry>
   >;
+  readonly packageListCache?: VolcanoPackageListCache;
 }
 
 export interface VolcanoModelPackageSnapshot {
@@ -36,12 +49,14 @@ export interface VolcanoModelPackageSnapshot {
 export interface VolcanoModelUsage {
   readonly used: number;
   readonly remaining: number;
+  /** Unused amount forfeited when packages expired (not whole package total). */
   readonly expired: number;
   readonly quota: number;
   readonly unit: "tokens" | "images" | "seconds";
   readonly period: "package";
   readonly usagePercent: number;
   readonly overQuota: boolean;
+  readonly packageStatus?: VolcanoPackageStatusBreakdown;
 }
 
 export interface VolcanoModelSnapshotRow {
@@ -87,6 +102,7 @@ export interface VolcanoSnapshotResponse {
   } | null;
   readonly balanceError?: string;
   readonly usageError?: string;
+  readonly packageListCachedAt?: string;
   readonly pricing: VolcanoSnapshotPricing;
   readonly models: readonly VolcanoModelSnapshotRow[];
 }

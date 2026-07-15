@@ -1,10 +1,25 @@
 import type { NodeType } from "@dafthunk/types";
+import { AI_INTERFACE_NODE_TYPE } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { getCloudflareModelNodeTypes } from "../runtime/cloudflare-model-catalog";
-import { getAiInterfaceNodeTypes } from "../runtime/cloudflare-ai-interface-catalog";
 import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
 import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
+
+/** Canvas template-as-node types — kept executable for legacy graphs, omitted from catalogs. */
+export function isLegacyAiInterfaceCanvasNodeType(nodeType: NodeType): boolean {
+  return (
+    nodeType.type === AI_INTERFACE_NODE_TYPE ||
+    nodeType.id === AI_INTERFACE_NODE_TYPE ||
+    nodeType.id.startsWith(`${AI_INTERFACE_NODE_TYPE}-`)
+  );
+}
+
+export function omitLegacyAiInterfaceCanvasNodes(
+  nodeTypes: readonly NodeType[]
+): NodeType[] {
+  return nodeTypes.filter((entry) => !isLegacyAiInterfaceCanvasNodeType(entry));
+}
 
 export async function getAllNodeTypes(
   env: Bindings,
@@ -12,13 +27,7 @@ export async function getAllNodeTypes(
   developerMode = false
 ): Promise<NodeType[]> {
   if (env.RUNTIME === "node") {
-    const staticTypes = loadNodeTypesFromJson();
-    try {
-      const aiNodeTypes = await getAiInterfaceNodeTypes(env, executionCtx);
-      return [...staticTypes, ...aiNodeTypes];
-    } catch {
-      return staticTypes;
-    }
+    return omitLegacyAiInterfaceCanvasNodes(loadNodeTypesFromJson());
   }
 
   const registry = await createCloudflareNodeRegistry(env, developerMode);
@@ -29,9 +38,11 @@ export async function getAllNodeTypes(
       env,
       executionCtx
     );
-    const aiNodeTypes = await getAiInterfaceNodeTypes(env, executionCtx);
-    return [...staticNodeTypes, ...cloudflareNodeTypes, ...aiNodeTypes];
+    return omitLegacyAiInterfaceCanvasNodes([
+      ...staticNodeTypes,
+      ...cloudflareNodeTypes,
+    ]);
   } catch {
-    return staticNodeTypes;
+    return omitLegacyAiInterfaceCanvasNodes(staticNodeTypes);
   }
 }

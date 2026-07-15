@@ -1,4 +1,5 @@
 import type {
+  Edge as BackendEdge,
   Node as BackendNode,
   ObjectReference,
   Parameter,
@@ -94,6 +95,51 @@ function serializeNodeSnapshot(
         description: output.name,
       } as Parameter;
     }),
+  };
+}
+
+function collectUpstreamNodeIds(
+  targetNodeId: string,
+  edges: ReactFlowEdge<WorkflowEdgeType>[]
+): Set<string> {
+  const upstream = new Set<string>();
+  const queue = [targetNodeId];
+
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (!current) continue;
+
+    for (const edge of edges) {
+      if (edge.target !== current) continue;
+      if (upstream.has(edge.source)) continue;
+      upstream.add(edge.source);
+      queue.push(edge.source);
+    }
+  }
+
+  return upstream;
+}
+
+function serializeSubgraphForExecute(
+  targetNodeId: string,
+  nodes: ReactFlowNode<WorkflowNodeType>[],
+  edges: ReactFlowEdge<WorkflowEdgeType>[]
+): { nodes: BackendNode[]; edges: BackendEdge[] } {
+  const upstream = collectUpstreamNodeIds(targetNodeId, edges);
+  const includedIds = new Set([targetNodeId, ...upstream]);
+  const includedNodes = nodes.filter((node) => includedIds.has(node.id));
+  const includedEdges = edges.filter(
+    (edge) => includedIds.has(edge.source) && includedIds.has(edge.target)
+  );
+
+  return {
+    nodes: includedNodes.map((node) => serializeNodeSnapshot(node, edges)),
+    edges: includedEdges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      sourceOutput: edge.sourceHandle ?? "",
+      targetInput: edge.targetHandle ?? "",
+    })),
   };
 }
 
@@ -288,6 +334,18 @@ export function WorkflowBuilder({
     });
   }, [reactFlowInstance, fitViewPadding]);
 
+  const handleZoomOneToOne = useCallback(() => {
+    reactFlowInstance?.zoomTo(1, { duration: 200 });
+  }, [reactFlowInstance]);
+
+  const [isViewportMoving, setIsViewportMoving] = useState(false);
+  const handleViewportMoveStart = useCallback(() => {
+    setIsViewportMoving(true);
+  }, []);
+  const handleViewportMoveEnd = useCallback(() => {
+    setIsViewportMoving(false);
+  }, []);
+
   // Check if workflow already contains a trigger node
   const hasTriggerNode = useMemo(() => {
     if (!nodeTypes) return false;
@@ -347,11 +405,12 @@ export function WorkflowBuilder({
       });
 
       try {
-        const snapshot = serializeNodeSnapshot(node, edges);
+        const snapshot = serializeSubgraphForExecute(nodeId, nodes, edges);
         const response = await executeWorkflowNode(
           workflowId,
           nodeId,
           orgId,
+          snapshot.nodes.find((entry) => entry.id === nodeId),
           snapshot
         );
         const nodeExecution = response.nodeExecutions?.find(
@@ -394,6 +453,7 @@ export function WorkflowBuilder({
         edges={edges}
         connectedHandles={connectedHandles}
         soleSelectedNodeId={soleSelectedNodeId}
+        isViewportMoving={isViewportMoving}
         disabled={readOnly}
         expandedOutputs={expandedOutputs}
         nodeTypes={nodeTypes}
@@ -421,6 +481,8 @@ export function WorkflowBuilder({
               onNodeDragStart={onNodeDragStart}
               onNodeDragStop={onNodeDragStop}
               isDraggingRef={isDraggingRef}
+              onMoveStart={handleViewportMoveStart}
+              onMoveEnd={handleViewportMoveEnd}
               onInit={setReactFlowInstance}
               onAddNode={readOnly ? undefined : handleAddNode}
               onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
@@ -436,6 +498,7 @@ export function WorkflowBuilder({
               isValidConnection={isValidConnection}
               disabled={readOnly}
               onFitToScreen={handleFitToScreen}
+              onZoomOneToOne={handleZoomOneToOne}
               selectedNodes={selectedNodes}
               selectedEdges={selectedEdges}
               onDeleteSelected={readOnly ? undefined : deleteSelected}

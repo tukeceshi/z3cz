@@ -1,4 +1,5 @@
 import type { NodeType } from "./workflow";
+import type { VolcanoActivationProbeResult } from "./volcano-activation";
 import type { VolcanoInterfaceMetadata } from "./volcano-snapshot";
 
 export const AI_INTERFACE_NODE_TYPE = "ai-interface" as const;
@@ -154,53 +155,12 @@ export interface AiInterfaceManifest {
   readonly nodeTypes: readonly NodeType[];
 }
 
-export interface AiInterfaceTemplateIndex {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly provider: AiInterfaceProvider;
-  readonly executionMode: AiInterfaceExecutionMode;
-  readonly enabled: boolean;
-  readonly isSystem: boolean;
-  readonly isDefault: boolean;
-  readonly sortOrder: number;
-  readonly specVersion: number;
-  readonly artifactChecksum: string;
-  readonly updatedAt: string;
-  readonly updatedBy?: string | null;
-}
-
-export interface AiInterfaceTemplateDetail extends AiInterfaceTemplateIndex {
-  readonly sourceSpec: AiInterfaceSourceSpec;
-}
-
-export interface ListAiInterfaceTemplatesResponse {
-  readonly templates: AiInterfaceTemplateIndex[];
-}
-
-export interface GetAiInterfaceTemplateResponse {
-  readonly template: AiInterfaceTemplateDetail;
-}
-
-export interface SaveAiInterfaceTemplateRequest {
-  readonly sourceSpec: AiInterfaceSourceSpec;
-  readonly changeNote?: string;
-}
-
-export interface AiInterfaceTemplateRevision {
-  readonly id: string;
-  readonly templateId: string;
-  readonly version: number;
-  readonly artifactChecksum: string;
-  readonly changeNote?: string | null;
-  readonly createdAt: string;
-  readonly createdBy?: string | null;
-}
-
 export interface OrganizationAiInterface {
   readonly id: string;
   readonly organizationId: string;
-  readonly templateId: string;
+  /** @deprecated Legacy template linkage; unused after template retirement. */
+  readonly templateId?: string | null;
+  /** @deprecated Legacy template revision pin; unused after template retirement. */
   readonly templateVersion?: number | null;
   readonly name: string;
   readonly provider: AiInterfaceProvider;
@@ -219,13 +179,13 @@ export interface ListOrganizationAiInterfacesResponse {
 }
 
 export interface CreateOrganizationAiInterfaceRequest {
-  readonly templateId: string;
+  readonly provider: AiInterfaceProvider;
   readonly name: string;
   readonly apiKey?: string;
   readonly accessKeyId?: string;
   readonly secretAccessKey?: string;
   readonly enabledModels?: readonly string[];
-  readonly templateVersion?: number | null;
+  readonly volcanoActivationResults?: readonly VolcanoActivationProbeResult[];
   readonly baseUrl?: string | null;
   readonly selectedModel?: string | null;
   readonly metadata?: Readonly<Record<string, unknown>>;
@@ -236,7 +196,8 @@ export interface CreateOrganizationAiInterfaceRequest {
 export interface UpdateOrganizationAiInterfaceRequest {
   readonly name?: string;
   readonly apiKey?: string;
-  readonly templateVersion?: number | null;
+  readonly accessKeyId?: string;
+  readonly secretAccessKey?: string;
   readonly baseUrl?: string | null;
   readonly selectedModel?: string | null;
   readonly metadata?: Readonly<Record<string, unknown>>;

@@ -1,15 +1,18 @@
 import type { NodeExecution, NodeType } from "@dafthunk/types";
-import { withSelectedModel } from "@dafthunk/types";
+import {
+  resolveAiTextEffectivePrompt,
+  withSelectedModel,
+} from "@dafthunk/types";
 
 import { executeAiInterfaceSync } from "../../ai-interface/execute-sync";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
 
 export const AI_TEXT_NODE_TYPE = "ai-text" as const;
+export const AI_TEXT_KEYWORDS_INPUT = "keywords" as const;
 
 /**
- * AI Text node — gateway-style text generation via org AI interfaces.
- * Supports manual_text bypass for testing without API calls.
+ * AI Text node — generates text via org AI interfaces and platform model catalog.
  */
 export class AiTextNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
@@ -21,9 +24,9 @@ export class AiTextNode extends ExecutableNode {
     documentation: `Generates text using the organization's configured AI interface.
 
 ### Inputs
-- **prompt**: The prompt to send to the AI model.
-- **model**: Optional model override.
-- **manual_text**: When set, returns this text directly without calling the AI API (useful for testing).
+- **keywords**: Optional upstream text reference (wired on the canvas).
+- **prompt**: Manual prompt when keywords is not connected.
+- **model**: Platform model canonical id (e.g. deepseek-v4-flash).
 
 ### Outputs
 - **text**: The generated text response.`,
@@ -35,27 +38,44 @@ export class AiTextNode extends ExecutableNode {
       {
         name: "ai_interface_id",
         type: "string",
-        description:
-          "Organization AI interface instance ID. Leave empty to use the org default.",
+        description: "Resolved automatically from the selected model.",
         required: false,
         hidden: true,
       },
       {
         name: "model",
         type: "string",
-        description: "Model override (e.g. gpt-4o, claude-3-5-sonnet).",
+        description: "Platform model canonical id.",
         required: false,
+        hidden: true,
+      },
+      {
+        name: "result",
+        type: "string",
+        description:
+          "Last generated text shown on the canvas card (persisted with the workflow).",
+        required: false,
+        hidden: true,
+      },
+      {
+        name: AI_TEXT_KEYWORDS_INPUT,
+        type: "any",
+        description: "Upstream references (text / image / video per model limits).",
+        required: false,
+        hidden: true,
+        repeated: true,
+      },
+      {
+        name: "result_history",
+        type: "json",
+        description: "Candidate generation results for history picker.",
+        required: false,
+        hidden: true,
       },
       {
         name: "prompt",
         type: "string",
-        description: "The prompt to send to the model.",
-        required: false,
-      },
-      {
-        name: "manual_text",
-        type: "string",
-        description: "Return this text directly, bypassing the AI API.",
+        description: "Manual prompt when keywords is not connected.",
         required: false,
         hidden: true,
       },
@@ -64,9 +84,15 @@ export class AiTextNode extends ExecutableNode {
   };
 
   public async execute(context: NodeContext): Promise<NodeExecution> {
-    const manualText = context.inputs.manual_text;
-    if (typeof manualText === "string" && manualText.trim().length > 0) {
-      return this.createSuccessResult({ text: manualText.trim() });
+    const effectivePrompt = resolveAiTextEffectivePrompt({
+      keywords: context.inputs[AI_TEXT_KEYWORDS_INPUT],
+      prompt: context.inputs.prompt,
+    });
+
+    if (!effectivePrompt) {
+      return this.createErrorResult(
+        "A prompt or connected keywords input is required."
+      );
     }
 
     if (!context.resolveAiInterface) {
@@ -75,11 +101,37 @@ export class AiTextNode extends ExecutableNode {
       );
     }
 
-    const interfaceIdRaw = context.inputs.ai_interface_id;
-    const interfaceId =
-      typeof interfaceIdRaw === "string" && interfaceIdRaw.trim().length > 0
-        ? interfaceIdRaw.trim()
+    const modelCanonicalId =
+      typeof context.inputs.model === "string" &&
+      context.inputs.model.trim().length > 0
+        ? context.inputs.model.trim()
         : undefined;
+
+    let interfaceId =
+      typeof context.inputs.ai_interface_id === "string" &&
+      context.inputs.ai_interface_id.trim().length > 0
+        ? context.inputs.ai_interface_id.trim()
+        : undefined;
+
+    let providerModelId: string | undefined;
+
+    if (modelCanonicalId) {
+      if (!context.resolveTextModel) {
+        return this.createErrorResult(
+          "Text model resolution is unavailable in this runtime."
+        );
+      }
+
+      const resolvedModel = await context.resolveTextModel(modelCanonicalId);
+      if (!resolvedModel) {
+        return this.createErrorResult(
+          `Model "${modelCanonicalId}" is not available for this organization.`
+        );
+      }
+
+      interfaceId = resolvedModel.interfaceId;
+      providerModelId = resolvedModel.providerModelId;
+    }
 
     const resolved = await context.resolveAiInterface({ interfaceId });
 
@@ -89,9 +141,14 @@ export class AiTextNode extends ExecutableNode {
       );
     }
 
+    const selected = withSelectedModel(resolved, providerModelId);
+
     const result = await executeAiInterfaceSync({
-      resolved: withSelectedModel(resolved, context.inputs.model),
-      inputs: context.inputs,
+      resolved: selected,
+      inputs: {
+        ...context.inputs,
+        prompt: effectivePrompt,
+      },
     });
 
     if (result.status === "failed") {

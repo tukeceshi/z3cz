@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { Bindings } from "../context";
 import { decryptSecret, encryptSecret } from "./encryption";
+import { DecryptionFailedError } from "./encryption-errors";
 
 // Mock Bindings for testing
 const createMockEnv = (masterKey?: string): Bindings => ({
@@ -135,7 +136,7 @@ describe("Encryption Utilities", () => {
 
       await expect(
         decryptSecret(encrypted, mockEnv, "org-2")
-      ).rejects.toThrow();
+      ).rejects.toThrow(DecryptionFailedError);
     });
 
     it("should maintain organization isolation consistently", async () => {
@@ -162,11 +163,11 @@ describe("Encryption Utilities", () => {
       // Cross-organization decryption should fail
       await expect(
         decryptSecret(org1Encrypted, mockEnv, "org-2")
-      ).rejects.toThrow();
+      ).rejects.toThrow(DecryptionFailedError);
 
       await expect(
         decryptSecret(org2Encrypted, mockEnv, "org-1")
-      ).rejects.toThrow();
+      ).rejects.toThrow(DecryptionFailedError);
     });
   });
 

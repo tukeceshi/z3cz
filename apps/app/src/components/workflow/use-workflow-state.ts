@@ -11,6 +11,7 @@ import type {
   ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
+import type { RefObject } from "react";
 
 import { useClipboard } from "./use-clipboard";
 import { useGraphOperations } from "./use-graph-operations";
@@ -87,6 +88,9 @@ interface UseWorkflowStateReturn {
   cutSelected: () => void;
   pasteFromClipboard: () => void;
   hasClipboardData: boolean;
+  soleSelectedNodeId: string | null;
+  connectedHandles: ReadonlySet<string>;
+  isDraggingRef: RefObject<boolean>;
 }
 
 const NOOP = () => {};

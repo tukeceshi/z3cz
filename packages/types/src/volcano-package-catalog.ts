@@ -5,7 +5,6 @@ export const VOLCANO_PACKAGE_CONFIG_BY_CANONICAL_ID = {
   "doubao-seedance-2-fast": ["Doubao_Seedance_2.0_fast_pack_free_infer"],
   "doubao-seedance-2-mini": ["Doubao_Seedance_2.0_mini_pack_free_infer"],
   "doubao-seedream-5": ["Doubao_Seedream_5.0_pack_free_infer"],
-  "doubao-seedream-5-pro": ["Doubao_Seedream_5.0_pro_pack_free_infer"],
   "doubao-seed-evolving": [],
 } as const satisfies Readonly<Record<string, readonly string[]>>;
 
@@ -32,7 +31,6 @@ export const VOLCANO_PACKAGE_PROVISION_MODE_BY_CANONICAL_ID = {
   "doubao-seedance-2-fast": "required",
   "doubao-seedance-2-mini": "required",
   "doubao-seedream-5": "required",
-  "doubao-seedream-5-pro": "optional",
   "doubao-seed-evolving": "none",
 } as const satisfies Readonly<
   Record<string, VolcanoPackageProvisionMode>

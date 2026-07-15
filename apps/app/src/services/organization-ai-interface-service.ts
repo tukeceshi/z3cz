@@ -1,5 +1,4 @@
 import type {
-  AiInterfaceTemplateIndex,
   CreateOrganizationAiInterfaceRequest,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
@@ -28,24 +27,6 @@ export function useOrganizationAiInterfaces(organizationId: string | undefined) 
     interfacesError: error,
     isInterfacesLoading: isLoading,
     refreshInterfaces: mutate,
-  };
-}
-
-export function useAiInterfaceCatalog(organizationId: string | undefined) {
-  const key = organizationId
-    ? `${orgEndpoint(organizationId)}/catalog`
-    : null;
-  const { data, error, isLoading } = useSWR(key, async () => {
-    const response = await makeRequest<{
-      templates: AiInterfaceTemplateIndex[];
-    }>(`${orgEndpoint(organizationId!)}/catalog`);
-    return response.templates;
-  });
-
-  return {
-    catalog: data ?? [],
-    catalogError: error,
-    isCatalogLoading: isLoading,
   };
 }
 
@@ -89,10 +70,12 @@ export async function deleteOrganizationAiInterface(
 
 export async function fetchVolcanoSnapshot(
   organizationId: string,
-  interfaceId: string
+  interfaceId: string,
+  options?: { refreshPackages?: boolean }
 ): Promise<VolcanoSnapshotResponse> {
+  const query = options?.refreshPackages ? "?refreshPackages=1" : "";
   const response = await makeRequest<{ snapshot: VolcanoSnapshotResponse }>(
-    `${orgEndpoint(organizationId)}/${interfaceId}/volcano-snapshot`
+    `${orgEndpoint(organizationId)}/${interfaceId}/volcano-snapshot${query}`
   );
   return response.snapshot;
 }

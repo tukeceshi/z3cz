@@ -1,5 +1,5 @@
 import type { ObjectReference, ToolReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -36,6 +36,13 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
+import {
+  AI_TEXT_CARD_WIDTH_PX,
+  AI_TEXT_KEYWORDS_HANDLE_ID,
+  AI_TEXT_OUTPUT_ID,
+  isAiTextGenerating,
+  withAiTextResult,
+} from "./ai-text-node-utils";
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
 import { SubscriptionBadge } from "./subscription-badge";
@@ -72,6 +79,7 @@ import {
   InputOutputType,
   NodeExecutionState,
   WorkflowParameter,
+  type WorkflowNodeType as CanvasWorkflowNodeType,
 } from "./workflow-types";
 
 /**
@@ -127,7 +135,7 @@ export const TypeBadge = memo(
     type,
     position,
     id,
-    nodeId,
+    nodeId: _nodeId,
     parameter,
     onInputClick,
     onOutputClick,
@@ -293,6 +301,7 @@ export const WorkflowNode = memo(
       nodeTypes,
       connectedHandles = new Set(),
       soleSelectedNodeId = null,
+      isViewportMoving = false,
     } = useWorkflow();
     const { t } = useTranslation();
     const isSoleSelected = soleSelectedNodeId === id;
@@ -338,8 +347,13 @@ export const WorkflowNode = memo(
       [nodeType, id, data.inputs, data.outputs, data.metadata]
     );
 
-    const handleWidgetChange = (value: any) => {
+    const handleWidgetChange = (value: string) => {
       if (disabled || !updateNodeData || !widget) return;
+
+      if (nodeType === AI_TEXT_NODE_TYPE) {
+        updateNodeData(id, (current) => withAiTextResult(current, value));
+        return;
+      }
 
       const input = data.inputs.find((i) => i.id === widget.inputField);
       if (input) {
@@ -492,9 +506,12 @@ export const WorkflowNode = memo(
     };
 
     const isAiGenerative = (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType);
+    const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
     const isExecuting =
       data.executionState === "executing" ||
       data.executionState === "pending";
+    const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
+    const showBusyOverlay = isExecuting || isAiTextBusy;
     const isError = data.executionState === "error" && !!data.error;
 
     return (
@@ -549,21 +566,26 @@ export const WorkflowNode = memo(
           <CircleHelp className="h-2.5 w-2.5" />
         </button>
 
+        <div className={cn("relative", isAiTextNode && "inline-block")}>
         <div
           className={cn("bg-card shadow-xs rounded-md border relative", {
-            "w-[220px]": !isAiGenerative,
-            "w-[280px]": isAiGenerative,
-            "border-border": !selected && data.executionState === "idle",
-            "border-yellow-400": !selected && isExecuting,
+            "w-[220px]": !isAiGenerative && !isAiTextNode,
+            "w-[280px]": isAiGenerative && !isAiTextNode,
+            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy,
+            "border-yellow-400":
+              !selected && (isExecuting || isAiTextBusy),
             "border-green-500":
-              !selected && data.executionState === "completed",
+              !selected && data.executionState === "completed" && !isAiTextBusy,
             "border-red-500": !selected && data.executionState === "error",
             "border-blue-400": !selected && data.executionState === "skipped",
             "border-blue-500": selected,
           })}
+          style={
+            isAiTextNode ? { width: AI_TEXT_CARD_WIDTH_PX } : undefined
+          }
         >
-          {/* Execution overlay */}
-          {isExecuting && (
+          {/* Execution / generate overlay */}
+          {showBusyOverlay && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-card/70 backdrop-blur-[1px]">
               <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
             </div>
@@ -578,9 +600,14 @@ export const WorkflowNode = memo(
             </div>
           )}
 
-          {/* Widget */}
+          {/* Widget — AI text keeps the whole card draggable; only controls use nodrag */}
           {widget && (
-            <div className="px-0 py-0 nodrag border-b">
+            <div
+              className={cn(
+                "px-0 py-0 border-b",
+                !isAiTextNode && "nodrag"
+              )}
+            >
               {createElement(widget.Component, {
                 ...widget.config,
                 onChange: !disabled ? handleWidgetChange : () => {},
@@ -724,6 +751,7 @@ export const WorkflowNode = memo(
           )}
 
           {/* Parameters */}
+          {!isAiTextNode ? (
           <div className="py-2 grid grid-cols-2 justify-between gap-3">
             {/* Input Parameters */}
             <div className="flex flex-col gap-1 flex-1">
@@ -789,12 +817,63 @@ export const WorkflowNode = memo(
                 ))}
             </div>
           </div>
+          ) : (
+            <>
+              <div className="pointer-events-auto absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+                <TypeBadge
+                  type={
+                    data.inputs.find(
+                      (input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID
+                    )?.type ?? "any"
+                  }
+                  position={Position.Left}
+                  id={AI_TEXT_KEYWORDS_HANDLE_ID}
+                  nodeId={id}
+                  parameter={data.inputs.find(
+                    (input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID
+                  )}
+                  disabled={disabled}
+                  executionState={data.executionState}
+                  selected={selected}
+                  isConnected={isWorkflowHandleConnected(
+                    connectedHandles,
+                    id,
+                    AI_TEXT_KEYWORDS_HANDLE_ID
+                  )}
+                />
+              </div>
+              <div className="pointer-events-auto absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2">
+                {data.outputs
+                  .filter((output) => output.id === AI_TEXT_OUTPUT_ID)
+                  .map((output) => (
+                    <TypeBadge
+                      key={output.id}
+                      type={output.type}
+                      position={Position.Right}
+                      id={output.id}
+                      nodeId={id}
+                      parameter={output}
+                      onOutputClick={handleOutputClick}
+                      disabled={disabled}
+                      executionState={data.executionState}
+                      selected={selected}
+                      isConnected={isWorkflowHandleConnected(
+                        connectedHandles,
+                        id,
+                        output.id
+                      )}
+                    />
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
         </div>
 
-        {isSoleSelected && !isDragging ? (
+        {isSoleSelected && !isDragging && !isViewportMoving ? (
           <WorkflowNodeBottomPanel
             nodeId={id}
-            data={data}
+            data={data as unknown as CanvasWorkflowNodeType}
             createObjectUrl={data.createObjectUrl}
           />
         ) : null}

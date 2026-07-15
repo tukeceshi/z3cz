@@ -135,6 +135,6 @@ export function buildDockerCommand(featureId: ResourceFeatureId): string | null 
     "# .env.docker",
     envLines,
     "",
-    "docker compose --env-file .env.docker up -d --build api",
+    "docker compose up -d",
   ].join("\n");
 }

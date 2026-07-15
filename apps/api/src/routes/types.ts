@@ -5,9 +5,9 @@ import { optionalJwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { createDatabase, getEnabledWorkflowSchemeById } from "../db";
 import { getCloudflareModelNodeTypes } from "../runtime/cloudflare-model-catalog";
-import { getAiInterfaceNodeTypes } from "../runtime/cloudflare-ai-interface-catalog";
 import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
 import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
+import { omitLegacyAiInterfaceCanvasNodes } from "../utils/node-types";
 import { filterNodeTypesForScheme } from "../utils/workflow-scheme";
 
 const typeRoutes = new Hono<ApiContext>();
@@ -18,19 +18,7 @@ typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
 
     let nodeTypes: NodeType[];
     if (c.env.RUNTIME === "node") {
-      nodeTypes = loadNodeTypesFromJson();
-      try {
-        const aiNodeTypes = await getAiInterfaceNodeTypes(
-          c.env,
-          c.executionCtx
-        );
-        nodeTypes = [...nodeTypes, ...aiNodeTypes];
-      } catch (error) {
-        console.warn(
-          "[types] Skipping AI interface synthesis:",
-          error instanceof Error ? error.message : error
-        );
-      }
+      nodeTypes = omitLegacyAiInterfaceCanvasNodes(loadNodeTypesFromJson());
     } else {
       const jwtPayload = c.get("jwtPayload");
       const registry = await createCloudflareNodeRegistry(
@@ -40,7 +28,6 @@ typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
       const staticNodeTypes = registry.getNodeTypes();
 
       let cloudflareNodeTypes: NodeType[] = [];
-      let aiNodeTypes: NodeType[] = [];
       try {
         cloudflareNodeTypes = await getCloudflareModelNodeTypes(
           c.env,
@@ -53,16 +40,10 @@ typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
         );
       }
 
-      try {
-        aiNodeTypes = await getAiInterfaceNodeTypes(c.env, c.executionCtx);
-      } catch (error) {
-        console.warn(
-          "[types] Skipping AI interface synthesis:",
-          error instanceof Error ? error.message : error
-        );
-      }
-
-      nodeTypes = [...staticNodeTypes, ...cloudflareNodeTypes, ...aiNodeTypes];
+      nodeTypes = omitLegacyAiInterfaceCanvasNodes([
+        ...staticNodeTypes,
+        ...cloudflareNodeTypes,
+      ]);
     }
 
     if (schemeId) {

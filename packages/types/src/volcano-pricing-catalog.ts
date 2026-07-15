@@ -87,14 +87,6 @@ export const VOLCANO_MODEL_PRICING_CATALOG: readonly VolcanoModelPricingRow[] = 
     monthlyFreeQuota: null,
   },
   {
-    canonicalId: "doubao-seedream-5-pro",
-    alias: "Seedream 5.0 Pro",
-    modality: "image",
-    unitLabel: "元/张",
-    priceLabel: "0.30",
-    monthlyFreeQuota: 200,
-  },
-  {
     canonicalId: "doubao-seedream-5",
     alias: "Seedream 5.0",
     modality: "image",

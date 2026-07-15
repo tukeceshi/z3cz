@@ -21,6 +21,11 @@ export default defineConfig({
   ],
   server: {
     host: true,
+    // Docker Desktop (Windows/macOS) bind mounts often miss inotify events.
+    watch: {
+      usePolling: process.env.CHOKIDAR_USEPOLLING === "1" || !!process.env.API_PROXY_TARGET,
+      interval: 300,
+    },
     proxy: {
       "/api": {
         target: apiProxyTarget,

@@ -57,6 +57,34 @@
       "when": 1783880000000,
       "tag": "0007_strip_workflow_feature_nav",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783960000000,
+      "tag": "0008_platform_ai_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784040000000,
+      "tag": "0009_strip_ai_interface_canvas_scheme",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784120000000,
+      "tag": "0010_platform_ai_model_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784200000000,
+      "tag": "0011_retire_ai_interface_templates",
+      "breakpoints": true
     }
   ]
 }

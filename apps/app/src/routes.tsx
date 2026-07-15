@@ -22,11 +22,12 @@ import { AdminOrganizationDetailPage } from "./pages/admin/admin-organization-de
 import { AdminOrganizationsPage } from "./pages/admin/admin-organizations-page";
 import { AdminQueuesPage } from "./pages/admin/admin-queues-page";
 import { AdminSettingsPage } from "./pages/admin/admin-settings-page";
+import { AdminAiModelsPage } from "./pages/admin/admin-ai-models-page";
+import { AdminModelInvocationsPage } from "./pages/admin/admin-model-invocations-page";
 import { AdminFeatureSettingsPage } from "./pages/admin/admin-feature-settings-page";
 import { AdminStuckUsersPage } from "./pages/admin/admin-stuck-users-page";
 import { AdminSupportPage } from "./pages/admin/admin-support-page";
 import { AdminPlatformRelayAccountsPage } from "./pages/admin/admin-platform-relay-accounts-page";
-import { AdminAiInterfaceTemplatesPage } from "./pages/admin/admin-ai-interface-templates-page";
 import { AdminWorkflowSchemesPage } from "./pages/admin/admin-workflow-schemes-page";
 import { AdminUserDetailPage } from "./pages/admin/admin-user-detail-page";
 import { AdminUsersPage } from "./pages/admin/admin-users-page";
@@ -50,6 +51,7 @@ import { EditorPage } from "./pages/editor-page";
 import { EmailInboxPage } from "./pages/email-inbox-page";
 import { EmailsPage } from "./pages/emails-page";
 import { ExecutionDetailPage } from "./pages/execution-detail-page";
+import { ModelCallsPage } from "./pages/model-calls-page";
 import { ExecutionsPage } from "./pages/executions-page";
 import { FeedbackFormPage } from "./pages/feedback-form-page";
 import { FeedbackPage } from "./pages/feedback-page";
@@ -282,6 +284,28 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.adminDatasets") },
   },
   {
+    path: "/admin/ai-models",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminAiModelsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminAiModels") },
+  },
+  {
+    path: "/admin/model-invocations",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminModelInvocationsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminModelInvocations") },
+  },
+  {
     path: "/admin/feature-settings",
     element: (
       <AdminLayout>
@@ -324,19 +348,6 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminRelayAccounts") },
-  },
-  {
-    path: "/admin/ai-interface-templates",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminAiInterfaceTemplatesPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: {
-      head: createRouteHead("seo.routes.adminAiTemplates"),
-    },
   },
   {
     path: "/admin/databases",
@@ -462,6 +473,21 @@ export const routes: AppRouteObject[] = [
       </OrgLayout>
     ),
     handle: { head: createRouteHead("seo.routes.executions") },
+  },
+  {
+    path: "/model-calls",
+    element: <OrgRedirect to="/org/:organizationId/model-calls" />,
+  },
+  {
+    path: "/org/:organizationId/model-calls",
+    element: (
+      <OrgLayout title="Workflows">
+        <ProtectedRoute>
+          <ModelCallsPage />
+        </ProtectedRoute>
+      </OrgLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.modelCalls") },
   },
   {
     path: "/datasets",

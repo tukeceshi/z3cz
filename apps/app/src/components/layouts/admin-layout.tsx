@@ -1,5 +1,4 @@
 import Building2 from "lucide-react/icons/building-2";
-import Cpu from "lucide-react/icons/cpu";
 import Database from "lucide-react/icons/database";
 import Inbox from "lucide-react/icons/inbox";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
@@ -10,6 +9,7 @@ import Settings from "lucide-react/icons/settings";
 import SlidersHorizontal from "lucide-react/icons/sliders-horizontal";
 import Shapes from "lucide-react/icons/shapes";
 import Server from "lucide-react/icons/server";
+import Sparkles from "lucide-react/icons/sparkles";
 import Table from "lucide-react/icons/table";
 import UserMinus from "lucide-react/icons/user-minus";
 import Users from "lucide-react/icons/users";
@@ -118,10 +118,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           icon: Server,
         },
         {
-          id: "ai-interface-templates",
-          title: t("sidebar.aiInterfaceTemplates"),
-          url: "/admin/ai-interface-templates",
-          icon: Cpu,
+          id: "ai-models",
+          title: t("sidebar.aiModels"),
+          url: "/admin/ai-models",
+          icon: Sparkles,
+        },
+        {
+          id: "model-invocations",
+          title: t("sidebar.modelInvocations"),
+          url: "/admin/model-invocations",
+          icon: Sparkles,
         },
         {
           id: "feature-settings",

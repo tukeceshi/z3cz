@@ -6,3 +6,4 @@ build
 
 # Generated files
 data/nodes.json
+data/.nodes-source-hash

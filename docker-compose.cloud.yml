@@ -1,0 +1,6 @@
+# 注入 Cloudflare 凭证（可选 profile）
+services:
+  api:
+    environment:
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}

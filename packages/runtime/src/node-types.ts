@@ -298,6 +298,16 @@ export interface NodeContext {
   }) => Promise<
     import("@dafthunk/types").ResolvedOrgAiInterface | undefined
   >;
+  /** Resolve a platform text model to interface + provider model id. */
+  resolveTextModel?: (
+    canonicalId: string
+  ) => Promise<
+    | {
+        readonly interfaceId: string;
+        readonly providerModelId: string;
+      }
+    | undefined
+  >;
   env: NodeEnv;
   // Multi-step execution primitives (populated for MultiStepNode instances)
   sleep?: (durationMs: number) => Promise<void>;

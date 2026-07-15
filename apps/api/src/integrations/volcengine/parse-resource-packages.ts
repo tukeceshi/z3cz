@@ -1,19 +1,21 @@
-export interface VolcanoResourcePackageRow {
-  readonly InstanceNo?: string;
-  readonly ConfigurationCode?: string;
-  readonly ConfigurationName?: string;
-  readonly Product?: string;
-  readonly TotalAmount?: string;
-  readonly AvailableAmount?: string;
-  readonly Unit?: string;
-  readonly Status?: string;
-}
+import type { VolcanoResourcePackageRow } from "@dafthunk/types";
+import {
+  isEffectiveResourcePackage,
+  isUsageCountableResourcePackage,
+  parseVolcanoPackageAmount,
+  VOLCANO_USAGE_PACKAGE_STATUSES,
+  type VolcanoUsagePackageStatus,
+} from "@dafthunk/types";
 
-export function parsePackageAmount(value: string | undefined): number {
-  if (!value) return 0;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+export type { VolcanoResourcePackageRow, VolcanoUsagePackageStatus };
+export {
+  isEffectiveResourcePackage,
+  isUsageCountableResourcePackage,
+  VOLCANO_USAGE_PACKAGE_STATUSES,
+};
+
+/** @deprecated Use parseVolcanoPackageAmount from @dafthunk/types */
+export const parsePackageAmount = parseVolcanoPackageAmount;
 
 export function indexResourcePackagesByConfigurationCode(
   rows: readonly VolcanoResourcePackageRow[]
@@ -30,27 +32,4 @@ export function indexResourcePackagesByConfigurationCode(
   }
 
   return index;
-}
-
-export const VOLCANO_USAGE_PACKAGE_STATUSES = [
-  "Effective",
-  "UsedUp",
-  "Expired",
-] as const;
-
-export type VolcanoUsagePackageStatus =
-  (typeof VOLCANO_USAGE_PACKAGE_STATUSES)[number];
-
-export function isUsageCountableResourcePackage(
-  row: VolcanoResourcePackageRow
-): boolean {
-  const status = row.Status;
-  if (!status) return false;
-  return (VOLCANO_USAGE_PACKAGE_STATUSES as readonly string[]).includes(status);
-}
-
-export function isEffectiveResourcePackage(
-  row: VolcanoResourcePackageRow
-): boolean {
-  return row.Status === "Effective";
 }

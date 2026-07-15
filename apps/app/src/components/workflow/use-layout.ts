@@ -70,7 +70,7 @@ export function useLayout({
         };
       })
     );
-    reactFlowInstance?.fitView();
+    reactFlowInstance?.fitView({ duration: 200 });
   }, [setNodes, disabled, reactFlowInstance, nodesRef, edgesRef]);
 
   return { applyLayout };

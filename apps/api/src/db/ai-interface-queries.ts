@@ -1,39 +1,13 @@
 import type {
   AiInterfaceProvider,
-  AiInterfaceSourceSpec,
-  AiInterfaceTemplateIndex,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
 } from "@dafthunk/types";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 
 import { parseInterfaceMetadata } from "../integrations/volcengine/metadata";
 import type { Database } from "./index";
-import {
-  aiInterfaceTemplateRevisions,
-  aiInterfaceTemplates,
-  organizationAiInterfaces,
-} from "./schema";
-
-function rowToTemplateIndex(
-  row: typeof aiInterfaceTemplates.$inferSelect
-): AiInterfaceTemplateIndex {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? "",
-    provider: row.provider as AiInterfaceProvider,
-    executionMode: "sync",
-    enabled: row.enabled,
-    isSystem: row.isSystem,
-    isDefault: row.isDefault,
-    sortOrder: row.sortOrder,
-    specVersion: row.specVersion,
-    artifactChecksum: row.artifactChecksum,
-    updatedAt: row.updatedAt.toISOString(),
-    updatedBy: row.updatedBy,
-  };
-}
+import { organizationAiInterfaces } from "./schema";
 
 function rowToOrgInterface(
   row: typeof organizationAiInterfaces.$inferSelect
@@ -56,105 +30,6 @@ function rowToOrgInterface(
   };
 }
 
-export async function listAiInterfaceTemplateRows(db: Database) {
-  return db
-    .select()
-    .from(aiInterfaceTemplates)
-    .orderBy(asc(aiInterfaceTemplates.sortOrder), asc(aiInterfaceTemplates.name));
-}
-
-export async function getAiInterfaceTemplateRow(db: Database, id: string) {
-  const [row] = await db
-    .select()
-    .from(aiInterfaceTemplates)
-    .where(eq(aiInterfaceTemplates.id, id))
-    .limit(1);
-  return row;
-}
-
-export async function listEnabledAiInterfaceTemplateRows(db: Database) {
-  return db
-    .select()
-    .from(aiInterfaceTemplates)
-    .where(eq(aiInterfaceTemplates.enabled, true))
-    .orderBy(asc(aiInterfaceTemplates.sortOrder), asc(aiInterfaceTemplates.name));
-}
-
-export async function upsertAiInterfaceTemplateIndex(
-  db: Database,
-  params: {
-    source: AiInterfaceSourceSpec;
-    version: number;
-    artifactChecksum: string;
-    artifactKey: string;
-    sourceKey: string;
-    updatedBy?: string;
-  }
-): Promise<AiInterfaceTemplateIndex> {
-  const now = new Date();
-  const { source } = params;
-
-  if (source.meta.isDefault) {
-    await db
-      .update(aiInterfaceTemplates)
-      .set({ isDefault: false, updatedAt: now })
-      .where(
-        and(
-          eq(aiInterfaceTemplates.provider, source.meta.provider),
-          eq(aiInterfaceTemplates.isDefault, true),
-          ne(aiInterfaceTemplates.id, source.meta.id)
-        )
-      );
-  }
-
-  const values = {
-    id: source.meta.id,
-    name: source.meta.name,
-    description: source.meta.description,
-    provider: source.meta.provider,
-    executionMode: source.execution.mode,
-    enabled: source.meta.enabled,
-    isSystem: source.meta.isSystem,
-    isDefault: source.meta.isDefault ?? false,
-    sortOrder: source.meta.sortOrder,
-    specVersion: params.version,
-    artifactChecksum: params.artifactChecksum,
-    artifactKey: params.artifactKey,
-    sourceKey: params.sourceKey,
-    updatedAt: now,
-    updatedBy: params.updatedBy ?? null,
-  };
-
-  const [row] = await db
-    .insert(aiInterfaceTemplates)
-    .values({ ...values, createdAt: now })
-    .onConflictDoUpdate({
-      target: aiInterfaceTemplates.id,
-      set: values,
-    })
-    .returning();
-
-  await db.insert(aiInterfaceTemplateRevisions).values({
-    id: crypto.randomUUID(),
-    templateId: source.meta.id,
-    version: params.version,
-    artifactChecksum: params.artifactChecksum,
-    artifactKey: params.artifactKey,
-    sourceKey: params.sourceKey,
-    createdAt: now,
-    createdBy: params.updatedBy ?? null,
-  });
-
-  return rowToTemplateIndex(row);
-}
-
-export async function deleteAiInterfaceTemplateRow(
-  db: Database,
-  id: string
-): Promise<void> {
-  await db.delete(aiInterfaceTemplates).where(eq(aiInterfaceTemplates.id, id));
-}
-
 export async function listOrganizationAiInterfaces(
   db: Database,
   organizationId: string
@@ -163,7 +38,7 @@ export async function listOrganizationAiInterfaces(
     .select()
     .from(organizationAiInterfaces)
     .where(eq(organizationAiInterfaces.organizationId, organizationId))
-    .orderBy(asc(organizationAiInterfaces.name));
+    .orderBy(desc(organizationAiInterfaces.createdAt));
 
   return rows.map(rowToOrgInterface);
 }
@@ -198,10 +73,10 @@ export async function getOrganizationAiInterfaceDefaultRow(
       and(
         eq(organizationAiInterfaces.organizationId, organizationId),
         eq(organizationAiInterfaces.provider, provider),
-        eq(organizationAiInterfaces.enabled, true),
-        eq(organizationAiInterfaces.isDefault, true)
+        eq(organizationAiInterfaces.enabled, true)
       )
     )
+    .orderBy(desc(organizationAiInterfaces.isDefault))
     .limit(1);
   return row;
 }
@@ -211,11 +86,10 @@ async function clearOrgDefault(
   organizationId: string,
   provider: AiInterfaceProvider,
   exceptId?: string
-) {
+): Promise<void> {
   const conditions = [
     eq(organizationAiInterfaces.organizationId, organizationId),
     eq(organizationAiInterfaces.provider, provider),
-    eq(organizationAiInterfaces.isDefault, true),
   ];
   if (exceptId) {
     conditions.push(ne(organizationAiInterfaces.id, exceptId));
@@ -232,10 +106,8 @@ export async function createOrganizationAiInterface(
   organizationId: string,
   input: {
     id: string;
-    templateId: string;
     name: string;
     provider: AiInterfaceProvider;
-    templateVersion?: number | null;
     baseUrl?: string | null;
     selectedModel?: string | null;
     apiKeyEncrypted: string;
@@ -254,8 +126,8 @@ export async function createOrganizationAiInterface(
     .values({
       id: input.id,
       organizationId,
-      templateId: input.templateId,
-      templateVersion: input.templateVersion ?? null,
+      templateId: null,
+      templateVersion: null,
       name: input.name,
       provider: input.provider,
       baseUrl: input.baseUrl ?? null,
@@ -299,9 +171,6 @@ export async function updateOrganizationAiInterface(
     .update(organizationAiInterfaces)
     .set({
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.templateVersion !== undefined
-        ? { templateVersion: input.templateVersion }
-        : {}),
       ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
       ...(input.selectedModel !== undefined
         ? { selectedModel: input.selectedModel }
@@ -371,17 +240,24 @@ export async function resolveOrganizationAiInterfaceRow(
       return byTemplate;
     }
 
-    const template = await getAiInterfaceTemplateRow(db, params.templateId);
-    if (template) {
+    // Legacy canvas nodes keyed by template id → fall back to provider default.
+    const providerByLegacyTemplate: Record<string, AiInterfaceProvider> = {
+      "doubao-volcano-chat-v1": "doubao_volcano",
+      "builtin:doubao_volcano": "doubao_volcano",
+      "openai-chat-v1": "openai",
+      "builtin:openai": "openai",
+      "deepseek-chat-v1": "deepseek",
+      "builtin:deepseek": "deepseek",
+    };
+    const provider = providerByLegacyTemplate[params.templateId];
+    if (provider) {
       return getOrganizationAiInterfaceDefaultRow(
         db,
         organizationId,
-        template.provider as AiInterfaceProvider
+        provider
       );
     }
   }
 
   return undefined;
 }
-
-export { rowToTemplateIndex };

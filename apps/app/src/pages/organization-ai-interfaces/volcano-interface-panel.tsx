@@ -1,6 +1,6 @@
 import {
-  VOLCANO_AI_MODEL_CATALOG,
-  VOLCANO_TEMPLATE_ID,
+  isVolcanoAiInterfaceProvider,
+  resolveVolcanoInterfaceDisplayName,
   type OrganizationAiInterface,
   type VolcanoActivationProbeResult,
   type VolcanoSnapshotResponse,
@@ -8,6 +8,7 @@ import {
 import RefreshCw from "lucide-react/icons/refresh-cw";
 import Search from "lucide-react/icons/search";
 import Trash2 from "lucide-react/icons/trash-2";
+import KeyRound from "lucide-react/icons/key-round";
 import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -19,9 +20,13 @@ import {
   probeVolcanoActivation,
   updateVolcanoModelEnabled,
 } from "@/services/organization-ai-interface-service";
+import { ApiRequestError } from "@/services/utils";
 import { isVolcanoModelActivationBlocking } from "@/utils/volcano-activation";
 
+import { VolcanoCredentialsDialog } from "./volcano-credentials-dialog";
 import { VolcanoModelRow } from "./volcano-model-row";
+
+const CREDENTIALS_DECRYPT_FAILED = "CREDENTIALS_DECRYPT_FAILED";
 
 const PRICING_DOC_URL =
   "https://docs.volcengine.com/docs/82379/1544106?lang=zh";
@@ -34,7 +39,7 @@ interface VolcanoInterfacePanelProps {
 }
 
 function isVolcanoInterface(iface: OrganizationAiInterface): boolean {
-  return iface.templateId === VOLCANO_TEMPLATE_ID;
+  return isVolcanoAiInterfaceProvider(iface.provider);
 }
 
 function mergeActivationIntoSnapshot(
@@ -60,6 +65,12 @@ function mergeActivationIntoSnapshot(
   };
 }
 
+function snapshotNeedsActivationProbe(snapshot: VolcanoSnapshotResponse): boolean {
+  return snapshot.models.some(
+    (row) => !row.activation || row.activation.status === "unknown"
+  );
+}
+
 function formatBalance(amount: string): string {
   const parsed = Number(amount);
   if (!Number.isFinite(parsed)) return amount;
@@ -82,6 +93,7 @@ export function VolcanoInterfacePanel({
   const [isProbing, setIsProbing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [credentialsOpen, setCredentialsOpen] = useState(false);
 
   const pricingByCanonicalId = useMemo(() => {
     if (!snapshot?.pricing.rows) return new Map();
@@ -94,12 +106,36 @@ export function VolcanoInterfacePanel({
     return null;
   }
 
-  const loadSnapshot = async () => {
+  const loadSnapshot = async (options?: {
+    probeIfNeeded?: boolean;
+    refreshPackages?: boolean;
+  }) => {
     setIsLoading(true);
     try {
-      const next = await fetchVolcanoSnapshot(organizationId, iface.id);
-      setSnapshot(next);
+      const next = await fetchVolcanoSnapshot(organizationId, iface.id, {
+        refreshPackages: options?.refreshPackages === true,
+      });
+      let merged = next;
+
+      if (
+        (options?.probeIfNeeded ?? true) &&
+        snapshotNeedsActivationProbe(next)
+      ) {
+        const { results } = await probeVolcanoActivation(organizationId, iface.id);
+        merged = mergeActivationIntoSnapshot(next, results);
+        await onUpdated();
+      }
+
+      setSnapshot(merged);
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === CREDENTIALS_DECRYPT_FAILED
+      ) {
+        appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+        setCredentialsOpen(true);
+        return;
+      }
       appToast.errorRaw(
         error instanceof Error ? error.message : t("pages.aiInterfaces.volcano.loadFailed")
       );
@@ -126,6 +162,14 @@ export function VolcanoInterfacePanel({
       await onUpdated();
       appToast.success("pages.aiInterfaces.volcano.activation.probeDone");
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === CREDENTIALS_DECRYPT_FAILED
+      ) {
+        appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+        setCredentialsOpen(true);
+        return;
+      }
       appToast.errorRaw(
         error instanceof Error
           ? error.message
@@ -167,6 +211,14 @@ export function VolcanoInterfacePanel({
           return;
         }
       } catch (error) {
+        if (
+          error instanceof ApiRequestError &&
+          error.code === CREDENTIALS_DECRYPT_FAILED
+        ) {
+          appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+          setCredentialsOpen(true);
+          return;
+        }
         appToast.errorRaw(
           error instanceof Error
             ? error.message
@@ -199,25 +251,14 @@ export function VolcanoInterfacePanel({
     }
   };
 
-  const rows =
-    snapshot?.models ??
-    VOLCANO_AI_MODEL_CATALOG.map((entry) => ({
-      canonicalId: entry.canonicalId,
-      alias: entry.alias,
-      modality: entry.modality,
-      providerModelId: entry.providerModelId,
-      enabled: true,
-      usage: null,
-      activation: null,
-      package: null,
-    }));
+  const displayName = resolveVolcanoInterfaceDisplayName(iface.name);
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="truncate font-medium" title={iface.name}>
-            {iface.name}
+          <p className="truncate font-medium" title={displayName}>
+            {displayName}
           </p>
           {snapshot ? (
             <div className="space-y-0.5">
@@ -280,6 +321,14 @@ export function VolcanoInterfacePanel({
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setCredentialsOpen(true)}
+              >
+                <KeyRound className="mr-2 size-4" />
+                {t("pages.aiInterfaces.volcano.credentialsButton")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleProbeActivation}
                 disabled={isProbing}
               >
@@ -291,7 +340,9 @@ export function VolcanoInterfacePanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadSnapshot}
+                onClick={() =>
+                  loadSnapshot({ probeIfNeeded: false, refreshPackages: true })
+                }
                 disabled={isLoading}
               >
                 <RefreshCw
@@ -312,22 +363,22 @@ export function VolcanoInterfacePanel({
                 <Skeleton key={index} className="mb-3 h-28 w-full rounded-lg" />
               ))}
             </div>
-          ) : (
+          ) : snapshot ? (
             <>
-              {snapshot?.usageError ? (
+              {snapshot.usageError ? (
                 <p className="text-destructive text-sm">{snapshot.usageError}</p>
               ) : null}
 
               <div className="columns-1 gap-3 md:columns-2">
-                {rows.map((row) => (
+                {snapshot.models.map((row) => (
                   <div key={row.canonicalId} className="mb-3 break-inside-avoid">
                     <VolcanoModelRow
                       row={row}
-                      showUsage={Boolean(snapshot)}
+                      showUsage
                       disabled={togglingId === row.canonicalId}
                       pricingRow={pricingByCanonicalId.get(row.canonicalId) ?? null}
                       pricingDocUrl={
-                        snapshot?.pricing.docUrl ?? PRICING_DOC_URL
+                        snapshot.pricing.docUrl ?? PRICING_DOC_URL
                       }
                       onEnabledChange={(enabled) =>
                         handleToggle(row.canonicalId, enabled)
@@ -337,7 +388,7 @@ export function VolcanoInterfacePanel({
                 ))}
               </div>
 
-              {snapshot?.fetchedAt ? (
+              {snapshot.fetchedAt ? (
                 <p className="text-muted-foreground text-xs">
                   {t("pages.aiInterfaces.volcano.updatedAt", {
                     time: new Date(snapshot.fetchedAt).toLocaleString(),
@@ -345,9 +396,21 @@ export function VolcanoInterfacePanel({
                 </p>
               ) : null}
             </>
-          )}
+          ) : null}
         </div>
       ) : null}
+      <VolcanoCredentialsDialog
+        open={credentialsOpen}
+        organizationId={organizationId}
+        interfaceId={iface.id}
+        onOpenChange={setCredentialsOpen}
+        onUpdated={async () => {
+          await onUpdated();
+          if (expanded) {
+            await loadSnapshot({ probeIfNeeded: false });
+          }
+        }}
+      />
     </div>
   );
 }

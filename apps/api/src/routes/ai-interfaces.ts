@@ -1,7 +1,6 @@
 import type {
   AiInterfaceProvider,
   CreateOrganizationAiInterfaceRequest,
-  ListAiInterfaceTemplatesResponse,
   ListOrganizationAiInterfacesResponse,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
@@ -11,8 +10,7 @@ import type {
 } from "@dafthunk/types";
 import {
   ALL_AI_INTERFACE_PROVIDERS,
-  VOLCANO_AI_MODEL_CATALOG,
-  VOLCANO_TEMPLATE_ID,
+  isVolcanoAiInterfaceProvider,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
@@ -24,16 +22,20 @@ import { createDatabase } from "../db";
 import {
   createOrganizationAiInterface,
   deleteOrganizationAiInterface,
-  getAiInterfaceTemplateRow,
   getOrganizationAiInterfaceRow,
   listOrganizationAiInterfaces,
   updateOrganizationAiInterface,
 } from "../db/ai-interface-queries";
-import { AiInterfaceTemplateStore } from "../stores/ai-interface-template-store";
+import { listPlatformAiModels } from "../db/platform-ai-model-queries";
 import { encryptSecret } from "../utils/encryption";
+import {
+  CREDENTIALS_DECRYPT_FAILED,
+  DecryptionFailedError,
+} from "../utils/encryption-errors";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { getVolcanoArkApiKey } from "../integrations/volcengine/get-api-key";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
+import { toVolcanoCatalogEntriesFromPlatform } from "../services/resolve-text-model-interface";
 import {
   createVolcanoMetadata,
   isVolcanoMetadata,
@@ -46,6 +48,25 @@ import {
 import { probeVolcanoModelsActivation } from "../integrations/volcengine/probe-model-activation";
 import { buildVolcanoSnapshot } from "../integrations/volcengine/snapshot";
 import { VOLCANO_ARK_INFERENCE_BASE_URL } from "../integrations/volcengine/constants";
+import { defaultBaseUrlForProvider } from "@dafthunk/runtime/ai-interface/builtin-artifact";
+
+function mapAiInterfaceError(
+  c: { json: (body: unknown, status?: number) => Response },
+  error: unknown,
+  fallbackMessage: string
+): Response {
+  if (error instanceof DecryptionFailedError) {
+    return c.json(
+      { error: error.message, code: CREDENTIALS_DECRYPT_FAILED },
+      409
+    );
+  }
+
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  const status = message === "AI interface not found" ? 404 : 400;
+  return c.json({ error: message }, status);
+}
+
 const aiInterfaceRoutes = new Hono<ApiContext>();
 
 aiInterfaceRoutes.use("*", jwtMiddleware);
@@ -58,15 +79,32 @@ const providerSchema = z.enum(
   ]
 );
 
+const volcanoActivationResultSchema = z.object({
+  canonicalId: z.string(),
+  providerModelId: z.string(),
+  status: z.enum([
+    "open",
+    "not_open",
+    "service_not_open",
+    "invalid_model_id",
+    "auth_error",
+    "transient_error",
+    "unknown",
+  ]),
+  errorCode: z.string().nullable(),
+  message: z.string().nullable(),
+  probedAt: z.string(),
+});
+
 const createSchema = z
   .object({
-    templateId: z.string().min(1),
+    provider: providerSchema,
     name: z.string().trim().min(1).max(120),
     apiKey: z.string().trim().min(1).optional(),
     accessKeyId: z.string().trim().min(1).optional(),
     secretAccessKey: z.string().trim().min(1).optional(),
     enabledModels: z.array(z.string()).optional(),
-    templateVersion: z.number().int().positive().nullable().optional(),
+    volcanoActivationResults: z.array(volcanoActivationResultSchema).optional(),
     baseUrl: z.string().url().nullable().optional(),
     selectedModel: z.string().nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
@@ -74,8 +112,7 @@ const createSchema = z
     isDefault: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
-    const isVolcano = value.templateId === VOLCANO_TEMPLATE_ID;
-    if (isVolcano) {
+    if (isVolcanoAiInterfaceProvider(value.provider)) {
       if (!value.accessKeyId || !value.secretAccessKey) {
         ctx.addIssue({
           code: "custom",
@@ -92,19 +129,39 @@ const createSchema = z
         path: ["apiKey"],
       });
     }
+    if (value.provider === "custom" && !value.baseUrl) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Base URL is required for custom providers",
+        path: ["baseUrl"],
+      });
+    }
   }) satisfies z.ZodType<CreateOrganizationAiInterfaceRequest>;
 
-const updateSchema = z.object({
-  name: z.string().trim().min(1).max(120).optional(),
-  apiKey: z.string().trim().min(1).optional(),
-  templateVersion: z.number().int().positive().nullable().optional(),
-  baseUrl: z.string().url().nullable().optional(),
-  selectedModel: z.string().nullable().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  volcanoModelEnabled: z.record(z.string(), z.boolean()).optional(),
-  enabled: z.boolean().optional(),
-  isDefault: z.boolean().optional(),
-}) satisfies z.ZodType<UpdateOrganizationAiInterfaceRequest>;
+const updateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    apiKey: z.string().trim().min(1).optional(),
+    accessKeyId: z.string().trim().min(1).optional(),
+    secretAccessKey: z.string().trim().min(1).optional(),
+    baseUrl: z.string().url().nullable().optional(),
+    selectedModel: z.string().nullable().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+    volcanoModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    enabled: z.boolean().optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasAccessKeyId = value.accessKeyId !== undefined;
+    const hasSecretAccessKey = value.secretAccessKey !== undefined;
+    if (hasAccessKeyId !== hasSecretAccessKey) {
+      ctx.addIssue({
+        code: "custom",
+        message: "accessKeyId and secretAccessKey must be provided together",
+        path: ["accessKeyId"],
+      });
+    }
+  }) satisfies z.ZodType<UpdateOrganizationAiInterfaceRequest>;
 
 const probeCredentialsSchema = z.object({
   accessKeyId: z.string().trim().min(1),
@@ -114,18 +171,6 @@ const probeCredentialsSchema = z.object({
 
 const probeActivationSchema = z.object({
   canonicalIds: z.array(z.string()).optional(),
-});
-aiInterfaceRoutes.get("/catalog", async (c) => {
-  try {
-    const store = new AiInterfaceTemplateStore(c.env);
-    const templates = (await store.listTemplates()).filter(
-      (template) => template.enabled
-    );
-    return c.json({ templates } satisfies ListAiInterfaceTemplatesResponse);
-  } catch (error) {
-    console.error("Error listing AI interface catalog:", error);
-    return c.json({ error: "Failed to list templates" }, 500);
-  }
 });
 
 aiInterfaceRoutes.get("/", async (c) => {
@@ -144,12 +189,14 @@ aiInterfaceRoutes.get("/", async (c) => {
 aiInterfaceRoutes.get("/:id/volcano-snapshot", async (c) => {
   const organizationId = c.get("organizationId")!;
   const id = c.req.param("id");
+  const refreshPackages = c.req.query("refreshPackages") === "1";
 
   try {
     const snapshot = await buildVolcanoSnapshot({
       env: c.env,
       organizationId,
       interfaceId: id,
+      refreshPackages,
     });
     return c.json({ snapshot } satisfies { snapshot: VolcanoSnapshotResponse });
   } catch (error) {
@@ -166,6 +213,7 @@ aiInterfaceRoutes.post(
   zValidator("json", probeCredentialsSchema),
   async (c) => {
     const body = c.req.valid("json");
+    const db = createDatabase(c.env);
 
     try {
       const issued = await getVolcanoArkApiKey({
@@ -173,7 +221,13 @@ aiInterfaceRoutes.post(
         secretAccessKey: body.secretAccessKey,
         region: "cn-beijing",
       });
-      const entries = resolveVolcanoCatalogEntries(body.canonicalIds);
+      const platformModels = await listPlatformAiModels(db);
+      const catalogEntries =
+        toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const entries = resolveVolcanoCatalogEntries(
+        body.canonicalIds,
+        catalogEntries
+      );
       const results = await probeVolcanoModelsActivation({
         apiKey: issued.apiKey,
         entries,
@@ -224,25 +278,31 @@ aiInterfaceRoutes.post(
         });
       }
 
-      const entries = resolveVolcanoCatalogEntries(body.canonicalIds);
+      const platformModels = await listPlatformAiModels(db);
+      const catalogEntries =
+        toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const entries = resolveVolcanoCatalogEntries(
+        body.canonicalIds,
+        catalogEntries
+      );
       const results = await probeVolcanoModelsActivation({
         apiKey: ensured.apiKey,
         entries,
       });
 
-      const nextMetadata = mergeVolcanoActivationCache(metadata, results);
+      const nextMetadata = mergeVolcanoActivationCache(
+        metadata,
+        results,
+        catalogEntries
+      );
       await updateOrganizationAiInterface(db, organizationId, row.id, {
         metadata: serializeInterfaceMetadata(nextMetadata),
       });
 
       return c.json({ results } satisfies VolcanoProbeActivationResponse);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to probe model activation";
       console.error("Error probing volcano activation:", error);
-      return c.json({ error: message }, 400);
+      return mapAiInterfaceError(c, error, "Failed to probe model activation");
     }
   }
 );
@@ -286,35 +346,42 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
   const organizationId = c.get("organizationId")!;
   const body = c.req.valid("json");
   const db = createDatabase(c.env);
+  const provider = body.provider as AiInterfaceProvider;
 
   try {
-    const template = await getAiInterfaceTemplateRow(db, body.templateId);
-    if (!template?.enabled) {
-      return c.json({ error: "Template not found or disabled" }, 400);
-    }
-
     let apiKeyEncrypted = "";
     let metadataRaw: string | null = null;
-    let baseUrl = body.baseUrl ?? null;
+    let baseUrl =
+      body.baseUrl ?? defaultBaseUrlForProvider(provider) ?? null;
 
-    if (body.templateId === VOLCANO_TEMPLATE_ID) {
+    if (isVolcanoAiInterfaceProvider(provider)) {
       const secretAccessKeyEncrypted = await encryptSecret(
         body.secretAccessKey!,
         c.env,
         organizationId
       );
+      const platformModels = await listPlatformAiModels(db);
+      const catalogEntries = toVolcanoCatalogEntriesFromPlatform(platformModels);
       const metadata = createVolcanoMetadata({
         accessKeyId: body.accessKeyId!,
         secretAccessKeyEncrypted,
         enabledModels: body.enabledModels,
+        catalogEntries,
       });
+      const metadataWithActivation = body.volcanoActivationResults?.length
+        ? mergeVolcanoActivationCache(
+            metadata,
+            body.volcanoActivationResults,
+            catalogEntries
+          )
+        : metadata;
       const issued = await getVolcanoArkApiKey({
         accessKeyId: body.accessKeyId!,
         secretAccessKey: body.secretAccessKey!,
-        region: metadata.region,
+        region: metadataWithActivation.region,
       });
       metadataRaw = serializeInterfaceMetadata({
-        ...metadata,
+        ...metadataWithActivation,
         arkApiKeyExpiresAt: issued.expiresAt,
       });
       apiKeyEncrypted = await encryptSecret(
@@ -322,7 +389,7 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
         c.env,
         organizationId
       );
-      baseUrl = baseUrl ?? VOLCANO_ARK_INFERENCE_BASE_URL;
+      baseUrl = body.baseUrl ?? VOLCANO_ARK_INFERENCE_BASE_URL;
     } else {
       apiKeyEncrypted = await encryptSecret(
         body.apiKey!,
@@ -335,10 +402,8 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
     }
 
     const iface = await createOrganizationAiInterface(db, organizationId, {
-      templateId: body.templateId,
       name: body.name,
-      provider: template.provider as AiInterfaceProvider,
-      templateVersion: body.templateVersion ?? null,
+      provider,
       baseUrl,
       selectedModel: body.selectedModel ?? null,
       enabled: body.enabled,
@@ -356,6 +421,7 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
     return c.json({ error: message }, 400);
   }
 });
+
 aiInterfaceRoutes.patch(
   "/:id",
   zValidator("json", updateSchema),
@@ -375,12 +441,16 @@ aiInterfaceRoutes.patch(
         return c.json({ error: "AI interface not found" }, 404);
       }
 
-      const apiKeyEncrypted =
+      let apiKeyEncrypted: string | undefined =
         body.apiKey !== undefined
           ? await encryptSecret(body.apiKey, c.env, organizationId)
           : undefined;
 
       let metadataUpdate: Record<string, unknown> | undefined = body.metadata;
+      const platformModels = await listPlatformAiModels(db);
+      const catalogEntries =
+        toVolcanoCatalogEntriesFromPlatform(platformModels);
+
       if (body.volcanoModelEnabled) {
         const current = parseInterfaceMetadata(existing.metadata);
         if (!isVolcanoMetadata(current)) {
@@ -388,7 +458,41 @@ aiInterfaceRoutes.patch(
         }
         metadataUpdate = mergeVolcanoModelEnabled(
           current,
-          body.volcanoModelEnabled
+          body.volcanoModelEnabled,
+          catalogEntries
+        );
+      }
+
+      if (body.accessKeyId !== undefined && body.secretAccessKey !== undefined) {
+        const current = parseInterfaceMetadata(existing.metadata);
+        if (!isVolcanoMetadata(current)) {
+          return c.json({ error: "Volcano metadata not configured" }, 400);
+        }
+
+        const baseMetadata = isVolcanoMetadata(metadataUpdate)
+          ? metadataUpdate
+          : current;
+
+        const secretAccessKeyEncrypted = await encryptSecret(
+          body.secretAccessKey,
+          c.env,
+          organizationId
+        );
+        const issued = await getVolcanoArkApiKey({
+          accessKeyId: body.accessKeyId,
+          secretAccessKey: body.secretAccessKey,
+          region: baseMetadata.region,
+        });
+        metadataUpdate = {
+          ...baseMetadata,
+          accessKeyId: body.accessKeyId,
+          secretAccessKeyEncrypted,
+          arkApiKeyExpiresAt: issued.expiresAt,
+        };
+        apiKeyEncrypted = await encryptSecret(
+          issued.apiKey,
+          c.env,
+          organizationId
         );
       }
 
@@ -398,7 +502,6 @@ aiInterfaceRoutes.patch(
         id,
         {
           name: body.name,
-          templateVersion: body.templateVersion,
           baseUrl: body.baseUrl,
           selectedModel: body.selectedModel,
           enabled: body.enabled,
@@ -412,11 +515,8 @@ aiInterfaceRoutes.patch(
 
       return c.json({ interface: iface });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update AI interface";
       console.error("Error updating organization AI interface:", error);
-      const status = message === "AI interface not found" ? 404 : 400;
-      return c.json({ error: message }, status);
+      return mapAiInterfaceError(c, error, "Failed to update AI interface");
     }
   }
 );

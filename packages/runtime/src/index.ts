@@ -63,6 +63,10 @@ export type {
   ResolvedRelayAccount,
 } from "./relay-account-service";
 export type { AiInterfaceService } from "./ai-interface-service";
+export type {
+  ResolvedRuntimeTextModel,
+  TextModelService,
+} from "./text-model-service";
 export { SEEDANCE_2_0_T2V_PROFILE } from "./upstream/upstream-param-profiles";
 export {
   isSubscriptionRequiredError,

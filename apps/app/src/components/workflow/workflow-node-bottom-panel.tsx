@@ -1,5 +1,5 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import { useNodes } from "@xyflow/react";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import { createElement, useState } from "react";
@@ -8,6 +8,7 @@ import { cn } from "@/utils/utils";
 
 import { useTranslation } from "@/components/locale-provider";
 
+import { AiTextConfigPanel } from "./ai-text-config-panel";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
 import { PropertyField } from "./fields";
 import { registry } from "./widgets";
@@ -48,6 +49,10 @@ export function WorkflowNodeBottomPanel({
   const [errorExpanded, setErrorExpanded] = useState(true);
 
   // AI generative nodes get a dedicated config panel
+  if (data.nodeType === AI_TEXT_NODE_TYPE) {
+    return <AiTextConfigPanel nodeId={nodeId} data={data} />;
+  }
+
   if (
     data.nodeType &&
     (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(data.nodeType)

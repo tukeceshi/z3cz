@@ -18,6 +18,7 @@ import {
   BackgroundVariant,
   ConnectionMode,
   Controls,
+  Panel,
   ReactFlow,
 } from "@xyflow/react";
 import { Plus } from "lucide-react";
@@ -122,7 +123,7 @@ function StatusBar({ workflowStatus, errorMessage }: StatusBarProps) {
 
   return (
     <div className="absolute bottom-4 left-4 flex items-center gap-3 z-50">
-      <div className="bg-white dark:bg-neutral-900 backdrop-blur-xs border border-neutral-200 dark:border-neutral-700 rounded-lg px-3 py-2 shadow-xs flex items-center gap-3">
+      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-3 py-2 shadow-xs flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div className={cn("w-2 h-2 rounded-full", config.bg)}>
             <div className={cn("w-full h-full rounded-full")} />
@@ -161,6 +162,8 @@ export interface WorkflowCanvasProps {
   ) => void;
   isDraggingRef?: React.RefObject<boolean>;
   onNodeDoubleClick?: (event: React.MouseEvent) => void;
+  onMoveStart?: () => void;
+  onMoveEnd?: () => void;
   onInit: (
     instance: ReactFlowInstance<
       ReactFlowNode<WorkflowNodeType>,
@@ -178,6 +181,7 @@ export interface WorkflowCanvasProps {
   isValidConnection?: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
   disabled?: boolean;
   onFitToScreen?: (e: React.MouseEvent) => void;
+  onZoomOneToOne?: (e: React.MouseEvent) => void;
   selectedNodes: ReactFlowNode<WorkflowNodeType>[];
   selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
   onDeleteSelected?: (e: React.MouseEvent) => void;
@@ -327,6 +331,26 @@ function FitToScreenButton({
       tooltip={t("workflow.canvas.fitToScreen")}
     >
       <Maximize className="size-4!" />
+    </ActionBarButton>
+  );
+}
+
+function ZoomOneToOneButton({
+  onClick,
+}: {
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ActionBarButton
+      onClick={onClick}
+      className={actionBarButtonOutlineClassName}
+      tooltipSide="top"
+      tooltip={t("workflow.canvas.zoomOneToOne")}
+    >
+      <span className="px-0.5 text-[11px] font-semibold leading-none tracking-tight">
+        1:1
+      </span>
     </ActionBarButton>
   );
 }
@@ -607,6 +631,8 @@ export function WorkflowCanvas({
   onNodeDragStart,
   onNodeDragStop,
   isDraggingRef,
+  onMoveStart,
+  onMoveEnd,
   onInit,
   onAddNode,
   onQuickAddAiNode,
@@ -619,6 +645,7 @@ export function WorkflowCanvas({
   isValidConnection,
   disabled = false,
   onFitToScreen,
+  onZoomOneToOne,
   selectedNodes,
   selectedEdges,
   onDeleteSelected,
@@ -670,6 +697,8 @@ export function WorkflowCanvas({
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
+        onMoveStart={onMoveStart}
+        onMoveEnd={onMoveEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Strict}
@@ -759,7 +788,10 @@ export function WorkflowCanvas({
           )}
 
         {showControls && (
-          <div className="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-row items-center gap-2">
+          <Panel
+            position="bottom-center"
+            className="m-4 flex flex-row items-center gap-2"
+          >
             <ActionBarGroup>
               {onAddNode && <AddNodeButton onClick={onAddNode} disabled={disabled} />}
               {onQuickAddAiNode && (
@@ -813,15 +845,18 @@ export function WorkflowCanvas({
               )}
             </ActionBarGroup>
 
-            {!disabled && (onApplyLayout || onFitToScreen) && (
+            {!disabled && (onApplyLayout || onFitToScreen || onZoomOneToOne) && (
               <ActionBarGroup>
                 {onApplyLayout && (
                   <ApplyLayoutButton onClick={() => onApplyLayout()} disabled={disabled || nodes.length === 0} />
                 )}
                 {onFitToScreen && <FitToScreenButton onClick={onFitToScreen} />}
+                {onZoomOneToOne && (
+                  <ZoomOneToOneButton onClick={onZoomOneToOne} />
+                )}
               </ActionBarGroup>
             )}
-          </div>
+          </Panel>
         )}
       </ReactFlow>
       </div>

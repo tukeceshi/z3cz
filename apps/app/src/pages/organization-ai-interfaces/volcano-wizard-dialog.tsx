@@ -1,12 +1,11 @@
 import {
   VOLCANO_AI_MODEL_CATALOG,
   VOLCANO_PRODUCT_DISPLAY_NAME_ZH,
-  VOLCANO_TEMPLATE_ID,
   type VolcanoActivationProbeResult,
 } from "@dafthunk/types";
 import ExternalLink from "lucide-react/icons/external-link";
-import Search from "lucide-react/icons/search";
-import { useMemo, useState } from "react";
+import Loader2 from "lucide-react/icons/loader-2";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
@@ -19,19 +18,21 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
   createOrganizationAiInterface,
   probeVolcanoCredentials,
 } from "@/services/organization-ai-interface-service";
 
+import { VolcanoCredentialFields } from "./volcano-credential-fields";
 import { VolcanoModelRow } from "./volcano-model-row";
 
 const IAM_KEY_URL = "https://console.volcengine.com/iam/keymanage";
-const OPEN_MANAGEMENT_URL =
-  "https://console.volcengine.com/ark/region:cn-beijing/openManagement";
 const GET_API_KEY_DOC_URL =
   "https://console.volcengine.com/ark/region:cn-beijing/docs/82379/1262825?lang=zh";
+
+type WizardProbePhase = "idle" | "loading" | "ready" | "error";
 
 interface VolcanoWizardDialogProps {
   open: boolean;
@@ -46,6 +47,29 @@ function activationByCanonicalId(
   return Object.fromEntries(results.map((result) => [result.canonicalId, result]));
 }
 
+function emptyEnabledModels(): Record<string, boolean> {
+  return Object.fromEntries(
+    VOLCANO_AI_MODEL_CATALOG.map((entry) => [entry.canonicalId, false])
+  );
+}
+
+function enabledModelsFromProbeResults(
+  results: readonly VolcanoActivationProbeResult[]
+): Record<string, boolean> {
+  return Object.fromEntries(
+    VOLCANO_AI_MODEL_CATALOG.map((entry) => {
+      const probe = results.find((result) => result.canonicalId === entry.canonicalId);
+      return [entry.canonicalId, probe?.status === "open"];
+    })
+  );
+}
+
+function canToggleModelInWizard(
+  probe: VolcanoActivationProbeResult | undefined
+): boolean {
+  return probe?.status === "open";
+}
+
 export function VolcanoWizardDialog({
   open,
   organizationId,
@@ -57,18 +81,15 @@ export function VolcanoWizardDialog({
   const [step, setStep] = useState(1);
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [name, setName] = useState(VOLCANO_PRODUCT_DISPLAY_NAME_ZH);
-  const [enabledModels, setEnabledModels] = useState<Record<string, boolean>>(
-    () =>
-      Object.fromEntries(
-        VOLCANO_AI_MODEL_CATALOG.map((entry) => [entry.canonicalId, true])
-      )
-  );
+  const [name, setName] = useState<string>(VOLCANO_PRODUCT_DISPLAY_NAME_ZH);
+  const [enabledModels, setEnabledModels] = useState(emptyEnabledModels);
   const [activationResults, setActivationResults] = useState<
     Record<string, VolcanoActivationProbeResult>
   >({});
+  const [probePhase, setProbePhase] = useState<WizardProbePhase>("idle");
+  const [probeError, setProbeError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isProbing, setIsProbing] = useState(false);
+  const [probeRunId, setProbeRunId] = useState(0);
 
   const selectedModelIds = useMemo(
     () =>
@@ -83,12 +104,11 @@ export function VolcanoWizardDialog({
     setAccessKeyId("");
     setSecretAccessKey("");
     setName(VOLCANO_PRODUCT_DISPLAY_NAME_ZH);
-    setEnabledModels(
-      Object.fromEntries(
-        VOLCANO_AI_MODEL_CATALOG.map((entry) => [entry.canonicalId, true])
-      )
-    );
+    setEnabledModels(emptyEnabledModels());
     setActivationResults({});
+    setProbePhase("idle");
+    setProbeError(null);
+    setProbeRunId(0);
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -96,37 +116,50 @@ export function VolcanoWizardDialog({
     onOpenChange(nextOpen);
   };
 
-  const runActivationProbe = async (canonicalIds: string[]) => {
-    setIsProbing(true);
+  const runStep2Probe = useCallback(async () => {
+    if (!accessKeyId.trim() || !secretAccessKey.trim()) {
+      return;
+    }
+
+    setProbePhase("loading");
+    setProbeError(null);
+    setActivationResults({});
+    setEnabledModels(emptyEnabledModels());
+
     try {
       const { results } = await probeVolcanoCredentials(organizationId, {
         accessKeyId: accessKeyId.trim(),
         secretAccessKey: secretAccessKey.trim(),
-        canonicalIds,
       });
-      setActivationResults((current) => ({
-        ...current,
-        ...activationByCanonicalId(results),
-      }));
-      return results;
+
+      if (results.some((result) => result.status === "auth_error")) {
+        setProbeError(t("pages.aiInterfaces.volcano.activation.authGlobalError"));
+        setProbePhase("error");
+        return;
+      }
+
+      setActivationResults(activationByCanonicalId(results));
+      setEnabledModels(enabledModelsFromProbeResults(results));
+      setProbePhase("ready");
     } catch (error) {
-      appToast.errorRaw(
+      setProbeError(
         error instanceof Error
           ? error.message
           : t("pages.aiInterfaces.volcano.activation.probeFailed")
       );
-      return null;
-    } finally {
-      setIsProbing(false);
+      setProbePhase("error");
     }
-  };
+  }, [accessKeyId, organizationId, secretAccessKey, t]);
 
-  const handleNextFromStep2 = async () => {
-    const ids = selectedModelIds;
-    if (ids.length > 0) {
-      await runActivationProbe(ids);
+  useEffect(() => {
+    if (step !== 2) {
+      return;
     }
-    setStep(3);
+    void runStep2Probe();
+  }, [step, probeRunId, runStep2Probe]);
+
+  const handleRetryProbe = () => {
+    setProbeRunId((current) => current + 1);
   };
 
   const handleSave = async () => {
@@ -142,11 +175,12 @@ export function VolcanoWizardDialog({
     setIsSaving(true);
     try {
       await createOrganizationAiInterface(organizationId, {
-        templateId: VOLCANO_TEMPLATE_ID,
+        provider: "doubao_volcano",
         name: name.trim(),
         accessKeyId: accessKeyId.trim(),
         secretAccessKey: secretAccessKey.trim(),
         enabledModels: selectedModelIds,
+        volcanoActivationResults: Object.values(activationResults),
         enabled: true,
         isDefault: true,
       });
@@ -172,7 +206,11 @@ export function VolcanoWizardDialog({
         </DialogHeader>
 
         {step === 1 ? (
-          <div className="space-y-4">
+          <form
+            className="space-y-4"
+            autoComplete="off"
+            onSubmit={(event) => event.preventDefault()}
+          >
             <p className="text-muted-foreground text-sm">
               {t("pages.aiInterfaces.volcano.step1Description")}
             </p>
@@ -192,48 +230,14 @@ export function VolcanoWizardDialog({
                 {t("pages.aiInterfaces.volcano.getApiKeyDoc")}
               </a>
             </p>
-            <input
-              type="text"
-              name="username"
-              autoComplete="username"
-              className="hidden"
-              tabIndex={-1}
-              aria-hidden
-              readOnly
+            <VolcanoCredentialFields
+              idPrefix="volcano-wizard"
+              accessKeyId={accessKeyId}
+              secretAccessKey={secretAccessKey}
+              onAccessKeyIdChange={setAccessKeyId}
+              onSecretAccessKeyChange={setSecretAccessKey}
             />
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              className="hidden"
-              tabIndex={-1}
-              aria-hidden
-              readOnly
-            />
-            <div className="space-y-2">
-              <Label htmlFor="volcano-ak">{t("pages.aiInterfaces.volcano.accessKeyId")}</Label>
-              <Input
-                id="volcano-ak"
-                name="volcano-access-key-id"
-                autoComplete="off"
-                value={accessKeyId}
-                onChange={(event) => setAccessKeyId(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="volcano-sk">
-                {t("pages.aiInterfaces.volcano.secretAccessKey")}
-              </Label>
-              <Input
-                id="volcano-sk"
-                name="volcano-secret-access-key"
-                type="password"
-                autoComplete="new-password"
-                value={secretAccessKey}
-                onChange={(event) => setSecretAccessKey(event.target.value)}
-              />
-            </div>
-          </div>
+          </form>
         ) : null}
 
         {step === 2 ? (
@@ -241,55 +245,75 @@ export function VolcanoWizardDialog({
             <p className="text-muted-foreground text-sm">
               {t("pages.aiInterfaces.volcano.step2Description")}
             </p>
-            <Button variant="outline" size="sm" asChild>
-              <a href={OPEN_MANAGEMENT_URL} target="_blank" rel="noreferrer">
-                {t("pages.aiInterfaces.volcano.openManagement")}
-                <ExternalLink className="ml-2 size-4" />
-              </a>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isProbing || selectedModelIds.length === 0}
-              onClick={() => void runActivationProbe(selectedModelIds)}
-            >
-              <Search className={`mr-2 size-4 ${isProbing ? "animate-pulse" : ""}`} />
-              {t("pages.aiInterfaces.volcano.activation.probeButton")}
-            </Button>
-            <div className="columns-1 gap-3 md:columns-2">
-              {VOLCANO_AI_MODEL_CATALOG.map((entry) => {
-                const probe = activationResults[entry.canonicalId];
-                return (
-                  <div key={entry.canonicalId} className="mb-3 break-inside-avoid">
-                    <VolcanoModelRow
-                      row={{
-                        canonicalId: entry.canonicalId,
-                        alias: entry.alias,
-                        modality: entry.modality,
-                        providerModelId: entry.providerModelId,
-                        enabled: enabledModels[entry.canonicalId] ?? false,
-                        usage: null,
-                        activation: probe
-                          ? {
-                              status: probe.status,
-                              probedAt: probe.probedAt,
-                              errorCode: probe.errorCode,
-                              message: probe.message,
-                            }
-                          : null,
-                      }}
-                      showUsage={false}
-                      onEnabledChange={(enabled) =>
-                        setEnabledModels((current) => ({
-                          ...current,
-                          [entry.canonicalId]: enabled,
-                        }))
-                      }
+
+            {probePhase === "error" && probeError ? (
+              <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-destructive text-sm">{probeError}</p>
+                <Button variant="outline" size="sm" onClick={handleRetryProbe}>
+                  {t("pages.aiInterfaces.volcano.activation.probeRetry")}
+                </Button>
+              </div>
+            ) : null}
+
+            {probePhase === "loading" ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="size-4 animate-spin" />
+                  {t("pages.aiInterfaces.volcano.activation.probing")}
+                </div>
+                <div className="columns-1 gap-3 md:columns-2">
+                  {VOLCANO_AI_MODEL_CATALOG.map((entry) => (
+                    <Skeleton
+                      key={entry.canonicalId}
+                      className="mb-3 h-28 w-full rounded-lg break-inside-avoid"
                     />
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {probePhase === "ready" ? (
+              <div className="columns-1 gap-3 md:columns-2">
+                {VOLCANO_AI_MODEL_CATALOG.map((entry) => {
+                  const probe = activationResults[entry.canonicalId];
+                  const canToggle = canToggleModelInWizard(probe);
+                  return (
+                    <div key={entry.canonicalId} className="mb-3 break-inside-avoid">
+                      <VolcanoModelRow
+                        hintVariant="wizard"
+                        row={{
+                          canonicalId: entry.canonicalId,
+                          alias: entry.alias,
+                          modality: entry.modality,
+                          providerModelId: entry.providerModelId,
+                          enabled: enabledModels[entry.canonicalId] ?? false,
+                          usage: null,
+                          activation: probe
+                            ? {
+                                status: probe.status,
+                                probedAt: probe.probedAt,
+                                errorCode: probe.errorCode,
+                                message: probe.message,
+                              }
+                            : null,
+                        }}
+                        showUsage={false}
+                        disabled={!canToggle}
+                        onEnabledChange={
+                          canToggle
+                            ? (enabled) =>
+                                setEnabledModels((current) => ({
+                                  ...current,
+                                  [entry.canonicalId]: enabled,
+                                }))
+                            : undefined
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -335,14 +359,14 @@ export function VolcanoWizardDialog({
               <Button
                 onClick={() => {
                   if (step === 2) {
-                    void handleNextFromStep2();
+                    setStep(3);
                     return;
                   }
                   setStep((current) => current + 1);
                 }}
                 disabled={
                   (step === 1 && (!accessKeyId.trim() || !secretAccessKey.trim())) ||
-                  (step === 2 && isProbing)
+                  (step === 2 && probePhase !== "ready")
                 }
               >
                 {t("common.next")}

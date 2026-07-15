@@ -21,7 +21,6 @@ async function main(): Promise<void> {
 
   const packages = await fetchAllVolcanoResourcePackages({
     credentials,
-    status: "Effective",
   });
   console.log("Package count:", packages.length);
 
@@ -35,7 +34,18 @@ async function main(): Promise<void> {
     const usage = usageByCanonicalId.get(entry.canonicalId);
     const pkg = packageByCanonicalId.get(entry.canonicalId);
     console.log(
-      `${entry.canonicalId}: provisioned=${pkg?.provisioned} remaining=${usage?.remaining ?? "—"} quota=${usage?.quota ?? "—"}`
+      `${entry.canonicalId}: provisioned=${pkg?.provisioned} remaining=${usage?.remaining ?? "—"} quota=${usage?.quota ?? "—"} used=${usage?.used ?? "—"} usedUp=${usage?.packageStatus?.usedUpCount ?? 0}`
+    );
+  }
+
+  const seedanceCode = "Doubao_Seedance_2.0_pack_free_infer";
+  const seedanceRows = packages.filter(
+    (row) => row.ConfigurationCode === seedanceCode
+  );
+  console.log(`\nSeedance 2.0 raw rows by status (${seedanceRows.length}):`);
+  for (const row of seedanceRows) {
+    console.log(
+      `  ${row.Status} ${row.AvailableAmount}/${row.TotalAmount} ${row.Unit} ${row.InstanceNo}`
     );
   }
 

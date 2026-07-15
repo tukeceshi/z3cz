@@ -21,3 +21,6 @@ packages/runtime/src/fonts/*/
 
 # Local AI interface template artifacts (object storage mirror for dev)
 data/ai-interface-templates/
+
+# Docker bind-mounted API logs (docker-compose.dev.yml)
+logs/

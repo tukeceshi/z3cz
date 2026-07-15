@@ -1,1 +1,0 @@
-Why is the NodeContext created in credential services? Would it make sense to move this utility elsewhere where the intent is clearer.

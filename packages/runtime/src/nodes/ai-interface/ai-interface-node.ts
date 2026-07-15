@@ -1,22 +1,23 @@
-import type {
-  NodeExecution,
-  NodeType,
-} from "@dafthunk/types";
-import { AI_INTERFACE_NODE_TYPE, withSelectedModel } from "@dafthunk/types";
+import type { NodeExecution, NodeType } from "@dafthunk/types";
+import { AI_INTERFACE_NODE_TYPE } from "@dafthunk/types";
 
-import { executeAiInterfaceSync } from "../../ai-interface/execute-sync";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
 
+/**
+ * Legacy template-as-node implementation.
+ * Kept registered so old graphs still resolve the type; new catalogs omit it.
+ * Execution directs users to the platform-model `ai-text` node.
+ */
 export class AiInterfaceNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
     id: "ai-interface",
     name: "AI Interface",
     type: AI_INTERFACE_NODE_TYPE,
     description:
-      "Run a configured AI interface template using organization credentials.",
+      "Deprecated. Use the AI Text node with platform AI models instead.",
     documentation:
-      "Executes a platform AI interface template compiled from Admin settings. Provide an organization AI interface instance or rely on the org default for the template provider.",
+      "This node type is no longer available in the palette. Replace it with an AI Text (`ai-text`) node and select a platform model. Configure upstream credentials under Organization → AI & Resource APIs.",
     tags: ["AI", "LLM"],
     icon: "bot",
     inlinable: false,
@@ -46,46 +47,9 @@ export class AiInterfaceNode extends ExecutableNode {
     outputs: [{ name: "text", type: "string" }],
   };
 
-  public async execute(context: NodeContext): Promise<NodeExecution> {
-    if (!context.resolveAiInterface) {
-      return this.createErrorResult("AI interface resolver is not configured");
-    }
-
-    const interfaceIdRaw = context.inputs.ai_interface_id;
-    const interfaceId =
-      typeof interfaceIdRaw === "string" && interfaceIdRaw.trim().length > 0
-        ? interfaceIdRaw.trim()
-        : undefined;
-
-    const templateId =
-      typeof this.node.metadata?.aiInterfaceTemplateId === "string"
-        ? this.node.metadata.aiInterfaceTemplateId
-        : undefined;
-
-    if (!interfaceId && !templateId) {
-      return this.createErrorResult(
-        "ai_interface_id or template metadata is required"
-      );
-    }
-
-    const resolved = await context.resolveAiInterface({
-      interfaceId,
-      templateId,
-    });
-
-    if (!resolved) {
-      return this.createErrorResult("AI interface could not be resolved");
-    }
-
-    const result = await executeAiInterfaceSync({
-      resolved: withSelectedModel(resolved, context.inputs.model),
-      inputs: context.inputs,
-    });
-
-    if (result.status === "failed") {
-      return this.createErrorResult(result.error ?? "AI interface request failed");
-    }
-
-    return this.createSuccessResult(result.outputs ?? {}, result.usage ?? 1);
+  public async execute(_context: NodeContext): Promise<NodeExecution> {
+    return this.createErrorResult(
+      "The AI Interface canvas node is deprecated. Replace it with an AI Text (ai-text) node and select a platform model. Upstream credentials remain under Organization → AI & Resource APIs."
+    );
   }
 }
