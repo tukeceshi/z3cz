@@ -107,6 +107,32 @@ export async function probeVolcanoCredentials(
   );
 }
 
+export async function listVolcanoTosBuckets(
+  organizationId: string,
+  interfaceId: string,
+  region: string
+): Promise<readonly string[]> {
+  const response = await makeRequest<{ buckets: string[] }>(
+    `${orgEndpoint(organizationId)}/${interfaceId}/tos-buckets?region=${encodeURIComponent(region)}`
+  );
+  return response.buckets ?? [];
+}
+
+export async function updateVolcanoTosStorage(
+  organizationId: string,
+  interfaceId: string,
+  input: {
+    readonly enabled: boolean;
+    readonly region: string;
+    readonly bucket: string;
+    readonly createBucket?: boolean;
+  }
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    tosStorage: input,
+  });
+}
+
 export async function probeVolcanoActivation(
   organizationId: string,
   interfaceId: string,

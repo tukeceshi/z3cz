@@ -1,11 +1,15 @@
 import type {
+  ImageModelParameterRules,
   PlatformAiModel,
   PlatformAiModelGroup,
   TextModelParameterRules,
 } from "@dafthunk/types";
 import {
+  DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  isImageModelParameterRules,
   isTextModelParameterRules,
+  normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
 } from "@dafthunk/types";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
@@ -56,11 +60,14 @@ import { cn } from "@/utils/utils";
 
 const NO_GROUP_VALUE = "__none__";
 
+type AdminModelModality = "text" | "image";
+
 export function AdminAiModelsPage() {
   const { t } = useTranslation();
   const setBreadcrumbs = useBreadcrumbsSetter();
+  const [modality, setModality] = useState<AdminModelModality>("text");
   const { models, groups, isLoading, refreshModels } =
-    useAdminPlatformAiModels("text");
+    useAdminPlatformAiModels(modality);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [settingsModel, setSettingsModel] = useState<PlatformAiModel | null>(
@@ -154,7 +161,7 @@ export function AdminAiModelsPage() {
   const handleSaveModel = async (
     model: PlatformAiModel,
     patch: {
-      readonly rules: TextModelParameterRules;
+      readonly rules: TextModelParameterRules | ImageModelParameterRules;
       readonly groupId: string | null;
       readonly description: string;
     }
@@ -340,9 +347,32 @@ export function AdminAiModelsPage() {
           </CardContent>
         </Card>
 
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={modality === "text" ? "default" : "outline"}
+            onClick={() => setModality("text")}
+          >
+            {t("pages.adminAiModels.textModels")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={modality === "image" ? "default" : "outline"}
+            onClick={() => setModality("image")}
+          >
+            {t("pages.adminAiModels.imageModels")}
+          </Button>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>{t("pages.adminAiModels.textModels")}</CardTitle>
+            <CardTitle>
+              {modality === "text"
+                ? t("pages.adminAiModels.textModels")
+                : t("pages.adminAiModels.imageModels")}
+            </CardTitle>
             <CardDescription>
               {t("pages.adminAiModels.description")}
             </CardDescription>
@@ -436,6 +466,15 @@ export function AdminAiModelsPage() {
 
       {settingsModel && isTextModelParameterRules(settingsModel.parameterRules) ? (
         <TextModelSettingsDialog
+          model={settingsModel}
+          groups={orderedGroups}
+          saving={savingId === settingsModel.canonicalId}
+          onClose={() => setSettingsModel(null)}
+          onSave={(patch) => handleSaveModel(settingsModel, patch)}
+        />
+      ) : null}
+      {settingsModel && isImageModelParameterRules(settingsModel.parameterRules) ? (
+        <ImageModelSettingsDialog
           model={settingsModel}
           groups={orderedGroups}
           saving={savingId === settingsModel.canonicalId}
@@ -776,6 +815,185 @@ function NumberField({
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
+  );
+}
+
+function ImageModelSettingsDialog({
+  model,
+  groups,
+  saving,
+  onClose,
+  onSave,
+}: {
+  readonly model: PlatformAiModel;
+  readonly groups: readonly PlatformAiModelGroup[];
+  readonly saving: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (patch: {
+    readonly rules: ImageModelParameterRules;
+    readonly groupId: string | null;
+    readonly description: string;
+  }) => void;
+}) {
+  const { t } = useTranslation();
+  const baseRules = isImageModelParameterRules(model.parameterRules)
+    ? normalizeImageModelParameterRules(model.parameterRules)
+    : DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
+
+  const [description, setDescription] = useState(model.description ?? "");
+  const [groupId, setGroupId] = useState(model.groupId ?? NO_GROUP_VALUE);
+  const [maxReferenceImages, setMaxReferenceImages] = useState(
+    String(baseRules.maxReferenceImages)
+  );
+  const [maxImageReferenceBytes, setMaxImageReferenceBytes] = useState(
+    String(baseRules.maxImageReferenceBytes)
+  );
+  const [promptMaxChars, setPromptMaxChars] = useState(
+    String(baseRules.promptMaxChars)
+  );
+  const [generationFields, setGenerationFields] = useState(
+    baseRules.generationFields.map((field) => ({ ...field }))
+  );
+
+  const handleSave = () => {
+    onSave({
+      groupId: groupId === NO_GROUP_VALUE ? null : groupId,
+      description: description.trim(),
+      rules: {
+        ...baseRules,
+        maxReferenceImages: Number(maxReferenceImages) || 0,
+        maxImageReferenceBytes:
+          Number(maxImageReferenceBytes) ||
+          DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxImageReferenceBytes,
+        promptMaxChars:
+          Number(promptMaxChars) ||
+          DEFAULT_IMAGE_MODEL_PARAMETER_RULES.promptMaxChars,
+        generationFields,
+      },
+    });
+  };
+
+  const updateFieldDefault = (
+    name: string,
+    value: string | number | boolean
+  ) => {
+    setGenerationFields((current) =>
+      current.map((field) =>
+        field.name === name ? { ...field, default: value } : field
+      )
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("pages.adminAiModels.settingsTitle", { name: model.displayName })}</DialogTitle>
+          <DialogDescription>
+            {t("pages.adminAiModels.imageSettingsDescription")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">{t("pages.adminAiModels.modelDescription")}</Label>
+            <Input
+              className="h-8 text-xs"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">{t("pages.adminAiModels.modelGroup")}</Label>
+            <Select value={groupId} onValueChange={setGroupId}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_GROUP_VALUE}>
+                  {t("pages.adminAiModels.noGroup")}
+                </SelectItem>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <NumberField
+            label={t("pages.adminAiModels.maxImageReferences")}
+            value={maxReferenceImages}
+            onChange={setMaxReferenceImages}
+          />
+          <NumberField
+            label={t("pages.adminAiModels.maxImageReferenceBytes")}
+            value={maxImageReferenceBytes}
+            onChange={setMaxImageReferenceBytes}
+          />
+          <NumberField
+            className="sm:col-span-2"
+            label={t("pages.adminAiModels.promptMaxChars")}
+            value={promptMaxChars}
+            onChange={setPromptMaxChars}
+          />
+
+          {generationFields
+            .filter((field) => !field.hidden)
+            .map((field) => (
+              <div key={field.name} className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">{field.description || field.name}</Label>
+                {field.type === "boolean" ? (
+                  <Switch
+                    checked={field.default === true}
+                    onCheckedChange={(checked) =>
+                      updateFieldDefault(field.name, checked)
+                    }
+                  />
+                ) : field.enumValues && field.enumValues.length > 0 ? (
+                  <Select
+                    value={
+                      field.default === undefined ? "" : String(field.default)
+                    }
+                    onValueChange={(value) =>
+                      updateFieldDefault(field.name, value)
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.enumValues.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    className="h-8 text-xs"
+                    value={
+                      field.default === undefined ? "" : String(field.default)
+                    }
+                    onChange={(e) => updateFieldDefault(field.name, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button type="button" disabled={saving} onClick={handleSave}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

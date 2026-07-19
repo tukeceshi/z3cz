@@ -55,6 +55,8 @@ import type { ObjectStore } from "./object-store";
 import { apiToNodeParameter, nodeToApiParameter } from "./parameter-mapper";
 import type { QueueService } from "./queue-service";
 import type { AiInterfaceService } from "./ai-interface-service";
+import type { ImageModelService } from "./image-model-service";
+import type { ResolveAiImageStorage } from "./ai-image-storage";
 import type { TextModelService } from "./text-model-service";
 import type { RelayAccountService } from "./relay-account-service";
 import type { SchemaService } from "./schema-service";
@@ -128,6 +130,10 @@ export interface RuntimeDependencies<Env = unknown> {
   aiInterfaceService?: AiInterfaceService;
   /** Platform text model resolver (canonical id → interface + provider model). */
   textModelService?: TextModelService;
+  /** Platform image model resolver (canonical id → interface + provider model). */
+  imageModelService?: ImageModelService;
+  /** Ephemeral vs cloud storage for AI image generation. */
+  resolveAiImageStorage?: ResolveAiImageStorage;
   runtimeVersion?: string;
 }
 
@@ -167,6 +173,8 @@ export abstract class Runtime<Env = unknown> {
   protected relayAccountService?: RelayAccountService;
   protected aiInterfaceService?: AiInterfaceService;
   protected textModelService?: TextModelService;
+  protected imageModelService?: ImageModelService;
+  protected resolveAiImageStorage?: ResolveAiImageStorage;
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -203,6 +211,8 @@ export abstract class Runtime<Env = unknown> {
     this.relayAccountService = dependencies.relayAccountService;
     this.aiInterfaceService = dependencies.aiInterfaceService;
     this.textModelService = dependencies.textModelService;
+    this.imageModelService = dependencies.imageModelService;
+    this.resolveAiImageStorage = dependencies.resolveAiImageStorage;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -1226,6 +1236,20 @@ export abstract class Runtime<Env = unknown> {
               this.textModelService!.resolveTextModel({
                 organizationId: context.organizationId,
                 canonicalId,
+              })
+          : undefined,
+        resolveImageModel: this.imageModelService
+          ? (canonicalId) =>
+              this.imageModelService!.resolveImageModel({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
+        resolveAiImageStorage: this.resolveAiImageStorage
+          ? () =>
+              this.resolveAiImageStorage!({
+                organizationId: context.organizationId,
+                workflowId: context.workflowId,
               })
           : undefined,
         env: this.env as NodeEnv,

@@ -1,4 +1,4 @@
-import type { ObjectReference, WorkflowTrigger } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -24,11 +24,21 @@ import {
   ALL_TRIGGER_NODE_TYPE_IDS,
   getTriggerNodeTypes,
 } from "./trigger-node-mapping";
+import { collectAiTextFirstDegreeEdgeIds } from "./ai-text-edge-selection";
+import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
 import {
-  classifyReferenceFromNodeType,
-  isAiTextAllowedReferenceNodeType,
+  buildAiTextReferenceConnectionFromCardDrop,
+} from "./ai-text-reference-policy";
+import {
+  buildAiImageReferenceConnectionFromCardDrop,
+} from "./ai-image-reference-policy";
+import {
   mergeAiTextNodeCatalogInputs,
 } from "./ai-text-node-utils";
+import {
+  mergeAiImageNodeCatalogInputs,
+} from "./ai-image-node-utils";
+import { validateWorkflowConnection } from "./workflow-connection-validation";
 import type {
   ConnectionValidationState,
   NodeExecutionState,
@@ -316,6 +326,45 @@ export function useGraphOperations({
     edgesRef.current = edges;
   }, [edges]);
 
+  const edgeTopologyFingerprint = useMemo(
+    () =>
+      edges
+        .map(
+          (edge) =>
+            `${edge.id}:${edge.source}:${edge.sourceHandle ?? ""}:${edge.target}:${edge.targetHandle ?? ""}`
+        )
+        .join("|"),
+    [edges]
+  );
+
+  // AI text sole-select: animate first-degree connected edges (output → input).
+  useEffect(() => {
+    const selectedNode =
+      soleSelectedNodeId !== null
+        ? nodes.find((node) => node.id === soleSelectedNodeId)
+        : undefined;
+    const flowEdgeIds =
+      selectedNode?.data.nodeType === AI_TEXT_NODE_TYPE && soleSelectedNodeId
+        ? collectAiTextFirstDegreeEdgeIds(soleSelectedNodeId, edges)
+        : selectedNode?.data.nodeType === AI_IMAGE_NODE_TYPE && soleSelectedNodeId
+          ? collectAiImageFirstDegreeEdgeIds(soleSelectedNodeId, edges)
+          : new Set<string>();
+
+    setEdges((current) => {
+      let changed = false;
+      const next = current.map((edge) => {
+        const animated = flowEdgeIds.has(edge.id);
+        const nextZIndex = animated ? 1 : 0;
+        if (edge.animated === animated && edge.zIndex === nextZIndex) {
+          return edge;
+        }
+        changed = true;
+        return { ...edge, animated, zIndex: nextZIndex };
+      });
+      return changed ? next : current;
+    });
+  }, [edgeTopologyFingerprint, nodes, selectionFingerprint, soleSelectedNodeId, setEdges]);
+
   // Sync initialNodes prop
   useEffect(() => {
     if (isDraggingRef.current) {
@@ -324,9 +373,13 @@ export function useGraphOperations({
 
     const newNodesWithCreateObjectUrl = initialNodes.map((node) => {
       const catalog = nodeTypes.find((entry) => entry.type === node.data.nodeType);
-      const inputs = mergeAiTextNodeCatalogInputs(
+      const inputs = mergeAiImageNodeCatalogInputs(
         node.data.nodeType,
-        node.data.inputs,
+        mergeAiTextNodeCatalogInputs(
+          node.data.nodeType,
+          node.data.inputs,
+          catalog
+        ),
         catalog
       );
 
@@ -434,19 +487,12 @@ export function useGraphOperations({
     setConnectionValidationState("default");
   }, [disabled]);
 
-  const onConnectEnd = useCallback(() => {
-    if (disabled) return;
-    setConnectionValidationState("default");
-  }, [disabled]);
-
   // Connection validation
   const isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>> =
     useCallback(
       (connection) => {
-        if (disabled) return false;
         if (!connection.source || !connection.target) return false;
 
-        // Normalize to Connection shape (Edge has optional sourceHandle/targetHandle)
         const conn: Connection = {
           source: connection.source,
           target: connection.target,
@@ -454,127 +500,16 @@ export function useGraphOperations({
           targetHandle: connection.targetHandle ?? null,
         };
 
-        const sourceNode = nodes.find((node) => node.id === conn.source);
-        const targetNode = nodes.find((node) => node.id === conn.target);
-        if (!sourceNode || !targetNode) return false;
+        const valid = validateWorkflowConnection({
+          connection: conn,
+          nodes,
+          edges,
+          extraValidate: validateConnection,
+          disabled,
+        });
 
-        const sourceOutput = sourceNode.data.outputs.find(
-          (output) => output.id === conn.sourceHandle
-        );
-        const sourceInput = sourceNode.data.inputs.find(
-          (input) => input.id === conn.sourceHandle
-        );
-
-        const targetInput = targetNode.data.inputs.find(
-          (input) => input.id === conn.targetHandle
-        );
-        const targetOutput = targetNode.data.outputs.find(
-          (output) => output.id === conn.targetHandle
-        );
-
-        let inputParam, outputParam, inputNodeId, inputHandleId;
-
-        if (sourceOutput && targetInput) {
-          outputParam = sourceOutput;
-          inputParam = targetInput;
-          inputNodeId = conn.target;
-          inputHandleId = conn.targetHandle;
-        } else if (sourceInput && targetOutput) {
-          outputParam = targetOutput;
-          inputParam = sourceInput;
-          inputNodeId = conn.source;
-          inputHandleId = conn.sourceHandle;
-        } else {
-          setConnectionValidationState("invalid");
-          return false;
-        }
-
-        const blobTypes = new Set([
-          "image",
-          "audio",
-          "video",
-          "document",
-          "buffergeometry",
-          "gltf",
-        ]);
-
-        const exactMatch = outputParam.type === inputParam.type;
-        const anyTypeMatch =
-          outputParam.type === "any" || inputParam.type === "any";
-        const blobCompatible =
-          (outputParam.type === "blob" && blobTypes.has(inputParam.type)) ||
-          (inputParam.type === "blob" && blobTypes.has(outputParam.type));
-
-        const typesMatch = exactMatch || anyTypeMatch || blobCompatible;
-
-        if (!typesMatch) {
-          setConnectionValidationState("invalid");
-          return false;
-        }
-
-        // AI text: only AI text / AI image / AI video may connect into keywords
-        if (
-          targetNode.data.nodeType === "ai-text" &&
-          inputParam.id === "keywords"
-        ) {
-          const sourceKind = classifyReferenceFromNodeType(
-            sourceNode.data.nodeType
-          );
-          if (
-            !isAiTextAllowedReferenceNodeType(sourceNode.data.nodeType) ||
-            !sourceKind
-          ) {
-            setConnectionValidationState("invalid");
-            return false;
-          }
-
-          const meta = targetNode.data.metadata ?? {};
-          const maxText = Number(meta.refMaxText ?? 4);
-          const maxImage = Number(meta.refMaxImage ?? 0);
-          const maxVideo = Number(meta.refMaxVideo ?? 0);
-          const existing = edges.filter(
-            (edge) =>
-              edge.target === inputNodeId &&
-              edge.targetHandle === inputHandleId
-          );
-          const counts = { text: 0, image: 0, video: 0 };
-          for (const edge of existing) {
-            const src = nodes.find((node) => node.id === edge.source);
-            const kind = classifyReferenceFromNodeType(src?.data.nodeType);
-            if (kind === "text") counts.text += 1;
-            else if (kind === "image") counts.image += 1;
-            else if (kind === "video") counts.video += 1;
-          }
-          if (sourceKind === "text" && counts.text >= maxText) {
-            setConnectionValidationState("invalid");
-            return false;
-          }
-          if (sourceKind === "image" && counts.image >= maxImage) {
-            setConnectionValidationState("invalid");
-            return false;
-          }
-          if (sourceKind === "video" && counts.video >= maxVideo) {
-            setConnectionValidationState("invalid");
-            return false;
-          }
-        }
-
-        if (!inputParam.repeated) {
-          const hasExistingConnection = edges.some(
-            (edge) =>
-              (edge.target === inputNodeId &&
-                edge.targetHandle === inputHandleId) ||
-              (edge.source === inputNodeId &&
-                edge.sourceHandle === inputHandleId)
-          );
-          if (hasExistingConnection) {
-            setConnectionValidationState("invalid");
-            return false;
-          }
-        }
-
-        setConnectionValidationState("valid");
-        return validateConnection(conn);
+        setConnectionValidationState(valid ? "valid" : "invalid");
+        return valid;
       },
       [nodes, edges, validateConnection, disabled]
     );
@@ -640,6 +575,56 @@ export function useGraphOperations({
       });
     },
     [setEdges, isValidConnection, disabled, createObjectUrl, nodes]
+  );
+
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (event, connectionState) => {
+      if (disabled) {
+        setConnectionValidationState("default");
+        return;
+      }
+
+      if (!connectionState.isValid && connectionState.fromNode && "clientX" in event) {
+        const topEl = document.elementFromPoint(event.clientX, event.clientY);
+        const nodeEl = topEl?.closest(
+          ".react-flow__node"
+        ) as HTMLElement | null;
+        const hoveredNodeId = nodeEl?.getAttribute("data-id");
+        if (hoveredNodeId) {
+          const policyNodes = nodesRef.current.map((node) => ({
+            id: node.id,
+            data: node.data,
+          }));
+          const drop =
+            buildAiTextReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            }) ??
+            buildAiImageReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            });
+          if (
+            drop &&
+            validateWorkflowConnection({
+              connection: drop,
+              nodes: nodesRef.current,
+              edges: edgesRef.current,
+              disabled,
+            })
+          ) {
+            onConnect(drop);
+          }
+        }
+      }
+
+      setConnectionValidationState("default");
+    },
+    [disabled, onConnect, edgesRef, nodesRef]
   );
 
   // Node management

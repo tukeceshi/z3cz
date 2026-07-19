@@ -1,4 +1,6 @@
 import type { AiModelModality } from "./ai-model-catalog";
+import type { UpstreamParamProfileField } from "./upstream-param-profile";
+import type { ObjectReference } from "./workflow";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 
@@ -43,6 +45,8 @@ export interface ImageModelParameterRules {
   readonly schemaVersion: typeof PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION;
   readonly maxReferenceImages: number;
   readonly maxImageReferenceBytes: number;
+  readonly promptMaxChars: number;
+  readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
 export interface VideoModelParameterRules {
@@ -204,6 +208,59 @@ export interface AiTextResultHistory {
   readonly selectedId: string | null;
 }
 
+export type OrgImageModelUnavailableReason = OrgTextModelUnavailableReason;
+
+export interface OrgImageModelOption {
+  readonly canonicalId: string;
+  readonly displayName: string;
+  readonly modality: AiModelModality;
+  readonly providerModelId: string;
+  readonly parameterRules: ImageModelParameterRules;
+  readonly selectable: boolean;
+  readonly unavailableReason?: OrgImageModelUnavailableReason;
+  readonly description: string;
+  readonly groupId: string | null;
+  readonly groupName: string | null;
+  readonly groupDescription: string | null;
+  readonly groupIcon: string | null;
+}
+
+export interface ListOrgImageModelsResponse {
+  readonly models: readonly OrgImageModelOption[];
+  readonly groups: readonly PlatformAiModelGroup[];
+}
+
+export interface GenerateAiImageRequest {
+  readonly modelCanonicalId: string;
+  readonly prompt?: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+  readonly workflowId?: string;
+  readonly nodeId?: string;
+}
+
+import type { MediaReference } from "./media-reference";
+
+export interface GenerateAiImageResponse {
+  readonly images: readonly MediaReference[];
+  readonly invocationId: string;
+  readonly aiInterfaceId: string;
+  readonly storageMode: "ephemeral" | "cloud";
+}
+
+export interface AiImageResultHistoryItem {
+  readonly id: string;
+  readonly images: readonly MediaReference[];
+  readonly prompt: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
+}
+
+export interface AiImageResultHistory {
+  readonly items: readonly AiImageResultHistoryItem[];
+  readonly selectedId: string | null;
+}
+
 export const DEEPSEEK_V4_FLASH_CANONICAL_ID = "deepseek-v4-flash" as const;
 
 export const DEFAULT_TEXT_MODEL_PARAMETER_RULES: TextModelParameterRules = {
@@ -227,10 +284,78 @@ export const DEFAULT_TEXT_MODEL_PARAMETER_RULES: TextModelParameterRules = {
   allowPromptInjectVideo: false,
 };
 
+export const DEFAULT_IMAGE_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
+  [
+    {
+      name: "size",
+      apiName: "size",
+      type: "string",
+      description: "Output size preset or pixel dimensions",
+      default: "2K",
+      enumValues: [
+        "2K",
+        "3K",
+        "2048x2048",
+        "1728x2304",
+        "2304x1728",
+        "2848x1600",
+        "1600x2848",
+      ],
+    },
+    {
+      name: "output_format",
+      apiName: "output_format",
+      type: "string",
+      description: "Generated image file format",
+      default: "png",
+      enumValues: ["png", "jpeg"],
+    },
+    {
+      name: "watermark",
+      apiName: "watermark",
+      type: "boolean",
+      description: "Add AI-generated watermark",
+      default: false,
+    },
+    {
+      name: "sequential_image_generation",
+      apiName: "sequential_image_generation",
+      type: "string",
+      description: "Single image or auto multi-image set",
+      default: "disabled",
+      enumValues: ["disabled", "auto"],
+    },
+    {
+      name: "max_images",
+      apiName: "sequential_image_generation_options.max_images",
+      type: "number",
+      description: "Max images when sequential mode is auto",
+      default: 1,
+      hidden: true,
+    },
+    {
+      name: "optimize_prompt_mode",
+      apiName: "optimize_prompt_options.mode",
+      type: "string",
+      description: "Prompt optimization mode",
+      default: "standard",
+      enumValues: ["standard", "fast"],
+    },
+    {
+      name: "web_search",
+      apiName: "web_search",
+      type: "boolean",
+      description: "Enable web search tools when supported",
+      default: false,
+    },
+  ] as const;
+
 export const DEFAULT_IMAGE_MODEL_PARAMETER_RULES: ImageModelParameterRules = {
   schemaVersion: PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
   maxReferenceImages: 4,
   maxImageReferenceBytes: 10 * 1024 * 1024,
+  promptMaxChars: 600,
+  generationFields: DEFAULT_IMAGE_GENERATION_FIELDS,
 };
 
 export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
@@ -249,13 +374,97 @@ export function isTextModelParameterRules(
 export function isImageModelParameterRules(
   rules: PlatformAiModelParameterRules
 ): rules is ImageModelParameterRules {
-  return "maxReferenceImages" in rules && !("promptMaxChars" in rules);
+  return (
+    "maxReferenceImages" in rules &&
+    !("referenceInputs" in rules) &&
+    !("maxReferenceVideos" in rules)
+  );
 }
 
 export function isVideoModelParameterRules(
   rules: PlatformAiModelParameterRules
 ): rules is VideoModelParameterRules {
   return "maxReferenceVideos" in rules && !("promptMaxChars" in rules);
+}
+
+export function normalizeImageModelParameterRules(
+  rules: ImageModelParameterRules
+): ImageModelParameterRules {
+  const generationFields =
+    rules.generationFields?.length > 0
+      ? rules.generationFields
+      : DEFAULT_IMAGE_MODEL_PARAMETER_RULES.generationFields;
+
+  return {
+    ...DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
+    ...rules,
+    maxReferenceImages:
+      rules.maxReferenceImages ??
+      DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxReferenceImages,
+    maxImageReferenceBytes:
+      rules.maxImageReferenceBytes ??
+      DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxImageReferenceBytes,
+    promptMaxChars:
+      rules.promptMaxChars ??
+      DEFAULT_IMAGE_MODEL_PARAMETER_RULES.promptMaxChars,
+    generationFields,
+  };
+}
+
+/** Build Volcano /images/generations body from admin field definitions. */
+export function buildVolcanoImageGenerationBody(params: {
+  readonly providerModelId: string;
+  readonly prompt: string;
+  readonly generationFields: readonly UpstreamParamProfileField[];
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: params.providerModelId,
+    prompt: params.prompt,
+    stream: false,
+    response_format: "url",
+  };
+
+  for (const field of params.generationFields) {
+    const raw = params.params?.[field.name];
+    const value =
+      raw === undefined || raw === null || raw === ""
+        ? field.default
+        : raw;
+
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+
+    if (field.apiName === "web_search") {
+      if (value === true) {
+        body.tools = [{ type: "web_search" }];
+      }
+      continue;
+    }
+
+    if (field.apiName.includes(".")) {
+      const [root, leaf] = field.apiName.split(".", 2);
+      const existing =
+        body[root] && typeof body[root] === "object"
+          ? (body[root] as Record<string, unknown>)
+          : {};
+      body[root] = { ...existing, [leaf!]: value };
+      continue;
+    }
+
+    body[field.apiName] = value;
+  }
+
+  const urls = params.referenceImageUrls?.filter(Boolean) ?? [];
+  if (urls.length === 1) {
+    body.image = urls[0];
+  } else if (urls.length > 1) {
+    body.image = urls;
+  }
+
+  return body;
 }
 
 /** Normalize older DB rows that lack the newer reference-limit fields. */

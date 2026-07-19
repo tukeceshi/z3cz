@@ -5,6 +5,9 @@ export interface ObjectReference {
   id: string;
   mimeType: string;
   filename?: string;
+  /** Cloud object key when stored in user TOS (not platform R2). */
+  storageKey?: string;
+  storageBackend?: "platform" | "volcengine_tos";
 }
 
 import type { WorkflowBillingMode } from "./workflow-billing";

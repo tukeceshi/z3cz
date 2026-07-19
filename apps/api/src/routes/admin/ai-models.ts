@@ -47,10 +47,23 @@ const textRulesSchema = z.object({
   allowPromptInjectVideo: z.boolean().optional(),
 });
 
+const generationFieldSchema = z.object({
+  name: z.string().min(1),
+  apiName: z.string().min(1),
+  type: z.enum(["string", "number", "boolean", "json"]),
+  description: z.string(),
+  required: z.boolean().optional(),
+  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  hidden: z.boolean().optional(),
+  enumValues: z.array(z.string()).optional(),
+});
+
 const imageRulesSchema = z.object({
   schemaVersion: z.literal(1),
   maxReferenceImages: z.number().int().nonnegative(),
   maxImageReferenceBytes: z.number().int().positive(),
+  promptMaxChars: z.number().int().positive(),
+  generationFields: z.array(generationFieldSchema),
 });
 
 const videoRulesSchema = z.object({

@@ -1,0 +1,41 @@
+import type { ReactNode } from "react";
+
+import { cn } from "@/utils/utils";
+
+import {
+  AI_GENERATIVE_PANEL_HEIGHT_PX,
+  AI_GENERATIVE_PANEL_WIDTH_PX,
+} from "./ai-generative-panel-utils";
+
+export interface GenerativeConfigPanelShellProps {
+  readonly zoom: number;
+  readonly children: ReactNode;
+}
+
+/** Shared bottom editor shell for AI text / AI image nodes. */
+export function GenerativeConfigPanelShell({
+  zoom,
+  children,
+}: GenerativeConfigPanelShellProps) {
+  const panelZoom = zoom > 0 ? zoom : 1;
+
+  return (
+    <div
+      className={cn(
+        "nodrag nopan nowheel absolute top-full left-1/2 z-20 -mt-px",
+        "overflow-hidden rounded-b-xl border border-t-0 border-border/70",
+        "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:bg-neutral-900/95"
+      )}
+      style={{
+        width: AI_GENERATIVE_PANEL_WIDTH_PX,
+        height: AI_GENERATIVE_PANEL_HEIGHT_PX,
+        transform: `translateX(-50%) scale(${1 / panelZoom})`,
+        transformOrigin: "top center",
+      }}
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <div className="flex h-full flex-col px-3 pb-3 pt-2">{children}</div>
+    </div>
+  );
+}

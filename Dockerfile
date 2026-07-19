@@ -98,17 +98,20 @@ FROM deps AS build-app-prod
 ARG VITE_API_HOST=/api
 ARG VITE_WEBSITE_URL=http://localhost:3100
 ARG VITE_APP_URL=http://localhost:3101
+ARG VITE_WS_VIA_PROXY=1
 
 ENV VITE_API_HOST=${VITE_API_HOST}
 ENV VITE_WEBSITE_URL=${VITE_WEBSITE_URL}
 ENV VITE_APP_URL=${VITE_APP_URL}
+ENV VITE_WS_VIA_PROXY=${VITE_WS_VIA_PROXY}
 
 RUN pnpm --filter '@dafthunk/types' build \
   && pnpm --filter '@dafthunk/app' build:docker-prod
 
 FROM nginx:1.27-alpine AS prod-app
 
-COPY docker/nginx/app.conf /etc/nginx/conf.d/default.conf
+# Default: static-only (Caddy / edge owns /api). Legacy compose may mount app.conf over this.
+COPY docker/nginx/app.static.conf /etc/nginx/conf.d/default.conf
 COPY --from=build-app-prod /app/apps/app/dist /usr/share/nginx/html
 
 EXPOSE 80

@@ -1,14 +1,10 @@
-# Dafthunk 实验性生产编排（Postgres + Node API + app + www SSR + SMTP 网关）
+# DEPRECATED: 请改用 docker-host（单域名 Caddy，无 SMTP）。
+#   node docker-host/dafthunk-setup.mjs
+#   node docker-host/launcher.mjs rebuild
 #
-# 准备：cp .env.docker.prod.example .env.docker.prod（可选 node scripts/sync-env-docker-prod.mjs）
+# 本文件保留作过渡；app 镜像默认为静态-only，故此处挂载旧版 nginx 反代 conf。
+#
 # 启动：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up -d --build
-# 停止：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod down
-#
-# 访问：
-#   www  http://localhost:3100
-#   app  http://localhost:3101
-#   api  http://localhost:3102
-#   smtp localhost:2525 → /inbound-email/raw
 
 services:
   supabase-db:
@@ -103,31 +99,15 @@ services:
         VITE_API_HOST: /api
         VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3100}
         VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
+        VITE_WS_VIA_PROXY: "1"
     depends_on:
       api:
         condition: service_healthy
+    volumes:
+      # Legacy direct :3101 access — proxy /api inside nginx (host stack uses Caddy instead)
+      - ./docker/nginx/app.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "${APP_PORT:-3101}:80"
-    restart: unless-stopped
-
-  smtp-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: prod-smtp-gateway
-      args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      API_URL: http://api:3102
-      INBOUND_EMAIL_SECRET: ${INBOUND_EMAIL_SECRET:?Set INBOUND_EMAIL_SECRET in .env.docker.prod}
-      SMTP_HOST: 0.0.0.0
-      SMTP_PORT: ${SMTP_PORT:-2525}
-    ports:
-      - "${SMTP_PORT:-2525}:2525"
     restart: unless-stopped
 
 volumes:

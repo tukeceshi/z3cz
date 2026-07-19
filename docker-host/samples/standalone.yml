@@ -1,0 +1,25 @@
+# Dafthunk 自托管（单机）模板
+# 复制：cp samples/standalone.yml containers/app.yml
+# 或运行：node dafthunk-setup.mjs
+
+# 对外主机名（单域名）。本地可用 localhost
+hostname: workflow.example.com
+
+# true = Caddy 自动 HTTPS（需公网解析到本机 80/443）
+# localhost / 私网 IP 请设为 false
+https: true
+
+# Let's Encrypt 通知邮箱（可选，与平台 admin 无关）
+# le_email: admin@example.com
+
+# 宿主机端口（本地验链路可改为 8080/8443，避免与开发栈或权限冲突）
+http_port: 80
+https_port: 443
+
+env:
+  # setup / launcher 会写入真实密钥；勿提交 containers/
+  JWT_SECRET: change-me
+  SECRET_MASTER_KEY: change-me
+  # 以下由 setup 按 hostname 生成，也可手改
+  # WEB_HOST: https://workflow.example.com
+  # WEBSITE_URL: https://workflow.example.com

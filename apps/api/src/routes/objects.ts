@@ -10,9 +10,68 @@ import { Hono } from "hono";
 
 import { apiKeyOrJwtMiddleware, jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
+import { createDatabase } from "../db";
+import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
 import { CloudflareObjectStore } from "../runtime/cloudflare-object-store";
+import { resolveOrgCloudStorage } from "../services/resolve-org-cloud-storage";
+import { decryptSecret } from "../utils/encryption";
 
 const objectRoutes = new Hono<ApiContext>();
+
+const STORAGE_KEY_PATTERN = /^[a-zA-Z0-9_\-/.]+$/;
+
+objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, async (c) => {
+  const storageKey = c.req.query("storageKey");
+  const mimeType = c.req.query("mimeType");
+
+  if (!storageKey || !mimeType) {
+    return c.json(
+      { error: "Missing required parameters: storageKey and mimeType" },
+      400
+    );
+  }
+
+  if (!STORAGE_KEY_PATTERN.test(storageKey)) {
+    return c.json({ error: "Invalid storage key" }, 400);
+  }
+
+  const organizationId = c.get("organizationId")!;
+
+  try {
+    const db = createDatabase(c.env);
+    const cloud = await resolveOrgCloudStorage(db, organizationId);
+    if (!cloud) {
+      return c.json({ error: "Cloud storage is not configured" }, 404);
+    }
+
+    const secretAccessKey = await decryptSecret(
+      cloud.secretAccessKeyEncrypted,
+      c.env,
+      organizationId
+    );
+
+    const tosClient = new VolcengineTosClient({
+      accessKeyId: cloud.accessKeyId,
+      secretAccessKey,
+      region: cloud.tosStorage.region,
+      bucket: cloud.tosStorage.bucket,
+    });
+
+    const result = await tosClient.getObject({ key: storageKey });
+
+    return new Response(result.data, {
+      headers: {
+        "content-type": mimeType,
+        "Cache-Control": "public, max-age=3600",
+        "Content-Disposition": `attachment; filename="cloud-${storageKey.split("/").pop() ?? "object"}"`,
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    console.error("Cloud object retrieval error:", error);
+    return c.json({ error: "Object not found or error retrieving object" }, 404);
+  }
+});
 
 // organizationId is guaranteed by jwtMiddleware / apiKeyOrJwtMiddleware,
 // so route handlers use c.get("organizationId")! without null checks.

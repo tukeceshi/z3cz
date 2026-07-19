@@ -308,6 +308,21 @@ export interface NodeContext {
       }
     | undefined
   >;
+  /** Resolve a platform image model to interface + provider model id. */
+  resolveImageModel?: (
+    canonicalId: string
+  ) => Promise<
+    | {
+        readonly interfaceId: string;
+        readonly providerModelId: string;
+        readonly parameterRules: import("@dafthunk/types").ImageModelParameterRules;
+      }
+    | undefined
+  >;
+  /** Resolve ephemeral vs cloud storage for AI image generation. */
+  resolveAiImageStorage?: () => Promise<
+    import("./ai-image-storage").AiImageStorageResolution
+  >;
   env: NodeEnv;
   // Multi-step execution primitives (populated for MultiStepNode instances)
   sleep?: (durationMs: number) => Promise<void>;

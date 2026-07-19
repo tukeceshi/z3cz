@@ -327,36 +327,6 @@ export function referencesFitModelLimits(
   );
 }
 
-export function canAcceptAiTextReference(params: {
-  readonly rules: TextModelParameterRules;
-  readonly sourceNodeType: string | undefined;
-  readonly currentCounts: AiTextReferenceCounts;
-}): { readonly ok: boolean; readonly reason?: string } {
-  const kind = classifyReferenceFromNodeType(params.sourceNodeType);
-  if (!kind) {
-    return { ok: false, reason: "unsupported_source" };
-  }
-
-  const rules = normalizeTextModelParameterRules(params.rules);
-
-  if (kind === "text") {
-    if (params.currentCounts.text >= rules.maxTextReferences) {
-      return { ok: false, reason: "text_limit" };
-    }
-    return { ok: true };
-  }
-  if (kind === "image") {
-    if (params.currentCounts.image >= rules.maxImageReferences) {
-      return { ok: false, reason: "image_limit" };
-    }
-    return { ok: true };
-  }
-  if (params.currentCounts.video >= rules.maxVideoReferences) {
-    return { ok: false, reason: "video_limit" };
-  }
-  return { ok: true };
-}
-
 export function probeVideoFileDurationSeconds(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);

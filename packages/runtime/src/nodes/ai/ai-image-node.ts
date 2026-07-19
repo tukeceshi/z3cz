@@ -1,168 +1,429 @@
-import type { NodeExecution, NodeType } from "@dafthunk/types";
-
 import {
-  buildReplicateInput,
-  createReplicatePollContinuation,
-  submitReplicatePrediction,
-} from "../../upstream/replicate-upstream";
+  isEphemeralMediaReference,
+  type MediaReference,
+  type ObjectReference,
+} from "@dafthunk/types";
+
+
+
+import { executeVolcanoImageGeneration } from "../../ai-interface/execute-volcano-image";
+
 import type { NodeContext } from "../../node-types";
+
 import { ExecutableNode, isObjectReference } from "../../node-types";
-import { awaitReplicateOrPending } from "./await-replicate-or-pending";
+
+
 
 export const AI_IMAGE_NODE_TYPE = "ai-image" as const;
 
+export const AI_IMAGE_REFERENCE_INPUT = "reference_images" as const;
+
+
+
 /**
- * AI Image node — gateway-style image generation.
- * Supports manual_images bypass and Replicate for generation.
+
+ * AI Image node — generates images via org Volcano interfaces and platform model catalog.
+
  */
+
 export class AiImageNode extends ExecutableNode {
-  public static readonly nodeType: NodeType = {
+
+  public static readonly nodeType: import("@dafthunk/types").NodeType = {
+
     id: "ai-image",
+
     name: "AI Image",
+
     type: "ai-image",
+
     description:
-      "Generate images using AI models via Replicate. Supports manual image bypass for testing.",
-    documentation: `Generates images using AI models.
+
+      "Generate images using an AI model configured via your organization's AI interfaces.",
+
+    documentation: `Generates images using the organization's configured Volcano AI interface.
+
+
 
 ### Inputs
-- **model**: Replicate model identifier (e.g. \`black-forest-labs/flux-schnell\`).
-- **prompt**: Image generation prompt.
-- **count**: Number of images to generate (default 1).
-- **params**: Additional JSON parameters passed to the model.
-- **manual_images**: JSON array of ObjectReferences — bypasses generation and returns these directly.
+
+- **reference_images**: Optional upstream image references (wired on the canvas).
+
+- **prompt**: Image generation prompt (or synced from a connected AI text node).
+
+- **model**: Platform model canonical id (e.g. doubao-seedream-5).
+
+- **params**: Generation parameters configured in admin (size, watermark, etc.).
+
+- **manual_images**: JSON array of ObjectReferences — bypasses generation.
+
+
 
 ### Outputs
+
 - **images**: Array of generated image references.`,
+
     tags: ["newai"],
+
     icon: "image",
+
     inlinable: false,
+
     usage: 10,
+
     inputs: [
+
       {
+
+        name: "ai_interface_id",
+
+        type: "string",
+
+        description: "Resolved automatically from the selected model.",
+
+        required: false,
+
+        hidden: true,
+
+      },
+
+      {
+
         name: "model",
+
         type: "string",
-        description:
-          "Replicate model identifier (e.g. black-forest-labs/flux-schnell).",
+
+        description: "Platform model canonical id.",
+
         required: false,
+
+        hidden: true,
+
       },
+
       {
+
         name: "prompt",
+
         type: "string",
+
         description: "Image generation prompt.",
+
         required: false,
+
+        hidden: true,
+
       },
+
       {
-        name: "count",
-        type: "number",
-        description: "Number of images to generate.",
-        required: false,
-        default: 1,
-        minimum: 1,
-        maximum: 8,
-      },
-      {
+
         name: "params",
+
         type: "json",
-        description: "Additional model parameters as JSON.",
+
+        description: "Generation parameters from admin model rules.",
+
         required: false,
+
         hidden: true,
+
       },
+
       {
-        name: "manual_images",
-        type: "json",
-        description:
-          "JSON array of ObjectReferences to return directly, bypassing generation.",
-        required: false,
-        hidden: true,
-      },
-    ],
-    outputs: [
-      {
-        name: "images",
+
+        name: AI_IMAGE_REFERENCE_INPUT,
+
         type: "image",
+
+        description: "Upstream image references.",
+
+        required: false,
+
+        hidden: true,
+
         repeated: true,
-        description: "Generated images.",
+
       },
+
+      {
+
+        name: "manual_images",
+
+        type: "json",
+
+        description:
+
+          "JSON array of ObjectReferences to return directly, bypassing generation.",
+
+        required: false,
+
+        hidden: true,
+
+      },
+
     ],
+
+    outputs: [
+
+      {
+
+        name: "images",
+
+        type: "image",
+
+        repeated: true,
+
+        description: "Generated images.",
+
+        hidden: true,
+
+      },
+
+    ],
+
   };
 
-  public async execute(context: NodeContext): Promise<NodeExecution> {
-    // Manual bypass
+
+
+  public async execute(context: NodeContext): Promise<import("@dafthunk/types").NodeExecution> {
+
     const manualImages = context.inputs.manual_images;
+
     if (Array.isArray(manualImages) && manualImages.length > 0) {
-      const refs = manualImages.filter((v) => isObjectReference(v));
+
+      const refs = manualImages.filter(
+
+        (value): value is ObjectReference | MediaReference =>
+
+          isObjectReference(value) || isEphemeralMediaReference(value)
+
+      );
+
       if (refs.length > 0) {
+
         return this.createSuccessResult({ images: refs });
+
       }
+
     }
 
-    const model = context.inputs.model;
-    if (typeof model !== "string" || model.trim().length === 0) {
-      return this.createErrorResult(
-        "A model identifier is required (e.g. black-forest-labs/flux-schnell)."
-      );
-    }
 
-    const prompt = context.inputs.prompt;
-    if (typeof prompt !== "string" || prompt.trim().length === 0) {
+
+    const prompt =
+
+      typeof context.inputs.prompt === "string" ? context.inputs.prompt : "";
+
+    if (!prompt.trim()) {
+
       return this.createErrorResult("A prompt is required.");
+
     }
 
-    const { REPLICATE_API_TOKEN } = context.env;
-    if (!REPLICATE_API_TOKEN) {
+
+
+    if (!context.resolveAiInterface) {
+
       return this.createErrorResult(
-        "REPLICATE_API_TOKEN is not configured. Please contact your platform administrator."
+
+        "No AI interface configured. Please set up an AI interface in your organization settings."
+
       );
+
     }
 
-    if (!context.objectStore) {
-      return this.createErrorResult("Object store is not available.");
+
+
+    const modelCanonicalId =
+
+      typeof context.inputs.model === "string" &&
+
+      context.inputs.model.trim().length > 0
+
+        ? context.inputs.model.trim()
+
+        : undefined;
+
+
+
+    if (!modelCanonicalId) {
+
+      return this.createErrorResult("A model selection is required.");
+
     }
 
-    const count =
-      typeof context.inputs.count === "number" ? context.inputs.count : 1;
-    const extraParams =
+
+
+    if (!context.resolveImageModel) {
+
+      return this.createErrorResult(
+
+        "Image model resolution is unavailable in this runtime."
+
+      );
+
+    }
+
+
+
+    const resolvedModel = await context.resolveImageModel(modelCanonicalId);
+
+    if (!resolvedModel) {
+
+      return this.createErrorResult(
+
+        `Model "${modelCanonicalId}" is not available for this organization.`
+
+      );
+
+    }
+
+
+
+    const interfaceId =
+
+      typeof context.inputs.ai_interface_id === "string" &&
+
+      context.inputs.ai_interface_id.trim().length > 0
+
+        ? context.inputs.ai_interface_id.trim()
+
+        : resolvedModel.interfaceId;
+
+
+
+    const resolvedInterface = await context.resolveAiInterface({ interfaceId });
+
+    if (!resolvedInterface) {
+
+      return this.createErrorResult(
+
+        "Could not resolve an AI interface. Please configure an AI interface in your organization settings."
+
+      );
+
+    }
+
+
+
+    const generationParams =
+
       context.inputs.params && typeof context.inputs.params === "object"
-        ? (context.inputs.params as Record<string, unknown>)
-        : {};
 
-    const input = await buildReplicateInput(
-      context,
-      this.node.inputs ?? [],
-      context.objectStore
+        ? (context.inputs.params as Record<string, unknown>)
+
+        : undefined;
+
+
+
+    const referenceValues = context.inputs[AI_IMAGE_REFERENCE_INPUT];
+
+    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
+
+      ? referenceValues.filter(
+
+          (value): value is MediaReference =>
+
+            isObjectReference(value) || isEphemeralMediaReference(value)
+
+        )
+
+      : isObjectReference(referenceValues) ||
+
+          isEphemeralMediaReference(referenceValues)
+
+        ? [referenceValues]
+
+        : [];
+
+
+
+    const referenceImageUrls: string[] = [];
+
+    for (const ref of referenceRefs) {
+
+      if (isEphemeralMediaReference(ref)) {
+
+        referenceImageUrls.push(ref.url);
+
+        continue;
+
+      }
+
+      if (!context.objectStore) {
+
+        return this.createErrorResult(
+
+          "Object store is not available for reference images."
+
+        );
+
+      }
+
+      referenceImageUrls.push(
+
+        await context.objectStore.getPresignedUrl(ref, 3600)
+
+      );
+
+    }
+
+
+
+    const storageResolution = context.resolveAiImageStorage
+
+      ? await context.resolveAiImageStorage()
+
+      : { storageMode: "ephemeral" as const };
+
+
+
+    const result = await executeVolcanoImageGeneration({
+
+      apiKey: resolvedInterface.apiKey,
+
+      baseUrl: resolvedInterface.baseUrl,
+
+      providerModelId: resolvedModel.providerModelId,
+
+      prompt,
+
+      parameterRules: resolvedModel.parameterRules,
+
+      generationParams,
+
+      referenceImageUrls,
+
+      storageMode: storageResolution.storageMode,
+
+      objectStore: context.objectStore,
+
+      organizationId: context.organizationId,
+
+      workflowId: context.workflowId,
+
+      cloudUpload: storageResolution.cloudUpload,
+
+    });
+
+
+
+    if (result.status === "failed") {
+
+      return this.createErrorResult(result.error ?? "Image generation failed");
+
+    }
+
+
+
+    return this.createSuccessResult(
+
+      { images: result.images ?? [] },
+
+      result.images?.length ?? 1
+
     );
 
-    const submitResult = await submitReplicatePrediction({
-      model: model.trim(),
-      input: { ...input, prompt, num_outputs: count, ...extraParams },
-      token: REPLICATE_API_TOKEN,
-    });
-
-    if (
-      "status" in submitResult &&
-      submitResult.status === "failed" &&
-      typeof submitResult.error === "string"
-    ) {
-      return this.createErrorResult(submitResult.error);
-    }
-
-    const prediction = submitResult as { id: string };
-    const continuation = createReplicatePollContinuation({
-      nodeId: this.node.id,
-      predictionId: prediction.id,
-      pollIntervalMs: 5000,
-      timeoutMinutes: 30,
-    });
-
-    return awaitReplicateOrPending({
-      context,
-      continuation,
-      token: REPLICATE_API_TOKEN,
-      timeoutLabel: "30 minutes",
-      nodeOutputs: AiImageNode.nodeType.outputs ?? [],
-      createSuccessResult: (outputs, usage) =>
-        this.createSuccessResult(outputs, usage),
-      createErrorResult: (error, usage) => this.createErrorResult(error, usage),
-    });
   }
+
 }
+
+

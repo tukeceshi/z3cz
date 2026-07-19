@@ -49,6 +49,10 @@ import { probeVolcanoModelsActivation } from "../integrations/volcengine/probe-m
 import { buildVolcanoSnapshot } from "../integrations/volcengine/snapshot";
 import { VOLCANO_ARK_INFERENCE_BASE_URL } from "../integrations/volcengine/constants";
 import { defaultBaseUrlForProvider } from "@dafthunk/runtime/ai-interface/builtin-artifact";
+import { mergeVolcanoTosStorage } from "../services/resolve-org-cloud-storage";
+import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
+import { getVolcanoCredentials } from "../integrations/volcengine/ensure-api-key";
+import { VOLCANO_TOS_DEFAULT_PREFIX } from "@dafthunk/types";
 
 function mapAiInterfaceError(
   c: { json: (body: unknown, status?: number) => Response },
@@ -148,6 +152,14 @@ const updateSchema = z
     selectedModel: z.string().nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     volcanoModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    tosStorage: z
+      .object({
+        enabled: z.boolean(),
+        bucket: z.string().trim().min(1),
+        region: z.string().trim().min(1),
+        createBucket: z.boolean().optional(),
+      })
+      .optional(),
     enabled: z.boolean().optional(),
     isDefault: z.boolean().optional(),
   })
@@ -205,6 +217,50 @@ aiInterfaceRoutes.get("/:id/volcano-snapshot", async (c) => {
     console.error("Error fetching volcano snapshot:", error);
     const status = message === "AI interface not found" ? 404 : 400;
     return c.json({ error: message }, status);
+  }
+});
+
+aiInterfaceRoutes.get("/:id/tos-buckets", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const id = c.req.param("id");
+  const region = c.req.query("region")?.trim();
+  if (!region) {
+    return c.json({ error: "region is required" }, 400);
+  }
+
+  try {
+    const db = createDatabase(c.env);
+    const row = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    if (!row) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+
+    const metadata = parseInterfaceMetadata(row.metadata);
+    if (!isVolcanoMetadata(metadata)) {
+      return c.json({ error: "Volcano metadata not configured" }, 400);
+    }
+
+    const credentials = await getVolcanoCredentials(
+      c.env,
+      organizationId,
+      row.metadata
+    );
+    if (!credentials) {
+      return c.json({ error: "Volcano credentials not configured" }, 400);
+    }
+
+    const client = VolcengineTosClient.forRegion({
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      region,
+    });
+    const buckets = await client.listBuckets();
+    return c.json({ buckets });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to list TOS buckets";
+    console.error("Error listing TOS buckets:", error);
+    return c.json({ error: message }, 400);
   }
 });
 
@@ -451,6 +507,10 @@ aiInterfaceRoutes.patch(
       const catalogEntries =
         toVolcanoCatalogEntriesFromPlatform(platformModels);
 
+      if (body.accessKeyId !== undefined || body.secretAccessKey !== undefined) {
+        return c.json({ error: "Credentials cannot be reconfigured" }, 400);
+      }
+
       if (body.volcanoModelEnabled) {
         const current = parseInterfaceMetadata(existing.metadata);
         if (!isVolcanoMetadata(current)) {
@@ -463,37 +523,38 @@ aiInterfaceRoutes.patch(
         );
       }
 
-      if (body.accessKeyId !== undefined && body.secretAccessKey !== undefined) {
+      if (body.tosStorage) {
         const current = parseInterfaceMetadata(existing.metadata);
         if (!isVolcanoMetadata(current)) {
           return c.json({ error: "Volcano metadata not configured" }, 400);
         }
-
         const baseMetadata = isVolcanoMetadata(metadataUpdate)
           ? metadataUpdate
           : current;
 
-        const secretAccessKeyEncrypted = await encryptSecret(
-          body.secretAccessKey,
-          c.env,
-          organizationId
-        );
-        const issued = await getVolcanoArkApiKey({
-          accessKeyId: body.accessKeyId,
-          secretAccessKey: body.secretAccessKey,
-          region: baseMetadata.region,
+        if (body.tosStorage.enabled && body.tosStorage.createBucket) {
+          const credentials = await getVolcanoCredentials(
+            c.env,
+            organizationId,
+            existing.metadata
+          );
+          if (!credentials) {
+            return c.json({ error: "Volcano credentials not configured" }, 400);
+          }
+          const client = VolcengineTosClient.forRegion({
+            accessKeyId: credentials.accessKeyId,
+            secretAccessKey: credentials.secretAccessKey,
+            region: body.tosStorage.region,
+          });
+          await client.createBucket(body.tosStorage.bucket);
+        }
+
+        metadataUpdate = mergeVolcanoTosStorage(baseMetadata, {
+          enabled: body.tosStorage.enabled,
+          bucket: body.tosStorage.bucket,
+          region: body.tosStorage.region,
+          prefix: VOLCANO_TOS_DEFAULT_PREFIX,
         });
-        metadataUpdate = {
-          ...baseMetadata,
-          accessKeyId: body.accessKeyId,
-          secretAccessKeyEncrypted,
-          arkApiKeyExpiresAt: issued.expiresAt,
-        };
-        apiKeyEncrypted = await encryptSecret(
-          issued.apiKey,
-          c.env,
-          organizationId
-        );
       }
 
       const iface = await updateOrganizationAiInterface(

@@ -3,6 +3,7 @@ import {
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
   type VolcanoModelUsage,
+  type VolcanoResourcePackageRow,
   type VolcanoSnapshotResponse,
 } from "@dafthunk/types";
 
@@ -36,6 +37,7 @@ import {
   buildUsageMapsFromPackageRows,
   resolveVolcanoPackageRows,
 } from "./resolve-package-rows";
+import { buildVolcanoTosStorageSnapshot } from "./tos-storage-snapshot";
 
 function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
   return {
@@ -131,6 +133,7 @@ export async function buildVolcanoSnapshot(params: {
   >();
   let usageFetchError: string | undefined;
   let packageListCachedAt: string | undefined;
+  let packageRows: VolcanoResourcePackageRow[] = [];
 
   try {
     const resolved = await resolveVolcanoPackageRows({
@@ -148,6 +151,7 @@ export async function buildVolcanoSnapshot(params: {
     const maps = buildUsageMapsFromPackageRows(resolved.rows);
     usageByModel = maps.usageByModel;
     packageByModel = maps.packageByModel;
+    packageRows = [...resolved.rows];
     usageFetchError = resolved.usageFetchError;
     packageListCachedAt = resolved.packageListCachedAt;
   } catch (error) {
@@ -157,6 +161,10 @@ export async function buildVolcanoSnapshot(params: {
         : error instanceof Error
           ? error.message
           : "Failed to fetch resource packages";
+    const cached = refreshedMetadata.packageListCache?.rows;
+    if (cached?.length) {
+      packageRows = [...cached];
+    }
   }
 
   const activationCache = refreshedMetadata.modelActivationCache ?? {};
@@ -225,5 +233,10 @@ export async function buildVolcanoSnapshot(params: {
     ...(packageListCachedAt ? { packageListCachedAt } : {}),
     pricing: buildPricingSection(),
     models: modelRows,
+    tosStorage: buildVolcanoTosStorageSnapshot({
+      metadata: refreshedMetadata,
+      packageRows,
+      usageError: usageFetchError,
+    }),
   };
 }

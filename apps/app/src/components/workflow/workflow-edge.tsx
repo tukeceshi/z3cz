@@ -3,51 +3,77 @@ import {
   EdgeProps,
   getSmoothStepPath,
   Position,
+  useConnection,
+  useStore,
   Edge as ReactFlowEdge,
 } from "@xyflow/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
 import { cn } from "@/utils/utils";
 
+import {
+  snapAiImageOutputBorderPoint,
+} from "./ai-image-connection-utils";
+import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
+import {
+  buildGenerativeDragPreviewState,
+} from "./generative-connection-preview";
+import {
+  getAiTextEdgePathOffset,
+  resolveAiTextEdgeAnchors,
+  resolveWorkflowEdgeHandles,
+  snapAiTextKeywordsBorderPoint,
+  snapAiTextOutputBorderPoint,
+} from "./ai-text-connection-utils";
+import {
+  AI_TEXT_KEYWORDS_HANDLE_ID,
+  AI_TEXT_OUTPUT_ID,
+} from "./ai-text-node-utils";
+import { validateWorkflowConnection } from "./workflow-connection-validation";
 import { WorkflowEdgeType } from "./workflow-types";
+import type { WorkflowNodeType } from "./workflow-types";
 
 interface WorkflowEdgeProps extends EdgeProps<ReactFlowEdge<WorkflowEdgeType>> {
   zIndex?: number;
 }
 
-// Shared path creator for both edge and connection line
-const createSmoothStepPath = (params: {
+interface SmoothStepPathParams {
   sourceX: number;
   sourceY: number;
   targetX: number;
   targetY: number;
   sourcePosition: Position;
   targetPosition: Position;
-  sourceOffset?: number;
-  targetOffset?: number;
-}) => {
-  const { sourceOffset = 0, targetOffset = 0 } = params;
-  return getSmoothStepPath({
-    sourceX: params.sourceX + sourceOffset,
+  offset?: number;
+}
+
+function buildSmoothStepPath(params: SmoothStepPathParams): string {
+  const { offset = 20 } = params;
+  const [edgePath] = getSmoothStepPath({
+    sourceX: params.sourceX,
     sourceY: params.sourceY,
-    targetX: params.targetX + targetOffset,
+    targetX: params.targetX,
     targetY: params.targetY,
     sourcePosition: params.sourcePosition,
     targetPosition: params.targetPosition,
-    borderRadius: 8,
+    borderRadius: offset === 0 ? 0 : 8,
+    offset,
   });
-};
+  return edgePath;
+}
 
-// Shared SVG rendering for both components
-const renderPath = (
+function renderPath(
   path: string,
   color: string,
-  isActive?: boolean,
-  zIndex?: number
-) => {
+  options: {
+    readonly isActive?: boolean;
+    readonly isSelectionFlow?: boolean;
+    readonly zIndex?: number;
+  }
+) {
+  const { isActive = false, isSelectionFlow = false, zIndex } = options;
   return (
     <>
-      {/* Invisible hit slop area for easier clicking */}
       <path
         d={path}
         className="stroke-12 fill-none pointer-events-stroke"
@@ -56,11 +82,12 @@ const renderPath = (
           zIndex: zIndex,
         }}
       />
-      {/* Visible edge */}
       <path
         d={path}
-        className={cn("stroke-1 fill-none", {
-          "animate-pulse": isActive,
+        className={cn("fill-none", {
+          "animate-pulse stroke-1": isActive,
+          "workflow-edge-selection-flow stroke-[1.5]": isSelectionFlow,
+          "stroke-1": !isActive && !isSelectionFlow,
         })}
         style={{
           stroke: color,
@@ -69,11 +96,14 @@ const renderPath = (
       />
     </>
   );
-};
+}
 
 export const WorkflowEdge = memo(
   ({
-    id: _id,
+    source,
+    target,
+    sourceHandle,
+    targetHandle,
     sourceX,
     sourceY,
     targetX,
@@ -82,33 +112,96 @@ export const WorkflowEdge = memo(
     targetPosition,
     data,
     selected,
+    animated = false,
     zIndex,
   }: WorkflowEdgeProps) => {
-    const [edgePath] = createSmoothStepPath({
-      sourceX,
-      sourceY,
-      targetX,
-      targetY,
+    const nodeLookup = useStore((state) => state.nodeLookup);
+
+    const pathOffset = useMemo(() => {
+      const resolved = resolveWorkflowEdgeHandles({
+        sourceHandle,
+        targetHandle,
+        dataSourceHandle:
+          typeof data?.sourceType === "string" ? data.sourceType : null,
+        dataTargetHandle:
+          typeof data?.targetType === "string" ? data.targetType : null,
+      });
+      const sourceType = (
+        nodeLookup.get(source)?.data as { nodeType?: string } | undefined
+      )?.nodeType;
+      const targetType = (
+        nodeLookup.get(target)?.data as { nodeType?: string } | undefined
+      )?.nodeType;
+      return getAiTextEdgePathOffset(
+        sourceType,
+        targetType,
+        resolved.sourceHandle ?? null,
+        resolved.targetHandle ?? null
+      );
+    }, [data?.sourceType, data?.targetType, nodeLookup, source, target, sourceHandle, targetHandle]);
+
+    const anchors = useMemo(
+      () =>
+        resolveAiTextEdgeAnchors({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          source,
+          target,
+          sourceHandle,
+          targetHandle,
+          dataSourceHandle:
+            typeof data?.sourceType === "string" ? data.sourceType : null,
+          dataTargetHandle:
+            typeof data?.targetType === "string" ? data.targetType : null,
+          nodeLookup,
+        }),
+      [
+        data?.sourceType,
+        data?.targetType,
+        nodeLookup,
+        source,
+        sourceHandle,
+        sourceX,
+        sourceY,
+        target,
+        targetHandle,
+        targetX,
+        targetY,
+      ]
+    );
+
+    const edgePath = buildSmoothStepPath({
+      sourceX: anchors.sourceX,
+      sourceY: anchors.sourceY,
+      targetX: anchors.targetX,
+      targetY: anchors.targetY,
       sourcePosition,
       targetPosition,
+      offset: pathOffset,
     });
 
     const isValid = data?.isValid ?? true;
     const isActive = data?.isActive ?? false;
+    const isSelectionFlow = animated && !isActive;
 
     const getColor = () => {
-      if (!isValid) return "#f87171"; // red-400
-      if (selected) return "#3b82f6"; // blue-500
-      return "#d4d4d4"; // neutral-300
+      if (!isValid) return "#f87171";
+      if (isSelectionFlow || selected) return "#3b82f6";
+      return "#d4d4d4";
     };
 
-    return renderPath(edgePath, getColor(), isActive, zIndex);
+    return renderPath(edgePath, getColor(), {
+      isActive,
+      isSelectionFlow,
+      zIndex,
+    });
   }
 );
 
 WorkflowEdge.displayName = "WorkflowEdge";
 
-// Connection line component using the same rendering logic
 export const WorkflowConnectionLine = memo(
   ({
     fromX,
@@ -119,22 +212,184 @@ export const WorkflowConnectionLine = memo(
     toPosition,
     connectionStatus,
   }: ConnectionLineComponentProps) => {
-    const [edgePath] = createSmoothStepPath({
-      sourceX: fromX,
-      sourceY: fromY,
-      targetX: toX,
-      targetY: toY,
-      sourcePosition: fromPosition,
-      targetPosition: toPosition,
+    const connection = useConnection();
+    const nodeLookup = useStore((state) => state.nodeLookup);
+    const edges = useStore((state) => state.edges);
+    const domNode = useStore((state) => state.domNode);
+    const transform = useStore((state) => state.transform);
+
+    const flowNodes = useMemo(
+      () =>
+        Array.from(nodeLookup.values()).map((node) => ({
+          id: node.id,
+          data: node.data as WorkflowNodeType,
+          position: node.position,
+          type: node.type,
+        })),
+      [nodeLookup]
+    );
+
+    const { previewConnection, snap: generativeSnap, previewAllowed } = useMemo(
+      () =>
+        buildGenerativeDragPreviewState(
+          connection,
+          nodeLookup,
+          { domNode, transform },
+          edges,
+          (preview) =>
+            validateWorkflowConnection({
+              connection: preview,
+              nodes: flowNodes,
+              edges,
+            })
+        ),
+      [connection, domNode, edges, flowNodes, nodeLookup, transform]
+    );
+
+    const snapped = generativeSnap;
+
+    const outboundFromImageOutput = useMemo(() => {
+      if (
+        connection.fromHandle?.id !== AI_IMAGE_OUTPUT_ID ||
+        !connection.fromNode
+      ) {
+        return null;
+      }
+      const node = nodeLookup.get(connection.fromNode.id);
+      return node ? snapAiImageOutputBorderPoint(node) : null;
+    }, [connection.fromHandle, connection.fromNode, nodeLookup]);
+
+    const outboundFromKeywords = useMemo(() => {
+      if (
+        connection.fromHandle?.type !== "target" ||
+        connection.fromHandle.id !== AI_TEXT_KEYWORDS_HANDLE_ID ||
+        !connection.fromNode
+      ) {
+        return null;
+      }
+      const node = nodeLookup.get(connection.fromNode.id);
+      return node ? snapAiTextKeywordsBorderPoint(node) : null;
+    }, [connection.fromHandle, connection.fromNode, nodeLookup]);
+
+    const outboundFromOutput = useMemo(() => {
+      if (
+        connection.fromHandle?.id !== AI_TEXT_OUTPUT_ID ||
+        !connection.fromNode
+      ) {
+        return null;
+      }
+      const node = nodeLookup.get(connection.fromNode.id);
+      return node ? snapAiTextOutputBorderPoint(node) : null;
+    }, [connection.fromHandle, connection.fromNode, nodeLookup]);
+
+    const pathOffset = useMemo(() => {
+      if (
+        snapped ||
+        outboundFromKeywords ||
+        outboundFromOutput ||
+        outboundFromImageOutput
+      ) {
+        return 0;
+      }
+      const fromType = (
+        connection.fromNode?.data as { nodeType?: string } | undefined
+      )?.nodeType;
+      return getAiTextEdgePathOffset(
+        fromType,
+        undefined,
+        connection.fromHandle?.id ?? null,
+        null
+      );
+    }, [
+      connection.fromHandle,
+      connection.fromNode,
+      outboundFromKeywords,
+      outboundFromOutput,
+      outboundFromImageOutput,
+      snapped,
+    ]);
+
+    const targetX = snapped?.x ?? toX;
+    const targetY = snapped?.y ?? toY;
+    const targetPosition = snapped
+      ? snapped.side === "right"
+        ? Position.Right
+        : Position.Left
+      : toPosition;
+    const status =
+      previewAllowed === null
+        ? connectionStatus
+        : previewAllowed
+          ? "valid"
+          : "invalid";
+
+    const sourceX =
+      outboundFromOutput?.x ??
+      outboundFromImageOutput?.x ??
+      outboundFromKeywords?.x ??
+      fromX;
+    const sourceY =
+      outboundFromOutput?.y ??
+      outboundFromImageOutput?.y ??
+      outboundFromKeywords?.y ??
+      fromY;
+    const sourcePosition = outboundFromOutput || outboundFromImageOutput
+      ? Position.Right
+      : outboundFromKeywords
+        ? Position.Left
+        : fromPosition;
+
+    const previewTargetId =
+      snapped?.nodeId ??
+      (outboundFromOutput || outboundFromImageOutput || outboundFromKeywords
+        ? ""
+        : (connection.toNode?.id ?? ""));
+
+    const snappedTargetHandle = snapped?.targetHandle ?? null;
+
+    const anchors = useMemo(
+      () =>
+        resolveAiTextEdgeAnchors({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          source: connection.fromNode?.id ?? "",
+          target: previewTargetId,
+          sourceHandle: connection.fromHandle?.id ?? null,
+          targetHandle: snappedTargetHandle,
+          nodeLookup,
+        }),
+      [
+        connection.fromHandle,
+        connection.fromNode,
+        nodeLookup,
+        previewTargetId,
+        snappedTargetHandle,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+      ]
+    );
+
+    const edgePath = buildSmoothStepPath({
+      sourceX: anchors.sourceX,
+      sourceY: anchors.sourceY,
+      targetX: anchors.targetX,
+      targetY: anchors.targetY,
+      sourcePosition,
+      targetPosition,
+      offset: pathOffset,
     });
 
     const getColor = () => {
-      if (connectionStatus === "invalid") return "#f87171"; // red-400
-      if (connectionStatus === "valid") return "#16a34a"; // green-600
-      return "#d4d4d4"; // neutral-300
+      if (status === "invalid") return "#f87171";
+      if (status === "valid") return "#16a34a";
+      return "#d4d4d4";
     };
 
-    return renderPath(edgePath, getColor(), false, undefined);
+    return renderPath(edgePath, getColor(), { zIndex: undefined });
   }
 );
 

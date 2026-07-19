@@ -29,30 +29,14 @@ import { cn } from "@/utils/utils";
 import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   classifyReferenceFromNodeType,
-  type AiTextReferenceKind,
 } from "./ai-text-node-utils";
+import {
+  collectGenerativeReferenceChips,
+  type GenerativeReferenceChip,
+} from "./generative-reference-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
-export interface AiTextReferenceChip {
-  readonly edgeId: string;
-  readonly kind: AiTextReferenceKind;
-  readonly label: string;
-  readonly previewUrl?: string;
-  readonly textExcerpt?: string;
-}
-
-function firstObjectReference(value: unknown): ObjectReference | null {
-  if (!value || typeof value !== "object") return null;
-  if (Array.isArray(value)) {
-    const first = value[0];
-    if (first && typeof first === "object" && "id" in first) {
-      return first as ObjectReference;
-    }
-    return null;
-  }
-  if ("id" in value) return value as ObjectReference;
-  return null;
-}
+export type AiTextReferenceChip = GenerativeReferenceChip;
 
 export function collectAiTextReferenceChips(params: {
   readonly nodeId: string;
@@ -60,53 +44,14 @@ export function collectAiTextReferenceChips(params: {
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly createObjectUrl?: (objectReference: ObjectReference) => string;
 }): readonly AiTextReferenceChip[] {
-  return params.edges
-    .filter(
-      (edge) =>
-        edge.target === params.nodeId &&
-        edge.targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID
-    )
-    .flatMap((edge) => {
-      const source = params.nodes.find((node) => node.id === edge.source);
-      if (!source) return [];
-      const sourceData = source.data as WorkflowNodeType;
-      const kind = classifyReferenceFromNodeType(sourceData.nodeType);
-      if (!kind) return [];
-
-      const output = sourceData.outputs?.find(
-        (entry) => entry.id === edge.sourceHandle
-      );
-
-      let previewUrl: string | undefined;
-      let textExcerpt: string | undefined;
-
-      if (kind === "text") {
-        const fromOutput =
-          typeof output?.value === "string" ? output.value : undefined;
-        const fromResult = sourceData.inputs?.find(
-          (entry) => entry.id === "result"
-        )?.value;
-        const text =
-          fromOutput ??
-          (typeof fromResult === "string" ? fromResult : undefined);
-        textExcerpt = text?.trim() || undefined;
-      } else {
-        const ref = firstObjectReference(output?.value);
-        if (ref && params.createObjectUrl) {
-          previewUrl = params.createObjectUrl(ref);
-        }
-      }
-
-      return [
-        {
-          edgeId: edge.id,
-          kind,
-          label: sourceData.name || edge.source,
-          previewUrl,
-          textExcerpt,
-        },
-      ];
-    });
+  return collectGenerativeReferenceChips({
+    nodeId: params.nodeId,
+    targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
+    edges: params.edges,
+    nodes: params.nodes,
+    createObjectUrl: params.createObjectUrl,
+    classifyKind: classifyReferenceFromNodeType,
+  });
 }
 
 export interface AiTextReferenceBarProps {

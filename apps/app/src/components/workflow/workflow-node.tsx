@@ -1,5 +1,5 @@
 import type { ObjectReference, ToolReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -38,11 +38,16 @@ import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
-  AI_TEXT_KEYWORDS_HANDLE_ID,
-  AI_TEXT_OUTPUT_ID,
   isAiTextGenerating,
   withAiTextResult,
 } from "./ai-text-node-utils";
+import {
+  AI_IMAGE_CARD_WIDTH_PX,
+  isAiImageGenerating,
+} from "./ai-image-node-utils";
+import { AiTextConnectionSides } from "./ai-text-connection-handles";
+import { AiImageConnectionSides } from "./ai-image-connection-handles";
+import { useGenerativeConnectionHighlight } from "./generative-connection-highlight";
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
 import { SubscriptionBadge } from "./subscription-badge";
@@ -313,6 +318,12 @@ export const WorkflowNode = memo(
     const [configToolId, setConfigToolId] = useState<string | null>(null);
 
     const nodeType = data.nodeType || "";
+    const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
+    const isAiImageNode = nodeType === AI_IMAGE_NODE_TYPE;
+    const isGenerativeConnectionTarget = useGenerativeConnectionHighlight(
+      id,
+      isAiTextNode || isAiImageNode
+    );
 
     const resolvedNodeType = useMemo(() => {
       if (!nodeTypes || nodeTypes.length === 0) return null;
@@ -506,12 +517,12 @@ export const WorkflowNode = memo(
     };
 
     const isAiGenerative = (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType);
-    const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
     const isExecuting =
       data.executionState === "executing" ||
       data.executionState === "pending";
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
-    const showBusyOverlay = isExecuting || isAiTextBusy;
+    const isAiImageBusy = isAiImageNode && isAiImageGenerating(data.metadata);
+    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy;
     const isError = data.executionState === "error" && !!data.error;
 
     return (
@@ -566,22 +577,32 @@ export const WorkflowNode = memo(
           <CircleHelp className="h-2.5 w-2.5" />
         </button>
 
-        <div className={cn("relative", isAiTextNode && "inline-block")}>
+        <div className={cn("relative", (isAiTextNode || isAiImageNode) && "inline-block")}>
         <div
-          className={cn("bg-card shadow-xs rounded-md border relative", {
-            "w-[220px]": !isAiGenerative && !isAiTextNode,
-            "w-[280px]": isAiGenerative && !isAiTextNode,
-            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy,
+          className={cn(
+            "bg-card shadow-xs rounded-md border relative",
+            isAiTextNode && "ai-text-node-card group/aitext overflow-visible",
+            isAiImageNode && "ai-image-node-card group/aiimage overflow-visible",
+            {
+            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode,
+            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode,
+            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy,
             "border-yellow-400":
-              !selected && (isExecuting || isAiTextBusy),
+              !selected && (isExecuting || isAiTextBusy || isAiImageBusy),
             "border-green-500":
-              !selected && data.executionState === "completed" && !isAiTextBusy,
+              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy,
             "border-red-500": !selected && data.executionState === "error",
             "border-blue-400": !selected && data.executionState === "skipped",
             "border-blue-500": selected,
-          })}
+            "generative-connect-target": isGenerativeConnectionTarget,
+          }
+          )}
           style={
-            isAiTextNode ? { width: AI_TEXT_CARD_WIDTH_PX } : undefined
+            isAiTextNode
+              ? { width: AI_TEXT_CARD_WIDTH_PX }
+              : isAiImageNode
+                ? { width: AI_IMAGE_CARD_WIDTH_PX }
+                : undefined
           }
         >
           {/* Execution / generate overlay */}
@@ -605,7 +626,7 @@ export const WorkflowNode = memo(
             <div
               className={cn(
                 "px-0 py-0 border-b",
-                !isAiTextNode && "nodrag"
+                !isAiTextNode && !isAiImageNode && "nodrag"
               )}
             >
               {createElement(widget.Component, {
@@ -616,6 +637,14 @@ export const WorkflowNode = memo(
               })}
             </div>
           )}
+
+          {isAiTextNode ? (
+            <AiTextConnectionSides disabled={disabled} />
+          ) : null}
+
+          {isAiImageNode ? (
+            <AiImageConnectionSides disabled={disabled} />
+          ) : null}
 
           {/* Resource Selectors (database, dataset, queue, email, integration) */}
           {resourceInputs.length > 0 && (
@@ -750,8 +779,8 @@ export const WorkflowNode = memo(
             </div>
           )}
 
-          {/* Parameters */}
-          {!isAiTextNode ? (
+          {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
+          {!isAiTextNode && !isAiImageNode ? (
           <div className="py-2 grid grid-cols-2 justify-between gap-3">
             {/* Input Parameters */}
             <div className="flex flex-col gap-1 flex-1">
@@ -817,56 +846,7 @@ export const WorkflowNode = memo(
                 ))}
             </div>
           </div>
-          ) : (
-            <>
-              <div className="pointer-events-auto absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-                <TypeBadge
-                  type={
-                    data.inputs.find(
-                      (input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID
-                    )?.type ?? "any"
-                  }
-                  position={Position.Left}
-                  id={AI_TEXT_KEYWORDS_HANDLE_ID}
-                  nodeId={id}
-                  parameter={data.inputs.find(
-                    (input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID
-                  )}
-                  disabled={disabled}
-                  executionState={data.executionState}
-                  selected={selected}
-                  isConnected={isWorkflowHandleConnected(
-                    connectedHandles,
-                    id,
-                    AI_TEXT_KEYWORDS_HANDLE_ID
-                  )}
-                />
-              </div>
-              <div className="pointer-events-auto absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2">
-                {data.outputs
-                  .filter((output) => output.id === AI_TEXT_OUTPUT_ID)
-                  .map((output) => (
-                    <TypeBadge
-                      key={output.id}
-                      type={output.type}
-                      position={Position.Right}
-                      id={output.id}
-                      nodeId={id}
-                      parameter={output}
-                      onOutputClick={handleOutputClick}
-                      disabled={disabled}
-                      executionState={data.executionState}
-                      selected={selected}
-                      isConnected={isWorkflowHandleConnected(
-                        connectedHandles,
-                        id,
-                        output.id
-                      )}
-                    />
-                  ))}
-              </div>
-            </>
-          )}
+          ) : null}
         </div>
         </div>
 

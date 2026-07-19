@@ -15,13 +15,25 @@ import { buildApiUrl, getApiBaseUrl } from "@/config/api";
 // Re-export for convenience
 export type { WorkflowState };
 
+function isWsViaProxy(): boolean {
+  if (typeof import.meta.env === "undefined") {
+    return false;
+  }
+  const flag = import.meta.env.VITE_WS_VIA_PROXY;
+  return flag === "1" || flag === "true";
+}
+
 function getWebSocketBaseUrl(): string {
-  const wsHost =
-    typeof import.meta.env !== "undefined"
-      ? import.meta.env.VITE_WS_HOST
-      : undefined;
-  if (typeof wsHost === "string" && wsHost.length > 0) {
-    return wsHost.replace(/\/$/, "");
+  const viaProxy = isWsViaProxy();
+
+  if (!viaProxy) {
+    const wsHost =
+      typeof import.meta.env !== "undefined"
+        ? import.meta.env.VITE_WS_HOST
+        : undefined;
+    if (typeof wsHost === "string" && wsHost.length > 0) {
+      return wsHost.replace(/\/$/, "");
+    }
   }
 
   const apiBaseUrl = getApiBaseUrl();
@@ -29,8 +41,10 @@ function getWebSocketBaseUrl(): string {
     return apiBaseUrl.replace(/^http/, "ws");
   }
 
-  // Vite /api proxy cannot complete @hono/node-ws handshakes (returns HTTP 200).
+  // Classic Vite /api proxy cannot complete @hono/node-ws (HTTP 200).
+  // Dev gateway / host Caddy (VITE_WS_VIA_PROXY) upgrades WS on the same origin.
   if (
+    !viaProxy &&
     apiBaseUrl.startsWith("/") &&
     typeof import.meta.env !== "undefined" &&
     import.meta.env.DEV

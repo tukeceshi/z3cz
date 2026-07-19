@@ -32,10 +32,12 @@ import { CloudflareToolRegistry } from "./cloudflare-tool-registry";
 import { createCodeModeExecutor } from "./code-mode-executor";
 import { CloudflareRelayAccountService } from "./cloudflare-relay-account-service";
 import { CloudflareAiInterfaceService } from "./cloudflare-ai-interface-service";
+import { CloudflareImageModelService } from "./cloudflare-image-model-service";
 import { CloudflareTextModelService } from "./cloudflare-text-model-service";
 import { createSandboxExecutor } from "./sandbox-executor";
 import { createToolContext } from "./tool-context";
 import { runtimeVersion } from "./version";
+import { resolveAiImageStorage } from "../services/ai-image-storage";
 
 export function buildDependencies(
   env: Bindings,
@@ -93,6 +95,8 @@ export function buildDependencies(
     relayAccountService: new CloudflareRelayAccountService(env),
     aiInterfaceService: new CloudflareAiInterfaceService(env),
     textModelService: new CloudflareTextModelService(env),
+    imageModelService: new CloudflareImageModelService(env),
+    resolveAiImageStorage: (params) => resolveAiImageStorage(env, params),
     runtimeVersion,
   };
 }

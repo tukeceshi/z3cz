@@ -1,5 +1,6 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { VolcanoModelActivationCacheEntry } from "./volcano-activation";
+import type { VolcanoTosRegionPricingSnapshot } from "./volcano-tos-pricing";
 import type {
   VolcanoPackageStatusBreakdown,
   VolcanoResourcePackageFetchMode,
@@ -25,6 +26,15 @@ export interface VolcanoPackageListCache {
   readonly statusCounts: Readonly<Record<string, number>>;
 }
 
+/** Volcano TOS (object storage) — optional per AI interface. */
+export interface VolcanoTosStorageConfig {
+  readonly enabled: boolean;
+  readonly bucket: string;
+  readonly region: string;
+  /** Root prefix inside bucket; default `z3cz`. */
+  readonly prefix: string;
+}
+
 export interface VolcanoInterfaceMetadata {
   readonly credentialMode: "volcengine_iam";
   readonly accessKeyId: string;
@@ -37,6 +47,32 @@ export interface VolcanoInterfaceMetadata {
     Record<string, VolcanoModelActivationCacheEntry>
   >;
   readonly packageListCache?: VolcanoPackageListCache;
+  readonly tosStorage?: VolcanoTosStorageConfig;
+}
+
+/** TOS resource package usage (storage capacity or traffic). */
+export interface VolcanoTosPackageUsage {
+  readonly used: number;
+  readonly remaining: number;
+  readonly expired: number;
+  readonly quota: number;
+  readonly unit: "gb";
+  readonly usagePercent: number;
+  readonly overQuota: boolean;
+  readonly packageStatus?: VolcanoPackageStatusBreakdown;
+}
+
+/** Cloud storage row in volcano snapshot (same level as models). */
+export interface VolcanoTosStorageSnapshot {
+  readonly enabled: boolean;
+  readonly configured: boolean;
+  readonly region: string;
+  readonly bucket: string;
+  readonly prefix: string;
+  readonly storageUsage: VolcanoTosPackageUsage | null;
+  readonly trafficUsage: VolcanoTosPackageUsage | null;
+  readonly pricing?: VolcanoTosRegionPricingSnapshot;
+  readonly usageError?: string;
 }
 
 export interface VolcanoModelPackageSnapshot {
@@ -105,4 +141,5 @@ export interface VolcanoSnapshotResponse {
   readonly packageListCachedAt?: string;
   readonly pricing: VolcanoSnapshotPricing;
   readonly models: readonly VolcanoModelSnapshotRow[];
+  readonly tosStorage?: VolcanoTosStorageSnapshot;
 }

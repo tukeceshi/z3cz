@@ -118,16 +118,12 @@ function AiTextWidget({
             )}
           </div>
         )}
-        <div className="pointer-events-none absolute right-[7px] top-[7px] z-30 flex items-center gap-1.5">
-          <div className="pointer-events-auto">
-            <AiTextHistoryButton
-              count={historyItems.items.length}
-              onClick={() => setHistoryOpen(true)}
-            />
-          </div>
-          <div className="pointer-events-auto">
-            <AiTextExpandButton onClick={() => setExpandOpen(true)} />
-          </div>
+        <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
+          <AiTextHistoryButton
+            count={historyItems.items.length}
+            onClick={() => setHistoryOpen(true)}
+          />
+          <AiTextExpandButton onClick={() => setExpandOpen(true)} />
         </div>
       </div>
 

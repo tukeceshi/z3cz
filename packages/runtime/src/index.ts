@@ -67,6 +67,10 @@ export type {
   ResolvedRuntimeTextModel,
   TextModelService,
 } from "./text-model-service";
+export type {
+  ImageModelService,
+  ResolvedRuntimeImageModel,
+} from "./image-model-service";
 export { SEEDANCE_2_0_T2V_PROFILE } from "./upstream/upstream-param-profiles";
 export {
   isSubscriptionRequiredError,

@@ -45,6 +45,7 @@ import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey, getModifierSymbol } from "@/utils/utils";
 
+import { AiEditorOverlays } from "./ai-editor-overlays";
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
 import { WorkflowNode } from "./workflow-node";
 import type {
@@ -752,6 +753,10 @@ export function WorkflowCanvas({
             workflowStatus={workflowStatus}
             errorMessage={workflowErrorMessage}
           />
+        )}
+
+        {!disabled && (
+          <AiEditorOverlays nodes={displayNodes} />
         )}
 
         {/* Action Bars */}

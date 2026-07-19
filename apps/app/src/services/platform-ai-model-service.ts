@@ -1,9 +1,13 @@
 import type {
+  GenerateAiImageRequest,
+  GenerateAiImageResponse,
   GenerateAiTextRequest,
   GenerateAiTextResponse,
   ListAiModelInvocationsResponse,
   ListModelInterfacePrioritiesResponse,
+  ListOrgImageModelsResponse,
   ListOrgTextModelsResponse,
+  OrgCloudStorageStatus,
   UpdateModelInterfacePriorityRequest,
 } from "@dafthunk/types";
 import useSWR from "swr";
@@ -27,6 +31,57 @@ export function useOrgTextModels(orgId: string | undefined) {
     isLoading,
     refreshModels: mutate,
   };
+}
+
+export function useOrgImageModels(orgId: string | undefined) {
+  const key = orgId ? `${platformAiEndpoint(orgId)}/image-models` : null;
+  const { data, error, isLoading, mutate } = useSWR(key, async () =>
+    makeRequest<ListOrgImageModelsResponse>(`${key}`)
+  );
+
+  return {
+    models: data?.models ?? [],
+    groups: data?.groups ?? [],
+    modelsError: error,
+    isLoading,
+    refreshModels: mutate,
+  };
+}
+
+export async function resolveOrgImageModel(
+  orgId: string,
+  canonicalId: string
+): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
+    `${platformAiEndpoint(orgId)}/image-models/${encodeURIComponent(canonicalId)}/resolve`
+  );
+}
+
+export function useOrgCloudStorageStatus(orgId: string | undefined) {
+  const key = orgId ? `${platformAiEndpoint(orgId)}/storage-status` : null;
+  const { data, error, isLoading, mutate } = useSWR(key, async () =>
+    makeRequest<OrgCloudStorageStatus>(`${key}`)
+  );
+
+  return {
+    configured: data?.configured ?? false,
+    statusError: error,
+    isLoading,
+    refreshStatus: mutate,
+  };
+}
+
+export async function generateAiImage(
+  orgId: string,
+  body: GenerateAiImageRequest
+): Promise<GenerateAiImageResponse> {
+  return makeRequest<GenerateAiImageResponse>(
+    `${platformAiEndpoint(orgId)}/ai-image/generate`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
 }
 
 export async function resolveOrgTextModel(

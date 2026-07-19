@@ -469,3 +469,105 @@ html.dark .react-flow__attribution:hover {
 html.dark .react-flow__attribution a {
   color: #bbb !important;
 }
+
+/* Generative nodes (AI text / AI image): connect-target border light */
+@property --generative-connect-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes generative-connect-border-light {
+  to {
+    --generative-connect-angle: 360deg;
+  }
+}
+
+.generative-connect-target {
+  z-index: 1;
+}
+
+.generative-connect-target::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.generative-connect-target::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: 51;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--generative-connect-angle),
+    transparent 0deg,
+    transparent 288deg,
+    rgba(59, 130, 246, 0.25) 306deg,
+    rgba(59, 130, 246, 0.95) 326deg,
+    rgba(59, 130, 246, 0.65) 342deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.45));
+  animation: generative-connect-border-light 2.3s linear infinite;
+}
+
+.dark .generative-connect-target::before {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.dark .generative-connect-target::after {
+  background: conic-gradient(
+    from var(--generative-connect-angle),
+    transparent 0deg,
+    transparent 288deg,
+    rgba(255, 255, 255, 0.2) 306deg,
+    rgba(255, 255, 255, 0.95) 326deg,
+    rgba(255, 255, 255, 0.7) 342deg,
+    transparent 360deg
+  );
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.48));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .generative-connect-target::after {
+    animation: none;
+  }
+}
+
+@keyframes workflow-edge-selection-flow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.workflow-edge-selection-flow {
+  stroke-dasharray: 8 4;
+  animation: workflow-edge-selection-flow 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-edge-selection-flow {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
+
+

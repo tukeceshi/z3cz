@@ -203,6 +203,12 @@ export function AiTextHistoryButton({
         "dark:border-white/10 dark:bg-black/30 dark:text-white dark:hover:bg-black/45",
         className
       )}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+      }}
+      onMouseDown={(event) => {
+        event.stopPropagation();
+      }}
       onClick={(event) => {
         event.stopPropagation();
         onClick();

@@ -1,0 +1,4 @@
+# 忽略 launcher 生成物（配置与数据见 containers/、shared/）
+docker-compose.generated.yml
+Caddyfile.generated
+.env.generated

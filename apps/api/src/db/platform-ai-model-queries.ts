@@ -14,9 +14,13 @@ import type {
   UpdatePlatformAiModelRequest,
 } from "@dafthunk/types";
 import {
+  DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  isImageModelParameterRules,
   isTextModelParameterRules,
+  normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
+  type ImageModelParameterRules,
 } from "@dafthunk/types";
 
 import type { Database } from "./index";
@@ -398,4 +402,13 @@ export function getTextParameterRules(
     return normalizeTextModelParameterRules(model.parameterRules);
   }
   return DEFAULT_TEXT_MODEL_PARAMETER_RULES;
+}
+
+export function getImageParameterRules(
+  model: PlatformAiModel
+): ImageModelParameterRules {
+  if (isImageModelParameterRules(model.parameterRules)) {
+    return normalizeImageModelParameterRules(model.parameterRules);
+  }
+  return DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
 }

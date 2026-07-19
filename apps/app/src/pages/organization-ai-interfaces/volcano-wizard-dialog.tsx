@@ -23,10 +23,12 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import {
   createOrganizationAiInterface,
   probeVolcanoCredentials,
+  updateVolcanoTosStorage,
 } from "@/services/organization-ai-interface-service";
 
 import { VolcanoCredentialFields } from "./volcano-credential-fields";
 import { VolcanoModelRow } from "./volcano-model-row";
+import { VolcanoStorageSetupDialog } from "./volcano-storage-setup-dialog";
 
 const IAM_KEY_URL = "https://console.volcengine.com/iam/keymanage";
 const GET_API_KEY_DOC_URL =
@@ -89,6 +91,8 @@ export function VolcanoWizardDialog({
   const [probePhase, setProbePhase] = useState<WizardProbePhase>("idle");
   const [probeError, setProbeError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingTos, setIsSavingTos] = useState(false);
+  const [createdInterfaceId, setCreatedInterfaceId] = useState<string | null>(null);
   const [probeRunId, setProbeRunId] = useState(0);
 
   const selectedModelIds = useMemo(
@@ -109,6 +113,13 @@ export function VolcanoWizardDialog({
     setProbePhase("idle");
     setProbeError(null);
     setProbeRunId(0);
+    setCreatedInterfaceId(null);
+    setIsSavingTos(false);
+  };
+
+  const finishWizard = async () => {
+    handleClose(false);
+    await onCreated();
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -174,7 +185,7 @@ export function VolcanoWizardDialog({
 
     setIsSaving(true);
     try {
-      await createOrganizationAiInterface(organizationId, {
+      const created = await createOrganizationAiInterface(organizationId, {
         provider: "doubao_volcano",
         name: name.trim(),
         accessKeyId: accessKeyId.trim(),
@@ -185,8 +196,8 @@ export function VolcanoWizardDialog({
         isDefault: true,
       });
       appToast.success("pages.aiInterfaces.created");
-      handleClose(false);
-      await onCreated();
+      setCreatedInterfaceId(created.id);
+      setStep(4);
     } catch (error) {
       appToast.errorRaw(
         error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
@@ -195,6 +206,55 @@ export function VolcanoWizardDialog({
       setIsSaving(false);
     }
   };
+
+  const handleTosSetupComplete = async (params: {
+    readonly region: string;
+    readonly bucket: string;
+    readonly createBucket: boolean;
+    readonly enable: boolean;
+  }) => {
+    if (!createdInterfaceId) return;
+
+    setIsSavingTos(true);
+    try {
+      await updateVolcanoTosStorage(organizationId, createdInterfaceId, {
+        enabled: params.enable,
+        region: params.region,
+        bucket: params.bucket,
+        createBucket: params.createBucket,
+      });
+      appToast.success("pages.aiInterfaces.tosStorage.saved");
+      await finishWizard();
+    } catch (error) {
+      appToast.errorRaw(
+        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+      );
+    } finally {
+      setIsSavingTos(false);
+    }
+  };
+
+  if (step === 4 && createdInterfaceId) {
+    return (
+      <VolcanoStorageSetupDialog
+        open={open}
+        organizationId={organizationId}
+        interfaceId={createdInterfaceId}
+        initialRegion=""
+        initialBucket=""
+        defaultEnable
+        isSaving={isSavingTos}
+        showSkip
+        onSkip={() => void finishWizard()}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            void finishWizard();
+          }
+        }}
+        onComplete={handleTosSetupComplete}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

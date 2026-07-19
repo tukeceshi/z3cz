@@ -1,0 +1,64 @@
+{
+  "Product": "TOS",
+  "ProductZhName": "对象存储",
+  "TemplateInfoList": [
+    {
+      "TemplateCode": "CLT7235520909463900460",
+      "Type": 2,
+      "Platform": ",web,web_landing_page,",
+      "ZhName": "对象存储",
+      "TableCodeList": [
+        ""
+      ],
+      "TemplateName": "",
+      "Product": "TOS",
+      "ProductZhName": "对象存储"
+    },
+    {
+      "TemplateCode": "CLT7320718184397836588",
+      "Type": 1,
+      "Platform": ",web,",
+      "ZhName": "对象存储",
+      "TableCodeList": [
+        "Tableukj8g73g",
+        "Table4btf0dmo",
+        "Tableut6ubuhg",
+        "Tablervfr2qf8",
+        "Table7e4dvrm8",
+        "Tableb3sjamd4",
+        "Table13gkaupg",
+        "Tabled9md3ulr",
+        "Table71iqvhuo",
+        "Table17ibp9no",
+        "Tablepk276tb8",
+        "Table75meibi8",
+        "Tables4bv58no",
+        "Tableconll378",
+        "Tableo56b0vic",
+        "Tableb1fetga4",
+        "Tableea7o5ejc",
+        "Table6hfcsp0k",
+        "Table7uoadcj4",
+        "Table2octmdd6",
+        "Table5b6jpgac",
+        "Table0bno21ag",
+        "Tableq8igu9f4",
+        "Table623knim4",
+        "Table8tjc5fbo",
+        "Tablehhn584uo",
+        "Table5hii6q18",
+        "Tableric8uufo",
+        "Tabletd31gr5o"
+      ],
+      "TemplateName": "",
+      "Product": "TOS",
+      "ProductZhName": "对象存储"
+    }
+  ],
+  "IconURL": "",
+  "HoverIconURL": "",
+  "ProductDisplayName": "",
+  "TagCode": 0,
+  "IndexKey": "",
+  "IsLeaf": true
+}

@@ -2,7 +2,6 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
-  DEFAULT_TEXT_MODEL_PARAMETER_RULES,
   normalizeTextModelParameterRules,
   type GenerateAiTextResponse,
   type ObjectReference,
@@ -10,11 +9,9 @@ import {
   type TextModelParameterRules,
 } from "@dafthunk/types";
 import {
-  addEdge,
   useNodes,
   useReactFlow,
   useViewport,
-  type Connection,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 import LoaderIcon from "lucide-react/icons/loader-circle";
@@ -25,12 +22,6 @@ import { Link } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -40,7 +31,6 @@ import {
   useOrgTextModels,
 } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
-import { cn } from "@/utils/utils";
 
 import {
   AiTextExpandButton,
@@ -53,11 +43,15 @@ import {
   type AiTextReferenceChip,
 } from "./ai-text-reference-bar";
 import {
-  AI_TEXT_KEYWORDS_HANDLE_ID,
-  AI_TEXT_PANEL_HEIGHT_PX,
-  AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX,
-  AI_TEXT_PANEL_WIDTH_PX,
   canAcceptAiTextReference,
+  countAiTextReferences,
+  evaluateAiTextReferenceStructural,
+  listPickableReferenceSources,
+  resolveAiTextReferenceRules,
+} from "./ai-text-reference-policy";
+import {
+  AI_TEXT_KEYWORDS_HANDLE_ID,
+  AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX,
   classifyReferenceFromNodeType,
   pickDefaultTextModelCanonicalId,
   probeVideoFileDurationSeconds,
@@ -65,8 +59,13 @@ import {
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
   withAiTextGeneratedResult,
-  type AiTextReferenceCounts,
 } from "./ai-text-node-utils";
+import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
+import {
+  GenerativePickNodeDialog,
+  type GenerativePickNodeEntry,
+} from "./generative-pick-node-dialog";
+import { connectGenerativeReferenceEdge } from "./generative-reference-utils";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -100,6 +99,15 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
   const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
 
+  const textModelCatalog = useMemo(
+    () =>
+      models.map((entry) => ({
+        canonicalId: entry.canonicalId,
+        parameterRules: entry.parameterRules,
+      })),
+    [models]
+  );
+
   const selectedModelId = getInputString(data, "model");
   const promptValue = getInputString(data, "prompt");
 
@@ -116,17 +124,15 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     [createObjectUrl, edges, nodeId, typedNodes]
   );
 
-  const currentReferenceCounts = useMemo(() => {
-    let text = 0;
-    let image = 0;
-    let video = 0;
-    for (const chip of referenceChips) {
-      if (chip.kind === "text") text += 1;
-      if (chip.kind === "image") image += 1;
-      if (chip.kind === "video") video += 1;
-    }
-    return { text, image, video } satisfies AiTextReferenceCounts;
-  }, [referenceChips]);
+  const currentReferenceCounts = useMemo(
+    () =>
+      countAiTextReferences(
+        nodeId,
+        edges,
+        typedNodes.map((node) => ({ id: node.id, data: node.data }))
+      ),
+    [edges, nodeId, typedNodes]
+  );
 
   const selectedModel = useMemo(
     () => models.find((entry) => entry.canonicalId === selectedModelId),
@@ -135,10 +141,11 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
   const modelRules = useMemo(
     () =>
-      selectedModel
-        ? normalizeTextModelParameterRules(selectedModel.parameterRules)
-        : DEFAULT_TEXT_MODEL_PARAMETER_RULES,
-    [selectedModel]
+      resolveAiTextReferenceRules({
+        targetNodeData: data,
+        models: textModelCatalog,
+      }),
+    [data, textModelCatalog]
   );
 
   const modelFitsCurrentRefs = useCallback(
@@ -328,19 +335,12 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
-  const connectReferenceEdge = (connection: Connection) => {
-    setEdges((current) =>
-      addEdge(
-        {
-          ...connection,
-          id: `${connection.source}:${connection.sourceHandle}-${connection.target}:${connection.targetHandle}-${Date.now()}`,
-          type: "workflowEdge",
-          data: { isValid: true },
-        },
-        current
-      )
-    );
-  };
+  const connectReferenceEdge = useCallback(
+    (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
+      connectGenerativeReferenceEdge(setEdges, connection);
+    },
+    [setEdges]
+  );
 
   const validateReferenceContent = async (params: {
     readonly kind: "text" | "image" | "video";
@@ -437,12 +437,17 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       return;
     }
 
-    const check = canAcceptAiTextReference({
-      rules: modelRules,
+    const verdict = evaluateAiTextReferenceStructural({
+      targetNodeId: nodeId,
+      sourceNodeId,
+      sourceHandle,
       sourceNodeType: sourceData.nodeType,
-      currentCounts: currentReferenceCounts,
+      targetNodeData: data,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      models: textModelCatalog,
     });
-    if (!check.ok) {
+    if (!verdict.ok) {
       toast.error("workflow.aiTextPanel.referenceRejected");
       return;
     }
@@ -670,39 +675,15 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       ? Boolean(keywordsValue?.trim())
       : promptBuffer.value.trim().length > 0);
 
-  const panelZoom = zoom > 0 ? zoom : 1;
-
-  const pickableOutputs = useMemo(() => {
-    return typedNodes.flatMap((node) => {
-      if (node.id === nodeId) return [];
-      const sourceData = node.data;
-      const kind = classifyReferenceFromNodeType(sourceData.nodeType);
-      if (!kind) return [];
-      const check = canAcceptAiTextReference({
-        rules: modelRules,
-        sourceNodeType: sourceData.nodeType,
-        currentCounts: currentReferenceCounts,
-      });
-      if (!check.ok) return [];
-
-      const preferredHandle =
-        kind === "text" ? "text" : kind === "image" ? "images" : "videos";
-      const output =
-        sourceData.outputs?.find((entry) => entry.id === preferredHandle) ??
-        sourceData.outputs?.[0];
-      if (!output) return [];
-
-      return [
-        {
-          nodeId: node.id,
-          nodeName: sourceData.name,
-          outputId: output.id,
-          outputName: output.name,
-          kind,
-        },
-      ];
+  const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
+    return listPickableReferenceSources({
+      targetNodeId: nodeId,
+      targetNodeData: data,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      models: textModelCatalog,
     });
-  }, [currentReferenceCounts, modelRules, nodeId, typedNodes]);
+  }, [data, edges, nodeId, textModelCatalog, typedNodes]);
 
   const showOverLimitHint =
     selectableModels.length > 0 &&
@@ -752,108 +733,92 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
   return (
     <>
-      <div
-        className={cn(
-          "nodrag nopan nowheel absolute top-full left-1/2 z-20 -mt-px",
-          "overflow-hidden rounded-b-xl border border-t-0 border-border/70",
-          "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:bg-neutral-900/95"
-        )}
-        style={{
-          width: AI_TEXT_PANEL_WIDTH_PX,
-          height: AI_TEXT_PANEL_HEIGHT_PX,
-          transform: `translateX(-50%) scale(${1 / panelZoom})`,
-          transformOrigin: "top center",
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex h-full flex-col px-3 pb-3 pt-2">
-          <AiTextReferenceBar
-            chips={referenceChips}
-            disabled={disabled}
-            allowUpload={allowUpload && !disabled}
-            onDisconnect={(edgeId) => deleteEdge?.(edgeId)}
-            onPickCanvasNode={() => setPickNodeOpen(true)}
-            onUploadFiles={(files) => {
-              void handleUploadFiles(files);
-            }}
-            onInjectChip={handleInjectChip}
+      <GenerativeConfigPanelShell zoom={zoom}>
+        <AiTextReferenceBar
+          chips={referenceChips}
+          disabled={disabled}
+          allowUpload={allowUpload && !disabled}
+          onDisconnect={(edgeId) => deleteEdge?.(edgeId)}
+          onPickCanvasNode={() => setPickNodeOpen(true)}
+          onUploadFiles={(files) => {
+            void handleUploadFiles(files);
+          }}
+          onInjectChip={handleInjectChip}
+        />
+
+        <div
+          className="relative mt-2 min-h-0 flex-1"
+          style={{ minHeight: AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX }}
+        >
+          <Textarea
+            value={promptBuffer.value}
+            onChange={(event) => promptBuffer.onChange(event.target.value)}
+            onFocus={promptBuffer.onFocus}
+            onBlur={promptBuffer.onBlur}
+            onCompositionStart={promptBuffer.onCompositionStart}
+            onCompositionEnd={promptBuffer.onCompositionEnd}
+            maxLength={promptMaxLength}
+            placeholder={
+              hasAiTextReference
+                ? t("workflow.aiTextPanel.promptOptionalWithRefs")
+                : t("workflow.aiTextPanel.promptPlaceholder")
+            }
+            className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0"
           />
-
-          <div
-            className="relative mt-2 min-h-0 flex-1"
-            style={{ minHeight: AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX }}
-          >
-            <Textarea
-              value={promptBuffer.value}
-              onChange={(event) => promptBuffer.onChange(event.target.value)}
-              onFocus={promptBuffer.onFocus}
-              onBlur={promptBuffer.onBlur}
-              onCompositionStart={promptBuffer.onCompositionStart}
-              onCompositionEnd={promptBuffer.onCompositionEnd}
-              maxLength={promptMaxLength}
-              placeholder={
-                hasAiTextReference
-                  ? t("workflow.aiTextPanel.promptOptionalWithRefs")
-                  : t("workflow.aiTextPanel.promptPlaceholder")
-              }
-              className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0"
-            />
-            <AiTextExpandButton
-              className="absolute right-1 top-1"
-              onClick={() => setExpandOpen(true)}
-            />
-          </div>
-
-          <div className="mt-2 flex items-end justify-between gap-2">
-            <div className="min-w-0">
-              <AiTextModelPicker
-                orgId={orgId}
-                models={models}
-                groups={groups}
-                selectedModelId={selectedModelId}
-                disabled={disabled || isLoading || models.length === 0}
-                modelFitsCurrentRefs={modelFitsCurrentRefs}
-                onSelect={(canonicalId) => {
-                  void applyModelSelection(canonicalId);
-                }}
-              />
-              {models.length > 0 && selectableModels.length === 0 ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {t("workflow.aiTextPanel.enableModelsHint")}{" "}
-                  <Link
-                    to={getOrgUrl("/ai-interfaces")}
-                    className="underline underline-offset-2"
-                  >
-                    {t("workflow.aiTextPanel.openAiInterfaces")}
-                  </Link>
-                </p>
-              ) : null}
-              {showOverLimitHint ? (
-                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                  {t("workflow.aiTextPanel.referencesExceedModels")}
-                </p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="h-9 shrink-0 gap-1 rounded-lg text-xs"
-              disabled={!canGenerate}
-              onClick={handleGenerate}
-            >
-              {isGenerating ? (
-                <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <SparklesIcon className="h-3.5 w-3.5" />
-              )}
-              {isGenerating
-                ? t("workflow.aiTextPanel.generating")
-                : t("workflow.aiTextPanel.generate")}
-            </Button>
-          </div>
+          <AiTextExpandButton
+            className="absolute right-1 top-1"
+            onClick={() => setExpandOpen(true)}
+          />
         </div>
-      </div>
+
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <AiTextModelPicker
+              orgId={orgId}
+              models={models}
+              groups={groups}
+              selectedModelId={selectedModelId}
+              disabled={disabled || isLoading || models.length === 0}
+              modelFitsCurrentRefs={modelFitsCurrentRefs}
+              onSelect={(canonicalId) => {
+                void applyModelSelection(canonicalId);
+              }}
+            />
+            {models.length > 0 && selectableModels.length === 0 ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {t("workflow.aiTextPanel.enableModelsHint")}{" "}
+                <Link
+                  to={getOrgUrl("/ai-interfaces")}
+                  className="underline underline-offset-2"
+                >
+                  {t("workflow.aiTextPanel.openAiInterfaces")}
+                </Link>
+              </p>
+            ) : null}
+            {showOverLimitHint ? (
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                {t("workflow.aiTextPanel.referencesExceedModels")}
+              </p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 shrink-0 gap-1 rounded-lg text-xs"
+            disabled={!canGenerate}
+            onClick={handleGenerate}
+          >
+            {isGenerating ? (
+              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <SparklesIcon className="h-3.5 w-3.5" />
+            )}
+            {isGenerating
+              ? t("workflow.aiTextPanel.generating")
+              : t("workflow.aiTextPanel.generate")}
+          </Button>
+        </div>
+      </GenerativeConfigPanelShell>
 
       <AiTextExpandOverlay
         open={expandOpen}
@@ -865,42 +830,16 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
         placeholder={t("workflow.aiTextPanel.promptPlaceholder")}
       />
 
-      <Dialog open={pickNodeOpen} onOpenChange={setPickNodeOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("workflow.aiTextPanel.pickCanvasNode")}</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {pickableOutputs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {t("workflow.aiTextPanel.noPickableNodes")}
-              </p>
-            ) : (
-              pickableOutputs.map((entry) => (
-                <button
-                  key={`${entry.nodeId}:${entry.outputId}`}
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-2 text-left text-xs hover:bg-muted/50"
-                  onClick={() => {
-                    void handlePickNode(entry.nodeId, entry.outputId);
-                  }}
-                >
-                  <span className="truncate">
-                    {entry.nodeName}
-                    <span className="text-muted-foreground">
-                      {" · "}
-                      {entry.outputName}
-                    </span>
-                  </span>
-                  <span className="text-[10px] uppercase text-muted-foreground">
-                    {entry.kind}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <GenerativePickNodeDialog
+        open={pickNodeOpen}
+        onOpenChange={setPickNodeOpen}
+        title={t("workflow.aiTextPanel.pickCanvasNode")}
+        emptyMessage={t("workflow.aiTextPanel.noPickableNodes")}
+        entries={pickableOutputs}
+        onPick={(sourceNodeId, sourceHandle) => {
+          void handlePickNode(sourceNodeId, sourceHandle);
+        }}
+      />
     </>
   );
 }

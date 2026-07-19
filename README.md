@@ -47,8 +47,9 @@ docker compose up -d --build --wait
 | http://localhost:3100 | 营销站 www |
 | http://localhost:3101 | 产品 app（`/api` 反代至 API） |
 | http://localhost:3102 | API |
+| http://localhost:8080 | 可选 Dev gateway（`pnpm dev:gateway`） |
 
-请通过 **3101** 使用产品；不要把浏览器里的 API 指到 3102（Cookie 同源问题）。
+请通过 **3101** 使用产品；不要把浏览器里的 API 指到 3102（Cookie 同源问题）。验证单域名行为时用 **8080**，不要与 3101 混用 Cookie。
 
 ### 登录
 
@@ -163,11 +164,12 @@ docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --wait
 
 | 现象 | 处理 |
 |------|------|
-| 端口占用 | 先停 prod/dev 另一方，或改 `.env.docker` 端口 |
+| 端口占用 | 改 `.env.docker` 端口；自托管用 `dafthunk-host`（默认可与 310x 并存） |
 | API 长时间无响应 | 首次 2–6 分钟；`docker compose logs -f api` |
 | www/app 异常 | `docker compose ps` 看健康状态 |
 | entrypoint / 镜像改了不生效 | `docker compose up -d --build` 后有序重启 |
 | 登录 401 | 用 http://localhost:3101；清库后刷新再注册 |
+| Gateway Cookie 错乱 | 只用 http://localhost:8080，勿与 3101 混用 |
 | 登录/API 500、503 | API 可能仍在启动；看日志 |
 | OAuth 失败 | 回调须为 `http://localhost:3101/api/auth/login/{provider}` |
 | JWT 500 | `docker compose exec api cat /data/secrets/.dev.vars` |
@@ -189,11 +191,12 @@ docker compose exec app node -e "fetch('http://127.0.0.1:3101/api/health').then(
 apps/api/            Hono API（本地 Node / 可选 Workers）
 apps/app/            产品 UI（React + Vite）
 apps/www/            营销站（React Router SSR）
-apps/smtp-gateway/   入站 SMTP（自托管）
+apps/smtp-gateway/   入站 SMTP（可选；host 栈默认不起）
 packages/types/      共享类型
 packages/utils/      共享工具
 packages/runtime/    工作流节点运行时（含 bundled TTF 字体供 SVG→栅格）
-docker/              开发 entrypoint、生产 Nginx
+docker-host/         自托管 launcher / setup（Caddy 单域名）
+docker/              开发 entrypoint、Nginx、Caddyfile.dev
 ```
 
 | Cloudflare | Node / Docker |
@@ -209,16 +212,35 @@ docker/              开发 entrypoint、生产 Nginx
 
 ## 部署
 
-### Docker 自托管（实验性）
+### Docker 自托管（推荐）
+
+单域名 + Caddy，无 SMTP。与开发栈隔离（compose project `dafthunk-host`）。
 
 ```bash
-cp .env.docker.prod.example .env.docker.prod   # 编辑密钥
-pnpm prod:env                                   # 可选：同步示例字段
-pnpm prod:up                                    # ≡ compose -f docker-compose.prod.yml --env-file .env.docker.prod up -d --build
-pnpm prod:down
+pnpm host:setup      # 问 hostname；本地默认 http://localhost:8080
+pnpm host:rebuild    # 构建并启动 postgres + api + app + caddy
 ```
 
-栈：Postgres + API + www（SSR）+ app（Nginx + `/api`）+ SMTP。端口与开发栈同为 **3100–3102**，切换时先停另一方。SMTP：`localhost:2525` → `/inbound-email/raw`。
+打开打印的 URL，**注册第一个用户**即为 platform admin。
+
+升级：`git pull` 后再次 `pnpm host:rebuild`。详见 [docker-host/README.md](./docker-host/README.md)。
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm host:status` / `host:logs` / `host:stop` | 运维 |
+| `pnpm host:start` | 不重建镜像启动 |
+
+### 开发可选：同源 Gateway
+
+日常仍用 `http://localhost:3101`。验证单域名 / Cookie / WS 时：
+
+```bash
+pnpm dev:gateway    # http://localhost:8080 ，勿与 3101 混用 Cookie
+```
+
+### 旧版 compose prod（已弃用）
+
+多端口 + www，需 `ALLOW_LEGACY_PROD=1 pnpm prod:up`。请迁移到 `pnpm host:*`。
 
 ### Cloudflare
 
