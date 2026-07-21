@@ -11,7 +11,6 @@ import {
 
 type UpdateNodeFn = (nodeId: string, data: Partial<WorkflowNodeType>) => void;
 
-// Extends UpdateNodeFn with functional updater support (like React's setState)
 type UpdateNodeDataFn = (
   nodeId: string,
   data:
@@ -20,48 +19,82 @@ type UpdateNodeDataFn = (
 ) => void;
 type UpdateEdgeFn = (edgeId: string, data: Partial<WorkflowEdgeType>) => void;
 type DeleteEdgeFn = (edgeId: string) => void;
-/** Called when the user requests a single-node run from the AI config panel. */
 type RunNodeFn = (nodeId: string) => Promise<void>;
 
-export interface WorkflowContextProps {
-  updateNodeData?: UpdateNodeDataFn;
-  updateEdgeData?: UpdateEdgeFn;
-  deleteEdge?: DeleteEdgeFn;
-  edges?: ReactFlowEdge<WorkflowEdgeType>[];
-  connectedHandles?: ReadonlySet<string>;
-  soleSelectedNodeId?: string | null;
-  /** True while the user (or fit/zoom/layout) is moving the viewport. */
-  isViewportMoving?: boolean;
-  disabled?: boolean;
-  expandedOutputs?: boolean;
-  nodeTypes?: NodeType[];
+/** Stable callbacks and catalog — does not change on selection or edge topology. */
+export interface WorkflowActionsContextValue {
+  updateNodeData: UpdateNodeDataFn;
+  updateEdgeData: UpdateEdgeFn;
+  deleteEdge: DeleteEdgeFn;
+  disabled: boolean;
+  expandedOutputs: boolean;
+  nodeTypes: NodeType[];
+  allowedNodeTypes: ReadonlySet<string>;
   workflowTrigger?: WorkflowTrigger;
   onRunNode?: RunNodeFn;
 }
 
-export function isWorkflowHandleConnected(
-  connectedHandles: ReadonlySet<string>,
-  nodeId: string,
-  handleId: string
-): boolean {
-  return connectedHandles.has(`${nodeId}:${handleId}`);
+/** Volatile graph UI state — changes on selection, edges, viewport gestures. */
+export interface WorkflowGraphContextValue {
+  edges: ReactFlowEdge<WorkflowEdgeType>[];
+  soleSelectedNodeId: string | null;
+  isViewportMoving: boolean;
 }
 
-// Create the context with a default value
-const WorkflowContext = createContext<WorkflowContextProps>({
+export interface WorkflowContextProps
+  extends WorkflowActionsContextValue,
+    WorkflowGraphContextValue {}
+
+const defaultActions: WorkflowActionsContextValue = {
   updateNodeData: () => {},
   updateEdgeData: () => {},
   deleteEdge: () => {},
+  disabled: false,
+  expandedOutputs: false,
+  nodeTypes: [],
+  allowedNodeTypes: new Set(),
+};
+
+const defaultGraph: WorkflowGraphContextValue = {
   edges: [],
-  connectedHandles: new Set(),
   soleSelectedNodeId: null,
   isViewportMoving: false,
-  disabled: false,
-  nodeTypes: [],
-});
+};
 
-// Custom hook for using the workflow context
-export const useWorkflow = () => useContext(WorkflowContext);
+const WorkflowActionsContext =
+  createContext<WorkflowActionsContextValue>(defaultActions);
+const WorkflowGraphContext =
+  createContext<WorkflowGraphContextValue>(defaultGraph);
+
+export function isWorkflowHandleConnected(
+  connectedHandles:
+    | ReadonlySet<string>
+    | readonly string[]
+    | undefined,
+  nodeId: string,
+  handleId: string
+): boolean {
+  const key = `${nodeId}:${handleId}`;
+  if (!connectedHandles) {
+    return false;
+  }
+  if (connectedHandles instanceof Set) {
+    return connectedHandles.has(key);
+  }
+  return connectedHandles.includes(key);
+}
+
+export const useWorkflowActions = (): WorkflowActionsContextValue =>
+  useContext(WorkflowActionsContext);
+
+export const useWorkflowGraph = (): WorkflowGraphContextValue =>
+  useContext(WorkflowGraphContext);
+
+export const useWorkflow = (): WorkflowContextProps => {
+  const actions = useWorkflowActions();
+  const graph = useWorkflowGraph();
+  return useMemo(() => ({ ...actions, ...graph }), [actions, graph]);
+};
 
 export interface WorkflowProviderProps {
   readonly children: ReactNode;
@@ -69,12 +102,12 @@ export interface WorkflowProviderProps {
   readonly updateEdgeData?: UpdateEdgeFn;
   readonly deleteEdge?: DeleteEdgeFn;
   readonly edges?: ReactFlowEdge<WorkflowEdgeType>[];
-  readonly connectedHandles?: ReadonlySet<string>;
   readonly soleSelectedNodeId?: string | null;
   readonly isViewportMoving?: boolean;
   readonly disabled?: boolean;
   readonly expandedOutputs?: boolean;
   readonly nodeTypes?: NodeType[];
+  readonly allowedNodeTypes?: ReadonlySet<string>;
   readonly workflowTrigger?: WorkflowTrigger;
   readonly onRunNode?: RunNodeFn;
 }
@@ -85,27 +118,24 @@ export function WorkflowProvider({
   updateEdgeData = () => {},
   deleteEdge = () => {},
   edges = [],
-  connectedHandles = new Set(),
   soleSelectedNodeId = null,
   isViewportMoving = false,
   disabled = false,
   expandedOutputs = false,
   nodeTypes = [],
+  allowedNodeTypes = new Set(),
   workflowTrigger,
   onRunNode,
 }: WorkflowProviderProps) {
-  const workflowContextValue = useMemo(
+  const actionsValue = useMemo(
     () => ({
       updateNodeData,
       updateEdgeData,
       deleteEdge,
-      edges,
-      connectedHandles,
-      soleSelectedNodeId,
-      isViewportMoving,
       disabled,
       expandedOutputs,
       nodeTypes,
+      allowedNodeTypes,
       workflowTrigger,
       onRunNode,
     }),
@@ -113,26 +143,33 @@ export function WorkflowProvider({
       updateNodeData,
       updateEdgeData,
       deleteEdge,
-      edges,
-      connectedHandles,
-      soleSelectedNodeId,
-      isViewportMoving,
       disabled,
       expandedOutputs,
       nodeTypes,
+      allowedNodeTypes,
       workflowTrigger,
       onRunNode,
     ]
   );
 
+  const graphValue = useMemo(
+    () => ({
+      edges,
+      soleSelectedNodeId,
+      isViewportMoving,
+    }),
+    [edges, soleSelectedNodeId, isViewportMoving]
+  );
+
   return (
-    <WorkflowContext.Provider value={workflowContextValue}>
-      {children}
-    </WorkflowContext.Provider>
+    <WorkflowActionsContext.Provider value={actionsValue}>
+      <WorkflowGraphContext.Provider value={graphValue}>
+        {children}
+      </WorkflowGraphContext.Provider>
+    </WorkflowActionsContext.Provider>
   );
 }
 
-// Helper functions for common node updates
 export const convertValueByType = (
   value: string,
   type: string
@@ -162,7 +199,6 @@ export const updateNodeInput = (
     input.id === inputId ? ({ ...input, value } as WorkflowParameter) : input
   );
 
-  // Delete any edges connected to this input when manually setting a value
   if (edges && deleteEdge) {
     const connectedEdges = edges.filter(
       (edge) => edge.target === nodeId && edge.targetHandle === inputId

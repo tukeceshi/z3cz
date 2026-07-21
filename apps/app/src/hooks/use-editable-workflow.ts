@@ -3,6 +3,7 @@ import type {
   Edge as WorkflowBackendEdge,
   Node as WorkflowBackendNode,
   WorkflowBillingMode,
+  WorkflowEditorViewport,
   WorkflowExecution,
   WorkflowRuntime,
   WorkflowTrigger,
@@ -12,6 +13,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
+import { useTranslation } from "@/components/locale-provider";
 import { AI_TEXT_GENERATING_META_KEY } from "@/components/workflow/ai-text-node-utils";
 import type {
   NodeType,
@@ -24,6 +26,13 @@ import {
   WorkflowWebSocket,
 } from "@/services/workflow-session-service.ts";
 import { adaptBackendNodesToReactFlowNodes } from "@/utils/utils";
+
+import {
+  isValidWorkflowEditorViewport,
+  normalizeWorkflowEditorViewport,
+} from "@/components/workflow/workflow-viewport-utils";
+
+const VIEWPORT_PERSIST_DEBOUNCE_MS = 300;
 
 interface UseEditableWorkflowProps {
   workflowId: string | undefined;
@@ -125,8 +134,12 @@ export function useEditableWorkflow({
     runtime?: WorkflowRuntime;
     billingMode?: WorkflowBillingMode;
   } | null>(null);
+  const [editorViewport, setEditorViewport] = useState<
+    WorkflowEditorViewport | null | undefined
+  >(undefined);
 
   const { organization } = useAuth();
+  const { t } = useTranslation();
 
   // Canonical "latest local graph" — always reflects what the editor shows,
   // independent of the `nodes`/`edges` state (which only changes on remote
@@ -144,6 +157,11 @@ export function useEditableWorkflow({
   // this, which suppresses echo-saves of remote updates and redundant resends.
   const lastSavedSerializedRef = useRef<string>("");
   const saveScheduledRef = useRef(false);
+  const editorViewportRef = useRef<WorkflowEditorViewport | undefined>(
+    undefined
+  );
+  const lastPersistedViewportRef = useRef<string>("");
+  const viewportPersistTimerRef = useRef<number | null>(null);
 
   // Send the current local graph if it differs from what the server last had.
   // Synchronous (the underlying WS send is synchronous) so it can run from
@@ -177,6 +195,28 @@ export function useEditableWorkflow({
   // cleanup without capturing a stale `flushSave`.
   const flushSaveRef = useRef(flushSave);
   flushSaveRef.current = flushSave;
+
+  const flushViewportSave = useCallback(() => {
+    const viewport = editorViewportRef.current;
+    if (!viewport || !hasInitializedRef.current || !workflowId) {
+      return;
+    }
+
+    const serialized = JSON.stringify(viewport);
+    if (serialized === lastPersistedViewportRef.current) {
+      return;
+    }
+
+    if (!wsRef.current?.isConnected()) {
+      return;
+    }
+
+    wsRef.current.sendViewportUpdate(viewport);
+    lastPersistedViewportRef.current = serialized;
+  }, [workflowId]);
+
+  const flushViewportSaveRef = useRef(flushViewportSave);
+  flushViewportSaveRef.current = flushViewportSave;
 
   // Coalesce the separate node and edge change callbacks (which fire in the
   // same commit) into a single save once both refs are up to date.
@@ -229,6 +269,16 @@ export function useEditableWorkflow({
     );
     setNodes(reactFlowNodes);
     setEdges(reactFlowEdges);
+    if (isValidWorkflowEditorViewport(fallback.editorViewport)) {
+      const normalized = normalizeWorkflowEditorViewport(
+        fallback.editorViewport
+      );
+      editorViewportRef.current = normalized;
+      lastPersistedViewportRef.current = JSON.stringify(normalized);
+      setEditorViewport(normalized);
+    } else {
+      setEditorViewport(null);
+    }
     hasInitializedRef.current = true;
     setIsInitializing(false);
     return true;
@@ -306,6 +356,17 @@ export function useEditableWorkflow({
 
         setNodes(reactFlowNodes);
         setEdges(reactFlowEdges);
+
+        if (isValidWorkflowEditorViewport(state.editorViewport)) {
+          const normalized = normalizeWorkflowEditorViewport(
+            state.editorViewport
+          );
+          editorViewportRef.current = normalized;
+          lastPersistedViewportRef.current = JSON.stringify(normalized);
+          setEditorViewport(normalized);
+        } else {
+          setEditorViewport(null);
+        }
       };
 
       const handleStateUpdate = (state: WorkflowState) => {
@@ -341,6 +402,11 @@ export function useEditableWorkflow({
           },
           onExecutionUpdate: (execution: WorkflowExecution) => {
             onExecutionUpdate?.(execution);
+          },
+          onWorkflowError: (error) => {
+            if (error.message) {
+              setSavingError(error.message);
+            }
           },
           onConnectionOpen: () => {
             setIsWSConnected(true);
@@ -394,8 +460,11 @@ export function useEditableWorkflow({
       cancelled = true;
       clearTimeout(timeoutId);
       clearTimeout(fallbackTimeoutId);
-      // Best-effort flush of any pending edit before tearing down the socket.
       flushSaveRef.current();
+      flushViewportSaveRef.current();
+      if (viewportPersistTimerRef.current !== null) {
+        window.clearTimeout(viewportPersistTimerRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.disconnect();
         wsRef.current = null;
@@ -406,10 +475,31 @@ export function useEditableWorkflow({
   // Flush pending edits on tab close / refresh.
   // not fire this; the connection effect cleanup covers that case instead.
   useEffect(() => {
-    const handleBeforeUnload = () => flushSaveRef.current();
+    const handleBeforeUnload = () => {
+      flushSaveRef.current();
+      flushViewportSaveRef.current();
+    };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
+
+  const handleEditorViewportChange = useCallback(
+    (viewport: WorkflowEditorViewport) => {
+      const normalized = normalizeWorkflowEditorViewport(viewport);
+      editorViewportRef.current = normalized;
+      setEditorViewport(normalized);
+
+      if (viewportPersistTimerRef.current !== null) {
+        window.clearTimeout(viewportPersistTimerRef.current);
+      }
+
+      viewportPersistTimerRef.current = window.setTimeout(() => {
+        viewportPersistTimerRef.current = null;
+        flushViewportSaveRef.current();
+      }, VIEWPORT_PERSIST_DEBOUNCE_MS);
+    },
+    []
+  );
 
   const handleNodesChange = useCallback(
     (changedNodes: Node<WorkflowNodeType>[]) => {
@@ -480,8 +570,10 @@ export function useEditableWorkflow({
     connectionError,
     isWSConnected,
     workflowMetadata,
+    editorViewport,
     handleNodesChange,
     handleEdgesChange,
+    handleEditorViewportChange,
     executeWorkflow,
     updateMetadata,
   };

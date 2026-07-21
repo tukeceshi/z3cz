@@ -1,6 +1,6 @@
 import type { NodeType } from "@dafthunk/types";
 import {
-  buildAllowedNodeTypeSet,
+  buildSchemeAllowedNodeTypeSet,
   filterNodeTypesByScheme,
 } from "@dafthunk/runtime";
 import type { WorkflowScheme } from "@dafthunk/types";
@@ -16,7 +16,7 @@ export function getAllowedNodeTypesForScheme(
   allNodeTypes: NodeType[],
   scheme: WorkflowScheme
 ): Set<string> {
-  return buildAllowedNodeTypeSet(allNodeTypes, scheme.nodeRules);
+  return buildSchemeAllowedNodeTypeSet(allNodeTypes, scheme.nodeRules);
 }
 
 export function assertTriggerAllowedByScheme(

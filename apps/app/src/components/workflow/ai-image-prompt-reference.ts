@@ -1,8 +1,15 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type ObjectReference } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
-import { AI_IMAGE_PROMPT_HANDLE_ID } from "./ai-image-node-utils";
+import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
+} from "./ai-image-node-utils";
+import {
+  collectGenerativeReferenceChips,
+  type GenerativeReferenceChip,
+} from "./generative-reference-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export interface AiImagePromptReferenceEdge {
@@ -145,6 +152,10 @@ export function evaluateAiImagePromptReferenceStructural(params: {
   readonly targetNodeId: string;
   readonly sourceNodeId: string;
   readonly sourceNodeType: string | undefined;
+  readonly edges?: readonly Pick<
+    ReactFlowEdge<WorkflowEdgeType>,
+    "source" | "target" | "targetHandle"
+  >[];
 }): { readonly ok: boolean } {
   if (params.sourceNodeId === params.targetNodeId) {
     return { ok: false };
@@ -152,7 +163,83 @@ export function evaluateAiImagePromptReferenceStructural(params: {
   if (params.sourceNodeType !== AI_TEXT_NODE_TYPE) {
     return { ok: false };
   }
+  if (
+    params.edges?.some(
+      (edge) =>
+        edge.target === params.targetNodeId &&
+        edge.targetHandle === AI_IMAGE_PROMPT_HANDLE_ID &&
+        edge.source !== params.sourceNodeId
+    )
+  ) {
+    return { ok: false };
+  }
   return { ok: true };
+}
+
+/** Prompt text + image refs shown together in the bottom panel reference bar. */
+export function collectAiImageUnifiedReferenceChips(params: {
+  readonly nodeId: string;
+  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
+}): readonly GenerativeReferenceChip[] {
+  const promptChips = collectGenerativeReferenceChips({
+    nodeId: params.nodeId,
+    targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
+    edges: params.edges,
+    nodes: params.nodes,
+    createObjectUrl: params.createObjectUrl,
+    classifyKind: () => "text",
+  });
+  const imageChips = collectGenerativeReferenceChips({
+    nodeId: params.nodeId,
+    targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
+    edges: params.edges,
+    nodes: params.nodes,
+    createObjectUrl: params.createObjectUrl,
+    classifyKind: (nodeType) =>
+      nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
+  });
+  return [...promptChips, ...imageChips];
+}
+
+/** Canvas card drop: AI text output → AI image prompt (unified left handle). */
+export function buildAiImagePromptReferenceConnectionFromCardDrop(params: {
+  readonly dragFromNodeId: string;
+  readonly dragFromHandle: {
+    readonly type: string;
+    readonly id?: string | null;
+  } | null;
+  readonly hoveredNodeId: string;
+  readonly nodes: readonly Pick<
+    ReactFlowNode<WorkflowNodeType>,
+    "id" | "data"
+  >[];
+}): {
+  readonly source: string;
+  readonly sourceHandle: string;
+  readonly target: string;
+  readonly targetHandle: string;
+} | null {
+  if (!params.dragFromHandle) return null;
+  if (params.hoveredNodeId === params.dragFromNodeId) return null;
+  if (params.dragFromHandle.type !== "source") return null;
+
+  const sourceNode = params.nodes.find(
+    (node) => node.id === params.dragFromNodeId
+  );
+  const targetNode = params.nodes.find(
+    (node) => node.id === params.hoveredNodeId
+  );
+  if (sourceNode?.data.nodeType !== AI_TEXT_NODE_TYPE) return null;
+  if (targetNode?.data.nodeType !== AI_IMAGE_NODE_TYPE) return null;
+
+  return {
+    source: params.dragFromNodeId,
+    sourceHandle: params.dragFromHandle.id ?? AI_TEXT_OUTPUT_ID,
+    target: params.hoveredNodeId,
+    targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
+  };
 }
 
 export function isAiImagePromptReferenceTarget(

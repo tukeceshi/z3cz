@@ -4,12 +4,12 @@ import {
   getAiMediaCacheStats,
   type AiMediaCacheStats,
 } from "@/services/ai-media-cache-service";
+import {
+  CACHE_STATS_EVENT,
+  notifyAiMediaCacheChanged,
+} from "@/services/ai-media-cache-events";
 
-const CACHE_STATS_EVENT = "dafthunk:ai-media-cache-changed";
-
-export function notifyAiMediaCacheChanged(): void {
-  window.dispatchEvent(new CustomEvent(CACHE_STATS_EVENT));
-}
+export { notifyAiMediaCacheChanged };
 
 export function useAiMediaCacheStats(organizationId: string | undefined) {
   const [stats, setStats] = useState<AiMediaCacheStats | null>(null);

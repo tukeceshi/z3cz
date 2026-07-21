@@ -19,6 +19,7 @@
     "typecheck": "pnpm --parallel typecheck",
     "check": "pnpm --parallel check",
     "test": "pnpm --parallel --filter '@dafthunk/api' --filter '@dafthunk/runtime' --filter '@dafthunk/geo' --filter '@dafthunk/www' test",
+    "check:mainline-core-only": "node scripts/check-mainline-core-only.mjs",
     "build": "pnpm build:packages && pnpm build:apps",
     "build:packages": "pnpm --filter '@dafthunk/types' build",
     "build:apps": "pnpm --filter '@dafthunk/app' build && pnpm --filter '@dafthunk/www' build",

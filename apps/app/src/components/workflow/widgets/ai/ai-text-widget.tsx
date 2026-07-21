@@ -1,5 +1,5 @@
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,10 @@ import {
   readAiTextResultHistory,
   withAiTextHistorySelection,
 } from "../../ai-text-node-utils";
+import {
+  shouldShowGenerativeHistoryIcon,
+  withGenerativeCardEditing,
+} from "../../generative-card-mode-utils";
 import { useBufferedTextValue } from "../../use-buffered-text-value";
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
@@ -30,6 +34,7 @@ interface AiTextWidgetProps extends BaseWidgetProps {
   outputMaxChars: number;
   historyItems: ReturnType<typeof readAiTextResultHistory>;
   nodeId: string;
+  metadata?: Record<string, string>;
 }
 
 function AiTextWidget({
@@ -40,6 +45,7 @@ function AiTextWidget({
   disabled = false,
   className,
   nodeId,
+  metadata,
 }: AiTextWidgetProps) {
   const { t } = useTranslation();
   const { updateNodeData } = useWorkflow();
@@ -47,6 +53,11 @@ function AiTextWidget({
   const [expandOpen, setExpandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const displayValue = text ?? "";
+  const showHistoryIcon = shouldShowGenerativeHistoryIcon(
+    historyItems.items.length,
+    metadata
+  );
+  const cardPlaceholder = t("workflow.aiTextPanel.cardInputPlaceholder");
 
   const commitText = useCallback(
     (value: string) => {
@@ -57,6 +68,22 @@ function AiTextWidget({
   );
 
   const textBuffer = useBufferedTextValue(displayValue, commitText);
+
+  useEffect(() => {
+    if (!updateNodeData) return;
+    updateNodeData(nodeId, (current) => ({
+      metadata: withGenerativeCardEditing(current.metadata, editing),
+    }));
+  }, [editing, nodeId, updateNodeData]);
+
+  useEffect(() => {
+    return () => {
+      if (!updateNodeData) return;
+      updateNodeData(nodeId, (current) => ({
+        metadata: withGenerativeCardEditing(current.metadata, false),
+      }));
+    };
+  }, [nodeId, updateNodeData]);
 
   const stopEditing = () => {
     textBuffer.onBlur();
@@ -90,11 +117,6 @@ function AiTextWidget({
           setEditing(true);
         }}
       >
-        {/*
-          Idle: plain div so React Flow can drag (it blocks drag on TEXTAREA).
-          Edit: textarea with nodrag. Avoid class-only pointer-events-none —
-          React Compiler was stripping that class from the served bundle.
-        */}
         {editing ? (
           <Textarea
             autoFocus
@@ -106,23 +128,25 @@ function AiTextWidget({
             onCompositionEnd={textBuffer.onCompositionEnd}
             readOnly={disabled}
             maxLength={outputMaxChars}
-            placeholder={t("workflow.aiTextPanel.outputPlaceholder")}
+            placeholder={cardPlaceholder}
             className="nodrag h-full min-h-0 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
           />
         ) : (
           <div className="h-full overflow-hidden whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80">
             {textBuffer.value || (
               <span className="text-muted-foreground/50 italic">
-                {t("workflow.aiTextPanel.outputPlaceholder")}
+                {cardPlaceholder}
               </span>
             )}
           </div>
         )}
         <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
-          <AiTextHistoryButton
-            count={historyItems.items.length}
-            onClick={() => setHistoryOpen(true)}
-          />
+          {showHistoryIcon ? (
+            <AiTextHistoryButton
+              count={historyItems.items.length}
+              onClick={() => setHistoryOpen(true)}
+            />
+          ) : null}
           <AiTextExpandButton onClick={() => setExpandOpen(true)} />
         </div>
       </div>
@@ -138,13 +162,15 @@ function AiTextWidget({
         placeholder={t("workflow.aiTextPanel.outputPlaceholder")}
       />
 
-      <AiTextHistoryOverlay
-        open={historyOpen}
-        history={historyItems}
-        currentOutput={textBuffer.value}
-        onClose={() => setHistoryOpen(false)}
-        onSelect={handleHistorySelect}
-      />
+      {showHistoryIcon ? (
+        <AiTextHistoryOverlay
+          open={historyOpen}
+          history={historyItems}
+          currentOutput={textBuffer.value}
+          onClose={() => setHistoryOpen(false)}
+          onSelect={handleHistorySelect}
+        />
+      ) : null}
     </>
   );
 }
@@ -161,10 +187,11 @@ export const aiTextWidget = createWidget({
     "result",
     "result_history",
   ],
-  extractConfig: (nodeId, inputs, outputs) => ({
+  extractConfig: (nodeId, inputs, outputs, metadata) => ({
     text: readAiTextResult(inputs, outputs),
     outputMaxChars: AI_TEXT_HARD_OUTPUT_MAX_CHARS,
     historyItems: readAiTextResultHistory(inputs),
     nodeId,
+    metadata,
   }),
 });

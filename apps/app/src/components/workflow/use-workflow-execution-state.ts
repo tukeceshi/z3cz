@@ -37,6 +37,9 @@ interface UseWorkflowExecutionStateProps {
     parameters?: Record<string, unknown>;
   }) => void;
   updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
+  batchUpdateNodeExecutions?: (
+    updates: Readonly<Record<string, NodeExecutionUpdate>>
+  ) => void;
   updateNodeData: (nodeId: string, data: Partial<WorkflowNodeType>) => void;
   deselectAll: () => void;
 }
@@ -103,9 +106,22 @@ export function useWorkflowExecutionState({
   executeWorkflow,
   wsExecuteWorkflow,
   updateNodeExecution,
+  batchUpdateNodeExecutions,
   updateNodeData,
   deselectAll,
 }: UseWorkflowExecutionStateProps): UseWorkflowExecutionStateReturn {
+  const applyExecutionUpdates = useCallback(
+    (updates: Readonly<Record<string, NodeExecutionUpdate>>) => {
+      if (batchUpdateNodeExecutions) {
+        batchUpdateNodeExecutions(updates);
+        return;
+      }
+      for (const [nodeId, update] of Object.entries(updates)) {
+        updateNodeExecution(nodeId, update);
+      }
+    },
+    [batchUpdateNodeExecutions, updateNodeExecution]
+  );
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowExecutionStatus>(
     initialWorkflowExecution?.status || "idle"
   );
@@ -212,16 +228,17 @@ export function useWorkflowExecutionState({
 
   const resetNodeStates = useCallback(
     (state: NodeExecutionState = "idle") => {
-      nodes.forEach((node) => {
-        updateNodeExecution(node.id, {
-          state,
-          outputs: {},
-          error: undefined,
-        });
-      });
+      applyExecutionUpdates(
+        Object.fromEntries(
+          nodes.map((node) => [
+            node.id,
+            { state, outputs: {}, error: undefined },
+          ])
+        )
+      );
       setWorkflowErrorMessage(undefined);
     },
-    [nodes, updateNodeExecution]
+    [applyExecutionUpdates, nodes]
   );
 
   // Unified execution callback factory — eliminates the two duplicate closures
@@ -274,13 +291,15 @@ export function useWorkflowExecutionState({
 
         setWorkflowErrorMessage(execution.error);
 
-        execution.nodeExecutions.forEach((nodeExecution) => {
-          updateNodeExecution(nodeExecution.nodeId, {
+        const executionUpdates: Record<string, NodeExecutionUpdate> = {};
+        for (const nodeExecution of execution.nodeExecutions) {
+          executionUpdates[nodeExecution.nodeId] = {
             state: nodeExecution.status,
             outputs: nodeExecution.outputs || {},
             error: nodeExecution.error,
-          });
-        });
+          };
+        }
+        applyExecutionUpdates(executionUpdates);
 
         if (execution.status === "exhausted") {
           setErrorDialogOpen(true);
@@ -332,7 +351,7 @@ export function useWorkflowExecutionState({
         }
       };
     },
-    [resetNodeStates, updateNodeExecution, nodes, nodeTypeById]
+    [applyExecutionUpdates, resetNodeStates, nodes, nodeTypeById]
   );
 
   const handleExecuteRequest = useCallback(

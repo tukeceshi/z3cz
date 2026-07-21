@@ -27,7 +27,7 @@ export function TemplatePreviewPage() {
       : undefined;
 
   const { template, isTemplateLoading } = useTemplate(templateId);
-  const { nodeTypes, isNodeTypesLoading } = useNodeTypes({
+  const { nodeTypes, isNodeTypesLoading } = useNodeTypes(undefined, {
     revalidateOnFocus: false,
   });
 

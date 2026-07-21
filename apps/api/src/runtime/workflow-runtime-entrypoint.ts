@@ -21,7 +21,7 @@ import {
   type WorkflowRuntime,
 } from "./cloudflare-workflow-runtime";
 
-// Internal params injected by Agent.runWorkflow() â€?matches AgentWorkflowParams<T>
+// Internal params injected by Agent.runWorkflow() ï¿½?matches AgentWorkflowParams<T>
 // from the agents SDK (not directly importable due to bundled d.ts resolution issues).
 interface WorkflowParams extends RuntimeParams {
   __agentName: string;
@@ -49,7 +49,7 @@ export class WorkflowRuntimeEntrypoint extends AgentWorkflowBase {
       `[WorkflowRuntime] run instanceId=${event.instanceId} workflow=${params.workflow.id} trigger=${params.workflow.trigger} nodes=${params.workflow.nodes.length}`
     );
     try {
-      const runtime: WorkflowRuntime<Bindings> = createWorkflowRuntime(
+      const runtime = await createWorkflowRuntime(
         this.env,
         (exec) => this.reportProgress(exec)
       );

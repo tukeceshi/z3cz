@@ -33,6 +33,7 @@ import { useOrganizations } from "@/services/organizations-service";
 interface OrgLayoutProps {
   children: React.ReactNode;
   title: string;
+  sidebarDefaultOpen?: boolean;
 }
 
 function buildWorkflowSidebarItems(
@@ -198,7 +199,11 @@ export const getDashboardSidebarGroups = (
   return groups.filter((group) => group.items.length > 0);
 };
 
-export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
+export const OrgLayout: React.FC<OrgLayoutProps> = ({
+  children,
+  title,
+  sidebarDefaultOpen = true,
+}) => {
   const params = useParams<{ organizationId: string }>();
   const { organization, setSelectedOrganization } = useAuth();
   const { organizations: orgList } = useOrganizations();
@@ -244,6 +249,7 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({ children, title }) => {
         groups: sidebarGroups,
         footerItems: [],
       }}
+      sidebarDefaultOpen={sidebarDefaultOpen}
     >
       <TourProvider>
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>

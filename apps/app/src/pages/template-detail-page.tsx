@@ -11,6 +11,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
+import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useTemplate } from "@/services/template-service";
@@ -32,7 +33,7 @@ export function TemplateDetailPage() {
 
   const { template, templateError, isTemplateLoading } =
     useTemplate(templateId);
-  const { nodeTypes, isNodeTypesLoading } = useNodeTypes({
+  const { nodeTypes, isNodeTypesLoading } = useNodeTypes(undefined, {
     revalidateOnFocus: false,
   });
 
@@ -70,7 +71,9 @@ export function TemplateDetailPage() {
         edges: template.edges,
       };
       const newWorkflow = await createWorkflow(request, orgId);
-      navigate(getOrgUrl(`workflows/${newWorkflow.id}`));
+      navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
+        state: createWorkflowEditorLocationState(),
+      });
     } catch (error) {
       console.error("Failed to import template:", error);
     } finally {

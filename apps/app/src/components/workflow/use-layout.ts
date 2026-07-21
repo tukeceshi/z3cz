@@ -7,6 +7,10 @@ import type {
 import { useCallback } from "react";
 
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import {
+  resolveWorkflowNodeDimensions,
+  WORKFLOW_NODE_GAP_PX,
+} from "./workflow-node-placement";
 
 interface UseLayoutProps {
   nodesRef: React.RefObject<ReactFlowNode<WorkflowNodeType>[]>;
@@ -37,14 +41,18 @@ export function useLayout({
 
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
-    dagreGraph.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 100 });
+    dagreGraph.setGraph({
+      rankdir: "LR",
+      nodesep: WORKFLOW_NODE_GAP_PX,
+      ranksep: WORKFLOW_NODE_GAP_PX,
+    });
 
     nodesRef.current.forEach((node) => {
-      const nodeWidth = node.measured?.width || node.width || 200;
-      const isOutputNode = node.data.nodeType?.startsWith("output-");
-      const nodeHeight =
-        node.measured?.height || node.height || (isOutputNode ? 250 : 100);
-      dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+      const { width, height } = resolveWorkflowNodeDimensions(
+        node.data.nodeType,
+        node
+      );
+      dagreGraph.setNode(node.id, { width, height });
     });
 
     edgesRef.current.forEach((edge) => {
@@ -57,12 +65,12 @@ export function useLayout({
       nds.map((node) => {
         const nodeWithPosition = dagreGraph.node(node.id);
         if (!nodeWithPosition) return node;
-        const isOutputNode = node.data.nodeType?.startsWith("output-");
-        const nodeWidth = node.measured?.width || node.width || 200;
-        const nodeHeight =
-          node.measured?.height || node.height || (isOutputNode ? 250 : 100);
-        const x = nodeWithPosition.x - nodeWidth / 2;
-        const y = nodeWithPosition.y - nodeHeight / 2;
+        const { width, height } = resolveWorkflowNodeDimensions(
+          node.data.nodeType,
+          node
+        );
+        const x = nodeWithPosition.x - width / 2;
+        const y = nodeWithPosition.y - height / 2;
 
         return {
           ...node,

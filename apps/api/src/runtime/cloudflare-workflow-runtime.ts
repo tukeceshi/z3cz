@@ -18,14 +18,17 @@ export { WorkflowRuntime } from "@dafthunk/runtime";
  * Creates a WorkflowRuntime for AgentWorkflow execution.
  * Monitoring updates flow through reportProgress → onWorkflowProgress → WS clients.
  */
-export function createWorkflowRuntime(
+export async function createWorkflowRuntime(
   env: Bindings,
   reportProgress: (execution: WorkflowExecution) => Promise<void>
-): WorkflowRuntime<Bindings> {
+): Promise<WorkflowRuntime<Bindings>> {
   const monitoringService: MonitoringService = {
     async sendUpdate(execution) {
       await reportProgress(execution);
     },
   };
-  return new WorkflowRuntime(env, buildDependencies(env, monitoringService));
+  return new WorkflowRuntime(
+    env,
+    await buildDependencies(env, monitoringService)
+  );
 }

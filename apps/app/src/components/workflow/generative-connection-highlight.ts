@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { useCallback } from "react";
 import {
   useStore,
@@ -66,7 +66,8 @@ export function findGenerativeConnectionHighlightTargetId(
   const targetType = readNodeType(nodeLookup.get(previewConnection.target));
   if (
     targetType !== AI_TEXT_NODE_TYPE &&
-    targetType !== AI_IMAGE_NODE_TYPE
+    targetType !== AI_IMAGE_NODE_TYPE &&
+    targetType !== AI_VIDEO_NODE_TYPE
   ) {
     return null;
   }

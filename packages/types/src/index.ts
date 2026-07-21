@@ -1,3 +1,4 @@
+export * from "./agent";
 export * from "./ai-interface";
 export * from "./media-reference";
 export * from "./ai-model-catalog";

@@ -34,6 +34,7 @@ export interface SaveWorkflowRecord {
   organizationId: string;
   nodes: any[];
   edges: any[];
+  editorViewport?: WorkflowType["editorViewport"];
   createdAt?: Date;
   updatedAt?: Date;
   apiHost?: string;
@@ -634,6 +635,9 @@ export class WorkflowStore {
       runtime: (record.runtime as any) || "workflow",
       nodes,
       edges,
+      ...(record.editorViewport
+        ? { editorViewport: record.editorViewport }
+        : {}),
     };
 
     // Create metadata record for D1

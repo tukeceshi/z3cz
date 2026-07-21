@@ -1,6 +1,7 @@
 import {
   isEphemeralMediaReference,
   type MediaReference,
+  type NodeType,
   type ObjectReference,
 } from "@dafthunk/types";
 
@@ -28,11 +29,11 @@ export const AI_IMAGE_REFERENCE_INPUT = "reference_images" as const;
 
 export class AiImageNode extends ExecutableNode {
 
-  public static readonly nodeType: import("@dafthunk/types").NodeType = {
+  public static readonly nodeType: NodeType = {
 
     id: "ai-image",
 
-    name: "AI Image",
+    name: "Image",
 
     type: "ai-image",
 

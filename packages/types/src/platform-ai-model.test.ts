@@ -3,11 +3,20 @@ import { describe, expect, it } from "vitest";
 import { resolveAiTextEffectivePrompt } from "./platform-ai-model";
 
 describe("resolveAiTextEffectivePrompt", () => {
-  it("prefers connected keywords over manual prompt", () => {
+  it("combines connected keywords with manual prompt", () => {
     expect(
       resolveAiTextEffectivePrompt({
         keywords: " upstream ",
         prompt: "manual",
+      })
+    ).toBe("upstream\n\nmanual");
+  });
+
+  it("uses keywords alone when prompt is empty", () => {
+    expect(
+      resolveAiTextEffectivePrompt({
+        keywords: " upstream ",
+        prompt: " ",
       })
     ).toBe("upstream");
   });

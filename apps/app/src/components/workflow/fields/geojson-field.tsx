@@ -1,4 +1,4 @@
-import { type GeoJSONSvgOptions, geojsonToSvg } from "@dafthunk/utils";
+import { type GeoJSONSvgOptions, geojsonToSvg } from "@dafthunk/utils/geojson";
 import { useMemo } from "react";
 
 import { useTranslation } from "@/components/locale-provider";

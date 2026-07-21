@@ -7,7 +7,7 @@
 import { ReactFlowProvider } from "@xyflow/react";
 import Settings from "lucide-react/icons/settings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
@@ -15,6 +15,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
+import { readInitialViewportOneToOne } from "@/components/workflow/workflow-editor-navigation";
 import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-editor-sidebar-effect";
 import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
@@ -28,6 +29,10 @@ import { getWorkflow, setWorkflowEnabled } from "@/services/workflow-service";
 export function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialViewportOneToOneRef = useRef(
+    readInitialViewportOneToOne(location.state)
+  );
   const { organization } = useAuth();
   const { t } = useTranslation();
   const appToast = useAppToast();
@@ -87,8 +92,10 @@ export function EditorPage() {
     connectionError: workflowConnectionError,
     isWSConnected: _isWSConnected,
     workflowMetadata,
+    editorViewport,
     handleNodesChange,
     handleEdgesChange,
+    handleEditorViewportChange,
     executeWorkflow: wsExecuteWorkflow,
     updateMetadata: wsUpdateMetadata,
   } = useEditableWorkflow({
@@ -140,6 +147,16 @@ export function EditorPage() {
     };
     fetchWorkflowMetadata();
   }, [id, orgId]);
+
+  useEffect(() => {
+    if (!readInitialViewportOneToOne(location.state)) {
+      return;
+    }
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null }
+    );
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const workflowSettingsButton = useMemo(
     () => (
@@ -241,7 +258,8 @@ export function EditorPage() {
 
   const isLoading =
     isNodeTypesLoading ||
-    (isWorkflowInitializing && !effectiveWorkflowMetadata);
+    (isWorkflowInitializing && !effectiveWorkflowMetadata) ||
+    editorViewport === undefined;
 
   if (isLoading) {
     return <InsetLoading />;
@@ -285,6 +303,9 @@ export function EditorPage() {
           onToggleEnabled={handleToggleEnabled}
           workflowSettingsOpen={workflowSettingsOpen}
           onWorkflowSettingsOpenChange={setWorkflowSettingsOpen}
+          initialViewportOneToOne={initialViewportOneToOneRef.current}
+          savedEditorViewport={editorViewport ?? null}
+          onEditorViewportChange={handleEditorViewportChange}
         />
       </div>
     </ReactFlowProvider>

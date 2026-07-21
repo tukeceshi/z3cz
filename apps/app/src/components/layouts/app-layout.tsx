@@ -17,9 +17,16 @@ interface AppLayoutProps {
     groups: NavMainProps["groups"];
     footerItems?: NavMainProps["footerItems"];
   };
+  /** Initial sidebar open state for routes that need a fixed layout before paint. */
+  sidebarDefaultOpen?: boolean;
 }
 
-export function AppLayout({ children, sidebar, className }: AppLayoutProps) {
+export function AppLayout({
+  children,
+  sidebar,
+  className,
+  sidebarDefaultOpen = true,
+}: AppLayoutProps) {
   return (
     <PageProvider>
       <SiteBrandingEffect />
@@ -28,7 +35,10 @@ export function AppLayout({ children, sidebar, className }: AppLayoutProps) {
         <Toaster />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {sidebar ? (
-            <Sidebar.SidebarProvider className="flex h-full min-h-0 w-full flex-1">
+            <Sidebar.SidebarProvider
+              defaultOpen={sidebarDefaultOpen}
+              className="flex h-full min-h-0 w-full flex-1"
+            >
               <AppSidebar
                 title={sidebar.title}
                 groups={sidebar.groups}

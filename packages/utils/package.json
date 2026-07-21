@@ -6,7 +6,8 @@
   "types": "./dist/index.d.ts",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./geojson": "./src/geojson.ts"
   },
   "files": ["dist/**"],
   "scripts": {

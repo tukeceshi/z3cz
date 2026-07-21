@@ -70,6 +70,13 @@ import {
   prepareWorkflowExecution,
 } from "../utils/execution-preparation";
 import { validateWorkflow } from "../utils/workflows";
+import { validateWorkflowGraphAgainstCatalog } from "../utils/workflow-catalog-validation";
+
+const workflowEditorViewportSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  zoom: z.number().positive(),
+});
 
 // Extend the ApiContext with our custom variable
 type ExtendedApiContext = ApiContext & {
@@ -199,6 +206,24 @@ workflowRoutes.post(
       return c.json({ errors: validationErrors }, 400);
     }
 
+    try {
+      await validateWorkflowGraphAgainstCatalog(
+        c.env,
+        { nodes },
+        c.executionCtx
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Workflow contains archived node types",
+        },
+        400
+      );
+    }
+
     // Save workflow to both D1 and R2
     const workflowStore = new WorkflowStore(c.env);
 
@@ -280,6 +305,9 @@ workflowRoutes.get("/:id", jwtMiddleware, async (c) => {
       updatedAt: workflow.updatedAt || new Date(),
       nodes: workflow.data.nodes || [],
       edges: workflow.data.edges || [],
+      ...(workflow.data.editorViewport
+        ? { editorViewport: workflow.data.editorViewport }
+        : {}),
     };
 
     return c.json(response);
@@ -305,6 +333,7 @@ workflowRoutes.put(
       runtime: z.enum(["worker", "workflow"]).optional(),
       nodes: z.array(z.any()).optional(),
       edges: z.array(z.any()).optional(),
+      editorViewport: workflowEditorViewportSchema.optional(),
     }) as z.ZodType<UpdateWorkflowRequest>
   ),
   async (c) => {
@@ -365,6 +394,8 @@ workflowRoutes.put(
 
     const nextTrigger = data.trigger || existingWorkflowData.trigger;
     const nextRuntime = data.runtime || existingWorkflow.runtime;
+    const nextEditorViewport =
+      data.editorViewport ?? existingWorkflowData.editorViewport;
 
     const db = createDatabase(c.env);
     const scheme =
@@ -418,6 +449,7 @@ workflowRoutes.put(
       organizationId: organizationId,
       nodes: sanitizedNodes,
       edges: sanitizedEdges,
+      editorViewport: nextEditorViewport,
       createdAt: existingWorkflow.createdAt,
       updatedAt: now,
       apiHost: new URL(c.req.url).origin,
@@ -437,6 +469,9 @@ workflowRoutes.put(
       updatedAt: now,
       nodes: updatedWorkflowData.nodes || [],
       edges: updatedWorkflowData.edges || [],
+      ...(updatedWorkflowData.editorViewport
+        ? { editorViewport: updatedWorkflowData.editorViewport }
+        : {}),
     };
 
     return c.json(response);
@@ -701,6 +736,24 @@ workflowRoutes.post(
       await stampOnboardingStage(db, userId, "workflowExecuted");
     } catch (error) {
       console.error("Failed to stamp workflow_executed onboarding:", error);
+    }
+
+    try {
+      await validateWorkflowGraphAgainstCatalog(
+        c.env,
+        { nodes: executionNodes },
+        c.executionCtx
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Workflow contains archived node types",
+        },
+        400
+      );
     }
 
     const runtimeParams = WorkflowExecutor.buildRuntimeParams({

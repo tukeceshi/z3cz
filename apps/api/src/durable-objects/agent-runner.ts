@@ -9,7 +9,7 @@
  */
 
 import type { ToolDefinition, ToolReference } from "@dafthunk/runtime";
-import type { AgentProvider } from "@dafthunk/runtime/nodes/agent/base-agent-node";
+import type { AgentProvider } from "@dafthunk/types";
 import type {
   AgentLoopResult,
   AgentLoopState,

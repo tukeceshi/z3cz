@@ -17,7 +17,7 @@ export const AI_TEXT_KEYWORDS_INPUT = "keywords" as const;
 export class AiTextNode extends ExecutableNode {
   public static readonly nodeType: NodeType = {
     id: "ai-text",
-    name: "AI Text",
+    name: "Text",
     type: "ai-text",
     description:
       "Generate text using an AI model configured via your organization's AI interfaces.",
@@ -75,7 +75,7 @@ export class AiTextNode extends ExecutableNode {
       {
         name: "prompt",
         type: "string",
-        description: "Manual prompt when keywords is not connected.",
+        description: "Manual instruction; combined with connected keywords when present.",
         required: false,
         hidden: true,
       },

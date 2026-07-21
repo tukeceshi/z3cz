@@ -11,7 +11,8 @@
     "./heartbeat/*": "./src/heartbeat/*.ts",
     "./upstream/*": "./src/upstream/*.ts",
     "./utils/*": "./src/utils/*.ts",
-    "./node-utils": "./src/node-utils.ts"
+    "./node-utils": "./src/node-utils.ts",
+    "./test/fixtures/*": "./test/fixtures/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

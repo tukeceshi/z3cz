@@ -170,13 +170,20 @@ export class WorkflowExecutor {
 
     const finalExecutionParams = WorkflowExecutor.buildRuntimeParams(options);
 
+    const { validateWorkflowGraphAgainstCatalog } = await import(
+      "../utils/workflow-catalog-validation"
+    );
+    await validateWorkflowGraphAgainstCatalog(env, {
+      nodes: workflow.nodes,
+    });
+
     // Use WorkerRuntime for "worker" runtime (synchronous execution)
     // Use Cloudflare Workflows for "workflow" runtime (durable execution, default)
     if (workflow.runtime === "worker") {
       const { createWorkerRuntime } = await import(
         "../runtime/cloudflare-worker-runtime"
       );
-      const workerRuntime = createWorkerRuntime(env);
+      const workerRuntime = await createWorkerRuntime(env);
       const execution = await workerRuntime.execute(finalExecutionParams);
       console.log(
         `[Execution] ${execution.id} workflow=${workflow.id} runtime=worker trigger=${workflow.trigger}`

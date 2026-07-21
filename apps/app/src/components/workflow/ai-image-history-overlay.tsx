@@ -3,13 +3,14 @@ import { getMediaReferenceKey } from "@dafthunk/types";
 import { createPortal } from "react-dom";
 import HistoryIcon from "lucide-react/icons/history";
 import XIcon from "lucide-react/icons/x";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
 import { MediaImageField } from "./fields/media-image-field";
+import { LazyMediaImageField } from "./fields/lazy-media-image-field";
 
 export interface AiImageHistoryOverlayProps {
   readonly open: boolean;
@@ -53,6 +54,16 @@ export function AiImageHistoryOverlay({
         : matchingCurrent[0]?.id;
 
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const [listScrollRoot, setListScrollRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setListScrollRoot(null);
+      return;
+    }
+    setListScrollRoot(listScrollRef.current);
+  }, [open, history.items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -101,7 +112,10 @@ export function AiImageHistoryOverlay({
               {t("workflow.aiImagePanel.historyCount", { count: total })}
             </p>
           </div>
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
+          <div
+            ref={listScrollRef}
+            className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2"
+          >
             {history.items.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">
                 {t("workflow.aiImagePanel.historyEmpty")}
@@ -137,10 +151,12 @@ export function AiImageHistoryOverlay({
                     <span className="min-w-0 flex-1">
                       <div className="mb-1 h-[72px] w-[72px] overflow-hidden rounded">
                         {thumb ? (
-                          <MediaImageField
+                          <LazyMediaImageField
                             value={thumb}
                             createObjectUrl={createObjectUrl}
                             className="h-full w-full"
+                            size="thumb"
+                            scrollRoot={listScrollRoot}
                           />
                         ) : (
                           <span className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
@@ -199,6 +215,8 @@ export function AiImageHistoryOverlay({
                     key={getMediaReferenceKey(img) ?? idx}
                     value={img}
                     createObjectUrl={createObjectUrl}
+                    className="w-full"
+                    imageClassName="max-h-[min(52vh,480px)] object-contain"
                   />
                 ))}
               </div>

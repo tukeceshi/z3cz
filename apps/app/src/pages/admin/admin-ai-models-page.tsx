@@ -3,14 +3,18 @@ import type {
   PlatformAiModel,
   PlatformAiModelGroup,
   TextModelParameterRules,
+  VideoModelParameterRules,
 } from "@dafthunk/types";
 import {
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
   isImageModelParameterRules,
   isTextModelParameterRules,
+  isVideoModelParameterRules,
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
+  normalizeVideoModelParameterRules,
 } from "@dafthunk/types";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import ChevronUpIcon from "lucide-react/icons/chevron-up";
@@ -60,7 +64,7 @@ import { cn } from "@/utils/utils";
 
 const NO_GROUP_VALUE = "__none__";
 
-type AdminModelModality = "text" | "image";
+type AdminModelModality = "text" | "image" | "video";
 
 export function AdminAiModelsPage() {
   const { t } = useTranslation();
@@ -161,7 +165,10 @@ export function AdminAiModelsPage() {
   const handleSaveModel = async (
     model: PlatformAiModel,
     patch: {
-      readonly rules: TextModelParameterRules | ImageModelParameterRules;
+      readonly rules:
+        | TextModelParameterRules
+        | ImageModelParameterRules
+        | VideoModelParameterRules;
       readonly groupId: string | null;
       readonly description: string;
     }
@@ -364,6 +371,14 @@ export function AdminAiModelsPage() {
           >
             {t("pages.adminAiModels.imageModels")}
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={modality === "video" ? "default" : "outline"}
+            onClick={() => setModality("video")}
+          >
+            {t("pages.adminAiModels.videoModels")}
+          </Button>
         </div>
 
         <Card>
@@ -371,7 +386,9 @@ export function AdminAiModelsPage() {
             <CardTitle>
               {modality === "text"
                 ? t("pages.adminAiModels.textModels")
-                : t("pages.adminAiModels.imageModels")}
+                : modality === "image"
+                  ? t("pages.adminAiModels.imageModels")
+                  : t("pages.adminAiModels.videoModels")}
             </CardTitle>
             <CardDescription>
               {t("pages.adminAiModels.description")}
@@ -475,6 +492,15 @@ export function AdminAiModelsPage() {
       ) : null}
       {settingsModel && isImageModelParameterRules(settingsModel.parameterRules) ? (
         <ImageModelSettingsDialog
+          model={settingsModel}
+          groups={orderedGroups}
+          saving={savingId === settingsModel.canonicalId}
+          onClose={() => setSettingsModel(null)}
+          onSave={(patch) => handleSaveModel(settingsModel, patch)}
+        />
+      ) : null}
+      {settingsModel && isVideoModelParameterRules(settingsModel.parameterRules) ? (
+        <VideoModelSettingsDialog
           model={settingsModel}
           groups={orderedGroups}
           saving={savingId === settingsModel.canonicalId}
@@ -842,9 +868,6 @@ function ImageModelSettingsDialog({
 
   const [description, setDescription] = useState(model.description ?? "");
   const [groupId, setGroupId] = useState(model.groupId ?? NO_GROUP_VALUE);
-  const [maxReferenceImages, setMaxReferenceImages] = useState(
-    String(baseRules.maxReferenceImages)
-  );
   const [maxImageReferenceBytes, setMaxImageReferenceBytes] = useState(
     String(baseRules.maxImageReferenceBytes)
   );
@@ -861,7 +884,7 @@ function ImageModelSettingsDialog({
       description: description.trim(),
       rules: {
         ...baseRules,
-        maxReferenceImages: Number(maxReferenceImages) || 0,
+        maxReferenceImages: baseRules.maxReferenceImages,
         maxImageReferenceBytes:
           Number(maxImageReferenceBytes) ||
           DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxImageReferenceBytes,
@@ -923,6 +946,200 @@ function ImageModelSettingsDialog({
           </div>
 
           <NumberField
+            label={t("pages.adminAiModels.maxImageReferenceBytes")}
+            value={maxImageReferenceBytes}
+            onChange={setMaxImageReferenceBytes}
+          />
+          <NumberField
+            className="sm:col-span-2"
+            label={t("pages.adminAiModels.promptMaxChars")}
+            value={promptMaxChars}
+            onChange={setPromptMaxChars}
+          />
+
+          {generationFields
+            .filter((field) => !field.hidden)
+            .map((field) => (
+              <div key={field.name} className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">{field.description || field.name}</Label>
+                {field.type === "boolean" ? (
+                  <Switch
+                    checked={field.default === true}
+                    onCheckedChange={(checked) =>
+                      updateFieldDefault(field.name, checked)
+                    }
+                  />
+                ) : field.enumValues && field.enumValues.length > 0 ? (
+                  <Select
+                    value={
+                      field.default === undefined ? "" : String(field.default)
+                    }
+                    onValueChange={(value) =>
+                      updateFieldDefault(field.name, value)
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.enumValues.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    className="h-8 text-xs"
+                    value={
+                      field.default === undefined ? "" : String(field.default)
+                    }
+                    onChange={(e) => updateFieldDefault(field.name, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button type="button" disabled={saving} onClick={handleSave}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VideoModelSettingsDialog({
+  model,
+  groups,
+  saving,
+  onClose,
+  onSave,
+}: {
+  readonly model: PlatformAiModel;
+  readonly groups: readonly PlatformAiModelGroup[];
+  readonly saving: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (patch: {
+    readonly rules: VideoModelParameterRules;
+    readonly groupId: string | null;
+    readonly description: string;
+  }) => void;
+}) {
+  const { t } = useTranslation();
+  const baseRules = isVideoModelParameterRules(model.parameterRules)
+    ? normalizeVideoModelParameterRules(model.parameterRules)
+    : DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
+
+  const [description, setDescription] = useState(model.description ?? "");
+  const [groupId, setGroupId] = useState(model.groupId ?? NO_GROUP_VALUE);
+  const [maxReferenceImages, setMaxReferenceImages] = useState(
+    String(baseRules.maxReferenceImages)
+  );
+  const [maxImageReferenceBytes, setMaxImageReferenceBytes] = useState(
+    String(baseRules.maxImageReferenceBytes)
+  );
+  const [maxReferenceVideos, setMaxReferenceVideos] = useState(
+    String(baseRules.maxReferenceVideos)
+  );
+  const [maxVideoReferenceBytes, setMaxVideoReferenceBytes] = useState(
+    String(baseRules.maxVideoReferenceBytes)
+  );
+  const [maxVideoReferenceSeconds, setMaxVideoReferenceSeconds] = useState(
+    String(baseRules.maxVideoReferenceSeconds)
+  );
+  const [promptMaxChars, setPromptMaxChars] = useState(
+    String(baseRules.promptMaxChars)
+  );
+  const [generationFields, setGenerationFields] = useState(
+    baseRules.generationFields.map((field) => ({ ...field }))
+  );
+
+  const handleSave = () => {
+    onSave({
+      groupId: groupId === NO_GROUP_VALUE ? null : groupId,
+      description: description.trim(),
+      rules: {
+        ...baseRules,
+        maxReferenceImages:
+          Number(maxReferenceImages) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceImages,
+        maxImageReferenceBytes:
+          Number(maxImageReferenceBytes) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxImageReferenceBytes,
+        maxReferenceVideos:
+          Number(maxReferenceVideos) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos,
+        maxVideoReferenceBytes:
+          Number(maxVideoReferenceBytes) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceBytes,
+        maxVideoReferenceSeconds:
+          Number(maxVideoReferenceSeconds) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
+        promptMaxChars:
+          Number(promptMaxChars) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
+        generationFields,
+      },
+    });
+  };
+
+  const updateFieldDefault = (
+    name: string,
+    value: string | number | boolean
+  ) => {
+    setGenerationFields((current) =>
+      current.map((field) =>
+        field.name === name ? { ...field, default: value } : field
+      )
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("pages.adminAiModels.settingsTitle", { name: model.displayName })}</DialogTitle>
+          <DialogDescription>
+            {t("pages.adminAiModels.videoSettingsDescription")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">{t("pages.adminAiModels.modelDescription")}</Label>
+            <Input
+              className="h-8 text-xs"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">{t("pages.adminAiModels.modelGroup")}</Label>
+            <Select value={groupId} onValueChange={setGroupId}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_GROUP_VALUE}>
+                  {t("pages.adminAiModels.noGroup")}
+                </SelectItem>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <NumberField
             label={t("pages.adminAiModels.maxImageReferences")}
             value={maxReferenceImages}
             onChange={setMaxReferenceImages}
@@ -931,6 +1148,21 @@ function ImageModelSettingsDialog({
             label={t("pages.adminAiModels.maxImageReferenceBytes")}
             value={maxImageReferenceBytes}
             onChange={setMaxImageReferenceBytes}
+          />
+          <NumberField
+            label={t("pages.adminAiModels.maxVideoReferences")}
+            value={maxReferenceVideos}
+            onChange={setMaxReferenceVideos}
+          />
+          <NumberField
+            label={t("pages.adminAiModels.maxVideoReferenceBytes")}
+            value={maxVideoReferenceBytes}
+            onChange={setMaxVideoReferenceBytes}
+          />
+          <NumberField
+            label={t("pages.adminAiModels.maxVideoReferenceSeconds")}
+            value={maxVideoReferenceSeconds}
+            onChange={setMaxVideoReferenceSeconds}
           />
           <NumberField
             className="sm:col-span-2"

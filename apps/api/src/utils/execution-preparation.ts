@@ -6,7 +6,6 @@ import {
   type ParseRequestError,
   parseRequestBody,
 } from "../utils/request-parser";
-import { validateWorkflowForExecution } from "../utils/workflows";
 
 /**
  * Workflow data structure for execution
@@ -94,17 +93,7 @@ export async function prepareWorkflowExecution(
   c: Context,
   workflowData: WorkflowData
 ): Promise<ExecutionPreparationResult | ExecutionPreparationError> {
-  // Validate if workflow has nodes
-  try {
-    validateWorkflowForExecution(workflowData);
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Invalid workflow",
-      status: 400,
-    };
-  }
-
-  // Extract HTTP request information
+  // Request body parsing follows; execution validation runs in WorkflowExecutor.
   const headers = c.req.header();
   const url = c.req.url;
   const method = c.req.method;

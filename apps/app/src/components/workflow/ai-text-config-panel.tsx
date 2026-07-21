@@ -3,6 +3,7 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   normalizeTextModelParameterRules,
+  resolveAiTextEffectivePrompt,
   type GenerateAiTextResponse,
   type ObjectReference,
   type OrgTextModelOption,
@@ -60,6 +61,7 @@ import {
   withAiTextGeneratingFlag,
   withAiTextGeneratedResult,
 } from "./ai-text-node-utils";
+import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
   GenerativePickNodeDialog,
@@ -186,6 +188,16 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     }
     return parts.length > 0 ? parts.join("\n") : undefined;
   }, [edges, nodeId, typedNodes]);
+
+  const hasKeywordsReference = useMemo(
+    () =>
+      edges.some(
+        (edge) =>
+          edge.target === nodeId &&
+          edge.targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID
+      ),
+    [edges, nodeId]
+  );
 
   const hasAiTextReference = useMemo(
     () =>
@@ -562,7 +574,13 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
             type: "workflowNode",
             position,
             data: {
-              name: catalog.name,
+              name: resolveGenerativeNodeDisplayName({
+                nodeType: catalog.type,
+                baseName: catalog.name,
+                existingNodes: typedNodes,
+                additionalSameTypeCount:
+                  kind === "image" ? addedImage : addedVideo,
+              }),
               nodeType: catalog.type,
               icon: catalog.icon,
               inputs: catalog.inputs.map((param) => ({
@@ -606,15 +624,20 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     }
 
     promptBuffer.flush();
-    const prompt = hasAiTextReference ? undefined : promptBuffer.value;
-    const keywords = hasAiTextReference ? keywordsValue : undefined;
+    const trimmedPrompt = promptBuffer.value.trim();
+    const prompt = trimmedPrompt || undefined;
+    const keywords =
+      hasAiTextReference && keywordsValue?.trim()
+        ? keywordsValue.trim()
+        : undefined;
 
-    if (!hasAiTextReference && !prompt?.trim()) {
-      toast.error("workflow.aiTextPanel.promptRequired");
-      return;
-    }
-    if (hasAiTextReference && !keywords?.trim()) {
-      toast.error("workflow.aiTextPanel.keywordsEmpty");
+    const effectivePrompt = resolveAiTextEffectivePrompt({ keywords, prompt });
+    if (!effectivePrompt) {
+      if (hasAiTextReference && !keywords?.trim()) {
+        toast.error("workflow.aiTextPanel.keywordsEmpty");
+      } else {
+        toast.error("workflow.aiTextPanel.promptRequired");
+      }
       return;
     }
 
@@ -644,7 +667,10 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
         return {
           ...withResult,
           inputs,
-          metadata: withAiTextGeneratingFlag(current.metadata, false),
+          metadata: withAiTextGeneratingFlag(
+            withResult.metadata ?? current.metadata,
+            false
+          ),
         };
       });
 
@@ -671,9 +697,12 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     selectedModelOk &&
     !disabled &&
     !isGenerating &&
-    (hasAiTextReference
-      ? Boolean(keywordsValue?.trim())
-      : promptBuffer.value.trim().length > 0);
+    Boolean(
+      resolveAiTextEffectivePrompt({
+        keywords: hasAiTextReference ? keywordsValue : undefined,
+        prompt: promptBuffer.value,
+      })
+    );
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
     return listPickableReferenceSources({
@@ -759,7 +788,7 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
             onCompositionEnd={promptBuffer.onCompositionEnd}
             maxLength={promptMaxLength}
             placeholder={
-              hasAiTextReference
+              hasKeywordsReference
                 ? t("workflow.aiTextPanel.promptOptionalWithRefs")
                 : t("workflow.aiTextPanel.promptPlaceholder")
             }

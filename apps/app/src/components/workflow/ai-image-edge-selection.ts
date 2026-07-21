@@ -3,6 +3,7 @@ import type { Edge as ReactFlowEdge } from "@xyflow/react";
 import { resolveWorkflowEdgeHandles } from "./ai-text-connection-utils";
 import {
   AI_IMAGE_OUTPUT_ID,
+  AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
 } from "./ai-image-node-utils";
 import type { WorkflowEdgeType } from "./workflow-types";
@@ -31,7 +32,8 @@ export function collectAiImageFirstDegreeEdgeIds(
 
     if (
       edge.target === nodeId &&
-      resolved.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID
+      (resolved.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
+        resolved.targetHandle === AI_IMAGE_PROMPT_HANDLE_ID)
     ) {
       ids.add(edge.id);
     }

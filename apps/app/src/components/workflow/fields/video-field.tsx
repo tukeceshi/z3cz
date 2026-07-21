@@ -1,7 +1,7 @@
 import { useTranslation } from "@/components/locale-provider";
-import { isObjectReference } from "@/services/object-service";
 import { cn } from "@/utils/utils";
 
+import { WorkflowMediaVideoPlayer } from "../workflow-media-video-player";
 import { FieldPlaceholder } from "./field-placeholder";
 import {
   FileUploadZone,
@@ -35,10 +35,6 @@ export function VideoField({
   );
   const objectUrl = getObjectUrl(value, createObjectUrl);
   const hasValue = objectUrl !== null;
-  const mimeType =
-    value && isObjectReference(value)
-      ? (value as ObjectReference)?.mimeType || "video/*"
-      : "video/*";
 
   if (disabled && !hasValue) {
     return (
@@ -54,15 +50,18 @@ export function VideoField({
     return (
       <div
         className={cn(
-          "relative rounded-md p-2 bg-background border border-neutral-300 dark:border-neutral-700",
+          "relative overflow-hidden rounded-md border border-neutral-300 bg-neutral-950 dark:border-neutral-700",
           className
         )}
       >
-        <video controls className="w-full text-xs rounded" preload="metadata">
-          <source src={objectUrl} type={mimeType} />
-        </video>
+        <WorkflowMediaVideoPlayer
+          src={objectUrl}
+          variant="field"
+          objectFit="contain"
+          className="min-h-[160px]"
+        />
         {uploadError && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+          <p className="px-2 pb-2 text-xs text-red-600 dark:text-red-400">
             {uploadError}
           </p>
         )}

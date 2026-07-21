@@ -1,12 +1,26 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import type { Connection, InternalNode, Node } from "@xyflow/react";
 
 import {
   buildAiImageReferenceConnectionFromCardDrop,
   isIncomingAiImageReferenceConnection,
 } from "./ai-image-reference-policy";
+import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-prompt-reference";
 import { snapAiImageReferenceBorderPoint } from "./ai-image-connection-utils";
-import { AI_IMAGE_REFERENCE_HANDLE_ID } from "./ai-image-node-utils";
+import {
+  buildAiVideoReferenceConnectionFromCardDrop,
+  isIncomingAiVideoReferenceConnection,
+} from "./ai-video-reference-policy";
+import { buildAiVideoPromptReferenceConnectionFromCardDrop } from "./ai-video-prompt-reference";
+import { snapAiVideoReferenceBorderPoint } from "./ai-video-connection-utils";
+import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
+} from "./ai-image-node-utils";
+import {
+  AI_VIDEO_PROMPT_HANDLE_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+} from "./ai-video-node-utils";
 import {
   buildAiTextReferenceConnectionFromCardDrop,
   isIncomingAiTextReferenceConnection,
@@ -65,7 +79,11 @@ function readNodeType(node: InternalNode<Node> | undefined): string | undefined 
 }
 
 function isGenerativeNodeType(nodeType: string | undefined): boolean {
-  return nodeType === AI_TEXT_NODE_TYPE || nodeType === AI_IMAGE_NODE_TYPE;
+  return (
+    nodeType === AI_TEXT_NODE_TYPE ||
+    nodeType === AI_IMAGE_NODE_TYPE ||
+    nodeType === AI_VIDEO_NODE_TYPE
+  );
 }
 
 /** Dragging from another node's input toward a generative card's right output. */
@@ -75,7 +93,8 @@ function isIncomingGenerativeOutputPick(connection: FlowConnectionLike): boolean
   if (fromHandle.type !== "target") return false;
   if (
     fromHandle.id === AI_TEXT_KEYWORDS_HANDLE_ID ||
-    fromHandle.id === AI_IMAGE_REFERENCE_HANDLE_ID
+    fromHandle.id === AI_IMAGE_REFERENCE_HANDLE_ID ||
+    fromHandle.id === AI_VIDEO_REFERENCE_HANDLE_ID
   ) {
     return false;
   }
@@ -124,7 +143,23 @@ function snapFromGenerativeReferenceTarget(
       nodeId: node.id,
       x: point.x,
       y: point.y,
-      targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
+      targetHandle:
+        fromNodeType === AI_TEXT_NODE_TYPE
+          ? AI_IMAGE_PROMPT_HANDLE_ID
+          : AI_IMAGE_REFERENCE_HANDLE_ID,
+      side: "left",
+    };
+  }
+  if (nodeType === AI_VIDEO_NODE_TYPE) {
+    const point = snapAiVideoReferenceBorderPoint(node);
+    return {
+      nodeId: node.id,
+      x: point.x,
+      y: point.y,
+      targetHandle:
+        fromNodeType === AI_TEXT_NODE_TYPE
+          ? AI_VIDEO_PROMPT_HANDLE_ID
+          : AI_VIDEO_REFERENCE_HANDLE_ID,
       side: "left",
     };
   }
@@ -223,7 +258,8 @@ export function resolveGenerativeCardSnapUnderPointer(
   const fromNodeType = readNodeType(connection.fromNode);
   const isIncomingReference =
     isIncomingAiTextReferenceConnection(connection) ||
-    isIncomingAiImageReferenceConnection(connection);
+    isIncomingAiImageReferenceConnection(connection) ||
+    isIncomingAiVideoReferenceConnection(connection);
 
   if (isIncomingReference) {
     return snapFromGenerativeReferenceTarget(
@@ -273,7 +309,8 @@ export function resolveGenerativePreviewConnection(
   const hoveredType = readNodeType(nodeLookup.get(hoveredNodeId));
   const isIncomingReference =
     isIncomingAiTextReferenceConnection(connection) ||
-    isIncomingAiImageReferenceConnection(connection);
+    isIncomingAiImageReferenceConnection(connection) ||
+    isIncomingAiVideoReferenceConnection(connection);
 
   if (!isIncomingReference) {
     if (
@@ -311,7 +348,25 @@ export function resolveGenerativePreviewConnection(
       hoveredNodeId,
       nodes: policyNodes,
     }) ??
+    buildAiImagePromptReferenceConnectionFromCardDrop({
+      dragFromNodeId: connection.fromNode.id,
+      dragFromHandle: connection.fromHandle,
+      hoveredNodeId,
+      nodes: policyNodes,
+    }) ??
     buildAiImageReferenceConnectionFromCardDrop({
+      dragFromNodeId: connection.fromNode.id,
+      dragFromHandle: connection.fromHandle,
+      hoveredNodeId,
+      nodes: policyNodes,
+    }) ??
+    buildAiVideoPromptReferenceConnectionFromCardDrop({
+      dragFromNodeId: connection.fromNode.id,
+      dragFromHandle: connection.fromHandle,
+      hoveredNodeId,
+      nodes: policyNodes,
+    }) ??
+    buildAiVideoReferenceConnectionFromCardDrop({
       dragFromNodeId: connection.fromNode.id,
       dragFromHandle: connection.fromHandle,
       hoveredNodeId,

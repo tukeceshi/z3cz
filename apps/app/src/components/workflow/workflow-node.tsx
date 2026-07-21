@@ -1,5 +1,5 @@
 import type { ObjectReference, ToolReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -39,14 +39,21 @@ import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
   isAiTextGenerating,
-  withAiTextResult,
+  withAiTextManualResult,
 } from "./ai-text-node-utils";
 import {
   AI_IMAGE_CARD_WIDTH_PX,
   isAiImageGenerating,
 } from "./ai-image-node-utils";
+import {
+  AI_VIDEO_CARD_WIDTH_PX,
+  isAiVideoGenerating,
+} from "./ai-video-node-utils";
+import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
+import { shouldShowGenerativeBottomPanel } from "./generative-card-mode-utils";
 import { AiTextConnectionSides } from "./ai-text-connection-handles";
 import { AiImageConnectionSides } from "./ai-image-connection-handles";
+import { AiVideoConnectionSides } from "./ai-video-connection-handles";
 import { useGenerativeConnectionHighlight } from "./generative-connection-highlight";
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
@@ -76,7 +83,7 @@ import {
   convertValueByType,
   isWorkflowHandleConnected,
   updateNodeInput,
-  useWorkflow,
+  useWorkflowActions,
 } from "./workflow-context";
 import { WorkflowNodeBottomPanel } from "./workflow-node-bottom-panel";
 import { WorkflowToolSelector } from "./workflow-tool-selector";
@@ -304,12 +311,15 @@ export const WorkflowNode = memo(
       updateNodeData,
       disabled,
       nodeTypes,
-      connectedHandles = new Set(),
-      soleSelectedNodeId = null,
-      isViewportMoving = false,
-    } = useWorkflow();
+      allowedNodeTypes,
+    } = useWorkflowActions();
     const { t } = useTranslation();
-    const isSoleSelected = soleSelectedNodeId === id;
+    const connectedHandleKeys =
+      (data.connectedHandleKeys as readonly string[] | undefined) ?? [];
+    const showBottomPanelHost = data.showBottomPanelHost === true;
+    const viewportZoom =
+      typeof data.viewportZoom === "number" ? data.viewportZoom : 1;
+    const isViewportMovingCanvas = data.isViewportMoving === true;
     const isDragging = dragging;
     const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
     const [isDocsOpen, setIsDocsOpen] = useState(false);
@@ -320,9 +330,15 @@ export const WorkflowNode = memo(
     const nodeType = data.nodeType || "";
     const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
     const isAiImageNode = nodeType === AI_IMAGE_NODE_TYPE;
+    const isAiVideoNode = nodeType === AI_VIDEO_NODE_TYPE;
+    const showBottomPanel =
+      isWorkflowBottomPanelVisible(viewportZoom) &&
+      (!isAiTextNode && !isAiImageNode && !isAiVideoNode
+        ? true
+        : shouldShowGenerativeBottomPanel(data.metadata));
     const isGenerativeConnectionTarget = useGenerativeConnectionHighlight(
       id,
-      isAiTextNode || isAiImageNode
+      isAiTextNode || isAiImageNode || isAiVideoNode
     );
 
     const resolvedNodeType = useMemo(() => {
@@ -362,7 +378,7 @@ export const WorkflowNode = memo(
       if (disabled || !updateNodeData || !widget) return;
 
       if (nodeType === AI_TEXT_NODE_TYPE) {
-        updateNodeData(id, (current) => withAiTextResult(current, value));
+        updateNodeData(id, (current) => withAiTextManualResult(current, value));
         return;
       }
 
@@ -497,7 +513,7 @@ export const WorkflowNode = memo(
     ) => {
       if (disabled) return;
       const isConnected = isWorkflowHandleConnected(
-        connectedHandles,
+        connectedHandleKeys,
         id,
         param.id
       );
@@ -522,7 +538,8 @@ export const WorkflowNode = memo(
       data.executionState === "pending";
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
     const isAiImageBusy = isAiImageNode && isAiImageGenerating(data.metadata);
-    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy;
+    const isAiVideoBusy = isAiVideoNode && isAiVideoGenerating(data.metadata);
+    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy;
     const isError = data.executionState === "error" && !!data.error;
 
     return (
@@ -577,20 +594,21 @@ export const WorkflowNode = memo(
           <CircleHelp className="h-2.5 w-2.5" />
         </button>
 
-        <div className={cn("relative", (isAiTextNode || isAiImageNode) && "inline-block")}>
+        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode) && "inline-block")}>
         <div
           className={cn(
             "bg-card shadow-xs rounded-md border relative",
             isAiTextNode && "ai-text-node-card group/aitext overflow-visible",
             isAiImageNode && "ai-image-node-card group/aiimage overflow-visible",
+            isAiVideoNode && "ai-video-node-card group/aivideo overflow-visible",
             {
-            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode,
-            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode,
-            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy,
+            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode,
+            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode,
+            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy,
             "border-yellow-400":
-              !selected && (isExecuting || isAiTextBusy || isAiImageBusy),
+              !selected && (isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy),
             "border-green-500":
-              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy,
+              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy,
             "border-red-500": !selected && data.executionState === "error",
             "border-blue-400": !selected && data.executionState === "skipped",
             "border-blue-500": selected,
@@ -602,7 +620,9 @@ export const WorkflowNode = memo(
               ? { width: AI_TEXT_CARD_WIDTH_PX }
               : isAiImageNode
                 ? { width: AI_IMAGE_CARD_WIDTH_PX }
-                : undefined
+                : isAiVideoNode
+                  ? { width: AI_VIDEO_CARD_WIDTH_PX }
+                  : undefined
           }
         >
           {/* Execution / generate overlay */}
@@ -625,8 +645,11 @@ export const WorkflowNode = memo(
           {widget && (
             <div
               className={cn(
-                "px-0 py-0 border-b",
-                !isAiTextNode && !isAiImageNode && "nodrag"
+                "px-0 py-0",
+                isAiImageNode || isAiVideoNode
+                  ? "overflow-hidden rounded-md"
+                  : "border-b",
+                !isAiTextNode && !isAiImageNode && !isAiVideoNode && "nodrag"
               )}
             >
               {createElement(widget.Component, {
@@ -646,12 +669,16 @@ export const WorkflowNode = memo(
             <AiImageConnectionSides disabled={disabled} />
           ) : null}
 
+          {isAiVideoNode ? (
+            <AiVideoConnectionSides disabled={disabled} />
+          ) : null}
+
           {/* Resource Selectors (database, dataset, queue, email, integration) */}
           {resourceInputs.length > 0 && (
             <div className="px-2 py-2 nodrag border-b space-y-1 [&_button]:text-xs [&_button]:h-7">
               {resourceInputs.map((input) => {
                 const isConnected = isWorkflowHandleConnected(
-                  connectedHandles,
+                  connectedHandleKeys,
                   id,
                   input.id
                 );
@@ -780,7 +807,7 @@ export const WorkflowNode = memo(
           )}
 
           {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
-          {!isAiTextNode && !isAiImageNode ? (
+          {(!isAiTextNode && !isAiImageNode && !isAiVideoNode) ? (
           <div className="py-2 grid grid-cols-2 justify-between gap-3">
             {/* Input Parameters */}
             <div className="flex flex-col gap-1 flex-1">
@@ -802,7 +829,7 @@ export const WorkflowNode = memo(
                       executionState={data.executionState}
                       selected={selected}
                       isConnected={isWorkflowHandleConnected(
-                        connectedHandles,
+                        connectedHandleKeys,
                         id,
                         input.id
                       )}
@@ -837,7 +864,7 @@ export const WorkflowNode = memo(
                       executionState={data.executionState}
                       selected={selected}
                       isConnected={isWorkflowHandleConnected(
-                        connectedHandles,
+                        connectedHandleKeys,
                         id,
                         output.id
                       )}
@@ -850,12 +877,17 @@ export const WorkflowNode = memo(
         </div>
         </div>
 
-        {isSoleSelected && !isDragging && !isViewportMoving ? (
-          <WorkflowNodeBottomPanel
-            nodeId={id}
-            data={data as unknown as CanvasWorkflowNodeType}
-            createObjectUrl={data.createObjectUrl}
-          />
+        {showBottomPanelHost && !isDragging && !isViewportMovingCanvas ? (
+          <div
+            className={cn(!showBottomPanel && "hidden pointer-events-none")}
+            aria-hidden={!showBottomPanel}
+          >
+            <WorkflowNodeBottomPanel
+              nodeId={id}
+              data={data as unknown as CanvasWorkflowNodeType}
+              createObjectUrl={data.createObjectUrl}
+            />
+          </div>
         ) : null}
 
         <WorkflowToolSelector
@@ -865,8 +897,8 @@ export const WorkflowNode = memo(
           templates={nodeTypes || []}
         />
 
-        {configToolId &&
-          (() => {
+        {configToolId
+          ? (() => {
             const tool = getCurrentSelectedTools().find(
               (t) => t.identifier === configToolId
             );
@@ -885,16 +917,18 @@ export const WorkflowNode = memo(
                 currentConfig={tool.config ?? {}}
               />
             );
-          })()}
+          })()
+          : null}
 
-        {resolvedNodeType && (
+        {resolvedNodeType && isDocsOpen ? (
           <NodeDocsDialog
             nodeType={resolvedNodeType}
             isOpen={isDocsOpen}
             onOpenChange={setIsDocsOpen}
           />
-        )}
+        ) : null}
 
+        {activeInputId !== null ? (
         <Dialog
           open={activeInputId !== null}
           onOpenChange={(open) => !open && setActiveInputId(null)}
@@ -914,7 +948,7 @@ export const WorkflowNode = memo(
               if (!activeInput) return null;
 
               const isInputConnected = isWorkflowHandleConnected(
-                connectedHandles,
+                connectedHandleKeys,
                 id,
                 activeInput.id
               );
@@ -964,7 +998,9 @@ export const WorkflowNode = memo(
             })()}
           </DialogContent>
         </Dialog>
+        ) : null}
 
+        {activeOutputId !== null ? (
         <Dialog
           open={activeOutputId !== null}
           onOpenChange={(open) => !open && setActiveOutputId(null)}
@@ -984,7 +1020,7 @@ export const WorkflowNode = memo(
               if (!activeOutput) return null;
 
               const isOutputConnected = isWorkflowHandleConnected(
-                connectedHandles,
+                connectedHandleKeys,
                 id,
                 activeOutput.id
               );
@@ -1015,6 +1051,7 @@ export const WorkflowNode = memo(
             })()}
           </DialogContent>
         </Dialog>
+        ) : null}
         </div>
       </TooltipProvider>
     );

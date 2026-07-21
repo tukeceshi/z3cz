@@ -16,11 +16,15 @@ import type {
 import {
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
   isImageModelParameterRules,
   isTextModelParameterRules,
+  isVideoModelParameterRules,
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
+  normalizeVideoModelParameterRules,
   type ImageModelParameterRules,
+  type VideoModelParameterRules,
 } from "@dafthunk/types";
 
 import type { Database } from "./index";
@@ -120,10 +124,13 @@ export async function updatePlatformAiModel(
   if (!existing) return null;
 
   const nextRulesRaw = patch.parameterRules ?? existing.parameterRules;
-  const nextRules =
-    isTextModelParameterRules(nextRulesRaw)
-      ? normalizeTextModelParameterRules(nextRulesRaw)
-      : nextRulesRaw;
+  const nextRules = isTextModelParameterRules(nextRulesRaw)
+    ? normalizeTextModelParameterRules(nextRulesRaw)
+    : isImageModelParameterRules(nextRulesRaw)
+      ? normalizeImageModelParameterRules(nextRulesRaw)
+      : isVideoModelParameterRules(nextRulesRaw)
+        ? normalizeVideoModelParameterRules(nextRulesRaw)
+        : nextRulesRaw;
 
   await db
     .update(platformAiModels)
@@ -411,4 +418,13 @@ export function getImageParameterRules(
     return normalizeImageModelParameterRules(model.parameterRules);
   }
   return DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
+}
+
+export function getVideoParameterRules(
+  model: PlatformAiModel
+): VideoModelParameterRules {
+  if (isVideoModelParameterRules(model.parameterRules)) {
+    return normalizeVideoModelParameterRules(model.parameterRules);
+  }
+  return DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
 }

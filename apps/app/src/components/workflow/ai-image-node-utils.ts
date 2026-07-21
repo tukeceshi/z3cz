@@ -13,6 +13,11 @@ import {
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_GENERATIVE_PANEL_WIDTH_PX,
 } from "./ai-generative-panel-utils";
+import {
+  isGenerativeManualContent,
+  withGenerativeGeneratedContentMode,
+  withGenerativeManualContentMode,
+} from "./generative-card-mode-utils";
 
 export const AI_IMAGE_REFERENCE_HANDLE_ID = "reference_images" as const;
 export const AI_IMAGE_PROMPT_HANDLE_ID = "prompt_reference" as const;
@@ -240,6 +245,49 @@ export function withAiImageResult(
   return { inputs, outputs };
 }
 
+export function readAiImageCardImages(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): MediaReference[] {
+  if (isGenerativeManualContent(metadata)) {
+    const manual = parseMediaReferences(
+      inputs.find((input) => input.id === "manual_images")?.value
+    );
+    if (manual.length > 0) {
+      return manual;
+    }
+  }
+
+  return readAiImageResult(inputs, outputs);
+}
+
+export function withAiImageManualUpload(
+  current: WorkflowNodeType,
+  images: readonly MediaReference[]
+): Partial<WorkflowNodeType> {
+  let inputs = upsertInputValue(
+    current.inputs,
+    "manual_images",
+    [...images],
+    "json"
+  );
+  inputs = upsertInputValue(inputs, AI_IMAGE_RESULT_INPUT_ID, [...images], "json");
+
+  const outputs = current.outputs.map((output) =>
+    output.id === AI_IMAGE_OUTPUT_ID
+      ? ({ ...output, value: [...images] } as WorkflowParameter)
+      : output
+  );
+
+  const metadata =
+    images.length > 0
+      ? withGenerativeManualContentMode(current.metadata)
+      : withGenerativeGeneratedContentMode(current.metadata);
+
+  return { inputs, outputs, metadata };
+}
+
 export function withAiImageGeneratedResult(
   current: WorkflowNodeType,
   images: readonly MediaReference[],
@@ -261,14 +309,19 @@ export function withAiImageGeneratedResult(
     selectedId: item.id,
   };
 
-  return withAiImageResult(current, images, {
-    inputs: upsertInputValue(
-      current.inputs,
-      AI_IMAGE_HISTORY_INPUT_ID,
-      nextHistory,
-      "json"
-    ),
-  });
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  inputs = upsertInputValue(inputs, "manual_images", [], "json");
+
+  const result = withAiImageResult(current, images, { inputs });
+  return {
+    ...result,
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
 }
 
 export function withAiImageHistorySelection(
@@ -290,7 +343,7 @@ export function withAiImageHistorySelection(
       ? upsertInputValue(promptInputs, "params", selected.params, "json")
       : promptInputs;
 
-  return withAiImageResult(current, selected.images, {
+  const result = withAiImageResult(current, selected.images, {
     inputs: upsertInputValue(
       paramsInputs,
       AI_IMAGE_HISTORY_INPUT_ID,
@@ -298,6 +351,10 @@ export function withAiImageHistorySelection(
       "json"
     ),
   });
+  return {
+    ...result,
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
 }
 
 export function isAiImageGenerating(

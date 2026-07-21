@@ -1,5 +1,6 @@
 import {
   AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
   normalizeImageModelParameterRules,
   type ObjectReference,
   type OrgImageModelOption,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
+import { cn } from "@/utils/utils";
 import { useOrgImageModels, generateAiImage, resolveOrgImageModel } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
 import {
@@ -54,15 +56,19 @@ import {
   readAiImageGenerationParams,
 } from "./ai-image-params-popover";
 import {
+  AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
   countAiImageReferences,
+  mergeAiImageNodeCatalogInputs,
   pickDefaultImageModelCanonicalId,
   referencesFitImageModelLimits,
   withAiImageGeneratedResult,
   withAiImageGeneratingFlag,
 } from "./ai-image-node-utils";
+import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
 import {
   canAcceptAiImageReference,
   evaluateAiImageReferenceStructural,
@@ -71,10 +77,10 @@ import {
 } from "./ai-image-reference-policy";
 import {
   hasAiImagePromptReference,
-  listAiImagePromptReferenceEdges,
   listPickableAiImagePromptSources,
   resolveAiImageReferencedPrompt,
   evaluateAiImagePromptReferenceStructural,
+  collectAiImageUnifiedReferenceChips,
 } from "./ai-image-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
@@ -113,7 +119,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
-  const [pickMode, setPickMode] = useState<"image" | "prompt">("image");
   const [generationParams, setGenerationParams] = useState<
     Record<string, unknown>
   >(() => readAiImageGenerationParams(data.inputs));
@@ -133,6 +138,17 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
   const referenceChips = useMemo(
     () =>
+      collectAiImageUnifiedReferenceChips({
+        nodeId,
+        edges,
+        nodes: typedNodes,
+        createObjectUrl,
+      }),
+    [createObjectUrl, edges, nodeId, typedNodes]
+  );
+
+  const imageReferenceChips = useMemo(
+    () =>
       collectGenerativeReferenceChips({
         nodeId,
         targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
@@ -143,16 +159,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
       }),
     [createObjectUrl, edges, nodeId, typedNodes]
-  );
-
-  const promptReferenceEdges = useMemo(
-    () =>
-      listAiImagePromptReferenceEdges({
-        nodeId,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      }),
-    [edges, nodeId, typedNodes]
   );
 
   const hasPromptReference = useMemo(
@@ -335,6 +341,23 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const displayPrompt = hasPromptReference ? referencedPrompt : promptBuffer.value;
   const promptMaxLength = modelRules.promptMaxChars;
 
+  const promptReferenceSourceName = useMemo(() => {
+    const edge = edges.find(
+      (entry) =>
+        entry.target === nodeId &&
+        entry.targetHandle === AI_IMAGE_PROMPT_HANDLE_ID
+    );
+    if (!edge) return null;
+    const source = typedNodes.find((node) => node.id === edge.source);
+    return source?.data.name ?? edge.source;
+  }, [edges, nodeId, typedNodes]);
+
+  const promptReferenceEditHint = t("workflow.aiImagePanel.promptReferenceEditHint", {
+    nodeName:
+      promptReferenceSourceName ??
+      t("workflow.aiImagePanel.promptReferenceEditHintFallback"),
+  });
+
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
       setGenerationParams(next);
@@ -367,13 +390,15 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   };
 
   const handlePickNode = (sourceNodeId: string, sourceHandle: string) => {
-    if (pickMode === "prompt") {
-      const source = typedNodes.find((node) => node.id === sourceNodeId);
-      if (!source) return;
+    const source = typedNodes.find((node) => node.id === sourceNodeId);
+    if (!source) return;
+
+    if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
       const verdict = evaluateAiImagePromptReferenceStructural({
         targetNodeId: nodeId,
         sourceNodeId,
         sourceNodeType: source.data.nodeType,
+        edges,
       });
       if (!verdict.ok) {
         toast.error("workflow.aiImagePanel.referenceRejected");
@@ -388,9 +413,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       setPickNodeOpen(false);
       return;
     }
-
-    const source = typedNodes.find((node) => node.id === sourceNodeId);
-    if (!source) return;
 
     const verdict = evaluateAiImageReferenceStructural({
       targetNodeId: nodeId,
@@ -464,6 +486,28 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           y: host.position.y + offset * 100,
         };
 
+        const catalogInputs = mergeAiImageNodeCatalogInputs(
+          catalog.type,
+          mergeAiTextNodeCatalogInputs(
+            catalog.type,
+            catalog.inputs.map((param) => ({
+              ...param,
+              id: param.name,
+              value: param.name === "manual_images" ? [value] : param.value,
+            })),
+            catalog
+          ),
+          catalog
+        );
+        const catalogOutputs = catalog.outputs.map((param) => ({
+          ...param,
+          id: param.name,
+          value:
+            param.name === AI_IMAGE_OUTPUT_ID
+              ? [value]
+              : param.value,
+        }));
+
         setNodes((current) => [
           ...current,
           {
@@ -471,19 +515,16 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             type: "workflowNode",
             position,
             data: {
-              name: catalog.name,
+              name: resolveGenerativeNodeDisplayName({
+                nodeType: catalog.type,
+                baseName: catalog.name,
+                existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
+                additionalSameTypeCount: offset,
+              }),
               nodeType: catalog.type,
               icon: catalog.icon,
-              inputs: catalog.inputs.map((param) => ({
-                ...param,
-                id: param.name,
-                value: param.name === "manual_images" ? [value] : param.value,
-              })),
-              outputs: catalog.outputs.map((param) => ({
-                ...param,
-                id: param.name,
-                value: param.name === "images" ? [value] : undefined,
-              })),
+              inputs: catalogInputs,
+              outputs: catalogOutputs,
               executionState: "idle" as const,
               createObjectUrl,
             },
@@ -492,7 +533,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
         connectReferenceEdge({
           source: newId,
-          sourceHandle: "images",
+          sourceHandle: AI_IMAGE_OUTPUT_ID,
           target: nodeId,
           targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
         });
@@ -505,7 +546,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   };
 
   const handleInjectChip = (chip: AiTextReferenceChip) => {
-    if (disabled || hasPromptReference) return;
+    if (disabled || hasPromptReference || chip.kind !== "image") return;
     const insertion = `[image:${chip.label}]`;
     const current = promptBuffer.value;
     const needsSpace =
@@ -537,7 +578,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     }));
 
     try {
-      const referenceImageUrls = referenceChips
+      const referenceImageUrls = imageReferenceChips
         .map((chip) => chip.previewUrl)
         .filter((url): url is string => Boolean(url));
 
@@ -561,7 +602,9 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             media: image,
             nodeType: "ai-image",
             fetchUrl,
-          }).then(() => notifyAiMediaCacheChanged());
+          }).then((cachedOk) => {
+            if (cachedOk) notifyAiMediaCacheChanged();
+          });
         }
       }
 
@@ -583,7 +626,10 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         return {
           ...withResult,
           inputs,
-          metadata: withAiImageGeneratingFlag(current.metadata, false),
+          metadata: withAiImageGeneratingFlag(
+            withResult.metadata ?? current.metadata,
+            false
+          ),
         };
       });
 
@@ -610,24 +656,22 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     (!selectedModel || modelFitsCurrentRefs(selectedModel));
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
-    if (pickMode === "prompt") {
-      return listPickableAiImagePromptSources({
-        targetNodeId: nodeId,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      }).map((entry) => {
-        const source = typedNodes.find((node) => node.id === entry.nodeId);
-        return {
-          nodeId: entry.nodeId,
-          outputId: entry.sourceHandle,
-          nodeName: source?.data.name ?? entry.nodeId,
-          outputName: "text",
-          kind: "text" as const,
-        };
-      });
-    }
+    const textEntries = listPickableAiImagePromptSources({
+      targetNodeId: nodeId,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+    }).map((entry) => {
+      const source = typedNodes.find((node) => node.id === entry.nodeId);
+      return {
+        nodeId: entry.nodeId,
+        outputId: entry.sourceHandle,
+        nodeName: source?.data.name ?? entry.nodeId,
+        outputName: "text",
+        kind: "text" as const,
+      };
+    });
 
-    return listPickableAiImageReferenceSources({
+    const imageEntries = listPickableAiImageReferenceSources({
       targetNodeId: nodeId,
       targetNodeData: data,
       edges,
@@ -646,7 +690,17 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         kind: "image" as const,
       };
     });
-  }, [data, edges, imageModelCatalog, nodeId, pickMode, typedNodes]);
+
+    return [...textEntries, ...imageEntries];
+  }, [data, edges, imageModelCatalog, nodeId, typedNodes]);
+
+  const canAddReference =
+    pickableOutputs.length > 0 ||
+    (allowUpload &&
+      canAcceptAiImageReference({
+        rules: modelRules,
+        currentCount: referenceCount,
+      }).ok);
 
   return (
     <>
@@ -655,9 +709,10 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           chips={referenceChips}
           disabled={disabled}
           allowUpload={allowUpload && !disabled}
+          addReferenceDisabled={!canAddReference}
+          canPickCanvasNode={pickableOutputs.length > 0}
           onDisconnect={handleDisconnectEdge}
           onPickCanvasNode={() => {
-            setPickMode("image");
             setPickNodeOpen(true);
           }}
           onUploadFiles={(files) => {
@@ -665,45 +720,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           }}
           onInjectChip={handleInjectChip}
         />
-
-        {promptReferenceEdges.length > 0 ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            {promptReferenceEdges.map((entry) => (
-              <button
-                key={entry.edgeId}
-                type="button"
-                className="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
-                onClick={() => handleDisconnectEdge(entry.edgeId)}
-                title={t("workflow.aiImagePanel.promptReferenceHint")}
-              >
-                <span className="truncate">{entry.label}</span>
-              </button>
-            ))}
-            {!hasPromptReference ? (
-              <button
-                type="button"
-                className="text-[11px] text-muted-foreground underline underline-offset-2"
-                onClick={() => {
-                  setPickMode("prompt");
-                  setPickNodeOpen(true);
-                }}
-              >
-                {t("workflow.aiImagePanel.linkPrompt")}
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="mt-1 text-[11px] text-muted-foreground underline underline-offset-2"
-            onClick={() => {
-              setPickMode("prompt");
-              setPickNodeOpen(true);
-            }}
-          >
-            {t("workflow.aiImagePanel.linkPrompt")}
-          </button>
-        )}
 
         <div
           className="relative mt-2 min-h-0 flex-1"
@@ -718,9 +734,24 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             onCompositionStart={promptBuffer.onCompositionStart}
             onCompositionEnd={promptBuffer.onCompositionEnd}
             maxLength={promptMaxLength}
-            placeholder={t("workflow.aiImagePanel.promptPlaceholder")}
-            className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0 read-only:cursor-default read-only:bg-muted/20"
+            placeholder={
+              hasPromptReference
+                ? undefined
+                : t("workflow.aiImagePanel.promptPlaceholder")
+            }
+            className={cn(
+              "h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0",
+              hasPromptReference &&
+                "read-only:cursor-default read-only:text-foreground"
+            )}
           />
+          {hasPromptReference ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+              <div className="max-w-[92%] rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur-[2px]">
+                {promptReferenceEditHint}
+              </div>
+            </div>
+          ) : null}
           <AiTextExpandButton
             className="absolute right-1 top-1"
             onClick={() => setExpandOpen(true)}
@@ -803,17 +834,17 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         onClose={() => setExpandOpen(false)}
         readOnly={hasPromptReference || disabled}
         maxLength={promptMaxLength}
-        placeholder={t("workflow.aiImagePanel.promptPlaceholder")}
+        placeholder={
+          hasPromptReference
+            ? promptReferenceEditHint
+            : t("workflow.aiImagePanel.promptPlaceholder")
+        }
       />
 
       <GenerativePickNodeDialog
         open={pickNodeOpen}
         onOpenChange={setPickNodeOpen}
-        title={
-          pickMode === "prompt"
-            ? t("workflow.aiImagePanel.pickPromptNode")
-            : t("workflow.aiImagePanel.pickCanvasNode")
-        }
+        title={t("workflow.aiImagePanel.pickCanvasNode")}
         emptyMessage={t("workflow.aiImagePanel.noPickableNodes")}
         entries={pickableOutputs}
         onPick={handlePickNode}

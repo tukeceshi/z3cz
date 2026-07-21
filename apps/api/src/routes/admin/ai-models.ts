@@ -68,9 +68,13 @@ const imageRulesSchema = z.object({
 
 const videoRulesSchema = z.object({
   schemaVersion: z.literal(1),
+  maxReferenceImages: z.number().int().nonnegative(),
+  maxImageReferenceBytes: z.number().int().positive(),
   maxReferenceVideos: z.number().int().nonnegative(),
   maxVideoReferenceBytes: z.number().int().positive(),
   maxVideoReferenceSeconds: z.number().int().positive(),
+  promptMaxChars: z.number().int().positive(),
+  generationFields: z.array(generationFieldSchema),
 });
 
 const parameterRulesSchema = z.union([

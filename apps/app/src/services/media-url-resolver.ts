@@ -7,7 +7,9 @@ import {
 } from "@dafthunk/types";
 
 import { getApiBaseUrl } from "@/config/api";
-import { getCachedMediaBlobUrl } from "@/services/ai-media-cache-service";
+import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
+import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
+import type { MediaDisplaySize } from "@/services/media-display-size";
 
 export function createCloudObjectUrl(
   ref: ObjectReference,
@@ -42,25 +44,59 @@ export function resolveMediaFetchUrl(
   return null;
 }
 
+export function inferMediaNodeType(
+  media: MediaReference
+): "ai-image" | "ai-video" | null {
+  const mime = media.mimeType.toLowerCase();
+  if (mime.startsWith("video/")) return "ai-video";
+  if (mime.startsWith("image/")) return "ai-image";
+  return null;
+}
+
 export async function resolveMediaDisplayUrl(params: {
   readonly media: MediaReference;
   readonly organizationId: string;
   readonly workflowId: string;
+  readonly workflowName?: string;
+  readonly nodeType?: "ai-image" | "ai-video";
   readonly createObjectUrl?: (ref: ObjectReference) => string;
+  readonly warmCache?: boolean;
+  readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
   const mediaId = getMediaReferenceKey(params.media);
   const cached = await getCachedMediaBlobUrl({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     mediaId,
+    size: params.size,
   });
   if (cached) return cached;
 
-  return resolveMediaFetchUrl(
+  const fetchUrl = resolveMediaFetchUrl(
     params.media,
     params.organizationId,
     params.createObjectUrl
   );
+  if (!fetchUrl) return null;
+
+  const shouldWarm = params.warmCache !== false;
+  const nodeType =
+    params.nodeType ?? inferMediaNodeType(params.media);
+
+  if (shouldWarm && nodeType && !isMediaExpired(params.media)) {
+    void cacheMediaFromUrl({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      workflowName: params.workflowName ?? params.workflowId,
+      media: params.media,
+      nodeType,
+      fetchUrl,
+    }).then((cachedOk) => {
+      if (cachedOk) notifyAiMediaCacheChanged();
+    });
+  }
+
+  return fetchUrl;
 }
 
 export function isMediaExpired(media: MediaReference): boolean {

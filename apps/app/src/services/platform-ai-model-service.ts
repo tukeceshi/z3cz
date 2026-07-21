@@ -7,7 +7,11 @@ import type {
   ListModelInterfacePrioritiesResponse,
   ListOrgImageModelsResponse,
   ListOrgTextModelsResponse,
+  ListOrgVideoModelsResponse,
   OrgCloudStorageStatus,
+  PollAiVideoTaskResponse,
+  SubmitAiVideoRequest,
+  SubmitAiVideoResponse,
   UpdateModelInterfacePriorityRequest,
 } from "@dafthunk/types";
 import useSWR from "swr";
@@ -48,12 +52,36 @@ export function useOrgImageModels(orgId: string | undefined) {
   };
 }
 
+export function useOrgVideoModels(orgId: string | undefined) {
+  const key = orgId ? `${platformAiEndpoint(orgId)}/video-models` : null;
+  const { data, error, isLoading, mutate } = useSWR(key, async () =>
+    makeRequest<ListOrgVideoModelsResponse>(`${key}`)
+  );
+
+  return {
+    models: data?.models ?? [],
+    groups: data?.groups ?? [],
+    modelsError: error,
+    isLoading,
+    refreshModels: mutate,
+  };
+}
+
 export async function resolveOrgImageModel(
   orgId: string,
   canonicalId: string
 ): Promise<{ aiInterfaceId: string; providerModelId: string }> {
   return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
     `${platformAiEndpoint(orgId)}/image-models/${encodeURIComponent(canonicalId)}/resolve`
+  );
+}
+
+export async function resolveOrgVideoModel(
+  orgId: string,
+  canonicalId: string
+): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
+    `${platformAiEndpoint(orgId)}/video-models/${encodeURIComponent(canonicalId)}/resolve`
   );
 }
 
@@ -81,6 +109,30 @@ export async function generateAiImage(
       method: "POST",
       body: JSON.stringify(body),
     }
+  );
+}
+
+export async function submitAiVideo(
+  orgId: string,
+  body: SubmitAiVideoRequest
+): Promise<SubmitAiVideoResponse> {
+  return makeRequest<SubmitAiVideoResponse>(
+    `${platformAiEndpoint(orgId)}/ai-video/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function pollAiVideoTask(
+  orgId: string,
+  taskId: string,
+  aiInterfaceId: string
+): Promise<PollAiVideoTaskResponse> {
+  const query = new URLSearchParams({ aiInterfaceId });
+  return makeRequest<PollAiVideoTaskResponse>(
+    `${platformAiEndpoint(orgId)}/ai-video/tasks/${encodeURIComponent(taskId)}?${query.toString()}`
   );
 }
 

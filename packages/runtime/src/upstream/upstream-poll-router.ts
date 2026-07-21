@@ -17,6 +17,11 @@ import {
   resolveNewApiApiKey,
 } from "./newapi-relay-upstream";
 import { getUpstreamParamProfile } from "./upstream-param-profiles";
+import {
+  VOLCANO_VIDEO_PROVIDER,
+  downloadVolcanoVideo,
+  pollVolcanoVideoTask,
+} from "../ai-interface/execute-volcano-video";
 
 interface RelayTaskPollBody {
   readonly status?: string;
@@ -239,9 +244,98 @@ class NewApiRelayUpstreamPollProvider implements UpstreamPollProvider {
   }
 }
 
+class VolcanoVideoUpstreamPollProvider implements UpstreamPollProvider {
+  readonly provider = VOLCANO_VIDEO_PROVIDER;
+
+  async poll(
+    continuation: UpstreamPollContinuation,
+    context: UpstreamPollRuntimeContext
+  ): Promise<UpstreamPollResult> {
+    const interfaceId = continuation.metadata?.interfaceId;
+    const organizationId =
+      continuation.metadata?.organizationId ?? context.organizationId;
+
+    if (!interfaceId || !context.aiInterfaceService) {
+      return {
+        status: "failed",
+        error: "Volcano video poll requires interface context",
+      };
+    }
+
+    const iface = await context.aiInterfaceService.resolveOrgInterface({
+      organizationId,
+      interfaceId,
+    });
+
+    if (!iface?.apiKey) {
+      return {
+        status: "failed",
+        error: "Could not resolve Volcano AI interface for video poll",
+      };
+    }
+
+    const pollResult = await pollVolcanoVideoTask({
+      apiKey: iface.apiKey,
+      pollUrl: continuation.pollUrl,
+    });
+
+    if (pollResult.status === "failed") {
+      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+    }
+
+    if (pollResult.status === "pending") {
+      return {
+        status: "pending",
+        nextPollAt: new Date(
+          Date.now() + continuation.pollIntervalMs
+        ).toISOString(),
+      };
+    }
+
+    if (!pollResult.videoUrl) {
+      return {
+        status: "failed",
+        error: "Video task completed without a URL",
+      };
+    }
+
+    const storageResolution = context.resolveAiVideoStorage
+      ? await context.resolveAiVideoStorage({
+          organizationId,
+          workflowId: context.workflowId,
+        })
+      : { storageMode: "ephemeral" as const };
+
+    const outputName = context.nodeOutputs[0]?.name ?? "videos";
+    const downloadResult = await downloadVolcanoVideo({
+      videoUrl: pollResult.videoUrl,
+      storageMode: storageResolution.storageMode,
+      objectStore: context.objectStore,
+      organizationId,
+      workflowId: context.workflowId,
+      executionId: context.executionId,
+      cloudUpload: storageResolution.cloudUpload,
+    });
+
+    if (downloadResult.status === "failed") {
+      return {
+        status: "failed",
+        error: downloadResult.error ?? "Failed to store generated video",
+      };
+    }
+
+    return {
+      status: "completed",
+      outputs: { [outputName]: downloadResult.videos ?? [] },
+      usage: 1,
+    };
+  }
+}
+
 const providers: UpstreamPollProvider[] = [
   new ReplicateUpstreamPollProvider(),
   new NewApiRelayUpstreamPollProvider(),
+  new VolcanoVideoUpstreamPollProvider(),
 ];
 
 export function resolveUpstreamPollProvider(
@@ -256,6 +350,9 @@ export function buildUpstreamPollRuntimeContext(params: {
   executionId: string;
   env: NodeEnv;
   relayAccountService?: import("../relay-account-service").RelayAccountService;
+  aiInterfaceService?: import("../ai-interface-service").AiInterfaceService;
+  resolveAiVideoStorage?: import("../ai-image-storage").ResolveAiImageStorage;
+  workflowId?: string;
   nodeOutputs: UpstreamPollRuntimeContext["nodeOutputs"];
 }): UpstreamPollRuntimeContext {
   return {
@@ -264,6 +361,9 @@ export function buildUpstreamPollRuntimeContext(params: {
     executionId: params.executionId,
     env: params.env,
     relayAccountService: params.relayAccountService,
+    aiInterfaceService: params.aiInterfaceService,
+    resolveAiVideoStorage: params.resolveAiVideoStorage,
+    workflowId: params.workflowId,
     nodeOutputs: params.nodeOutputs,
   };
 }
@@ -275,6 +375,9 @@ export async function pollUpstreamContinuation(params: {
   executionId: string;
   env: NodeEnv;
   relayAccountService?: import("../relay-account-service").RelayAccountService;
+  aiInterfaceService?: import("../ai-interface-service").AiInterfaceService;
+  resolveAiVideoStorage?: import("../ai-image-storage").ResolveAiImageStorage;
+  workflowId?: string;
   nodeOutputs: UpstreamPollRuntimeContext["nodeOutputs"];
 }): Promise<UpstreamPollResult> {
   const provider = resolveUpstreamPollProvider(params.continuation.provider);

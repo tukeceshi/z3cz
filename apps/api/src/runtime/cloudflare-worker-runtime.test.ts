@@ -32,7 +32,13 @@ import { createWorkerRuntime } from "./cloudflare-worker-runtime";
 
 // Run all specifications against Worker Runtime
 const runtimeName = "WorkerRuntime";
-const factory: RuntimeFactory = () => createWorkerRuntime(env as Bindings);
+const factory: RuntimeFactory = () => {
+  const runtimePromise = createWorkerRuntime(env as Bindings);
+  return {
+    run: (params, instanceId) =>
+      runtimePromise.then((runtime) => runtime.run(params, instanceId)),
+  };
+};
 
 testSuccessfulExecution(runtimeName, factory);
 testFailingExecution(runtimeName, factory);

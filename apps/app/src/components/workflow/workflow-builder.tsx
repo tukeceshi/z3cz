@@ -4,16 +4,19 @@ import type {
   ObjectReference,
   Parameter,
   WorkflowBillingMode,
+  WorkflowEditorViewport,
   WorkflowRuntime,
   WorkflowTrigger,
 } from "@dafthunk/types";
+import { buildCatalogAllowedNodeTypeSet } from "@dafthunk/types";
 import type {
   Connection,
   Edge as ReactFlowEdge,
+  ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
@@ -51,6 +54,7 @@ import { WorkflowProvider } from "./workflow-context";
 import { WorkflowNodeSelector } from "./workflow-node-selector";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
+import { isValidWorkflowEditorViewport } from "./workflow-viewport-utils";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -191,6 +195,10 @@ export interface WorkflowBuilderProps {
   isTogglingEnabled?: boolean;
   onToggleEnabled?: (checked: boolean) => void;
   fitViewPadding?: number;
+  /** After workflow creation: center canvas at 100% zoom on first editor open only. */
+  initialViewportOneToOne?: boolean;
+  savedEditorViewport?: WorkflowEditorViewport | null;
+  onEditorViewportChange?: (viewport: WorkflowEditorViewport) => void;
   workflowSettingsOpen?: boolean;
   onWorkflowSettingsOpenChange?: (open: boolean) => void;
 }
@@ -223,6 +231,9 @@ export function WorkflowBuilder({
   isTogglingEnabled,
   onToggleEnabled,
   fitViewPadding = 0.25,
+  initialViewportOneToOne = false,
+  savedEditorViewport,
+  onEditorViewportChange,
   workflowSettingsOpen = false,
   onWorkflowSettingsOpenChange,
 }: WorkflowBuilderProps) {
@@ -232,6 +243,11 @@ export function WorkflowBuilder({
   const interactive = mode !== "preview";
   const sidebarEnabled = showSidebar ?? interactive;
 
+  const allowedNodeTypes = useMemo(
+    () => buildCatalogAllowedNodeTypeSet(nodeTypes),
+    [nodeTypes]
+  );
+
   // Graph state & operations
   const {
     nodes,
@@ -239,7 +255,6 @@ export function WorkflowBuilder({
     selectedNodes,
     selectedEdges,
     soleSelectedNodeId,
-    connectedHandles,
     isNodeSelectorOpen,
     setIsNodeSelectorOpen,
     onNodesChange,
@@ -250,6 +265,7 @@ export function WorkflowBuilder({
     handleAddNode,
     handleNodeSelect,
     updateNodeExecution,
+    batchUpdateNodeExecutions,
     setReactFlowInstance,
     reactFlowInstance,
     connectionValidationState,
@@ -278,6 +294,7 @@ export function WorkflowBuilder({
     validateConnection,
     createObjectUrl,
     disabled: readOnly,
+    allowedNodeTypes,
     nodeTypes,
   });
 
@@ -292,6 +309,7 @@ export function WorkflowBuilder({
     executeWorkflow,
     wsExecuteWorkflow,
     updateNodeExecution,
+    batchUpdateNodeExecutions,
     updateNodeData,
     deselectAll,
   });
@@ -302,9 +320,13 @@ export function WorkflowBuilder({
   const handleQuickAddAiNode = useCallback(
     (nodeType: "ai-text" | "ai-image" | "ai-video") => {
       const template = nodeTypes.find((item) => item.type === nodeType);
-      if (template) handleNodeSelect(template);
+      if (!template) {
+        appToast.error("workflow.canvas.nodeTypeUnavailable");
+        return;
+      }
+      handleNodeSelect(template);
     },
-    [handleNodeSelect, nodeTypes]
+    [appToast, handleNodeSelect, nodeTypes]
   );
 
   // Keyboard shortcuts (Cmd+C/X/V/D + Cmd+Enter)
@@ -315,6 +337,7 @@ export function WorkflowBuilder({
 
   useKeyboardShortcuts({
     disabled: readOnly,
+    clipboardDisabled: readOnly,
     selectedNodes,
     selectedEdges,
     hasClipboardData,
@@ -326,6 +349,8 @@ export function WorkflowBuilder({
     nodeCount: nodes.length,
   });
 
+  const suppressViewportPersistEndRef = useRef(false);
+
   const handleFitToScreen = useCallback(() => {
     reactFlowInstance?.fitView({
       padding: fitViewPadding,
@@ -333,6 +358,36 @@ export function WorkflowBuilder({
       maxZoom: 2,
     });
   }, [reactFlowInstance, fitViewPadding]);
+
+  const handleReactFlowInit = useCallback(
+    (
+      instance: ReactFlowInstance<
+        ReactFlowNode<WorkflowNodeType>,
+        ReactFlowEdge<WorkflowEdgeType>
+      >
+    ) => {
+      setReactFlowInstance(instance);
+
+      if (!initialViewportOneToOne) {
+        return;
+      }
+
+      suppressViewportPersistEndRef.current = true;
+      const flowNodes = instance.getNodes();
+      if (flowNodes.length === 0) {
+        void instance.setViewport({ x: 0, y: 0, zoom: 1 });
+        return;
+      }
+
+      void instance.fitView({
+        padding: fitViewPadding,
+        minZoom: 1,
+        maxZoom: 1,
+        duration: 0,
+      });
+    },
+    [setReactFlowInstance, initialViewportOneToOne, fitViewPadding]
+  );
 
   const handleZoomOneToOne = useCallback(() => {
     reactFlowInstance?.zoomTo(1, { duration: 200 });
@@ -345,6 +400,81 @@ export function WorkflowBuilder({
   const handleViewportMoveEnd = useCallback(() => {
     setIsViewportMoving(false);
   }, []);
+
+  const restoredDefaultViewport = useMemo(() => {
+    if (initialViewportOneToOne) {
+      return undefined;
+    }
+    if (
+      savedEditorViewport != null &&
+      isValidWorkflowEditorViewport(savedEditorViewport)
+    ) {
+      return savedEditorViewport;
+    }
+    return undefined;
+  }, [initialViewportOneToOne, savedEditorViewport]);
+
+  const skipInitialFitView =
+    initialViewportOneToOne || restoredDefaultViewport != null;
+
+  const [canPersistViewport, setCanPersistViewport] = useState(false);
+
+  useEffect(() => {
+    if (restoredDefaultViewport) {
+      suppressViewportPersistEndRef.current = true;
+    }
+  }, [restoredDefaultViewport]);
+
+  const appliedViewportKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!reactFlowInstance || initialViewportOneToOne) {
+      return;
+    }
+    if (
+      savedEditorViewport == null ||
+      !isValidWorkflowEditorViewport(savedEditorViewport)
+    ) {
+      return;
+    }
+
+    const viewportKey = JSON.stringify(savedEditorViewport);
+    if (appliedViewportKeyRef.current === viewportKey) {
+      return;
+    }
+
+    suppressViewportPersistEndRef.current = true;
+    void reactFlowInstance.setViewport(savedEditorViewport, { duration: 0 });
+    appliedViewportKeyRef.current = viewportKey;
+    const readyTimer = window.setTimeout(() => {
+      setCanPersistViewport(true);
+    }, 0);
+    return () => window.clearTimeout(readyTimer);
+  }, [reactFlowInstance, savedEditorViewport, initialViewportOneToOne]);
+
+  useEffect(() => {
+    if (initialViewportOneToOne) {
+      return;
+    }
+    if (savedEditorViewport != null) {
+      return;
+    }
+
+    const readyTimer = window.setTimeout(() => {
+      setCanPersistViewport(true);
+    }, 600);
+    return () => window.clearTimeout(readyTimer);
+  }, [initialViewportOneToOne, savedEditorViewport]);
+
+  useEffect(() => {
+    if (!initialViewportOneToOne) {
+      return;
+    }
+    const readyTimer = window.setTimeout(() => {
+      setCanPersistViewport(true);
+    }, 600);
+    return () => window.clearTimeout(readyTimer);
+  }, [initialViewportOneToOne]);
 
   // Check if workflow already contains a trigger node
   const hasTriggerNode = useMemo(() => {
@@ -451,16 +581,17 @@ export function WorkflowBuilder({
         updateEdgeData={readOnly ? undefined : updateEdgeData}
         deleteEdge={readOnly ? undefined : deleteEdge}
         edges={edges}
-        connectedHandles={connectedHandles}
         soleSelectedNodeId={soleSelectedNodeId}
         isViewportMoving={isViewportMoving}
         disabled={readOnly}
         expandedOutputs={expandedOutputs}
         nodeTypes={nodeTypes}
+        allowedNodeTypes={allowedNodeTypes}
         workflowTrigger={workflowTrigger}
         onRunNode={readOnly ? undefined : handleRunNode}
       >
-        <div className="w-full h-full min-h-0 flex">
+        <div className="w-full h-full min-h-0 flex flex-col">
+          <div className="flex min-h-0 flex-1">
           <div
             className="h-full overflow-hidden relative"
             style={{
@@ -483,7 +614,7 @@ export function WorkflowBuilder({
               isDraggingRef={isDraggingRef}
               onMoveStart={handleViewportMoveStart}
               onMoveEnd={handleViewportMoveEnd}
-              onInit={setReactFlowInstance}
+              onInit={handleReactFlowInit}
               onAddNode={readOnly ? undefined : handleAddNode}
               onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
               onAction={handleActionButtonClick}
@@ -511,6 +642,16 @@ export function WorkflowBuilder({
               showControls={interactive}
               showBackground={showBackground}
               fitViewPadding={fitViewPadding}
+              skipInitialFitView={skipInitialFitView}
+              defaultViewport={restoredDefaultViewport}
+              onEditorViewportChange={
+                readOnly || !canPersistViewport
+                  ? undefined
+                  : onEditorViewportChange
+              }
+              suppressViewportPersistEndRef={suppressViewportPersistEndRef}
+              soleSelectedNodeId={soleSelectedNodeId}
+              isViewportMoving={isViewportMoving}
             />
           </div>
 
@@ -564,6 +705,7 @@ export function WorkflowBuilder({
             onToggleEnabled={readOnly ? undefined : onToggleEnabled}
             onTriggerChange={readOnly ? undefined : handleTriggerChange}
           />
+        </div>
         </div>
 
         {(workflowTrigger === "http_webhook" ||

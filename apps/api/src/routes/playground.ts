@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
-import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
+import { createCloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import {
   buildPresignedUrlConfig,
   CloudflareObjectStore,

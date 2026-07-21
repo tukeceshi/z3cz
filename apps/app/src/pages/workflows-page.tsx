@@ -54,6 +54,7 @@ import { TagFilterButtons } from "@/components/ui/tag-filter-buttons";
 import { Textarea } from "@/components/ui/textarea";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CreateWorkflowDialog } from "@/components/workflow/create-workflow-dialog";
+import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
 import { buildInitialTriggerNodes } from "@/components/workflow/trigger-node-mapping";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
@@ -386,7 +387,9 @@ export function WorkflowsPage() {
       const newWorkflow = await createWorkflow(request, orgId);
 
       mutateWorkflows();
-      navigate(getOrgUrl(`workflows/${newWorkflow.id}`));
+      navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
+        state: createWorkflowEditorLocationState(),
+      });
     } catch (error) {
       console.error("Failed to create workflow:", error);
     }

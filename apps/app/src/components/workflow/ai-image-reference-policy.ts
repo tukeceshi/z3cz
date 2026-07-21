@@ -1,5 +1,6 @@
 import {
   AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   normalizeImageModelParameterRules,
   type ImageModelParameterRules,
@@ -209,10 +210,14 @@ export function buildAiImageReferenceConnectionFromCardDrop(params: {
   if (params.hoveredNodeId === params.dragFromNodeId) return null;
 
   if (params.dragFromHandle.type === "source") {
+    const sourceNode = params.nodes.find(
+      (node) => node.id === params.dragFromNodeId
+    );
     const targetNode = params.nodes.find(
       (node) => node.id === params.hoveredNodeId
     );
     if (targetNode?.data.nodeType !== AI_IMAGE_NODE_TYPE) return null;
+    if (sourceNode?.data.nodeType === AI_TEXT_NODE_TYPE) return null;
     return {
       source: params.dragFromNodeId,
       sourceHandle: params.dragFromHandle.id ?? AI_IMAGE_OUTPUT_ID,

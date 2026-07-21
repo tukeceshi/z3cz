@@ -19,7 +19,6 @@ import {
   type WorkflowExecutorParameters,
 } from "../services/workflow-executor";
 import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
-import { validateWorkflowForExecution } from "../utils/workflows";
 
 interface ExecutionManagerOptions {
   env: Bindings;
@@ -64,8 +63,6 @@ export class ExecutionManager {
     ) {
       throw new Error("Insufficient compute credits");
     }
-
-    validateWorkflowForExecution(state);
 
     const executorParameters = this.buildExecutorParameters(
       state.trigger,

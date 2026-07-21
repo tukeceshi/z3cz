@@ -319,8 +319,23 @@ export interface NodeContext {
       }
     | undefined
   >;
+  /** Resolve a platform video model to interface + provider model id. */
+  resolveVideoModel?: (
+    canonicalId: string
+  ) => Promise<
+    | {
+        readonly interfaceId: string;
+        readonly providerModelId: string;
+        readonly parameterRules: import("@dafthunk/types").VideoModelParameterRules;
+      }
+    | undefined
+  >;
   /** Resolve ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: () => Promise<
+    import("./ai-image-storage").AiImageStorageResolution
+  >;
+  /** Resolve ephemeral vs cloud storage for AI video generation. */
+  resolveAiVideoStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution
   >;
   env: NodeEnv;

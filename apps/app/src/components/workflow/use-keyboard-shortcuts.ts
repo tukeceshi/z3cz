@@ -8,6 +8,7 @@ import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 interface UseKeyboardShortcutsProps {
   disabled: boolean;
+  clipboardDisabled?: boolean;
   selectedNodes: ReactFlowNode<WorkflowNodeType>[];
   selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
   hasClipboardData: boolean;
@@ -25,6 +26,7 @@ interface UseKeyboardShortcutsProps {
  */
 export function useKeyboardShortcuts({
   disabled,
+  clipboardDisabled = disabled,
   selectedNodes,
   selectedEdges,
   hasClipboardData,
@@ -68,25 +70,25 @@ export function useKeyboardShortcuts({
 
       switch (event.key.toLowerCase()) {
         case "c":
-          if (!disabled && hasSelection) {
+          if (!clipboardDisabled && hasSelection) {
             event.preventDefault();
             copySelected();
           }
           break;
         case "x":
-          if (!disabled && hasSelection) {
+          if (!clipboardDisabled && hasSelection) {
             event.preventDefault();
             cutSelected();
           }
           break;
         case "v":
-          if (!disabled && hasClipboardData) {
+          if (!clipboardDisabled && hasClipboardData) {
             event.preventDefault();
             pasteFromClipboard();
           }
           break;
         case "d":
-          if (!disabled && hasSelection) {
+          if (!clipboardDisabled && hasSelection) {
             event.preventDefault();
             duplicateSelected();
           }
@@ -97,6 +99,7 @@ export function useKeyboardShortcuts({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [
+    clipboardDisabled,
     disabled,
     selectedNodes,
     selectedEdges,

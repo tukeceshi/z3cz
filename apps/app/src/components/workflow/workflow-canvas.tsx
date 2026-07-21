@@ -11,6 +11,7 @@ import type {
   Edge as ReactFlowEdge,
   ReactFlowInstance,
   Node as ReactFlowNode,
+  Viewport,
 } from "@xyflow/react";
 import {
   applyNodeChanges,
@@ -20,6 +21,7 @@ import {
   Controls,
   Panel,
   ReactFlow,
+  useViewport,
 } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import Bot from "lucide-react/icons/bot";
@@ -37,7 +39,7 @@ import Trash2 from "lucide-react/icons/trash-2";
 import Type from "lucide-react/icons/type";
 import Video from "lucide-react/icons/video";
 import X from "lucide-react/icons/x";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -46,8 +48,13 @@ import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey, getModifierSymbol } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
+import {
+  buildConnectedHandleKeysByNode,
+  connectedHandleKeysEqual,
+} from "./workflow-connected-handles";
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
 import { WorkflowNode } from "./workflow-node";
+import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
 import type {
   ConnectionValidationState,
   WorkflowEdgeType,
@@ -195,6 +202,13 @@ export interface WorkflowCanvasProps {
   showBackground?: boolean;
   /** Padding for React Flow's `fitView`. Defaults to 0.25. */
   fitViewPadding?: number;
+  /** Skip mount-time fitView; caller sets viewport in onInit instead. */
+  skipInitialFitView?: boolean;
+  defaultViewport?: Viewport;
+  onEditorViewportChange?: (viewport: Viewport) => void;
+  suppressViewportPersistEndRef?: React.RefObject<boolean>;
+  soleSelectedNodeId?: string | null;
+  isViewportMoving?: boolean;
 }
 
 interface ActionButtonProps {
@@ -658,8 +672,15 @@ export function WorkflowCanvas({
   hasClipboardData = false,
   showBackground = true,
   fitViewPadding = 0.25,
+  skipInitialFitView = false,
+  defaultViewport,
+  onEditorViewportChange,
+  suppressViewportPersistEndRef,
+  soleSelectedNodeId = null,
+  isViewportMoving = false,
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
+  const { zoom } = useViewport();
   const [displayNodes, setDisplayNodes] =
     useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
 
@@ -668,6 +689,51 @@ export function WorkflowCanvas({
       setDisplayNodes(nodes);
     }
   }, [nodes, isDraggingRef]);
+
+  const connectedKeysByNode = useMemo(
+    () => buildConnectedHandleKeysByNode(edges),
+    [edges]
+  );
+
+  const renderNodes = useMemo(() => {
+    return displayNodes.map((node) => {
+      const handleKeys = connectedKeysByNode.get(node.id) ?? [];
+      const isHost = node.id === soleSelectedNodeId;
+      const prevKeys = node.data.connectedHandleKeys as
+        | readonly string[]
+        | undefined;
+      const prevHost = node.data.showBottomPanelHost === true;
+      const prevZoom = node.data.viewportZoom;
+      const prevMoving = node.data.isViewportMoving === true;
+      const nextMoving = isHost && isViewportMoving;
+
+      if (
+        connectedHandleKeysEqual(prevKeys, handleKeys) &&
+        prevHost === isHost &&
+        (!isHost || (prevZoom === zoom && prevMoving === nextMoving))
+      ) {
+        return node;
+      }
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          connectedHandleKeys: handleKeys,
+          showBottomPanelHost: isHost,
+          ...(isHost
+            ? { viewportZoom: zoom, isViewportMoving: nextMoving }
+            : { viewportZoom: undefined, isViewportMoving: undefined }),
+        },
+      };
+    });
+  }, [
+    connectedKeysByNode,
+    displayNodes,
+    isViewportMoving,
+    soleSelectedNodeId,
+    zoom,
+  ]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<ReactFlowNode<WorkflowNodeType>>[]) => {
@@ -688,7 +754,7 @@ export function WorkflowCanvas({
     <TooltipProvider>
       <div className="h-full w-full min-h-0">
         <ReactFlow
-        nodes={displayNodes}
+        nodes={renderNodes}
         edges={edges}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
@@ -707,11 +773,16 @@ export function WorkflowCanvas({
         connectionRadius={8}
         onInit={onInit}
         isValidConnection={isValidConnection}
-        fitView
-        fitViewOptions={{
-          padding: fitViewPadding,
-          maxZoom: 2,
-        }}
+        {...(defaultViewport ? { defaultViewport } : {})}
+        {...(skipInitialFitView
+          ? {}
+          : {
+              fitView: true,
+              fitViewOptions: {
+                padding: fitViewPadding,
+                maxZoom: 2,
+              },
+            })}
         minZoom={0.05}
         maxZoom={4}
         className={cn(
@@ -731,6 +802,13 @@ export function WorkflowCanvas({
         zoomOnDoubleClick={showControls}
         preventScrolling={showControls}
       >
+        {onEditorViewportChange && (
+          <WorkflowViewportPersistenceListener
+            disabled={disabled}
+            onViewportEnd={onEditorViewportChange}
+            suppressNextEndRef={suppressViewportPersistEndRef}
+          />
+        )}
         {showControls && (
           <Controls
             showInteractive={false}

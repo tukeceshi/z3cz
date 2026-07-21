@@ -9,7 +9,7 @@ export const nodeLabelsZh: Record<
   }
 > = {
   "ai-text": {
-    name: "AI 文本",
+    name: "文字",
     description: "使用组织配置的 AI 接口生成文本。",
     inputs: {
       model: "模型覆盖（如 gpt-4o）",
@@ -22,7 +22,7 @@ export const nodeLabelsZh: Record<
     },
   },
   "ai-image": {
-    name: "AI 图片",
+    name: "图片",
     description: "使用组织配置的 AI 接口生成图片。",
     inputs: {
       prompt: "图片描述提示词",
@@ -33,7 +33,7 @@ export const nodeLabelsZh: Record<
     },
   },
   "ai-video": {
-    name: "AI 视频",
+    name: "视频",
     description: "使用组织配置的 AI 接口生成视频。",
     inputs: {
       prompt: "视频描述提示词",

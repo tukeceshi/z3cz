@@ -73,7 +73,7 @@ class NodeWorkflowExecutionService {
       nodeWorkflowSessionHub.broadcastExecution(workflowId, execution);
     };
 
-    const runtime = createNodeDurableWorkflowRuntime(env, reportProgress);
+    const runtime = await createNodeDurableWorkflowRuntime(env, reportProgress);
 
     try {
       const result = await runtime.execute(params, executionId);

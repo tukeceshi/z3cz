@@ -21,7 +21,7 @@ import { PostgresDatabaseService } from "./postgres-database-service";
 import { CloudflareDatasetService } from "./cloudflare-dataset-service";
 import { CloudflareExecutionStore } from "./cloudflare-execution-store";
 import { CloudflareMailboxService } from "./cloudflare-mailbox-service";
-import { CloudflareNodeRegistry } from "./cloudflare-node-registry";
+import { createCloudflareNodeRegistry } from "./cloudflare-node-registry";
 import {
   buildPresignedUrlConfig,
   CloudflareObjectStore,
@@ -34,16 +34,18 @@ import { CloudflareRelayAccountService } from "./cloudflare-relay-account-servic
 import { CloudflareAiInterfaceService } from "./cloudflare-ai-interface-service";
 import { CloudflareImageModelService } from "./cloudflare-image-model-service";
 import { CloudflareTextModelService } from "./cloudflare-text-model-service";
+import { CloudflareVideoModelService } from "./cloudflare-video-model-service";
 import { createSandboxExecutor } from "./sandbox-executor";
 import { createToolContext } from "./tool-context";
 import { runtimeVersion } from "./version";
 import { resolveAiImageStorage } from "../services/ai-image-storage";
+import { resolveAiVideoStorage } from "../services/ai-video-storage";
 
-export function buildDependencies(
+export async function buildDependencies(
   env: Bindings,
   monitoringService: MonitoringService
-): RuntimeDependencies<Bindings> {
-  const nodeRegistry = new CloudflareNodeRegistry(env, true);
+): Promise<RuntimeDependencies<Bindings>> {
+  const nodeRegistry = await createCloudflareNodeRegistry(env, true);
   const objectStore = new CloudflareObjectStore(
     env.RESSOURCES,
     buildPresignedUrlConfig(env)
@@ -96,7 +98,9 @@ export function buildDependencies(
     aiInterfaceService: new CloudflareAiInterfaceService(env),
     textModelService: new CloudflareTextModelService(env),
     imageModelService: new CloudflareImageModelService(env),
+    videoModelService: new CloudflareVideoModelService(env),
     resolveAiImageStorage: (params) => resolveAiImageStorage(env, params),
+    resolveAiVideoStorage: (params) => resolveAiVideoStorage(env, params),
     runtimeVersion,
   };
 }

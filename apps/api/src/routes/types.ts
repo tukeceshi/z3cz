@@ -1,13 +1,10 @@
-import type { GetNodeTypesResponse, NodeType } from "@dafthunk/types";
+import type { GetNodeTypesResponse } from "@dafthunk/types";
 import { Hono } from "hono";
 
 import { optionalJwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { createDatabase, getEnabledWorkflowSchemeById } from "../db";
-import { getCloudflareModelNodeTypes } from "../runtime/cloudflare-model-catalog";
-import { createCloudflareNodeRegistry } from "../runtime/lazy-node-registry";
-import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
-import { omitLegacyAiInterfaceCanvasNodes } from "../utils/node-types";
+import { getAllNodeTypes } from "../utils/node-types";
 import { filterNodeTypesForScheme } from "../utils/workflow-scheme";
 
 const typeRoutes = new Hono<ApiContext>();
@@ -15,36 +12,14 @@ const typeRoutes = new Hono<ApiContext>();
 typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
   try {
     const schemeId = c.req.query("schemeId");
+    const jwtPayload = c.get("jwtPayload");
+    const developerMode = jwtPayload?.developerMode ?? false;
 
-    let nodeTypes: NodeType[];
-    if (c.env.RUNTIME === "node") {
-      nodeTypes = omitLegacyAiInterfaceCanvasNodes(loadNodeTypesFromJson());
-    } else {
-      const jwtPayload = c.get("jwtPayload");
-      const registry = await createCloudflareNodeRegistry(
-        c.env,
-        jwtPayload?.developerMode ?? false
-      );
-      const staticNodeTypes = registry.getNodeTypes();
-
-      let cloudflareNodeTypes: NodeType[] = [];
-      try {
-        cloudflareNodeTypes = await getCloudflareModelNodeTypes(
-          c.env,
-          c.executionCtx
-        );
-      } catch (error) {
-        console.warn(
-          "[types] Skipping Cloudflare model synthesis:",
-          error instanceof Error ? error.message : error
-        );
-      }
-
-      nodeTypes = omitLegacyAiInterfaceCanvasNodes([
-        ...staticNodeTypes,
-        ...cloudflareNodeTypes,
-      ]);
-    }
+    let nodeTypes = await getAllNodeTypes(
+      c.env,
+      c.executionCtx,
+      developerMode
+    );
 
     if (schemeId) {
       const db = createDatabase(c.env);

@@ -15,7 +15,7 @@ import type { Bindings } from "../context";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
 import { PostgresDatabaseService } from "../runtime/postgres-database-service";
 import { CloudflareDatasetService } from "../runtime/cloudflare-dataset-service";
-import { CloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
+import { createCloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import {
   buildPresignedUrlConfig,
   CloudflareObjectStore,
@@ -29,7 +29,7 @@ export async function buildNodeToolProvider(
   env: Bindings,
   organizationId: string
 ): Promise<NodeToolProvider> {
-  const nodeRegistry = new CloudflareNodeRegistry(env, false);
+  const nodeRegistry = await createCloudflareNodeRegistry(env, false);
   const objectStore = new CloudflareObjectStore(
     env.RESSOURCES,
     buildPresignedUrlConfig(env)

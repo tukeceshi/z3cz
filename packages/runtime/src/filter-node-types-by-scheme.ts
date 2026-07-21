@@ -48,7 +48,7 @@ export function filterNodeTypesByScheme(
   });
 }
 
-export function buildAllowedNodeTypeSet(
+export function buildSchemeAllowedNodeTypeSet(
   allNodeTypes: NodeType[],
   nodeRules: WorkflowSchemeNodeRules
 ): Set<string> {

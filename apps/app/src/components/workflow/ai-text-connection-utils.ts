@@ -17,6 +17,7 @@ import {
   AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_CARD_WIDTH_PX,
   AI_IMAGE_OUTPUT_ID,
+  AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
 } from "./ai-image-node-utils";
 import {
@@ -316,6 +317,8 @@ export function getAiTextEdgePathOffset(
   if (
     sourceHandle === AI_TEXT_OUTPUT_ID ||
     targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID ||
+    targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
+    targetHandle === AI_IMAGE_PROMPT_HANDLE_ID ||
     (targetNodeType === AI_TEXT_NODE_TYPE &&
       isAiTextAllowedReferenceNodeType(sourceNodeType))
   ) {
@@ -417,6 +420,7 @@ export function resolveAiTextEdgeAnchors(params: {
     }
   } else if (
     resolved.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
+    resolved.targetHandle === AI_IMAGE_PROMPT_HANDLE_ID ||
     resolved.targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID
   ) {
     const node = params.nodeLookup.get(params.target);

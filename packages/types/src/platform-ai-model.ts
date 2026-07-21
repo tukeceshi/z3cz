@@ -51,9 +51,13 @@ export interface ImageModelParameterRules {
 
 export interface VideoModelParameterRules {
   readonly schemaVersion: typeof PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION;
+  readonly maxReferenceImages: number;
+  readonly maxImageReferenceBytes: number;
   readonly maxReferenceVideos: number;
   readonly maxVideoReferenceBytes: number;
   readonly maxVideoReferenceSeconds: number;
+  readonly promptMaxChars: number;
+  readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
 export type PlatformAiModelParameterRules =
@@ -248,6 +252,49 @@ export interface GenerateAiImageResponse {
   readonly storageMode: "ephemeral" | "cloud";
 }
 
+export type OrgVideoModelUnavailableReason = OrgTextModelUnavailableReason;
+
+export interface OrgVideoModelOption {
+  readonly canonicalId: string;
+  readonly displayName: string;
+  readonly modality: AiModelModality;
+  readonly providerModelId: string;
+  readonly parameterRules: VideoModelParameterRules;
+  readonly selectable: boolean;
+  readonly unavailableReason?: OrgVideoModelUnavailableReason;
+  readonly description: string;
+  readonly groupId: string | null;
+  readonly groupName: string | null;
+  readonly groupDescription: string | null;
+  readonly groupIcon: string | null;
+}
+
+export interface ListOrgVideoModelsResponse {
+  readonly models: readonly OrgVideoModelOption[];
+  readonly groups: readonly PlatformAiModelGroup[];
+}
+
+export interface SubmitAiVideoRequest {
+  readonly modelCanonicalId: string;
+  readonly prompt?: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+  readonly workflowId?: string;
+  readonly nodeId?: string;
+}
+
+export interface SubmitAiVideoResponse {
+  readonly taskId: string;
+  readonly invocationId: string;
+  readonly aiInterfaceId: string;
+}
+
+export interface PollAiVideoTaskResponse {
+  readonly status: "queued" | "running" | "succeeded" | "failed" | "expired";
+  readonly videoUrl?: string;
+  readonly error?: string;
+}
+
 export interface AiImageResultHistoryItem {
   readonly id: string;
   readonly images: readonly MediaReference[];
@@ -258,6 +305,19 @@ export interface AiImageResultHistoryItem {
 
 export interface AiImageResultHistory {
   readonly items: readonly AiImageResultHistoryItem[];
+  readonly selectedId: string | null;
+}
+
+export interface AiVideoResultHistoryItem {
+  readonly id: string;
+  readonly videos: readonly MediaReference[];
+  readonly prompt: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
+}
+
+export interface AiVideoResultHistory {
+  readonly items: readonly AiVideoResultHistoryItem[];
   readonly selectedId: string | null;
 }
 
@@ -358,11 +418,63 @@ export const DEFAULT_IMAGE_MODEL_PARAMETER_RULES: ImageModelParameterRules = {
   generationFields: DEFAULT_IMAGE_GENERATION_FIELDS,
 };
 
+export const DEFAULT_VIDEO_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
+  [
+    {
+      name: "ratio",
+      apiName: "ratio",
+      type: "string",
+      description: "Output aspect ratio",
+      default: "16:9",
+      enumValues: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "adaptive"],
+    },
+    {
+      name: "duration",
+      apiName: "duration",
+      type: "number",
+      description: "Video duration in seconds",
+      default: 5,
+    },
+    {
+      name: "resolution",
+      apiName: "resolution",
+      type: "string",
+      description: "Output resolution",
+      default: "720p",
+      enumValues: ["480p", "720p", "1080p"],
+    },
+    {
+      name: "generate_audio",
+      apiName: "generate_audio",
+      type: "boolean",
+      description: "Generate synchronized audio",
+      default: true,
+    },
+    {
+      name: "watermark",
+      apiName: "watermark",
+      type: "boolean",
+      description: "Add AI-generated watermark",
+      default: false,
+    },
+    {
+      name: "seed",
+      apiName: "seed",
+      type: "number",
+      description: "Random seed (-1 for random)",
+      default: -1,
+    },
+  ] as const;
+
 export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   schemaVersion: PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
+  maxReferenceImages: 2,
+  maxImageReferenceBytes: 10 * 1024 * 1024,
   maxReferenceVideos: 1,
   maxVideoReferenceBytes: 50 * 1024 * 1024,
   maxVideoReferenceSeconds: 60,
+  promptMaxChars: 600,
+  generationFields: DEFAULT_VIDEO_GENERATION_FIELDS,
 };
 
 export function isTextModelParameterRules(
@@ -384,7 +496,40 @@ export function isImageModelParameterRules(
 export function isVideoModelParameterRules(
   rules: PlatformAiModelParameterRules
 ): rules is VideoModelParameterRules {
-  return "maxReferenceVideos" in rules && !("promptMaxChars" in rules);
+  return "maxReferenceVideos" in rules && !("referenceInputs" in rules);
+}
+
+export function normalizeVideoModelParameterRules(
+  rules: VideoModelParameterRules
+): VideoModelParameterRules {
+  const generationFields =
+    rules.generationFields?.length > 0
+      ? rules.generationFields
+      : DEFAULT_VIDEO_MODEL_PARAMETER_RULES.generationFields;
+
+  return {
+    ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+    ...rules,
+    maxReferenceImages:
+      rules.maxReferenceImages ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceImages,
+    maxImageReferenceBytes:
+      rules.maxImageReferenceBytes ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxImageReferenceBytes,
+    maxReferenceVideos:
+      rules.maxReferenceVideos ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos,
+    maxVideoReferenceBytes:
+      rules.maxVideoReferenceBytes ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceBytes,
+    maxVideoReferenceSeconds:
+      rules.maxVideoReferenceSeconds ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
+    promptMaxChars:
+      rules.promptMaxChars ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
+    generationFields,
+  };
 }
 
 export function normalizeImageModelParameterRules(
@@ -467,6 +612,68 @@ export function buildVolcanoImageGenerationBody(params: {
   return body;
 }
 
+/** Build Volcano /contents/generations/tasks body from admin field definitions. */
+export function buildVolcanoVideoGenerationBody(params: {
+  readonly providerModelId: string;
+  readonly prompt: string;
+  readonly generationFields: readonly UpstreamParamProfileField[];
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+}): Record<string, unknown> {
+  const trimmedPrompt = params.prompt.trim();
+  const content: Record<string, unknown>[] = [
+    { type: "text", text: trimmedPrompt },
+  ];
+
+  const urls = params.referenceImageUrls?.filter(Boolean) ?? [];
+  if (urls.length === 1) {
+    content.push({
+      type: "image_url",
+      image_url: { url: urls[0] },
+      role: "first_frame",
+    });
+  } else if (urls.length > 1) {
+    for (const url of urls) {
+      content.push({
+        type: "image_url",
+        image_url: { url },
+        role: "reference_image",
+      });
+    }
+  }
+
+  const body: Record<string, unknown> = {
+    model: params.providerModelId,
+    content,
+  };
+
+  for (const field of params.generationFields) {
+    const raw = params.params?.[field.name];
+    const value =
+      raw === undefined || raw === null || raw === ""
+        ? field.default
+        : raw;
+
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+
+    if (field.apiName.includes(".")) {
+      const [root, leaf] = field.apiName.split(".", 2);
+      const existing =
+        body[root] && typeof body[root] === "object"
+          ? (body[root] as Record<string, unknown>)
+          : {};
+      body[root] = { ...existing, [leaf!]: value };
+      continue;
+    }
+
+    body[field.apiName] = value;
+  }
+
+  return body;
+}
+
 /** Normalize older DB rows that lack the newer reference-limit fields. */
 export function normalizeTextModelParameterRules(
   rules: TextModelParameterRules
@@ -522,19 +729,27 @@ export function resolveAiTextEffectivePrompt(params: {
   readonly keywords?: unknown;
   readonly prompt?: unknown;
 }): string {
-  if (typeof params.keywords === "string" && params.keywords.trim().length > 0) {
-    return params.keywords.trim();
+  const keywords = normalizeAiTextKeywordsValue(params.keywords);
+  const prompt =
+    typeof params.prompt === "string" ? params.prompt.trim() : "";
+
+  if (keywords && prompt) {
+    return `${keywords}\n\n${prompt}`;
   }
-  if (Array.isArray(params.keywords)) {
-    const joined = params.keywords
+  return keywords || prompt;
+}
+
+function normalizeAiTextKeywordsValue(keywords: unknown): string {
+  if (typeof keywords === "string" && keywords.trim().length > 0) {
+    return keywords.trim();
+  }
+  if (Array.isArray(keywords)) {
+    const joined = keywords
       .filter((entry): entry is string => typeof entry === "string")
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0)
       .join("\n");
     if (joined.length > 0) return joined;
-  }
-  if (typeof params.prompt === "string") {
-    return params.prompt.trim();
   }
   return "";
 }

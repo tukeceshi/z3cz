@@ -36,22 +36,34 @@ interface NodeType {
   }[];
 }
 
-const API_NODES_DIR = join(__dirname, "../../../packages/runtime/src/nodes");
+const RUNTIME_NODES_DIR = join(
+  __dirname,
+  "../../../packages/runtime/src/nodes"
+);
 const OUTPUT_PATH = join(__dirname, "../data/nodes.json");
 
-function main() {
-  const nodes: Record<string, NodeType> = {};
+/** Matches `NodeType` and qualified forms like `import("@dafthunk/types").NodeType`. */
+export const NODE_TYPE_DECLARATION_PATTERN =
+  /static\s+readonly\s+nodeType:\s*(?:import\([^)]+\)\.)?NodeType\s*=\s*(\{[\s\S]*?\n\s*\});/;
 
-  // Get all subdirectories in the nodes folder
-  const categories = readdirSync(API_NODES_DIR).filter((name) => {
-    const path = join(API_NODES_DIR, name);
+export function findNodeTypeDeclaration(content: string): string | null {
+  const match = content.match(NODE_TYPE_DECLARATION_PATTERN);
+  return match?.[1] ?? null;
+}
+
+function scanNodesDirectory(
+  nodes: Record<string, NodeType>,
+  nodesRootDir: string
+): void {
+  const categories = readdirSync(nodesRootDir).filter((name) => {
+    const path = join(nodesRootDir, name);
     return statSync(path).isDirectory();
   });
 
-  console.log(`Scanning ${categories.length} node categories...`);
+  console.log(`Scanning ${categories.length} categories in ${nodesRootDir}...`);
 
   for (const category of categories) {
-    const categoryDir = join(API_NODES_DIR, category);
+    const categoryDir = join(nodesRootDir, category);
     const nodeFiles = readdirSync(categoryDir).filter(
       (f) =>
         f.endsWith("-node.ts") &&
@@ -63,15 +75,11 @@ function main() {
       const filePath = join(categoryDir, file);
       const content = readFileSync(filePath, "utf-8");
 
-      const nodeTypeMatch = content.match(
-        /static\s+readonly\s+nodeType:\s*NodeType\s*=\s*(\{[\s\S]*?\n\s*\});/
-      );
+      const nodeTypeStr = findNodeTypeDeclaration(content);
 
-      if (!nodeTypeMatch) continue;
+      if (!nodeTypeStr) continue;
 
       try {
-        const nodeTypeStr = nodeTypeMatch[1];
-
         const id = extractStringField(nodeTypeStr, "id", content);
         const name = extractStringField(nodeTypeStr, "name", content);
         if (!id || !name) continue;
@@ -112,6 +120,12 @@ function main() {
       }
     }
   }
+}
+
+function main() {
+  const nodes: Record<string, NodeType> = {};
+
+  scanNodesDirectory(nodes, RUNTIME_NODES_DIR);
 
   writeFileSync(OUTPUT_PATH, JSON.stringify(nodes, null, 2));
   console.log(`Extracted ${Object.keys(nodes).length} nodes to ${OUTPUT_PATH}`);

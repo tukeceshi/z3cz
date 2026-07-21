@@ -8,7 +8,19 @@ import {
   evaluateAiImagePromptReferenceStructural,
   isAiImagePromptReferenceTarget,
 } from "./ai-image-prompt-reference";
-import { AI_IMAGE_PROMPT_HANDLE_ID, AI_IMAGE_REFERENCE_HANDLE_ID } from "./ai-image-node-utils";
+import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
+} from "./ai-image-node-utils";
+import {
+  evaluateAiVideoReferenceStructural,
+  isAiVideoReferenceTarget,
+} from "./ai-video-reference-policy";
+import {
+  evaluateAiVideoPromptReferenceStructural,
+  isAiVideoPromptReferenceTarget,
+} from "./ai-video-prompt-reference";
+import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import {
   evaluateAiTextReferenceStructural,
   isAiTextKeywordsTarget,
@@ -158,16 +170,26 @@ export function validateWorkflowConnection(
     const refSourceNode = nodes.find((node) => node.id === sourceNodeId);
     if (!refSourceNode) return false;
 
-    const verdict = evaluateAiImageReferenceStructural({
-      targetNodeId: inputNodeId,
-      sourceNodeId,
-      sourceHandle: conn.sourceHandle,
-      sourceNodeType: refSourceNode.data.nodeType,
-      targetNodeData: hostNode.data,
-      edges,
-      nodes: nodes.map((node) => ({ id: node.id, data: node.data })),
-    });
-    if (!verdict.ok) return false;
+    if (refSourceNode.data.nodeType === AI_TEXT_NODE_TYPE) {
+      const verdict = evaluateAiImagePromptReferenceStructural({
+        targetNodeId: inputNodeId,
+        sourceNodeId,
+        sourceNodeType: refSourceNode.data.nodeType,
+        edges,
+      });
+      if (!verdict.ok) return false;
+    } else {
+      const verdict = evaluateAiImageReferenceStructural({
+        targetNodeId: inputNodeId,
+        sourceNodeId,
+        sourceHandle: conn.sourceHandle,
+        sourceNodeType: refSourceNode.data.nodeType,
+        targetNodeData: hostNode.data,
+        edges,
+        nodes: nodes.map((node) => ({ id: node.id, data: node.data })),
+      });
+      if (!verdict.ok) return false;
+    }
   }
 
   if (
@@ -183,6 +205,56 @@ export function validateWorkflowConnection(
       targetNodeId: inputNodeId,
       sourceNodeId,
       sourceNodeType: refSourceNode.data.nodeType,
+      edges,
+    });
+    if (!verdict.ok) return false;
+  }
+
+  if (
+    hostNode &&
+    isAiVideoReferenceTarget(hostNode.data.nodeType, inputHandleId)
+  ) {
+    const sourceNodeId =
+      inputNodeId === conn.target ? conn.source : conn.target;
+    const refSourceNode = nodes.find((node) => node.id === sourceNodeId);
+    if (!refSourceNode) return false;
+
+    if (refSourceNode.data.nodeType === AI_TEXT_NODE_TYPE) {
+      const verdict = evaluateAiVideoPromptReferenceStructural({
+        targetNodeId: inputNodeId,
+        sourceNodeId,
+        sourceNodeType: refSourceNode.data.nodeType,
+        edges,
+      });
+      if (!verdict.ok) return false;
+    } else {
+      const verdict = evaluateAiVideoReferenceStructural({
+        targetNodeId: inputNodeId,
+        sourceNodeId,
+        sourceHandle: conn.sourceHandle,
+        sourceNodeType: refSourceNode.data.nodeType,
+        targetNodeData: hostNode.data,
+        edges,
+        nodes: nodes.map((node) => ({ id: node.id, data: node.data })),
+      });
+      if (!verdict.ok) return false;
+    }
+  }
+
+  if (
+    hostNode &&
+    isAiVideoPromptReferenceTarget(hostNode.data.nodeType, inputHandleId)
+  ) {
+    const sourceNodeId =
+      inputNodeId === conn.target ? conn.source : conn.target;
+    const refSourceNode = nodes.find((node) => node.id === sourceNodeId);
+    if (!refSourceNode) return false;
+
+    const verdict = evaluateAiVideoPromptReferenceStructural({
+      targetNodeId: inputNodeId,
+      sourceNodeId,
+      sourceNodeType: refSourceNode.data.nodeType,
+      edges,
     });
     if (!verdict.ok) return false;
   }

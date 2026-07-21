@@ -1,5 +1,6 @@
 import type {
   ClientMessage,
+  WorkflowErrorMessage,
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
@@ -212,6 +213,9 @@ class NodeWorkflowSessionHub {
         runtime: workflowData.runtime,
         nodes: workflowData.nodes,
         edges: workflowData.edges,
+        ...(workflowData.editorViewport
+          ? { editorViewport: workflowData.editorViewport }
+          : {}),
         timestamp: workflow.updatedAt?.getTime() ?? Date.now(),
       },
     };
@@ -243,8 +247,27 @@ class NodeWorkflowSessionHub {
       (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
     );
 
-    session.workflowState = { ...message.state, edges: filteredEdges };
-    this.schedulePersist(session);
+    session.workflowState = {
+      ...message.state,
+      edges: filteredEdges,
+      editorViewport:
+        message.state.editorViewport ?? session.workflowState.editorViewport,
+    };
+
+    const graphUnchanged =
+      JSON.stringify(session.workflowState.nodes) ===
+        JSON.stringify(message.state.nodes) &&
+      JSON.stringify(session.workflowState.edges) ===
+        JSON.stringify(filteredEdges);
+    const viewportChanged =
+      JSON.stringify(session.workflowState.editorViewport ?? null) !==
+      JSON.stringify(message.state.editorViewport ?? null);
+
+    if (graphUnchanged && viewportChanged) {
+      void this.flushPersist(session);
+    } else {
+      this.schedulePersist(session);
+    }
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
@@ -338,6 +361,9 @@ class NodeWorkflowSessionHub {
         organizationId: session.organizationId,
         nodes: state.nodes,
         edges: state.edges,
+        ...(state.editorViewport
+          ? { editorViewport: state.editorViewport }
+          : {}),
       };
 
       await Promise.all([

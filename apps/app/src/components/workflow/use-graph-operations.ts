@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -26,19 +26,34 @@ import {
 } from "./trigger-node-mapping";
 import { collectAiTextFirstDegreeEdgeIds } from "./ai-text-edge-selection";
 import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
+import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
 import {
   buildAiTextReferenceConnectionFromCardDrop,
 } from "./ai-text-reference-policy";
 import {
   buildAiImageReferenceConnectionFromCardDrop,
 } from "./ai-image-reference-policy";
+import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-prompt-reference";
+import {
+  buildAiVideoReferenceConnectionFromCardDrop,
+} from "./ai-video-reference-policy";
+import { buildAiVideoPromptReferenceConnectionFromCardDrop } from "./ai-video-prompt-reference";
 import {
   mergeAiTextNodeCatalogInputs,
 } from "./ai-text-node-utils";
 import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
   mergeAiImageNodeCatalogInputs,
 } from "./ai-image-node-utils";
+import {
+  AI_VIDEO_PROMPT_HANDLE_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+  mergeAiVideoNodeCatalogInputs,
+} from "./ai-video-node-utils";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
+import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import type {
   ConnectionValidationState,
   NodeExecutionState,
@@ -68,34 +83,6 @@ function updateNodesWithExecutionState(
         }
       : node
   );
-}
-
-function updateEdgesForNodeExecution(
-  edges: ReactFlowEdge<WorkflowEdgeType>[],
-  state: NodeExecutionState,
-  connectedEdgeIds: string[]
-): ReactFlowEdge<WorkflowEdgeType>[] {
-  if (state === "executing") {
-    return edges.map((edge) => ({
-      ...edge,
-      data: {
-        ...(edge.data || {}),
-        isActive: connectedEdgeIds.includes(edge.id),
-      },
-    }));
-  }
-
-  if (state === "completed" || state === "error") {
-    return edges.map((edge) => ({
-      ...edge,
-      data: {
-        ...(edge.data || {}),
-        isActive: false,
-      },
-    }));
-  }
-
-  return edges;
 }
 
 function updateNodesWithExecutionOutputs(
@@ -140,20 +127,47 @@ function updateNodesWithExecutionError(
   );
 }
 
+function mergeGenerativeNodeCatalogInputs(
+  nodeType: string | undefined,
+  inputs: readonly WorkflowParameter[],
+  catalog: NodeType | undefined
+): WorkflowParameter[] {
+  return mergeAiVideoNodeCatalogInputs(
+    nodeType,
+    mergeAiImageNodeCatalogInputs(
+      nodeType,
+      mergeAiTextNodeCatalogInputs(nodeType, inputs, catalog),
+      catalog
+    ),
+    catalog
+  );
+}
+
 function createReactFlowNode(
   nodeType: NodeType,
   position: { x: number; y: number },
   createObjectUrl: (objectReference: ObjectReference) => string,
+  existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>,
   id?: string
 ): ReactFlowNode<WorkflowNodeType> {
+  const inputs = mergeGenerativeNodeCatalogInputs(
+    nodeType.type,
+    nodeType.inputs.map((param) => ({ ...param, id: param.name })),
+    nodeType
+  );
+
   return {
     id: id ?? `${nodeType.type}-${Date.now()}`,
     type: "workflowNode",
     position,
     selected: false,
     data: {
-      name: nodeType.name,
-      inputs: nodeType.inputs.map((param) => ({ ...param, id: param.name })),
+      name: resolveGenerativeNodeDisplayName({
+        nodeType: nodeType.type,
+        baseName: nodeType.name,
+        existingNodes,
+      }),
+      inputs,
       outputs: nodeType.outputs.map((param) => ({ ...param, id: param.name })),
       executionState: "idle" as NodeExecutionState,
       nodeType: nodeType.type,
@@ -174,6 +188,7 @@ export interface UseGraphOperationsProps {
   validateConnection?: (connection: Connection) => boolean;
   createObjectUrl: (objectReference: ObjectReference) => string;
   disabled?: boolean;
+  allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
 }
 
@@ -184,7 +199,6 @@ export interface UseGraphOperationsReturn {
   selectedNodes: ReactFlowNode<WorkflowNodeType>[];
   selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
   soleSelectedNodeId: string | null;
-  connectedHandles: ReadonlySet<string>;
   reactFlowInstance: ReactFlowInstance<
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
@@ -227,6 +241,9 @@ export interface UseGraphOperationsReturn {
   handleAddNode: () => void;
   handleNodeSelect: (template: NodeType) => void;
   updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
+  batchUpdateNodeExecutions: (
+    updates: Readonly<Record<string, NodeExecutionUpdate>>
+  ) => void;
   updateNodeData: (
     nodeId: string,
     data:
@@ -249,7 +266,8 @@ export function useGraphOperations({
   initialEdges = [],
   validateConnection = () => true,
   createObjectUrl,
-  disabled = false,
+  disabled: readOnlyDisabled = false,
+  allowedNodeTypes,
   nodeTypes = [],
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   // Core state
@@ -257,6 +275,8 @@ export function useGraphOperations({
     useNodesState<ReactFlowNode<WorkflowNodeType>>(initialNodes);
   const [edges, setEdges, onEdgesChange] =
     useEdgesState<ReactFlowEdge<WorkflowEdgeType>>(initialEdges);
+
+  const graphEditBlocked = readOnlyDisabled;
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
@@ -305,19 +325,6 @@ export function useGraphOperations({
     return found;
   }, [nodes, selectionFingerprint]);
 
-  const connectedHandles = useMemo(() => {
-    const set = new Set<string>();
-    for (const edge of edges) {
-      if (edge.targetHandle) {
-        set.add(`${edge.target}:${edge.targetHandle}`);
-      }
-      if (edge.sourceHandle) {
-        set.add(`${edge.source}:${edge.sourceHandle}`);
-      }
-    }
-    return set;
-  }, [edges]);
-
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
@@ -348,7 +355,9 @@ export function useGraphOperations({
         ? collectAiTextFirstDegreeEdgeIds(soleSelectedNodeId, edges)
         : selectedNode?.data.nodeType === AI_IMAGE_NODE_TYPE && soleSelectedNodeId
           ? collectAiImageFirstDegreeEdgeIds(soleSelectedNodeId, edges)
-          : new Set<string>();
+          : selectedNode?.data.nodeType === AI_VIDEO_NODE_TYPE && soleSelectedNodeId
+            ? collectAiVideoFirstDegreeEdgeIds(soleSelectedNodeId, edges)
+            : new Set<string>();
 
     setEdges((current) => {
       let changed = false;
@@ -373,13 +382,9 @@ export function useGraphOperations({
 
     const newNodesWithCreateObjectUrl = initialNodes.map((node) => {
       const catalog = nodeTypes.find((entry) => entry.type === node.data.nodeType);
-      const inputs = mergeAiImageNodeCatalogInputs(
+      const inputs = mergeGenerativeNodeCatalogInputs(
         node.data.nodeType,
-        mergeAiTextNodeCatalogInputs(
-          node.data.nodeType,
-          node.data.inputs,
-          catalog
-        ),
+        node.data.inputs,
         catalog
       );
 
@@ -393,7 +398,7 @@ export function useGraphOperations({
       };
     });
 
-    if (!disabled && initialNodes.length === 0 && nodesRef.current.length > 0) {
+    if (!graphEditBlocked && initialNodes.length === 0 && nodesRef.current.length > 0) {
       return;
     }
 
@@ -436,23 +441,23 @@ export function useGraphOperations({
 
       setNodes(updatedNodes);
     }
-  }, [initialNodes, disabled, setNodes, createObjectUrl, nodeTypes]);
+  }, [initialNodes, graphEditBlocked, setNodes, createObjectUrl, nodeTypes]);
 
   // Sync initialEdges prop
   useEffect(() => {
-    if (!disabled && initialEdges.length === 0 && edgesRef.current.length > 0) {
+    if (!graphEditBlocked && initialEdges.length === 0 && edgesRef.current.length > 0) {
       return;
     }
     if (JSON.stringify(edgesRef.current) !== JSON.stringify(initialEdges)) {
       setEdges(initialEdges);
     }
-  }, [initialEdges, disabled, setEdges]);
+  }, [initialEdges, graphEditBlocked, setEdges]);
 
-  // In disabled mode, only allow selection changes.
+  // In graphEditBlocked mode, only allow selection changes.
   // Always prevent removal of trigger nodes (use trigger type selector instead).
   const handleNodesChangeInternal = useCallback(
     (changes: NodeChange<ReactFlowNode<WorkflowNodeType>>[]) => {
-      if (disabled) {
+      if (graphEditBlocked) {
         const selectionChanges = changes.filter(
           (change) => change.type === "select"
         );
@@ -478,14 +483,14 @@ export function useGraphOperations({
         onNodesChange(filtered);
       }
     },
-    [onNodesChange, disabled, nodesRef]
+    [graphEditBlocked, onNodesChange, nodesRef]
   );
 
   // Connection event handlers
   const onConnectStart = useCallback(() => {
-    if (disabled) return;
+    if (graphEditBlocked) return;
     setConnectionValidationState("default");
-  }, [disabled]);
+  }, [graphEditBlocked]);
 
   // Connection validation
   const isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>> =
@@ -505,19 +510,19 @@ export function useGraphOperations({
           nodes,
           edges,
           extraValidate: validateConnection,
-          disabled,
+          graphEditBlocked,
         });
 
         setConnectionValidationState(valid ? "valid" : "invalid");
         return valid;
       },
-      [nodes, edges, validateConnection, disabled]
+      [nodes, edges, validateConnection, graphEditBlocked]
     );
 
   // Handle connection
   const onConnect = useCallback(
     (connection: Connection) => {
-      if (disabled) return;
+      if (graphEditBlocked) return;
       if (!connection.source || !connection.target) return;
       if (!isValidConnection(connection)) return;
 
@@ -525,29 +530,42 @@ export function useGraphOperations({
       const targetNode = nodes.find((node) => node.id === connection.target);
       if (!sourceNode || !targetNode) return;
 
+      const normalizedConnection =
+        targetNode.data.nodeType === AI_IMAGE_NODE_TYPE &&
+        connection.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID &&
+        sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
+          ? { ...connection, targetHandle: AI_IMAGE_PROMPT_HANDLE_ID }
+          : targetNode.data.nodeType === AI_VIDEO_NODE_TYPE &&
+              connection.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID &&
+              sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
+            ? { ...connection, targetHandle: AI_VIDEO_PROMPT_HANDLE_ID }
+            : connection;
+
       const targetInput = targetNode.data.inputs.find(
-        (input) => input.id === connection.targetHandle
+        (input) => input.id === normalizedConnection.targetHandle
       );
       const sourceInput = sourceNode.data.inputs.find(
-        (input) => input.id === connection.sourceHandle
+        (input) => input.id === normalizedConnection.sourceHandle
       );
 
-      const inputNodeId = targetInput ? connection.target : connection.source;
+      const inputNodeId = targetInput
+        ? normalizedConnection.target
+        : normalizedConnection.source;
       const inputHandleId = targetInput
-        ? connection.targetHandle
-        : connection.sourceHandle;
+        ? normalizedConnection.targetHandle
+        : normalizedConnection.sourceHandle;
       const acceptsMultipleConnections =
         targetInput?.repeated || sourceInput?.repeated || false;
 
       const newEdge: ReactFlowEdge<WorkflowEdgeType> = {
-        ...connection,
-        id: `${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}-${Date.now()}`,
+        ...normalizedConnection,
+        id: `${normalizedConnection.source}-${normalizedConnection.sourceHandle}-${normalizedConnection.target}-${normalizedConnection.targetHandle}-${Date.now()}`,
         type: "workflowEdge",
         data: {
           isValid: true,
           isActive: false,
-          sourceType: connection.sourceHandle ?? undefined,
-          targetType: connection.targetHandle ?? undefined,
+          sourceType: normalizedConnection.sourceHandle ?? undefined,
+          targetType: normalizedConnection.targetHandle ?? undefined,
           createObjectUrl,
         },
         zIndex: 0,
@@ -574,12 +592,12 @@ export function useGraphOperations({
         );
       });
     },
-    [setEdges, isValidConnection, disabled, createObjectUrl, nodes]
+    [setEdges, isValidConnection, graphEditBlocked, createObjectUrl, nodes]
   );
 
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
-      if (disabled) {
+      if (graphEditBlocked) {
         setConnectionValidationState("default");
         return;
       }
@@ -602,7 +620,25 @@ export function useGraphOperations({
               hoveredNodeId,
               nodes: policyNodes,
             }) ??
+            buildAiImagePromptReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            }) ??
             buildAiImageReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            }) ??
+            buildAiVideoPromptReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            }) ??
+            buildAiVideoReferenceConnectionFromCardDrop({
               dragFromNodeId: connectionState.fromNode.id,
               dragFromHandle: connectionState.fromHandle,
               hoveredNodeId,
@@ -614,7 +650,7 @@ export function useGraphOperations({
               connection: drop,
               nodes: nodesRef.current,
               edges: edgesRef.current,
-              disabled,
+              graphEditBlocked,
             })
           ) {
             onConnect(drop);
@@ -624,82 +660,138 @@ export function useGraphOperations({
 
       setConnectionValidationState("default");
     },
-    [disabled, onConnect, edgesRef, nodesRef]
+    [graphEditBlocked, onConnect, edgesRef, nodesRef]
   );
 
   // Node management
   const handleAddNode = useCallback(() => {
-    if (disabled) return;
+    if (graphEditBlocked) return;
     setIsNodeSelectorOpen(true);
-  }, [disabled]);
+  }, [graphEditBlocked]);
 
   const handleNodeSelect = useCallback(
     (nodeType: NodeType) => {
       if (!reactFlowInstance) return;
 
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
+      const placement = findOpenNodePosition({
+        reactFlowInstance,
+        nodeType: nodeType.type,
+        existingNodes: nodesRef.current,
       });
 
-      const newNode = createReactFlowNode(nodeType, position, createObjectUrl);
+      const newNode = createReactFlowNode(
+        nodeType,
+        placement.position,
+        createObjectUrl,
+        nodesRef.current
+      );
       newNode.selected = true;
 
       setNodes((nds) => [
         ...nds.map((node) => ({ ...node, selected: false })),
         newNode,
       ]);
+
+      if (placement.shouldPanIntoView) {
+        const { width, height } = resolveWorkflowNodeDimensions(nodeType.type);
+        const { zoom } = reactFlowInstance.getViewport();
+        reactFlowInstance.setCenter(
+          placement.position.x + width / 2,
+          placement.position.y + height / 2,
+          { zoom, duration: 200 }
+        );
+      }
     },
-    [reactFlowInstance, setNodes, createObjectUrl]
+    [reactFlowInstance, setNodes, createObjectUrl, nodesRef]
   );
 
-  // Update node execution data
-  const updateNodeExecution = useCallback(
-    (nodeId: string, update: NodeExecutionUpdate) => {
-      const { state, outputs, error } = update;
+  // Update node execution data (batched for multi-node execution ticks)
+  const batchUpdateNodeExecutions = useCallback(
+    (updates: Readonly<Record<string, NodeExecutionUpdate>>) => {
+      const entries = Object.entries(updates);
+      if (entries.length === 0) {
+        return;
+      }
 
       setNodes((nds) => {
         let updatedNodes = nds;
-
-        if (state !== undefined) {
-          updatedNodes = updateNodesWithExecutionState(
-            updatedNodes,
-            nodeId,
-            state
-          );
+        for (const [nodeId, update] of entries) {
+          if (update.state !== undefined) {
+            updatedNodes = updateNodesWithExecutionState(
+              updatedNodes,
+              nodeId,
+              update.state
+            );
+          }
+          if (update.outputs !== undefined) {
+            updatedNodes = updateNodesWithExecutionOutputs(
+              updatedNodes,
+              nodeId,
+              update.outputs
+            );
+          }
+          if (update.error !== undefined) {
+            updatedNodes = updateNodesWithExecutionError(
+              updatedNodes,
+              nodeId,
+              update.error
+            );
+          }
         }
-
-        if (outputs !== undefined) {
-          updatedNodes = updateNodesWithExecutionOutputs(
-            updatedNodes,
-            nodeId,
-            outputs
-          );
-        }
-
-        if (error !== undefined) {
-          updatedNodes = updateNodesWithExecutionError(
-            updatedNodes,
-            nodeId,
-            error
-          );
-        }
-
-        return [...updatedNodes];
+        return updatedNodes;
       });
 
-      if (state !== undefined) {
-        setEdges((eds) => {
-          const nodeEdges = getConnectedEdges(
-            [{ id: nodeId } as ReactFlowNode<WorkflowNodeType>],
-            eds
-          );
-          const connectedEdgeIds = nodeEdges.map((edge) => edge.id);
-          return [...updateEdgesForNodeExecution(eds, state, connectedEdgeIds)];
-        });
-      }
+      setEdges((eds) => {
+        const executingNodeIds = entries
+          .filter(([, update]) => update.state === "executing")
+          .map(([nodeId]) => nodeId);
+
+        if (executingNodeIds.length > 0) {
+          const activeEdgeIds = new Set<string>();
+          for (const nodeId of executingNodeIds) {
+            for (const edge of getConnectedEdges(
+              [{ id: nodeId } as ReactFlowNode<WorkflowNodeType>],
+              eds
+            )) {
+              activeEdgeIds.add(edge.id);
+            }
+          }
+          return eds.map((edge) => ({
+            ...edge,
+            data: {
+              ...(edge.data || {}),
+              isActive: activeEdgeIds.has(edge.id),
+            },
+          }));
+        }
+
+        const hasTerminalState = entries.some(
+          ([, update]) =>
+            update.state === "completed" ||
+            update.state === "error" ||
+            update.state === "idle"
+        );
+        if (hasTerminalState) {
+          return eds.map((edge) => ({
+            ...edge,
+            data: {
+              ...(edge.data || {}),
+              isActive: false,
+            },
+          }));
+        }
+
+        return eds;
+      });
     },
     [setNodes, setEdges]
+  );
+
+  const updateNodeExecution = useCallback(
+    (nodeId: string, update: NodeExecutionUpdate) => {
+      batchUpdateNodeExecutions({ [nodeId]: update });
+    },
+    [batchUpdateNodeExecutions]
   );
 
   const updateNodeData = useCallback(
@@ -749,15 +841,20 @@ export function useGraphOperations({
   // Delete nodes and their connected edges (trigger nodes are protected)
   const deleteNodes = useCallback(
     (nodeIds: string[]) => {
-      if (disabled || nodeIds.length === 0) return;
+      if (readOnlyDisabled || nodeIds.length === 0) return;
 
-      const nodesToDelete = nodesRef.current.filter(
-        (n) =>
-          nodeIds.includes(n.id) &&
-          !(n.data.nodeType && ALL_TRIGGER_NODE_TYPE_IDS.has(n.data.nodeType))
-      );
+      const nodesToDelete = nodesRef.current.filter((n) => {
+        if (!nodeIds.includes(n.id)) {
+          return false;
+        }
+        if (n.data.nodeType && ALL_TRIGGER_NODE_TYPE_IDS.has(n.data.nodeType)) {
+          return false;
+        }
+        return true;
+      });
       if (nodesToDelete.length === 0) return;
 
+      const idsToDelete = nodesToDelete.map((node) => node.id);
       const nodeEdges = getConnectedEdges(nodesToDelete, edgesRef.current);
       const edgeIdsToRemove = nodeEdges.map((edge) => edge.id);
 
@@ -767,9 +864,9 @@ export function useGraphOperations({
         );
       }
 
-      setNodes((nds) => nds.filter((node) => !nodeIds.includes(node.id)));
+      setNodes((nds) => nds.filter((node) => !idsToDelete.includes(node.id)));
     },
-    [disabled, nodesRef, setEdges, setNodes]
+    [edgesRef, nodesRef, readOnlyDisabled, setEdges, setNodes]
   );
 
   const deleteNode = useCallback(
@@ -779,14 +876,14 @@ export function useGraphOperations({
 
   const deleteEdge = useCallback(
     (edgeId: string) => {
-      if (disabled) return;
+      if (graphEditBlocked) return;
       setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
     },
-    [disabled, setEdges]
+    [graphEditBlocked, setEdges]
   );
 
   const deleteSelected = useCallback(() => {
-    if (disabled) return;
+    if (readOnlyDisabled) return;
 
     if (selectedNodes.length > 0) {
       deleteNodes(selectedNodes.map((n) => n.id));
@@ -794,7 +891,7 @@ export function useGraphOperations({
       const edgeIds = selectedEdges.map((e) => e.id);
       setEdges((eds) => eds.filter((edge) => !edgeIds.includes(edge.id)));
     }
-  }, [disabled, selectedNodes, selectedEdges, deleteNodes, setEdges]);
+  }, [deleteNodes, readOnlyDisabled, selectedEdges, selectedNodes, setEdges]);
 
   const deselectAll = useCallback(() => {
     setNodes((nds) => nds.map((node) => ({ ...node, selected: false })));
@@ -831,6 +928,7 @@ export function useGraphOperations({
           nodeType,
           { x: i * 400, y: 0 },
           createObjectUrl,
+          nodesRef.current,
           `${nodeType.type}-${Date.now()}-${i}`
         );
       });
@@ -848,7 +946,6 @@ export function useGraphOperations({
     selectedNodes,
     selectedEdges,
     soleSelectedNodeId,
-    connectedHandles,
     reactFlowInstance,
     isNodeSelectorOpen,
     connectionValidationState,
@@ -859,7 +956,7 @@ export function useGraphOperations({
     nodesRef,
     edgesRef,
     onNodesChange: handleNodesChangeInternal,
-    onEdgesChange: disabled ? NOOP : onEdgesChange,
+    onEdgesChange: graphEditBlocked ? NOOP : onEdgesChange,
     onConnect,
     onConnectStart,
     onConnectEnd,
@@ -887,13 +984,14 @@ export function useGraphOperations({
     handleAddNode,
     handleNodeSelect,
     updateNodeExecution,
+    batchUpdateNodeExecutions,
     updateNodeData,
-    updateEdgeData: disabled ? NOOP : updateEdgeData,
-    deleteNode: disabled ? NOOP : deleteNode,
-    deleteEdge: disabled ? NOOP : deleteEdge,
-    deleteSelected: disabled ? NOOP : deleteSelected,
+    updateEdgeData: graphEditBlocked ? NOOP : updateEdgeData,
+    deleteNode: readOnlyDisabled ? NOOP : deleteNode,
+    deleteEdge: graphEditBlocked ? NOOP : deleteEdge,
+    deleteSelected: readOnlyDisabled ? NOOP : deleteSelected,
     deselectAll,
-    addTriggerNodes: disabled ? NOOP : addTriggerNodes,
-    removeTriggerNodes: disabled ? NOOP : removeTriggerNodes,
+    addTriggerNodes: graphEditBlocked ? NOOP : addTriggerNodes,
+    removeTriggerNodes: graphEditBlocked ? NOOP : removeTriggerNodes,
   };
 }

@@ -7,6 +7,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
 import { useOrgUrl } from "@/hooks/use-org-url";
+import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
 import { useTemplate } from "@/services/template-service";
 import { createWorkflow } from "@/services/workflow-service";
 
@@ -36,7 +37,10 @@ export function TemplateTryPage() {
           edges: template.edges,
         };
         const newWorkflow = await createWorkflow(request, orgId);
-        navigate(getOrgUrl(`workflows/${newWorkflow.id}`), { replace: true });
+        navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
+          replace: true,
+          state: createWorkflowEditorLocationState(),
+        });
       } catch (error) {
         console.error("Failed to create workflow from template:", error);
         creatingRef.current = false;

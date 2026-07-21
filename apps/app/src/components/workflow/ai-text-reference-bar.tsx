@@ -58,6 +58,8 @@ export interface AiTextReferenceBarProps {
   readonly chips: readonly AiTextReferenceChip[];
   readonly disabled?: boolean;
   readonly allowUpload?: boolean;
+  readonly addReferenceDisabled?: boolean;
+  readonly canPickCanvasNode?: boolean;
   readonly onDisconnect: (edgeId: string) => void;
   readonly onPickCanvasNode: () => void;
   readonly onUploadFiles: (files: FileList) => void;
@@ -68,6 +70,8 @@ export function AiTextReferenceBar({
   chips,
   disabled = false,
   allowUpload = false,
+  addReferenceDisabled = false,
+  canPickCanvasNode = true,
   onDisconnect,
   onPickCanvasNode,
   onUploadFiles,
@@ -155,7 +159,7 @@ export function AiTextReferenceBar({
               "border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground",
               disabled && "pointer-events-none opacity-50"
             )}
-            disabled={disabled}
+            disabled={disabled || addReferenceDisabled}
             title={t("workflow.aiTextPanel.addReference")}
           >
             <PlusIcon className="h-4 w-4" />
@@ -163,7 +167,9 @@ export function AiTextReferenceBar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-44">
           <DropdownMenuItem
+            disabled={!canPickCanvasNode}
             onClick={() => {
+              if (!canPickCanvasNode) return;
               setMenuOpen(false);
               onPickCanvasNode();
             }}

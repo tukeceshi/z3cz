@@ -58,6 +58,7 @@ export {
 export { upstreamPollContinuation } from "./upstream/upstream-types";
 export { REPLICATE_PROVIDER } from "./upstream/replicate-upstream";
 export { NEWAPI_RELAY_PROVIDER } from "./upstream/newapi-relay-upstream";
+export { VOLCANO_VIDEO_PROVIDER } from "./ai-interface/execute-volcano-video";
 export type {
   RelayAccountService,
   ResolvedRelayAccount,
@@ -71,6 +72,10 @@ export type {
   ImageModelService,
   ResolvedRuntimeImageModel,
 } from "./image-model-service";
+export type {
+  VideoModelService,
+  ResolvedRuntimeVideoModel,
+} from "./video-model-service";
 export { SEEDANCE_2_0_T2V_PROFILE } from "./upstream/upstream-param-profiles";
 export {
   isSubscriptionRequiredError,
@@ -182,10 +187,18 @@ export {
   validateIdentifier,
 } from "./utils/database-table";
 export {
-  buildAllowedNodeTypeSet,
+  buildSchemeAllowedNodeTypeSet,
   filterNodeTypesByScheme,
   isSchemeNodeCatalogUnrestricted,
 } from "./filter-node-types-by-scheme";
+export {
+  assertWorkflowExecutableAgainstCatalog,
+  buildCatalogAllowedNodeTypeSet,
+  detectArchivedWorkflow,
+  findArchivedWorkflowNodes,
+  type ArchivedWorkflowDetection,
+  type ArchivedWorkflowNode,
+} from "./archived-node-utils";
 // Validation
 export {
   detectCycles,

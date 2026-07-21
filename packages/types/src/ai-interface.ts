@@ -17,6 +17,21 @@ export const AI_GENERATIVE_NODE_TYPES: readonly AiGenerativeNodeType[] = [
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
 ] as const;
+
+/** Executable when legacy is on, but omitted from the add-node panel catalog. */
+export const EXECUTABLE_NON_PANEL_NODE_TYPES: readonly string[] = [
+  AI_INTERFACE_NODE_TYPE,
+] as const;
+
+export function buildCatalogAllowedNodeTypeSet(
+  panelNodeTypes: readonly { readonly type: string }[]
+): Set<string> {
+  const allowed = new Set(panelNodeTypes.map((entry) => entry.type));
+  for (const nodeType of EXECUTABLE_NON_PANEL_NODE_TYPES) {
+    allowed.add(nodeType);
+  }
+  return allowed;
+}
 export const AI_INTERFACE_MANIFEST_SCHEMA_VERSION = 1 as const;
 export const AI_INTERFACE_RUNTIME_SCHEMA_VERSION = 1 as const;
 export const AI_INTERFACE_SOURCE_SCHEMA_VERSION = 1 as const;

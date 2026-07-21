@@ -132,8 +132,12 @@ export interface RuntimeDependencies<Env = unknown> {
   textModelService?: TextModelService;
   /** Platform image model resolver (canonical id → interface + provider model). */
   imageModelService?: ImageModelService;
+  /** Platform video model resolver (canonical id → interface + provider model). */
+  videoModelService?: import("./video-model-service").VideoModelService;
   /** Ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: ResolveAiImageStorage;
+  /** Ephemeral vs cloud storage for AI video generation. */
+  resolveAiVideoStorage?: ResolveAiImageStorage;
   runtimeVersion?: string;
 }
 
@@ -174,7 +178,9 @@ export abstract class Runtime<Env = unknown> {
   protected aiInterfaceService?: AiInterfaceService;
   protected textModelService?: TextModelService;
   protected imageModelService?: ImageModelService;
+  protected videoModelService?: import("./video-model-service").VideoModelService;
   protected resolveAiImageStorage?: ResolveAiImageStorage;
+  protected resolveAiVideoStorage?: ResolveAiImageStorage;
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -212,7 +218,9 @@ export abstract class Runtime<Env = unknown> {
     this.aiInterfaceService = dependencies.aiInterfaceService;
     this.textModelService = dependencies.textModelService;
     this.imageModelService = dependencies.imageModelService;
+    this.videoModelService = dependencies.videoModelService;
     this.resolveAiImageStorage = dependencies.resolveAiImageStorage;
+    this.resolveAiVideoStorage = dependencies.resolveAiVideoStorage;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -631,6 +639,10 @@ export abstract class Runtime<Env = unknown> {
       objectStore: this.objectStore,
       env: this.env as NodeEnv,
       relayAccountService: this.relayAccountService,
+      aiInterfaceService: this.aiInterfaceService,
+      resolveAiVideoStorage: this.resolveAiVideoStorage
+        ? (params) => this.resolveAiVideoStorage!(params)
+        : undefined,
       findNode: (workflowContext, nodeId) =>
         workflowContext.workflow.nodes.find((node) => node.id === nodeId),
     });
@@ -1245,9 +1257,23 @@ export abstract class Runtime<Env = unknown> {
                 canonicalId,
               })
           : undefined,
+        resolveVideoModel: this.videoModelService
+          ? (canonicalId) =>
+              this.videoModelService!.resolveVideoModel({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
         resolveAiImageStorage: this.resolveAiImageStorage
           ? () =>
               this.resolveAiImageStorage!({
+                organizationId: context.organizationId,
+                workflowId: context.workflowId,
+              })
+          : undefined,
+        resolveAiVideoStorage: this.resolveAiVideoStorage
+          ? () =>
+              this.resolveAiVideoStorage!({
                 organizationId: context.organizationId,
                 workflowId: context.workflowId,
               })

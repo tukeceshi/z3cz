@@ -10,6 +10,10 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import {
+  withGenerativeGeneratedContentMode,
+  withGenerativeManualContentMode,
+} from "./generative-card-mode-utils";
 
 export const AI_TEXT_RESULT_INPUT_ID = "result" as const;
 export const AI_TEXT_RESULT_HISTORY_INPUT_ID = "result_history" as const;
@@ -196,6 +200,18 @@ export function readAiTextResultHistory(
   };
 }
 
+export function withAiTextManualResult(
+  current: WorkflowNodeType,
+  text: string
+): Partial<WorkflowNodeType> {
+  const withResult = withAiTextResult(current, text);
+  const metadata = text.trim()
+    ? withGenerativeManualContentMode(current.metadata)
+    : withGenerativeGeneratedContentMode(current.metadata);
+
+  return { ...withResult, metadata };
+}
+
 export function withAiTextGeneratedResult(
   current: WorkflowNodeType,
   text: string
@@ -219,7 +235,10 @@ export function withAiTextGeneratedResult(
       "json"
     ),
   });
-  return withResult;
+  return {
+    ...withResult,
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
 }
 
 /** Mark history selection; caller should then commit item text via the text buffer. */
@@ -251,7 +270,7 @@ export function withAiTextHistorySelection(
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  return withAiTextResult(current, selected.text, {
+  const result = withAiTextResult(current, selected.text, {
     inputs: upsertInputValue(
       current.inputs,
       AI_TEXT_RESULT_HISTORY_INPUT_ID,
@@ -259,6 +278,10 @@ export function withAiTextHistorySelection(
       "json"
     ),
   });
+  return {
+    ...result,
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
 }
 
 export function isAiTextGenerating(

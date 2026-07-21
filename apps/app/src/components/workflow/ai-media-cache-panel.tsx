@@ -2,10 +2,12 @@ import {
   AI_MEDIA_CACHE_MAX_LIMIT_MB,
   AI_MEDIA_CACHE_MIN_LIMIT_MB,
 } from "@dafthunk/types";
+import Download from "lucide-react/icons/download";
 import Trash2 from "lucide-react/icons/trash-2";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,7 @@ import {
 } from "@/hooks/use-ai-media-cache";
 import {
   clearAiMediaCache,
+  downloadCacheForWorkflows,
   formatBytes,
   setAiMediaCacheSettings,
 } from "@/services/ai-media-cache-service";
@@ -94,8 +97,10 @@ export function AiMediaCachePanel({
   const [enabled, setEnabled] = useState(true);
   const [limitMb, setLimitMb] = useState(1024);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [confirmDownloadOpen, setConfirmDownloadOpen] = useState(false);
   const [pendingClearAll, setPendingClearAll] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!stats) return;
@@ -138,6 +143,18 @@ export function AiMediaCachePanel({
     notifyAiMediaCacheChanged();
     setSelected(new Set());
     await refresh();
+  };
+
+  const runDownloadSelected = async () => {
+    setDownloading(true);
+    try {
+      await downloadCacheForWorkflows({
+        organizationId,
+        workflowIds: Array.from(selected),
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const workflows = stats?.workflows ?? [];
@@ -226,6 +243,7 @@ export function AiMediaCachePanel({
                 id="select-all-workflows"
                 type="checkbox"
                 checked={allSelected}
+                disabled={workflows.length === 0}
                 onChange={(event) => handleSelectAll(event.target.checked)}
                 className="size-4 rounded border"
               />
@@ -262,6 +280,8 @@ export function AiMediaCachePanel({
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {t("workflow.aiMediaCache.workflowCounts", {
+                          total:
+                            row.entryCount ?? row.imageCount + row.videoCount,
                           images: row.imageCount,
                           videos: row.videoCount,
                           size: formatBytes(row.totalBytes),
@@ -277,10 +297,20 @@ export function AiMediaCachePanel({
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               variant="outline"
+              disabled={selected.size === 0 || downloading}
+              onClick={() => setConfirmDownloadOpen(true)}
+            >
+              <Download className="mr-1 size-4" />
+              {t("workflow.aiMediaCache.downloadSelected", {
+                count: selected.size,
+              })}
+            </Button>
+            <Button
+              variant="outline"
               disabled={selected.size === 0}
               onClick={() => {
                 setPendingClearAll(false);
-                setConfirmOpen(true);
+                setConfirmClearOpen(true);
               }}
             >
               <Trash2 className="mr-1 size-4" />
@@ -291,7 +321,7 @@ export function AiMediaCachePanel({
               disabled={workflows.length === 0}
               onClick={() => {
                 setPendingClearAll(true);
-                setConfirmOpen(true);
+                setConfirmClearOpen(true);
               }}
             >
               {t("workflow.aiMediaCache.clearAll")}
@@ -300,7 +330,7 @@ export function AiMediaCachePanel({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -313,13 +343,45 @@ export function AiMediaCachePanel({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={(event) => {
+                event.preventDefault();
                 void runClear(
                   pendingClearAll ? undefined : Array.from(selected)
-                ).then(() => setConfirmOpen(false));
+                ).then(() => setConfirmClearOpen(false));
               }}
             >
               {t("workflow.aiMediaCache.confirmAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmDownloadOpen}
+        onOpenChange={setConfirmDownloadOpen}
+      >
+        <AlertDialogContent>
+          <Alert variant="destructive" className="mb-2">
+            <AlertTitle>
+              {t("workflow.aiMediaCache.downloadWarningTitle")}
+            </AlertTitle>
+            <AlertDescription>
+              {t("workflow.aiMediaCache.downloadWarningDescription")}
+            </AlertDescription>
+          </Alert>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={downloading}
+              onClick={() => {
+                void runDownloadSelected().then(() =>
+                  setConfirmDownloadOpen(false)
+                );
+              }}
+            >
+              {downloading
+                ? t("workflow.aiMediaCache.downloading")
+                : t("workflow.aiMediaCache.downloadConfirmAction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

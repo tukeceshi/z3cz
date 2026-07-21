@@ -1,36 +1,87 @@
+import type { GetNodeTypesResponse, NodeType } from "@dafthunk/types";
+import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
 import { env } from "cloudflare:test";
-import type { GetNodeTypesResponse } from "@dafthunk/types";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Bindings } from "../context";
 import { ApiContext } from "../context";
-import { MockNodeRegistry } from "../mocks";
-import typeRoutes from "./types";
 
-// Mock the CloudflareNodeRegistry to use MockNodeRegistry instead
-vi.mock("../runtime/cloudflare-node-registry", () => ({
-  CloudflareNodeRegistry: class {
-    constructor(_env: any, _developerMode: boolean) {
-      return new MockNodeRegistry(env as Bindings, true);
-    }
+vi.mock("../auth", () => ({
+  optionalJwtMiddleware: async (
+    _c: unknown,
+    next: () => Promise<void>
+  ): Promise<void> => {
+    await next();
   },
 }));
 
+vi.mock("../utils/workflow-scheme", () => ({
+  filterNodeTypesForScheme: vi.fn(
+    (nodeTypes: NodeType[]) => nodeTypes
+  ),
+}));
+
+const { defaultTypesCatalog, generativeNodeTypes, getAllNodeTypesMock } =
+  vi.hoisted(() => {
+    const generativeNodeTypes = ["ai-text", "ai-image", "ai-video"] as const;
+
+    function createCatalogNodeType(type: string): NodeType {
+      return {
+        id: type,
+        name: type,
+        type,
+        tags: [],
+        icon: "box",
+        inputs: [],
+        outputs: [],
+      };
+    }
+
+    const defaultTypesCatalog = [
+      ...generativeNodeTypes.map((type) => createCatalogNodeType(type)),
+      createCatalogNodeType("http-request"),
+    ] satisfies NodeType[];
+
+    return {
+      generativeNodeTypes,
+      defaultTypesCatalog,
+      getAllNodeTypesMock: vi.fn(async () => defaultTypesCatalog),
+    };
+  });
+
+vi.mock("../utils/node-types", () => ({
+  getAllNodeTypes: getAllNodeTypesMock,
+}));
+
+const mockExecutionCtx = {
+  waitUntil: () => {},
+  passThroughOnException: () => {},
+} satisfies ExecutionContext;
+
 describe("Types Route Tests", () => {
   let app: Hono<ApiContext>;
+  let typeRoutes: typeof import("./types").default;
 
-  beforeEach(() => {
-    // Create a new Hono app instance with the types routes
+  function requestTypes(path = "/types", init?: RequestInit) {
+    return app.request(
+      path,
+      init ?? { method: "GET" },
+      env as Bindings,
+      mockExecutionCtx
+    );
+  }
+
+  beforeEach(async () => {
+    getAllNodeTypesMock.mockResolvedValue(defaultTypesCatalog);
+    typeRoutes = (await import("./types")).default;
     app = new Hono<ApiContext>();
     app.route("/types", typeRoutes);
   });
 
   describe("Basic Functionality", () => {
     it("should handle GET requests to /types", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain(
@@ -39,9 +90,7 @@ describe("Types Route Tests", () => {
     });
 
     it("should return valid GetNodeTypesResponse structure", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const data = (await response.json()) as GetNodeTypesResponse;
 
@@ -51,14 +100,11 @@ describe("Types Route Tests", () => {
     });
 
     it("should return node types with correct structure", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const data = (await response.json()) as GetNodeTypesResponse;
       const nodeType = data.nodeTypes[0];
 
-      // Validate NodeType structure
       expect(nodeType).toHaveProperty("id");
       expect(nodeType).toHaveProperty("name");
       expect(nodeType).toHaveProperty("type");
@@ -79,9 +125,7 @@ describe("Types Route Tests", () => {
 
   describe("Node Types", () => {
     it("should return all node types", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       expect(response.status).toBe(200);
 
@@ -94,16 +138,15 @@ describe("Types Route Tests", () => {
 
   describe("Error Handling", () => {
     it("should handle OPTIONS requests (CORS preflight)", async () => {
-      const response = await app.request("/types", {
+      const response = await requestTypes("/types", {
         method: "OPTIONS",
       });
 
-      // Should not error (might return 404 or 405, but not 500)
       expect(response.status).not.toBe(500);
     });
 
     it("should handle POST requests with method not allowed", async () => {
-      const response = await app.request("/types", {
+      const response = await requestTypes("/types", {
         method: "POST",
         body: JSON.stringify({ test: "data" }),
         headers: {
@@ -111,14 +154,11 @@ describe("Types Route Tests", () => {
         },
       });
 
-      // Should not error with 500 (might return 404 or 405)
       expect(response.status).not.toBe(500);
     });
 
     it("should handle malformed query parameters", async () => {
-      const response = await app.request("/types?workflowType=", {
-        method: "GET",
-      });
+      const response = await requestTypes("/types?workflowType=");
 
       expect(response.status).toBe(200);
       const data = (await response.json()) as GetNodeTypesResponse;
@@ -128,27 +168,21 @@ describe("Types Route Tests", () => {
 
   describe("Response Validation", () => {
     it("should return consistent response format", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const data = (await response.json()) as GetNodeTypesResponse;
 
-      // Validate the exact structure matches GetNodeTypesResponse
       expect(Object.keys(data)).toEqual(["nodeTypes"]);
       expect(data.nodeTypes).toBeDefined();
       expect(Array.isArray(data.nodeTypes)).toBe(true);
     });
 
     it("should return node types with required fields", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const data = (await response.json()) as GetNodeTypesResponse;
 
       data.nodeTypes.forEach((nodeType) => {
-        // Required fields
         expect(nodeType.id).toBeDefined();
         expect(nodeType.name).toBeDefined();
         expect(nodeType.type).toBeDefined();
@@ -157,7 +191,6 @@ describe("Types Route Tests", () => {
         expect(nodeType.inputs).toBeDefined();
         expect(nodeType.outputs).toBeDefined();
 
-        // Types
         expect(typeof nodeType.id).toBe("string");
         expect(typeof nodeType.name).toBe("string");
         expect(typeof nodeType.type).toBe("string");
@@ -166,7 +199,6 @@ describe("Types Route Tests", () => {
         expect(Array.isArray(nodeType.inputs)).toBe(true);
         expect(Array.isArray(nodeType.outputs)).toBe(true);
 
-        // Optional fields
         if (nodeType.description !== undefined) {
           expect(typeof nodeType.description).toBe("string");
         }
@@ -180,21 +212,17 @@ describe("Types Route Tests", () => {
     });
 
     it("should return node types with valid parameters", async () => {
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const data = (await response.json()) as GetNodeTypesResponse;
 
       data.nodeTypes.forEach((nodeType) => {
-        // Validate input parameters
         nodeType.inputs.forEach((input) => {
           expect(input.name).toBeDefined();
           expect(input.type).toBeDefined();
           expect(typeof input.name).toBe("string");
           expect(typeof input.type).toBe("string");
 
-          // Valid parameter types
           expect([
             "string",
             "number",
@@ -208,14 +236,12 @@ describe("Types Route Tests", () => {
           ]).toContain(input.type);
         });
 
-        // Validate output parameters
         nodeType.outputs.forEach((output) => {
           expect(output.name).toBeDefined();
           expect(output.type).toBeDefined();
           expect(typeof output.name).toBe("string");
           expect(typeof output.type).toBe("string");
 
-          // Valid parameter types
           expect([
             "string",
             "number",
@@ -235,21 +261,17 @@ describe("Types Route Tests", () => {
     it("should respond quickly", async () => {
       const startTime = Date.now();
 
-      const response = await app.request("/types", {
-        method: "GET",
-      });
+      const response = await requestTypes();
 
       const endTime = Date.now();
       const responseTime = endTime - startTime;
 
       expect(response.status).toBe(200);
-      expect(responseTime).toBeLessThan(1000); // Should respond within 1 second
+      expect(responseTime).toBeLessThan(1000);
     });
 
     it("should handle multiple concurrent requests", async () => {
-      const requests = Array.from({ length: 5 }, () =>
-        app.request("/types", { method: "GET" })
-      );
+      const requests = Array.from({ length: 5 }, () => requestTypes());
 
       const responses = await Promise.all(requests);
 
@@ -259,8 +281,8 @@ describe("Types Route Tests", () => {
     });
 
     it("should return consistent results across multiple calls", async () => {
-      const response1 = await app.request("/types", { method: "GET" });
-      const response2 = await app.request("/types", { method: "GET" });
+      const response1 = await requestTypes();
+      const response2 = await requestTypes();
 
       const data1 = (await response1.json()) as GetNodeTypesResponse;
       const data2 = (await response2.json()) as GetNodeTypesResponse;
@@ -269,10 +291,29 @@ describe("Types Route Tests", () => {
       expect(response2.status).toBe(200);
       expect(data1.nodeTypes.length).toBe(data2.nodeTypes.length);
 
-      // Should return the same node types in the same order
       expect(data1.nodeTypes.map((n) => n.id)).toEqual(
         data2.nodeTypes.map((n) => n.id)
       );
+    });
+  });
+
+  describe("Core catalog", () => {
+    it("returns only core generative types", async () => {
+      getAllNodeTypesMock.mockResolvedValueOnce(
+        defaultTypesCatalog.filter((entry) =>
+          generativeNodeTypes.includes(
+            entry.type as (typeof generativeNodeTypes)[number]
+          )
+        )
+      );
+
+      const response = await requestTypes();
+      expect(response.status).toBe(200);
+
+      const data = (await response.json()) as GetNodeTypesResponse;
+      expect(data.nodeTypes.map((entry) => entry.type)).toEqual([
+        ...AI_GENERATIVE_NODE_TYPES,
+      ]);
     });
   });
 });

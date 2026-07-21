@@ -9,6 +9,7 @@ import {
   AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_CARD_WIDTH_PX,
   AI_IMAGE_OUTPUT_ID,
+  AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
   isAiImageAllowedReferenceNodeType,
 } from "./ai-image-node-utils";
@@ -230,7 +231,10 @@ export function isAiImageInboundReferenceEdge(params: {
 
   const targetHandle =
     params.targetHandle ?? params.dataTargetHandle ?? undefined;
-  if (targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID) {
+  if (
+    targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
+    targetHandle === AI_IMAGE_PROMPT_HANDLE_ID
+  ) {
     return true;
   }
 

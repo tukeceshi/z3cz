@@ -26,6 +26,7 @@
 import type { RuntimeParams } from "@dafthunk/runtime";
 import type {
   ClientMessage,
+  WorkflowErrorMessage,
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
@@ -383,6 +384,9 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,
       edges: workflowData.edges,
+      ...(workflowData.editorViewport
+        ? { editorViewport: workflowData.editorViewport }
+        : {}),
       timestamp: workflow.updatedAt?.getTime() || Date.now(),
     };
 
@@ -419,8 +423,27 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
     );
 
-    this.workflowState = { ...message.state, edges: filteredEdges };
-    await this.schedulePersist();
+    this.workflowState = {
+      ...message.state,
+      edges: filteredEdges,
+      editorViewport:
+        message.state.editorViewport ?? this.workflowState.editorViewport,
+    };
+
+    const graphUnchanged =
+      JSON.stringify(this.workflowState.nodes) ===
+        JSON.stringify(message.state.nodes) &&
+      JSON.stringify(this.workflowState.edges) ===
+        JSON.stringify(filteredEdges);
+    const viewportChanged =
+      JSON.stringify(this.workflowState.editorViewport ?? null) !==
+      JSON.stringify(message.state.editorViewport ?? null);
+
+    if (graphUnchanged && viewportChanged) {
+      await this.flushPersist();
+    } else {
+      await this.schedulePersist();
+    }
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
@@ -785,6 +808,9 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         organizationId: pending.organizationId,
         nodes: pending.workflowState.nodes,
         edges: pending.workflowState.edges,
+        ...(pending.workflowState.editorViewport
+          ? { editorViewport: pending.workflowState.editorViewport }
+          : {}),
         ...(pending.apiHost ? { apiHost: pending.apiHost } : {}),
       };
 

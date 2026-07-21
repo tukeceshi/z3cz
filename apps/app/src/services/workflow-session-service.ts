@@ -5,6 +5,7 @@ import type {
   ServerMessage,
   WorkflowBillingMode,
   WorkflowExecution,
+  WorkflowEditorViewport,
   WorkflowRuntime,
   WorkflowState,
   WorkflowTrigger,
@@ -64,6 +65,7 @@ export interface WorkflowWSOptions {
   onInit?: (state: WorkflowState) => void;
   onUpdate?: (state: WorkflowState) => void;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
+  onWorkflowError?: (error: { code: string; message: string }) => void;
 
   // Connection-level callbacks (problems)
   onConnectionOpen?: () => void;
@@ -222,6 +224,13 @@ export class WorkflowWebSocket {
           });
           break;
 
+        case "error":
+          this.options.onWorkflowError?.({
+            code: message.code,
+            message: message.message,
+          });
+          break;
+
         default:
           // Unknown message type - protocol violation
           console.error(
@@ -274,6 +283,30 @@ export class WorkflowWebSocket {
     const success = this.sendMessage(
       { type: "update", state: updatedState },
       "send state update"
+    );
+
+    if (success) {
+      this.currentState = updatedState;
+    }
+  }
+
+  /**
+   * Persist editor canvas pan/zoom (debounced on the client).
+   */
+  sendViewportUpdate(viewport: WorkflowEditorViewport): void {
+    if (!this.currentState) {
+      return;
+    }
+
+    const updatedState: WorkflowState = {
+      ...this.currentState,
+      editorViewport: viewport,
+      timestamp: Date.now(),
+    };
+
+    const success = this.sendMessage(
+      { type: "update", state: updatedState },
+      "send viewport update"
     );
 
     if (success) {

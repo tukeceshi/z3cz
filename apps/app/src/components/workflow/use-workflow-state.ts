@@ -12,6 +12,7 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import type { RefObject } from "react";
+import { useMemo } from "react";
 
 import { useClipboard } from "./use-clipboard";
 import { useGraphOperations } from "./use-graph-operations";
@@ -33,6 +34,7 @@ interface UseWorkflowStateProps {
   validateConnection?: (connection: Connection) => boolean;
   createObjectUrl: (objectReference: ObjectReference) => string;
   disabled?: boolean;
+  allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
 }
 
@@ -68,6 +70,9 @@ interface UseWorkflowStateReturn {
     > | null
   ) => void;
   updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
+  batchUpdateNodeExecutions: (
+    updates: Readonly<Record<string, NodeExecutionUpdate>>
+  ) => void;
   updateNodeData: (
     nodeId: string,
     data:
@@ -89,7 +94,6 @@ interface UseWorkflowStateReturn {
   pasteFromClipboard: () => void;
   hasClipboardData: boolean;
   soleSelectedNodeId: string | null;
-  connectedHandles: ReadonlySet<string>;
   isDraggingRef: RefObject<boolean>;
 }
 
@@ -103,6 +107,7 @@ export function useWorkflowState({
   validateConnection,
   createObjectUrl,
   disabled = false,
+  allowedNodeTypes,
   nodeTypes = [],
 }: UseWorkflowStateProps): UseWorkflowStateReturn {
   // Core graph state and operations
@@ -112,14 +117,18 @@ export function useWorkflowState({
     validateConnection,
     createObjectUrl,
     disabled,
+    allowedNodeTypes,
     nodeTypes,
   });
+
+  const graphLocked = disabled;
+  const clipboardLocked = disabled;
 
   // Persistence (side-effect only)
   useGraphPersistence({
     nodes: graphOps.nodes,
     edges: graphOps.edges,
-    disabled,
+    disabled: graphLocked,
     isDraggingRef: graphOps.isDraggingRef,
     onNodesChangePersist,
     onEdgesChangePersist,
@@ -131,7 +140,7 @@ export function useWorkflowState({
     edgesRef: graphOps.edgesRef,
     setNodes: graphOps.setNodes,
     reactFlowInstance: graphOps.reactFlowInstance,
-    disabled,
+    disabled: graphLocked,
   });
 
   // Clipboard & duplication
@@ -143,18 +152,18 @@ export function useWorkflowState({
     setNodes: graphOps.setNodes,
     setEdges: graphOps.setEdges,
     deleteSelected: graphOps.deleteSelected,
-    disabled,
+    disabled: graphLocked,
     createObjectUrl,
   });
 
   return {
     ...graphOps,
     applyLayout,
-    duplicateNode: disabled ? NOOP : clipboard.duplicateNode,
-    duplicateSelected: disabled ? NOOP : clipboard.duplicateSelected,
-    copySelected: disabled ? NOOP : clipboard.copySelected,
-    cutSelected: disabled ? NOOP : clipboard.cutSelected,
-    pasteFromClipboard: disabled ? NOOP : clipboard.pasteFromClipboard,
+    duplicateNode: clipboardLocked ? NOOP : clipboard.duplicateNode,
+    duplicateSelected: clipboardLocked ? NOOP : clipboard.duplicateSelected,
+    copySelected: clipboardLocked ? NOOP : clipboard.copySelected,
+    cutSelected: clipboardLocked ? NOOP : clipboard.cutSelected,
+    pasteFromClipboard: clipboardLocked ? NOOP : clipboard.pasteFromClipboard,
     hasClipboardData: clipboard.hasClipboardData,
   };
 }

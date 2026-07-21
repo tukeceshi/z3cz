@@ -2,11 +2,13 @@ import type {
   Edge as ReactFlowEdge,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
 
 import { AI_TEXT_GENERATING_META_KEY } from "./ai-text-node-utils";
+import { stripWorkflowNodeCanvasUi } from "./workflow-node-canvas-ui";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+
+const PERSIST_DEBOUNCE_MS = 250;
 
 function stripTransientMetadata(
   metadata: Record<string, string> | undefined
@@ -17,7 +19,6 @@ function stripTransientMetadata(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-// Strip execution-only fields so persistence ignores transient state
 const stripExecutionFields = (
   data: WorkflowNodeType
 ): Omit<WorkflowNodeType, "executionState" | "error"> & {
@@ -26,9 +27,10 @@ const stripExecutionFields = (
 } => {
   const { executionState, error, metadata: _metadata, ...rest } = data;
   const metadata = stripTransientMetadata(data.metadata);
+  const persistable = stripWorkflowNodeCanvasUi(rest);
 
   return {
-    ...rest,
+    ...persistable,
     ...(metadata ? { metadata } : {}),
     outputs: data.outputs.map(({ value, ...outputRest }) => outputRest),
     inputs: data.inputs,
@@ -46,15 +48,11 @@ interface UseGraphPersistenceProps {
   nodes: ReactFlowNode<WorkflowNodeType>[];
   edges: ReactFlowEdge<WorkflowEdgeType>[];
   disabled: boolean;
-  isDraggingRef: RefObject<boolean>;
+  isDraggingRef: React.RefObject<boolean>;
   onNodesChangePersist?: (nodes: ReactFlowNode<WorkflowNodeType>[]) => void;
   onEdgesChangePersist?: (edges: ReactFlowEdge<WorkflowEdgeType>[]) => void;
 }
 
-/**
- * Side-effect-only hook that notifies the parent when persistable
- * graph data (nodes/edges minus execution state) actually changes.
- */
 export function useGraphPersistence({
   nodes,
   edges,
@@ -65,45 +63,77 @@ export function useGraphPersistence({
 }: UseGraphPersistenceProps): void {
   const lastPersistedNodesRef = useRef<string>("");
   const lastPersistedEdgesRef = useRef<string>("");
+  const nodesPersistTimerRef = useRef<number | null>(null);
+  const edgesPersistTimerRef = useRef<number | null>(null);
+  const pendingNodesRef = useRef<ReactFlowNode<WorkflowNodeType>[]>(nodes);
+  const pendingEdgesRef = useRef<ReactFlowEdge<WorkflowEdgeType>[]>(edges);
 
-  // Persist nodes when their persistable data changes (skip during drag)
   useEffect(() => {
-    if (disabled || isDraggingRef.current) return;
-
-    const normalizedNodes = nodes.map((node) => ({
-      id: node.id,
-      type: node.type,
-      position: node.position,
-      data: stripExecutionFields(node.data),
-    }));
-
-    const serialized = JSON.stringify(normalizedNodes);
-
-    if (serialized !== lastPersistedNodesRef.current) {
-      lastPersistedNodesRef.current = serialized;
-      onNodesChangePersist?.(nodes);
+    pendingNodesRef.current = nodes;
+    if (disabled || isDraggingRef.current) {
+      return;
     }
-  }, [nodes, onNodesChangePersist, disabled]);
 
-  // Persist edges when their persistable data changes
+    if (nodesPersistTimerRef.current !== null) {
+      window.clearTimeout(nodesPersistTimerRef.current);
+    }
+
+    nodesPersistTimerRef.current = window.setTimeout(() => {
+      nodesPersistTimerRef.current = null;
+      const normalizedNodes = pendingNodesRef.current.map((node) => ({
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        data: stripExecutionFields(node.data),
+      }));
+
+      const serialized = JSON.stringify(normalizedNodes);
+      if (serialized !== lastPersistedNodesRef.current) {
+        lastPersistedNodesRef.current = serialized;
+        onNodesChangePersist?.(pendingNodesRef.current);
+      }
+    }, PERSIST_DEBOUNCE_MS);
+
+    return () => {
+      if (nodesPersistTimerRef.current !== null) {
+        window.clearTimeout(nodesPersistTimerRef.current);
+      }
+    };
+  }, [nodes, onNodesChangePersist, disabled, isDraggingRef]);
+
   useEffect(() => {
-    if (disabled) return;
-
-    const normalizedEdges = edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: edge.type,
-      data: stripEdgeExecutionFields(edge.data),
-    }));
-
-    const serialized = JSON.stringify(normalizedEdges);
-
-    if (serialized !== lastPersistedEdgesRef.current) {
-      lastPersistedEdgesRef.current = serialized;
-      onEdgesChangePersist?.(edges);
+    pendingEdgesRef.current = edges;
+    if (disabled) {
+      return;
     }
+
+    if (edgesPersistTimerRef.current !== null) {
+      window.clearTimeout(edgesPersistTimerRef.current);
+    }
+
+    edgesPersistTimerRef.current = window.setTimeout(() => {
+      edgesPersistTimerRef.current = null;
+      const normalizedEdges = pendingEdgesRef.current.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        type: edge.type,
+        data: stripEdgeExecutionFields(edge.data),
+      }));
+
+      const serialized = JSON.stringify(normalizedEdges);
+      if (serialized !== lastPersistedEdgesRef.current) {
+        lastPersistedEdgesRef.current = serialized;
+        onEdgesChangePersist?.(pendingEdgesRef.current);
+      }
+    }, PERSIST_DEBOUNCE_MS);
+
+    return () => {
+      if (edgesPersistTimerRef.current !== null) {
+        window.clearTimeout(edgesPersistTimerRef.current);
+      }
+    };
   }, [edges, onEdgesChangePersist, disabled]);
 }

@@ -797,7 +797,7 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/workflows/:id",
     element: (
-      <OrgLayout title="Workflows">
+      <OrgLayout title="Workflows" sidebarDefaultOpen={false}>
         <ProtectedRoute>
           <EditorPage />
         </ProtectedRoute>

@@ -73,10 +73,10 @@ class NodeDurableWorkflowRuntime extends Runtime<Bindings> {
   }
 }
 
-export function createNodeDurableWorkflowRuntime(
+export async function createNodeDurableWorkflowRuntime(
   env: Bindings,
   reportProgress: (execution: WorkflowExecution) => Promise<void>
-): NodeDurableWorkflowRuntime {
+): Promise<NodeDurableWorkflowRuntime> {
   const monitoringService: MonitoringService = {
     async sendUpdate(execution) {
       await reportProgress(execution);
@@ -84,7 +84,7 @@ export function createNodeDurableWorkflowRuntime(
   };
   return new NodeDurableWorkflowRuntime(
     env,
-    buildDependencies(env, monitoringService)
+    await buildDependencies(env, monitoringService)
   );
 }
 

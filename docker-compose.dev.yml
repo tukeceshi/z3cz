@@ -152,7 +152,6 @@ services:
       API_PROXY_TARGET: http://api:3102
       HOST: 0.0.0.0
       SKIP_EXTRACT_NODES: "1"
-      # Set when using profile gateway (http://localhost:8080) so WS uses same-origin Caddy.
       VITE_WS_VIA_PROXY: ${VITE_WS_VIA_PROXY:-}
     networks:
       - dafthunk-network

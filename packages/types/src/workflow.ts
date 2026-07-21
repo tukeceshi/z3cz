@@ -357,6 +357,15 @@ export interface Edge {
 }
 
 /**
+ * Canvas pan/zoom saved per workflow (editor UI only, not used at execution).
+ */
+export interface WorkflowEditorViewport {
+  readonly x: number;
+  readonly y: number;
+  readonly zoom: number;
+}
+
+/**
  * Represents a workflow as stored in the database
  */
 export interface Workflow {
@@ -371,6 +380,8 @@ export interface Workflow {
   runtime?: WorkflowRuntime;
   nodes: Node[];
   edges: Edge[];
+  /** Last editor canvas pan/zoom; restored on next open */
+  editorViewport?: WorkflowEditorViewport;
 }
 
 /**
@@ -493,6 +504,7 @@ export interface UpdateWorkflowRequest {
   runtime?: WorkflowRuntime;
   nodes: Node[];
   edges: Edge[];
+  editorViewport?: WorkflowEditorViewport;
 }
 
 /**
@@ -585,6 +597,15 @@ export interface WorkflowExecutionUpdateMessage {
 }
 
 /**
+ * Message sent from server to client when a workflow update is rejected
+ */
+export interface WorkflowErrorMessage {
+  type: "error";
+  code: "ARCHIVED_WORKFLOW";
+  message: string;
+}
+
+/**
  * Messages sent from client to server
  */
 export type ClientMessage = WorkflowUpdateMessage | WorkflowExecuteMessage;
@@ -595,7 +616,8 @@ export type ClientMessage = WorkflowUpdateMessage | WorkflowExecuteMessage;
 export type ServerMessage =
   | WorkflowInitMessage
   | WorkflowUpdateMessage
-  | WorkflowExecutionUpdateMessage;
+  | WorkflowExecutionUpdateMessage
+  | WorkflowErrorMessage;
 
 /**
  * Represents a workflow template

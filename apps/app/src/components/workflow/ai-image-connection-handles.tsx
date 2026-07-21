@@ -11,6 +11,7 @@ import { cn } from "@/utils/utils";
 import {
   AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_OUTPUT_ID,
+  AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
 } from "./ai-image-node-utils";
 import {
@@ -195,6 +196,18 @@ function AiImageEdgeSide({ side, disabled = false }: AiImageEdgeSideProps) {
           className={hitHandleClass}
           style={handleStyle}
         />
+
+        {!isSource ? (
+          <Handle
+            type="target"
+            position={Position.Left}
+            id={AI_IMAGE_PROMPT_HANDLE_ID}
+            isConnectable={false}
+            isConnectableStart={false}
+            className={hitHandleClass}
+            style={handleStyle}
+          />
+        ) : null}
 
         <div
           className={cn(
