@@ -95,11 +95,11 @@ function AiTextWidget({
     const item = historyItems.items.find((entry) => entry.id === id);
     if (!item) return;
 
-    textBuffer.flush();
+    setEditing(false);
+    textBuffer.reset(item.text);
     updateNodeData(nodeId, (current) =>
       withAiTextHistorySelection(current, id)
     );
-    textBuffer.commit(item.text);
   };
 
   return (

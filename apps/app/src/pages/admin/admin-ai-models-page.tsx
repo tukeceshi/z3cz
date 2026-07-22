@@ -575,15 +575,6 @@ function TextModelSettingsDialog({
   const [maxVideoReferenceSeconds, setMaxVideoReferenceSeconds] = useState(
     String(baseRules.maxVideoReferenceSeconds)
   );
-  const [allowPromptInjectText, setAllowPromptInjectText] = useState(
-    baseRules.allowPromptInjectText
-  );
-  const [allowPromptInjectImage, setAllowPromptInjectImage] = useState(
-    baseRules.allowPromptInjectImage
-  );
-  const [allowPromptInjectVideo, setAllowPromptInjectVideo] = useState(
-    baseRules.allowPromptInjectVideo
-  );
 
   const handleSave = () => {
     const nextText = Number(maxTextReferences) || 0;
@@ -622,9 +613,6 @@ function TextModelSettingsDialog({
         maxVideoReferenceSeconds:
           Number(maxVideoReferenceSeconds) ||
           baseRules.maxVideoReferenceSeconds,
-        allowPromptInjectText,
-        allowPromptInjectImage,
-        allowPromptInjectVideo,
         referenceInputs: [
           {
             type: "any",
@@ -765,27 +753,6 @@ function TextModelSettingsDialog({
               label={t("pages.adminAiModels.maxVideoReferenceSeconds")}
               value={maxVideoReferenceSeconds}
               onChange={setMaxVideoReferenceSeconds}
-            />
-          </SettingsSection>
-
-          <SettingsSection title={t("pages.adminAiModels.sectionInject")}>
-            <ToggleField
-              id="inject-text"
-              label={t("pages.adminAiModels.allowPromptInjectText")}
-              checked={allowPromptInjectText}
-              onCheckedChange={setAllowPromptInjectText}
-            />
-            <ToggleField
-              id="inject-image"
-              label={t("pages.adminAiModels.allowPromptInjectImage")}
-              checked={allowPromptInjectImage}
-              onCheckedChange={setAllowPromptInjectImage}
-            />
-            <ToggleField
-              id="inject-video"
-              label={t("pages.adminAiModels.allowPromptInjectVideo")}
-              checked={allowPromptInjectVideo}
-              onCheckedChange={setAllowPromptInjectVideo}
             />
           </SettingsSection>
         </div>

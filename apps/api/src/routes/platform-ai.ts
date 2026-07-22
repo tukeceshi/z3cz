@@ -1,5 +1,5 @@
 import {
-  resolveAiTextEffectivePrompt,
+  validateAiTextPromptAssembly,
   type GenerateAiImageRequest,
   type GenerateAiTextRequest,
   type SubmitAiVideoRequest,
@@ -7,6 +7,7 @@ import {
 import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
 import { executeVolcanoImageGeneration } from "@dafthunk/runtime/ai-interface/execute-volcano-image";
 import {
+  downloadVolcanoVideo,
   pollVolcanoVideoTask,
   submitVolcanoVideoTask,
 } from "@dafthunk/runtime/ai-interface/execute-volcano-video";
@@ -40,7 +41,12 @@ import {
   resolveVideoModelInterface,
 } from "../services/resolve-video-model-interface";
 import { resolveAiImageStorage } from "../services/ai-image-storage";
+import { resolveAiVideoStorage } from "../services/ai-video-storage";
 import { isOrgCloudStorageConfigured } from "../services/resolve-org-cloud-storage";
+import {
+  presignTosMediaDownloadUrls,
+  presignTosMediaUpload,
+} from "../services/tos-media-presign";
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
 
 const platformAiRoutes = new Hono<ApiContext>();
@@ -49,7 +55,7 @@ platformAiRoutes.use("*", jwtMiddleware);
 platformAiRoutes.use("*", createRequireFeatureMiddleware("ai-interfaces"));
 
 platformAiRoutes.get("/storage-status", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const interfaces = await listOrganizationAiInterfaces(db, organizationId);
   return c.json({
@@ -57,8 +63,70 @@ platformAiRoutes.get("/storage-status", async (c) => {
   });
 });
 
+const tosPresignUploadSchema = z.object({
+  mimeType: z.string().min(1),
+  contentLength: z.number().int().positive(),
+  workflowId: z.string().optional(),
+  mediaKind: z.enum(["ai-image", "ai-video", "reference"]).optional(),
+});
+
+platformAiRoutes.post(
+  "/tos/presign-upload",
+  zValidator("json", tosPresignUploadSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const body = c.req.valid("json");
+    const result = await presignTosMediaUpload(c.env, {
+      organizationId,
+      workflowId: body.workflowId,
+      mimeType: body.mimeType,
+      contentLength: body.contentLength,
+      mediaKind: body.mediaKind ?? "reference",
+    });
+
+    if (!result) {
+      return c.json({ error: "Cloud storage is not configured" }, 400);
+    }
+
+    return c.json(result);
+  }
+);
+
+const objectReferenceSchema = z.object({
+  id: z.string().min(1),
+  mimeType: z.string().min(1),
+  filename: z.string().optional(),
+  storageKey: z.string().optional(),
+  storageBackend: z.enum(["platform", "volcengine_tos"]).optional(),
+});
+
+const tosPresignDownloadSchema = z.object({
+  references: z.array(objectReferenceSchema).min(1),
+});
+
+platformAiRoutes.post(
+  "/tos/presign-download",
+  zValidator("json", tosPresignDownloadSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const body = c.req.valid("json");
+
+    try {
+      const urls = await presignTosMediaDownloadUrls(c.env, {
+        organizationId,
+        references: body.references,
+      });
+      return c.json({ urls });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to presign download";
+      return c.json({ error: message }, 400);
+    }
+  }
+);
+
 platformAiRoutes.get("/text-models", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgTextModelOptions(db, organizationId),
@@ -68,7 +136,7 @@ platformAiRoutes.get("/text-models", async (c) => {
 });
 
 platformAiRoutes.get("/image-models", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgImageModelOptions(db, organizationId),
@@ -78,7 +146,7 @@ platformAiRoutes.get("/image-models", async (c) => {
 });
 
 platformAiRoutes.get("/video-models", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgVideoModelOptions(db, organizationId),
@@ -88,7 +156,7 @@ platformAiRoutes.get("/video-models", async (c) => {
 });
 
 platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const resolved = await resolveVideoModelInterface(
     db,
@@ -107,7 +175,7 @@ platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
 });
 
 platformAiRoutes.get("/image-models/:canonicalId/resolve", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const resolved = await resolveImageModelInterface(
     db,
@@ -126,7 +194,7 @@ platformAiRoutes.get("/image-models/:canonicalId/resolve", async (c) => {
 });
 
 platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const resolved = await resolveTextModelInterface(
     db,
@@ -145,7 +213,7 @@ platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
 });
 
 platformAiRoutes.get("/model-interface-priorities", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const { listModelInterfacePriorities } = await import(
     "../db/platform-ai-model-queries"
@@ -163,7 +231,7 @@ platformAiRoutes.put(
   "/model-interface-priorities",
   zValidator("json", prioritySchema),
   async (c) => {
-    const organizationId = c.req.param("organizationId");
+    const organizationId = c.get("organizationId")!;
     const body = c.req.valid("json");
     const db = createDatabase(c.env);
     const priority = await upsertModelInterfacePriority(
@@ -177,7 +245,7 @@ platformAiRoutes.put(
 );
 
 platformAiRoutes.get("/model-calls", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const limit = Number(c.req.query("limit") ?? "50");
   const offset = Number(c.req.query("offset") ?? "0");
   const db = createDatabase(c.env);
@@ -189,7 +257,7 @@ platformAiRoutes.get("/model-calls", async (c) => {
 });
 
 platformAiRoutes.get("/model-calls/:id", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
   const invocation = await getAiModelInvocation(
     db,
@@ -202,10 +270,15 @@ platformAiRoutes.get("/model-calls/:id", async (c) => {
   return c.json({ invocation });
 });
 
+const aiTextReferenceSchema = z.object({
+  name: z.string().min(1),
+  content: z.string().min(1),
+});
+
 const generateSchema = z.object({
   modelCanonicalId: z.string().min(1),
   prompt: z.string().optional(),
-  keywords: z.string().optional(),
+  references: z.array(aiTextReferenceSchema).optional(),
   workflowId: z.string().optional(),
   nodeId: z.string().optional(),
 });
@@ -214,19 +287,10 @@ platformAiRoutes.post(
   "/ai-text/generate",
   zValidator("json", generateSchema),
   async (c) => {
-    const organizationId = c.req.param("organizationId");
+    const organizationId = c.get("organizationId")!;
     const jwtPayload = c.get("jwtPayload");
     const body = c.req.valid("json") as GenerateAiTextRequest;
     const db = createDatabase(c.env);
-
-    const effectivePrompt = resolveAiTextEffectivePrompt({
-      keywords: body.keywords,
-      prompt: body.prompt,
-    });
-
-    if (!effectivePrompt) {
-      return c.json({ error: "Prompt or keywords is required" }, 400);
-    }
 
     const resolvedModel = await resolveTextModelInterface(
       db,
@@ -238,20 +302,17 @@ platformAiRoutes.post(
       return c.json({ error: "Model is not available for this organization" }, 400);
     }
 
-    const usesKeywords =
-      typeof body.keywords === "string" && body.keywords.trim().length > 0;
-    const maxChars = usesKeywords
-      ? resolvedModel.parameterRules.keywordsMaxChars
-      : resolvedModel.parameterRules.promptMaxChars;
+    const assembly = validateAiTextPromptAssembly({
+      references: body.references,
+      question: body.prompt,
+      parameterRules: resolvedModel.parameterRules,
+    });
 
-    if (effectivePrompt.length > maxChars) {
-      return c.json(
-        {
-          error: `Input exceeds maximum length of ${maxChars} characters for this model`,
-        },
-        400
-      );
+    if (!assembly.ok) {
+      return c.json({ error: assembly.error }, 400);
     }
+
+    const effectivePrompt = assembly.prompt;
 
     const service = new CloudflareAiInterfaceService(c.env);
     const iface = await service.resolveOrgInterface({
@@ -329,11 +390,17 @@ platformAiRoutes.post(
   }
 );
 
+const referenceImageInlineSchema = z.object({
+  mimeType: z.string().min(1),
+  data: z.string().min(1),
+});
+
 const generateImageSchema = z.object({
   modelCanonicalId: z.string().min(1),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
-  referenceImageUrls: z.array(z.string().url()).optional(),
+  referenceImageUrls: z.array(z.string().min(1)).optional(),
+  referenceImageInline: z.array(referenceImageInlineSchema).optional(),
   workflowId: z.string().optional(),
   nodeId: z.string().optional(),
 });
@@ -342,13 +409,17 @@ platformAiRoutes.post(
   "/ai-image/generate",
   zValidator("json", generateImageSchema),
   async (c) => {
-    const organizationId = c.req.param("organizationId");
+    const organizationId = c.get("organizationId")!;
     const jwtPayload = c.get("jwtPayload");
     const body = c.req.valid("json") as GenerateAiImageRequest;
     const db = createDatabase(c.env);
 
     const prompt = body.prompt?.trim() ?? "";
-    if (!prompt) {
+    const hasReferences =
+      (body.referenceImageUrls?.length ?? 0) > 0 ||
+      (body.referenceImageInline?.length ?? 0) > 0;
+
+    if (!prompt && !hasReferences) {
       return c.json({ error: "Prompt is required" }, 400);
     }
 
@@ -384,7 +455,11 @@ platformAiRoutes.post(
     const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
     const invocationId = crypto.randomUUID();
     const promptExcerpt =
-      prompt.length > 200 ? `${prompt.slice(0, 200)}…` : prompt;
+      prompt.length > 0
+        ? prompt.length > 200
+          ? `${prompt.slice(0, 200)}…`
+          : prompt
+        : "(reference only)";
 
     const storageResolution = await resolveAiImageStorage(c.env, {
       organizationId,
@@ -399,6 +474,7 @@ platformAiRoutes.post(
       parameterRules: resolvedModel.parameterRules,
       generationParams: body.params,
       referenceImageUrls: body.referenceImageUrls,
+      referenceImageInline: body.referenceImageInline,
       storageMode: storageResolution.storageMode,
       objectStore:
         storageResolution.storageMode === "cloud" &&
@@ -455,7 +531,8 @@ const submitVideoSchema = z.object({
   modelCanonicalId: z.string().min(1),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
-  referenceImageUrls: z.array(z.string().url()).optional(),
+  referenceImageUrls: z.array(z.string().min(1)).optional(),
+  referenceImageInline: z.array(referenceImageInlineSchema).optional(),
   workflowId: z.string().optional(),
   nodeId: z.string().optional(),
 });
@@ -464,13 +541,17 @@ platformAiRoutes.post(
   "/ai-video/submit",
   zValidator("json", submitVideoSchema),
   async (c) => {
-    const organizationId = c.req.param("organizationId");
+    const organizationId = c.get("organizationId")!;
     const jwtPayload = c.get("jwtPayload");
     const body = c.req.valid("json") as SubmitAiVideoRequest;
     const db = createDatabase(c.env);
 
     const prompt = body.prompt?.trim() ?? "";
-    if (!prompt) {
+    const hasReferences =
+      (body.referenceImageUrls?.length ?? 0) > 0 ||
+      (body.referenceImageInline?.length ?? 0) > 0;
+
+    if (!prompt && !hasReferences) {
       return c.json({ error: "Prompt is required" }, 400);
     }
 
@@ -505,7 +586,11 @@ platformAiRoutes.post(
 
     const invocationId = crypto.randomUUID();
     const promptExcerpt =
-      prompt.length > 200 ? `${prompt.slice(0, 200)}…` : prompt;
+      prompt.length > 0
+        ? prompt.length > 200
+          ? `${prompt.slice(0, 200)}…`
+          : prompt
+        : "(reference only)";
 
     const submitResult = await submitVolcanoVideoTask({
       apiKey: iface.apiKey,
@@ -515,6 +600,7 @@ platformAiRoutes.post(
       parameterRules: resolvedModel.parameterRules,
       generationParams: body.params,
       referenceImageUrls: body.referenceImageUrls,
+      referenceImageInline: body.referenceImageInline,
     });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
@@ -558,7 +644,7 @@ platformAiRoutes.post(
 );
 
 platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
-  const organizationId = c.req.param("organizationId");
+  const organizationId = c.get("organizationId")!;
   const taskId = c.req.param("taskId");
   const interfaceId = c.req.query("aiInterfaceId");
 
@@ -589,14 +675,73 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     });
   }
 
-  if (pollResult.status === "completed") {
+  if (pollResult.status === "completed" && pollResult.videoUrl) {
+    const workflowId = c.req.query("workflowId")?.trim() || undefined;
+    const storageResolution = await resolveAiVideoStorage(c.env, {
+      organizationId,
+      workflowId,
+    });
+    const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
+
+    const downloadResult = await downloadVolcanoVideo({
+      videoUrl: pollResult.videoUrl,
+      storageMode: storageResolution.storageMode,
+      objectStore,
+      organizationId,
+      workflowId,
+      cloudUpload: storageResolution.cloudUpload,
+    });
+
+    if (downloadResult.status === "failed") {
+      return c.json({
+        status: "failed" as const,
+        error: downloadResult.error ?? "Failed to store generated video",
+      });
+    }
+
     return c.json({
       status: "succeeded" as const,
       videoUrl: pollResult.videoUrl,
+      videos: downloadResult.videos,
     });
   }
 
   return c.json({ status: "running" as const });
+});
+
+platformAiRoutes.get("/media/proxy", async (c) => {
+  const upstreamUrl = c.req.query("url")?.trim();
+  const mimeType = c.req.query("mimeType")?.trim() || "application/octet-stream";
+
+  if (!upstreamUrl) {
+    return c.json({ error: "url query parameter is required" }, 400);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(upstreamUrl);
+  } catch {
+    return c.json({ error: "Invalid url" }, 400);
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return c.json({ error: "Invalid url protocol" }, 400);
+  }
+
+  const response = await fetch(upstreamUrl);
+  if (!response.ok) {
+    return c.json(
+      { error: `Upstream fetch failed (${response.status})` },
+      502
+    );
+  }
+
+  return new Response(response.body, {
+    headers: {
+      "content-type": mimeType,
+      "Cache-Control": "private, max-age=3600",
+    },
+  });
 });
 
 export default platformAiRoutes;

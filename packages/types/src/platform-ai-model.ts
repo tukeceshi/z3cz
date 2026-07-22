@@ -1,5 +1,11 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { UpstreamParamProfileField } from "./upstream-param-profile";
+import {
+  assignReferenceImagesToBody,
+  mergeReferenceImageValues,
+  type ReferenceImageInline,
+} from "./reference-image-input";
+import type { MediaReference } from "./media-reference";
 import type { ObjectReference } from "./workflow";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
@@ -33,13 +39,14 @@ export interface TextModelParameterRules {
   readonly maxVideoReferenceBytes: number;
   /** Max video duration in seconds. */
   readonly maxVideoReferenceSeconds: number;
-  /** Allow clicking text refs to insert into the prompt box. */
-  readonly allowPromptInjectText: boolean;
-  /** Allow clicking image refs to insert into the prompt box. */
-  readonly allowPromptInjectImage: boolean;
-  /** Allow clicking video refs to insert into the prompt box. */
-  readonly allowPromptInjectVideo: boolean;
 }
+
+export interface AiTextReferenceInput {
+  readonly name: string;
+  readonly content: string;
+}
+
+export const AI_TEXT_DEFAULT_QUESTION = "请根据以上内容回答。" as const;
 
 export interface ImageModelParameterRules {
   readonly schemaVersion: typeof PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION;
@@ -190,7 +197,7 @@ export interface ListAiModelInvocationsResponse {
 export interface GenerateAiTextRequest {
   readonly modelCanonicalId: string;
   readonly prompt?: string;
-  readonly keywords?: string;
+  readonly references?: readonly AiTextReferenceInput[];
   readonly workflowId?: string;
   readonly nodeId?: string;
 }
@@ -239,11 +246,10 @@ export interface GenerateAiImageRequest {
   readonly prompt?: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly workflowId?: string;
   readonly nodeId?: string;
 }
-
-import type { MediaReference } from "./media-reference";
 
 export interface GenerateAiImageResponse {
   readonly images: readonly MediaReference[];
@@ -279,6 +285,7 @@ export interface SubmitAiVideoRequest {
   readonly prompt?: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly workflowId?: string;
   readonly nodeId?: string;
 }
@@ -292,6 +299,7 @@ export interface SubmitAiVideoResponse {
 export interface PollAiVideoTaskResponse {
   readonly status: "queued" | "running" | "succeeded" | "failed" | "expired";
   readonly videoUrl?: string;
+  readonly videos?: readonly MediaReference[];
   readonly error?: string;
 }
 
@@ -339,9 +347,6 @@ export const DEFAULT_TEXT_MODEL_PARAMETER_RULES: TextModelParameterRules = {
   maxVideoReferences: 0,
   maxVideoReferenceBytes: 50 * 1024 * 1024,
   maxVideoReferenceSeconds: 60,
-  allowPromptInjectText: true,
-  allowPromptInjectImage: false,
-  allowPromptInjectVideo: false,
 };
 
 export const DEFAULT_IMAGE_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
@@ -463,6 +468,16 @@ export const DEFAULT_VIDEO_GENERATION_FIELDS: readonly UpstreamParamProfileField
       type: "number",
       description: "Random seed (-1 for random)",
       default: -1,
+      hidden: true,
+    },
+    {
+      name: "generate_count",
+      apiName: "",
+      type: "number",
+      description: "生成数量",
+      default: 1,
+      enumValues: ["1", "2", "4"],
+      clientOnly: true,
     },
   ] as const;
 
@@ -563,13 +578,18 @@ export function buildVolcanoImageGenerationBody(params: {
   readonly generationFields: readonly UpstreamParamProfileField[];
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
 }): Record<string, unknown> {
+  const trimmedPrompt = params.prompt.trim();
   const body: Record<string, unknown> = {
     model: params.providerModelId,
-    prompt: params.prompt,
     stream: false,
     response_format: "url",
   };
+
+  if (trimmedPrompt.length > 0) {
+    body.prompt = trimmedPrompt;
+  }
 
   for (const field of params.generationFields) {
     const raw = params.params?.[field.name];
@@ -602,12 +622,11 @@ export function buildVolcanoImageGenerationBody(params: {
     body[field.apiName] = value;
   }
 
-  const urls = params.referenceImageUrls?.filter(Boolean) ?? [];
-  if (urls.length === 1) {
-    body.image = urls[0];
-  } else if (urls.length > 1) {
-    body.image = urls;
-  }
+  const referenceValues = mergeReferenceImageValues({
+    referenceImageUrls: params.referenceImageUrls,
+    referenceImageInline: params.referenceImageInline,
+  });
+  assignReferenceImagesToBody(body, referenceValues);
 
   return body;
 }
@@ -619,21 +638,27 @@ export function buildVolcanoVideoGenerationBody(params: {
   readonly generationFields: readonly UpstreamParamProfileField[];
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
 }): Record<string, unknown> {
   const trimmedPrompt = params.prompt.trim();
-  const content: Record<string, unknown>[] = [
-    { type: "text", text: trimmedPrompt },
-  ];
+  const content: Record<string, unknown>[] = [];
 
-  const urls = params.referenceImageUrls?.filter(Boolean) ?? [];
-  if (urls.length === 1) {
+  if (trimmedPrompt.length > 0) {
+    content.push({ type: "text", text: trimmedPrompt });
+  }
+
+  const referenceValues = mergeReferenceImageValues({
+    referenceImageUrls: params.referenceImageUrls,
+    referenceImageInline: params.referenceImageInline,
+  });
+  if (referenceValues.length === 1) {
     content.push({
       type: "image_url",
-      image_url: { url: urls[0] },
+      image_url: { url: referenceValues[0] },
       role: "first_frame",
     });
-  } else if (urls.length > 1) {
-    for (const url of urls) {
+  } else if (referenceValues.length > 1) {
+    for (const url of referenceValues) {
       content.push({
         type: "image_url",
         image_url: { url },
@@ -648,6 +673,10 @@ export function buildVolcanoVideoGenerationBody(params: {
   };
 
   for (const field of params.generationFields) {
+    if (field.clientOnly || !field.apiName) {
+      continue;
+    }
+
     const raw = params.params?.[field.name];
     const value =
       raw === undefined || raw === null || raw === ""
@@ -713,43 +742,110 @@ export function normalizeTextModelParameterRules(
     maxVideoReferenceSeconds:
       rules.maxVideoReferenceSeconds ??
       DEFAULT_TEXT_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
-    allowPromptInjectText:
-      rules.allowPromptInjectText ??
-      DEFAULT_TEXT_MODEL_PARAMETER_RULES.allowPromptInjectText,
-    allowPromptInjectImage:
-      rules.allowPromptInjectImage ??
-      DEFAULT_TEXT_MODEL_PARAMETER_RULES.allowPromptInjectImage,
-    allowPromptInjectVideo:
-      rules.allowPromptInjectVideo ??
-      DEFAULT_TEXT_MODEL_PARAMETER_RULES.allowPromptInjectVideo,
   };
 }
 
-export function resolveAiTextEffectivePrompt(params: {
-  readonly keywords?: unknown;
-  readonly prompt?: unknown;
-}): string {
-  const keywords = normalizeAiTextKeywordsValue(params.keywords);
-  const prompt =
-    typeof params.prompt === "string" ? params.prompt.trim() : "";
-
-  if (keywords && prompt) {
-    return `${keywords}\n\n${prompt}`;
-  }
-  return keywords || prompt;
+export function formatAiTextReferenceBlock(
+  name: string,
+  content: string
+): string {
+  return `[file name]: ${name}\n[file content begin]\n${content}\n[file content end]`;
 }
 
-function normalizeAiTextKeywordsValue(keywords: unknown): string {
+/** Build the user message for text models (DeepSeek file-block convention). */
+export function buildAiTextUserPrompt(params: {
+  readonly references?: readonly AiTextReferenceInput[];
+  readonly question?: string;
+  readonly defaultQuestion?: string;
+}): string {
+  const references = (params.references ?? [])
+    .map((entry) => ({
+      name: entry.name.trim() || "reference",
+      content: entry.content.trim(),
+    }))
+    .filter((entry) => entry.content.length > 0);
+
+  const question =
+    typeof params.question === "string" ? params.question.trim() : "";
+
+  if (references.length === 0) {
+    return question;
+  }
+
+  const blocks = references.map((entry) =>
+    formatAiTextReferenceBlock(entry.name, entry.content)
+  );
+  const finalQuestion =
+    question || params.defaultQuestion || AI_TEXT_DEFAULT_QUESTION;
+
+  return `${blocks.join("\n")}\n${finalQuestion}`;
+}
+
+export function normalizeAiTextReferences(
+  keywords: unknown
+): readonly AiTextReferenceInput[] {
   if (typeof keywords === "string" && keywords.trim().length > 0) {
-    return keywords.trim();
+    return [{ name: "reference", content: keywords.trim() }];
   }
   if (Array.isArray(keywords)) {
-    const joined = keywords
+    return keywords
       .filter((entry): entry is string => typeof entry === "string")
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0)
-      .join("\n");
-    if (joined.length > 0) return joined;
+      .map((content, index) => ({
+        name: `reference-${index + 1}`,
+        content,
+      }));
   }
-  return "";
+  return [];
+}
+
+export type AiTextPromptAssemblyResult =
+  | { readonly ok: true; readonly prompt: string }
+  | { readonly ok: false; readonly error: string };
+
+export function validateAiTextPromptAssembly(params: {
+  readonly references?: readonly AiTextReferenceInput[];
+  readonly question?: string;
+  readonly parameterRules: Pick<
+    TextModelParameterRules,
+    "keywordsMaxChars" | "promptMaxChars"
+  >;
+}): AiTextPromptAssemblyResult {
+  const references = params.references ?? [];
+  const question =
+    typeof params.question === "string" ? params.question.trim() : "";
+
+  const referencesContentLength = references.reduce(
+    (sum, entry) => sum + entry.content.trim().length,
+    0
+  );
+
+  if (referencesContentLength > params.parameterRules.keywordsMaxChars) {
+    return {
+      ok: false,
+      error: `References exceed maximum length of ${params.parameterRules.keywordsMaxChars} characters`,
+    };
+  }
+
+  if (question.length > params.parameterRules.promptMaxChars) {
+    return {
+      ok: false,
+      error: `Question exceeds maximum length of ${params.parameterRules.promptMaxChars} characters`,
+    };
+  }
+
+  const prompt = buildAiTextUserPrompt({ references, question });
+  if (!prompt) {
+    return { ok: false, error: "Prompt or references are required" };
+  }
+
+  if (prompt.length > params.parameterRules.promptMaxChars) {
+    return {
+      ok: false,
+      error: `Input exceeds maximum length of ${params.parameterRules.promptMaxChars} characters`,
+    };
+  }
+
+  return { ok: true, prompt };
 }

@@ -44,10 +44,12 @@ import {
 import {
   AI_IMAGE_CARD_WIDTH_PX,
   isAiImageGenerating,
+  readAiImageGenerateError,
 } from "./ai-image-node-utils";
 import {
   AI_VIDEO_CARD_WIDTH_PX,
   isAiVideoGenerating,
+  readAiVideoGenerateError,
 } from "./ai-video-node-utils";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel } from "./generative-card-mode-utils";
@@ -539,8 +541,15 @@ export const WorkflowNode = memo(
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
     const isAiImageBusy = isAiImageNode && isAiImageGenerating(data.metadata);
     const isAiVideoBusy = isAiVideoNode && isAiVideoGenerating(data.metadata);
+    const isAiImageGenerateError =
+      isAiImageNode && Boolean(readAiImageGenerateError(data.metadata));
+    const isAiVideoGenerateError =
+      isAiVideoNode && Boolean(readAiVideoGenerateError(data.metadata));
     const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy;
-    const isError = data.executionState === "error" && !!data.error;
+    const isError =
+      (data.executionState === "error" && !!data.error) ||
+      isAiImageGenerateError ||
+      isAiVideoGenerateError;
 
     return (
       <TooltipProvider>
@@ -633,13 +642,13 @@ export const WorkflowNode = memo(
           )}
 
           {/* Error overlay */}
-          {isError && (
+          {isError && data.error ? (
             <div className="absolute inset-0 z-10 flex items-start justify-start rounded-md bg-red-500/10 p-2">
               <p className="text-[10px] text-red-600 dark:text-red-400 line-clamp-3">
                 {data.error}
               </p>
             </div>
-          )}
+          ) : null}
 
           {/* Widget — AI text keeps the whole card draggable; only controls use nodrag */}
           {widget && (

@@ -6,14 +6,17 @@ import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_WIDTH_PX,
 } from "./ai-generative-panel-utils";
+import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
 
 export interface GenerativeConfigPanelShellProps {
+  readonly nodeId: string;
   readonly zoom: number;
   readonly children: ReactNode;
 }
 
 /** Shared bottom editor shell for AI text / AI image nodes. */
 export function GenerativeConfigPanelShell({
+  nodeId,
   zoom,
   children,
 }: GenerativeConfigPanelShellProps) {
@@ -33,6 +36,10 @@ export function GenerativeConfigPanelShell({
         transformOrigin: "top center",
       }}
       onClick={(event) => event.stopPropagation()}
+      onPointerDownCapture={(event) => {
+        event.stopPropagation();
+        armGenerativePanelPointerGuard(nodeId);
+      }}
       onMouseDown={(event) => event.stopPropagation()}
     >
       <div className="flex h-full flex-col px-3 pb-3 pt-2">{children}</div>

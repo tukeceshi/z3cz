@@ -128,9 +128,13 @@ export async function submitAiVideo(
 export async function pollAiVideoTask(
   orgId: string,
   taskId: string,
-  aiInterfaceId: string
+  aiInterfaceId: string,
+  options?: { readonly workflowId?: string }
 ): Promise<PollAiVideoTaskResponse> {
   const query = new URLSearchParams({ aiInterfaceId });
+  if (options?.workflowId) {
+    query.set("workflowId", options.workflowId);
+  }
   return makeRequest<PollAiVideoTaskResponse>(
     `${platformAiEndpoint(orgId)}/ai-video/tasks/${encodeURIComponent(taskId)}?${query.toString()}`
   );

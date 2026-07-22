@@ -67,6 +67,10 @@ import {
   useWorkflows,
 } from "@/services/workflow-service";
 import { formatRelativeDate } from "@/utils/date";
+import {
+  prefetchWorkflowEditorSession,
+  schedulePrefetchWorkflowEditorChunks,
+} from "@/utils/workflow-editor-prefetch";
 
 function useTriggerMeta(): Record<
   WorkflowTrigger,
@@ -332,6 +336,10 @@ export function WorkflowsPage() {
     setBreadcrumbs([{ label: t("pages.workflows.title") }]);
   }, [setBreadcrumbs, t]);
 
+  useEffect(() => {
+    schedulePrefetchWorkflowEditorChunks();
+  }, []);
+
   const searchFilteredWorkflows = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return workflows;
@@ -387,6 +395,7 @@ export function WorkflowsPage() {
       const newWorkflow = await createWorkflow(request, orgId);
 
       mutateWorkflows();
+      prefetchWorkflowEditorSession(newWorkflow.id, orgId, schemeId);
       navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
         state: createWorkflowEditorLocationState(),
       });
@@ -455,6 +464,7 @@ export function WorkflowsPage() {
                       <WorkflowCard
                         key={workflow.id}
                         workflow={workflow}
+                        orgId={orgId}
                         searchQuery={searchQuery}
                         href={getOrgUrl(`workflows/${workflow.id}`)}
                         executionsHref={getOrgUrl(
@@ -508,6 +518,7 @@ export function WorkflowsPage() {
 
 function WorkflowCard({
   workflow,
+  orgId,
   searchQuery,
   href,
   executionsHref,
@@ -516,6 +527,7 @@ function WorkflowCard({
   onDelete,
 }: {
   workflow: WorkflowWithMetadata;
+  orgId: string;
   searchQuery: string;
   href: string;
   executionsHref: string;
@@ -529,8 +541,19 @@ function WorkflowCard({
   const Icon = meta.icon;
   const workflowName = workflow.name || t("pages.workflows.untitled");
 
+  const handlePrefetch = () => {
+    if (!orgId) {
+      return;
+    }
+    prefetchWorkflowEditorSession(workflow.id, orgId, workflow.schemeId);
+  };
+
   return (
-    <Card className="relative group hover:border-primary/50 transition-colors">
+    <Card
+      className="relative group hover:border-primary/50 transition-colors"
+      onMouseEnter={handlePrefetch}
+      onFocus={handlePrefetch}
+    >
       <Link
         to={href}
         aria-label={t("pages.workflows.openWorkflow", { name: workflowName })}

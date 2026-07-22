@@ -27,6 +27,7 @@ import {
 import { collectAiTextFirstDegreeEdgeIds } from "./ai-text-edge-selection";
 import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
 import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
+import { shouldSuppressGenerativePanelDeselect } from "./generative-panel-pointer-guard";
 import {
   buildAiTextReferenceConnectionFromCardDrop,
 } from "./ai-text-reference-policy";
@@ -459,7 +460,12 @@ export function useGraphOperations({
     (changes: NodeChange<ReactFlowNode<WorkflowNodeType>>[]) => {
       if (graphEditBlocked) {
         const selectionChanges = changes.filter(
-          (change) => change.type === "select"
+          (change) =>
+            change.type === "select" &&
+            !(
+              change.selected === false &&
+              shouldSuppressGenerativePanelDeselect(change.id)
+            )
         );
         if (selectionChanges.length > 0) {
           onNodesChange(selectionChanges);
@@ -469,6 +475,13 @@ export function useGraphOperations({
 
       const filtered = changes.filter((change) => {
         if (isDraggingRef.current && change.type === "position") {
+          return false;
+        }
+        if (
+          change.type === "select" &&
+          change.selected === false &&
+          shouldSuppressGenerativePanelDeselect(change.id)
+        ) {
           return false;
         }
         if (change.type !== "remove") return true;

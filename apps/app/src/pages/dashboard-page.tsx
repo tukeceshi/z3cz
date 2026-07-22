@@ -29,9 +29,13 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useBilling } from "@/services/billing-service";
 import { useDashboard } from "@/services/dashboard-service";
-import { useNodeTypes } from "@/services/type-service";
+import { prefetchNodeTypes, useNodeTypes } from "@/services/type-service";
 import { createWorkflow, useWorkflows } from "@/services/workflow-service";
 import { useOrganizationAiInterfaces } from "@/services/organization-ai-interface-service";
+import {
+  prefetchWorkflowEditorSession,
+  schedulePrefetchWorkflowEditorChunks,
+} from "@/utils/workflow-editor-prefetch";
 
 const AI_SETUP_DISMISS_KEY = "dafthunk:dashboard-ai-setup-dismissed";
 
@@ -47,7 +51,10 @@ export function DashboardPage() {
   const { organization } = useAuth();
   const orgId = organization?.id || "";
   const { mutateWorkflows } = useWorkflows();
-  const { nodeTypes } = useNodeTypes(undefined, { revalidateOnFocus: false });
+  const { nodeTypes } = useNodeTypes(undefined, {
+    revalidateOnFocus: false,
+    enabled: isCreateDialogOpen,
+  });
   const { interfaces, isInterfacesLoading } = useOrganizationAiInterfaces(orgId || undefined);
   const [setupDismissed, setSetupDismissed] = useState(() => {
     if (!orgId) return false;
@@ -61,6 +68,16 @@ export function DashboardPage() {
   useEffect(() => {
     setBreadcrumbs([{ label: t("sidebar.dashboard") }]);
   }, [setBreadcrumbs, t]);
+
+  useEffect(() => {
+    schedulePrefetchWorkflowEditorChunks();
+  }, []);
+
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      prefetchNodeTypes();
+    }
+  }, [isCreateDialogOpen]);
 
   const handleCreateWorkflow = async (
     schemeId: string,
@@ -86,6 +103,7 @@ export function DashboardPage() {
       const newWorkflow = await createWorkflow(request, orgId);
 
       mutateWorkflows();
+      prefetchWorkflowEditorSession(newWorkflow.id, orgId, schemeId);
       navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
         state: createWorkflowEditorLocationState(),
       });

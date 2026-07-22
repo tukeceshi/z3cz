@@ -8,8 +8,8 @@ dafthunk_apply_api_restart_mode
 cd /app
 dafthunk_entrypoint_init "$@"
 
-if [ "$RUN_WASM_WARMUP" = "1" ]; then
-  echo "[entrypoint] Running WASM runtime warmup..."
+if [ "$RUN_RUNTIME_WARMUP" = "1" ] || [ "$RUN_WASM_WARMUP" = "1" ]; then
+  echo "[entrypoint] Running API runtime warmup..."
   node apps/api/scripts/warm-api-runtime.mjs
 fi
 

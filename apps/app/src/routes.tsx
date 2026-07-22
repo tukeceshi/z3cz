@@ -11,70 +11,70 @@ import { OrgFeatureRoute } from "./components/org-feature-route";
 import { HomeRedirect } from "./components/home-redirect";
 import { OrgRedirect } from "./components/org-redirect";
 import { ProtectedRoute } from "./components/protected-route";
-import { AdminDashboardPage } from "./pages/admin/admin-dashboard-page";
-import { AdminDatabasesPage } from "./pages/admin/admin-databases-page";
-import { AdminDatasetsPage } from "./pages/admin/admin-datasets-page";
-
-import { AdminEmailsPage } from "./pages/admin/admin-emails-page";
-import { AdminExecutionDetailPage } from "./pages/admin/admin-execution-detail-page";
-import { AdminExecutionsPage } from "./pages/admin/admin-executions-page";
-import { AdminOrganizationDetailPage } from "./pages/admin/admin-organization-detail-page";
-import { AdminOrganizationsPage } from "./pages/admin/admin-organizations-page";
-import { AdminQueuesPage } from "./pages/admin/admin-queues-page";
-import { AdminSettingsPage } from "./pages/admin/admin-settings-page";
-import { AdminAiModelsPage } from "./pages/admin/admin-ai-models-page";
-import { AdminModelInvocationsPage } from "./pages/admin/admin-model-invocations-page";
-import { AdminFeatureSettingsPage } from "./pages/admin/admin-feature-settings-page";
-import { AdminStuckUsersPage } from "./pages/admin/admin-stuck-users-page";
-import { AdminSupportPage } from "./pages/admin/admin-support-page";
-import { AdminPlatformRelayAccountsPage } from "./pages/admin/admin-platform-relay-accounts-page";
-import { AdminWorkflowSchemesPage } from "./pages/admin/admin-workflow-schemes-page";
-import { AdminUserDetailPage } from "./pages/admin/admin-user-detail-page";
-import { AdminUsersPage } from "./pages/admin/admin-users-page";
-import { AdminWorkflowDetailPage } from "./pages/admin/admin-workflow-detail-page";
-import { AdminWorkflowsPage } from "./pages/admin/admin-workflows-page";
-import { ApiKeysPage } from "./pages/api-keys-page";
-import { BillingPage } from "./pages/billing-page";
-import { BotDiscordDetailPage } from "./pages/bot-discord-detail-page";
-import { BotSlackDetailPage } from "./pages/bot-slack-detail-page";
-import { BotTelegramDetailPage } from "./pages/bot-telegram-detail-page";
-import { BotWhatsAppDetailPage } from "./pages/bot-whatsapp-detail-page";
-import { BotsPage } from "./pages/bots-page";
-import { DashboardPage } from "./pages/dashboard-page";
-import { DatabaseConsolePage } from "./pages/database-console-page";
-import { DatabaseExplorerPage } from "./pages/database-explorer-page";
-import { DatabasesPage } from "./pages/databases-page";
-import { DatasetDetailPage } from "./pages/dataset-detail-page";
-import { DatasetsPage } from "./pages/datasets-page";
-
-import { EditorPage } from "./pages/editor-page";
-import { EmailInboxPage } from "./pages/email-inbox-page";
-import { EmailsPage } from "./pages/emails-page";
-import { ExecutionDetailPage } from "./pages/execution-detail-page";
-import { ModelCallsPage } from "./pages/model-calls-page";
-import { ExecutionsPage } from "./pages/executions-page";
-import { FeedbackFormPage } from "./pages/feedback-form-page";
-import { FeedbackPage } from "./pages/feedback-page";
-import { FormPage } from "./pages/form-page";
-import { FormTriggerPage } from "./pages/form-trigger-page";
-import { IntegrationsPage } from "./pages/integrations-page";
-import { InvitationsPage } from "./pages/invitations-page";
+import {
+  AdminAiModelsPage,
+  AdminDashboardPage,
+  AdminDatabasesPage,
+  AdminDatasetsPage,
+  AdminEmailsPage,
+  AdminExecutionDetailPage,
+  AdminExecutionsPage,
+  AdminFeatureSettingsPage,
+  AdminModelInvocationsPage,
+  AdminOrganizationDetailPage,
+  AdminOrganizationsPage,
+  AdminPlatformRelayAccountsPage,
+  AdminQueuesPage,
+  AdminSettingsPage,
+  AdminStuckUsersPage,
+  AdminSupportPage,
+  AdminUserDetailPage,
+  AdminUsersPage,
+  AdminWorkflowDetailPage,
+  AdminWorkflowSchemesPage,
+  AdminWorkflowsPage,
+  ApiKeysPage,
+  BillingPage,
+  BotDiscordDetailPage,
+  BotSlackDetailPage,
+  BotTelegramDetailPage,
+  BotWhatsAppDetailPage,
+  BotsPage,
+  DashboardPage,
+  DatabaseConsolePage,
+  DatabaseExplorerPage,
+  DatabasesPage,
+  DatasetDetailPage,
+  DatasetsPage,
+  EditorPage,
+  EmailInboxPage,
+  EmailsPage,
+  ExecutionDetailPage,
+  ExecutionsPage,
+  FeedbackFormPage,
+  FeedbackPage,
+  FormPage,
+  FormTriggerPage,
+  IntegrationsPage,
+  InvitationsPage,
+  MembersPage,
+  ModelCallsPage,
+  NotFoundPage,
+  OrganizationAiInterfacesPage,
+  OrganizationsPage,
+  PlaygroundExecutePage,
+  PlaygroundPage,
+  ProfilePage,
+  QueuesPage,
+  SchemasPage,
+  SecretsPage,
+  TemplateDetailPage,
+  TemplatePreviewPage,
+  TemplateTryPage,
+  TemplatesPage,
+  WorkflowsPage,
+} from "./lazy-pages";
 import { LoginPage } from "./pages/login-page";
-import { MembersPage } from "./pages/members-page";
-import { NotFoundPage } from "./pages/not-found-page";
-import { OrganizationsPage } from "./pages/organizations-page";
-import { PlaygroundExecutePage } from "./pages/playground-execute-page";
-import { PlaygroundPage } from "./pages/playground-page";
-import { ProfilePage } from "./pages/profile-page";
-import { QueuesPage } from "./pages/queues-page";
-import { SchemasPage } from "./pages/schemas-page";
-import { SecretsPage } from "./pages/secrets-page";
-import { OrganizationAiInterfacesPage } from "./pages/organization-ai-interfaces-page";
-import { TemplateDetailPage } from "./pages/template-detail-page";
-import { TemplatePreviewPage } from "./pages/template-preview-page";
-import { TemplateTryPage } from "./pages/template-try-page";
-import { TemplatesPage } from "./pages/templates-page";
-import { WorkflowsPage } from "./pages/workflows-page";
 
 export interface RouteHandle {
   head?:
@@ -797,7 +797,7 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/workflows/:id",
     element: (
-      <OrgLayout title="Workflows" sidebarDefaultOpen={false}>
+      <OrgLayout title="Workflows">
         <ProtectedRoute>
           <EditorPage />
         </ProtectedRoute>

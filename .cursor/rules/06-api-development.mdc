@@ -80,6 +80,11 @@ alwaysApply: false
   - This middleware supports both **JWT (JSON Web Tokens)** for user sessions and **API Keys** for programmatic access.
   - Upon successful authentication, the middleware establishes the **`organizationId`** in the request context (e.g., `c.set("organizationId", ...)`) based on the authenticated user or API key.
 
+- **Lazy-mounted org routes** (`lazy-route.ts`):
+  - Org-scoped route modules are mounted lazily; the sub-app does not receive `:organizationId` as a route param.
+  - **Always use** `c.get("organizationId")` in handlers under `apps/api/src/routes/**` — never `c.req.param("organizationId")`.
+  - CI guard: `pnpm run check:lazy-route-org-id`.
+
 - **Data Isolation**:
   - Route handlers retrieve the `organizationId` from the request context (e.g., `c.get("organizationId")`).
   - This `organizationId` is then consistently used in database queries and other business logic to scope data access.

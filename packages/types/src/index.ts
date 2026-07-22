@@ -28,6 +28,7 @@ export * from "./integration";
 export * from "./objects";
 export * from "./organization";
 export * from "./playground";
+export * from "./reference-image-input";
 export * from "./platform-ai-model";
 export * from "./platform-features";
 export * from "./platform-relay-account";

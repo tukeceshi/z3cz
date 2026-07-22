@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/utils/utils";
 
+import { videoSrcAllowsCrossOrigin } from "./video-src-cross-origin";
 import {
   formatVideoTime,
   type VideoFrameCaptureMode,
@@ -65,6 +66,9 @@ export function WorkflowMediaVideoPlayer({
 
   const isCardVariant = variant === "card";
   const controlBarHeight = isCardVariant ? 70 : 56;
+  const allowCrossOrigin = videoSrcAllowsCrossOrigin(src);
+  const frameCaptureEnabled =
+    showFrameCapture && allowCrossOrigin && !frameCaptureDisabled;
 
   const [isHovered, setIsHovered] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
@@ -462,20 +466,25 @@ export function WorkflowMediaVideoPlayer({
         src={src}
         playsInline
         preload="metadata"
-        crossOrigin="anonymous"
+        crossOrigin={allowCrossOrigin ? "anonymous" : undefined}
         disablePictureInPicture
         disableRemotePlayback
         muted={isCardVariant ? isMuted : undefined}
         className={cn(
           "h-full w-full",
+          isCardVariant && "pointer-events-none",
           objectFit === "contain" ? "object-contain" : "object-cover",
           videoClassName
         )}
         onError={onError}
-        onClick={(event) => {
-          event.stopPropagation();
-          handleTogglePlay();
-        }}
+        onClick={
+          isCardVariant
+            ? undefined
+            : (event) => {
+                event.stopPropagation();
+                handleTogglePlay();
+              }
+        }
       />
 
       <div
@@ -551,7 +560,7 @@ export function WorkflowMediaVideoPlayer({
 
         {volumeControl}
 
-        {showFrameCapture ? (
+        {frameCaptureEnabled ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

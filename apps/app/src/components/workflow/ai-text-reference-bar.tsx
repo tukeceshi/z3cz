@@ -1,11 +1,12 @@
-import type { ObjectReference } from "@dafthunk/types";
+import type { ObjectReference, MediaReference } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 import ImageIcon from "lucide-react/icons/image";
 import PlusIcon from "lucide-react/icons/plus";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import XIcon from "lucide-react/icons/x";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { useTranslation } from "@/components/locale-provider";
 import {
@@ -38,11 +39,20 @@ import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export type AiTextReferenceChip = GenerativeReferenceChip;
 
+interface ReferenceHoverPreviewState {
+  readonly chip: AiTextReferenceChip;
+  readonly anchor: DOMRect;
+}
+
+const REFERENCE_HOVER_PREVIEW_GAP_PX = 8;
+const REFERENCE_HOVER_PREVIEW_MAX_PX = 150;
+
 export function collectAiTextReferenceChips(params: {
   readonly nodeId: string;
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly createObjectUrl?: (objectReference: ObjectReference) => string;
+  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
 }): readonly AiTextReferenceChip[] {
   return collectGenerativeReferenceChips({
     nodeId: params.nodeId,
@@ -50,6 +60,7 @@ export function collectAiTextReferenceChips(params: {
     edges: params.edges,
     nodes: params.nodes,
     createObjectUrl: params.createObjectUrl,
+    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: classifyReferenceFromNodeType,
   });
 }
@@ -63,7 +74,8 @@ export interface AiTextReferenceBarProps {
   readonly onDisconnect: (edgeId: string) => void;
   readonly onPickCanvasNode: () => void;
   readonly onUploadFiles: (files: FileList) => void;
-  readonly onInjectChip: (chip: AiTextReferenceChip) => void;
+  /** When omitted, chips are preview-only (AI Text). */
+  readonly onInjectChip?: (chip: AiTextReferenceChip) => void;
 }
 
 export function AiTextReferenceBar({
@@ -83,7 +95,24 @@ export function AiTextReferenceBar({
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(
     null
   );
-  const [hoverChipId, setHoverChipId] = useState<string | null>(null);
+  const [hoverPreview, setHoverPreview] =
+    useState<ReferenceHoverPreviewState | null>(null);
+
+  const handleChipMouseEnter = (
+    chip: AiTextReferenceChip,
+    event: MouseEvent<HTMLDivElement>
+  ) => {
+    setHoverPreview({
+      chip,
+      anchor: event.currentTarget.getBoundingClientRect(),
+    });
+  };
+
+  const handleChipMouseLeave = (chip: AiTextReferenceChip) => {
+    setHoverPreview((current) =>
+      current?.chip.edgeId === chip.edgeId ? null : current
+    );
+  };
 
   const iconForKind = useMemo(
     () => ({
@@ -94,46 +123,136 @@ export function AiTextReferenceBar({
     []
   );
 
-  const hoverChip = chips.find((chip) => chip.edgeId === hoverChipId);
+  const renderHoverPreviewPortal = () => {
+    if (!hoverPreview || typeof document === "undefined") {
+      return null;
+    }
+
+    const { chip, anchor } = hoverPreview;
+    const style = {
+      left: anchor.left + anchor.width / 2,
+      top: anchor.top - REFERENCE_HOVER_PREVIEW_GAP_PX,
+      transform: "translate(-50%, -100%)",
+    } as const;
+
+    if (chip.kind === "image" && chip.previewUrl) {
+      return createPortal(
+        <div
+          className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
+          style={style}
+        >
+          <img
+            src={chip.previewUrl}
+            alt=""
+            className="max-h-[150px] max-w-[150px] object-contain"
+            style={{
+              maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
+              maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
+            }}
+          />
+        </div>,
+        document.body
+      );
+    }
+
+    if (chip.kind === "video" && chip.previewUrl) {
+      return createPortal(
+        <div
+          className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
+          style={style}
+        >
+          <video
+            src={chip.previewUrl}
+            className="max-h-[150px] max-w-[150px] object-contain"
+            style={{
+              maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
+              maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
+            }}
+            muted
+            autoPlay
+            loop
+          />
+        </div>,
+        document.body
+      );
+    }
+
+    if (chip.kind === "text" && chip.textExcerpt) {
+      return createPortal(
+        <div
+          className="pointer-events-none fixed z-[300] w-56 rounded-lg border border-border bg-popover p-2 shadow-lg"
+          style={style}
+        >
+          <p className="line-clamp-6 text-xs leading-relaxed text-muted-foreground">
+            {chip.textExcerpt}
+          </p>
+        </div>,
+        document.body
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
         <div
           key={chip.edgeId}
-          className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
-          onMouseEnter={() => setHoverChipId(chip.edgeId)}
-          onMouseLeave={() =>
-            setHoverChipId((current) =>
-              current === chip.edgeId ? null : current
-            )
-          }
+          className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background"
+          onMouseEnter={(event) => handleChipMouseEnter(chip, event)}
+          onMouseLeave={() => handleChipMouseLeave(chip)}
         >
-          <button
-            type="button"
-            className="nodrag flex h-full w-full items-center justify-center"
-            disabled={disabled}
-            onClick={() => onInjectChip(chip)}
-            title={chip.label}
-          >
-            {chip.previewUrl && chip.kind === "image" ? (
-              <img
-                src={chip.previewUrl}
-                alt={chip.label}
-                className="h-full w-full object-cover"
-              />
-            ) : chip.previewUrl && chip.kind === "video" ? (
-              <video
-                src={chip.previewUrl}
-                className="h-full w-full object-cover"
-                muted
-              />
-            ) : (
-              <span className="text-muted-foreground">
-                {iconForKind[chip.kind]}
-              </span>
-            )}
-          </button>
+          {onInjectChip ? (
+            <button
+              type="button"
+              className="nodrag flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
+              disabled={disabled}
+              onClick={() => onInjectChip(chip)}
+              title={chip.label}
+            >
+              {chip.previewUrl && chip.kind === "image" ? (
+                <img
+                  src={chip.previewUrl}
+                  alt={chip.label}
+                  className="h-full w-full object-cover"
+                />
+              ) : chip.previewUrl && chip.kind === "video" ? (
+                <video
+                  src={chip.previewUrl}
+                  className="h-full w-full object-cover"
+                  muted
+                />
+              ) : (
+                <span className="text-muted-foreground">
+                  {iconForKind[chip.kind]}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div
+              className="nodrag flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
+              title={chip.label}
+            >
+              {chip.previewUrl && chip.kind === "image" ? (
+                <img
+                  src={chip.previewUrl}
+                  alt={chip.label}
+                  className="h-full w-full object-cover"
+                />
+              ) : chip.previewUrl && chip.kind === "video" ? (
+                <video
+                  src={chip.previewUrl}
+                  className="h-full w-full object-cover"
+                  muted
+                />
+              ) : (
+                <span className="text-muted-foreground">
+                  {iconForKind[chip.kind]}
+                </span>
+              )}
+            </div>
+          )}
           {!disabled ? (
             <button
               type="button"
@@ -205,33 +324,7 @@ export function AiTextReferenceBar({
         />
       ) : null}
 
-      {hoverChip ? (
-        <div className="pointer-events-none absolute left-0 top-12 z-50 w-56 rounded-lg border border-border bg-popover p-2 shadow-lg">
-          <p className="mb-1 truncate text-[11px] font-medium text-foreground">
-            {hoverChip.label}
-          </p>
-          {hoverChip.kind === "image" && hoverChip.previewUrl ? (
-            <img
-              src={hoverChip.previewUrl}
-              alt={hoverChip.label}
-              className="max-h-36 w-full rounded object-cover"
-            />
-          ) : hoverChip.kind === "video" && hoverChip.previewUrl ? (
-            <video
-              src={hoverChip.previewUrl}
-              className="max-h-36 w-full rounded object-cover"
-              muted
-              autoPlay
-              loop
-            />
-          ) : (
-            <p className="line-clamp-6 text-xs leading-relaxed text-muted-foreground">
-              {hoverChip.textExcerpt ||
-                t("workflow.aiTextPanel.historyEmptyItem")}
-            </p>
-          )}
-        </div>
-      ) : null}
+      {renderHoverPreviewPortal()}
 
       <AlertDialog
         open={pendingDisconnectId !== null}

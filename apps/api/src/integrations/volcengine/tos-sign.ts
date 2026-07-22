@@ -63,8 +63,101 @@ async function deriveSigningKey(
   return hmacSha256(kService, "request");
 }
 
-function buildCanonicalQueryString(): string {
-  return "";
+function buildCanonicalQueryString(
+  queryEntries?: readonly (readonly [string, string])[]
+): string {
+  if (!queryEntries || queryEntries.length === 0) {
+    return "";
+  }
+
+  return queryEntries
+    .slice()
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([key, value]) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    )
+    .join("&");
+}
+
+/** Presigned GET URL for anonymous download (e.g. upstream model fetch). */
+export async function presignTosGetUrl(params: {
+  readonly endpoint: string;
+  readonly path: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+  readonly region: string;
+  readonly expiresInSeconds: number;
+}): Promise<string> {
+  const host = new URL(params.endpoint).host;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const credentialScope = `${dateStamp}/${params.region}/${SERVICE}/request`;
+  const credential = `${params.accessKeyId}/${credentialScope}`;
+  const signedHeaders = "host";
+  const payloadHash = UNSIGNED_PAYLOAD;
+
+  const queryEntries: (readonly [string, string])[] = [
+    ["X-Tos-Algorithm", ALGORITHM],
+    ["X-Tos-Credential", credential],
+    ["X-Tos-Date", amzDate],
+    ["X-Tos-Expires", String(params.expiresInSeconds)],
+    ["X-Tos-SignedHeaders", signedHeaders],
+  ];
+
+  const canonicalQueryString = buildCanonicalQueryString(queryEntries);
+  const canonicalRequest = [
+    "GET",
+    params.path,
+    canonicalQueryString,
+    `host:${host}\n`,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+
+  const stringToSign = [
+    ALGORITHM,
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+
+  const signingKey = await deriveSigningKey(
+    params.secretAccessKey,
+    dateStamp,
+    params.region
+  );
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+
+  const url = new URL(`${params.endpoint}${params.path}`);
+  for (const [key, value] of queryEntries) {
+    url.searchParams.set(key, value);
+  }
+  url.searchParams.set("X-Tos-Signature", signature);
+  return url.toString();
+}
+
+/** Signed PUT request for browser-direct upload (returns URL + headers). */
+export async function signTosPutObject(params: {
+  readonly endpoint: string;
+  readonly path: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+  readonly region: string;
+  readonly mimeType: string;
+  readonly contentLength: number;
+}): Promise<TosSignedRequest> {
+  return signTosRequest({
+    method: "PUT",
+    endpoint: params.endpoint,
+    path: params.path,
+    accessKeyId: params.accessKeyId,
+    secretAccessKey: params.secretAccessKey,
+    region: params.region,
+    contentType: params.mimeType,
+    payloadHash: UNSIGNED_PAYLOAD,
+  });
 }
 
 export async function signTosRequest(

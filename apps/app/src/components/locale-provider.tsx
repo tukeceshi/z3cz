@@ -13,12 +13,21 @@ import useSWR from "swr";
 import {
   createTranslator,
   detectBrowserLocale,
+  loadLocaleDictionary,
   LOCALE_STORAGE_KEY,
   readStoredLocale,
   resolveInitialLocale,
   type TranslateFn,
+  type TranslationDictionary,
+  type TranslationKey,
 } from "@/i18n";
+import { RoutePageFallback } from "@/components/route-page-fallback";
 import { makeRequest } from "@/services/utils";
+
+const bootLocale = resolveInitialLocale(
+  readStoredLocale() ?? detectBrowserLocale()
+);
+void loadLocaleDictionary(bootLocale);
 
 interface LocaleContextValue {
   locale: AppLocale;
@@ -53,6 +62,23 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>(() =>
     resolveInitialLocale(readStoredLocale() ?? detectBrowserLocale())
   );
+  const [dictionary, setDictionary] = useState<TranslationDictionary | null>(
+    null
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadLocaleDictionary(locale).then((loaded) => {
+      if (!cancelled) {
+        setDictionary(loaded);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   useEffect(() => {
     if (data?.defaultLocale && !readStoredLocale()) {
@@ -69,7 +95,12 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(nextLocale);
   }, []);
 
-  const t = useMemo(() => createTranslator(locale), [locale]);
+  const t = useMemo<TranslateFn>(() => {
+    if (!dictionary) {
+      return (key: TranslationKey) => key;
+    }
+    return createTranslator(locale, dictionary);
+  }, [dictionary, locale]);
 
   const refreshSiteSettings = useCallback(async () => {
     await mutate();
@@ -85,6 +116,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     }),
     [locale, setLocale, t, siteSettings, refreshSiteSettings]
   );
+
+  if (!dictionary) {
+    return <RoutePageFallback variant="full" />;
+  }
 
   return (
     <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>

@@ -68,6 +68,11 @@ services:
       LOCAL_STORAGE_PATH: /app/data/storage
       HOST: 0.0.0.0
       SKIP_EXTRACT_NODES: "1"
+      # tsx watch process restarts: skip migrate when boot stamp matches journal.
+      SKIP_DB_MIGRATE: "1"
+      # Windows bind mounts often miss inotify events; tsx watch uses chokidar.
+      CHOKIDAR_USEPOLLING: "1"
+      CHOKIDAR_INTERVAL: "300"
     networks:
       - dafthunk-network
     healthcheck:
@@ -78,8 +83,8 @@ services:
         ]
       interval: 15s
       timeout: 5s
-      retries: 40
-      start_period: 360s
+      retries: 20
+      start_period: 120s
     restart: on-failure:5
     stdin_open: true
     tty: true

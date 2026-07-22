@@ -5,9 +5,12 @@ import {
   type ObjectReference,
 } from "@dafthunk/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { useObjectService } from "@/services/object-service";
+import { useOrgCloudStorageStatus } from "@/services/platform-ai-model-service";
+import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 import { cn } from "@/utils/utils";
 
 import {
@@ -22,11 +25,13 @@ import {
   AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_CARD_WIDTH_PX,
   isAiImageGenerating,
+  readAiImageGenerateError,
   readAiImageCardImages,
   readAiImageResultHistory,
   withAiImageHistorySelection,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
+import { GenerativeCardErrorOverlay } from "../../generative-card-error-overlay";
 import {
   shouldShowGenerativeHistoryIcon,
   withGenerativeCardEditing,
@@ -61,8 +66,11 @@ function AiImageWidget({
   createObjectUrl,
 }: AiImageWidgetProps) {
   const { t } = useTranslation();
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
+  const orgId = organization?.id;
+  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
   const { updateNodeData } = useWorkflow();
-  const { uploadBinaryData } = useObjectService();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandOpen, setExpandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -71,7 +79,11 @@ function AiImageWidget({
     historyItems.items.length,
     metadata
   );
-  const cardPlaceholder = t("workflow.aiImagePanel.cardUploadPlaceholder");
+  const isGenerating = isAiImageGenerating(metadata);
+  const generateError = readAiImageGenerateError(metadata);
+  const cardPlaceholder = isGenerating
+    ? t("workflow.aiImagePanel.cardGenerating")
+    : t("workflow.aiImagePanel.cardUploadPlaceholder");
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -84,7 +96,7 @@ function AiImageWidget({
     useGenerativeCardDoubleClickUpload({
       prompt,
       hasMedia: images.length > 0,
-      isGenerating: isAiImageGenerating(metadata),
+      isGenerating,
       disabled,
       uploading,
       fileInputRef,
@@ -123,7 +135,7 @@ function AiImageWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || !files?.length || !updateNodeData) return;
+      if (disabled || !files?.length || !updateNodeData || !orgId) return;
 
       const file = files[0];
       if (!file.type.startsWith("image/")) {
@@ -133,12 +145,13 @@ function AiImageWidget({
       setUploading(true);
       setCardEditing(true);
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mimeType = file.type || "application/octet-stream";
-        const value = (await uploadBinaryData(
-          arrayBuffer,
-          mimeType
-        )) as ObjectReference;
+        const value = await uploadGenerativeMedia({
+          organizationId: orgId,
+          workflowId,
+          file,
+          cloudConfigured,
+          mediaKind: "ai-image",
+        });
 
         updateNodeData(nodeId, (current) =>
           withAiImageManualUpload(current, [value])
@@ -148,7 +161,15 @@ function AiImageWidget({
         setCardEditing(false);
       }
     },
-    [disabled, nodeId, setCardEditing, updateNodeData, uploadBinaryData]
+    [
+      cloudConfigured,
+      disabled,
+      nodeId,
+      orgId,
+      setCardEditing,
+      updateNodeData,
+      workflowId,
+    ]
   );
 
   const gridCols =
@@ -181,12 +202,19 @@ function AiImageWidget({
           width: AI_IMAGE_CARD_WIDTH_PX,
           height: AI_IMAGE_CARD_HEIGHT_PX,
         }}
-        onDoubleClick={handleCardDoubleClick}
+        onDoubleClick={isGenerating ? undefined : handleCardDoubleClick}
       >
         {images.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-[11px] text-muted-foreground/50 italic">
-              {cardPlaceholder}
+          <div className="flex h-full items-center justify-center px-3">
+            <p
+              className={cn(
+                "text-center text-[11px] italic",
+                generateError
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-muted-foreground/50"
+              )}
+            >
+              {generateError ?? cardPlaceholder}
             </p>
           </div>
         ) : (
@@ -201,6 +229,10 @@ function AiImageWidget({
             ))}
           </div>
         )}
+
+        {generateError && images.length > 0 ? (
+          <GenerativeCardErrorOverlay message={generateError} />
+        ) : null}
 
         <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
           {showHistoryIcon ? (

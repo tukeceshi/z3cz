@@ -2,6 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   type AiImageResultHistory,
   type AiImageResultHistoryItem,
+  normalizeImageModelParameterRules,
   type ImageModelParameterRules,
   isMediaReference,
   type MediaReference,
@@ -36,6 +37,7 @@ export const AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX =
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX;
 
 export const AI_IMAGE_GENERATING_META_KEY = "aiImageGenerating" as const;
+export const AI_IMAGE_GENERATE_ERROR_META_KEY = "aiImageGenerateError" as const;
 
 export const AI_IMAGE_MAX_HISTORY_ITEMS = 30;
 
@@ -380,6 +382,32 @@ export function withAiImageGeneratingFlag(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+export function readAiImageGenerateError(
+  metadata: Record<string, string> | undefined
+): string | undefined {
+  const value = metadata?.[AI_IMAGE_GENERATE_ERROR_META_KEY];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+export function withAiImageGenerateError(
+  metadata: Record<string, string> | undefined,
+  error: string | null | undefined
+): Record<string, string> | undefined {
+  if (!error?.trim()) {
+    if (!metadata || !(AI_IMAGE_GENERATE_ERROR_META_KEY in metadata)) {
+      return metadata;
+    }
+    const next = { ...metadata };
+    delete next[AI_IMAGE_GENERATE_ERROR_META_KEY];
+    return Object.keys(next).length > 0 ? next : undefined;
+  }
+
+  return {
+    ...(metadata ?? {}),
+    [AI_IMAGE_GENERATE_ERROR_META_KEY]: error.trim(),
+  };
+}
+
 export function countAiImageReferences(
   targetNodeId: string,
   edges: readonly {
@@ -400,6 +428,22 @@ export function referencesFitImageModelLimits(
   rules: ImageModelParameterRules
 ): boolean {
   return referenceCount <= rules.maxReferenceImages;
+}
+
+export function imageModelAllowsMediaReferences(
+  rules: ImageModelParameterRules
+): boolean {
+  return normalizeImageModelParameterRules(rules).maxReferenceImages > 0;
+}
+
+export function canGenerateAiImage(params: {
+  readonly prompt: string;
+  readonly referenceCount: number;
+  readonly rules: ImageModelParameterRules;
+}): boolean {
+  if (params.prompt.trim().length > 0) return true;
+  if (!imageModelAllowsMediaReferences(params.rules)) return false;
+  return params.referenceCount > 0;
 }
 
 export function pickDefaultImageModelCanonicalId(

@@ -2,7 +2,6 @@ import type { NodeType } from "@dafthunk/types";
 import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
-import { createCloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
 
 function filterToCoreGenerativeNodeTypes(
@@ -21,6 +20,9 @@ export async function getAllNodeTypes(
     return filterToCoreGenerativeNodeTypes(loadNodeTypesFromJson());
   }
 
+  const { createCloudflareNodeRegistry } = await import(
+    "../runtime/cloudflare-node-registry"
+  );
   const registry = await createCloudflareNodeRegistry(env, developerMode);
   return filterToCoreGenerativeNodeTypes(registry.getNodeTypes());
 }

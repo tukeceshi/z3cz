@@ -15,6 +15,8 @@ export interface UpstreamParamProfileField {
   readonly required?: boolean;
   readonly default?: string | number | boolean;
   readonly hidden?: boolean;
+  /** When true, field is UI-only and must not be sent to upstream APIs. */
+  readonly clientOnly?: boolean;
   readonly enumValues?: readonly string[];
 }
 

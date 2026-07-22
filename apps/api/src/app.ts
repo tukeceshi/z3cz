@@ -2,54 +2,11 @@ import { Hono } from "hono";
 
 import auth from "./auth";
 import type { ApiContext } from "./context";
+import { lazyRoute } from "./lazy-route";
 import { corsMiddleware } from "./middleware/cors";
 import { createNodeRateLimitMiddleware } from "./middleware/rate-limit-node";
-import platformAiRoutes from "./routes/platform-ai";
-import aiInterfaceRoutes from "./routes/ai-interfaces";
-import adminRoutes from "./routes/admin";
-import apiKeyRoutes from "./routes/api-keys";
-import billingRoutes from "./routes/billing";
-import botRoutes from "./routes/bots";
-import cloudflareAiRoutes from "./routes/cloudflare-ai";
-import cloudflareGatewayRoutes from "./routes/cloudflare-gateway";
-import dashboardRoutes from "./routes/dashboard";
-import databaseRoutes from "./routes/databases";
-import datasetRoutes from "./routes/datasets";
-import discordWebhook from "./routes/discord-webhook";
-import emailRoutes from "./routes/emails";
-import executionRoutes from "./routes/executions";
-import feedbackRoutes from "./routes/feedback";
-import feedbackFormRoutes from "./routes/feedback-forms";
-import formTriggerRoutes from "./routes/form-triggers";
-import formRoutes from "./routes/forms";
 import health from "./routes/health";
-import inboundEmailRoutes from "./routes/inbound-email";
-import httpTriggerRoutes from "./routes/http-triggers";
-import integrationRoutes from "./routes/integrations";
-import invitationRoutes from "./routes/invitations";
-import llmsRoutes from "./routes/llms";
-import oauthRoutes from "./routes/oauth";
-import objectRoutes from "./routes/objects";
-import organizationRoutes from "./routes/organizations";
-import playgroundRoutes from "./routes/playground";
-import profileRoutes from "./routes/profile";
-import queuePublishRoutes from "./routes/queue-publish";
-import queueRoutes from "./routes/queues";
-import replicateRoutes from "./routes/replicate";
-import robotsRoutes from "./routes/robots";
-import schemaRoutes from "./routes/schemas";
-import secretRoutes from "./routes/secrets";
 import siteSettingsRoutes from "./routes/site-settings";
-import slackWebhook from "./routes/slack-webhook";
-import stripeWebhooks from "./routes/stripe-webhooks";
-import telegramWebhook from "./routes/telegram-webhook";
-import templateRoutes from "./routes/templates";
-import typeRoutes from "./routes/types";
-import usageRoutes from "./routes/usage";
-import whatsappWebhook from "./routes/whatsapp-webhook";
-import workflowSchemeRoutes from "./routes/workflow-schemes";
-import workflowRoutes from "./routes/workflows";
-import wsRoutes from "./routes/ws";
 
 export interface CreateAppOptions {
   runtime: "node" | "workers";
@@ -96,53 +53,131 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/health", health);
   app.route("/site-settings", siteSettingsRoutes);
   if (options.runtime === "node") {
-    app.route("/inbound-email", inboundEmailRoutes);
+    app.route(
+      "/inbound-email",
+      lazyRoute(() => import("./routes/inbound-email"))
+    );
   }
   app.route("/auth", auth);
-  app.route("/admin", adminRoutes);
-  app.route("/oauth", oauthRoutes);
-  app.route("/profile", profileRoutes);
-  app.route("/organizations", organizationRoutes);
-  app.route("/invitations", invitationRoutes);
-  app.route("/robots.txt", robotsRoutes);
-  app.route("/llms.txt", llmsRoutes);
-  app.route("/stripe/webhooks", stripeWebhooks);
-  app.route("/telegram", telegramWebhook);
-  app.route("/discord", discordWebhook);
-  app.route("/whatsapp", whatsappWebhook);
-  app.route("/slack", slackWebhook);
-  app.route("/http", httpTriggerRoutes);
-  app.route("/queues", queuePublishRoutes);
-  app.route("/replicate", replicateRoutes);
-  app.route("/cloudflare-ai", cloudflareAiRoutes);
-  app.route("/cloudflare-gateway", cloudflareGatewayRoutes);
-  app.route("/forms", formRoutes);
-  app.route("/form-triggers", formTriggerRoutes);
-  app.route("/feedback-forms", feedbackFormRoutes);
-  app.route("/templates", templateRoutes);
-  app.route("/workflow-schemes", workflowSchemeRoutes);
-  app.route("/types", typeRoutes);
-  app.route("/:organizationId/api-keys", apiKeyRoutes);
-  app.route("/:organizationId/billing", billingRoutes);
-  app.route("/:organizationId/dashboard", dashboardRoutes);
-  app.route("/:organizationId/databases", databaseRoutes);
-  app.route("/:organizationId/datasets", datasetRoutes);
-  app.route("/:organizationId/bots", botRoutes);
-  app.route("/:organizationId/emails", emailRoutes);
-  app.route("/:organizationId/feedback", feedbackRoutes);
-  app.route("/:organizationId/executions", executionRoutes);
-  app.route("/:organizationId/integrations", integrationRoutes);
-  app.route("/:organizationId/queues", queueRoutes);
-  app.route("/:organizationId/schemas", schemaRoutes);
-  app.route("/:organizationId/secrets", secretRoutes);
-  app.route("/:organizationId/ai-interfaces", aiInterfaceRoutes);
-  app.route("/:organizationId/platform-ai", platformAiRoutes);
-  app.route("/:organizationId/workflows", workflowRoutes);
-  app.route("/:organizationId/objects", objectRoutes);
-  app.route("/:organizationId/playground", playgroundRoutes);
-  app.route("/:organizationId/usage", usageRoutes);
+  app.route("/admin", lazyRoute(() => import("./routes/admin")));
+  app.route("/oauth", lazyRoute(() => import("./routes/oauth")));
+  app.route("/profile", lazyRoute(() => import("./routes/profile")));
+  app.route(
+    "/organizations",
+    lazyRoute(() => import("./routes/organizations"))
+  );
+  app.route("/invitations", lazyRoute(() => import("./routes/invitations")));
+  app.route("/robots.txt", lazyRoute(() => import("./routes/robots")));
+  app.route("/llms.txt", lazyRoute(() => import("./routes/llms")));
+  app.route(
+    "/stripe/webhooks",
+    lazyRoute(() => import("./routes/stripe-webhooks"))
+  );
+  app.route("/telegram", lazyRoute(() => import("./routes/telegram-webhook")));
+  app.route("/discord", lazyRoute(() => import("./routes/discord-webhook")));
+  app.route("/whatsapp", lazyRoute(() => import("./routes/whatsapp-webhook")));
+  app.route("/slack", lazyRoute(() => import("./routes/slack-webhook")));
+  app.route("/http", lazyRoute(() => import("./routes/http-triggers")));
+  app.route("/queues", lazyRoute(() => import("./routes/queue-publish")));
+  app.route("/replicate", lazyRoute(() => import("./routes/replicate")));
+  app.route(
+    "/cloudflare-ai",
+    lazyRoute(() => import("./routes/cloudflare-ai"))
+  );
+  app.route(
+    "/cloudflare-gateway",
+    lazyRoute(() => import("./routes/cloudflare-gateway"))
+  );
+  app.route("/forms", lazyRoute(() => import("./routes/forms")));
+  app.route("/form-triggers", lazyRoute(() => import("./routes/form-triggers")));
+  app.route(
+    "/feedback-forms",
+    lazyRoute(() => import("./routes/feedback-forms"))
+  );
+  app.route("/templates", lazyRoute(() => import("./routes/templates")));
+  app.route(
+    "/workflow-schemes",
+    lazyRoute(() => import("./routes/workflow-schemes"))
+  );
+  app.route("/types", lazyRoute(() => import("./routes/types")));
+  app.route(
+    "/:organizationId/api-keys",
+    lazyRoute(() => import("./routes/api-keys"))
+  );
+  app.route(
+    "/:organizationId/billing",
+    lazyRoute(() => import("./routes/billing"))
+  );
+  app.route(
+    "/:organizationId/dashboard",
+    lazyRoute(() => import("./routes/dashboard"))
+  );
+  app.route(
+    "/:organizationId/databases",
+    lazyRoute(() => import("./routes/databases"))
+  );
+  app.route(
+    "/:organizationId/datasets",
+    lazyRoute(() => import("./routes/datasets"))
+  );
+  app.route("/:organizationId/bots", lazyRoute(() => import("./routes/bots")));
+  app.route(
+    "/:organizationId/emails",
+    lazyRoute(() => import("./routes/emails"))
+  );
+  app.route(
+    "/:organizationId/feedback",
+    lazyRoute(() => import("./routes/feedback"))
+  );
+  app.route(
+    "/:organizationId/executions",
+    lazyRoute(() => import("./routes/executions"))
+  );
+  app.route(
+    "/:organizationId/integrations",
+    lazyRoute(() => import("./routes/integrations"))
+  );
+  app.route(
+    "/:organizationId/queues",
+    lazyRoute(() => import("./routes/queues"))
+  );
+  app.route(
+    "/:organizationId/schemas",
+    lazyRoute(() => import("./routes/schemas"))
+  );
+  app.route(
+    "/:organizationId/secrets",
+    lazyRoute(() => import("./routes/secrets"))
+  );
+  app.route(
+    "/:organizationId/ai-interfaces",
+    lazyRoute(() => import("./routes/ai-interfaces"))
+  );
+  app.route(
+    "/:organizationId/platform-ai",
+    lazyRoute(() => import("./routes/platform-ai"))
+  );
+  app.route(
+    "/:organizationId/workflows",
+    lazyRoute(() => import("./routes/workflows"))
+  );
+  app.route(
+    "/:organizationId/objects",
+    lazyRoute(() => import("./routes/objects"))
+  );
+  app.route(
+    "/:organizationId/playground",
+    lazyRoute(() => import("./routes/playground"))
+  );
+  app.route(
+    "/:organizationId/usage",
+    lazyRoute(() => import("./routes/usage"))
+  );
   if (options.runtime === "workers") {
-    app.route("/:organizationId/ws", wsRoutes);
+    app.route(
+      "/:organizationId/ws",
+      lazyRoute(() => import("./routes/ws"))
+    );
   }
 
   return app;

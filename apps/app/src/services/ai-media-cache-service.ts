@@ -9,6 +9,8 @@ import {
 
 import { generateImageThumbnail } from "@/services/generate-image-thumbnail";
 import type { MediaDisplaySize } from "@/services/media-display-size";
+import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
+import { resolveMediaCacheFetchUrl } from "@/services/media-object-url";
 
 const DB_NAME = "dafthunk-ai-media-cache";
 const DB_VERSION = 2;
@@ -451,16 +453,24 @@ export async function cacheMediaFromUrl(params: {
   readonly workflowName: string;
   readonly media: MediaReference;
   readonly nodeType: "ai-image" | "ai-video";
-  readonly fetchUrl: string;
+  readonly fetchUrl?: string;
 }): Promise<boolean> {
   const settings = await getAiMediaCacheSettings();
   if (!settings.enabled) return false;
 
   const mediaId = getMediaReferenceKey(params.media);
+  const fetchUrl =
+    params.fetchUrl && mediaUrlSupportsBrowserCache(params.fetchUrl)
+      ? params.fetchUrl
+      : resolveMediaCacheFetchUrl(params.media, params.organizationId);
+
+  if (!fetchUrl || !mediaUrlSupportsBrowserCache(fetchUrl)) {
+    return false;
+  }
 
   let response: Response;
   try {
-    response = await fetch(params.fetchUrl);
+    response = await fetch(fetchUrl, { credentials: "include" });
   } catch {
     return false;
   }

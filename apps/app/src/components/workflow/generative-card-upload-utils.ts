@@ -33,3 +33,10 @@ export function canGenerativeCardDoubleClickUpload(params: {
 export function hasGenerativePrompt(prompt: string): boolean {
   return prompt.trim().length > 0;
 }
+
+export function generativePromptWithinModelLimit(
+  prompt: string,
+  maxChars: number
+): boolean {
+  return prompt.trim().length <= maxChars;
+}

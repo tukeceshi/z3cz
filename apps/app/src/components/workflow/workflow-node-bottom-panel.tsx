@@ -21,6 +21,7 @@ import {
   useWorkflow,
 } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
+import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
 
 export const NODE_BOTTOM_PANEL_SINGLE_WIDTH = 384;
 export const NODE_BOTTOM_PANEL_DOUBLE_WIDTH = 768;
@@ -230,6 +231,10 @@ export function WorkflowNodeBottomPanel({
         height: NODE_BOTTOM_PANEL_HEIGHT,
       }}
       onClick={(event) => event.stopPropagation()}
+      onPointerDownCapture={(event) => {
+        event.stopPropagation();
+        armGenerativePanelPointerGuard(nodeId);
+      }}
       onMouseDown={(event) => event.stopPropagation()}
     >
       <div className="h-full overflow-y-auto">

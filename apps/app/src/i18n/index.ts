@@ -1,14 +1,39 @@
 import type { AppLocale } from "@dafthunk/types";
 
-import { en, type TranslationDictionary } from "./locales/en";
-import { zh } from "./locales/zh";
+import type { TranslationDictionary } from "./locales/en";
 
 export const LOCALE_STORAGE_KEY = "dafthunk-locale";
 
-export const locales: Record<AppLocale, TranslationDictionary> = {
-  en,
-  zh,
+export type { TranslationDictionary };
+
+const localeLoaders: Record<
+  AppLocale,
+  () => Promise<TranslationDictionary>
+> = {
+  en: async () => {
+    const module = await import("./locales/en");
+    return module.en;
+  },
+  zh: async () => {
+    const module = await import("./locales/zh");
+    return module.zh;
+  },
 };
+
+const localeCache = new Map<AppLocale, TranslationDictionary>();
+
+export async function loadLocaleDictionary(
+  locale: AppLocale
+): Promise<TranslationDictionary> {
+  const cached = localeCache.get(locale);
+  if (cached) {
+    return cached;
+  }
+
+  const dictionary = await localeLoaders[locale]();
+  localeCache.set(locale, dictionary);
+  return dictionary;
+}
 
 type NestedKeyOf<T> = T extends string
   ? never
@@ -37,16 +62,24 @@ function getNestedValue(
   return typeof current === "string" ? current : undefined;
 }
 
-export function createTranslator(locale: AppLocale) {
-  const dictionary = locales[locale];
-
+export function createTranslator(
+  locale: AppLocale,
+  dictionary: TranslationDictionary,
+  fallbackDictionary?: TranslationDictionary
+) {
   return (
     key: TranslationKey,
     params?: Record<string, string | number>
   ): string => {
     let value = getNestedValue(dictionary, key);
-    if (value === undefined) {
-      value = getNestedValue(locales.en, key);
+    if (value === undefined && fallbackDictionary) {
+      value = getNestedValue(fallbackDictionary, key);
+    }
+    if (value === undefined && locale !== "en") {
+      value = getNestedValue(
+        localeCache.get("en") ?? dictionary,
+        key
+      );
     }
     if (value === undefined) {
       return key;
@@ -58,7 +91,7 @@ export function createTranslator(locale: AppLocale) {
 
     return Object.entries(params).reduce(
       (result, [paramKey, paramValue]) =>
-        result.replaceAll(`{{${paramKey}}}`, String(paramValue)),
+        result.replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, "g"), String(paramValue)),
       value
     );
   };

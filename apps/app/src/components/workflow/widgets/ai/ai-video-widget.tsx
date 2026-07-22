@@ -4,10 +4,13 @@ import {
   type ObjectReference,
 } from "@dafthunk/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
-import { useObjectService } from "@/services/object-service";
+import { useOrgCloudStorageStatus } from "@/services/platform-ai-model-service";
+import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
@@ -24,11 +27,13 @@ import {
   AI_VIDEO_CARD_HEIGHT_PX,
   AI_VIDEO_CARD_WIDTH_PX,
   isAiVideoGenerating,
+  readAiVideoGenerateError,
   readAiVideoCardVideos,
   readAiVideoResultHistory,
   withAiVideoHistorySelection,
   withAiVideoManualUpload,
 } from "../../ai-video-node-utils";
+import { GenerativeCardErrorOverlay } from "../../generative-card-error-overlay";
 import type { VideoFrameCaptureMode } from "../../capture-video-frame";
 import {
   shouldShowGenerativeHistoryIcon,
@@ -66,7 +71,6 @@ function MediaVideoPreview({
   const expired = isMediaExpired(value);
   const { displayUrl, stale } = useMediaDisplayUrl({
     media: expired ? null : value,
-    createObjectUrl,
     nodeType: "ai-video",
     size,
   });
@@ -96,7 +100,7 @@ function MediaVideoPreview({
           className
         )}
       >
-        {t("workflow.aiMediaCache.imageUnavailable")}
+        {t("workflow.aiMediaCache.videoUnavailable")}
       </div>
     );
   }
@@ -136,8 +140,11 @@ function AiVideoWidget({
   createObjectUrl,
 }: AiVideoWidgetProps) {
   const { t } = useTranslation();
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
+  const orgId = organization?.id;
+  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
   const { updateNodeData } = useWorkflow();
-  const { uploadBinaryData } = useObjectService();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandOpen, setExpandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -146,7 +153,11 @@ function AiVideoWidget({
     historyItems.items.length,
     metadata
   );
-  const cardPlaceholder = t("workflow.aiVideoPanel.cardUploadPlaceholder");
+  const isGenerating = isAiVideoGenerating(metadata);
+  const generateError = readAiVideoGenerateError(metadata);
+  const cardPlaceholder = isGenerating
+    ? t("workflow.aiVideoPanel.cardGenerating")
+    : t("workflow.aiVideoPanel.cardUploadPlaceholder");
   const activeVideo = videos[0];
 
   const handleClearPrompt = useCallback(() => {
@@ -160,7 +171,7 @@ function AiVideoWidget({
     useGenerativeCardDoubleClickUpload({
       prompt,
       hasMedia: Boolean(activeVideo),
-      isGenerating: isAiVideoGenerating(metadata),
+      isGenerating,
       disabled,
       uploading,
       fileInputRef,
@@ -199,7 +210,7 @@ function AiVideoWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || !files?.length || !updateNodeData) return;
+      if (disabled || !files?.length || !updateNodeData || !orgId) return;
 
       const file = files[0];
       if (!file.type.startsWith("video/")) {
@@ -209,12 +220,13 @@ function AiVideoWidget({
       setUploading(true);
       setCardEditing(true);
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mimeType = file.type || "application/octet-stream";
-        const value = (await uploadBinaryData(
-          arrayBuffer,
-          mimeType
-        )) as ObjectReference;
+        const value = await uploadGenerativeMedia({
+          organizationId: orgId,
+          workflowId,
+          file,
+          cloudConfigured,
+          mediaKind: "ai-video",
+        });
 
         updateNodeData(nodeId, (current) =>
           withAiVideoManualUpload(current, [value])
@@ -224,7 +236,15 @@ function AiVideoWidget({
         setCardEditing(false);
       }
     },
-    [disabled, nodeId, setCardEditing, updateNodeData, uploadBinaryData]
+    [
+      cloudConfigured,
+      disabled,
+      nodeId,
+      orgId,
+      setCardEditing,
+      updateNodeData,
+      workflowId,
+    ]
   );
 
   const historyAsImageHistory = {
@@ -261,12 +281,19 @@ function AiVideoWidget({
           width: AI_VIDEO_CARD_WIDTH_PX,
           height: AI_VIDEO_CARD_HEIGHT_PX,
         }}
-        onDoubleClick={handleCardDoubleClick}
+        onDoubleClick={isGenerating ? undefined : handleCardDoubleClick}
       >
         {!activeVideo ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-[11px] text-muted-foreground/50 italic">
-              {cardPlaceholder}
+          <div className="flex h-full items-center justify-center px-3">
+            <p
+              className={cn(
+                "text-center text-[11px] italic",
+                generateError
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-muted-foreground/50"
+              )}
+            >
+              {generateError ?? cardPlaceholder}
             </p>
           </div>
         ) : (
@@ -278,6 +305,10 @@ function AiVideoWidget({
             disabled={disabled}
           />
         )}
+
+        {generateError && activeVideo ? (
+          <GenerativeCardErrorOverlay message={generateError} />
+        ) : null}
 
         <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
           {showHistoryIcon ? (

@@ -16,9 +16,7 @@ try {
 }
 
 writeBootPhase("loading_runtime");
-console.log(
-  "[api] Loading runtime (WASM init may take 2–6 minutes in Docker)..."
-);
+console.log("[api] Loading runtime module graph...");
 
 void import("./server-bootstrap.js")
   .then(({ runServer }) => runServer(envVars))

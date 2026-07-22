@@ -14,6 +14,8 @@ export interface BufferedTextValue {
   readonly flush: () => void;
   /** Replace local + persist immediately (e.g. expand overlay Done). */
   readonly commit: (value: string) => void;
+  /** Replace local state without persisting (e.g. history selection). */
+  readonly reset: (value: string) => void;
   readonly onFocus: () => void;
   readonly onBlur: () => void;
   readonly onCompositionStart: () => void;
@@ -107,6 +109,17 @@ export function useBufferedTextValue(
     [persist]
   );
 
+  const reset = useCallback(
+    (value: string) => {
+      clearScheduled();
+      composingRef.current = false;
+      setIsFocused(false);
+      setLocalValue(value);
+      localValueRef.current = value;
+    },
+    [clearScheduled]
+  );
+
   const onFocus = useCallback(() => {
     setIsFocused(true);
   }, []);
@@ -141,6 +154,7 @@ export function useBufferedTextValue(
     onChange,
     flush,
     commit,
+    reset,
     onFocus,
     onBlur,
     onCompositionStart,

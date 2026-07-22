@@ -13,7 +13,7 @@ import {
 import { useCallback } from "react";
 
 import { useAuth } from "@/components/auth-context";
-import { getApiBaseUrl } from "@/config/api";
+import { getApiBaseUrl, buildApiUrl } from "@/config/api";
 
 import { makeOrgRequest } from "./utils";
 
@@ -84,10 +84,10 @@ export const buildObjectApiUrl = (
 ): string => {
   if (!organizationId) {
     console.warn("No organization ID provided for object API URL");
-    return `${getApiBaseUrl()}${API_ENDPOINT_BASE}${path}`;
+    return buildApiUrl(`${API_ENDPOINT_BASE}${path}`);
   }
 
-  return `${getApiBaseUrl()}/${organizationId}${API_ENDPOINT_BASE}${path}`;
+  return buildApiUrl(`/${organizationId}${API_ENDPOINT_BASE}${path}`);
 };
 
 /**

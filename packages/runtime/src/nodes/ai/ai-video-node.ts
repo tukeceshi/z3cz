@@ -1,5 +1,6 @@
 import {
   isEphemeralMediaReference,
+  isLocalMediaReference,
   type MediaReference,
   type NodeExecution,
   type NodeType,
@@ -34,7 +35,7 @@ export class AiVideoNode extends ExecutableNode {
 - **prompt**: Video generation prompt (or synced from a connected AI text node).
 - **model**: Platform model canonical id (e.g. doubao-seedance-2).
 - **params**: Generation parameters configured in admin (ratio, duration, etc.).
-- **manual_videos**: JSON array of ObjectReferences — bypasses generation.
+- **manual_videos**: JSON array of media references — bypasses generation.
 
 ### Outputs
 - **videos**: Array of generated video references.`,
@@ -83,7 +84,7 @@ export class AiVideoNode extends ExecutableNode {
         name: "manual_videos",
         type: "json",
         description:
-          "JSON array of ObjectReferences to return directly, bypassing generation.",
+          "JSON array of media references to return directly, bypassing generation.",
         required: false,
         hidden: true,
       },
@@ -104,7 +105,9 @@ export class AiVideoNode extends ExecutableNode {
     if (Array.isArray(manualVideos) && manualVideos.length > 0) {
       const refs = manualVideos.filter(
         (value): value is ObjectReference | MediaReference =>
-          isObjectReference(value) || isEphemeralMediaReference(value)
+          isObjectReference(value) ||
+          isEphemeralMediaReference(value) ||
+          isLocalMediaReference(value)
       );
       if (refs.length > 0) {
         return this.createSuccessResult({ videos: refs }, refs.length);
@@ -112,8 +115,23 @@ export class AiVideoNode extends ExecutableNode {
     }
 
     const prompt = context.inputs.prompt;
-    if (typeof prompt !== "string" || prompt.trim().length === 0) {
-      return this.createErrorResult("A prompt is required.");
+    const referenceValues = context.inputs[AI_VIDEO_REFERENCE_INPUT];
+    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
+      ? referenceValues.filter(
+          (value): value is MediaReference =>
+            isObjectReference(value) ||
+            isEphemeralMediaReference(value) ||
+            isLocalMediaReference(value)
+        )
+      : isObjectReference(referenceValues) ||
+          isEphemeralMediaReference(referenceValues) ||
+          isLocalMediaReference(referenceValues)
+        ? [referenceValues]
+        : [];
+
+    const hasPrompt = typeof prompt === "string" && prompt.trim().length > 0;
+    if (!hasPrompt && referenceRefs.length === 0) {
+      return this.createErrorResult("A prompt or reference image is required.");
     }
 
     const modelCanonicalId = context.inputs.model;
@@ -155,19 +173,14 @@ export class AiVideoNode extends ExecutableNode {
         ? (context.inputs.params as Record<string, unknown>)
         : undefined;
 
-    const referenceValues = context.inputs[AI_VIDEO_REFERENCE_INPUT];
-    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
-      ? referenceValues.filter(
-          (value): value is MediaReference =>
-            isObjectReference(value) || isEphemeralMediaReference(value)
-        )
-      : isObjectReference(referenceValues) ||
-          isEphemeralMediaReference(referenceValues)
-        ? [referenceValues]
-        : [];
-
     const referenceImageUrls: string[] = [];
     for (const ref of referenceRefs) {
+      if (isLocalMediaReference(ref)) {
+        return this.createErrorResult(
+          "Local browser-only reference images cannot be used in server workflow runs."
+        );
+      }
+
       if (isEphemeralMediaReference(ref)) {
         referenceImageUrls.push(ref.url);
         continue;
@@ -192,7 +205,7 @@ export class AiVideoNode extends ExecutableNode {
       apiKey: resolvedInterface.apiKey,
       baseUrl: resolvedInterface.baseUrl,
       providerModelId: resolvedModel.providerModelId,
-      prompt,
+      prompt: typeof prompt === "string" ? prompt : "",
       parameterRules: resolvedModel.parameterRules,
       generationParams,
       referenceImageUrls,

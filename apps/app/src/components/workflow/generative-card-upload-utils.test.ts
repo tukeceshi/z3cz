@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canGenerativeCardDoubleClickUpload,
+  generativePromptWithinModelLimit,
   hasGenerativePrompt,
   readGenerativePrompt,
   withGenerativePromptCleared,
@@ -40,5 +41,13 @@ describe("generative prompt helpers", () => {
     expect(hasGenerativePrompt("  hi ")).toBe(true);
     expect(hasGenerativePrompt("   ")).toBe(false);
     expect(withGenerativePromptCleared(inputs)[0]?.value).toBe("");
+  });
+});
+
+describe("generativePromptWithinModelLimit", () => {
+  it("ignores surrounding whitespace when comparing length", () => {
+    expect(generativePromptWithinModelLimit("  abc  ", 3)).toBe(true);
+    expect(generativePromptWithinModelLimit("  abcd  ", 3)).toBe(false);
+    expect(generativePromptWithinModelLimit("", 600)).toBe(true);
   });
 });

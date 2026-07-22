@@ -42,9 +42,6 @@ const textRulesSchema = z.object({
   maxVideoReferences: z.number().int().nonnegative(),
   maxVideoReferenceBytes: z.number().int().positive(),
   maxVideoReferenceSeconds: z.number().int().positive(),
-  allowPromptInjectText: z.boolean().optional(),
-  allowPromptInjectImage: z.boolean().optional(),
-  allowPromptInjectVideo: z.boolean().optional(),
 });
 
 const generationFieldSchema = z.object({

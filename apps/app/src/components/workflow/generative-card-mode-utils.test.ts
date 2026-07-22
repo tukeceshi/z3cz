@@ -4,6 +4,7 @@ import {
   shouldShowGenerativeBottomPanel,
   shouldShowGenerativeHistoryIcon,
   withGenerativeCardEditing,
+  withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
 
@@ -25,5 +26,9 @@ describe("generative-card-mode-utils", () => {
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeCardEditing(undefined, true))
     ).toBe(false);
+  it("clears manual-only metadata to undefined (must not fall back with ??)", () => {
+    const manual = withGenerativeManualContentMode(undefined);
+    expect(withGenerativeGeneratedContentMode(manual)).toBeUndefined();
+    expect(withGenerativeGeneratedContentMode(manual) ?? manual).toEqual(manual);
   });
 });

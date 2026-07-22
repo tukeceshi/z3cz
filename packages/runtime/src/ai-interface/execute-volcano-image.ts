@@ -10,6 +10,8 @@ import {
 
   type ObjectReference,
 
+  type ReferenceImageInline,
+
   normalizeImageModelParameterRules,
 
 } from "@dafthunk/types";
@@ -102,6 +104,8 @@ export async function executeVolcanoImageGeneration(params: {
 
   readonly referenceImageUrls?: readonly string[];
 
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+
   readonly storageMode: VolcanoImageStorageMode;
 
   readonly objectStore?: ObjectStore;
@@ -119,18 +123,18 @@ export async function executeVolcanoImageGeneration(params: {
   const rules = normalizeImageModelParameterRules(params.parameterRules);
 
   const trimmedPrompt = params.prompt.trim();
+  const hasReferences =
+    (params.referenceImageUrls?.length ?? 0) > 0 ||
+    (params.referenceImageInline?.length ?? 0) > 0;
 
-
-
-  if (!trimmedPrompt) {
-
+  if (!trimmedPrompt && !hasReferences) {
     return { status: "failed", error: "Prompt is required" };
-
   }
 
-
-
-  if (trimmedPrompt.length > rules.promptMaxChars) {
+  if (
+    trimmedPrompt.length > 0 &&
+    trimmedPrompt.length > rules.promptMaxChars
+  ) {
 
     return {
 
@@ -155,6 +159,8 @@ export async function executeVolcanoImageGeneration(params: {
     params: params.generationParams,
 
     referenceImageUrls: params.referenceImageUrls,
+
+    referenceImageInline: params.referenceImageInline,
 
   });
 

@@ -36,7 +36,6 @@ export function MediaImageField({
   const effectiveSize = size === "thumb" && useFullFallback ? "full" : size;
   const { displayUrl, stale } = useMediaDisplayUrl({
     media,
-    createObjectUrl,
     nodeType: "ai-image",
     size: effectiveSize,
   });

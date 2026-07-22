@@ -2,6 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   normalizeImageModelParameterRules,
+  type MediaReference,
   type ObjectReference,
   type OrgImageModelOption,
   type OrgTextModelOption,
@@ -24,13 +25,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
-import { useOrgImageModels, generateAiImage, resolveOrgImageModel } from "@/services/platform-ai-model-service";
+import { useOrgImageModels, generateAiImage, resolveOrgImageModel, useOrgCloudStorageStatus } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
 import {
   cacheMediaFromUrl,
 } from "@/services/ai-media-cache-service";
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
+import { resolveReferencesForGenerate } from "@/services/resolve-references-for-generate";
+import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
@@ -39,6 +42,7 @@ import {
 } from "./generative-pick-node-dialog";
 import {
   collectGenerativeReferenceChips,
+  collectImageReferenceMedia,
   connectGenerativeReferenceEdge,
 } from "./generative-reference-utils";
 import {
@@ -61,12 +65,16 @@ import {
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
   countAiImageReferences,
+  canGenerateAiImage,
   mergeAiImageNodeCatalogInputs,
   pickDefaultImageModelCanonicalId,
   referencesFitImageModelLimits,
   withAiImageGeneratedResult,
   withAiImageGeneratingFlag,
+  withAiImageGenerateError,
 } from "./ai-image-node-utils";
+import { formatGenerativeApiError } from "./format-generative-api-error";
+import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
 import {
@@ -111,9 +119,16 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const { t } = useTranslation();
   const toast = useAppToast();
   const { getOrgUrl } = useOrgUrl();
-  const { uploadBinaryData, createObjectUrl } = useObjectService();
+  const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
+  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
+
+  const resolveMediaPreviewUrl = useCallback(
+    (media: MediaReference) =>
+      orgId ? resolveMediaFetchUrl(media, orgId) : null,
+    [createObjectUrl, orgId]
+  );
 
   const { models, groups, isLoading } = useOrgImageModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -143,8 +158,9 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         edges,
         nodes: typedNodes,
         createObjectUrl,
+        resolveMediaPreviewUrl,
       }),
-    [createObjectUrl, edges, nodeId, typedNodes]
+    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
   );
 
   const imageReferenceChips = useMemo(
@@ -155,10 +171,11 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         edges,
         nodes: typedNodes,
         createObjectUrl,
+        resolveMediaPreviewUrl,
         classifyKind: (nodeType) =>
           nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
       }),
-    [createObjectUrl, edges, nodeId, typedNodes]
+    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
   );
 
   const hasPromptReference = useMemo(
@@ -339,7 +356,17 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   ]);
 
   const displayPrompt = hasPromptReference ? referencedPrompt : promptBuffer.value;
+  const promptForGenerate = useMemo(() => {
+    if (!hasPromptReference) return displayPrompt;
+    return resolveAiImageReferencedPrompt({
+      nodeId,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+    });
+  }, [displayPrompt, edges, hasPromptReference, nodeId, typedNodes]);
   const promptMaxLength = modelRules.promptMaxChars;
+  const promptOverLimit =
+    promptForGenerate.trim().length > promptMaxLength;
 
   const promptReferenceSourceName = useMemo(() => {
     const edge = edges.find(
@@ -473,12 +500,18 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       }
 
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mimeType = file.type || "application/octet-stream";
-        const value = (await uploadBinaryData(
-          arrayBuffer,
-          mimeType
-        )) as ObjectReference;
+        if (!orgId) {
+          toast.error("workflow.aiImagePanel.referenceRejected");
+          continue;
+        }
+
+        const value = await uploadGenerativeMedia({
+          organizationId: orgId,
+          workflowId,
+          file,
+          cloudConfigured,
+          mediaKind: "reference",
+        });
 
         const newId = `${AI_IMAGE_NODE_TYPE}-${Date.now()}-${offset}`;
         const position = {
@@ -561,47 +594,84 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       return;
     }
 
-    const prompt = displayPrompt.trim();
-    if (!prompt) {
+    const prompt = promptForGenerate.trim();
+
+    if (hasPromptReference && !prompt) {
+      toast.error("workflow.aiImagePanel.referencedPromptEmpty");
+      return;
+    }
+
+    if (!canGenerateAiImage({ prompt, referenceCount, rules: modelRules })) {
       toast.error("workflow.aiImagePanel.promptRequired");
       return;
     }
 
     if (prompt.length > promptMaxLength) {
-      toast.error("workflow.aiImagePanel.promptRequired");
+      toast.error(
+        hasPromptReference
+          ? "workflow.aiImagePanel.referencedPromptTooLong"
+          : "workflow.generativeErrors.promptTooLong",
+        { max: promptMaxLength }
+      );
       return;
     }
 
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
-      metadata: withAiImageGeneratingFlag(current.metadata, true),
+      metadata: withAiImageGenerateError(
+        withAiImageGeneratingFlag(current.metadata, true),
+        null
+      ),
     }));
 
     try {
-      const referenceImageUrls = imageReferenceChips
-        .map((chip) => chip.previewUrl)
-        .filter((url): url is string => Boolean(url));
+      const referenceMedia = collectImageReferenceMedia({
+        nodeId,
+        targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
+        edges,
+        nodes: typedNodes,
+        classifyKind: (nodeType) =>
+          nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
+      });
+
+      const resolved = await resolveReferencesForGenerate({
+        organizationId: orgId,
+        references: referenceMedia,
+      });
+
+      const hasResolvedReferences =
+        resolved.referenceImageUrls.length > 0 ||
+        resolved.referenceImageInline.length > 0;
+
+      if (!prompt && !hasResolvedReferences) {
+        toast.error("workflow.aiImagePanel.promptRequired");
+        return;
+      }
 
       const response = await generateAiImage(orgId, {
         modelCanonicalId: selectedModel.canonicalId,
         prompt,
         params: generationParams,
-        referenceImageUrls,
+        referenceImageUrls:
+          resolved.referenceImageUrls.length > 0
+            ? resolved.referenceImageUrls
+            : undefined,
+        referenceImageInline:
+          resolved.referenceImageInline.length > 0
+            ? resolved.referenceImageInline
+            : undefined,
         nodeId,
         workflowId,
       });
 
       if (workflowId && orgId) {
         for (const image of response.images) {
-          const fetchUrl = resolveMediaFetchUrl(image, orgId, createObjectUrl);
-          if (!fetchUrl) continue;
           void cacheMediaFromUrl({
             organizationId: orgId,
             workflowId,
             workflowName: workflowId,
             media: image,
             nodeType: "ai-image",
-            fetchUrl,
           }).then((cachedOk) => {
             if (cachedOk) notifyAiMediaCacheChanged();
           });
@@ -626,20 +696,26 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         return {
           ...withResult,
           inputs,
-          metadata: withAiImageGeneratingFlag(
-            withResult.metadata ?? current.metadata,
-            false
+          metadata: withAiImageGenerateError(
+            withAiImageGeneratingFlag(withResult.metadata, false),
+            null
           ),
         };
       });
 
       toast.success("workflow.aiImagePanel.generated");
     } catch (error) {
-      if (error instanceof Error) {
-        toast.errorRaw(error.message);
-      } else {
-        toast.error("workflow.aiImagePanel.generateFailed");
-      }
+      const formatted = formatGenerativeApiError(
+        error instanceof Error ? error.message : String(error),
+        t
+      );
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withAiImageGenerateError(
+          withAiImageGeneratingFlag(current.metadata, false),
+          formatted
+        ),
+      }));
+      toast.errorRaw(formatted);
     } finally {
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiImageGeneratingFlag(current.metadata, false),
@@ -651,9 +727,14 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const canGenerate =
     !disabled &&
     !isGenerating &&
-    displayPrompt.trim().length > 0 &&
     Boolean(selectedModel?.selectable) &&
-    (!selectedModel || modelFitsCurrentRefs(selectedModel));
+    (!selectedModel || modelFitsCurrentRefs(selectedModel)) &&
+    generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
+    canGenerateAiImage({
+      prompt: promptForGenerate,
+      referenceCount,
+      rules: modelRules,
+    });
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
     const textEntries = listPickableAiImagePromptSources({
@@ -704,7 +785,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
   return (
     <>
-      <GenerativeConfigPanelShell zoom={zoom}>
+      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom}>
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
@@ -747,8 +828,19 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           />
           {hasPromptReference ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
-              <div className="max-w-[92%] rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur-[2px]">
-                {promptReferenceEditHint}
+              <div
+                className={cn(
+                  "max-w-[92%] rounded-lg border px-3 py-2 text-center text-xs leading-relaxed shadow-sm backdrop-blur-[2px]",
+                  promptOverLimit
+                    ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
+                    : "border-border/40 bg-background/50 text-muted-foreground"
+                )}
+              >
+                {promptOverLimit
+                  ? t("workflow.aiImagePanel.referencedPromptTooLong", {
+                      max: promptMaxLength,
+                    })
+                  : promptReferenceEditHint}
               </div>
             </div>
           ) : null}

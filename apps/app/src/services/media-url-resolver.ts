@@ -1,48 +1,30 @@
 import {
   getMediaReferenceKey,
   isEphemeralMediaReference,
-  isObjectReference,
+  isLocalMediaReference,
   type MediaReference,
-  type ObjectReference,
 } from "@dafthunk/types";
 
-import { getApiBaseUrl } from "@/config/api";
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
+import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
+import {
+  getCachedLocalMediaPreviewUrl,
+  readLocalMediaBlob,
+} from "@/services/local-media-staging";
+import {
+  createCloudObjectUrl,
+  resolveMediaCacheFetchUrl,
+  resolveMediaFetchUrl,
+} from "@/services/media-object-url";
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 
-export function createCloudObjectUrl(
-  ref: ObjectReference,
-  organizationId: string
-): string {
-  if (ref.storageBackend === "volcengine_tos" && ref.storageKey) {
-    const base = `${getApiBaseUrl()}/${organizationId}/objects/cloud`;
-    return `${base}?storageKey=${encodeURIComponent(ref.storageKey)}&mimeType=${encodeURIComponent(ref.mimeType)}`;
-  }
-
-  const base = `${getApiBaseUrl()}/${organizationId}/objects`;
-  return `${base}?id=${encodeURIComponent(ref.id)}&mimeType=${encodeURIComponent(ref.mimeType)}`;
-}
-
-export function resolveMediaFetchUrl(
-  media: MediaReference,
-  organizationId: string,
-  createObjectUrl?: (ref: ObjectReference) => string
-): string | null {
-  if (isEphemeralMediaReference(media)) {
-    return media.url;
-  }
-  if (isObjectReference(media)) {
-    if (media.storageBackend === "volcengine_tos" && media.storageKey) {
-      return createCloudObjectUrl(media, organizationId);
-    }
-    if (createObjectUrl) {
-      return createObjectUrl(media);
-    }
-    return createCloudObjectUrl(media, organizationId);
-  }
-  return null;
-}
+export {
+  createCloudObjectUrl,
+  resolveMediaCacheFetchUrl,
+  resolveMediaFetchUrl,
+} from "@/services/media-object-url";
+export { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 
 export function inferMediaNodeType(
   media: MediaReference
@@ -59,11 +41,19 @@ export async function resolveMediaDisplayUrl(params: {
   readonly workflowId: string;
   readonly workflowName?: string;
   readonly nodeType?: "ai-image" | "ai-video";
-  readonly createObjectUrl?: (ref: ObjectReference) => string;
   readonly warmCache?: boolean;
   readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
+  if (isLocalMediaReference(params.media)) {
+    const cached = getCachedLocalMediaPreviewUrl(params.media.mediaId);
+    if (cached) return cached;
+    const entry = await readLocalMediaBlob(params.media.mediaId);
+    if (!entry) return null;
+    return URL.createObjectURL(entry.blob);
+  }
+
   const mediaId = getMediaReferenceKey(params.media);
+
   const cached = await getCachedMediaBlobUrl({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
@@ -72,11 +62,7 @@ export async function resolveMediaDisplayUrl(params: {
   });
   if (cached) return cached;
 
-  const fetchUrl = resolveMediaFetchUrl(
-    params.media,
-    params.organizationId,
-    params.createObjectUrl
-  );
+  const fetchUrl = resolveMediaFetchUrl(params.media, params.organizationId);
   if (!fetchUrl) return null;
 
   const shouldWarm = params.warmCache !== false;
@@ -84,16 +70,22 @@ export async function resolveMediaDisplayUrl(params: {
     params.nodeType ?? inferMediaNodeType(params.media);
 
   if (shouldWarm && nodeType && !isMediaExpired(params.media)) {
-    void cacheMediaFromUrl({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      workflowName: params.workflowName ?? params.workflowId,
-      media: params.media,
-      nodeType,
-      fetchUrl,
-    }).then((cachedOk) => {
-      if (cachedOk) notifyAiMediaCacheChanged();
-    });
+    const cacheFetchUrl = resolveMediaCacheFetchUrl(
+      params.media,
+      params.organizationId
+    );
+    if (cacheFetchUrl && mediaUrlSupportsBrowserCache(cacheFetchUrl)) {
+      void cacheMediaFromUrl({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        workflowName: params.workflowName ?? params.workflowId,
+        media: params.media,
+        nodeType,
+        fetchUrl: cacheFetchUrl,
+      }).then((cachedOk) => {
+        if (cachedOk) notifyAiMediaCacheChanged();
+      });
+    }
   }
 
   return fetchUrl;

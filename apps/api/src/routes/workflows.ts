@@ -206,22 +206,24 @@ workflowRoutes.post(
       return c.json({ errors: validationErrors }, 400);
     }
 
-    try {
-      await validateWorkflowGraphAgainstCatalog(
-        c.env,
-        { nodes },
-        c.executionCtx
-      );
-    } catch (error) {
-      return c.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "Workflow contains archived node types",
-        },
-        400
-      );
+    if (nodes.length > 0) {
+      try {
+        await validateWorkflowGraphAgainstCatalog(
+          c.env,
+          { nodes },
+          c.executionCtx
+        );
+      } catch (error) {
+        return c.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Workflow contains archived node types",
+          },
+          400
+        );
+      }
     }
 
     // Save workflow to both D1 and R2

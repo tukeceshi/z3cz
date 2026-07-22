@@ -196,14 +196,16 @@ dafthunk_apply_api_restart_mode() {
     export SKIP_INSTALL=0
     export FORCE_PNPM_INSTALL=1
     export FORCE_DB_MIGRATE=1
+    export RUN_RUNTIME_WARMUP=1
     export RUN_WASM_WARMUP=1
     rm -f "$CACHE_DIR/restart-mode.full"
     return 0
   fi
 
   if [ -f "$CACHE_DIR/restart-mode.warm" ]; then
-    echo "[entrypoint] API restart mode: warm (WASM preload)"
+    echo "[entrypoint] API restart mode: warm (runtime preload)"
     export SKIP_DB_MIGRATE=1
+    export RUN_RUNTIME_WARMUP=1
     export RUN_WASM_WARMUP=1
     rm -f "$CACHE_DIR/restart-mode.warm"
     return 0

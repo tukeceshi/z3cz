@@ -24,9 +24,10 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
   const hostname = envVars.HOST ?? "0.0.0.0";
   const wsListenHost = hostname === "0.0.0.0" ? "localhost" : hostname;
 
+  writeBootPhase("creating_bindings");
   const bindings: Bindings = await createNodeBindings(envVars);
 
-  writeBootPhase("starting_server");
+  writeBootPhase("creating_app");
   const app = createApp({ runtime: "node" });
   const honoFetch = app.fetch.bind(app);
 
@@ -73,6 +74,7 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
 
   registerNodeWsRoutes(app, upgradeWebSocket);
 
+  writeBootPhase("starting_server");
   const server = serve(
     {
       fetch: fetchWithBindings,

@@ -2,11 +2,12 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
+  type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
-import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
+import { AI_TEXT_OUTPUT_ID, readAiTextPromptSource } from "./ai-text-node-utils";
 import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -24,17 +25,7 @@ export interface AiVideoPromptReferenceEdge {
 }
 
 function readTextFromSource(data: WorkflowNodeType): string {
-  const output = data.outputs?.find((entry) => entry.id === AI_TEXT_OUTPUT_ID);
-  if (typeof output?.value === "string" && output.value.trim()) {
-    return output.value.trim();
-  }
-
-  const resultInput = data.inputs?.find((entry) => entry.id === "result");
-  if (typeof resultInput?.value === "string" && resultInput.value.trim()) {
-    return resultInput.value.trim();
-  }
-
-  return "";
+  return readAiTextPromptSource(data);
 }
 
 /** Live prompt text from connected AI text output(s), joined by newline. */
@@ -187,6 +178,7 @@ export function collectAiVideoUnifiedReferenceChips(params: {
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly createObjectUrl?: (objectReference: ObjectReference) => string;
+  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
 }): readonly GenerativeReferenceChip[] {
   const promptChips = collectGenerativeReferenceChips({
     nodeId: params.nodeId,
@@ -194,6 +186,7 @@ export function collectAiVideoUnifiedReferenceChips(params: {
     edges: params.edges,
     nodes: params.nodes,
     createObjectUrl: params.createObjectUrl,
+    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: () => "text",
   });
   const imageChips = collectGenerativeReferenceChips({
@@ -202,6 +195,7 @@ export function collectAiVideoUnifiedReferenceChips(params: {
     edges: params.edges,
     nodes: params.nodes,
     createObjectUrl: params.createObjectUrl,
+    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: (nodeType) =>
       nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
   });

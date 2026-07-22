@@ -1,8 +1,10 @@
 import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
+  createEphemeralMediaExpiresAt,
   normalizeVideoModelParameterRules,
   type EphemeralMediaReference,
+  type MediaReference,
   type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
@@ -30,11 +32,14 @@ import {
   resolveOrgVideoModel,
   submitAiVideo,
   useOrgVideoModels,
+  useOrgCloudStorageStatus,
 } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
 import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
+import { resolveReferencesForGenerate } from "@/services/resolve-references-for-generate";
+import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
@@ -43,6 +48,7 @@ import {
 } from "./generative-pick-node-dialog";
 import {
   collectGenerativeReferenceChips,
+  collectImageReferenceMedia,
   connectGenerativeReferenceEdge,
 } from "./generative-reference-utils";
 import {
@@ -55,7 +61,10 @@ import {
   type AiTextReferenceChip,
 } from "./ai-text-reference-bar";
 import {
-  AiVideoParamsPopover,
+  AiVideoGenerationParamsPanel,
+  parseVideoGenerateCount,
+} from "./ai-video-generation-params-panel";
+import {
   buildDefaultVideoGenerationParams,
   readAiVideoGenerationParams,
 } from "./ai-video-params-popover";
@@ -68,11 +77,15 @@ import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
   countAiVideoReferences,
+  canGenerateAiVideo,
   pickDefaultVideoModelCanonicalId,
   referencesFitVideoModelLimits,
-  withAiVideoGeneratedResult,
+  appendAiVideoGeneratedHistoryItems,
   withAiVideoGeneratingFlag,
+  withAiVideoGenerateError,
 } from "./ai-video-node-utils";
+import { formatGenerativeApiError } from "./format-generative-api-error";
+import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
 import {
@@ -111,18 +124,29 @@ function createEphemeralVideoReference(videoUrl: string): EphemeralMediaReferenc
     url: videoUrl,
     mimeType: "video/mp4",
     mediaId: `video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    expiresAt: createEphemeralMediaExpiresAt(),
   };
 }
 
 async function pollUntilVideoReady(
   orgId: string,
   taskId: string,
-  aiInterfaceId: string
-): Promise<string> {
+  aiInterfaceId: string,
+  workflowId?: string
+): Promise<MediaReference> {
   for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
-    const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId);
-    if (result.status === "succeeded" && result.videoUrl) {
-      return result.videoUrl;
+    const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId, {
+      workflowId,
+    });
+    if (result.status === "succeeded") {
+      const stored = result.videos?.[0];
+      if (stored) {
+        return stored;
+      }
+      if (result.videoUrl) {
+        return createEphemeralVideoReference(result.videoUrl);
+      }
+      throw new Error("Video generation succeeded without a playable reference");
     }
     if (result.status === "failed" || result.status === "expired") {
       throw new Error(result.error ?? "Video generation failed");
@@ -149,9 +173,16 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
   const { t } = useTranslation();
   const toast = useAppToast();
   const { getOrgUrl } = useOrgUrl();
-  const { uploadBinaryData, createObjectUrl } = useObjectService();
+  const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
+  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
+
+  const resolveMediaPreviewUrl = useCallback(
+    (media: MediaReference) =>
+      orgId ? resolveMediaFetchUrl(media, orgId) : null,
+    [createObjectUrl, orgId]
+  );
 
   const { models, groups, isLoading } = useOrgVideoModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -181,8 +212,9 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
         edges,
         nodes: typedNodes,
         createObjectUrl,
+        resolveMediaPreviewUrl,
       }),
-    [createObjectUrl, edges, nodeId, typedNodes]
+    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
   );
 
   const imageReferenceChips = useMemo(
@@ -193,10 +225,11 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
         edges,
         nodes: typedNodes,
         createObjectUrl,
+        resolveMediaPreviewUrl,
         classifyKind: (nodeType) =>
           nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
       }),
-    [createObjectUrl, edges, nodeId, typedNodes]
+    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
   );
 
   const hasPromptReference = useMemo(
@@ -223,19 +256,20 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
     [data, videoModelCatalog]
   );
 
-  const generationFields = useMemo(
-    () => normalizeVideoModelParameterRules(modelRules).generationFields,
-    [modelRules]
+  const selectedModel = useMemo(
+    () => models.find((entry) => entry.canonicalId === selectedModelId),
+    [models, selectedModelId]
   );
+
+  const generationFields = useMemo(() => {
+    if (!selectedModel) return [];
+    return normalizeVideoModelParameterRules(selectedModel.parameterRules)
+      .generationFields;
+  }, [selectedModel]);
 
   const referenceCount = useMemo(
     () => countAiVideoReferences(nodeId, edges),
     [edges, nodeId]
-  );
-
-  const selectedModel = useMemo(
-    () => models.find((entry) => entry.canonicalId === selectedModelId),
-    [models, selectedModelId]
   );
 
   const selectableModels = useMemo(
@@ -377,7 +411,17 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
   ]);
 
   const displayPrompt = hasPromptReference ? referencedPrompt : promptBuffer.value;
+  const promptForGenerate = useMemo(() => {
+    if (!hasPromptReference) return displayPrompt;
+    return resolveAiVideoReferencedPrompt({
+      nodeId,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+    });
+  }, [displayPrompt, edges, hasPromptReference, nodeId, typedNodes]);
   const promptMaxLength = modelRules.promptMaxChars;
+  const promptOverLimit =
+    promptForGenerate.trim().length > promptMaxLength;
 
   const promptReferenceSourceName = useMemo(() => {
     const edge = edges.find(
@@ -511,12 +555,18 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
       }
 
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mimeType = file.type || "application/octet-stream";
-        const value = (await uploadBinaryData(
-          arrayBuffer,
-          mimeType
-        )) as ObjectReference;
+        if (!orgId) {
+          toast.error("workflow.aiVideoPanel.referenceRejected");
+          continue;
+        }
+
+        const value = await uploadGenerativeMedia({
+          organizationId: orgId,
+          workflowId,
+          file,
+          cloudConfigured,
+          mediaKind: "reference",
+        });
 
         const newId = `${AI_IMAGE_NODE_TYPE}-${Date.now()}-${offset}`;
         const position = {
@@ -599,92 +649,186 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
       return;
     }
 
-    const prompt = displayPrompt.trim();
-    if (!prompt) {
+    const prompt = promptForGenerate.trim();
+
+    if (hasPromptReference && !prompt) {
+      toast.error("workflow.aiVideoPanel.referencedPromptEmpty");
+      return;
+    }
+
+    if (!canGenerateAiVideo({ prompt, referenceCount, rules: modelRules })) {
       toast.error("workflow.aiVideoPanel.promptRequired");
       return;
     }
 
     if (prompt.length > promptMaxLength) {
-      toast.error("workflow.aiVideoPanel.promptRequired");
+      toast.error(
+        hasPromptReference
+          ? "workflow.aiVideoPanel.referencedPromptTooLong"
+          : "workflow.generativeErrors.promptTooLong",
+        { max: promptMaxLength }
+      );
       return;
     }
 
+    const generateCount = parseVideoGenerateCount(generationParams);
+
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
-      metadata: withAiVideoGeneratingFlag(current.metadata, true),
+      metadata: withAiVideoGenerateError(
+        withAiVideoGeneratingFlag(current.metadata, true),
+        null
+      ),
     }));
 
     try {
-      const referenceImageUrls = imageReferenceChips
-        .map((chip) => chip.previewUrl)
-        .filter((url): url is string => Boolean(url));
+      const referenceMedia = collectImageReferenceMedia({
+        nodeId,
+        targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+        edges,
+        nodes: typedNodes,
+        classifyKind: (nodeType) =>
+          nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
+      });
 
-      const submitResponse = await submitAiVideo(orgId, {
+      const resolved = await resolveReferencesForGenerate({
+        organizationId: orgId,
+        references: referenceMedia,
+      });
+
+      const hasResolvedReferences =
+        resolved.referenceImageUrls.length > 0 ||
+        resolved.referenceImageInline.length > 0;
+
+      if (!prompt && !hasResolvedReferences) {
+        toast.error("workflow.aiVideoPanel.promptRequired");
+        return;
+      }
+
+      const submitPayload = {
         modelCanonicalId: selectedModel.canonicalId,
         prompt,
         params: generationParams,
-        referenceImageUrls,
+        referenceImageUrls:
+          resolved.referenceImageUrls.length > 0
+            ? resolved.referenceImageUrls
+            : undefined,
+        referenceImageInline:
+          resolved.referenceImageInline.length > 0
+            ? resolved.referenceImageInline
+            : undefined,
         nodeId,
         workflowId,
-      });
+      } as const;
 
-      const videoUrl = await pollUntilVideoReady(
-        orgId,
-        submitResponse.taskId,
-        submitResponse.aiInterfaceId
+      interface CompletedVideo {
+        readonly video: MediaReference;
+        readonly aiInterfaceId: string;
+        readonly completedAt: number;
+      }
+
+      const runOneGeneration = async (): Promise<CompletedVideo> => {
+        const submitResponse = await submitAiVideo(orgId, submitPayload);
+        const video = await pollUntilVideoReady(
+          orgId,
+          submitResponse.taskId,
+          submitResponse.aiInterfaceId,
+          workflowId
+        );
+        return {
+          video,
+          aiInterfaceId: submitResponse.aiInterfaceId,
+          completedAt: Date.now(),
+        };
+      };
+
+      const results = await Promise.allSettled(
+        Array.from({ length: generateCount }, () => runOneGeneration())
       );
 
-      const video = createEphemeralVideoReference(videoUrl);
+      const completed = results
+        .filter(
+          (result): result is PromiseFulfilledResult<CompletedVideo> =>
+            result.status === "fulfilled"
+        )
+        .map((result) => result.value)
+        .sort((left, right) => right.completedAt - left.completedAt);
 
-      if (workflowId && orgId) {
-        const fetchUrl = resolveMediaFetchUrl(video, orgId, createObjectUrl);
-        if (fetchUrl) {
-          void cacheMediaFromUrl({
-            organizationId: orgId,
-            workflowId,
-            workflowName: workflowId,
-            media: video,
-            nodeType: "ai-video",
-            fetchUrl,
-          }).then((cachedOk) => {
-            if (cachedOk) notifyAiMediaCacheChanged();
-          });
-        }
+      const failCount = results.length - completed.length;
+
+      if (completed.length === 0) {
+        const firstError = results.find(
+          (result): result is PromiseRejectedResult => result.status === "rejected"
+        );
+        throw firstError?.reason instanceof Error
+          ? firstError.reason
+          : new Error("Video generation failed");
+      }
+
+      for (const entry of completed) {
+        if (!workflowId || !orgId) continue;
+        void cacheMediaFromUrl({
+          organizationId: orgId,
+          workflowId,
+          workflowName: workflowId,
+          media: entry.video,
+          nodeType: "ai-video",
+        }).then((cachedOk) => {
+          if (cachedOk) notifyAiMediaCacheChanged();
+        });
       }
 
       if (!updateNodeData) return;
 
+      const lastAiInterfaceId = completed[0]?.aiInterfaceId ?? "";
+
       updateNodeData(nodeId, (current) => {
-        const withResult = withAiVideoGeneratedResult(current, [video], {
-          prompt,
-          params: generationParams,
-        });
+        const withResult = appendAiVideoGeneratedHistoryItems(
+          current,
+          completed.map((entry) => entry.video),
+          {
+            prompt,
+            params: generationParams,
+          }
+        );
         const inputs = (withResult.inputs ?? current.inputs).map((input) =>
           input.id === "ai_interface_id"
             ? ({
                 ...input,
-                value: submitResponse.aiInterfaceId,
+                value: lastAiInterfaceId,
               } as WorkflowParameter)
             : input
         );
         return {
           ...withResult,
           inputs,
-          metadata: withAiVideoGeneratingFlag(
-            withResult.metadata ?? current.metadata,
-            false
+          metadata: withAiVideoGenerateError(
+            withAiVideoGeneratingFlag(withResult.metadata, false),
+            null
           ),
         };
       });
 
-      toast.success("workflow.aiVideoPanel.generated");
-    } catch (error) {
-      if (error instanceof Error) {
-        toast.errorRaw(error.message);
+      if (failCount > 0) {
+        toast.success("workflow.aiVideoPanel.generatedPartial", {
+          success: completed.length,
+          fail: failCount,
+        });
       } else {
-        toast.error("workflow.aiVideoPanel.generateFailed");
+        toast.success("workflow.aiVideoPanel.generated");
       }
+    } catch (error) {
+      const formatted = formatGenerativeApiError(
+        error instanceof Error ? error.message : String(error),
+        t
+      );
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withAiVideoGenerateError(
+          withAiVideoGeneratingFlag(current.metadata, false),
+          formatted
+        ),
+      }));
+      toast.errorRaw(formatted);
     } finally {
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiVideoGeneratingFlag(current.metadata, false),
@@ -696,9 +840,14 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
   const canGenerate =
     !disabled &&
     !isGenerating &&
-    displayPrompt.trim().length > 0 &&
     Boolean(selectedModel?.selectable) &&
-    (!selectedModel || modelFitsCurrentRefs(selectedModel));
+    (!selectedModel || modelFitsCurrentRefs(selectedModel)) &&
+    generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
+    canGenerateAiVideo({
+      prompt: promptForGenerate,
+      referenceCount,
+      rules: modelRules,
+    });
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
     const textEntries = listPickableAiVideoPromptSources({
@@ -749,7 +898,7 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
 
   return (
     <>
-      <GenerativeConfigPanelShell zoom={zoom}>
+      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom}>
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
@@ -792,8 +941,19 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
           />
           {hasPromptReference ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
-              <div className="max-w-[92%] rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-center text-xs leading-relaxed text-muted-foreground shadow-sm backdrop-blur-[2px]">
-                {promptReferenceEditHint}
+              <div
+                className={cn(
+                  "max-w-[92%] rounded-lg border px-3 py-2 text-center text-xs leading-relaxed shadow-sm backdrop-blur-[2px]",
+                  promptOverLimit
+                    ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
+                    : "border-border/40 bg-background/50 text-muted-foreground"
+                )}
+              >
+                {promptOverLimit
+                  ? t("workflow.aiVideoPanel.referencedPromptTooLong", {
+                      max: promptMaxLength,
+                    })
+                  : promptReferenceEditHint}
               </div>
             </div>
           ) : null}
@@ -821,12 +981,11 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
               />
             ) : null}
             {generationFields.length > 0 ? (
-              <AiVideoParamsPopover
+              <AiVideoGenerationParamsPanel
                 fields={generationFields}
                 values={generationParams}
                 disabled={disabled}
                 triggerLabel={t("workflow.aiVideoPanel.params")}
-                title={t("workflow.aiVideoPanel.paramsTitle")}
                 onChange={commitGenerationParams}
               />
             ) : null}

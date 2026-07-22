@@ -2216,6 +2216,23 @@ export const en = {
         "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/dafthunk-com/dafthunk.",
       close: "Close",
     },
+    generativeErrors: {
+      promptRequired: "Enter a prompt or add a reference image before generating",
+      promptTooLong: "Prompt is too long. Shorten it and try again",
+      timedOut: "Generation timed out. Please try again later",
+      generationFailed: "Generation failed. Please try again later",
+      modelUnavailable:
+        "This model is unavailable. Check your AI interface settings",
+      interfaceUnavailable:
+        "No AI interface is configured. Set one up in organization settings",
+      upstreamFailed: "The upstream service is unavailable. Try again later",
+      rateLimited: "Too many requests. Please wait and try again",
+      invalidParams:
+        "Generation parameters are invalid for this model. Adjust them and retry",
+      localReferenceUnsupported:
+        "Local browser-only references cannot be used in workflow runs. Generate from the canvas panel instead",
+      generic: "Generation failed: {{detail}}",
+    },
     canvas: {
       addNode: "Add Node",
       aiText: "Text",
@@ -2538,6 +2555,8 @@ export const en = {
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt or connect keywords",
       keywordsEmpty: "Connected keywords input is empty",
+      mediaReferenceUnsupported:
+        "Text models do not support image or video references. Connect a text node or enter a prompt.",
       expand: "Expand editor",
       done: "Done",
       outputTitle: "Output",
@@ -2611,6 +2630,7 @@ export const en = {
         "This removes local copies only. Files persisted in cloud storage (if configured) are not affected.",
       confirmAction: "Clear",
       imageUnavailable: "Image unavailable (link expired or not cached locally)",
+      videoUnavailable: "Video unavailable (link expired or not cached locally)",
       entryImage: "Image",
       entryVideo: "Video",
       downloadSelected: "Download selected ({{count}})",
@@ -2633,11 +2653,16 @@ export const en = {
       generated: "Images generated",
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt to generate",
+      referencedPromptEmpty:
+        "The linked text node has no content yet. Add or generate text there first",
+      referencedPromptTooLong:
+        "The linked prompt exceeds this model's {{max}}-character limit. Shorten the upstream text node",
       expand: "Expand",
       done: "Done",
       outputTitle: "Output",
       outputPlaceholder: "Generated images appear here…",
       cardUploadPlaceholder: "Double-click to upload an image…",
+      cardGenerating: "Generating…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local image replaces AI generation setup. The current prompt will be cleared. Continue?",
@@ -2676,11 +2701,16 @@ export const en = {
       generated: "Video generated",
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt to generate",
+      referencedPromptEmpty:
+        "The linked text node has no content yet. Add or generate text there first",
+      referencedPromptTooLong:
+        "The linked prompt exceeds this model's {{max}}-character limit. Shorten the upstream text node",
       expand: "Expand",
       done: "Done",
       outputTitle: "Output",
       outputPlaceholder: "Generated videos appear here…",
       cardUploadPlaceholder: "Double-click to upload a video…",
+      cardGenerating: "Generating…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local video replaces AI generation setup. The current prompt will be cleared. Continue?",
@@ -2702,6 +2732,10 @@ export const en = {
         "Current references exceed every available model. Remove some references or pick another model.",
       params: "Params",
       paramsTitle: "Generation parameters",
+      paramToggleOn: "On",
+      paramToggleOff: "Off",
+      generateCountOption: "{{count}}",
+      generatedPartial: "{{success}} generated, {{fail}} failed",
       linkPrompt: "Link prompt from canvas",
       pickPromptNode: "Pick text node for prompt",
       promptReferenceHint: "Click to unlink prompt reference",

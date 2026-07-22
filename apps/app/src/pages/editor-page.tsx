@@ -25,6 +25,10 @@ import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useObjectService } from "@/services/object-service";
 import { useNodeTypes } from "@/services/type-service";
 import { getWorkflow, setWorkflowEnabled } from "@/services/workflow-service";
+import {
+  clearPrefetchedWorkflowMetadata,
+  consumePrefetchedWorkflowMetadata,
+} from "@/utils/workflow-editor-prefetch";
 
 export function EditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +44,12 @@ export function EditorPage() {
   const { getOrgUrl } = useOrgUrl();
 
   const [httpWorkflowMetadata, setHttpWorkflowMetadata] =
-    useState<WorkflowWithMetadata | null>(null);
+    useState<WorkflowWithMetadata | null>(() => {
+      if (!id || !orgId) {
+        return null;
+      }
+      return consumePrefetchedWorkflowMetadata(id, orgId);
+    });
 
   const [isEnabled, setIsEnabled] = useState(true);
   const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
@@ -141,6 +150,7 @@ export function EditorPage() {
         const metadata = await getWorkflow(id, orgId);
         setHttpWorkflowMetadata(metadata);
         setIsEnabled(metadata.enabled === true);
+        clearPrefetchedWorkflowMetadata(id, orgId);
       } catch (error) {
         console.error("Failed to fetch workflow metadata:", error);
       }

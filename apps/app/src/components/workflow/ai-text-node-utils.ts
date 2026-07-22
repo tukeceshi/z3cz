@@ -169,6 +169,29 @@ export function readAiTextResult(
   return typeof fromOutput?.value === "string" ? fromOutput.value : undefined;
 }
 
+/** Text usable as downstream image/video prompt from an AI text node. */
+export function readAiTextPromptSource(data: WorkflowNodeType): string {
+  const fromResult = readAiTextResult(data.inputs, data.outputs);
+  if (typeof fromResult === "string" && fromResult.trim()) {
+    return fromResult.trim();
+  }
+
+  const promptInput = data.inputs.find((input) => input.id === "prompt");
+  if (typeof promptInput?.value === "string" && promptInput.value.trim()) {
+    return promptInput.value.trim();
+  }
+
+  const history = readAiTextResultHistory(data.inputs);
+  const selected = history.selectedId
+    ? history.items.find((item) => item.id === history.selectedId)
+    : undefined;
+  if (selected?.text.trim()) {
+    return selected.text.trim();
+  }
+
+  return "";
+}
+
 export function readAiTextResultHistory(
   inputs: readonly WorkflowParameter[]
 ): AiTextResultHistory {

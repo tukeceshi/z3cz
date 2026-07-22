@@ -31,7 +31,6 @@ function ExpandMediaPreview({
   const expired = isMediaExpired(media);
   const { displayUrl, stale } = useMediaDisplayUrl({
     media: expired ? null : media,
-    createObjectUrl,
     nodeType: isVideoMedia(media) ? "ai-video" : "ai-image",
     size: "full",
   });

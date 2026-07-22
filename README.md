@@ -36,7 +36,7 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 docker compose up -d --build --wait
 ```
 
-首次 API 就绪约 **2–6 分钟**（WASM）。启动后会：
+首次 API 就绪约 **30–90 秒**（lazy routes + 核心 runtime）。启动后会：
 
 - 在命名卷 `/data/secrets/.dev.vars` 写入 `JWT_SECRET` / `SECRET_MASTER_KEY`（K1）
 - API 自动幂等迁移（fast 重启在 boot stamp 有效时可跳过）
@@ -105,10 +105,17 @@ docker compose down -v && docker compose up -d --build --wait   # 完全重置�
 
 ### 有序重启
 
-源码挂载进容器，多数改动靠 **HMR，无需重启**。需要重启时**按顺序**操作，不要对整栈直接 `docker compose restart`（无健康等待）。
+源码挂载进容器：**前端**（www / app）靠 Vite HMR；**API** 靠 `tsx watch` 在检测到文件变更后**整进程重启**（非 HMR）。Windows 宿主机 bind mount 默认可能收不到 inotify 事件，API 容器已设置 `CHOKIDAR_USEPOLLING=1` 与 `CHOKIDAR_INTERVAL=300`（300ms 轮询间隔，减轻连续保存时的重启风暴）。`tsx watch` 进程重启时默认 `SKIP_DB_MIGRATE=1`（boot stamp 与 migration journal 一致则跳过 migrate）；`FORCE_DB_MIGRATE=1` 可强制跑迁移。
+
+需要**容器级**重启（改 entrypoint、环境变量、依赖安装策略等）时**按顺序**操作，不要对整栈直接 `docker compose restart`（无健康等待）。
+
+| 层级 | 触发 | 行为 |
+|------|------|------|
+| `tsx watch` | 保存 `apps/api` / `packages/*` 源码 | 仅 API 进程重启；`fast` 模式下 entrypoint 跳过 migrate |
+| 容器 `restart api` | 手动或改 Docker 配置 | 重新跑 entrypoint（install / migrate / 可选 runtime 预热） |
 
 ```bash
-# 1) 选择 API 模式（fast | warm | full），文件只消费一次
+# 1) 选择 API 容器重启模式（fast | warm | full），文件只消费一次
 docker compose exec api sh -c 'rm -f /app/data/storage/cache/restart-mode.* && touch /app/data/storage/cache/restart-mode.fast'
 
 # 2) 重启 API → 等 healthy → 再起前端
@@ -120,8 +127,8 @@ docker compose restart www app
 | 模式 | 何时 | 行为 |
 |------|------|------|
 | `fast` | 日常改 API 业务代码 | stamp 有效时跳过 migrate / AI bootstrap |
-| `warm` | 改了 `packages/runtime` / WASM | 额外预加载运行时 |
-| `full` | lockfile、migration、种子变更 | 强制 install、migrate、bootstrap、WASM 预热 |
+| `warm` | 改了 `packages/runtime` | 额外预加载运行时模块图 |
+| `full` | lockfile、migration、种子变更 | 强制 install、migrate、bootstrap、runtime 预热 |
 
 | 场景 | 命令 |
 |------|------|
@@ -165,7 +172,7 @@ docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --wait
 | 现象 | 处理 |
 |------|------|
 | 端口占用 | 改 `.env.docker` 端口；自托管用 `dafthunk-host`（默认可与 310x 并存） |
-| API 长时间无响应 | 首次 2–6 分钟；`docker compose logs -f api` |
+| API 长时间无响应 | 首次约 1–2 分钟；`docker compose logs -f api` 看 boot phase |
 | www/app 异常 | `docker compose ps` 看健康状态 |
 | entrypoint / 镜像改了不生效 | `docker compose up -d --build` 后有序重启 |
 | 登录 401 | 用 http://localhost:3101；清库后刷新再注册 |

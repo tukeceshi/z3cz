@@ -1,6 +1,7 @@
 import type { NodeExecution, NodeType } from "@dafthunk/types";
 import {
-  resolveAiTextEffectivePrompt,
+  buildAiTextUserPrompt,
+  normalizeAiTextReferences,
   withSelectedModel,
 } from "@dafthunk/types";
 
@@ -84,10 +85,14 @@ export class AiTextNode extends ExecutableNode {
   };
 
   public async execute(context: NodeContext): Promise<NodeExecution> {
-    const effectivePrompt = resolveAiTextEffectivePrompt({
-      keywords: context.inputs[AI_TEXT_KEYWORDS_INPUT],
-      prompt: context.inputs.prompt,
-    });
+    const references = normalizeAiTextReferences(
+      context.inputs[AI_TEXT_KEYWORDS_INPUT]
+    );
+    const question =
+      typeof context.inputs.prompt === "string"
+        ? context.inputs.prompt.trim()
+        : "";
+    const effectivePrompt = buildAiTextUserPrompt({ references, question });
 
     if (!effectivePrompt) {
       return this.createErrorResult(

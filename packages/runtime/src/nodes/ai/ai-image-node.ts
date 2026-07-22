@@ -1,5 +1,6 @@
 import {
   isEphemeralMediaReference,
+  isLocalMediaReference,
   type MediaReference,
   type NodeType,
   type ObjectReference,
@@ -195,7 +196,9 @@ export class AiImageNode extends ExecutableNode {
 
         (value): value is ObjectReference | MediaReference =>
 
-          isObjectReference(value) || isEphemeralMediaReference(value)
+          isObjectReference(value) ||
+          isEphemeralMediaReference(value) ||
+          isLocalMediaReference(value)
 
       );
 
@@ -213,9 +216,35 @@ export class AiImageNode extends ExecutableNode {
 
       typeof context.inputs.prompt === "string" ? context.inputs.prompt : "";
 
-    if (!prompt.trim()) {
+    const referenceValues = context.inputs[AI_IMAGE_REFERENCE_INPUT];
 
-      return this.createErrorResult("A prompt is required.");
+    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
+
+      ? referenceValues.filter(
+
+          (value): value is MediaReference =>
+
+            isObjectReference(value) ||
+            isEphemeralMediaReference(value) ||
+            isLocalMediaReference(value)
+
+        )
+
+      : isObjectReference(referenceValues) ||
+
+          isEphemeralMediaReference(referenceValues) ||
+
+          isLocalMediaReference(referenceValues)
+
+        ? [referenceValues]
+
+        : [];
+
+    const hasPrompt = prompt.trim().length > 0;
+
+    if (!hasPrompt && referenceRefs.length === 0) {
+
+      return this.createErrorResult("A prompt or reference image is required.");
 
     }
 
@@ -315,31 +344,19 @@ export class AiImageNode extends ExecutableNode {
 
 
 
-    const referenceValues = context.inputs[AI_IMAGE_REFERENCE_INPUT];
-
-    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
-
-      ? referenceValues.filter(
-
-          (value): value is MediaReference =>
-
-            isObjectReference(value) || isEphemeralMediaReference(value)
-
-        )
-
-      : isObjectReference(referenceValues) ||
-
-          isEphemeralMediaReference(referenceValues)
-
-        ? [referenceValues]
-
-        : [];
-
-
-
     const referenceImageUrls: string[] = [];
 
     for (const ref of referenceRefs) {
+
+      if (isLocalMediaReference(ref)) {
+
+        return this.createErrorResult(
+
+          "Local browser-only reference images cannot be used in server workflow runs. Generate from the canvas panel instead."
+
+        );
+
+      }
 
       if (isEphemeralMediaReference(ref)) {
 

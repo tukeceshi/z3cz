@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Docker 开发栈启动顺序：先启动 API，等待 /health 就绪后再启动 www 与 app，
- * 避免 app 代理在 API WASM 初始化期间大量报 ECONNREFUSED。
+ * 避免 app 代理在 API 启动完成前大量报 ECONNREFUSED。
  */
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -34,7 +34,7 @@ async function waitForApi(api) {
   let loggedWasmHint = false;
 
   console.log(
-    `[dev:docker] Waiting for API at ${API_HEALTH_URL} (WASM init may take 2–6 minutes)...`
+    `[dev:docker] Waiting for API at ${API_HEALTH_URL} (first boot may take ~1–2 minutes)...`
   );
 
   while (Date.now() - startedAt < HEALTH_TIMEOUT_MS) {
@@ -63,10 +63,10 @@ async function waitForApi(api) {
         `[dev:docker] Still waiting for API (${elapsedSec}s elapsed)...`
       );
     }
-    if (elapsedSec >= 60 && !loggedWasmHint) {
+    if (elapsedSec >= 120 && !loggedWasmHint) {
       loggedWasmHint = true;
       console.log(
-        "[dev:docker] If logs show initSync(), WASM is loading — usually ready in ~5 minutes total."
+        "[dev:docker] API still starting — check `docker compose logs api` for boot phase or errors."
       );
     }
 

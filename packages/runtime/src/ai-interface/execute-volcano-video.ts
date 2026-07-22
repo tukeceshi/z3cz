@@ -1,8 +1,10 @@
 import {
   buildVolcanoVideoGenerationBody,
+  createEphemeralMediaExpiresAt,
   type MediaReference,
   type ObjectReference,
   type VideoModelParameterRules,
+  type ReferenceImageInline,
   normalizeVideoModelParameterRules,
 } from "@dafthunk/types";
 
@@ -46,7 +48,6 @@ function inferVideoMimeType(url: string): string {
   return "video/mp4";
 }
 
-const EPHEMERAL_TTL_MS = 3_600_000;
 const DEFAULT_POLL_INTERVAL_MS = 10_000;
 const DEFAULT_TIMEOUT_MINUTES = 60;
 
@@ -92,15 +93,22 @@ export async function submitVolcanoVideoTask(params: {
   readonly parameterRules: VideoModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
+  const hasReferences =
+    (params.referenceImageUrls?.length ?? 0) > 0 ||
+    (params.referenceImageInline?.length ?? 0) > 0;
 
-  if (!trimmedPrompt) {
+  if (!trimmedPrompt && !hasReferences) {
     return { status: "failed", error: "Prompt is required" };
   }
 
-  if (trimmedPrompt.length > rules.promptMaxChars) {
+  if (
+    trimmedPrompt.length > 0 &&
+    trimmedPrompt.length > rules.promptMaxChars
+  ) {
     return {
       status: "failed",
       error: `Prompt exceeds maximum length of ${rules.promptMaxChars} characters`,
@@ -113,6 +121,7 @@ export async function submitVolcanoVideoTask(params: {
     generationFields: rules.generationFields,
     params: params.generationParams,
     referenceImageUrls: params.referenceImageUrls,
+    referenceImageInline: params.referenceImageInline,
   });
 
   const baseUrl = params.baseUrl.replace(/\/$/, "");
@@ -236,7 +245,21 @@ export async function downloadVolcanoVideo(params: {
   const data = new Uint8Array(await response.arrayBuffer());
 
   if (params.storageMode === "ephemeral") {
-    const expiresAt = new Date(Date.now() + EPHEMERAL_TTL_MS).toISOString();
+    if (params.objectStore) {
+      const reference = await params.objectStore.writeObject(
+        data,
+        mimeType,
+        params.organizationId,
+        params.executionId
+      );
+      return {
+        status: "completed",
+        videos: [reference],
+        storageMode: "cloud",
+      };
+    }
+
+    const expiresAt = createEphemeralMediaExpiresAt();
     const videos: MediaReference[] = [
       {
         kind: "ephemeral",

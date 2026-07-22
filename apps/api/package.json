@@ -11,9 +11,9 @@
   "scripts": {
     "extract-nodes": "pnpm --filter '@dafthunk/www' extract-nodes",
     "predev": "pnpm run extract-nodes",
-    "dev": "pnpm exec tsx watch --import ./src/shims/cloudflare-register.mjs src/server.ts",
-    "dev:docker:api": "pnpm exec tsx watch --import ./src/shims/cloudflare-register.mjs src/server.ts",
-    "dev:docker": "pnpm exec tsx watch --import ./src/shims/cloudflare-register.mjs src/server.ts",
+    "dev": "node scripts/dev-watch.mjs",
+    "dev:docker:api": "node scripts/dev-watch.mjs",
+    "dev:docker": "node scripts/dev-watch.mjs",
     "start:node": "tsx --import ./src/shims/cloudflare-register.mjs src/server.ts",
     "dev:workers": "wrangler dev --local --live-reload --port 3102 --ip 0.0.0.0 --enable-containers=false",
     "dev:preview": "wrangler dev --remote --port 3102",

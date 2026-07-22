@@ -223,6 +223,51 @@ export class VolcengineTosClient {
     const root = params.prefix.replace(/\/$/, "");
     return `${root}/workflows/wf_${params.workflowId}/${params.mediaKind}/${params.objectId}${ext}`;
   }
+
+  async presignGetObjectUrl(params: {
+    readonly key: string;
+    readonly expiresInSeconds?: number;
+  }): Promise<string> {
+    const bucket = this.requireBucket();
+    const { endpoint, path } = buildBucketObjectRequestPath(
+      this.credentials.region,
+      bucket,
+      params.key
+    );
+    const { presignTosGetUrl } = await import("./tos-sign");
+    return presignTosGetUrl({
+      endpoint,
+      path,
+      accessKeyId: this.credentials.accessKeyId,
+      secretAccessKey: this.credentials.secretAccessKey,
+      region: this.credentials.region,
+      expiresInSeconds: params.expiresInSeconds ?? 3600,
+    });
+  }
+
+  async signPutObjectUpload(params: {
+    readonly key: string;
+    readonly mimeType: string;
+    readonly contentLength: number;
+  }): Promise<{ readonly url: string; readonly headers: Record<string, string> }> {
+    const bucket = this.requireBucket();
+    const { endpoint, path } = buildBucketObjectRequestPath(
+      this.credentials.region,
+      bucket,
+      params.key
+    );
+    const { signTosPutObject } = await import("./tos-sign");
+    const signed = await signTosPutObject({
+      endpoint,
+      path,
+      accessKeyId: this.credentials.accessKeyId,
+      secretAccessKey: this.credentials.secretAccessKey,
+      region: this.credentials.region,
+      mimeType: params.mimeType,
+      contentLength: params.contentLength,
+    });
+    return { url: signed.url, headers: signed.headers };
+  }
 }
 
 export {

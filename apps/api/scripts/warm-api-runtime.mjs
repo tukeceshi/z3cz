@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Preloads the heavy API runtime module graph (including WASM) before tsx watch starts.
+ * Preloads the API runtime module graph before tsx watch starts.
  * Used on warm/full Docker restarts; does not start the HTTP server.
  */
 const startedAt = Date.now();
 
-console.log("[api:warm] Preloading runtime module graph (WASM may take minutes)...");
+console.log("[api:warm] Preloading runtime module graph...");
 
 try {
   await import("../src/runtime/cloudflare-node-registry.ts");

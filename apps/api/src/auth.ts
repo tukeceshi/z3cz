@@ -15,6 +15,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { z } from "zod";
 
 import { ApiContext } from "./context";
+import { LAZY_ROUTE_ORG_HEADER } from "./lazy-route";
 import {
   createDatabase,
   EmailAlreadyRegisteredError,
@@ -281,7 +282,8 @@ export const jwtMiddleware = async (
   c.set("jwtPayload", payload);
 
   const db = createDatabase(c.env);
-  const organizationIdFromUrl = c.req.param("organizationId");
+  const organizationIdFromUrl =
+    c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   if (organizationIdFromUrl) {
     // Resolve organization from URL param
@@ -346,7 +348,8 @@ export const wsUpgradeAuthMiddleware = async (
 
   c.set("jwtPayload", payload);
 
-  const organizationIdFromUrl = c.req.param("organizationId");
+  const organizationIdFromUrl =
+    c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   if (organizationIdFromUrl) {
     if (payload.organization?.id === organizationIdFromUrl) {
@@ -419,7 +422,8 @@ export const apiKeyMiddleware = async (
   next: () => Promise<void>
 ) => {
   const authHeader = c.req.header("Authorization");
-  const organizationIdFromUrl = c.req.param("organizationId");
+  const organizationIdFromUrl =
+    c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   if (!organizationIdFromUrl) {
     // This should ideally not happen if routes are configured correctly
@@ -458,7 +462,8 @@ export const apiKeyOrJwtMiddleware = async (
   next: () => Promise<void>
 ) => {
   const authHeader = c.req.header("Authorization");
-  const organizationIdFromUrl = c.req.param("organizationId");
+  const organizationIdFromUrl =
+    c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   // If Authorization header is present, try API key auth
   if (authHeader && authHeader.startsWith("Bearer ")) {

@@ -3,6 +3,7 @@ import {
   AI_VIDEO_NODE_TYPE,
   type AiVideoResultHistory,
   type AiVideoResultHistoryItem,
+  normalizeVideoModelParameterRules,
   type VideoModelParameterRules,
   isMediaReference,
   type MediaReference,
@@ -37,6 +38,7 @@ export const AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX =
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX;
 
 export const AI_VIDEO_GENERATING_META_KEY = "aiVideoGenerating" as const;
+export const AI_VIDEO_GENERATE_ERROR_META_KEY = "aiVideoGenerateError" as const;
 
 export const AI_VIDEO_MAX_HISTORY_ITEMS = 30;
 
@@ -297,6 +299,23 @@ export function withAiVideoGeneratedResult(
     readonly params?: Readonly<Record<string, unknown>>;
   }
 ): Partial<WorkflowNodeType> {
+  const primary = videos[0];
+  if (!primary) return {};
+
+  return appendAiVideoGeneratedHistoryItems(current, [primary], meta);
+}
+
+/** Append one history entry per generation batch; card shows the first video. */
+export function appendAiVideoGeneratedHistoryItems(
+  current: WorkflowNodeType,
+  videos: readonly MediaReference[],
+  meta?: {
+    readonly prompt: string;
+    readonly params?: Readonly<Record<string, unknown>>;
+  }
+): Partial<WorkflowNodeType> {
+  if (videos.length === 0) return {};
+
   const history = readAiVideoResultHistory(current.inputs);
   const item: AiVideoResultHistoryItem = {
     id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -305,6 +324,7 @@ export function withAiVideoGeneratedResult(
     params: meta?.params,
     createdAt: new Date().toISOString(),
   };
+
   const nextHistory: AiVideoResultHistory = {
     items: [item, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
     selectedId: item.id,
@@ -318,7 +338,8 @@ export function withAiVideoGeneratedResult(
   );
   inputs = upsertInputValue(inputs, "manual_videos", [], "json");
 
-  const result = withAiVideoResult(current, videos, { inputs });
+  const primary = videos[0]!;
+  const result = withAiVideoResult(current, [primary], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -381,6 +402,32 @@ export function withAiVideoGeneratingFlag(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+export function readAiVideoGenerateError(
+  metadata: Record<string, string> | undefined
+): string | undefined {
+  const value = metadata?.[AI_VIDEO_GENERATE_ERROR_META_KEY];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+export function withAiVideoGenerateError(
+  metadata: Record<string, string> | undefined,
+  error: string | null | undefined
+): Record<string, string> | undefined {
+  if (!error?.trim()) {
+    if (!metadata || !(AI_VIDEO_GENERATE_ERROR_META_KEY in metadata)) {
+      return metadata;
+    }
+    const next = { ...metadata };
+    delete next[AI_VIDEO_GENERATE_ERROR_META_KEY];
+    return Object.keys(next).length > 0 ? next : undefined;
+  }
+
+  return {
+    ...(metadata ?? {}),
+    [AI_VIDEO_GENERATE_ERROR_META_KEY]: error.trim(),
+  };
+}
+
 export function countAiVideoReferences(
   targetNodeId: string,
   edges: readonly {
@@ -401,6 +448,27 @@ export function referencesFitVideoModelLimits(
   rules: VideoModelParameterRules
 ): boolean {
   return referenceCount <= rules.maxReferenceImages;
+}
+
+/** Model allows image/video references in generation params. */
+export function videoModelAllowsMediaReferences(
+  rules: VideoModelParameterRules
+): boolean {
+  const normalized = normalizeVideoModelParameterRules(rules);
+  return (
+    normalized.maxReferenceImages > 0 || normalized.maxReferenceVideos > 0
+  );
+}
+
+/** Prompt text or connected media references satisfy the generate gate. */
+export function canGenerateAiVideo(params: {
+  readonly prompt: string;
+  readonly referenceCount: number;
+  readonly rules: VideoModelParameterRules;
+}): boolean {
+  if (params.prompt.trim().length > 0) return true;
+  if (!videoModelAllowsMediaReferences(params.rules)) return false;
+  return params.referenceCount > 0;
 }
 
 export function pickDefaultVideoModelCanonicalId(

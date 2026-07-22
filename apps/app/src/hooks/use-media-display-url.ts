@@ -2,7 +2,6 @@ import {
   getMediaReferenceKey,
   isMediaReference,
   type MediaReference,
-  type ObjectReference,
 } from "@dafthunk/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -13,17 +12,16 @@ import {
   isMediaExpired,
   resolveMediaDisplayUrl,
 } from "@/services/media-url-resolver";
+import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 
 interface UseMediaDisplayUrlParams {
   readonly media: MediaReference | null;
-  readonly createObjectUrl?: (ref: ObjectReference) => string;
   readonly nodeType?: "ai-image" | "ai-video";
   readonly size?: MediaDisplaySize;
 }
 
 export function useMediaDisplayUrl({
   media,
-  createObjectUrl,
   nodeType,
   size = "full",
 }: UseMediaDisplayUrlParams): {
@@ -39,8 +37,17 @@ export function useMediaDisplayUrl({
   );
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
+  const [cacheRevision, setCacheRevision] = useState(0);
   const expired = media ? isMediaExpired(media) : false;
   const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const handler = () => {
+      setCacheRevision((value) => value + 1);
+    };
+    window.addEventListener(CACHE_STATS_EVENT, handler);
+    return () => window.removeEventListener(CACHE_STATS_EVENT, handler);
+  }, []);
 
   useEffect(() => {
     setStale(false);
@@ -62,7 +69,6 @@ export function useMediaDisplayUrl({
       media,
       organizationId: orgId,
       workflowId,
-      createObjectUrl,
       nodeType,
       size,
     }).then((url) => {
@@ -90,7 +96,15 @@ export function useMediaDisplayUrl({
     return () => {
       cancelled = true;
     };
-  }, [mediaKey, orgId, workflowId, createObjectUrl, nodeType, size, expired]);
+  }, [
+    mediaKey,
+    orgId,
+    workflowId,
+    nodeType,
+    size,
+    expired,
+    cacheRevision,
+  ]);
 
   useEffect(() => {
     return () => {
