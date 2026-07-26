@@ -101,20 +101,39 @@ read_env_value() {
   printf '%s' "$value"
 }
 
+# wget|bash leaves stdin as a pipe — read answers from the real console when possible.
+ask_line() {
+  local prompt="$1"
+  local default="${2:-}"
+  local value=""
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    printf '%s' "$prompt" >/dev/tty
+    read -r value </dev/tty || true
+  elif [[ -t 0 ]]; then
+    read -r -p "$prompt" value || true
+  else
+    value="$default"
+  fi
+  if [[ -z "${value:-}" ]]; then
+    printf '%s' "$default"
+  else
+    printf '%s' "$value"
+  fi
+}
+
 echo "Dafthunk self-host setup"
 echo "------------------------"
 echo "Admin account: open the site after rebuild and register — the first user becomes platform admin."
 echo ""
 
-read -r -p "Hostname [localhost]: " hostname
-hostname="${hostname:-localhost}"
+hostname="$(ask_line "Hostname [localhost]: " "localhost")"
 
 https="true"
 if looks_like_local "$hostname"; then
   echo "Local hostname detected — HTTPS disabled (HTTP only)."
   https="false"
 else
-  read -r -p "Enable HTTPS / Let's Encrypt? [Y/n]: " https_answer
+  https_answer="$(ask_line "Enable HTTPS / Let's Encrypt? [Y/n]: " "Y")"
   https_answer="$(echo "${https_answer:-}" | tr '[:upper:]' '[:lower:]')"
   if [[ "$https_answer" == "n" || "$https_answer" == "no" ]]; then
     https="false"
@@ -123,15 +142,14 @@ fi
 
 le_email=""
 if [[ "$https" == "true" ]]; then
-  read -r -p "ACME notification email (optional, Enter to skip): " le_email
+  le_email="$(ask_line "ACME notification email (optional, Enter to skip): " "")"
 fi
 
 read_port() {
   local prompt="$1"
   local default="$2"
-  local value=""
-  read -r -p "$prompt" value
-  value="${value:-$default}"
+  local value
+  value="$(ask_line "$prompt" "$default")"
   if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1 || value > 65535)); then
     echo "Invalid port '$value' — using default $default" >&2
     value="$default"

@@ -13,6 +13,8 @@
 #   DAFTHUNK_REPO_URL=...
 #   DAFTHUNK_BRANCH=main
 #   DAFTHUNK_TARGET_RAM_MIB=4096   # default total memory+swap target
+#   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack + ignore tiny deficit
+#   DAFTHUNK_LOW_RAM_WARN_MIB=1792 # warn only below this (2G VMs often report ~1900)
 #   DAFTHUNK_LANG=zh|en            # prompt language (default zh)
 #   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
 #
@@ -22,6 +24,8 @@ INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
 TARGET_TOTAL_MIB="${DAFTHUNK_TARGET_RAM_MIB:-4096}"
+RAM_SLACK_MIB="${DAFTHUNK_RAM_SLACK_MIB:-256}"
+LOW_RAM_WARN_MIB="${DAFTHUNK_LOW_RAM_WARN_MIB:-1792}"
 SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
 TZ_SUGGEST="${DAFTHUNK_TZ_SUGGEST:-Asia/Shanghai}"
 # Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
@@ -30,7 +34,6 @@ LOG_FILE="$TEMP_LOG"
 
 RESUME=0
 SKIP_DOCKER=0
-SKIP_UPGRADE=0
 SKIP_SWAP=0
 FORCE_SETUP=0
 LANG_FLAG=""
@@ -49,7 +52,13 @@ log_warn() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
-is_tty() { [[ -t 0 ]]; }
+# True when we can ask a human (SSH console), even if stdin is a pipe (wget | bash).
+can_prompt() {
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    return 0
+  fi
+  [[ -t 0 ]]
+}
 
 # Localized message: M <key> [args...]
 # Keys are stable; only user-facing strings change with UI_LANG.
@@ -68,9 +77,10 @@ M() {
         skip_swap) echo "Skipping swap setup (--skip-swap)" ;;
         step_memory) echo "Memory check" ;;
         ram_swap_info) echo "RAM ≈ $1, swap ≈ $2 (target total ≈ $3)" ;;
-        ram_low) echo "RAM under 2G — builds may be slow or fail; swap is strongly recommended." ;;
+        ram_low) echo "RAM well under 2G (~${LOW_RAM_WARN_MIB}MiB threshold) — builds may be slow or fail; swap is strongly recommended." ;;
         swap_file_present) echo "Swap file already present at $1" ;;
         swap_meets_target) echo "Existing swap already meets the ~$1 target" ;;
+        swap_near_target) echo "RAM+swap ≈ $1 already near target ~$2 — no extra swap needed" ;;
         swap_replace_anyway) echo "Configure/replace swap anyway? [y/N]: " ;;
         swap_short) echo "Existing $1 but still short of target by ~$2" ;;
         swap_replace_size) echo "Replace swap with $1? [Y/n]: " ;;
@@ -92,8 +102,7 @@ M() {
         tz_no_timedatectl) echo "timedatectl not available — cannot change timezone" ;;
         tz_set_ok) echo "Timezone set to: $1" ;;
         tz_set_fail) echo "Failed to set timezone '$1' — keeping previous" ;;
-        step_apt) echo "System update (apt)" ;;
-        skip_upgrade) echo "Skipping apt upgrade (--skip-upgrade / --resume)" ;;
+        step_apt) echo "Refreshing apt package lists" ;;
         step_docker_pkgs) echo "Installing Docker, Compose, Git" ;;
         docker_missing) echo "docker not found after apt install" ;;
         compose_missing) echo "Neither 'docker compose' nor 'docker-compose' is available" ;;
@@ -141,9 +150,10 @@ M() {
         skip_swap) echo "跳过 swap 设置 (--skip-swap)" ;;
         step_memory) echo "内存检查" ;;
         ram_swap_info) echo "内存 ≈ $1，swap ≈ $2（目标合计 ≈ $3）" ;;
-        ram_low) echo "内存不足 2G — 构建可能很慢或失败；强烈建议添加 swap。" ;;
+        ram_low) echo "内存明显不足 2G（告警阈值约 ${LOW_RAM_WARN_MIB}MiB）— 构建可能很慢或失败；强烈建议添加 swap。" ;;
         swap_file_present) echo "已存在 swap 文件: $1" ;;
         swap_meets_target) echo "当前 swap 已达到约 $1 的目标" ;;
+        swap_near_target) echo "内存+swap ≈ $1 已接近目标 ~$2 — 无需再增加 swap" ;;
         swap_replace_anyway) echo "仍要配置/替换 swap？ [y/N]: " ;;
         swap_short) echo "已有 $1，但仍距目标约差 $2" ;;
         swap_replace_size) echo "将 swap 替换为 $1？ [Y/n]: " ;;
@@ -165,8 +175,7 @@ M() {
         tz_no_timedatectl) echo "无 timedatectl — 无法修改时区" ;;
         tz_set_ok) echo "时区已设为: $1" ;;
         tz_set_fail) echo "设置时区「$1」失败 — 保持原时区" ;;
-        step_apt) echo "系统更新 (apt)" ;;
-        skip_upgrade) echo "跳过 apt upgrade (--skip-upgrade / --resume)" ;;
+        step_apt) echo "刷新 apt 软件源" ;;
         step_docker_pkgs) echo "安装 Docker、Compose、Git" ;;
         docker_missing) echo "apt 安装后未找到 docker" ;;
         compose_missing) echo "未找到 docker compose 或 docker-compose" ;;
@@ -238,19 +247,26 @@ apply_lang_from_flag_or_env() {
   UI_LANG="zh"
 }
 
-# Interactive menu when no flag/env (TTY only); default zh
+# Interactive menu when no flag/env; default zh when no console
 choose_ui_lang_interactive() {
   if [[ -n "$LANG_FLAG" || -n "${DAFTHUNK_LANG:-}" ]]; then
     return 0
   fi
-  if ! is_tty; then
+  if ! can_prompt; then
     UI_LANG="zh"
     return 0
   fi
-  echo
-  echo "提示语言 / Prompt language"
-  echo "  1) 中文（默认）"
-  echo "  2) English"
+  {
+    echo
+    echo "提示语言 / Prompt language"
+    echo "  1) 中文（默认）"
+    echo "  2) English"
+  } >/dev/tty 2>/dev/null || {
+    echo
+    echo "提示语言 / Prompt language"
+    echo "  1) 中文（默认）"
+    echo "  2) English"
+  }
   local choice
   choice="$(ask "选择 / Choice [1]: " "1")"
   case "$choice" in
@@ -259,16 +275,32 @@ choose_ui_lang_interactive() {
   esac
 }
 
-# prompt default → prints answer (default when non-interactive / empty)
+# Status line for ask() — never stdout (stdout is reserved for $() capture).
+ask_status() {
+  local msg="$1"
+  if [[ -w /dev/tty ]]; then
+    echo -e "${GREEN}→${NC} $msg" >/dev/tty
+  else
+    echo -e "${GREEN}→${NC} $msg" >&2
+  fi
+}
+
+# prompt default → prints ONLY the answer on stdout (safe for answer="$(ask …)").
+# Always read from /dev/tty when available so wget|bash does not skip prompts.
 ask() {
   local prompt="$1"
   local default="$2"
   local answer=""
-  if is_tty; then
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    printf '%s' "$prompt" >/dev/tty
+    read -r answer </dev/tty || true
+  elif [[ -t 0 ]]; then
     read -r -p "$prompt" answer || true
   else
-    log_info "$(M non_interactive_default "$prompt" "$default")"
+    ask_status "$(M non_interactive_default "$prompt" "$default")"
   fi
+  # Keep last non-empty line; strip CR (guards against accidental capture noise)
+  answer="$(printf '%s' "${answer:-}" | tr -d '\r' | awk 'NF { line=$0 } END { print line }')"
   if [[ -z "${answer:-}" ]]; then
     printf '%s' "$default"
   else
@@ -305,9 +337,8 @@ Usage:
 
 Options:
   --lang zh|en     Prompt language (default: zh; or DAFTHUNK_LANG)
-  --resume         Skip apt upgrade / Docker install; update repo; setup if needed; rebuild
+  --resume         Skip Docker/package install; update repo; setup if needed; rebuild
   --skip-docker    Skip Docker/Git install (same as part of --resume)
-  --skip-upgrade   Skip apt upgrade (still apt update + install packages)
   --skip-swap      Skip swap dialogue and creation
   --force-setup    Re-run hostname wizard even if containers/app.yml exists
   -h, --help       Show this help
@@ -330,9 +361,8 @@ Dafthunk 一键安装脚本
 
 选项:
   --lang zh|en     提示语言（默认 zh；也可用 DAFTHUNK_LANG）
-  --resume         跳过 apt upgrade / Docker 安装；更新仓库；按需 setup；rebuild
+  --resume         跳过 Docker/软件包安装；更新仓库；按需 setup；rebuild
   --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
-  --skip-upgrade   跳过 apt upgrade（仍会 apt update 并装包）
   --skip-swap      跳过 swap 对话与创建
   --force-setup    即使已有 containers/app.yml 也重跑 hostname 向导
   -h, --help       显示帮助
@@ -365,15 +395,10 @@ while [[ $# -gt 0 ]]; do
     --resume)
       RESUME=1
       SKIP_DOCKER=1
-      SKIP_UPGRADE=1
       shift
       ;;
     --skip-docker)
       SKIP_DOCKER=1
-      shift
-      ;;
-    --skip-upgrade)
-      SKIP_UPGRADE=1
       shift
       ;;
     --skip-swap)
@@ -499,21 +524,30 @@ ensure_swap() {
   fi
 
   log_step "$(M step_memory)"
-  local mem swap deficit default_swap answer size_mib
+  local mem swap usable deficit default_swap answer size_mib
   mem="$(mem_total_mib)"
   swap="$(swap_total_mib)"
+  usable=$((mem + swap))
   log_info "$(M ram_swap_info "$(mib_to_display "$mem")" "$(mib_to_display "$swap")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
 
-  if ((mem < 2048)); then
+  # 2G cloud VMs often report MemTotal ~1900MiB — only warn when clearly smaller.
+  if ((mem < LOW_RAM_WARN_MIB)); then
     log_warn "$(M ram_low)"
   fi
 
-  deficit=$((TARGET_TOTAL_MIB - mem - swap))
-  if ((deficit < 0)); then
+  # Soft-meet: within slack of target counts as enough (avoids +1G for a ~174MiB gap).
+  if ((usable + RAM_SLACK_MIB >= TARGET_TOTAL_MIB)); then
     deficit=0
+    if ((usable < TARGET_TOTAL_MIB)); then
+      log_info "$(M swap_near_target "$(mib_to_display "$usable")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
+    fi
+  else
+    deficit=$((TARGET_TOTAL_MIB - usable))
   fi
-  # Round up to whole GiB for the default suggestion
-  if ((deficit == 0)); then
+
+  # Tiny leftover deficit → suggest 0; otherwise round up to whole GiB.
+  if ((deficit == 0)) || ((deficit < RAM_SLACK_MIB)); then
+    deficit=0
     default_swap=0
   else
     default_swap=$((((deficit + 1023) / 1024) * 1024))
@@ -530,6 +564,9 @@ ensure_swap() {
         return 0
       fi
       default_swap=2048
+    else
+      log_info "$(M swap_near_target "$(mib_to_display "$usable")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
+      return 0
     fi
   elif [[ -f "$SWAPFILE" ]]; then
     log_warn "$(M swap_short "$SWAPFILE" "$(mib_to_display "$deficit")")"
@@ -637,14 +674,11 @@ has_docker_compose() {
 }
 
 install_packages_apt() {
+  # System upgrade is intentionally not run here (can restart sshd / drop SSH).
+  # Docs recommend optional: apt-get update && apt-get upgrade -y
   log_step "$(M step_apt)"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
-  if [[ "$SKIP_UPGRADE" != "1" ]]; then
-    apt-get upgrade -y
-  else
-    log_info "$(M skip_upgrade)"
-  fi
 
   log_step "$(M step_docker_pkgs)"
   # Prefer Compose V2 plugin when available (docker compose …)
@@ -748,13 +782,13 @@ run_launcher_rebuild() {
   print_resume_hint
   cd "$INSTALL_DIR/docker-host"
 
-  if [[ -t 0 ]] && command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
+  if can_prompt && command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
     local session="dafthunk-install"
     log_info "$(M tmux_start "$session")"
     log_info "$(M tmux_reattach "$session")"
     if tmux has-session -t "$session" 2>/dev/null; then
       log_warn "$(M tmux_exists "$session")"
-      tmux attach -t "$session"
+      tmux attach -t "$session" </dev/tty >/dev/tty 2>&1
       return 0
     fi
     local done_msg
@@ -763,11 +797,12 @@ run_launcher_rebuild() {
     else
       done_msg="Rebuild 已结束。脱离会话: Ctrl+b d"
     fi
-    tmux new-session -s "$session" "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; bash"
+    tmux new-session -s "$session" "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; bash" \
+      </dev/tty >/dev/tty 2>&1
     return 0
   fi
 
-  if [[ -t 0 ]] && command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
+  if can_prompt && command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
     local session="dafthunk-install"
     log_info "$(M screen_start "$session")"
     log_info "$(M screen_reattach "$session")"
@@ -777,11 +812,12 @@ run_launcher_rebuild() {
     else
       done_msg="Rebuild 已结束。"
     fi
-    screen -S "$session" bash -c "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; exec bash"
+    screen -S "$session" bash -c "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; exec bash" \
+      </dev/tty >/dev/tty 2>&1
     return 0
   fi
 
-  if [[ ! -t 0 ]]; then
+  if ! can_prompt; then
     log_warn "$(M no_tty_rebuild)"
   elif ! command -v tmux >/dev/null 2>&1 && ! command -v screen >/dev/null 2>&1; then
     log_warn "$(M no_tmux_screen)"

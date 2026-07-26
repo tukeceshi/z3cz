@@ -10,19 +10,22 @@
 
 ## 一键安装（Linux 服务器）
 
+建议（可选）先更新系统，再一键安装：
+
 ```bash
+sudo apt-get update && sudo apt-get upgrade -y   # 可选；耗时长，建议 tmux/screen
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-推荐 Ubuntu。脚本会：
+推荐 Ubuntu。一键脚本会：
 
 1. 选择提示语言（默认中文；`--lang en` / `DAFTHUNK_LANG=en`）  
 2. 检测内存，对话加 swap（默认目标约 4G 总可用）  
 3. 显示当前时区，默认保持；可选修改  
-4. `apt update/upgrade`，安装 `docker.io` + Compose + `git`  
+4. `apt update` 并安装 `docker.io` + Compose + `git`（不含 `apt upgrade`）  
 5. clone → setup → 串行 `launcher rebuild`
 
-目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-upgrade`、`--skip-swap`、`--force-setup`。
+目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-swap`、`--force-setup`。SSH 下 `wget|bash` 经 `/dev/tty` 交互，无控制台才跳过问答。
 
 ## 更新
 
