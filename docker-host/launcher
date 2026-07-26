@@ -34,7 +34,10 @@ Commands:
 
 First install:
   ./dafthunk-setup
+
+If rebuild is interrupted (SSH drop):
   ./launcher rebuild
+  # shared/ data is kept
 EOF
 }
 
@@ -106,6 +109,10 @@ case "$COMMAND" in
     run_render
     ;;
   bootstrap|rebuild)
+    echo ""
+    echo "Note: if SSH disconnects, reconnect and run: ./launcher rebuild"
+    echo "      (shared/ data is kept; log may be in ../install.log)"
+    echo ""
     run_render
     compose up -d --build --remove-orphans
     ;;

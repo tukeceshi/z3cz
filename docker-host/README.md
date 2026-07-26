@@ -14,13 +14,25 @@
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-一条命令：装 Docker/Git（若缺）→ clone 到 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）→ `./dafthunk-setup` → 自动 `./launcher rebuild`。
+一条命令：装 Docker/Git（若缺）→ clone 到 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）→ setup → rebuild。有 `tmux`/`screen` 时 rebuild 进会话。日志：`/var/dafthunk/install.log`。
 
 ## 更新
 
 ```bash
 cd /var/dafthunk && git pull && docker-host/launcher rebuild
 ```
+
+## 应急（卡死 / SSH 断开）
+
+| 情况 | 命令 |
+|------|------|
+| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 无 app.yml | `./dafthunk-setup` |
+| 接着跑安装器 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
+| 重配 hostname | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
+| 日志 | `less /var/dafthunk/install.log` |
+
+`--resume`：跳过装 Docker/Git；已有 `containers/app.yml` 则跳过向导直接 rebuild。`shared/` 默认保留。
 
 ## 首次安装（已有仓库）
 

@@ -32,13 +32,24 @@
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-一条命令完成：装 Docker/Git（若缺）→ clone → 向导写配置 → `launcher rebuild`。默认目录 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖）。打开打印的 URL 注册登录；**首个用户**为平台管理员。本地默认 `http://localhost:8080`。补充说明见下方「部署」。
+一条命令完成：装 Docker/Git（若缺）→ clone → 向导写配置 → `launcher rebuild`。默认目录 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖）。有 `tmux`/`screen` 时 rebuild 会放进会话，降低 SSH 断线中断概率。打开打印的 URL 注册登录；**首个用户**为平台管理员。本地默认 `http://localhost:8080`。补充说明见下方「部署」。
 
 #### 更新
 
 ```bash
 cd /var/dafthunk && git pull && docker-host/launcher rebuild
 ```
+
+#### 应急（卡死 / SSH 断开）
+
+| 情况 | 命令 |
+|------|------|
+| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 尚未生成配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
+| 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
+| 查看安装日志 | `less /var/dafthunk/install.log` |
+
+`shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。
 
 ---
 
