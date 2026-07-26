@@ -8,7 +8,7 @@ const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
   const title =
-    "Dafthunk - Open Source Visual Workflow Automation on Cloudflare";
+    "z3cz.com - Open Source Visual Workflow Automation on Cloudflare";
   const description =
     "Open source, serverless visual workflow automation with AI on Cloudflare. Build AI workflows, web scraping, and data pipelines visually. MIT licensed.";
   const ogImage = `${websiteUrl}/og-image.webp`;
@@ -21,7 +21,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: `${websiteUrl}/` },
     { name: "twitter:title", content: title },
@@ -33,32 +33,32 @@ export function meta() {
 
 const faqs = [
   {
-    question: "What is Dafthunk?",
+    question: "What is z3cz.com?",
     answer:
-      "Dafthunk is an open source visual workflow automation platform. You build workflows by connecting nodes in a React Flow editor, and they run as serverless workflows on Cloudflare Workers and Workflows, with state persisted in D1, R2, and Durable Objects.",
+      "z3cz.com is an open source visual workflow automation platform. You build workflows by connecting nodes in a React Flow editor, and they run as serverless workflows on Cloudflare Workers and Workflows, with state persisted in D1, R2, and Durable Objects.",
   },
   {
-    question: "Is Dafthunk free and open source?",
+    question: "Is z3cz.com free and open source?",
     answer:
-      "Yes. Dafthunk is fully MIT licensed, with no enterprise tier, no fair-code restrictions, and no community edition that hides features. The entire workflow engine, node library, and runtime is on GitHub under the same permissive license.",
+      "Yes. z3cz.com is fully MIT licensed, with no enterprise tier, no fair-code restrictions, and no community edition that hides features. The entire workflow engine, node library, and runtime is on GitHub under the same permissive license.",
   },
   {
-    question: "How is Dafthunk different from n8n, Zapier, or Make?",
+    question: "How is z3cz.com different from n8n, Zapier, or Make?",
     answer:
-      "Dafthunk is MIT licensed rather than fair-code like n8n, and it runs natively on Cloudflare's serverless platform. Workflows scale to zero when idle and scale up automatically with demand, with no containers or infrastructure to provision. You can self-host it for free or embed it in commercial products.",
+      "z3cz.com is MIT licensed rather than fair-code like n8n, and it runs natively on Cloudflare's serverless platform. Workflows scale to zero when idle and scale up automatically with demand, with no containers or infrastructure to provision. You can self-host it for free or embed it in commercial products.",
   },
   {
-    question: "Do I need to manage servers or containers to run Dafthunk?",
+    question: "Do I need to manage servers or containers to run z3cz.com?",
     answer:
       "No. Workflows run on Cloudflare Workers and Workflows, so execution is serverless and durable by default. There is nothing to provision or scale. State is persisted in D1 SQL databases, R2 object storage, and Durable Objects, and long-running workflows survive restarts and retries automatically.",
   },
   {
-    question: "What kinds of workflows can I build with Dafthunk?",
+    question: "What kinds of workflows can I build with z3cz.com?",
     answer:
       "You can build AI workflows, web scraping and browser automation, data transformations, API integrations, scheduled cron jobs, webhook handlers, and email pipelines using 470+ nodes across AI models, browsers, data processing, media, and third-party integrations.",
   },
   {
-    question: "Can I self-host Dafthunk on my own Cloudflare account?",
+    question: "Can I self-host z3cz.com on my own Cloudflare account?",
     answer:
       "Yes. The full source is on GitHub and deploys to a standard Cloudflare account using Workers, Workflows, D1, R2, and the Workers AI and Analytics Engine bindings. You own your data, your deployment, and your costs.",
   },
@@ -125,7 +125,7 @@ export default function Home() {
             </p>
           </div>
           <div className="lg:col-span-3 aspect-video bg-gray-900 rounded-xl overflow-hidden shadow-xl">
-            <YouTubeFacade videoId="5EjJz1Dhtz0" title="Dafthunk Demo" />
+            <YouTubeFacade videoId="5EjJz1Dhtz0" title="z3cz.com Demo" />
           </div>
         </div>
       </section>
@@ -526,7 +526,7 @@ export default function Home() {
             Frequently asked questions
           </h2>
           <p className="text-3xl text-gray-500">
-            What people ask before they try Dafthunk
+            What people ask before they try z3cz.com
           </p>
         </div>
 

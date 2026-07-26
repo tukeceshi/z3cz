@@ -21,9 +21,9 @@ interface Alternative {
 const { alternatives } = alternativesData as { alternatives: Alternative[] };
 
 export const meta: MetaFunction = () => {
-  const title = "Dafthunk alternatives to n8n, Zapier, Make, and more";
+  const title = "z3cz.com alternatives to n8n, Zapier, Make, and more";
   const description =
-    "Compare Dafthunk with n8n, Zapier, Make, Dify, and more. Open source, serverless visual workflow automation with AI on Cloudflare. MIT licensed.";
+    "Compare z3cz.com with n8n, Zapier, Make, Dify, and more. Open source, serverless visual workflow automation with AI on Cloudflare. MIT licensed.";
   const url = `${websiteUrl}/alternatives`;
 
   return [
@@ -34,7 +34,7 @@ export const meta: MetaFunction = () => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: `${websiteUrl}/og-image.webp` },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -51,12 +51,12 @@ export default function AlternativesIndexPage() {
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Dafthunk alternatives to n8n, Zapier, Make, Dify, Langflow, Flowise",
+    name: "z3cz.com alternatives to n8n, Zapier, Make, Dify, Langflow, Flowise",
     itemListElement: published.map((alt, index) => ({
       "@type": "ListItem",
       position: index + 1,
       url: `${websiteUrl}/alternatives/${alt.id}`,
-      name: `Dafthunk vs ${alt.name}`,
+      name: `z3cz.com vs ${alt.name}`,
     })),
   };
 
@@ -94,7 +94,7 @@ export default function AlternativesIndexPage() {
 
         <div className="mb-32">
           <h1 className="text-6xl font-light text-gray-900 mb-6">
-            Dafthunk alternatives
+            z3cz.com alternatives
           </h1>
           <p className="text-3xl text-gray-500">
             Side-by-side comparisons with the tools you are already considering.
@@ -109,7 +109,7 @@ export default function AlternativesIndexPage() {
               className="group block bg-white rounded-xl p-6 shadow-xs hover:shadow-md transition-shadow"
             >
               <h2 className="text-2xl font-light text-gray-900 group-hover:text-black transition-colors">
-                Dafthunk vs {alternative.name}
+                z3cz.com vs {alternative.name}
               </h2>
               <p className="text-base text-gray-600 mt-3 leading-relaxed">
                 {alternative.tagline}

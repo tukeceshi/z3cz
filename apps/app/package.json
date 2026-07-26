@@ -60,7 +60,8 @@
     "react-router": "^7.18.0",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
-    "swr": "^2.4.1"
+    "swr": "^2.4.1",
+    "wavesurfer.js": "^7.12.1"
   },
   "devDependencies": {
     "@shikijs/langs": "^3.23.0",

@@ -323,6 +323,7 @@ async function main(): Promise<void> {
     "doubao-seed-evolving": ["evolving", "seed-evolving"],
     "deepseek-v4-pro": ["deepseek_v4_pro", "deepseek-v4-pro"],
     "deepseek-v4-flash": ["deepseek_v4_flash", "deepseek-v4-flash"],
+    "glm-5-2": ["glm_5.2_free_inference", "glm-5.2"],
     "doubao-seedance-2": ["seedance_2.0_pack_free_infer", "seedance-2.0免费"],
     "doubao-seedance-2-fast": [
       "seedance_2.0_fast_pack_free_infer",

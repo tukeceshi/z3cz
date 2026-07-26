@@ -6,12 +6,14 @@ import type {
 import { and, desc, eq, ne } from "drizzle-orm";
 
 import { parseInterfaceMetadata } from "../integrations/volcengine/metadata";
+import { readApiKeyHint } from "../utils/api-key-hint";
 import type { Database } from "./index";
 import { organizationAiInterfaces } from "./schema";
 
 function rowToOrgInterface(
   row: typeof organizationAiInterfaces.$inferSelect
 ): OrganizationAiInterface {
+  const metadata = parseInterfaceMetadata(row.metadata);
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -24,7 +26,8 @@ function rowToOrgInterface(
     enabled: row.enabled,
     isDefault: row.isDefault,
     hasApiKey: row.apiKeyEncrypted.length > 0,
-    metadata: parseInterfaceMetadata(row.metadata),
+    apiKeyHint: readApiKeyHint(metadata),
+    metadata,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

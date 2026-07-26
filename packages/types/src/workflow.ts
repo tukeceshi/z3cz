@@ -10,9 +10,6 @@ export interface ObjectReference {
   storageBackend?: "platform" | "volcengine_tos";
 }
 
-import type { WorkflowBillingMode } from "./workflow-billing";
-export type { WorkflowBillingMode } from "./workflow-billing";
-export { ALL_WORKFLOW_BILLING_MODES } from "./workflow-billing";
 
 /**
  * Workflow trigger types
@@ -37,6 +34,10 @@ export type WorkflowTrigger =
  * - workflow: Durable execution with retries and checkpoints
  */
 export type WorkflowRuntime = "worker" | "workflow";
+
+/** Triggers available when running from the canvas (mainline). */
+export const MAINLINE_RUN_TRIGGERS = ["manual", "http_request"] as const;
+export type MainlineRunTrigger = (typeof MAINLINE_RUN_TRIGGERS)[number];
 
 /**
  * Primitive value types
@@ -366,6 +367,14 @@ export interface WorkflowEditorViewport {
 }
 
 /**
+ * Optional cover image stored in org object storage.
+ */
+export interface WorkflowCover {
+  coverObjectId?: string;
+  coverMimeType?: string;
+}
+
+/**
  * Represents a workflow as stored in the database
  */
 export interface Workflow {
@@ -374,10 +383,11 @@ export interface Workflow {
   description?: string;
   /** Workflow scheme (方案) — determines allowed triggers, runtimes, and nodes */
   schemeId: string;
-  /** Credit enforcement mode — platform credits vs upstream relay billing */
-  billingMode?: WorkflowBillingMode;
   trigger: WorkflowTrigger;
   runtime?: WorkflowRuntime;
+  folderId?: string | null;
+  coverObjectId?: string | null;
+  coverMimeType?: string | null;
   nodes: Node[];
   edges: Edge[];
   /** Last editor canvas pan/zoom; restored on next open */
@@ -388,7 +398,6 @@ export interface Workflow {
  * Represents a workflow with additional metadata
  */
 export interface WorkflowWithMetadata extends Workflow {
-  enabled?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -469,12 +478,58 @@ export interface WorkflowExecution {
 export interface CreateWorkflowRequest {
   name: string;
   description?: string;
-  schemeId: string;
-  trigger: WorkflowTrigger;
+  schemeId?: string;
+  trigger?: WorkflowTrigger;
   runtime?: WorkflowRuntime;
-  nodes: Node[];
-  edges: Edge[];
+  folderId?: string | null;
+  nodes?: Node[];
+  edges?: Edge[];
 }
+
+/**
+ * One-level folder for organizing workflows in the library view.
+ */
+export interface WorkflowFolder {
+  id: string;
+  name: string;
+  coverObjectId?: string | null;
+  coverMimeType?: string | null;
+  workflowCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateWorkflowFolderRequest {
+  name: string;
+}
+
+export type CreateWorkflowFolderResponse = WorkflowFolder;
+
+export interface ListWorkflowFoldersResponse {
+  folders: WorkflowFolder[];
+}
+
+export interface UpdateWorkflowFolderRequest {
+  name?: string;
+  coverObjectId?: string | null;
+  coverMimeType?: string | null;
+}
+
+export type UpdateWorkflowFolderResponse = WorkflowFolder;
+
+export interface DeleteWorkflowFolderResponse {
+  id: string;
+  deletedWorkflowCount: number;
+}
+
+export interface UpdateWorkflowListMetadataRequest {
+  name?: string;
+  description?: string | null;
+  coverObjectId?: string | null;
+  coverMimeType?: string | null;
+}
+
+export type UpdateWorkflowListMetadataResponse = WorkflowWithMetadata;
 
 /**
  * Response when creating a new workflow
@@ -499,7 +554,6 @@ export type GetWorkflowResponse = WorkflowWithMetadata;
 export interface UpdateWorkflowRequest {
   name: string;
   description?: string;
-  billingMode?: WorkflowBillingMode;
   trigger?: WorkflowTrigger;
   runtime?: WorkflowRuntime;
   nodes: Node[];

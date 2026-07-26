@@ -8,7 +8,6 @@ import Sparkles from "lucide-react/icons/sparkles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { OnboardingFunnel } from "@/components/admin/onboarding-funnel";
-import { RoleBadge } from "@/components/admin/role-badge";
 import { RowActionsMenu } from "@/components/admin/row-actions-menu";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
@@ -54,7 +53,7 @@ import type { TranslateFn } from "@/i18n";
 import {
   type AdminOnboardingDraft,
   type AdminThreadSummary,
-  type AdminUserMembership,
+  type AdminUserSubAccount,
   draftAdminOnboardingMessage,
   resendAdminUserWelcomeEmail,
   sendAdminOnboardingMessage,
@@ -118,27 +117,37 @@ function createThreadColumns(t: TranslateFn): ColumnDef<AdminThreadSummary>[] {
   ];
 }
 
-function createMembershipColumns(
+function createSubAccountColumns(
   navigate: ReturnType<typeof useNavigate>,
   t: TranslateFn
-): ColumnDef<AdminUserMembership>[] {
+): ColumnDef<AdminUserSubAccount>[] {
   return [
     {
-      accessorKey: "organizationName",
-      header: t("admin.common.organization"),
+      accessorKey: "userName",
+      header: t("admin.table.user"),
       cell: ({ row }) => (
         <Link
-          to={`/admin/organizations/${row.original.organizationId}`}
-          className="font-medium hover:underline"
+          to={`/admin/users/${row.original.userId}`}
+          className="flex items-center gap-2 font-medium hover:underline"
         >
-          {row.original.organizationName}
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={row.original.userAvatarUrl || undefined} />
+            <AvatarFallback>
+              {row.original.userName?.charAt(0).toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <span>{row.original.userName}</span>
         </Link>
       ),
     },
     {
-      accessorKey: "role",
-      header: t("admin.common.role"),
-      cell: ({ row }) => <RoleBadge role={row.original.role} />,
+      accessorKey: "userEmail",
+      header: t("admin.table.email"),
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {row.original.userEmail || "-"}
+        </span>
+      ),
     },
     {
       accessorKey: "joinedAt",
@@ -154,11 +163,9 @@ function createMembershipColumns(
       cell: ({ row }) => (
         <RowActionsMenu>
           <DropdownMenuItem
-            onClick={() =>
-              navigate(`/admin/organizations/${row.original.organizationId}`)
-            }
+            onClick={() => navigate(`/admin/users/${row.original.userId}`)}
           >
-            {t("admin.userDetail.viewOrganization")}
+            {t("admin.organizationDetail.viewUser")}
           </DropdownMenuItem>
         </RowActionsMenu>
       ),
@@ -169,8 +176,16 @@ function createMembershipColumns(
 export function AdminUserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { user, memberships, userError, isUserLoading } =
-    useAdminUserDetail(userId);
+  const {
+    user,
+    membershipRole,
+    organization,
+    subAccounts,
+    ownerUser,
+    entityCounts,
+    userError,
+    isUserLoading,
+  } = useAdminUserDetail(userId);
   const { funnel, isFunnelLoading } = useAdminUserFunnel(userId);
   const { executionsSummary, isExecutionsSummaryLoading } =
     useAdminUserExecutionsSummary(userId);
@@ -199,8 +214,8 @@ export function AdminUserDetailPage() {
   const draftRequestIdRef = useRef(0);
   const autoOpenAttemptedRef = useRef(false);
 
-  const membershipColumns = useMemo(
-    () => createMembershipColumns(navigate, t),
+  const subAccountColumns = useMemo(
+    () => createSubAccountColumns(navigate, t),
     [navigate, t]
   );
   const threadColumns = useMemo(() => createThreadColumns(t), [t]);
@@ -330,6 +345,19 @@ export function AdminUserDetailPage() {
 
   return (
     <InsetLayout title={t("admin.userDetail.title")}>
+      {membershipRole === "member" && ownerUser && (
+        <div className="mb-6 rounded-md border bg-muted/40 px-4 py-3 text-sm">
+          {t("admin.userDetail.subAccountNotice")}{" "}
+          <Link
+            to={`/admin/users/${ownerUser.id}`}
+            className="font-medium hover:underline"
+          >
+            {ownerUser.name}
+            {ownerUser.email ? ` (${ownerUser.email})` : ""}
+          </Link>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-6">
         <Button
           variant="outline"
@@ -620,27 +648,177 @@ export function AdminUserDetailPage() {
         </Card>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>{t("admin.userDetail.orgMemberships")}</CardTitle>
-          <CardDescription>
-            {t("admin.userDetail.orgMembershipsDesc", {
-              count: memberships.length,
-            })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            bare
-            columns={membershipColumns}
-            data={memberships}
-            emptyState={{
-              title: t("admin.userDetail.noOrgs"),
-              description: t("admin.userDetail.noOrgsDesc"),
-            }}
-          />
-        </CardContent>
-      </Card>
+      {organization && (
+        <div className="grid gap-6 md:grid-cols-2 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{organization.name}</CardTitle>
+              <CardDescription className="font-mono">
+                @{organization.id}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                {organization.subscriptionStatus ? (
+                  <Badge
+                    variant={
+                      organization.subscriptionStatus === "active"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {organization.subscriptionStatus}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">
+                    {t("admin.organizationDetail.trial")}
+                  </Badge>
+                )}
+                {organization.creditsExhausted && (
+                  <Badge variant="destructive">
+                    {t("admin.organizationDetail.creditsExhausted")}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.orgId")}
+                  </div>
+                  <div className="font-mono text-xs">{organization.id}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.common.created")}
+                  </div>
+                  <div>{formatDate(organization.createdAt)}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.computeCredits")}
+                  </div>
+                  <div>{organization.computeCredits.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.overageLimit")}
+                  </div>
+                  <div>
+                    {organization.overageLimit
+                      ? organization.overageLimit.toLocaleString()
+                      : t("admin.organizationDetail.unlimited")}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("admin.organizationDetail.billingInfo")}</CardTitle>
+              <CardDescription>
+                {t("admin.organizationDetail.billingInfoDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.stripeCustomerId")}
+                  </div>
+                  <div className="font-mono text-xs">
+                    {organization.stripeCustomerId || "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.subscriptionId")}
+                  </div>
+                  <div className="font-mono text-xs">
+                    {organization.stripeSubscriptionId || "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.periodStart")}
+                  </div>
+                  <div>
+                    {organization.currentPeriodStart
+                      ? formatDate(organization.currentPeriodStart)
+                      : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    {t("admin.organizationDetail.periodEnd")}
+                  </div>
+                  <div>
+                    {organization.currentPeriodEnd
+                      ? formatDate(organization.currentPeriodEnd)
+                      : "-"}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {membershipRole === "owner" && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>{t("admin.userDetail.subAccounts")}</CardTitle>
+            <CardDescription>
+              {t("admin.userDetail.subAccountsDesc", {
+                count: subAccounts.length,
+              })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              bare
+              columns={subAccountColumns}
+              data={subAccounts}
+              emptyState={{
+                title: t("admin.userDetail.noSubAccounts"),
+                description: t("admin.userDetail.noSubAccountsDesc"),
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {entityCounts && organization && (
+        <div className="grid grid-cols-2 gap-4 mt-6 max-w-xl">
+          <Link
+            to={`/admin/workflows?organizationId=${organization.id}`}
+            className="block"
+          >
+            <Card className="hover:bg-muted/50 transition-colors">
+              <CardHeader className="pb-2">
+                <CardDescription>{t("sidebar.workflows")}</CardDescription>
+                <CardTitle className="text-2xl">
+                  {entityCounts.workflowCount}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </Link>
+          <Link
+            to={`/admin/executions?organizationId=${organization.id}`}
+            className="block"
+          >
+            <Card className="hover:bg-muted/50 transition-colors">
+              <CardHeader className="pb-2">
+                <CardDescription>{t("sidebar.executions")}</CardDescription>
+                <CardTitle className="text-2xl">
+                  {entityCounts.executionCount}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </Link>
+        </div>
+      )}
 
       {(() => {
         if (isBillingLoading) {

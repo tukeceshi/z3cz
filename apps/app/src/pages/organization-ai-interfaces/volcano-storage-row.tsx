@@ -2,17 +2,19 @@ import {
   VOLCANO_TOS_REGIONS,
   defaultVolcanoTosRegionForLocale,
   volcanoTosPricingForRegion,
+  type VolcanoTosServiceStatus,
   type VolcanoTosStorageSnapshot,
 } from "@dafthunk/types";
 import HardDrive from "lucide-react/icons/hard-drive";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { updateVolcanoTosStorage } from "@/services/organization-ai-interface-service";
+import { updateVolcanoTosStorage, ensureVolcanoTosCors, VOLCANO_TOS_NOT_OPENED_CODE } from "@/services/organization-ai-interface-service";
+import { ApiRequestError } from "@/services/utils";
 
 import { VolcanoStorageDisableDialog } from "./volcano-storage-disable-dialog";
 import { VolcanoStorageSetupDialog } from "./volcano-storage-setup-dialog";
@@ -36,6 +38,8 @@ interface VolcanoStorageRowProps {
 
   readonly snapshot: VolcanoTosStorageSnapshot;
 
+  readonly tosServiceStatus?: VolcanoTosServiceStatus | null;
+
   readonly onUpdated: () => Promise<void>;
 
   readonly onRefreshSnapshot: () => Promise<void>;
@@ -51,6 +55,8 @@ export function VolcanoStorageRow({
   interfaceId,
 
   snapshot,
+
+  tosServiceStatus = null,
 
   onUpdated,
 
@@ -91,9 +97,22 @@ export function VolcanoStorageRow({
   const hasUsageMeters =
     snapshot.storageUsage !== null || snapshot.trafficUsage !== null;
 
+  const storageEnableBlocked =
+    tosServiceStatus === "not_opened" || tosServiceStatus === "auth_error";
 
+  useEffect(() => {
+    if (!snapshot.configured || !snapshot.enabled) {
+      return;
+    }
+    void ensureVolcanoTosCors(organizationId, interfaceId).catch(() => {
+      // Health banner and storage settings surface failures.
+    });
+  }, [organizationId, interfaceId, snapshot.configured, snapshot.enabled]);
 
   const handleToggle = (checked: boolean) => {
+    if (storageEnableBlocked && checked) {
+      return;
+    }
 
     if (checked) {
 
@@ -208,6 +227,20 @@ export function VolcanoStorageRow({
       setSetupOpen(false);
 
     } catch (error) {
+
+      if (
+
+        error instanceof ApiRequestError &&
+
+        error.code === VOLCANO_TOS_NOT_OPENED_CODE
+
+      ) {
+
+        toast.error("pages.aiInterfaces.tosStorage.notOpened.configureBlocked");
+
+        return;
+
+      }
 
       toast.errorRaw(
 

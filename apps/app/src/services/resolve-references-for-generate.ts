@@ -11,7 +11,7 @@ import {
   isObjectReference,
 } from "@dafthunk/types";
 
-import { readLocalMediaAsInline } from "./local-media-staging";
+import { readGenerativeStagingAsInline } from "./generative-media-staging";
 import { makeRequest } from "./utils";
 
 export interface ResolvedReferencesForGenerate {
@@ -45,7 +45,7 @@ export async function resolveReferencesForGenerate(params: {
     }
 
     if (isLocalMediaReference(ref)) {
-      const inline = await readLocalMediaAsInline(ref.mediaId);
+      const inline = await readGenerativeStagingAsInline(ref.mediaId);
       if (!inline) {
         throw new Error("Local reference image is missing from this browser");
       }

@@ -72,6 +72,42 @@ export interface AdminUser {
 export interface AdminUserDetail extends AdminUser {
   githubId: string | null;
   googleId: string | null;
+  organizationId: string;
+}
+
+export interface AdminUserOrganizationDetail {
+  id: string;
+  name: string;
+  computeCredits: number;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  subscriptionStatus: string | null;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  overageLimit: number | null;
+  creditsExhausted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AdminUserSubAccount {
+  userId: string;
+  userName: string;
+  userEmail: string | null;
+  userAvatarUrl: string | null;
+  role: string;
+  joinedAt: Date;
+}
+
+export interface AdminUserEntityCounts {
+  workflowCount: number;
+  executionCount: number;
+}
+
+export interface AdminUserOwnerSummary {
+  id: string;
+  name: string;
+  email: string | null;
 }
 
 export interface AdminUserFunnelStage {
@@ -367,16 +403,29 @@ export const useAdminUsers = (page = 1, limit = 20, search?: string) => {
 export const useAdminUserDetail = (userId: string | undefined) => {
   const { data, error, isLoading, mutate } = useSWR<{
     user: AdminUserDetail;
-    memberships: AdminUserMembership[];
+    membershipRole: string;
+    organization: AdminUserOrganizationDetail | null;
+    subAccounts: AdminUserSubAccount[];
+    ownerUser: AdminUserOwnerSummary | null;
+    entityCounts: AdminUserEntityCounts;
   }>(userId ? `${ADMIN_API_ENDPOINT}/users/${userId}` : null, async () =>
-    makeRequest<{ user: AdminUserDetail; memberships: AdminUserMembership[] }>(
-      `${ADMIN_API_ENDPOINT}/users/${userId}`
-    )
+    makeRequest<{
+      user: AdminUserDetail;
+      membershipRole: string;
+      organization: AdminUserOrganizationDetail | null;
+      subAccounts: AdminUserSubAccount[];
+      ownerUser: AdminUserOwnerSummary | null;
+      entityCounts: AdminUserEntityCounts;
+    }>(`${ADMIN_API_ENDPOINT}/users/${userId}`)
   );
 
   return {
     user: data?.user || null,
-    memberships: data?.memberships || [],
+    membershipRole: data?.membershipRole ?? "owner",
+    organization: data?.organization ?? null,
+    subAccounts: data?.subAccounts ?? [],
+    ownerUser: data?.ownerUser ?? null,
+    entityCounts: data?.entityCounts ?? null,
     userError: error || null,
     isUserLoading: isLoading,
     mutateUser: mutate,

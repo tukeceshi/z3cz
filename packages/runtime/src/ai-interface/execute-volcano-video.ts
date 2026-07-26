@@ -59,6 +59,7 @@ export function createVolcanoVideoPollContinuation(params: {
   organizationId: string;
   pollIntervalMs?: number;
   timeoutMinutes?: number;
+  generationJobId?: string;
   now?: Date;
 }) {
   const now = params.now ?? new Date();
@@ -81,6 +82,9 @@ export function createVolcanoVideoPollContinuation(params: {
     metadata: {
       interfaceId: params.interfaceId,
       organizationId: params.organizationId,
+      ...(params.generationJobId
+        ? { generationJobId: params.generationJobId }
+        : {}),
     },
   };
 }

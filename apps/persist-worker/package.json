@@ -1,0 +1,15 @@
+{
+  "name": "@dafthunk/persist-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node worker.mjs"
+  },
+  "dependencies": {
+    "@dafthunk/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

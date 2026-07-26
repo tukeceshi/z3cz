@@ -1,10 +1,14 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import type { ReactFlowInstance, Node as ReactFlowNode } from "@xyflow/react";
 
 import {
   AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_CARD_WIDTH_PX,
 } from "./ai-image-node-utils";
+import {
+  AI_AUDIO_CARD_HEIGHT_PX,
+  AI_AUDIO_CARD_WIDTH_PX,
+} from "./ai-audio-node-utils";
 import {
   AI_VIDEO_CARD_HEIGHT_PX,
   AI_VIDEO_CARD_WIDTH_PX,
@@ -96,6 +100,12 @@ export function resolveWorkflowNodeDimensions(
       height: AI_VIDEO_CARD_HEIGHT_PX,
     };
   }
+  if (nodeType === AI_AUDIO_NODE_TYPE) {
+    return {
+      width: AI_AUDIO_CARD_WIDTH_PX,
+      height: AI_AUDIO_CARD_HEIGHT_PX,
+    };
+  }
   const isOutputNode = nodeType?.startsWith("output-") ?? false;
   return { width: 200, height: isOutputNode ? 250 : 100 };
 }
@@ -121,6 +131,12 @@ export function resolveWorkflowNodeCardSizeForPlacement(
     return {
       width: AI_VIDEO_CARD_WIDTH_PX,
       height: AI_VIDEO_CARD_HEIGHT_PX,
+    };
+  }
+  if (nodeType === AI_AUDIO_NODE_TYPE) {
+    return {
+      width: AI_AUDIO_CARD_WIDTH_PX,
+      height: AI_AUDIO_CARD_HEIGHT_PX,
     };
   }
   if (node?.measured?.width && node?.measured?.height) {

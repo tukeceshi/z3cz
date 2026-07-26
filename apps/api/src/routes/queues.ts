@@ -25,6 +25,7 @@ import {
 } from "../db";
 import { getAuthContext } from "../utils/auth-context";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 
 // Extend the ApiContext with our custom variable
 type ExtendedApiContext = ApiContext & {
@@ -37,6 +38,7 @@ const queueRoutes = new Hono<ExtendedApiContext>();
 
 // Apply JWT middleware to all queue routes
 queueRoutes.use("*", jwtMiddleware);
+queueRoutes.use("*", requireOrganizationOwner());
 queueRoutes.use("*", createRequireFeatureMiddleware("queues"));
 
 /**

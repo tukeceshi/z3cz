@@ -7,6 +7,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -16,6 +17,12 @@ import { useTelegramBot } from "@/services/bot-service";
 import { BotTelegramEditDialog } from "./bot-telegram-edit-dialog";
 
 export function BotTelegramDetailPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.bots");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <BotTelegramDetailPageContent />;
+}
+
+function BotTelegramDetailPageContent() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

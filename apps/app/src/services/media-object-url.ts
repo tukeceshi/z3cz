@@ -8,7 +8,7 @@ import {
 
 import { buildApiUrl } from "@/config/api";
 
-import { getCachedLocalMediaPreviewUrl } from "./local-media-staging";
+import { getGenerativeStagingPreviewUrl } from "./generative-media-staging";
 
 export function createCloudObjectUrl(
   ref: ObjectReference,
@@ -32,7 +32,7 @@ export function resolveMediaFetchUrl(
     return media.url;
   }
   if (isLocalMediaReference(media)) {
-    return getCachedLocalMediaPreviewUrl(media.mediaId);
+    return getGenerativeStagingPreviewUrl(media.mediaId);
   }
   if (isObjectReference(media)) {
     return createCloudObjectUrl(media, organizationId);

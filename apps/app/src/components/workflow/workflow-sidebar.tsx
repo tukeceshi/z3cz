@@ -2,6 +2,7 @@ import type {
   Edge as ReactFlowEdge,
   Node as ReactFlowNode,
 } from "@xyflow/react";
+import Bot from "lucide-react/icons/bot";
 import Users from "lucide-react/icons/users";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -20,9 +21,12 @@ function AgentPlaceholder() {
   const { t } = useTranslation();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-      <h2 className="text-base font-semibold text-foreground">
-        {t("workflow.sidebar.agentTitle")}
-      </h2>
+      <div className="inline-flex items-center gap-2">
+        <Bot className="h-5 w-5 shrink-0 text-blue-500" />
+        <h2 className="text-base font-semibold text-foreground">
+          {t("workflow.sidebar.agentTitle")}
+        </h2>
+      </div>
       <p className="text-sm text-muted-foreground">
         {t("workflow.sidebar.agentDescription")}
       </p>

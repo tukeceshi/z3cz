@@ -3,5 +3,6 @@ packages:
   - apps/api
   - apps/www
   - apps/smtp-gateway
+  - apps/persist-worker
   # Include all packages in the packages directory
   - packages/*

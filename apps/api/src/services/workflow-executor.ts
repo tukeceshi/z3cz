@@ -6,7 +6,7 @@
  */
 
 import type { BlobParameter, RuntimeParams } from "@dafthunk/runtime";
-import type { Node, WorkflowExecution, WorkflowRuntime, WorkflowBillingMode } from "@dafthunk/types";
+import type { Node, WorkflowExecution, WorkflowRuntime } from "@dafthunk/types";
 import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
 import { createSimulatedEmailMessage } from "../utils/email";
@@ -16,7 +16,6 @@ export interface WorkflowExecutorOptions {
   workflow: {
     id: string;
     name: string;
-    billingMode?: WorkflowBillingMode;
     trigger: string;
     runtime?: WorkflowRuntime;
     nodes: Node[];
@@ -81,7 +80,6 @@ export class WorkflowExecutor {
       workflow: {
         id: workflow.id,
         name: workflow.name,
-        billingMode: workflow.billingMode,
         trigger: workflow.trigger,
         runtime: workflow.runtime,
         nodes: workflow.nodes,

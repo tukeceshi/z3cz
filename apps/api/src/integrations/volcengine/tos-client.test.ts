@@ -1,41 +1,37 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { buildBucketObjectRequestPath } from "./tos-client";
-import { signTosRequest } from "./tos-sign";
+import { VolcengineTosClient } from "./tos-client";
+import { TosRequestError } from "./tos-errors";
 
-describe("buildBucketObjectRequestPath", () => {
-  it("uses virtual-hosted style instead of path-style bucket prefix", () => {
-    const request = buildBucketObjectRequestPath(
-      "cn-guangzhou",
-      "z3cz-com-abc",
-      "z3cz/workflows/wf_test/ai-image/obj-1.png"
-    );
-
-    expect(request.endpoint).toBe(
-      "https://z3cz-com-abc.tos-cn-guangzhou.volces.com"
-    );
-    expect(request.path).toBe(
-      "/z3cz/workflows/wf_test/ai-image/obj-1.png"
-    );
+describe("VolcengineTosClient listBuckets errors", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
-});
 
-describe("signTosRequest virtual host object upload", () => {
-  it("signs against bucket host without bucket in canonical path", async () => {
-    const signed = await signTosRequest({
-      method: "PUT",
-      endpoint: "https://my-bucket.tos-cn-beijing.volces.com",
-      path: "/z3cz/workflows/wf_1/ai-image/object.png",
-      accessKeyId: "AKTESTKEY",
-      secretAccessKey: "SKTESTSECRET",
-      region: "cn-beijing",
-      contentType: "image/png",
+  it("throws TosRequestError with AccountDisable code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            Code: "AccountDisable",
+            Message: "The account does not open tos service.",
+          }),
+          { status: 403 }
+        )
+      )
+    );
+
+    const client = VolcengineTosClient.forRegion({
+      accessKeyId: "AKTEST",
+      secretAccessKey: "secret",
+      region: "cn-guangzhou",
     });
 
-    expect(signed.url).toBe(
-      "https://my-bucket.tos-cn-beijing.volces.com/z3cz/workflows/wf_1/ai-image/object.png"
-    );
-    expect(signed.headers.Host).toBe("my-bucket.tos-cn-beijing.volces.com");
-    expect(signed.headers.Authorization).toMatch(/^TOS4-HMAC-SHA256 Credential=/);
+    await expect(client.listBuckets()).rejects.toMatchObject({
+      name: "TosRequestError",
+      httpStatus: 403,
+      tosCode: "AccountDisable",
+    } satisfies Partial<TosRequestError>);
   });
 });

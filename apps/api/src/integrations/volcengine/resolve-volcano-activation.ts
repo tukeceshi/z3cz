@@ -1,61 +1,84 @@
 import type {
-  ModelActivationStatus,
-  VolcanoModelActivationCacheEntry,
+  AiModelCatalogEntry,
+  VolcanoActivationProbeResult,
   VolcanoModelPackageSnapshot,
 } from "@dafthunk/types";
-import { volcanoPackageProvisionModeForCanonicalId } from "@dafthunk/types";
+import {
+  isVolcanoModelActivationBlocking,
+  isVolcanoProbeActivationBlocking,
+  resolveVolcanoEffectiveActivationStatus,
+} from "@dafthunk/types";
 
-const PROBE_BLOCKING_STATUSES: ReadonlySet<ModelActivationStatus> = new Set([
-  "not_open",
-  "service_not_open",
-]);
+export {
+  isVolcanoModelActivationBlocking,
+  isVolcanoProbeActivationBlocking,
+  resolveVolcanoEffectiveActivationStatus,
+};
 
-export function isVolcanoProbeActivationBlocking(
-  status: ModelActivationStatus
+/**
+ * Wizard credential probe: when billing shows a provisioned package, treat the
+ * model as opened even if inference probe is inconclusive (common after
+ * openManagement without custom endpoints).
+ */
+export function enrichVolcanoProbeResultsWithPackages(params: {
+  results: readonly VolcanoActivationProbeResult[];
+  packageByCanonicalId: ReadonlyMap<string, VolcanoModelPackageSnapshot>;
+}): VolcanoActivationProbeResult[] {
+  return params.results.map((result) => {
+    const snapshot = params.packageByCanonicalId.get(result.canonicalId);
+    if (!snapshot?.provisioned) {
+      return result;
+    }
+    if (result.status === "open" || result.status === "auth_error") {
+      return result;
+    }
+    return {
+      ...result,
+      status: "open",
+    };
+  });
+}
+
+export function hasProvisionedVolcanoPackageModels(
+  packageByCanonicalId: ReadonlyMap<string, VolcanoModelPackageSnapshot>
 ): boolean {
-  return PROBE_BLOCKING_STATUSES.has(status);
+  for (const snapshot of packageByCanonicalId.values()) {
+    if (snapshot.provisioned) {
+      return true;
+    }
+  }
+  return false;
 }
 
-export function resolveVolcanoEffectiveActivationStatus(params: {
-  probe: VolcanoModelActivationCacheEntry | null;
-  packageSnapshot: VolcanoModelPackageSnapshot | null;
-  canonicalId: string;
-}): ModelActivationStatus | null {
-  const probeStatus = params.probe?.status;
-  if (probeStatus === "open") return "open";
-  if (probeStatus && isVolcanoProbeActivationBlocking(probeStatus)) {
-    return probeStatus;
-  }
-  if (
-    probeStatus === "invalid_model_id" ||
-    probeStatus === "auth_error" ||
-    probeStatus === "transient_error"
-  ) {
-    return probeStatus;
-  }
+export function buildVolcanoProbeResultsFromPackages(params: {
+  entries: readonly AiModelCatalogEntry[];
+  packageByCanonicalId: ReadonlyMap<string, VolcanoModelPackageSnapshot>;
+}): VolcanoActivationProbeResult[] {
+  const probedAt = new Date().toISOString();
 
-  const mode = volcanoPackageProvisionModeForCanonicalId(params.canonicalId);
-  if (mode === "none") {
-    return probeStatus ?? null;
-  }
+  return params.entries.map((entry) => {
+    const provisioned =
+      params.packageByCanonicalId.get(entry.canonicalId)?.provisioned ?? false;
 
-  const provisioned = params.packageSnapshot?.provisioned ?? false;
-  if (probeStatus) {
-    return probeStatus;
-  }
-
-  if (mode === "required" && !provisioned) {
-    return "not_open";
-  }
-
-  return "unknown";
+    return {
+      canonicalId: entry.canonicalId,
+      providerModelId: entry.providerModelId,
+      status: provisioned ? "open" : "not_open",
+      errorCode: null,
+      message: null,
+      probedAt,
+    };
+  });
 }
 
-export function isVolcanoModelActivationBlocking(params: {
-  probe: VolcanoModelActivationCacheEntry | null;
-  packageSnapshot: VolcanoModelPackageSnapshot | null;
-  canonicalId: string;
-}): boolean {
-  const effective = resolveVolcanoEffectiveActivationStatus(params);
-  return effective !== null && isVolcanoProbeActivationBlocking(effective);
+/** Wizard probe: collapse inconclusive statuses into open vs not_open. */
+export function normalizeVolcanoWizardProbeResults(
+  results: readonly VolcanoActivationProbeResult[]
+): VolcanoActivationProbeResult[] {
+  return results.map((result) => {
+    if (result.status === "open" || result.status === "auth_error") {
+      return result;
+    }
+    return { ...result, status: "not_open" };
+  });
 }

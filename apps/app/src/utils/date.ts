@@ -1,4 +1,10 @@
+import type { AppLocale } from "@dafthunk/types";
 import { format, formatDistanceToNowStrict } from "date-fns";
+import { enUS, zhCN } from "date-fns/locale";
+
+function getDateFnsLocale(locale?: AppLocale) {
+  return locale === "zh" ? zhCN : enUS;
+}
 
 export function formatDate(date: string | Date): string {
   try {
@@ -8,9 +14,15 @@ export function formatDate(date: string | Date): string {
   }
 }
 
-export function formatRelativeDate(date: string | Date): string {
+export function formatRelativeDate(
+  date: string | Date,
+  locale?: AppLocale
+): string {
   try {
-    return formatDistanceToNowStrict(new Date(date), { addSuffix: true });
+    return formatDistanceToNowStrict(new Date(date), {
+      addSuffix: true,
+      locale: getDateFnsLocale(locale),
+    });
   } catch {
     return String(date);
   }

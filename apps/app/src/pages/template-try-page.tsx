@@ -3,15 +3,32 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
 import { useTemplate } from "@/services/template-service";
 import { createWorkflow } from "@/services/workflow-service";
 
 export function TemplateTryPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canEditWorkflows) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("pages.templateTry.title")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <TemplateTryPageContent />;
+}
+
+function TemplateTryPageContent() {
   const { t } = useTranslation();
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();

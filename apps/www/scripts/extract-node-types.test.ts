@@ -12,7 +12,7 @@ const aiNodesDir = join(
 );
 
 describe("findNodeTypeDeclaration", () => {
-  it.each(["ai-text-node.ts", "ai-image-node.ts", "ai-video-node.ts"])(
+  it.each(["ai-text-node.ts", "ai-image-node.ts", "ai-video-node.ts", "ai-audio-node.ts"])(
     "extracts nodeType from %s",
     (fileName) => {
       const content = readFileSync(join(aiNodesDir, fileName), "utf8");

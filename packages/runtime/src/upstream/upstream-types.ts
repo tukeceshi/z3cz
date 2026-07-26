@@ -29,9 +29,9 @@ export interface UpstreamPollRuntimeContext {
   readonly organizationId: string;
   readonly executionId: string;
   readonly env: import("../node-types").NodeEnv;
-  readonly relayAccountService?: import("../relay-account-service").RelayAccountService;
   readonly aiInterfaceService?: import("../ai-interface-service").AiInterfaceService;
   readonly resolveAiVideoStorage?: import("../ai-image-storage").ResolveAiImageStorage;
+  readonly trackWorkflowGenerationJob?: import("../generation-job-tracker").WorkflowGenerationJobTracker;
   readonly workflowId?: string;
   readonly nodeOutputs: ReadonlyArray<{
     readonly name: string;

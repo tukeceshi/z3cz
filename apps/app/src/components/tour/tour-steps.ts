@@ -14,7 +14,7 @@ export function getTourSteps(t: TranslateFn): TourStep[] {
       id: "organization",
       title: t("tour.steps.organization.title"),
       content: t("tour.steps.organization.content"),
-      targetSelector: '[data-tour="organization-switcher"]',
+      targetSelector: '[data-tour="dashboard-nav"]',
       spotlightPadding: 2,
     },
     {
@@ -22,13 +22,6 @@ export function getTourSteps(t: TranslateFn): TourStep[] {
       title: t("tour.steps.workflows.title"),
       content: t("tour.steps.workflows.content"),
       targetSelector: '[data-tour="workflows-nav-group"]',
-      spotlightPadding: 4,
-    },
-    {
-      id: "resources",
-      title: t("tour.steps.resources.title"),
-      content: t("tour.steps.resources.content"),
-      targetSelector: '[data-tour="resources-nav-group"]',
       spotlightPadding: 4,
     },
     {

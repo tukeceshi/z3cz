@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Spinner } from "@/components/ui/spinner";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useEmail } from "@/services/email-service";
 import {
@@ -26,6 +27,12 @@ import {
 import { cn } from "@/utils/utils";
 
 export function EmailInboxPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.emails");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <EmailInboxPageContent />;
+}
+
+function EmailInboxPageContent() {
   const { t } = useTranslation();
   const { emailId } = useParams<{ emailId: string }>();
   const { organization } = useAuth();

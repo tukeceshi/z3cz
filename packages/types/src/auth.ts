@@ -1,9 +1,13 @@
-export type OrganizationRoleType = "member" | "admin" | "owner";
+import type { SubAccountPermissions } from "./sub-account-permissions";
+
+export type OrganizationRoleType = "member" | "owner";
 
 export interface OrganizationInfo {
   id: string;
   name: string;
   role: OrganizationRoleType;
+  /** Present for sub-accounts (member role). Owners have implicit full access. */
+  permissions?: SubAccountPermissions;
 }
 
 // Full user data as stored in database (includes provider info)
@@ -55,6 +59,7 @@ export interface PasswordLoginRequest {
 export interface PasswordRegisterRequest {
   email: string;
   password: string;
+  verificationCode?: string;
 }
 
 export interface AuthErrorResponse {

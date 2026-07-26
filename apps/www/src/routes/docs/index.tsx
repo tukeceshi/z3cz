@@ -5,9 +5,9 @@ import { DocsLayout } from "../../components/docs/docs-layout";
 const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
-  const title = "Documentation - Dafthunk";
+  const title = "Documentation - z3cz.com";
   const description =
-    "Explore the Dafthunk documentation: core concepts, nodes reference, REST API, and developers guide for building serverless visual workflows on Cloudflare.";
+    "Explore the z3cz.com documentation: core concepts, nodes reference, REST API, and developers guide for building serverless visual workflows on Cloudflare.";
   const url = `${websiteUrl}/docs`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -19,7 +19,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -49,7 +49,7 @@ const cards = [
     href: "/docs/concepts",
     icon: BookOpen,
     title: "Core Concepts",
-    description: "Understand the fundamental building blocks of Dafthunk.",
+    description: "Understand the fundamental building blocks of z3cz.com.",
     bullets: [
       "Workflows: blueprints for your automation",
       "Nodes: individual tasks and operations",
@@ -75,7 +75,7 @@ const cards = [
     href: "/docs/api",
     icon: Code,
     title: "API Reference",
-    description: "Integrate Dafthunk programmatically using our REST API.",
+    description: "Integrate z3cz.com programmatically using our REST API.",
     bullets: [
       "Authentication with API keys",
       "Endpoints for workflow execution",
@@ -88,7 +88,7 @@ const cards = [
     href: "/docs/developers",
     icon: Github,
     title: "Developers Guide",
-    description: "Contribute to Dafthunk or integrate it into your projects.",
+    description: "Contribute to z3cz.com or integrate it into your projects.",
     bullets: [
       "Setting up your local development environment",
       "How to contribute: bug reports, features, PRs",
@@ -108,7 +108,7 @@ export default function DocsIndex() {
       />
       <h1>Documentation</h1>
       <p className="lead">
-        Explore the Dafthunk documentation and learn how to build powerful
+        Explore the z3cz.com documentation and learn how to build powerful
         workflow automations.
       </p>
 
@@ -150,13 +150,13 @@ export default function DocsIndex() {
           Ready to build?
         </h2>
         <p className="text-gray-600 mb-6">
-          Sign in to Dafthunk and start composing your first workflow.
+          Sign in to z3cz.com and start composing your first workflow.
         </p>
         <a
           href={import.meta.env.VITE_APP_URL}
           className="inline-block text-base bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
         >
-          Open Dafthunk
+          Open z3cz.com
         </a>
       </div>
     </DocsLayout>

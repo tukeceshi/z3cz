@@ -1,6 +1,6 @@
 import type { GetBillingResponse } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
-import { desc, eq, like, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -12,8 +12,10 @@ import {
   organizations,
   resolveOrganizationPlan,
   users,
+  workflows,
 } from "../../db";
 import { sendWelcomeEmail } from "../../services/welcome-email";
+import { fetchAdminOrganizationExecutionCount } from "../../utils/admin-execution-count";
 import { getOrganizationComputeUsage } from "../../utils/credits";
 
 type OnboardingStage =
@@ -23,10 +25,6 @@ type OnboardingStage =
   | "workflow_executed"
   | "workflow_executed_ok";
 
-// Derive the furthest reached stage from the four stamp columns. Order is
-// canonical: a user can have workflow_executed_ok stamped without
-// workflow_executed (e.g. legacy data), but for display we always pick the
-// latest stage they qualify for in canonical order.
 function deriveFurthestStage(stamps: {
   tourCompleted: Date | null;
   workflowCreated: Date | null;
@@ -40,12 +38,32 @@ function deriveFurthestStage(stamps: {
   return "signed_up";
 }
 
+const ownerMembershipJoin = and(
+  eq(memberships.userId, users.id),
+  eq(memberships.organizationId, users.organizationId),
+  eq(memberships.role, "owner")
+);
+
 const adminUsersRoutes = new Hono<ApiContext>();
+
+async function resolveMatchingOrganizationIds(
+  db: ReturnType<typeof createDatabase>,
+  search: string
+): Promise<string[]> {
+  const pattern = `%${search}%`;
+  const rows = await db
+    .selectDistinct({ organizationId: users.organizationId })
+    .from(users)
+    .where(or(like(users.name, pattern), like(users.email, pattern)));
+
+  return rows.map((row) => row.organizationId);
+}
 
 /**
  * GET /admin/users
  *
- * List all users with pagination and optional search
+ * List primary (owner) accounts. Search may match sub-accounts but returns
+ * their owning primary account.
  */
 adminUsersRoutes.get(
   "/",
@@ -63,19 +81,33 @@ adminUsersRoutes.get(
     const offset = (page - 1) * limit;
 
     try {
-      // Build where clause for search
-      const whereClause = search
-        ? or(like(users.name, `%${search}%`), like(users.email, `%${search}%`))
+      const trimmedSearch = search?.trim();
+      const matchingOrgIds = trimmedSearch
+        ? await resolveMatchingOrganizationIds(db, trimmedSearch)
+        : null;
+
+      if (trimmedSearch && matchingOrgIds && matchingOrgIds.length === 0) {
+        return c.json({
+          users: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        });
+      }
+
+      const ownerFilter = matchingOrgIds
+        ? inArray(users.organizationId, matchingOrgIds)
         : undefined;
 
-      // Get total count
       const [countResult] = await db
         .select({ count: sql<number>`COUNT(*)` })
         .from(users)
-        .where(whereClause);
+        .innerJoin(memberships, ownerMembershipJoin)
+        .where(ownerFilter);
 
-      // Get paginated users with org billing info to derive plan. Onboarding
-      // stage stamps live on the users row itself, so no workflow JOIN needed.
       const rows = await db
         .select({
           id: users.id,
@@ -94,8 +126,9 @@ adminUsersRoutes.get(
           updatedAt: users.updatedAt,
         })
         .from(users)
+        .innerJoin(memberships, ownerMembershipJoin)
         .innerJoin(organizations, eq(users.organizationId, organizations.id))
-        .where(whereClause)
+        .where(ownerFilter)
         .orderBy(desc(users.createdAt))
         .limit(limit)
         .offset(offset);
@@ -130,14 +163,13 @@ adminUsersRoutes.get(
 /**
  * GET /admin/users/:id
  *
- * Get details for a specific user including their organization memberships
+ * User detail with organization billing context and sub-accounts.
  */
 adminUsersRoutes.get("/:id", async (c) => {
   const db = createDatabase(c.env);
   const userId = c.req.param("id");
 
   try {
-    // Get user details with org billing info to derive plan
     const [row] = await db
       .select({
         id: users.id,
@@ -146,6 +178,7 @@ adminUsersRoutes.get("/:id", async (c) => {
         avatarUrl: users.avatarUrl,
         githubId: users.githubId,
         googleId: users.googleId,
+        organizationId: users.organizationId,
         subscriptionStatus: organizations.subscriptionStatus,
         currentPeriodEnd: organizations.currentPeriodEnd,
         role: users.role,
@@ -162,30 +195,103 @@ adminUsersRoutes.get("/:id", async (c) => {
       return c.json({ error: "User not found" }, 404);
     }
 
-    const { subscriptionStatus, currentPeriodEnd, ...userFields } = row;
+    const { subscriptionStatus, currentPeriodEnd, organizationId, ...userFields } =
+      row;
     const user = {
       ...userFields,
+      organizationId,
       plan: resolveOrganizationPlan({ subscriptionStatus, currentPeriodEnd }),
     };
 
-    // Get user's organization memberships
-    const userMemberships = await db
+    const [membership] = await db
+      .select({ role: memberships.role })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, userId),
+          eq(memberships.organizationId, organizationId)
+        )
+      )
+      .limit(1);
+
+    const membershipRole = membership?.role ?? "owner";
+
+    const [organization] = await db
       .select({
-        organizationId: memberships.organizationId,
-        organizationName: organizations.name,
+        id: organizations.id,
+        name: organizations.name,
+        computeCredits: organizations.computeCredits,
+        stripeCustomerId: organizations.stripeCustomerId,
+        stripeSubscriptionId: organizations.stripeSubscriptionId,
+        subscriptionStatus: organizations.subscriptionStatus,
+        currentPeriodStart: organizations.currentPeriodStart,
+        currentPeriodEnd: organizations.currentPeriodEnd,
+        overageLimit: organizations.overageLimit,
+        creditsExhausted: organizations.creditsExhausted,
+        createdAt: organizations.createdAt,
+        updatedAt: organizations.updatedAt,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+
+    const subAccounts = await db
+      .select({
+        userId: users.id,
+        userName: users.name,
+        userEmail: users.email,
+        userAvatarUrl: users.avatarUrl,
         role: memberships.role,
         joinedAt: memberships.createdAt,
       })
       .from(memberships)
-      .innerJoin(
-        organizations,
-        eq(memberships.organizationId, organizations.id)
-      )
-      .where(eq(memberships.userId, userId));
+      .innerJoin(users, eq(memberships.userId, users.id))
+      .where(
+        and(
+          eq(memberships.organizationId, organizationId),
+          eq(memberships.role, "member")
+        )
+      );
+
+    let ownerUser: {
+      id: string;
+      name: string;
+      email: string | null;
+    } | null = null;
+
+    if (membershipRole === "member") {
+      const [owner] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        })
+        .from(users)
+        .innerJoin(memberships, ownerMembershipJoin)
+        .where(eq(users.organizationId, organizationId))
+        .limit(1);
+      ownerUser = owner ?? null;
+    }
+
+    const [workflowCountResult] = await db
+      .select({ count: count() })
+      .from(workflows)
+      .where(eq(workflows.organizationId, organizationId));
+
+    const executionCount = await fetchAdminOrganizationExecutionCount(
+      c.env,
+      organizationId
+    );
 
     return c.json({
       user,
-      memberships: userMemberships,
+      membershipRole,
+      organization: organization ?? null,
+      subAccounts,
+      ownerUser,
+      entityCounts: {
+        workflowCount: workflowCountResult?.count ?? 0,
+        executionCount,
+      },
     });
   } catch (error) {
     console.error("Error fetching admin user detail:", error);
@@ -193,13 +299,6 @@ adminUsersRoutes.get("/:id", async (c) => {
   }
 });
 
-/**
- * GET /admin/users/:id/billing
- *
- * Get billing info (including KV-stored compute usage) for the user's primary
- * organization. Mirrors the shape of the public `GET /billing` endpoint so the
- * admin UI can reuse the same usage card.
- */
 adminUsersRoutes.get("/:id/billing", async (c) => {
   const db = createDatabase(c.env);
   const userId = c.req.param("id");
@@ -247,13 +346,6 @@ adminUsersRoutes.get("/:id/billing", async (c) => {
   return c.json(response);
 });
 
-/**
- * POST /admin/users/:id/welcome-email
- *
- * Resend the welcome email to a user. Always creates a new support thread so
- * the admin sees the outbound message in the inbox view (matching the OAuth
- * signup flow). Surfaces a structured error if the user has no email on file.
- */
 adminUsersRoutes.post("/:id/welcome-email", async (c) => {
   const db = createDatabase(c.env);
   const userId = c.req.param("id");

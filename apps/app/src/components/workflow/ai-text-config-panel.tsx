@@ -31,9 +31,9 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 import {
   generateAiText,
   resolveOrgTextModel,
-  useOrgCloudStorageStatus,
   useOrgTextModels,
 } from "@/services/platform-ai-model-service";
+import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
@@ -66,6 +66,9 @@ import {
   withAiTextGeneratedResult,
 } from "./ai-text-node-utils";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import { formatGenerativeApiError, extractGenerativeApiErrorMessage } from "./format-generative-api-error";
+import { prepareGenerativeCardError } from "./prepare-generative-card-error";
+import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
   GenerativePickNodeDialog,
@@ -100,7 +103,7 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
   const { uploadBinaryData, createObjectUrl, getObjectMetadata } =
     useObjectService();
   const orgId = organization?.id;
-  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   const resolveMediaPreviewUrl = useCallback(
     (media: MediaReference) =>
@@ -637,7 +640,10 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
-      metadata: withAiTextGeneratingFlag(current.metadata, true),
+      metadata: withGenerativeCardGenerateError(
+        withAiTextGeneratingFlag(current.metadata, true),
+        null
+      ),
     }));
     try {
       const response: GenerateAiTextResponse = await generateAiText(orgId, {
@@ -662,17 +668,27 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
         return {
           ...withResult,
           inputs,
-          metadata: withAiTextGeneratingFlag(withResult.metadata, false),
+          metadata: withGenerativeCardGenerateError(
+            withAiTextGeneratingFlag(withResult.metadata, false),
+            null
+          ),
         };
       });
 
       toast.success("workflow.aiTextPanel.generated");
     } catch (error) {
-      if (error instanceof Error) {
-        toast.errorRaw(error.message);
-      } else {
-        toast.error("workflow.aiTextPanel.generateFailed");
-      }
+      const raw = error instanceof Error ? error.message : String(error);
+      const extracted = extractGenerativeApiErrorMessage(raw);
+      const formatted = extracted.includes("\n")
+        ? extracted
+        : formatGenerativeApiError(raw, t);
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withGenerativeCardGenerateError(
+          withAiTextGeneratingFlag(current.metadata, false),
+          prepareGenerativeCardError(formatted, t)
+        ),
+      }));
+      toast.errorRaw(formatted);
     } finally {
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiTextGeneratingFlag(current.metadata, false),

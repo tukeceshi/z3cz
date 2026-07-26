@@ -1,31 +1,40 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
 
 import { useSidebar } from "@/components/ui/sidebar";
 import {
+  readSidebarBeforeEditor,
+  readSidebarCookie,
   SIDEBAR_BEFORE_EDITOR_KEY,
-  SIDEBAR_RESTORE_ON_MOUNT_KEY,
-  writeSidebarCookie,
+  writeSidebarBeforeEditor,
 } from "@/utils/sidebar-state";
+import { isWorkflowWorkspacePath } from "@/utils/workflow-workspace-path";
 
 /** Collapse org sidebar in the editor and restore the prior state on leave. */
 export function WorkflowEditorSidebarEffect() {
   const { open, setOpen } = useSidebar();
-  const initialOpenRef = useRef(open);
 
   useLayoutEffect(() => {
-    const previousOpen = initialOpenRef.current;
-    sessionStorage.setItem(SIDEBAR_BEFORE_EDITOR_KEY, String(previousOpen));
-    if (previousOpen) {
+    if (readSidebarBeforeEditor() === undefined) {
+      const priorOpen = readSidebarCookie() ?? open;
+      writeSidebarBeforeEditor(priorOpen);
+    }
+
+    if (open) {
       setOpen(false, { persist: false });
     }
 
     return () => {
-      const saved = sessionStorage.getItem(SIDEBAR_BEFORE_EDITOR_KEY);
-      sessionStorage.removeItem(SIDEBAR_BEFORE_EDITOR_KEY);
-      if (saved !== null) {
-        sessionStorage.setItem(SIDEBAR_RESTORE_ON_MOUNT_KEY, saved);
-        writeSidebarCookie(saved === "true");
+      if (isWorkflowWorkspacePath(window.location.pathname)) {
+        return;
       }
+
+      const saved = readSidebarBeforeEditor();
+      sessionStorage.removeItem(SIDEBAR_BEFORE_EDITOR_KEY);
+      if (saved === undefined) {
+        return;
+      }
+
+      setOpen(saved, { persist: true });
     };
   }, [setOpen]);
 

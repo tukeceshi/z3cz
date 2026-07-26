@@ -8,6 +8,7 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { PropertyField } from "@/components/workflow/fields/property-field";
 import { registry } from "@/components/workflow/widgets";
 import { convertValueByType } from "@/components/workflow/workflow-context";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useObjectService } from "@/services/object-service";
@@ -22,6 +24,21 @@ import { executeNode } from "@/services/playground-service";
 import { useNodeTypes } from "@/services/type-service";
 
 export function PlaygroundExecutePage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessModelCalls) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.playground")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <PlaygroundExecutePageContent />;
+}
+
+function PlaygroundExecutePageContent() {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id || "";

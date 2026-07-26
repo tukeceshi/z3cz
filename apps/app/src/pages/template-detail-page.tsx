@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useTemplate } from "@/services/template-service";
@@ -24,6 +26,22 @@ import {
 
 export function TemplateDetailPage() {
   const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canViewWorkflows) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.templates")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <TemplateDetailPageContent />;
+}
+
+function TemplateDetailPageContent() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
@@ -112,14 +130,16 @@ export function TemplateDetailPage() {
             {template.description}
           </p>
         </div>
-        <Button onClick={handleImport} disabled={isImporting}>
-          {isImporting ? (
-            <Spinner className="h-4 w-4 mr-2" />
-          ) : (
-            <Import className="h-4 w-4 mr-2" />
-          )}
-          {t("pages.templateDetail.createWorkflow")}
-        </Button>
+        {perms.canEditWorkflows && (
+          <Button onClick={handleImport} disabled={isImporting}>
+            {isImporting ? (
+              <Spinner className="h-4 w-4 mr-2" />
+            ) : (
+              <Import className="h-4 w-4 mr-2" />
+            )}
+            {t("pages.templateDetail.createWorkflow")}
+          </Button>
+        )}
       </div>
       <div className="flex-1 min-h-0">
         <ReactFlowProvider>

@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import {
+  formatLocalizedGenerativeNodeDisplayName,
+  resolveGenerativeNodeDisplayName,
+} from "./generative-node-naming";
+
+describe("formatLocalizedGenerativeNodeDisplayName", () => {
+  it("replaces stored base name with localized label while keeping suffix", () => {
+    expect(
+      formatLocalizedGenerativeNodeDisplayName({
+        nodeType: "ai-audio",
+        storedName: "Audio 2",
+        localizedBaseName: "音频",
+      })
+    ).toBe("音频 2");
+  });
+
+  it("returns stored name for non-generative nodes", () => {
+    expect(
+      formatLocalizedGenerativeNodeDisplayName({
+        nodeType: "http-request",
+        storedName: "HTTP Request",
+        localizedBaseName: "请求",
+      })
+    ).toBe("HTTP Request");
+  });
+});
 
 describe("resolveGenerativeNodeDisplayName", () => {
   it("numbers generative nodes by same-type count", () => {

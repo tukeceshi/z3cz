@@ -3,7 +3,6 @@ import type {
   Node as BackendNode,
   ObjectReference,
   Parameter,
-  WorkflowBillingMode,
   WorkflowEditorViewport,
   WorkflowRuntime,
   WorkflowTrigger,
@@ -20,16 +19,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +31,6 @@ import {
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
-import { ExecutionEmailDialog } from "./execution-email-dialog";
 import { HttpRequestConfigDialog } from "./http-request-config-dialog";
 import { UpgradeRequiredDialog } from "./upgrade-required-dialog";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
@@ -50,8 +38,10 @@ import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
 import { WorkflowCanvas } from "./workflow-canvas";
+import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowNodeSelector } from "./workflow-node-selector";
+import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
 import { isValidWorkflowEditorViewport } from "./workflow-viewport-utils";
@@ -159,7 +149,6 @@ export interface WorkflowBuilderProps {
   workflowId: string;
   workflowTrigger?: WorkflowTrigger;
   workflowRuntime?: WorkflowRuntime;
-  workflowBillingMode?: WorkflowBillingMode;
   initialNodes?: ReactFlowNode<WorkflowNodeType>[];
   initialEdges?: ReactFlowEdge<WorkflowEdgeType>[];
   nodeTypes?: NodeType[];
@@ -173,27 +162,18 @@ export interface WorkflowBuilderProps {
   ) => void | (() => void | Promise<void>);
   initialWorkflowExecution?: WorkflowExecution;
   mode?: WorkflowBuilderMode;
-  disabledFeedback?: boolean;
   createObjectUrl: (objectReference: ObjectReference) => string;
   expandedOutputs?: boolean;
   workflowName?: string;
   workflowDescription?: string;
-  onWorkflowUpdate?: (
-    name: string,
-    description?: string,
-    trigger?: WorkflowTrigger,
-    runtime?: WorkflowRuntime,
-    billingMode?: WorkflowBillingMode
-  ) => void;
+  onWorkflowUpdate?: (name: string, description?: string) => void;
+  onPersistRuntime?: (runtime: WorkflowRuntime) => void;
   orgId: string;
   wsExecuteWorkflow?: (options?: {
     parameters?: Record<string, unknown>;
   }) => void;
   showSidebar?: boolean;
   showBackground?: boolean;
-  isEnabled?: boolean;
-  isTogglingEnabled?: boolean;
-  onToggleEnabled?: (checked: boolean) => void;
   fitViewPadding?: number;
   /** After workflow creation: center canvas at 100% zoom on first editor open only. */
   initialViewportOneToOne?: boolean;
@@ -207,7 +187,6 @@ export function WorkflowBuilder({
   workflowId,
   workflowTrigger,
   workflowRuntime,
-  workflowBillingMode = "platform",
   initialNodes = [],
   initialEdges = [],
   nodeTypes = [],
@@ -217,19 +196,16 @@ export function WorkflowBuilder({
   executeWorkflow,
   initialWorkflowExecution,
   mode = "edit",
-  disabledFeedback = false,
   createObjectUrl,
   expandedOutputs = false,
   workflowName,
   workflowDescription,
   onWorkflowUpdate,
+  onPersistRuntime,
   orgId,
   wsExecuteWorkflow,
   showSidebar,
   showBackground = true,
-  isEnabled,
-  isTogglingEnabled,
-  onToggleEnabled,
   fitViewPadding = 0.25,
   initialViewportOneToOne = false,
   savedEditorViewport,
@@ -284,8 +260,6 @@ export function WorkflowBuilder({
     onNodeDragStart,
     onNodeDragStop,
     isDraggingRef,
-    addTriggerNodes,
-    removeTriggerNodes,
   } = useWorkflowState({
     initialNodes,
     initialEdges,
@@ -301,11 +275,12 @@ export function WorkflowBuilder({
   // Execution state
   const execution = useWorkflowExecutionState({
     workflowId,
-    workflowTrigger,
+    workflowRuntime: workflowRuntime ?? "workflow",
     orgId,
     nodes,
     nodeTypes,
     initialWorkflowExecution,
+    onPersistRuntime,
     executeWorkflow,
     wsExecuteWorkflow,
     updateNodeExecution,
@@ -318,7 +293,7 @@ export function WorkflowBuilder({
   const sidebar = useResizableSidebar({ initialVisible: false });
 
   const handleQuickAddAiNode = useCallback(
-    (nodeType: "ai-text" | "ai-image" | "ai-video") => {
+    (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => {
       const template = nodeTypes.find((item) => item.type === nodeType);
       if (!template) {
         appToast.error("workflow.canvas.nodeTypeUnavailable");
@@ -476,49 +451,6 @@ export function WorkflowBuilder({
     return () => window.clearTimeout(readyTimer);
   }, [initialViewportOneToOne]);
 
-  // Check if workflow already contains a trigger node
-  const hasTriggerNode = useMemo(() => {
-    if (!nodeTypes) return false;
-    const triggerTypes = new Set(
-      nodeTypes.filter((t) => t.trigger).map((t) => t.type)
-    );
-    return nodes.some(
-      (n) => n.data.nodeType && triggerTypes.has(n.data.nodeType)
-    );
-  }, [nodes, nodeTypes]);
-
-  // Trigger change: confirmation dialog + node swap
-  const [triggerConfirmOpen, setTriggerConfirmOpen] = useState(false);
-  const pendingTriggerRef = useRef<WorkflowTrigger | null>(null);
-
-  const applyTriggerChange = useCallback(
-    (newTrigger: WorkflowTrigger) => {
-      removeTriggerNodes();
-      addTriggerNodes(newTrigger);
-      onWorkflowUpdate?.(
-        workflowName || "",
-        workflowDescription || undefined,
-        newTrigger,
-        workflowRuntime,
-        workflowBillingMode
-      );
-    },
-    [
-      removeTriggerNodes,
-      addTriggerNodes,
-      onWorkflowUpdate,
-      workflowName,
-      workflowDescription,
-      workflowRuntime,
-      workflowBillingMode,
-    ]
-  );
-
-  const handleTriggerChange = useCallback((newTrigger: WorkflowTrigger) => {
-    pendingTriggerRef.current = newTrigger;
-    setTriggerConfirmOpen(true);
-  }, []);
-
   // Single-node run: send unsaved editor snapshot, write results back to canvas.
   const handleRunNode = useCallback(
     async (nodeId: string) => {
@@ -591,89 +523,94 @@ export function WorkflowBuilder({
         onRunNode={readOnly ? undefined : handleRunNode}
       >
         <div className="w-full h-full min-h-0 flex flex-col">
-          <div className="flex min-h-0 flex-1">
-          <div
-            className="h-full overflow-hidden relative"
-            style={{
-              width: sidebar.isSidebarVisible
-                ? `calc(100% - ${sidebar.sidebarWidth}px)`
-                : "100%",
-            }}
-          >
-            <WorkflowCanvas
-              nodes={nodes}
-              edges={edges}
-              connectionValidationState={connectionValidationState}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onConnectStart={onConnectStart}
-              onConnectEnd={onConnectEnd}
-              onNodeDragStart={onNodeDragStart}
-              onNodeDragStop={onNodeDragStop}
-              isDraggingRef={isDraggingRef}
-              onMoveStart={handleViewportMoveStart}
-              onMoveEnd={handleViewportMoveEnd}
-              onInit={handleReactFlowInit}
-              onAddNode={readOnly ? undefined : handleAddNode}
-              onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
-              onAction={handleActionButtonClick}
-              workflowStatus={execution.workflowStatus}
-              workflowErrorMessage={execution.workflowErrorMessage}
-              onToggleSidebar={
-                sidebarEnabled ? sidebar.toggleSidebar : undefined
-              }
-              isSidebarVisible={
-                sidebarEnabled ? sidebar.isSidebarVisible : false
-              }
-              isValidConnection={isValidConnection}
-              disabled={readOnly}
-              onFitToScreen={handleFitToScreen}
-              onZoomOneToOne={handleZoomOneToOne}
-              selectedNodes={selectedNodes}
-              selectedEdges={selectedEdges}
-              onDeleteSelected={readOnly ? undefined : deleteSelected}
-              onDuplicateSelected={readOnly ? undefined : duplicateSelected}
-              onApplyLayout={readOnly ? undefined : applyLayout}
-              onCopySelected={readOnly ? undefined : copySelected}
-              onCutSelected={readOnly ? undefined : cutSelected}
-              onPasteFromClipboard={readOnly ? undefined : pasteFromClipboard}
-              hasClipboardData={hasClipboardData}
-              showControls={interactive}
-              showBackground={showBackground}
-              fitViewPadding={fitViewPadding}
-              skipInitialFitView={skipInitialFitView}
-              defaultViewport={restoredDefaultViewport}
-              onEditorViewportChange={
-                readOnly || !canPersistViewport
-                  ? undefined
-                  : onEditorViewportChange
-              }
-              suppressViewportPersistEndRef={suppressViewportPersistEndRef}
-              soleSelectedNodeId={soleSelectedNodeId}
-              isViewportMoving={isViewportMoving}
-            />
-          </div>
-
-          {sidebar.isSidebarVisible && (
-            <>
+          <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly}>
+            <div className="flex min-h-0 flex-1">
               <div
-                className={cn(
-                  "w-1 bg-neutral-50 border-l border-border cursor-col-resize",
-                  sidebar.isResizing && "bg-muted"
-                )}
-                onMouseDown={sidebar.handleResizeStart}
-              />
-              <div style={{ width: `${sidebar.sidebarWidth}px` }}>
-                <WorkflowSidebar
+                className="h-full overflow-hidden relative"
+                style={{
+                  width: sidebar.isSidebarVisible
+                    ? `calc(100% - ${sidebar.sidebarWidth}px)`
+                    : "100%",
+                }}
+              >
+                <WorkflowCanvas
+                  nodes={nodes}
+                  edges={edges}
+                  connectionValidationState={connectionValidationState}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onConnect={onConnect}
+                  onConnectStart={onConnectStart}
+                  onConnectEnd={onConnectEnd}
+                  onNodeDragStart={onNodeDragStart}
+                  onNodeDragStop={onNodeDragStop}
+                  isDraggingRef={isDraggingRef}
+                  onMoveStart={handleViewportMoveStart}
+                  onMoveEnd={handleViewportMoveEnd}
+                  onInit={handleReactFlowInit}
+                  onAddNode={readOnly ? undefined : handleAddNode}
+                  onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
+                  onAction={handleActionButtonClick}
+                  workflowStatus={execution.workflowStatus}
+                  workflowErrorMessage={execution.workflowErrorMessage}
+                  onToggleSidebar={
+                    sidebarEnabled ? sidebar.toggleSidebar : undefined
+                  }
+                  isSidebarVisible={
+                    sidebarEnabled ? sidebar.isSidebarVisible : false
+                  }
+                  isValidConnection={isValidConnection}
+                  disabled={readOnly}
+                  onFitToScreen={handleFitToScreen}
+                  onZoomOneToOne={handleZoomOneToOne}
                   selectedNodes={selectedNodes}
                   selectedEdges={selectedEdges}
-                  onEdgeUpdate={readOnly ? undefined : updateEdgeData}
-                  disabledWorkflow={readOnly}
+                  onDeleteSelected={readOnly ? undefined : deleteSelected}
+                  onDuplicateSelected={readOnly ? undefined : duplicateSelected}
+                  onApplyLayout={readOnly ? undefined : applyLayout}
+                  onCopySelected={readOnly ? undefined : copySelected}
+                  onCutSelected={readOnly ? undefined : cutSelected}
+                  onPasteFromClipboard={
+                    readOnly ? undefined : pasteFromClipboard
+                  }
+                  hasClipboardData={hasClipboardData}
+                  showControls={interactive}
+                  showBackground={showBackground}
+                  fitViewPadding={fitViewPadding}
+                  skipInitialFitView={skipInitialFitView}
+                  defaultViewport={restoredDefaultViewport}
+                  onEditorViewportChange={
+                    readOnly || !canPersistViewport
+                      ? undefined
+                      : onEditorViewportChange
+                  }
+                  suppressViewportPersistEndRef={suppressViewportPersistEndRef}
+                  soleSelectedNodeId={soleSelectedNodeId}
+                  isViewportMoving={isViewportMoving}
                 />
               </div>
-            </>
-          )}
+
+              {sidebar.isSidebarVisible && (
+                <>
+                  <div
+                    className={cn(
+                      "w-1 bg-neutral-50 border-l border-border cursor-col-resize",
+                      sidebar.isResizing && "bg-muted"
+                    )}
+                    onMouseDown={sidebar.handleResizeStart}
+                  />
+                  <div style={{ width: `${sidebar.sidebarWidth}px` }}>
+                    <WorkflowSidebar
+                      selectedNodes={selectedNodes}
+                      selectedEdges={selectedEdges}
+                      onEdgeUpdate={readOnly ? undefined : updateEdgeData}
+                      disabledWorkflow={readOnly}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </CloudStorageCanvasProvider>
 
           <WorkflowNodeSelector
             open={readOnly ? false : isNodeSelectorOpen}
@@ -682,52 +619,33 @@ export function WorkflowBuilder({
             templates={nodeTypes}
             workflowName={workflowName}
             workflowDescription={workflowDescription}
-            hasTriggerNode={hasTriggerNode}
+            hasTriggerNode={false}
           />
 
           <WorkflowSettingsDialog
             open={workflowSettingsOpen}
             onOpenChange={onWorkflowSettingsOpenChange ?? (() => {})}
-            workflowId={workflowId}
             workflowName={workflowName}
             workflowDescription={workflowDescription}
-            workflowTrigger={workflowTrigger}
-            workflowRuntime={workflowRuntime}
-            workflowBillingMode={workflowBillingMode}
             onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
             disabledWorkflow={readOnly}
-            disabledFeedback={disabledFeedback}
             workflowStatus={execution.workflowStatus}
             workflowErrorMessage={execution.workflowErrorMessage}
-            executionId={execution.currentExecutionId}
-            isEnabled={isEnabled}
-            isTogglingEnabled={isTogglingEnabled}
-            onToggleEnabled={readOnly ? undefined : onToggleEnabled}
-            onTriggerChange={readOnly ? undefined : handleTriggerChange}
           />
         </div>
-        </div>
 
-        {(workflowTrigger === "http_webhook" ||
-          workflowTrigger === "http_request") && (
-          <HttpRequestConfigDialog
-            isOpen={execution.isHttpRequestConfigDialogVisible}
-            onClose={execution.closeExecutionForm}
-            onSubmit={execution.submitHttpRequestConfig}
-          />
-        )}
+        <WorkflowRunConfigDialog
+          open={execution.isRunConfigDialogVisible}
+          onOpenChange={execution.setRunConfigDialogVisible}
+          initialRuntime={workflowRuntime ?? "workflow"}
+          onConfirm={execution.confirmRunConfig}
+        />
 
-        {workflowTrigger === "email_message" && (
-          <ExecutionEmailDialog
-            isOpen={execution.isEmailFormDialogVisible}
-            onClose={execution.closeExecutionForm}
-            onCancel={() => {
-              execution.closeExecutionForm();
-              execution.executeRef.current = null;
-            }}
-            onSubmit={execution.submitEmailFormData}
-          />
-        )}
+        <HttpRequestConfigDialog
+          isOpen={execution.isHttpRequestConfigDialogVisible}
+          onClose={execution.closeExecutionForm}
+          onSubmit={execution.submitHttpRequestConfig}
+        />
 
         <Dialog
           open={execution.errorDialogOpen}
@@ -754,41 +672,6 @@ export function WorkflowBuilder({
           gatedNodeTypes={execution.upgradeDialogGatedNodeTypes}
           variant={execution.upgradeDialogVariant}
         />
-
-        <AlertDialog
-          open={triggerConfirmOpen}
-          onOpenChange={setTriggerConfirmOpen}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("workflow.triggerConfirm.title")}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("workflow.triggerConfirm.description")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  pendingTriggerRef.current = null;
-                  setTriggerConfirmOpen(false);
-                }}
-              >
-                {t("common.cancel")}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (pendingTriggerRef.current) {
-                    applyTriggerChange(pendingTriggerRef.current);
-                    pendingTriggerRef.current = null;
-                  }
-                  setTriggerConfirmOpen(false);
-                }}
-              >
-                {t("workflow.triggerConfirm.confirm")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </WorkflowProvider>
     </ReactFlowProvider>
   );

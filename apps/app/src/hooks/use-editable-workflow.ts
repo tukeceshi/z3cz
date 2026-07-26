@@ -2,7 +2,6 @@ import type {
   Parameter,
   Edge as WorkflowBackendEdge,
   Node as WorkflowBackendNode,
-  WorkflowBillingMode,
   WorkflowEditorViewport,
   WorkflowExecution,
   WorkflowRuntime,
@@ -132,7 +131,6 @@ export function useEditableWorkflow({
     schemeId: string;
     trigger: string;
     runtime?: WorkflowRuntime;
-    billingMode?: WorkflowBillingMode;
   } | null>(null);
   const [editorViewport, setEditorViewport] = useState<
     WorkflowEditorViewport | null | undefined
@@ -260,7 +258,6 @@ export function useEditableWorkflow({
       schemeId: fallback.schemeId,
       trigger: fallback.trigger || "manual",
       runtime: fallback.runtime as WorkflowRuntime | undefined,
-      billingMode: fallback.billingMode ?? "platform",
     });
     nodesRef.current = reactFlowNodes;
     edgesRef.current = reactFlowEdges;
@@ -326,7 +323,6 @@ export function useEditableWorkflow({
             schemeId: state.schemeId,
             trigger: state.trigger,
             runtime: state.runtime as WorkflowRuntime | undefined,
-            billingMode: state.billingMode ?? "platform",
           });
         }
 
@@ -534,7 +530,6 @@ export function useEditableWorkflow({
       description?: string;
       trigger?: WorkflowTrigger;
       runtime?: WorkflowRuntime;
-      billingMode?: WorkflowBillingMode;
     }) => {
       if (!wsRef.current?.isConnected()) {
         console.warn("WebSocket is not connected, cannot update metadata");
@@ -553,9 +548,6 @@ export function useEditableWorkflow({
           }),
           ...(metadata.trigger !== undefined && { trigger: metadata.trigger }),
           ...(metadata.runtime !== undefined && { runtime: metadata.runtime }),
-          ...(metadata.billingMode !== undefined && {
-            billingMode: metadata.billingMode,
-          }),
         };
       });
     },

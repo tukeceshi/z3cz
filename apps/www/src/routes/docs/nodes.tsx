@@ -4,9 +4,9 @@ const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 const appUrl = import.meta.env.VITE_APP_URL;
 
 export function meta() {
-  const title = "Nodes Reference - Dafthunk Documentation";
+  const title = "Nodes Reference - z3cz.com Documentation";
   const description =
-    "Learn how Dafthunk nodes work: the anatomy of a node, the categories available (AI, text, image, audio, network, data, math), and how to connect them.";
+    "Learn how z3cz.com nodes work: the anatomy of a node, the categories available (AI, text, image, audio, network, data, math), and how to connect them.";
   const url = `${websiteUrl}/docs/nodes`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -18,7 +18,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -58,11 +58,11 @@ export default function DocsNodes() {
       />
       <h1>Nodes Reference</h1>
       <p className="lead">
-        In Dafthunk, Nodes are the fundamental units of any workflow. Each node
+        In z3cz.com, Nodes are the fundamental units of any workflow. Each node
         represents a specific operation, function, or action. By connecting
         these nodes, you visually design the logic and data flow of your
         automated processes. They are the essential components that make visual
-        programming in Dafthunk powerful and intuitive.
+        programming in z3cz.com powerful and intuitive.
       </p>
 
       <h2 id="explore-nodes">Explore Nodes</h2>
@@ -78,7 +78,7 @@ export default function DocsNodes() {
 
       <h2 id="node-anatomy">Anatomy of a Node</h2>
       <p>
-        Each node in Dafthunk, regardless of its specific function, shares a
+        Each node in z3cz.com, regardless of its specific function, shares a
         common structure designed for clarity and ease of use. Understanding
         this anatomy is key to effectively building workflows:
       </p>
@@ -181,7 +181,7 @@ export default function DocsNodes() {
         </li>
         <li>
           <strong>Execution Order:</strong> The connections form a directed
-          graph, which dictates the order in which nodes execute. Dafthunk
+          graph, which dictates the order in which nodes execute. z3cz.com
           processes nodes based on these dependencies.
         </li>
       </ol>

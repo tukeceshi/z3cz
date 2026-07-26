@@ -237,8 +237,6 @@ export interface NodeEnv {
   SEND_EMAIL_FROM?: string;
   HUGGINGFACE_API_KEY?: string;
   REPLICATE_API_TOKEN?: string;
-  NEWAPI_BASE_URL?: string;
-  NEWAPI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
   TAVILY_API_KEY?: string;
   WEB_HOST?: string;
@@ -284,13 +282,6 @@ export interface NodeContext {
   // Callback-based access to sensitive data (improves security and isolation)
   getSecret?: (secretName: string) => Promise<string | undefined>;
   getIntegration: (integrationId: string) => Promise<IntegrationInfo>;
-  /** Resolve a platform relay account (DB-backed with env fallback). */
-  resolveRelayAccount?: (
-    accountId?: string,
-    provider?: import("@dafthunk/types").RelayAccountProvider
-  ) => Promise<
-    import("./relay-account-service").ResolvedRelayAccount | undefined
-  >;
   /** Resolve an organization AI interface (template + credentials). */
   resolveAiInterface?: (params: {
     interfaceId?: string;
@@ -298,6 +289,24 @@ export interface NodeContext {
   }) => Promise<
     import("@dafthunk/types").ResolvedOrgAiInterface | undefined
   >;
+  /** Re-read volcano metadata after ensure to resolve chat `model` field. */
+  resolveTextModelInferenceId?: (
+    params: {
+      readonly interfaceId: string;
+      readonly canonicalId: string;
+    }
+  ) => Promise<string | undefined>;
+  /** Execute a platform text model via the highest-priority enabled channel (single attempt). */
+  executeTextModel?: (params: {
+    readonly canonicalId: string;
+    readonly effectivePrompt: string;
+  }) => Promise<{
+    readonly ok: boolean;
+    readonly text?: string;
+    readonly interfaceId?: string;
+    readonly interfaceName?: string;
+    readonly error?: string;
+  }>;
   /** Resolve a platform text model to interface + provider model id. */
   resolveTextModel?: (
     canonicalId: string
@@ -308,6 +317,20 @@ export interface NodeContext {
       }
     | undefined
   >;
+  listTextModelCandidates?: (
+    canonicalId: string
+  ) => Promise<
+    readonly {
+      readonly interfaceId: string;
+      readonly interfaceName: string;
+      readonly providerModelId: string;
+      readonly channelKind: "aggregate" | "api";
+    }[]
+  >;
+  disableTextModelOnInterface?: (params: {
+    readonly interfaceId: string;
+    readonly canonicalId: string;
+  }) => Promise<boolean>;
   /** Resolve a platform image model to interface + provider model id. */
   resolveImageModel?: (
     canonicalId: string
@@ -330,6 +353,17 @@ export interface NodeContext {
       }
     | undefined
   >;
+  /** Resolve a platform audio model to interface + provider model id. */
+  resolveAudioModel?: (
+    canonicalId: string
+  ) => Promise<
+    | {
+        readonly interfaceId: string;
+        readonly providerModelId: string;
+        readonly parameterRules: import("@dafthunk/types").AudioModelParameterRules;
+      }
+    | undefined
+  >;
   /** Resolve ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution
@@ -338,6 +372,12 @@ export interface NodeContext {
   resolveAiVideoStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution
   >;
+  /** Resolve ephemeral vs cloud storage for AI audio generation. */
+  resolveAiAudioStorage?: () => Promise<
+    import("./ai-image-storage").AiImageStorageResolution
+  >;
+  /** Track cloud generation jobs during workflow execution (server-side persist). */
+  trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
   env: NodeEnv;
   // Multi-step execution primitives (populated for MultiStepNode instances)
   sleep?: (durationMs: number) => Promise<void>;

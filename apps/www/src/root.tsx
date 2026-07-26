@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {
         "@type": "Organization",
         "@id": `${websiteUrl}/#organization`,
-        name: "Dafthunk",
+        name: "z3cz.com",
         url: websiteUrl,
         logo: {
           "@type": "ImageObject",
@@ -51,7 +51,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         "@type": "WebSite",
         "@id": `${websiteUrl}/#website`,
         url: websiteUrl,
-        name: "Dafthunk",
+        name: "z3cz.com",
         description:
           "Open source, serverless visual workflow automation with AI on Cloudflare. MIT licensed.",
         publisher: {
@@ -61,7 +61,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {
         "@type": "SoftwareApplication",
         "@id": `${websiteUrl}/#application`,
-        name: "Dafthunk",
+        name: "z3cz.com",
         applicationCategory: "BusinessApplication",
         applicationSubCategory: "Workflow Automation",
         operatingSystem: "Web",
@@ -166,11 +166,11 @@ export function ErrorBoundary() {
   const status = isRouteError ? error.status : 500;
   const isNotFound = status === 404;
   const title = isNotFound
-    ? "Page not found - Dafthunk"
-    : "Something went wrong - Dafthunk";
+    ? "Page not found - z3cz.com"
+    : "Something went wrong - z3cz.com";
   const description = isNotFound
-    ? "Page not found. Explore Dafthunk: open source, serverless visual workflow automation with AI on Cloudflare. Browse nodes, use cases, and alternatives."
-    : "Unexpected error. Head back to Dafthunk: open source, serverless visual workflow automation with AI on Cloudflare. Browse nodes, use cases, alternatives.";
+    ? "Page not found. Explore z3cz.com: open source, serverless visual workflow automation with AI on Cloudflare. Browse nodes, use cases, and alternatives."
+    : "Unexpected error. Head back to z3cz.com: open source, serverless visual workflow automation with AI on Cloudflare. Browse nodes, use cases, alternatives.";
   const heading = isNotFound ? "Page not found" : "Something went wrong";
   const message = isNotFound
     ? "The page you are looking for doesn't exist or has moved."
@@ -189,7 +189,7 @@ export function ErrorBoundary() {
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:image" content={ogImage} />
-        <meta property="og:site_name" content="Dafthunk" />
+        <meta property="og:site_name" content="z3cz.com" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />

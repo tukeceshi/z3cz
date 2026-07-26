@@ -41,6 +41,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import type { TranslateFn } from "@/i18n";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   createSecret,
@@ -121,6 +122,12 @@ function createColumns(t: TranslateFn): ColumnDef<Secret>[] {
 }
 
 export function SecretsPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.secrets");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <SecretsPageContent />;
+}
+
+function SecretsPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

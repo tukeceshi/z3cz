@@ -5,8 +5,10 @@ import { useNavigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { TagFilterButtons } from "@/components/ui/tag-filter-buttons";
@@ -23,6 +25,21 @@ function isExcluded(nodeType: NodeType): boolean {
 }
 
 export function PlaygroundPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessModelCalls) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.playground")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <PlaygroundPageContent />;
+}
+
+function PlaygroundPageContent() {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id || "";

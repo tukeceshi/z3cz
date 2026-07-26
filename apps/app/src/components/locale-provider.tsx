@@ -34,14 +34,16 @@ interface LocaleContextValue {
   setLocale: (locale: AppLocale) => void;
   t: TranslateFn;
   siteSettings: PublicSiteSettings;
+  isSiteSettingsReady: boolean;
   refreshSiteSettings: () => Promise<void>;
 }
 
 const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
-  siteName: "Dafthunk",
+  siteName: "z3cz.com",
   siteTagline: "Build serverless workflows visually.",
-  defaultLocale: "zh",
   supportEmail: null,
+  newUserTourEnabled: true,
+  homepageMode: "console",
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 
@@ -58,6 +60,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   });
 
   const siteSettings = data ?? DEFAULT_SITE_SETTINGS;
+  const isSiteSettingsReady = data !== undefined;
 
   const [locale, setLocaleState] = useState<AppLocale>(() =>
     resolveInitialLocale(readStoredLocale() ?? detectBrowserLocale())
@@ -79,12 +82,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [locale]);
-
-  useEffect(() => {
-    if (data?.defaultLocale && !readStoredLocale()) {
-      setLocaleState(data.defaultLocale);
-    }
-  }, [data]);
 
   useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
@@ -112,9 +109,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       setLocale,
       t,
       siteSettings,
+      isSiteSettingsReady,
       refreshSiteSettings,
     }),
-    [locale, setLocale, t, siteSettings, refreshSiteSettings]
+    [locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings]
   );
 
   if (!dictionary) {
@@ -135,7 +133,7 @@ export function useLocale() {
 }
 
 export function useTranslation() {
-  const { locale, setLocale, t, siteSettings, refreshSiteSettings } =
+  const { locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings } =
     useLocale();
-  return { locale, setLocale, t, siteSettings, refreshSiteSettings };
+  return { locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings };
 }

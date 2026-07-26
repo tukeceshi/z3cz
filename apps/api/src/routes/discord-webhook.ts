@@ -11,7 +11,7 @@ import {
   resolveOrganizationBillingOptions,
 } from "../db";
 import { WorkflowStore } from "../stores/workflow-store";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
+import { isCreditExhausted } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
 
 const discordWebhook = new Hono<ApiContext>();
@@ -250,7 +250,6 @@ async function executeWorkflow(
     name: string;
     trigger: string;
     organizationId: string;
-    enabled: boolean;
   },
   interaction: DiscordInteractionPayload,
   workflowStore: WorkflowStore,
@@ -273,12 +272,6 @@ async function executeWorkflow(
       return;
     }
     workflowData = workflowWithData.data;
-    if (!workflowData.billingMode) {
-      workflowData = {
-        ...workflowData,
-        billingMode: workflowWithData.billingMode ?? "platform",
-      };
-    }
   } catch (error) {
     console.error(
       `[DiscordWebhook] Failed to load workflow ${workflow.id}:`,
@@ -300,12 +293,7 @@ async function executeWorkflow(
     return;
   }
 
-  const billingMode = workflowData.billingMode ?? "platform";
-
-  if (
-    !shouldSkipPlatformCreditCheck(billingMode) &&
-    isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)
-  ) {
+  if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
     console.log(
       `[DiscordWebhook] Skipping workflow ${workflow.id}: credits exhausted`
     );
@@ -325,7 +313,6 @@ async function executeWorkflow(
       id: workflow.id,
       name: workflow.name,
       schemeId: workflowData.schemeId,
-      billingMode,
       trigger: workflow.trigger as WorkflowTrigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,

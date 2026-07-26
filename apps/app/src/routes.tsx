@@ -14,18 +14,14 @@ import { ProtectedRoute } from "./components/protected-route";
 import {
   AdminAiModelsPage,
   AdminDashboardPage,
-  AdminDatabasesPage,
-  AdminDatasetsPage,
-  AdminEmailsPage,
   AdminExecutionDetailPage,
   AdminExecutionsPage,
-  AdminFeatureSettingsPage,
   AdminModelInvocationsPage,
-  AdminOrganizationDetailPage,
-  AdminOrganizationsPage,
-  AdminPlatformRelayAccountsPage,
-  AdminQueuesPage,
+  AdminPersistWorkersPage,
+  AdminOrganizationRedirectPage,
   AdminSettingsPage,
+  AdminLoginMethodsPage,
+  AdminLegalDocumentsPage,
   AdminStuckUsersPage,
   AdminSupportPage,
   AdminUserDetailPage,
@@ -51,19 +47,13 @@ import {
   EmailsPage,
   ExecutionDetailPage,
   ExecutionsPage,
-  FeedbackFormPage,
-  FeedbackPage,
   FormPage,
   FormTriggerPage,
   IntegrationsPage,
-  InvitationsPage,
   MembersPage,
   ModelCallsPage,
   NotFoundPage,
   OrganizationAiInterfacesPage,
-  OrganizationsPage,
-  PlaygroundExecutePage,
-  PlaygroundPage,
   ProfilePage,
   QueuesPage,
   SchemasPage,
@@ -72,6 +62,7 @@ import {
   TemplatePreviewPage,
   TemplateTryPage,
   TemplatesPage,
+  WorkflowFolderPage,
   WorkflowsPage,
 } from "./lazy-pages";
 import { LoginPage } from "./pages/login-page";
@@ -168,27 +159,17 @@ export const routes: AppRouteObject[] = [
   },
   {
     path: "/admin/organizations",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminOrganizationsPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminOrganizations") },
+    element: <Navigate to="/admin/users" replace />,
   },
   {
     path: "/admin/organizations/:organizationId",
     element: (
       <AdminLayout>
         <AdminProtectedRoute>
-          <AdminOrganizationDetailPage />
+          <AdminOrganizationRedirectPage />
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: {
-      head: createRouteHead("seo.routes.adminOrganizationDetail"),
-    },
   },
   {
     path: "/admin/workflows",
@@ -240,17 +221,6 @@ export const routes: AppRouteObject[] = [
     },
   },
   {
-    path: "/admin/emails",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminEmailsPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminEmails") },
-  },
-  {
     path: "/admin/support",
     element: (
       <AdminLayout>
@@ -260,28 +230,6 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminSupport") },
-  },
-  {
-    path: "/admin/queues",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminQueuesPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminQueues") },
-  },
-  {
-    path: "/admin/datasets",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminDatasetsPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminDatasets") },
   },
   {
     path: "/admin/ai-models",
@@ -306,15 +254,15 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.adminModelInvocations") },
   },
   {
-    path: "/admin/feature-settings",
+    path: "/admin/persist-workers",
     element: (
       <AdminLayout>
         <AdminProtectedRoute>
-          <AdminFeatureSettingsPage />
+          <AdminPersistWorkersPage />
         </AdminProtectedRoute>
       </AdminLayout>
     ),
-    handle: { head: createRouteHead("seo.routes.adminFeatureSettings") },
+    handle: { head: createRouteHead("seo.routes.adminPersistWorkers") },
   },
   {
     path: "/admin/settings",
@@ -328,6 +276,28 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.adminSettings") },
   },
   {
+    path: "/admin/login-methods",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminLoginMethodsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminLoginMethods") },
+  },
+  {
+    path: "/admin/legal-documents",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminLegalDocumentsPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminLegalDocuments") },
+  },
+  {
     path: "/admin/workflow-schemes",
     element: (
       <AdminLayout>
@@ -339,52 +309,16 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.adminWorkflowSchemes") },
   },
   {
-    path: "/admin/platform-relay-accounts",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminPlatformRelayAccountsPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminRelayAccounts") },
-  },
-  {
-    path: "/admin/databases",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminDatabasesPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminDatabases") },
-  },
-  {
     path: "/org",
     element: <OrgRedirect to="/org/:organizationId/dashboard" />,
   },
   {
     path: "/settings/organizations",
-    element: (
-      <SettingsLayout>
-        <ProtectedRoute>
-          <OrganizationsPage />
-        </ProtectedRoute>
-      </SettingsLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.organizations") },
+    element: <OrgRedirect to="/org/:organizationId/members" />,
   },
   {
     path: "/settings/invitations",
-    element: (
-      <SettingsLayout>
-        <ProtectedRoute>
-          <InvitationsPage />
-        </ProtectedRoute>
-      </SettingsLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.invitations") },
+    element: <OrgRedirect to="/org/:organizationId/members" />,
   },
   {
     path: "/org/:organizationId/dashboard",
@@ -407,6 +341,17 @@ export const routes: AppRouteObject[] = [
       <OrgLayout title="Workflows">
         <ProtectedRoute>
           <WorkflowsPage />
+        </ProtectedRoute>
+      </OrgLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.workflows") },
+  },
+  {
+    path: "/org/:organizationId/workflows/folders/:folderId",
+    element: (
+      <OrgLayout title="Workflows">
+        <ProtectedRoute>
+          <WorkflowFolderPage />
         </ProtectedRoute>
       </OrgLayout>
     ),
@@ -501,21 +446,6 @@ export const routes: AppRouteObject[] = [
       </OrgFeatureRoute>
     ),
     handle: { head: createRouteHead("seo.routes.datasets") },
-  },
-  {
-    path: "/feedback",
-    element: <OrgRedirect to="/org/:organizationId/feedback" />,
-  },
-  {
-    path: "/org/:organizationId/feedback",
-    element: (
-      <OrgLayout title="Feedback">
-        <ProtectedRoute>
-          <FeedbackPage />
-        </ProtectedRoute>
-      </OrgLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.feedback") },
   },
   {
     path: "/api-keys",
@@ -765,36 +695,6 @@ export const routes: AppRouteObject[] = [
     },
   },
   {
-    path: "/playground",
-    element: <OrgRedirect to="/org/:organizationId/playground" />,
-  },
-  {
-    path: "/playground/:nodeType",
-    element: <OrgRedirect to="/org/:organizationId/playground/:nodeType" />,
-  },
-  {
-    path: "/org/:organizationId/playground",
-    element: (
-      <OrgLayout title="Workflows">
-        <ProtectedRoute>
-          <PlaygroundPage />
-        </ProtectedRoute>
-      </OrgLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.playground") },
-  },
-  {
-    path: "/org/:organizationId/playground/:nodeType",
-    element: (
-      <OrgLayout title="Workflows">
-        <ProtectedRoute>
-          <PlaygroundExecutePage />
-        </ProtectedRoute>
-      </OrgLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.playground") },
-  },
-  {
     path: "/org/:organizationId/workflows/:id",
     element: (
       <OrgLayout title="Workflows">
@@ -817,13 +717,6 @@ export const routes: AppRouteObject[] = [
     element: <FormTriggerPage />,
     handle: {
       head: createRouteHead("seo.routes.form"),
-    },
-  },
-  {
-    path: "/feedback/:signedToken",
-    element: <FeedbackFormPage />,
-    handle: {
-      head: createRouteHead("seo.routes.feedbackForm"),
     },
   },
   {

@@ -58,7 +58,6 @@ import type { AiInterfaceService } from "./ai-interface-service";
 import type { ImageModelService } from "./image-model-service";
 import type { ResolveAiImageStorage } from "./ai-image-storage";
 import type { TextModelService } from "./text-model-service";
-import type { RelayAccountService } from "./relay-account-service";
 import type { SchemaService } from "./schema-service";
 import type { CodeModeExecutor } from "./utils/code-mode";
 import type { SandboxExecutor } from "./utils/sandbox-mode";
@@ -124,8 +123,6 @@ export interface RuntimeDependencies<Env = unknown> {
   codeModeExecutor?: CodeModeExecutor;
   /** Multi-language sandbox executor (Cloudflare Containers in production). */
   sandboxExecutor?: SandboxExecutor;
-  /** Platform NewAPI relay account resolver (DB with env fallback). */
-  relayAccountService?: RelayAccountService;
   /** Organization AI interface resolver (compiled templates + org credentials). */
   aiInterfaceService?: AiInterfaceService;
   /** Platform text model resolver (canonical id → interface + provider model). */
@@ -134,10 +131,16 @@ export interface RuntimeDependencies<Env = unknown> {
   imageModelService?: ImageModelService;
   /** Platform video model resolver (canonical id → interface + provider model). */
   videoModelService?: import("./video-model-service").VideoModelService;
+  /** Platform audio model resolver (canonical id → interface + provider model). */
+  audioModelService?: import("./audio-model-service").AudioModelService;
   /** Ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: ResolveAiImageStorage;
   /** Ephemeral vs cloud storage for AI video generation. */
   resolveAiVideoStorage?: ResolveAiImageStorage;
+  /** Ephemeral vs cloud storage for AI audio generation. */
+  resolveAiAudioStorage?: ResolveAiImageStorage;
+  /** Workflow cloud generation job tracking. */
+  trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
   runtimeVersion?: string;
 }
 
@@ -174,13 +177,15 @@ export abstract class Runtime<Env = unknown> {
   protected mailboxService?: MailboxService;
   protected codeModeExecutor?: CodeModeExecutor;
   protected sandboxExecutor?: SandboxExecutor;
-  protected relayAccountService?: RelayAccountService;
   protected aiInterfaceService?: AiInterfaceService;
   protected textModelService?: TextModelService;
   protected imageModelService?: ImageModelService;
   protected videoModelService?: import("./video-model-service").VideoModelService;
+  protected audioModelService?: import("./audio-model-service").AudioModelService;
   protected resolveAiImageStorage?: ResolveAiImageStorage;
   protected resolveAiVideoStorage?: ResolveAiImageStorage;
+  protected resolveAiAudioStorage?: ResolveAiImageStorage;
+  protected trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -214,13 +219,15 @@ export abstract class Runtime<Env = unknown> {
     this.mailboxService = dependencies.mailboxService;
     this.codeModeExecutor = dependencies.codeModeExecutor;
     this.sandboxExecutor = dependencies.sandboxExecutor;
-    this.relayAccountService = dependencies.relayAccountService;
     this.aiInterfaceService = dependencies.aiInterfaceService;
     this.textModelService = dependencies.textModelService;
     this.imageModelService = dependencies.imageModelService;
     this.videoModelService = dependencies.videoModelService;
+    this.audioModelService = dependencies.audioModelService;
     this.resolveAiImageStorage = dependencies.resolveAiImageStorage;
     this.resolveAiVideoStorage = dependencies.resolveAiVideoStorage;
+    this.resolveAiAudioStorage = dependencies.resolveAiAudioStorage;
+    this.trackWorkflowGenerationJob = dependencies.trackWorkflowGenerationJob;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -453,27 +460,21 @@ export abstract class Runtime<Env = unknown> {
       // ========================================================================
       // STEP 2: Check compute credit availability
       // ========================================================================
-      const usesUpstreamBilling =
-        context.workflow.billingMode === "upstream";
+      const canExecute = await this.creditService.hasEnoughCredits({
+        organizationId,
+        computeCredits,
+        subscriptionStatus,
+        overageLimit,
+        unlimitedUsage,
+      });
 
-      let canExecute = usesUpstreamBilling;
-      if (!usesUpstreamBilling) {
-        canExecute = await this.creditService.hasEnoughCredits({
-          organizationId,
-          computeCredits,
-          subscriptionStatus,
-          overageLimit,
-          unlimitedUsage,
-        });
-
-        if (!canExecute) {
-          // Fall through to the finally block so the exhausted record is
-          // persisted and the returned record matches what was stored.
-          isExhausted = true;
-          executionRecord.status = "exhausted";
-          executionRecord.error = "Insufficient compute credits";
-          await this.monitoringService.sendUpdate(executionRecord);
-        }
+      if (!canExecute) {
+        // Fall through to the finally block so the exhausted record is
+        // persisted and the returned record matches what was stored.
+        isExhausted = true;
+        executionRecord.status = "exhausted";
+        executionRecord.error = "Insufficient compute credits";
+        await this.monitoringService.sendUpdate(executionRecord);
       }
 
       if (canExecute) {
@@ -638,11 +639,11 @@ export abstract class Runtime<Env = unknown> {
     return createPollContinuationHandler({
       objectStore: this.objectStore,
       env: this.env as NodeEnv,
-      relayAccountService: this.relayAccountService,
       aiInterfaceService: this.aiInterfaceService,
       resolveAiVideoStorage: this.resolveAiVideoStorage
         ? (params) => this.resolveAiVideoStorage!(params)
         : undefined,
+      trackWorkflowGenerationJob: this.trackWorkflowGenerationJob,
       findNode: (workflowContext, nodeId) =>
         workflowContext.workflow.nodes.find((node) => node.id === nodeId),
     });
@@ -1232,9 +1233,6 @@ export abstract class Runtime<Env = unknown> {
           this.credentialProvider.getSecret(secretName),
         getIntegration: (integrationId: string) =>
           this.credentialProvider.getIntegration(integrationId),
-        resolveRelayAccount: this.relayAccountService
-          ? (accountId?: string) => this.relayAccountService!.resolve(accountId)
-          : undefined,
         resolveAiInterface: this.aiInterfaceService
           ? (params) =>
               this.aiInterfaceService!.resolveOrgInterface({
@@ -1243,11 +1241,42 @@ export abstract class Runtime<Env = unknown> {
                 templateId: params.templateId,
               })
           : undefined,
+        executeTextModel: this.textModelService
+          ? (params) =>
+              this.textModelService!.executeTextModel({
+                organizationId: context.organizationId,
+                canonicalId: params.canonicalId,
+                effectivePrompt: params.effectivePrompt,
+              })
+          : undefined,
         resolveTextModel: this.textModelService
           ? (canonicalId) =>
               this.textModelService!.resolveTextModel({
                 organizationId: context.organizationId,
                 canonicalId,
+              })
+          : undefined,
+        listTextModelCandidates: this.textModelService
+          ? (canonicalId) =>
+              this.textModelService!.listTextModelCandidates({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
+        disableTextModelOnInterface: this.textModelService
+          ? (params) =>
+              this.textModelService!.disableTextModelOnInterface({
+                organizationId: context.organizationId,
+                interfaceId: params.interfaceId,
+                canonicalId: params.canonicalId,
+              })
+          : undefined,
+        resolveTextModelInferenceId: this.textModelService
+          ? (params) =>
+              this.textModelService!.resolveTextModelInferenceId({
+                organizationId: context.organizationId,
+                interfaceId: params.interfaceId,
+                canonicalId: params.canonicalId,
               })
           : undefined,
         resolveImageModel: this.imageModelService
@@ -1260,6 +1289,13 @@ export abstract class Runtime<Env = unknown> {
         resolveVideoModel: this.videoModelService
           ? (canonicalId) =>
               this.videoModelService!.resolveVideoModel({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
+        resolveAudioModel: this.audioModelService
+          ? (canonicalId) =>
+              this.audioModelService!.resolveAudioModel({
                 organizationId: context.organizationId,
                 canonicalId,
               })
@@ -1278,6 +1314,14 @@ export abstract class Runtime<Env = unknown> {
                 workflowId: context.workflowId,
               })
           : undefined,
+        resolveAiAudioStorage: this.resolveAiAudioStorage
+          ? () =>
+              this.resolveAiAudioStorage!({
+                organizationId: context.organizationId,
+                workflowId: context.workflowId,
+              })
+          : undefined,
+        trackWorkflowGenerationJob: this.trackWorkflowGenerationJob,
         env: this.env as NodeEnv,
       };
 

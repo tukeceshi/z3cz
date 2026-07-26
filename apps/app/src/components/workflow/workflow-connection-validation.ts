@@ -20,6 +20,11 @@ import {
   evaluateAiVideoPromptReferenceStructural,
   isAiVideoPromptReferenceTarget,
 } from "./ai-video-prompt-reference";
+import {
+  evaluateAiAudioPromptReferenceStructural,
+  isAiAudioPromptReferenceTarget,
+} from "./ai-audio-prompt-reference";
+import { AI_AUDIO_PROMPT_HANDLE_ID } from "./ai-audio-node-utils";
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import {
   evaluateAiTextReferenceStructural,
@@ -52,6 +57,11 @@ const VIRTUAL_REFERENCE_INPUTS: Readonly<
   },
   [AI_IMAGE_PROMPT_HANDLE_ID]: {
     id: AI_IMAGE_PROMPT_HANDLE_ID,
+    type: "any",
+    repeated: false,
+  },
+  [AI_AUDIO_PROMPT_HANDLE_ID]: {
+    id: AI_AUDIO_PROMPT_HANDLE_ID,
     type: "any",
     repeated: false,
   },
@@ -173,6 +183,7 @@ export function validateWorkflowConnection(
     if (refSourceNode.data.nodeType === AI_TEXT_NODE_TYPE) {
       const verdict = evaluateAiImagePromptReferenceStructural({
         targetNodeId: inputNodeId,
+        targetNodeMetadata: hostNode.data.metadata,
         sourceNodeId,
         sourceNodeType: refSourceNode.data.nodeType,
         edges,
@@ -203,6 +214,7 @@ export function validateWorkflowConnection(
 
     const verdict = evaluateAiImagePromptReferenceStructural({
       targetNodeId: inputNodeId,
+      targetNodeMetadata: hostNode.data.metadata,
       sourceNodeId,
       sourceNodeType: refSourceNode.data.nodeType,
       edges,
@@ -222,6 +234,7 @@ export function validateWorkflowConnection(
     if (refSourceNode.data.nodeType === AI_TEXT_NODE_TYPE) {
       const verdict = evaluateAiVideoPromptReferenceStructural({
         targetNodeId: inputNodeId,
+        targetNodeMetadata: hostNode.data.metadata,
         sourceNodeId,
         sourceNodeType: refSourceNode.data.nodeType,
         edges,
@@ -252,6 +265,26 @@ export function validateWorkflowConnection(
 
     const verdict = evaluateAiVideoPromptReferenceStructural({
       targetNodeId: inputNodeId,
+      targetNodeMetadata: hostNode.data.metadata,
+      sourceNodeId,
+      sourceNodeType: refSourceNode.data.nodeType,
+      edges,
+    });
+    if (!verdict.ok) return false;
+  }
+
+  if (
+    hostNode &&
+    isAiAudioPromptReferenceTarget(hostNode.data.nodeType, inputHandleId)
+  ) {
+    const sourceNodeId =
+      inputNodeId === conn.target ? conn.source : conn.target;
+    const refSourceNode = nodes.find((node) => node.id === sourceNodeId);
+    if (!refSourceNode) return false;
+
+    const verdict = evaluateAiAudioPromptReferenceStructural({
+      targetNodeId: inputNodeId,
+      targetNodeMetadata: hostNode.data.metadata,
       sourceNodeId,
       sourceNodeType: refSourceNode.data.nodeType,
       edges,

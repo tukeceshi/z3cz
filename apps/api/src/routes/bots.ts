@@ -27,10 +27,12 @@ import {
 } from "../db";
 import { encryptSecret } from "../utils/encryption";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 
 const botRoutes = new Hono<ApiContext>();
 
 botRoutes.use("*", jwtMiddleware);
+botRoutes.use("*", requireOrganizationOwner());
 botRoutes.use("*", createRequireFeatureMiddleware("bots"));
 
 function toBotResponse(bot: {

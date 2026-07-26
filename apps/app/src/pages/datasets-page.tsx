@@ -10,6 +10,7 @@ import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { ResourceFeatureBanner } from "@/components/resource-feature-banner";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -160,6 +161,12 @@ function createColumns(
 }
 
 export function DatasetsPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.datasets");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <DatasetsPageContent />;
+}
+
+function DatasetsPageContent() {
   const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();

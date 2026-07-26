@@ -6,7 +6,9 @@ import X from "lucide-react/icons/x";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -31,6 +33,21 @@ import {
 import { formatDate } from "@/utils/date";
 
 export function BillingPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessBilling) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.billing")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <BillingPageContent />;
+}
+
+function BillingPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

@@ -5,7 +5,7 @@
       "name": "n8n",
       "tagline": "MIT-licensed, serverless n8n alternative on Cloudflare",
       "metaDescription": "MIT-licensed, serverless n8n alternative on Cloudflare Workers. Visual workflow automation with built-in AI, agentic tools, and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow automation platform built for Cloudflare Workers. Workflows scale to zero when idle, store state in D1 and R2, call Workers AI for inference, and expose any node as a tool for AI agents. Start on our hosted SaaS, or self-host the MIT source on your own Cloudflare account. The same code powers both paths.",
+      "intro": "z3cz.com is an MIT-licensed workflow automation platform built for Cloudflare Workers. Workflows scale to zero when idle, store state in D1 and R2, call Workers AI for inference, and expose any node as a tool for AI agents. Start on our hosted SaaS, or self-host the MIT source on your own Cloudflare account. The same code powers both paths.",
       "category": "Visual workflow builder",
       "license": "Sustainable Use License (fair-code)",
       "deployment": "Self-hosted (Docker) or n8n Cloud",
@@ -154,32 +154,32 @@
       ],
       "faqs": [
         {
-          "question": "Can I use a hosted Dafthunk instead of self-hosting?",
+          "question": "Can I use a hosted z3cz.com instead of self-hosting?",
           "answer": "Yes, and it is the fastest way to start. Our hosted SaaS runs the same MIT-licensed code you can read on GitHub, and lets you skip Cloudflare setup, database migrations, and credential management. When you need full control over data, secrets, or infrastructure, self-host on your own Cloudflare account. You can move between the two paths at any time."
         },
         {
           "question": "Is there a fully open source, MIT-licensed alternative to n8n?",
-          "answer": "Yes. Dafthunk is MIT licensed throughout, with no enterprise tier, no fair-code carve-outs, and no community edition that hides features. n8n moved to the Sustainable Use License in 2022, which restricts hosting n8n as a competing SaaS and embedding it in a competing commercial product. The MIT license lets you fork, embed, or resell without those restrictions."
+          "answer": "Yes. z3cz.com is MIT licensed throughout, with no enterprise tier, no fair-code carve-outs, and no community edition that hides features. n8n moved to the Sustainable Use License in 2022, which restricts hosting n8n as a competing SaaS and embedding it in a competing commercial product. The MIT license lets you fork, embed, or resell without those restrictions."
         },
         {
           "question": "Can I run n8n on Cloudflare Workers?",
-          "answer": "No. n8n is built around a long-running Node.js process and relies on a SQL database you provision yourself. Dafthunk was built for Cloudflare from day one. Workflows run on Workers and Cloudflare Workflows, state persists in D1 and R2, and AI calls go through Workers AI. If your goal is workflow automation on Cloudflare, Dafthunk is the native option."
+          "answer": "No. n8n is built around a long-running Node.js process and relies on a SQL database you provision yourself. z3cz.com was built for Cloudflare from day one. Workflows run on Workers and Cloudflare Workflows, state persists in D1 and R2, and AI calls go through Workers AI. If your goal is workflow automation on Cloudflare, z3cz.com is the native option."
         },
         {
           "question": "Is there a serverless, scale-to-zero alternative to n8n?",
-          "answer": "Yes. Dafthunk workflows run on Cloudflare Workers, so they scale to zero when idle and scale up with traffic. You pay Cloudflare for actual execution, not for a server running 24/7. n8n Cloud meters per execution, and self-hosted n8n needs a long-running server."
+          "answer": "Yes. z3cz.com workflows run on Cloudflare Workers, so they scale to zero when idle and scale up with traffic. You pay Cloudflare for actual execution, not for a server running 24/7. n8n Cloud meters per execution, and self-hosted n8n needs a long-running server."
         },
         {
-          "question": "How much does it cost to self-host Dafthunk vs n8n?",
-          "answer": "Self-hosted Dafthunk has no idle cost. You pay Cloudflare only for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions in most cases. Self-hosted n8n needs a 24/7 VPS or Kubernetes cluster (typically 5 to 50 USD per month) plus an external Postgres database. Exact figures depend on your workload."
+          "question": "How much does it cost to self-host z3cz.com vs n8n?",
+          "answer": "Self-hosted z3cz.com has no idle cost. You pay Cloudflare only for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions in most cases. Self-hosted n8n needs a 24/7 VPS or Kubernetes cluster (typically 5 to 50 USD per month) plus an external Postgres database. Exact figures depend on your workload."
         },
         {
           "question": "Which has better AI and agentic workflow support?",
-          "answer": "Dafthunk treats AI as a first-class primitive. Any node can become a tool for an AI agent, and Dafthunk ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. n8n offers LangChain-based AI agent nodes and strong LLM integrations, but structures AI as an integration category, not a primitive."
+          "answer": "z3cz.com treats AI as a first-class primitive. Any node can become a tool for an AI agent, and z3cz.com ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. n8n offers LangChain-based AI agent nodes and strong LLM integrations, but structures AI as an integration category, not a primitive."
         },
         {
           "question": "When is n8n still the better choice?",
-          "answer": "Choose n8n if you need the widest SaaS-integration library, an air-gapped on-premise deployment, a commercial cloud with paid SLA and support, or existing Docker and Kubernetes infrastructure. Dafthunk requires a Cloudflare account and does not fit air-gapped environments."
+          "answer": "Choose n8n if you need the widest SaaS-integration library, an air-gapped on-premise deployment, a commercial cloud with paid SLA and support, or existing Docker and Kubernetes infrastructure. z3cz.com requires a Cloudflare account and does not fit air-gapped environments."
         }
       ],
       "sources": [
@@ -196,7 +196,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]
@@ -206,7 +206,7 @@
       "name": "Make",
       "tagline": "MIT-licensed, serverless Make alternative on Cloudflare",
       "metaDescription": "MIT-licensed, serverless Make alternative on Cloudflare. Visual workflow automation with built-in AI, agentic tools, and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Start on our hosted SaaS, or self-host on your own Cloudflare account and run the same MIT source we do. Make is a proprietary SaaS with no self-hosting path.",
+      "intro": "z3cz.com is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Start on our hosted SaaS, or self-host on your own Cloudflare account and run the same MIT source we do. Make is a proprietary SaaS with no self-hosting path.",
       "category": "Visual workflow builder",
       "license": "Proprietary (SaaS)",
       "deployment": "SaaS only",
@@ -325,28 +325,28 @@
       ],
       "faqs": [
         {
-          "question": "Do I have to self-host Dafthunk?",
+          "question": "Do I have to self-host z3cz.com?",
           "answer": "No. Most teams start on our hosted SaaS, which runs the same MIT-licensed code you can read on GitHub and removes the setup work. Self-hosting on your own Cloudflare account is there when you need full control over data, secrets, or infrastructure. You can move from SaaS to self-host at any time."
         },
         {
           "question": "Is there a self-hosted, open source alternative to Make?",
-          "answer": "Yes. Dafthunk is MIT licensed and self-hostable on Cloudflare. You deploy the API and web app to your own Cloudflare account, store state in D1 and R2, and run workflows on Workers. Make is SaaS only; there is no way to run it on your own infrastructure."
+          "answer": "Yes. z3cz.com is MIT licensed and self-hostable on Cloudflare. You deploy the API and web app to your own Cloudflare account, store state in D1 and R2, and run workflows on Workers. Make is SaaS only; there is no way to run it on your own infrastructure."
         },
         {
           "question": "Can I run Make on Cloudflare or my own servers?",
-          "answer": "No. Make is a proprietary SaaS. Scenarios run on their servers and the source is not available. If your goal is a workflow platform on Cloudflare, Dafthunk was built for that from day one."
+          "answer": "No. Make is a proprietary SaaS. Scenarios run on their servers and the source is not available. If your goal is a workflow platform on Cloudflare, z3cz.com was built for that from day one."
         },
         {
-          "question": "How does Dafthunk pricing compare to Make?",
-          "answer": "Make charges per operation. Every module run, filter, or iteration costs one or more operations, and heavy scenarios can burn through a plan quickly. Dafthunk bills through Cloudflare for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions for most workflows. Idle workflows cost nothing."
+          "question": "How does z3cz.com pricing compare to Make?",
+          "answer": "Make charges per operation. Every module run, filter, or iteration costs one or more operations, and heavy scenarios can burn through a plan quickly. z3cz.com bills through Cloudflare for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions for most workflows. Idle workflows cost nothing."
         },
         {
           "question": "Which has better AI and agentic workflow support?",
-          "answer": "Dafthunk treats AI as a first-class primitive. Any node can become a tool for an AI agent, and Dafthunk ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. Make offers AI modules and a newer agent product, but AI is one integration category among thousands rather than the core of the platform."
+          "answer": "z3cz.com treats AI as a first-class primitive. Any node can become a tool for an AI agent, and z3cz.com ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. Make offers AI modules and a newer agent product, but AI is one integration category among thousands rather than the core of the platform."
         },
         {
           "question": "What about data residency and compliance?",
-          "answer": "With Dafthunk self-hosted, data lives in your Cloudflare account. You choose the jurisdiction, you hold the secrets, and you decide retention. Make stores scenario data and credentials in their data centers. For regulated industries, self-hosting often simplifies the compliance story."
+          "answer": "With z3cz.com self-hosted, data lives in your Cloudflare account. You choose the jurisdiction, you hold the secrets, and you decide retention. Make stores scenario data and credentials in their data centers. For regulated industries, self-hosting often simplifies the compliance story."
         },
         {
           "question": "When is Make still the better choice?",
@@ -363,7 +363,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]
@@ -373,7 +373,7 @@
       "name": "Zapier",
       "tagline": "Self-hostable, MIT-licensed Zapier alternative for developers",
       "metaDescription": "Self-hostable, MIT Zapier alternative on Cloudflare Workers. Visual workflow automation with built-in AI, agentic tools, and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow platform that runs on Cloudflare Workers. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Zapier is a proprietary SaaS with no self-hosting path. It targets business users who want the widest catalog of SaaS connectors and do not want to run servers.",
+      "intro": "z3cz.com is an MIT-licensed workflow platform that runs on Cloudflare Workers. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Zapier is a proprietary SaaS with no self-hosting path. It targets business users who want the widest catalog of SaaS connectors and do not want to run servers.",
       "category": "SaaS workflow builder",
       "license": "Proprietary (SaaS)",
       "deployment": "SaaS only",
@@ -492,28 +492,28 @@
       ],
       "faqs": [
         {
-          "question": "Do I need to run my own infrastructure to use Dafthunk?",
+          "question": "Do I need to run my own infrastructure to use z3cz.com?",
           "answer": "No. Our hosted SaaS is the fastest path to your first workflow and runs the same MIT-licensed code as the open-source project. Self-hosting on your own Cloudflare account is available when you need full control over data, secrets, or infrastructure. You can switch between the two at any time."
         },
         {
           "question": "Is there an open source, self-hostable alternative to Zapier?",
-          "answer": "Yes. Dafthunk is MIT licensed and runs on Cloudflare Workers. You deploy the API and web app to your own Cloudflare account, and you hold the source, the secrets, and the data. Zapier is proprietary SaaS with no self-hosting option."
+          "answer": "Yes. z3cz.com is MIT licensed and runs on Cloudflare Workers. You deploy the API and web app to your own Cloudflare account, and you hold the source, the secrets, and the data. Zapier is proprietary SaaS with no self-hosting option."
         },
         {
           "question": "Can I run Zapier on Cloudflare or my own servers?",
-          "answer": "No. Zapier is proprietary and SaaS only. If your goal is a workflow automation platform that runs on your Cloudflare account, Dafthunk was built for that from day one."
+          "answer": "No. Zapier is proprietary and SaaS only. If your goal is a workflow automation platform that runs on your Cloudflare account, z3cz.com was built for that from day one."
         },
         {
-          "question": "How does Dafthunk pricing compare to Zapier?",
-          "answer": "Zapier charges per task. Each step in a Zap counts as a task, and multi-step or higher-volume Zaps move into paid tiers quickly. Dafthunk bills through Cloudflare for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions in most cases. Idle workflows cost nothing."
+          "question": "How does z3cz.com pricing compare to Zapier?",
+          "answer": "Zapier charges per task. Each step in a Zap counts as a task, and multi-step or higher-volume Zaps move into paid tiers quickly. z3cz.com bills through Cloudflare for actual Workers, D1, and R2 usage, which runs to pennies per thousand executions in most cases. Idle workflows cost nothing."
         },
         {
-          "question": "Does Dafthunk have as many integrations as Zapier?",
-          "answer": "No. Zapier has a 7000+ app catalog built over more than a decade and optimized for SaaS connectivity. Dafthunk ships 470+ nodes focused on AI models, browser automation, geo, media, data transformation, and protocols. If your stack lives in SaaS, Zapier has more ready-made connectors. If you need AI, data, or custom code in workflows, Dafthunk covers that natively."
+          "question": "Does z3cz.com have as many integrations as Zapier?",
+          "answer": "No. Zapier has a 7000+ app catalog built over more than a decade and optimized for SaaS connectivity. z3cz.com ships 470+ nodes focused on AI models, browser automation, geo, media, data transformation, and protocols. If your stack lives in SaaS, Zapier has more ready-made connectors. If you need AI, data, or custom code in workflows, z3cz.com covers that natively."
         },
         {
           "question": "Which is better for AI agents and LLM workflows?",
-          "answer": "Dafthunk. Any node in a workflow can be exposed as a tool for an AI agent, and the platform ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. Zapier offers Zapier Agents as a separate product, but agents are layered on top of the task model rather than baked into the runtime."
+          "answer": "z3cz.com. Any node in a workflow can be exposed as a tool for an AI agent, and the platform ships native bindings for Workers AI, OpenAI, Anthropic, and Gemini. Zapier offers Zapier Agents as a separate product, but agents are layered on top of the task model rather than baked into the runtime."
         },
         {
           "question": "When is Zapier still the better choice?",
@@ -530,7 +530,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]
@@ -540,7 +540,7 @@
       "name": "Dify",
       "tagline": "MIT-licensed, Cloudflare-native alternative to Dify",
       "metaDescription": "MIT-licensed, serverless Dify alternative on Cloudflare. Visual AI workflow builder with agentic tools, 470+ nodes, and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow platform built for Cloudflare Workers. Workflows scale to zero when idle, state persists in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Dify focuses on LLM app development with RAG pipelines and a dataset UI. Dafthunk covers a broader scope, from HTTP APIs and cron jobs to browser automation, geo, and media, with AI as one first-class category rather than the whole product.",
+      "intro": "z3cz.com is an MIT-licensed workflow platform built for Cloudflare Workers. Workflows scale to zero when idle, state persists in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Dify focuses on LLM app development with RAG pipelines and a dataset UI. z3cz.com covers a broader scope, from HTTP APIs and cron jobs to browser automation, geo, and media, with AI as one first-class category rather than the whole product.",
       "category": "AI app builder",
       "license": "Apache 2.0 (with commercial terms)",
       "deployment": "Self-hosted (Docker) or Dify Cloud",
@@ -659,32 +659,32 @@
       ],
       "faqs": [
         {
-          "question": "Can I use a hosted Dafthunk instead of self-hosting?",
+          "question": "Can I use a hosted z3cz.com instead of self-hosting?",
           "answer": "Yes. Our hosted SaaS is the fastest way to start and runs the same MIT-licensed code as the open-source project. Self-hosting on your own Cloudflare account is available when you need full control over data, secrets, or infrastructure. You can move between the two paths at any time."
         },
         {
-          "question": "Is Dafthunk a Cloudflare-native alternative to Dify?",
-          "answer": "Yes. Dafthunk runs on Cloudflare Workers and Workflows, stores state in D1 and R2, and calls Workers AI for inference. Dify runs as a multi-container Python stack with Postgres, Redis, and a vector database. If your infrastructure is Cloudflare, Dafthunk is the native option."
+          "question": "Is z3cz.com a Cloudflare-native alternative to Dify?",
+          "answer": "Yes. z3cz.com runs on Cloudflare Workers and Workflows, stores state in D1 and R2, and calls Workers AI for inference. Dify runs as a multi-container Python stack with Postgres, Redis, and a vector database. If your infrastructure is Cloudflare, z3cz.com is the native option."
         },
         {
           "question": "Is Dify truly open source?",
-          "answer": "Dify is licensed under Apache 2.0 with additional commercial terms. You can use it internally for free, but offering a multi-tenant SaaS based on Dify or removing the Dify logo requires a commercial license. Dafthunk is MIT licensed throughout, with no additional terms, no enterprise tier, and no commercial carve-outs."
+          "answer": "Dify is licensed under Apache 2.0 with additional commercial terms. You can use it internally for free, but offering a multi-tenant SaaS based on Dify or removing the Dify logo requires a commercial license. z3cz.com is MIT licensed throughout, with no additional terms, no enterprise tier, and no commercial carve-outs."
         },
         {
-          "question": "What is the difference between Dafthunk and Dify in scope?",
-          "answer": "Dify is a focused LLM app builder with first-class dataset management, RAG pipelines, and chat UIs. Dafthunk is a general workflow platform where AI is one first-class category among many, alongside HTTP, cron, email, browser, geo, and media. If you want to build an AI chatbot end to end, Dify covers it in one product. If you want to orchestrate AI as part of broader automation, Dafthunk fits better."
+          "question": "What is the difference between z3cz.com and Dify in scope?",
+          "answer": "Dify is a focused LLM app builder with first-class dataset management, RAG pipelines, and chat UIs. z3cz.com is a general workflow platform where AI is one first-class category among many, alongside HTTP, cron, email, browser, geo, and media. If you want to build an AI chatbot end to end, Dify covers it in one product. If you want to orchestrate AI as part of broader automation, z3cz.com fits better."
         },
         {
           "question": "How do RAG and vector search compare?",
-          "answer": "Dify ships a built-in dataset UI with chunking, embeddings, and retrieval that you configure in the product. Dafthunk exposes RAG and vector search as workflow nodes backed by Cloudflare Vectorize and AutoRAG, so retrieval is a step in a larger pipeline. Dify is more turnkey for chatbots with a knowledge base; Dafthunk is more composable when RAG is part of a larger workflow."
+          "answer": "Dify ships a built-in dataset UI with chunking, embeddings, and retrieval that you configure in the product. z3cz.com exposes RAG and vector search as workflow nodes backed by Cloudflare Vectorize and AutoRAG, so retrieval is a step in a larger pipeline. Dify is more turnkey for chatbots with a knowledge base; z3cz.com is more composable when RAG is part of a larger workflow."
         },
         {
           "question": "Which has better agent support?",
-          "answer": "Both support agents. Dafthunk makes every workflow node a tool available to an AI agent and ships bindings for Workers AI, OpenAI, Anthropic, and Gemini. Dify structures agents around its tool framework and LLM provider bindings. Dafthunk is stronger when you want agents that reach into browser, geo, and media nodes; Dify is stronger when you want a polished chat agent with a knowledge base."
+          "answer": "Both support agents. z3cz.com makes every workflow node a tool available to an AI agent and ships bindings for Workers AI, OpenAI, Anthropic, and Gemini. Dify structures agents around its tool framework and LLM provider bindings. z3cz.com is stronger when you want agents that reach into browser, geo, and media nodes; Dify is stronger when you want a polished chat agent with a knowledge base."
         },
         {
           "question": "When is Dify still the better choice?",
-          "answer": "Pick Dify if you are building an LLM-native product with RAG, dataset management, and a chat UI, and you want an opinionated stack that covers the whole path. Dafthunk is broader and more composable, but does not ship a dedicated dataset UI or chatbot frontend out of the box."
+          "answer": "Pick Dify if you are building an LLM-native product with RAG, dataset management, and a chat UI, and you want an opinionated stack that covers the whole path. z3cz.com is broader and more composable, but does not ship a dedicated dataset UI or chatbot frontend out of the box."
         }
       ],
       "sources": [
@@ -701,7 +701,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]
@@ -711,7 +711,7 @@
       "name": "Langflow",
       "tagline": "Serverless, TypeScript-native alternative to Langflow on Cloudflare",
       "metaDescription": "MIT-licensed, serverless Langflow alternative on Cloudflare Workers. Visual AI workflow automation with agentic tools and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Workflows scale to zero, state lives in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Langflow is a Python-based visual builder for LangChain flows. Both are MIT licensed; the difference is the runtime and the scope.",
+      "intro": "z3cz.com is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Workflows scale to zero, state lives in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Langflow is a Python-based visual builder for LangChain flows. Both are MIT licensed; the difference is the runtime and the scope.",
       "category": "Visual LLM / agent builder",
       "license": "MIT",
       "deployment": "Self-hosted (Python, Docker) or Langflow Cloud",
@@ -830,28 +830,28 @@
       ],
       "faqs": [
         {
-          "question": "Can I try Dafthunk without setting up Cloudflare?",
+          "question": "Can I try z3cz.com without setting up Cloudflare?",
           "answer": "Yes. Our hosted SaaS is the fastest way to start and runs the same MIT-licensed code as the open-source project. Self-hosting on your own Cloudflare account is available when you need full control over data, secrets, or infrastructure. You can move between the two at any time."
         },
         {
           "question": "Is there a serverless alternative to Langflow?",
-          "answer": "Yes. Dafthunk runs on Cloudflare Workers and Workflows, so flows scale to zero when idle and scale up with traffic. You pay Cloudflare for actual execution. Langflow is a long-running Python process that expects a server to be available 24/7."
+          "answer": "Yes. z3cz.com runs on Cloudflare Workers and Workflows, so flows scale to zero when idle and scale up with traffic. You pay Cloudflare for actual execution. Langflow is a long-running Python process that expects a server to be available 24/7."
         },
         {
-          "question": "Langflow is already MIT. Why switch to Dafthunk?",
-          "answer": "License is only one dimension. Langflow is Python-first, built around LangChain, and centered on LLM flows. Dafthunk is TypeScript-first, built on Cloudflare, and covers a broader scope from HTTP and cron triggers to browser, geo, and media nodes. Pick the one that matches your runtime and the kind of work you want to automate."
+          "question": "Langflow is already MIT. Why switch to z3cz.com?",
+          "answer": "License is only one dimension. Langflow is Python-first, built around LangChain, and centered on LLM flows. z3cz.com is TypeScript-first, built on Cloudflare, and covers a broader scope from HTTP and cron triggers to browser, geo, and media nodes. Pick the one that matches your runtime and the kind of work you want to automate."
         },
         {
           "question": "Can I deploy Langflow to Cloudflare Workers?",
-          "answer": "No. Langflow is a Python process with FastAPI and background workers. It does not run on Cloudflare Workers. If your infrastructure is Cloudflare, Dafthunk was built for that from day one."
+          "answer": "No. Langflow is a Python process with FastAPI and background workers. It does not run on Cloudflare Workers. If your infrastructure is Cloudflare, z3cz.com was built for that from day one."
         },
         {
-          "question": "How does Dafthunk compare for LangChain-style agent work?",
-          "answer": "Dafthunk treats any workflow node as a potential tool for an AI agent. You get native bindings for Workers AI, OpenAI, Anthropic, and Gemini, plus a workflow graph that an agent can call. Langflow gives you direct access to LangChain's chains, agents, and retrievers. If you live in the LangChain world, Langflow feels more native; if you want agents plus broader automation on Cloudflare, Dafthunk fits better."
+          "question": "How does z3cz.com compare for LangChain-style agent work?",
+          "answer": "z3cz.com treats any workflow node as a potential tool for an AI agent. You get native bindings for Workers AI, OpenAI, Anthropic, and Gemini, plus a workflow graph that an agent can call. Langflow gives you direct access to LangChain's chains, agents, and retrievers. If you live in the LangChain world, Langflow feels more native; if you want agents plus broader automation on Cloudflare, z3cz.com fits better."
         },
         {
           "question": "What about production deployment?",
-          "answer": "Dafthunk deploys with wrangler to your Cloudflare account. Workflows run durably through Cloudflare Workflows, state persists in D1 and R2, and the global network handles requests. Langflow flows are easy to prototype, but moving to production usually means wrapping a flow in a FastAPI service, setting up a database, and managing containers or a PaaS."
+          "answer": "z3cz.com deploys with wrangler to your Cloudflare account. Workflows run durably through Cloudflare Workflows, state persists in D1 and R2, and the global network handles requests. Langflow flows are easy to prototype, but moving to production usually means wrapping a flow in a FastAPI service, setting up a database, and managing containers or a PaaS."
         },
         {
           "question": "When is Langflow still the better choice?",
@@ -868,7 +868,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]
@@ -878,7 +878,7 @@
       "name": "Flowise",
       "tagline": "MIT-licensed, serverless alternative to Flowise on Cloudflare",
       "metaDescription": "MIT-licensed, serverless Flowise alternative on Cloudflare Workers. Visual AI workflow automation with agentic tools and scale-to-zero runtime.",
-      "intro": "Dafthunk is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Workflows scale to zero, state lives in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Flowise is a Node.js visual builder for LangChain and LlamaIndex flows, run as a long-running server. Both are JavaScript runtimes, but Dafthunk is serverless and broader in scope.",
+      "intro": "z3cz.com is an MIT-licensed workflow automation platform that runs on Cloudflare Workers. Workflows scale to zero, state lives in D1 and R2, and any node can become a tool for an AI agent. Start on our hosted SaaS, or self-host on your own Cloudflare account under MIT. Flowise is a Node.js visual builder for LangChain and LlamaIndex flows, run as a long-running server. Both are JavaScript runtimes, but z3cz.com is serverless and broader in scope.",
       "category": "Visual LLM / agent builder",
       "license": "Apache 2.0",
       "deployment": "Self-hosted (Node.js, Docker) or Flowise Cloud",
@@ -997,28 +997,28 @@
       ],
       "faqs": [
         {
-          "question": "Can I try Dafthunk without setting up Cloudflare?",
+          "question": "Can I try z3cz.com without setting up Cloudflare?",
           "answer": "Yes. Our hosted SaaS is the fastest way to start and runs the same MIT-licensed code as the open-source project. Self-hosting on your own Cloudflare account is available when you need full control over data, secrets, or infrastructure. You can move between the two at any time."
         },
         {
           "question": "Is there a Cloudflare-native alternative to Flowise?",
-          "answer": "Yes. Dafthunk runs on Cloudflare Workers and Workflows, stores data in D1 and R2, and calls Workers AI for inference. Flowise runs as a long-running Node.js server with external databases and vector stores. If your infrastructure is Cloudflare, Dafthunk is the native option."
+          "answer": "Yes. z3cz.com runs on Cloudflare Workers and Workflows, stores data in D1 and R2, and calls Workers AI for inference. Flowise runs as a long-running Node.js server with external databases and vector stores. If your infrastructure is Cloudflare, z3cz.com is the native option."
         },
         {
           "question": "Can I run Flowise on Cloudflare Workers?",
-          "answer": "Not cleanly. Flowise is a Node.js server built for a long-running process with filesystem access and background workers. Cloudflare Workers use a different runtime model. Dafthunk was built for Workers from day one."
+          "answer": "Not cleanly. Flowise is a Node.js server built for a long-running process with filesystem access and background workers. Cloudflare Workers use a different runtime model. z3cz.com was built for Workers from day one."
         },
         {
-          "question": "How does Dafthunk differ from Flowise in license?",
-          "answer": "Flowise is Apache 2.0, which is permissive but keeps the Flowise trademark and branding with FlowiseAI. Dafthunk is MIT throughout, with no trademark carve-outs and no enterprise tier. You can fork, embed, or resell without friction."
+          "question": "How does z3cz.com differ from Flowise in license?",
+          "answer": "Flowise is Apache 2.0, which is permissive but keeps the Flowise trademark and branding with FlowiseAI. z3cz.com is MIT throughout, with no trademark carve-outs and no enterprise tier. You can fork, embed, or resell without friction."
         },
         {
           "question": "Which is better for chatbots and RAG apps?",
-          "answer": "Flowise is purpose-built for chatbots and RAG with a UI that matches the LangChain and LlamaIndex primitives. Dafthunk supports RAG through vector search nodes, Cloudflare Vectorize, and AutoRAG, but the product is broader. If your goal is only a chatbot, Flowise covers it faster. If you want agents that reach into browser, geo, media, and SaaS nodes, Dafthunk covers more."
+          "answer": "Flowise is purpose-built for chatbots and RAG with a UI that matches the LangChain and LlamaIndex primitives. z3cz.com supports RAG through vector search nodes, Cloudflare Vectorize, and AutoRAG, but the product is broader. If your goal is only a chatbot, Flowise covers it faster. If you want agents that reach into browser, geo, media, and SaaS nodes, z3cz.com covers more."
         },
         {
           "question": "What about production cost?",
-          "answer": "Flowise needs a server running 24/7, plus an external database and a vector store. Dafthunk runs on Workers and scales to zero, so idle workflows cost nothing. Active costs stay in pennies per thousand executions for most workloads."
+          "answer": "Flowise needs a server running 24/7, plus an external database and a vector store. z3cz.com runs on Workers and scales to zero, so idle workflows cost nothing. Active costs stay in pennies per thousand executions for most workloads."
         },
         {
           "question": "When is Flowise still the better choice?",
@@ -1035,7 +1035,7 @@
           "url": "https://developers.cloudflare.com/workers/platform/pricing/"
         },
         {
-          "label": "Dafthunk on GitHub",
+          "label": "z3cz.com on GitHub",
           "url": "https://github.com/dafthunk-com/dafthunk"
         }
       ]

@@ -1,5 +1,3 @@
-import type { WorkflowBillingMode } from "@dafthunk/types";
-
 /**
  * Gets the organization's total usage.
  */
@@ -52,13 +50,6 @@ export function isCreditExhausted(
   if (!creditChecksEnabled(cloudflareEnv)) return false;
   if (billingInfo.unlimitedUsage) return false;
   return billingInfo.creditsExhausted;
-}
-
-/** Workflows billed upstream skip platform credit pre-checks. */
-export function shouldSkipPlatformCreditCheck(
-  billingMode?: WorkflowBillingMode
-): boolean {
-  return billingMode === "upstream";
 }
 
 /**

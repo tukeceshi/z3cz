@@ -8,6 +8,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { QueueSnippetsDialog } from "@/components/queue-snippets-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -110,6 +111,12 @@ function createColumns(
 }
 
 export function QueuesPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.queues");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <QueuesPageContent />;
+}
+
+function QueuesPageContent() {
   const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [snippetsDialogOpen, setSnippetsDialogOpen] = useState(false);

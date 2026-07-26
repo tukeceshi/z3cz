@@ -5,6 +5,8 @@ import {
   volcanoResourcePackageStatusesForMode,
 } from "@dafthunk/types";
 
+import { appendPackageListRefreshLog } from "@dafthunk/types";
+
 import { callVolcengineBillingApi } from "./billing-client";
 import { fetchVolcanoResourcePackages } from "./list-resource-packages";
 import {
@@ -173,6 +175,29 @@ describe("resolveVolcanoPackageRows", () => {
     });
 
     expect(result.rows).toEqual([effectiveRow]);
+    expect(callVolcengineBillingApi).not.toHaveBeenCalled();
+  });
+
+  it("returns refreshLimited when refresh requested within server rate limit", async () => {
+    const cached = buildPackageListCache({
+      mode: "metering",
+      rows: [effectiveRow],
+      statusCounts: { Effective: 1 },
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const result = await resolveVolcanoPackageRows({
+      credentials,
+      metadata: appendPackageListRefreshLog(
+        { ...baseMetadata, packageListCache: cached },
+        new Date().toISOString()
+      ),
+      refreshPackages: true,
+    });
+
+    expect(result.rows).toEqual([effectiveRow]);
+    expect(result.refreshLimited).toBe(true);
+    expect(result.nextRefreshAt).toBeDefined();
     expect(callVolcengineBillingApi).not.toHaveBeenCalled();
   });
 

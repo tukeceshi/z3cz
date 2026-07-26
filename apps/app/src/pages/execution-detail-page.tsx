@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
@@ -13,6 +14,7 @@ import type {
   WorkflowNodeExecution,
 } from "@/components/workflow/workflow-types";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useExecution } from "@/services/execution-service";
@@ -24,6 +26,21 @@ import {
 } from "@/services/workflow-service";
 
 export function ExecutionDetailPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessExecutions) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.executions")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <ExecutionDetailPageContent />;
+}
+
+function ExecutionDetailPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { executionId } = useParams<{ executionId: string }>();

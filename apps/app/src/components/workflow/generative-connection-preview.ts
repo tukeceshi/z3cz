@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import type { Connection, InternalNode, Node } from "@xyflow/react";
 
 import {
@@ -17,6 +17,9 @@ import {
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
 } from "./ai-image-node-utils";
+import { buildAiAudioPromptReferenceConnectionFromCardDrop } from "./ai-audio-prompt-reference";
+import { snapAiAudioPromptBorderPoint } from "./ai-audio-connection-handles";
+import { AI_AUDIO_PROMPT_HANDLE_ID } from "./ai-audio-node-utils";
 import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -82,7 +85,8 @@ function isGenerativeNodeType(nodeType: string | undefined): boolean {
   return (
     nodeType === AI_TEXT_NODE_TYPE ||
     nodeType === AI_IMAGE_NODE_TYPE ||
-    nodeType === AI_VIDEO_NODE_TYPE
+    nodeType === AI_VIDEO_NODE_TYPE ||
+    nodeType === AI_AUDIO_NODE_TYPE
   );
 }
 
@@ -101,32 +105,11 @@ function isIncomingGenerativeOutputPick(connection: FlowConnectionLike): boolean
   return true;
 }
 
-/** AI image → AI text reference lands on the AI text card's right border. */
-function isAiImageToAiTextReferenceTarget(
-  fromNodeType: string | undefined,
-  targetNodeType: string
-): boolean {
-  return (
-    fromNodeType === AI_IMAGE_NODE_TYPE && targetNodeType === AI_TEXT_NODE_TYPE
-  );
-}
-
 function snapFromGenerativeReferenceTarget(
   node: InternalNode<Node>,
   nodeType: string,
   fromNodeType: string | undefined
 ): GenerativePreviewSnap | null {
-  if (isAiImageToAiTextReferenceTarget(fromNodeType, nodeType)) {
-    const point = snapAiTextOutputBorderPoint(node);
-    return {
-      nodeId: node.id,
-      x: point.x,
-      y: point.y,
-      targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
-      side: "right",
-    };
-  }
-
   if (nodeType === AI_TEXT_NODE_TYPE) {
     const point = snapAiTextKeywordsBorderPoint(node);
     return {
@@ -160,6 +143,16 @@ function snapFromGenerativeReferenceTarget(
         fromNodeType === AI_TEXT_NODE_TYPE
           ? AI_VIDEO_PROMPT_HANDLE_ID
           : AI_VIDEO_REFERENCE_HANDLE_ID,
+      side: "left",
+    };
+  }
+  if (nodeType === AI_AUDIO_NODE_TYPE) {
+    const point = snapAiAudioPromptBorderPoint(node);
+    return {
+      nodeId: node.id,
+      x: point.x,
+      y: point.y,
+      targetHandle: AI_AUDIO_PROMPT_HANDLE_ID,
       side: "left",
     };
   }
@@ -367,6 +360,12 @@ export function resolveGenerativePreviewConnection(
       nodes: policyNodes,
     }) ??
     buildAiVideoReferenceConnectionFromCardDrop({
+      dragFromNodeId: connection.fromNode.id,
+      dragFromHandle: connection.fromHandle,
+      hoveredNodeId,
+      nodes: policyNodes,
+    }) ??
+    buildAiAudioPromptReferenceConnectionFromCardDrop({
       dragFromNodeId: connection.fromNode.id,
       dragFromHandle: connection.fromHandle,
       hoveredNodeId,

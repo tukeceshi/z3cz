@@ -1,14 +1,12 @@
 import BookOpen from "lucide-react/icons/book-open";
 import Bot from "lucide-react/icons/bot";
-import Building from "lucide-react/icons/building";
+import LayoutDashboard from "lucide-react/icons/layout-dashboard";
 import Github from "lucide-react/icons/github";
-import Settings from "lucide-react/icons/settings";
 import Shield from "lucide-react/icons/shield";
 import { Link, useLocation } from "react-router";
 
 import { LanguageToggle } from "@/components/language-toggle";
 import { useTranslation } from "@/components/locale-provider";
-import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { UserProfile } from "@/components/user-profile";
 
 import { AppHeaderBreadcrumb } from "./app-header-breadcrumb";
@@ -30,8 +28,8 @@ export function AppHeader() {
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 ps-5 pe-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900">
-      <div className="flex items-center gap-2">
-        <Link to="/" className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <Link to="/" className="flex items-center gap-2 shrink-0">
           <Bot className="h-6 w-6" />
           <span className="text-sm font-semibold max-w-[12rem] truncate">
             {siteSettings.siteName}
@@ -39,19 +37,17 @@ export function AppHeader() {
         </Link>
         {isAuthenticated &&
           (isAdminSection ? (
-            <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50">
+            <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50 shrink-0">
               {t("nav.administration")}
             </span>
           ) : isSettingsSection ? (
-            <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50">
+            <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50 shrink-0">
               {t("nav.settings")}
             </span>
-          ) : (
-            <OrganizationSwitcher />
-          ))}
+          ) : null)}
         <AppHeaderBreadcrumb />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <nav className="flex items-center gap-2">
           {isAuthenticated ? (
             <>
@@ -60,17 +56,8 @@ export function AppHeader() {
                 className={navLinkClasses}
                 activeClassName={activeNavLinkClasses}
               >
-                <Building className="h-4 w-4 mr-1.5" />
-                <span>{t("nav.organization")}</span>
-              </NavLink>
-              <NavLink
-                to={"/settings"}
-                className={navLinkClasses}
-                activeClassName={activeNavLinkClasses}
-                data-tour="settings-link"
-              >
-                <Settings className="h-4 w-4 mr-1.5" />
-                <span>{t("nav.settings")}</span>
+                <LayoutDashboard className="h-4 w-4 mr-1.5" />
+                <span>{t("nav.console")}</span>
               </NavLink>
               {user?.role === "admin" && (
                 <NavLink
@@ -104,7 +91,7 @@ export function AppHeader() {
             <span>{t("nav.documentation")}</span>
           </a>
           <a
-            href="https://github.com/dafthunk-com/dafthunk"
+            href="https://github.com/tukeceshi/dafthunk"
             target="_blank"
             rel="noopener noreferrer"
             className={navLinkClasses}

@@ -2,6 +2,7 @@ import {
   VOLCANO_TOS_DEFAULT_PREFIX,
   VOLCANO_TOS_REGIONS,
   defaultVolcanoTosRegionForLocale,
+  type VolcanoTosServiceStatus,
 } from "@dafthunk/types";
 import Loader2 from "lucide-react/icons/loader-2";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,17 +16,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { listVolcanoTosBuckets } from "@/services/organization-ai-interface-service";
+import {
+  listVolcanoTosBuckets,
+  probeVolcanoTosBuckets,
+} from "@/services/organization-ai-interface-service";
 import { cn } from "@/utils/utils";
 
 import { resolveNewTosBucketName } from "./volcano-storage-bucket-name";
 import { CREATE_NEW_TOS_BUCKET } from "./volcano-storage-constants";
+import {
+  VolcanoTosAuthErrorGuide,
+  VolcanoTosNotOpenedGuide,
+} from "./volcano-tos-not-opened-guide";
 import { VolcanoTosPricingLines } from "./volcano-tos-pricing-lines";
 
 interface VolcanoStorageSetupDialogProps {
   readonly open: boolean;
   readonly organizationId: string;
-  readonly interfaceId: string;
+  readonly interfaceId?: string;
+  readonly wizardCredentials?: {
+    readonly accessKeyId: string;
+    readonly secretAccessKey: string;
+  };
   readonly initialRegion: string;
   readonly initialBucket: string;
   readonly defaultEnable: boolean;
@@ -36,26 +48,24 @@ interface VolcanoStorageSetupDialogProps {
     readonly createBucket: boolean;
     readonly enable: boolean;
   }) => Promise<void>;
+  readonly onServiceStatusChange?: (status: VolcanoTosServiceStatus) => void;
   readonly isSaving: boolean;
-  readonly showSkip?: boolean;
-  readonly onSkip?: () => void;
 }
 
 export function VolcanoStorageSetupDialog({
   open,
   organizationId,
   interfaceId,
+  wizardCredentials,
   initialRegion,
   initialBucket,
   defaultEnable,
   onOpenChange,
   onComplete,
+  onServiceStatusChange,
   isSaving,
-  showSkip,
-  onSkip,
 }: VolcanoStorageSetupDialogProps) {
   const { t, locale } = useTranslation();
-  const [step, setStep] = useState<"region" | "bucket">("region");
   const [region, setRegion] = useState(
     initialRegion || defaultVolcanoTosRegionForLocale(locale)
   );
@@ -65,6 +75,8 @@ export function VolcanoStorageSetupDialog({
   );
   const [isLoadingBuckets, setIsLoadingBuckets] = useState(false);
   const [bucketLoadError, setBucketLoadError] = useState<string | null>(null);
+  const [serviceStatus, setServiceStatus] =
+    useState<VolcanoTosServiceStatus | null>(null);
   const [confirmExistingOpen, setConfirmExistingOpen] = useState(false);
 
   const isCreateNewSelected = selectedBucket === CREATE_NEW_TOS_BUCKET;
@@ -74,58 +86,117 @@ export function VolcanoStorageSetupDialog({
     [buckets]
   );
 
+  const loadBuckets = useCallback(
+    async (targetRegion: string, preferredBucket?: string) => {
+      setIsLoadingBuckets(true);
+      setBucketLoadError(null);
+      try {
+        const result = wizardCredentials
+          ? await probeVolcanoTosBuckets(organizationId, {
+              accessKeyId: wizardCredentials.accessKeyId,
+              secretAccessKey: wizardCredentials.secretAccessKey,
+              region: targetRegion,
+            })
+          : interfaceId
+            ? await listVolcanoTosBuckets(
+                organizationId,
+                interfaceId,
+                targetRegion
+              )
+            : null;
+
+        if (!result) {
+          throw new Error("Storage setup requires interface or wizard credentials");
+        }
+
+        setServiceStatus(result.status);
+        onServiceStatusChange?.(result.status);
+
+        if (result.status === "not_opened") {
+          setBuckets([]);
+          setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+          return;
+        }
+
+        if (result.status === "auth_error") {
+          setBuckets([]);
+          setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+          setBucketLoadError(null);
+          return;
+        }
+
+        if (result.status !== "opened") {
+          setBuckets([]);
+          setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+          setBucketLoadError(
+            result.message ?? t("pages.aiInterfaces.tosStorage.loadFailed")
+          );
+          return;
+        }
+
+        const listed = result.buckets;
+        setBuckets(listed);
+        const bucketPreference = preferredBucket ?? initialBucket;
+        if (bucketPreference === CREATE_NEW_TOS_BUCKET) {
+          setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+        } else if (bucketPreference && listed.includes(bucketPreference)) {
+          setSelectedBucket(bucketPreference);
+        } else if (listed.length > 0) {
+          setSelectedBucket(listed[0]!);
+        } else {
+          setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : t("pages.aiInterfaces.tosStorage.loadFailed");
+        setBucketLoadError(message);
+        setBuckets([]);
+        setSelectedBucket(CREATE_NEW_TOS_BUCKET);
+        setServiceStatus("transient_error");
+      } finally {
+        setIsLoadingBuckets(false);
+      }
+    },
+    [
+      initialBucket,
+      interfaceId,
+      onServiceStatusChange,
+      organizationId,
+      t,
+      wizardCredentials,
+    ]
+  );
+
   useEffect(() => {
     if (!open) return;
-    setStep("region");
-    setRegion(initialRegion || defaultVolcanoTosRegionForLocale(locale));
+    const nextRegion = initialRegion || defaultVolcanoTosRegionForLocale(locale);
+    setRegion(nextRegion);
     setSelectedBucket(initialBucket || CREATE_NEW_TOS_BUCKET);
     setBucketLoadError(null);
+    setServiceStatus(null);
     setBuckets([]);
-  }, [open, initialRegion, initialBucket, locale]);
+    void loadBuckets(nextRegion, initialBucket || CREATE_NEW_TOS_BUCKET);
+  }, [open, initialRegion, initialBucket, locale, loadBuckets]);
 
-  const loadBuckets = useCallback(async () => {
-    setIsLoadingBuckets(true);
-    setBucketLoadError(null);
-    try {
-      const listed = await listVolcanoTosBuckets(
-        organizationId,
-        interfaceId,
-        region
-      );
-      setBuckets(listed);
-      if (initialBucket && listed.includes(initialBucket)) {
-        setSelectedBucket(initialBucket);
-      } else if (listed.length > 0) {
-        setSelectedBucket(listed[0]!);
-      } else {
-        setSelectedBucket(CREATE_NEW_TOS_BUCKET);
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : t("pages.aiInterfaces.saveFailed");
-      setBucketLoadError(message);
-      setBuckets([]);
-      setSelectedBucket(CREATE_NEW_TOS_BUCKET);
-    } finally {
-      setIsLoadingBuckets(false);
-    }
-  }, [initialBucket, interfaceId, organizationId, region, t]);
-
-  const handleRegionNext = async () => {
-    setStep("bucket");
-    await loadBuckets();
+  const handleRegionChange = (nextRegion: string) => {
+    setRegion(nextRegion);
+    void loadBuckets(nextRegion, selectedBucket);
   };
 
   const resolveBucketName = (): string => {
     if (isCreateNewSelected) {
-      return resolveNewTosBucketName(buckets);
+      return resolveNewTosBucketName(buckets, organizationId);
     }
     return selectedBucket;
   };
 
-  const canSave = !isLoadingBuckets && !isSaving && Boolean(selectedBucket);
+  const canSave =
+    !isLoadingBuckets &&
+    !isSaving &&
+    Boolean(selectedBucket) &&
+    serviceStatus !== "not_opened";
 
   const handleFinish = async (forceEnable?: boolean) => {
     const bucket = resolveBucketName();
@@ -162,13 +233,11 @@ export function VolcanoStorageSetupDialog({
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {step === "region"
-                ? t("pages.aiInterfaces.tosStorage.setupRegionTitle")
-                : t("pages.aiInterfaces.tosStorage.setupBucketTitle")}
+              {t("pages.aiInterfaces.tosStorage.setupTitle")}
             </DialogTitle>
           </DialogHeader>
 
-          {step === "region" ? (
+          <div className="space-y-4">
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 {t("pages.aiInterfaces.tosStorage.setupRegionHint")}
@@ -186,26 +255,32 @@ export function VolcanoStorageSetupDialog({
                       type="radio"
                       name="tos-region"
                       checked={region === entry.code}
-                      onChange={() => setRegion(entry.code)}
+                      onChange={() => handleRegionChange(entry.code)}
                     />
                     <span className="text-sm">{t(entry.labelKey)}</span>
                   </label>
                 ))}
               </div>
-              <VolcanoTosPricingLines
-                pricing={null}
-                region={region}
-              />
+              {!wizardCredentials ? (
+                <VolcanoTosPricingLines pricing={null} region={region} />
+              ) : null}
             </div>
-          ) : null}
 
-          {step === "bucket" ? (
             <div className="space-y-3">
+              <p className="text-sm font-medium">
+                {t("pages.aiInterfaces.tosStorage.setupBucketTitle")}
+              </p>
               {isLoadingBuckets ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
                   {t("common.loading")}
                 </div>
+              ) : serviceStatus === "not_opened" ? (
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <VolcanoTosNotOpenedGuide />
+                </div>
+              ) : serviceStatus === "auth_error" ? (
+                <VolcanoTosAuthErrorGuide />
               ) : (
                 <>
                   {bucketLoadError ? (
@@ -215,6 +290,9 @@ export function VolcanoStorageSetupDialog({
                     {bucketOptions.map((option) => {
                       const isCreateNew = option === CREATE_NEW_TOS_BUCKET;
                       const isSelected = selectedBucket === option;
+                      const createNewLabel = isCreateNew
+                        ? `${t("pages.aiInterfaces.tosStorage.createNewBucket")} (${resolveNewTosBucketName(buckets, organizationId)})`
+                        : option;
 
                       return (
                         <label
@@ -230,11 +308,7 @@ export function VolcanoStorageSetupDialog({
                             checked={isSelected}
                             onChange={() => setSelectedBucket(option)}
                           />
-                          <span className="text-sm">
-                            {isCreateNew
-                              ? t("pages.aiInterfaces.tosStorage.createNewBucket")
-                              : option}
-                          </span>
+                          <span className="text-sm">{createNewLabel}</span>
                         </label>
                       );
                     })}
@@ -247,35 +321,15 @@ export function VolcanoStorageSetupDialog({
                 })}
               </p>
             </div>
-          ) : null}
+          </div>
 
-          <DialogFooter className="gap-2 sm:justify-between">
-            {showSkip && onSkip ? (
-              <Button variant="ghost" onClick={onSkip}>
-                {t("pages.aiInterfaces.tosStorage.wizardSkip")}
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              {step === "bucket" ? (
-                <Button variant="outline" onClick={() => setStep("region")}>
-                  {t("common.back")}
-                </Button>
-              ) : null}
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                {t("common.cancel")}
-              </Button>
-              {step === "region" ? (
-                <Button onClick={() => void handleRegionNext()}>
-                  {t("common.next")}
-                </Button>
-              ) : (
-                <Button disabled={!canSave} onClick={() => void handleFinish()}>
-                  {isSaving ? t("common.saving") : t("common.save")}
-                </Button>
-              )}
-            </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button disabled={!canSave} onClick={() => void handleFinish()}>
+              {isSaving ? t("common.saving") : t("common.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

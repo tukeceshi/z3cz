@@ -24,7 +24,7 @@ import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-lim
 import { CloudflareObjectStore } from "../runtime/cloudflare-object-store";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
+import { isCreditExhausted } from "../utils/credits";
 import {
   type FormTriggerInfo,
   findFormResponse,
@@ -77,7 +77,7 @@ async function resolveForm(
 ): Promise<ResolvedForm | "not_found"> {
   const db = createDatabase(c.env);
   const workflow = await getWorkflowByIdUnscoped(db, workflowId);
-  if (!workflow || !workflow.enabled) return "not_found";
+  if (!workflow) return "not_found";
 
   const organizationId = workflow.organizationId;
   const store = new WorkflowStore(c.env);
@@ -169,10 +169,7 @@ formTriggerRoutes.post(
     if (!billingInfo) {
       return c.json({ error: "Organization not found" }, 404);
     }
-    if (
-      !shouldSkipPlatformCreditCheck(workflow.billingMode) &&
-      isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
-    ) {
+    if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
       return c.json({ error: "Insufficient compute credits" }, 402 as const);
     }
 
@@ -213,7 +210,6 @@ formTriggerRoutes.post(
       workflow: {
         id: workflow.id,
         name: workflow.name,
-        billingMode: workflow.billingMode,
         trigger: workflowData.trigger,
         runtime,
         nodes: workflowData.nodes,

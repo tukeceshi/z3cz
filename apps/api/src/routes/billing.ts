@@ -15,6 +15,7 @@ import { jwtMiddleware } from "../auth";
 import { PRO_INCLUDED_CREDITS, TRIAL_CREDITS } from "../constants/billing";
 import type { ApiContext } from "../context";
 import { createDatabase, organizations, resolveOrganizationPlan } from "../db";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 import { createStripeService } from "../services/stripe-service";
 import {
   clearCreditsExhausted,
@@ -24,6 +25,7 @@ import {
 const billing = new Hono<ApiContext>();
 
 billing.use("*", jwtMiddleware);
+billing.use("*", requireOrganizationOwner());
 
 /**
  * GET /billing

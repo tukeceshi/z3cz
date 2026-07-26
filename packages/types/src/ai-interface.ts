@@ -6,16 +6,19 @@ export const AI_INTERFACE_NODE_TYPE = "ai-interface" as const;
 export const AI_TEXT_NODE_TYPE = "ai-text" as const;
 export const AI_IMAGE_NODE_TYPE = "ai-image" as const;
 export const AI_VIDEO_NODE_TYPE = "ai-video" as const;
+export const AI_AUDIO_NODE_TYPE = "ai-audio" as const;
 
 export type AiGenerativeNodeType =
   | typeof AI_TEXT_NODE_TYPE
   | typeof AI_IMAGE_NODE_TYPE
-  | typeof AI_VIDEO_NODE_TYPE;
+  | typeof AI_VIDEO_NODE_TYPE
+  | typeof AI_AUDIO_NODE_TYPE;
 
 export const AI_GENERATIVE_NODE_TYPES: readonly AiGenerativeNodeType[] = [
   AI_TEXT_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
+  AI_AUDIO_NODE_TYPE,
 ] as const;
 
 /** Executable when legacy is on, but omitted from the add-node panel catalog. */
@@ -76,6 +79,10 @@ export type AiInterfaceBodyMapping =
       readonly kind: "openai-messages";
       readonly promptField: string;
       readonly systemField?: string;
+    }
+  | {
+      readonly kind: "anthropic-messages";
+      readonly promptField: string;
     };
 
 export interface AiInterfaceSourceSpec {
@@ -124,7 +131,7 @@ export interface AiInterfaceSourceSpec {
 }
 
 export interface AiInterfaceBodySlot {
-  readonly kind: "field" | "const" | "model" | "openai-messages";
+  readonly kind: "field" | "const" | "model" | "openai-messages" | "anthropic-messages";
   readonly to: string;
   readonly from?: string;
   readonly value?: unknown;
@@ -184,6 +191,7 @@ export interface OrganizationAiInterface {
   readonly enabled: boolean;
   readonly isDefault: boolean;
   readonly hasApiKey: boolean;
+  readonly apiKeyHint?: string | null;
   readonly metadata?: VolcanoInterfaceMetadata | Readonly<Record<string, unknown>> | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -217,6 +225,8 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly selectedModel?: string | null;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly volcanoModelEnabled?: Readonly<Record<string, boolean>>;
+  readonly singleModelModelEnabled?: Readonly<Record<string, boolean>>;
+  readonly singleModelUpstreamModelIds?: Readonly<Record<string, string>>;
   readonly tosStorage?: VolcanoTosStorageConfig & {
     readonly createBucket?: boolean;
   };

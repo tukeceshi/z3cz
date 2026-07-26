@@ -1,21 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DEFAULT_NEW_TOS_BUCKET_NAME,
-  resolveNewTosBucketName,
-} from "./volcano-storage-bucket-name";
+import { resolveNewTosBucketName } from "./volcano-storage-bucket-name";
 
 describe("resolveNewTosBucketName", () => {
-  it("returns the default name when unused", () => {
-    expect(resolveNewTosBucketName([])).toBe(DEFAULT_NEW_TOS_BUCKET_NAME);
-    expect(resolveNewTosBucketName(["other-bucket"])).toBe(
-      DEFAULT_NEW_TOS_BUCKET_NAME
-    );
+  const organizationId = "019f8866-5300-77c4-9ce2-abc1061ef26a";
+
+  it("returns a globally unique org-scoped bucket name", () => {
+    const name = resolveNewTosBucketName([], organizationId);
+    expect(name.startsWith("z3cz-com-019f88665300-")).toBe(true);
+    expect(name).not.toBe("z3cz-com");
   });
 
-  it("appends a suffix when the default name already exists", () => {
-    const name = resolveNewTosBucketName([DEFAULT_NEW_TOS_BUCKET_NAME]);
-    expect(name).not.toBe(DEFAULT_NEW_TOS_BUCKET_NAME);
-    expect(name.startsWith(`${DEFAULT_NEW_TOS_BUCKET_NAME}-`)).toBe(true);
+  it("appends a new suffix when the generated name already exists locally", () => {
+    const first = resolveNewTosBucketName([], organizationId);
+    const second = resolveNewTosBucketName([first], organizationId);
+    expect(second).not.toBe(first);
   });
 });

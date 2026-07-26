@@ -27,10 +27,12 @@ export interface NavMainItem {
 
 interface NavMainGroup {
   label?: string;
+  tourId?: string;
   items: NavMainItem[];
 }
 
 const NAV_ITEM_TOUR_MAP: Record<string, string> = {
+  dashboard: "dashboard-nav",
   templates: "templates-nav",
   workflows: "workflows-nav",
   executions: "executions-nav",
@@ -95,7 +97,7 @@ export function NavMain({ groups, footerItems }: NavMainProps) {
             key={group.label || index}
             className="bg-transparent p-0"
             data-tour={
-              group.label ? `${group.label.toLowerCase()}-nav-group` : undefined
+              group.tourId ? `${group.tourId}-nav-group` : undefined
             }
           >
             {group.label && (

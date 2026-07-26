@@ -3,18 +3,15 @@ import type {
   VolcanoModelSnapshotRow,
   VolcanoSnapshotPricingRow,
 } from "@dafthunk/types";
+import { formatPlatformModelLabel } from "@dafthunk/types";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { getVolcanoEffectiveActivationStatus } from "@/utils/volcano-activation";
-import { cn } from "@/utils/utils";
+import { getVolcanoEffectiveActivationStatus, isVolcanoModelActivationBlocking } from "@/utils/volcano-activation";
 
 import { VolcanoPricingPopover } from "./volcano-pricing-popover";
 import { VolcanoUsageMeter } from "./volcano-usage-meter";
-
-const OPEN_MANAGEMENT_URL =
-  "https://console.volcengine.com/ark/region:cn-beijing/openManagement";
 
 interface VolcanoModelRowProps {
   row: VolcanoModelSnapshotRow;
@@ -29,20 +26,16 @@ interface VolcanoModelRowProps {
 function activationBadgeVariant(
   status: ModelActivationStatus
 ): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "open") return "default";
   if (status === "invalid_model_id") return "destructive";
   if (status === "not_open" || status === "service_not_open") return "secondary";
   return "outline";
 }
 
-function isWizardBlockingActivation(
+function wizardDisplayStatus(
   status: ModelActivationStatus | null
-): boolean {
-  return (
-    status === "not_open" ||
-    status === "service_not_open" ||
-    status === "invalid_model_id" ||
-    status === "unknown"
-  );
+): "open" | "not_open" {
+  return status === "open" ? "open" : "not_open";
 }
 
 export function VolcanoModelRow({
@@ -58,14 +51,23 @@ export function VolcanoModelRow({
   const modalityShort = t(
     `pages.aiInterfaces.volcano.modalityShort.${row.modality}`
   );
+  const modelLabel = formatPlatformModelLabel({
+    alias: row.alias,
+    modalityLabel: modalityShort,
+  });
+  const isWizard = hintVariant === "wizard";
   const effectiveActivation = getVolcanoEffectiveActivationStatus(row);
-  const showActivationBadge =
-    effectiveActivation === "not_open" ||
-    effectiveActivation === "service_not_open" ||
-    effectiveActivation === "invalid_model_id" ||
-    effectiveActivation === "unknown";
-  const wizardBlocking =
-    hintVariant === "wizard" && isWizardBlockingActivation(effectiveActivation);
+  const enableBlocked = !isWizard && isVolcanoModelActivationBlocking(row);
+  const wizardStatus = isWizard
+    ? wizardDisplayStatus(effectiveActivation)
+    : null;
+  const showActivationBadge = isWizard
+    ? true
+    : effectiveActivation === "not_open" ||
+      effectiveActivation === "service_not_open" ||
+      effectiveActivation === "invalid_model_id" ||
+      effectiveActivation === "unknown";
+  const badgeStatus = isWizard ? wizardStatus! : effectiveActivation;
 
   return (
     <div className="rounded-lg border p-3 space-y-2">
@@ -73,19 +75,28 @@ export function VolcanoModelRow({
         <Switch
           checked={row.enabled}
           disabled={disabled || !onEnabledChange}
-          onCheckedChange={(checked) => onEnabledChange?.(checked)}
+          onCheckedChange={(checked) => {
+            if (checked && enableBlocked) {
+              return;
+            }
+            onEnabledChange?.(checked);
+          }}
         />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">
-              {row.alias}（{modalityShort}）
-            </span>
-            {showActivationBadge && effectiveActivation ? (
-              <Badge variant={activationBadgeVariant(effectiveActivation)}>
-                {t(`pages.aiInterfaces.volcano.activation.${effectiveActivation}`)}
+            <span className="font-medium">{modelLabel}</span>
+            {showActivationBadge && badgeStatus ? (
+              <Badge
+                variant={
+                  isWizard && badgeStatus === "open"
+                    ? "translucent-success"
+                    : activationBadgeVariant(badgeStatus)
+                }
+              >
+                {t(`pages.aiInterfaces.volcano.activation.${badgeStatus}`)}
               </Badge>
             ) : null}
-            {pricingRow && pricingDocUrl ? (
+            {!isWizard && pricingRow && pricingDocUrl ? (
               <VolcanoPricingPopover pricing={pricingRow} docUrl={pricingDocUrl} />
             ) : null}
           </div>
@@ -93,33 +104,12 @@ export function VolcanoModelRow({
             {row.providerModelId}
           </span>
 
-          {wizardBlocking ? (
-            <p className="text-muted-foreground text-xs">
-              {t("pages.aiInterfaces.volcano.activation.wizardDeferredEnable")}
-            </p>
-          ) : null}
-
-          {!wizardBlocking &&
-          (effectiveActivation === "not_open" ||
-            effectiveActivation === "service_not_open") ? (
-            <p className="text-muted-foreground text-xs">
-              {t("pages.aiInterfaces.volcano.activation.openConsole")}{" "}
-              <a
-                href={OPEN_MANAGEMENT_URL}
-                target="_blank"
-                rel="noreferrer"
-                className={cn("text-primary underline-offset-4 hover:underline")}
-              >
-                {t("pages.aiInterfaces.volcano.openManagement")}
-              </a>
-            </p>
-          ) : null}
-
-          {!row.enabled && !wizardBlocking ? (
+          {!isWizard && !row.enabled ? (
             <p className="text-muted-foreground text-sm">
               {t("pages.aiInterfaces.volcano.disabledHint")}
             </p>
-          ) : showUsage && row.usage ? (
+          ) : null}
+          {showUsage && row.usage ? (
             <VolcanoUsageMeter usage={row.usage} />
           ) : showUsage && row.usageError ? (
             <p className="text-muted-foreground text-sm">{row.usageError}</p>

@@ -3,11 +3,18 @@ import type {
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
   VolcanoProbeActivationResponse,
+  VolcanoProbeTosBucketsResponse,
+  VolcanoSnapshotFetchResponse,
   VolcanoSnapshotResponse,
 } from "@dafthunk/types";
 import useSWR from "swr";
 
 import { makeRequest } from "./utils";
+
+export const VOLCANO_ARK_NOT_OPENED_CODE = "volcano_ark_not_opened" as const;
+export const AI_INTERFACE_NAME_CONFLICT_CODE =
+  "ai_interface_name_conflict" as const;
+export const VOLCANO_TOS_NOT_OPENED_CODE = "volcano_tos_not_opened" as const;
 
 function orgEndpoint(organizationId: string): string {
   return `/${organizationId}/ai-interfaces`;
@@ -72,12 +79,11 @@ export async function fetchVolcanoSnapshot(
   organizationId: string,
   interfaceId: string,
   options?: { refreshPackages?: boolean }
-): Promise<VolcanoSnapshotResponse> {
+): Promise<VolcanoSnapshotFetchResponse> {
   const query = options?.refreshPackages ? "?refreshPackages=1" : "";
-  const response = await makeRequest<{ snapshot: VolcanoSnapshotResponse }>(
+  return makeRequest<VolcanoSnapshotFetchResponse>(
     `${orgEndpoint(organizationId)}/${interfaceId}/volcano-snapshot${query}`
   );
-  return response.snapshot;
 }
 
 export async function updateVolcanoModelEnabled(
@@ -87,6 +93,16 @@ export async function updateVolcanoModelEnabled(
 ): Promise<OrganizationAiInterface> {
   return updateOrganizationAiInterface(organizationId, interfaceId, {
     volcanoModelEnabled,
+  });
+}
+
+export async function updateSingleModelModelEnabled(
+  organizationId: string,
+  interfaceId: string,
+  singleModelModelEnabled: Record<string, boolean>
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    singleModelModelEnabled,
   });
 }
 
@@ -111,11 +127,27 @@ export async function listVolcanoTosBuckets(
   organizationId: string,
   interfaceId: string,
   region: string
-): Promise<readonly string[]> {
-  const response = await makeRequest<{ buckets: string[] }>(
+): Promise<VolcanoProbeTosBucketsResponse> {
+  return makeRequest<VolcanoProbeTosBucketsResponse>(
     `${orgEndpoint(organizationId)}/${interfaceId}/tos-buckets?region=${encodeURIComponent(region)}`
   );
-  return response.buckets ?? [];
+}
+
+export async function probeVolcanoTosBuckets(
+  organizationId: string,
+  input: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    region: string;
+  }
+): Promise<VolcanoProbeTosBucketsResponse> {
+  return makeRequest<VolcanoProbeTosBucketsResponse>(
+    `${orgEndpoint(organizationId)}/volcano-probe-tos-buckets`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
 }
 
 export async function updateVolcanoTosStorage(
@@ -130,6 +162,19 @@ export async function updateVolcanoTosStorage(
 ): Promise<OrganizationAiInterface> {
   return updateOrganizationAiInterface(organizationId, interfaceId, {
     tosStorage: input,
+  });
+}
+
+export async function ensureVolcanoTosCors(
+  organizationId: string,
+  interfaceId: string
+): Promise<{
+  readonly applied: boolean;
+  readonly configured: boolean;
+  readonly origins: readonly string[];
+}> {
+  return makeRequest(`${orgEndpoint(organizationId)}/${interfaceId}/ensure-tos-cors`, {
+    method: "POST",
   });
 }
 

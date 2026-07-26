@@ -6,6 +6,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -20,6 +21,12 @@ import {
 import { formatDate } from "@/utils/date";
 
 export function DatasetDetailPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.datasets");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <DatasetDetailPageContent />;
+}
+
+function DatasetDetailPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { datasetId } = useParams<{ datasetId: string }>();

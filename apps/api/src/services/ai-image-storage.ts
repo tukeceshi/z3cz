@@ -6,6 +6,8 @@ import { createDatabase } from "../db";
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
 import { decryptSecret } from "../utils/encryption";
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
+import { isTosRequestError } from "../integrations/volcengine/tos-errors";
+import { recordCloudStorageHealthFromError } from "./probe-org-cloud-storage-health";
 
 export type AiImageStorageMode = "ephemeral" | "cloud";
 
@@ -54,7 +56,18 @@ export async function resolveAiImageStorage(
         mimeType,
       });
 
-      await tosClient.putObject({ key: storageKey, body: data, mimeType });
+      try {
+        await tosClient.putObject({ key: storageKey, body: data, mimeType });
+      } catch (error) {
+        if (isTosRequestError(error)) {
+          await recordCloudStorageHealthFromError(
+            env,
+            params.organizationId,
+            error
+          );
+        }
+        throw error;
+      }
 
       const reference: ObjectReference = {
         id: objectId,

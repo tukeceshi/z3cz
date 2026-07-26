@@ -1,5 +1,4 @@
 ﻿import type {
-  WorkflowBillingMode,
   WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
@@ -10,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
+import { canEditWorkflows } from "@/utils/sub-account-permissions";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
@@ -20,17 +21,33 @@ import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-edit
 import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useObjectService } from "@/services/object-service";
 import { useNodeTypes } from "@/services/type-service";
-import { getWorkflow, setWorkflowEnabled } from "@/services/workflow-service";
+import { getWorkflow } from "@/services/workflow-service";
 import {
   clearPrefetchedWorkflowMetadata,
   consumePrefetchedWorkflowMetadata,
 } from "@/utils/workflow-editor-prefetch";
 
 export function EditorPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canViewWorkflows) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("pages.workflows.title")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <EditorPageContent />;
+}
+
+function EditorPageContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,6 +55,7 @@ export function EditorPage() {
     readInitialViewportOneToOne(location.state)
   );
   const { organization } = useAuth();
+  const workflowReadOnly = !canEditWorkflows(organization);
   const { t } = useTranslation();
   const appToast = useAppToast();
   const orgId = organization?.id || "";
@@ -51,30 +69,7 @@ export function EditorPage() {
       return consumePrefetchedWorkflowMetadata(id, orgId);
     });
 
-  const [isEnabled, setIsEnabled] = useState(true);
-  const [isTogglingEnabled, setIsTogglingEnabled] = useState(false);
   const [workflowSettingsOpen, setWorkflowSettingsOpen] = useState(false);
-
-  const handleToggleEnabled = useCallback(
-    async (checked: boolean) => {
-      if (!id || !orgId) return;
-      setIsTogglingEnabled(true);
-      try {
-        await setWorkflowEnabled(id, checked, orgId);
-        setIsEnabled(checked);
-        appToast.success(
-          checked ? "errors.workflowEnabled" : "errors.workflowDisabled"
-        );
-      } catch (error) {
-        appToast.errorRaw(
-          error instanceof Error ? error.message : t("errors.workflowUpdateFailed")
-        );
-      } finally {
-        setIsTogglingEnabled(false);
-      }
-    },
-    [id, orgId, appToast, t]
-  );
 
   const { nodeTypes, nodeTypesError, isNodeTypesLoading } = useNodeTypes(
     httpWorkflowMetadata?.schemeId,
@@ -89,7 +84,6 @@ export function EditorPage() {
     ((execution: WorkflowExecution) => void) | null
   >(null);
 
-  // Track the latest execution for scheduled workflows
   const [latestExecution, setLatestExecution] =
     useState<WorkflowExecution | null>(null);
 
@@ -112,12 +106,9 @@ export function EditorPage() {
     nodeTypes: nodeTypes || [],
     fallbackWorkflow: httpWorkflowMetadata,
     onExecutionUpdate: (execution) => {
-      // Try to call the callback ref (for UI-triggered executions)
       if (executionCallbackRef.current) {
         executionCallbackRef.current(execution);
       } else {
-        // For scheduled workflows or other backend-triggered executions,
-        // update state so WorkflowBuilder can receive it
         setLatestExecution(execution);
       }
     },
@@ -134,7 +125,6 @@ export function EditorPage() {
         parameters: triggerData as Record<string, unknown> | undefined,
       });
 
-      // Return a cleanup function that clears the ref
       return () => {
         executionCallbackRef.current = null;
       };
@@ -142,14 +132,12 @@ export function EditorPage() {
     [wsExecuteWorkflow]
   );
 
-  // Fetch workflow metadata via HTTP (for description and other metadata)
   useEffect(() => {
     const fetchWorkflowMetadata = async () => {
       if (!id || !orgId) return;
       try {
         const metadata = await getWorkflow(id, orgId);
         setHttpWorkflowMetadata(metadata);
-        setIsEnabled(metadata.enabled === true);
         clearPrefetchedWorkflowMetadata(id, orgId);
       } catch (error) {
         console.error("Failed to fetch workflow metadata:", error);
@@ -169,7 +157,8 @@ export function EditorPage() {
   }, [location.pathname, location.search, location.state, navigate]);
 
   const workflowSettingsButton = useMemo(
-    () => (
+    () =>
+      workflowReadOnly ? null : (
       <Button
         type="button"
         variant="ghost"
@@ -181,8 +170,8 @@ export function EditorPage() {
       >
         <Settings className="h-3.5 w-3.5" />
       </Button>
-    ),
-    [t]
+      ),
+    [t, workflowReadOnly]
   );
 
   usePageBreadcrumbs(
@@ -206,23 +195,21 @@ export function EditorPage() {
   );
 
   const handleWorkflowUpdate = useCallback(
-    (
-      name: string,
-      description?: string,
-      trigger?: WorkflowTrigger,
-      runtime?: WorkflowRuntime,
-      billingMode?: WorkflowBillingMode
-    ) => {
+    (name: string, description?: string) => {
       if (!id) return;
 
-      // Update via WebSocket - this updates the session state and persists to D1/R2
       wsUpdateMetadata?.({
         name,
         description,
-        trigger,
-        runtime,
-        billingMode,
       });
+    },
+    [id, wsUpdateMetadata]
+  );
+
+  const handlePersistRuntime = useCallback(
+    (runtime: WorkflowRuntime) => {
+      if (!id) return;
+      wsUpdateMetadata?.({ runtime });
     },
     [id, wsUpdateMetadata]
   );
@@ -262,7 +249,6 @@ export function EditorPage() {
           schemeId: httpWorkflowMetadata.schemeId,
           trigger: httpWorkflowMetadata.trigger,
           runtime: httpWorkflowMetadata.runtime,
-          billingMode: httpWorkflowMetadata.billingMode ?? "platform",
         }
       : null);
 
@@ -290,11 +276,9 @@ export function EditorPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkflowBuilder
           workflowId={id || ""}
+          mode={workflowReadOnly ? "readonly" : "edit"}
           workflowTrigger={effectiveWorkflowMetadata.trigger as WorkflowTrigger}
           workflowRuntime={effectiveWorkflowMetadata.runtime}
-          workflowBillingMode={
-            effectiveWorkflowMetadata.billingMode ?? "platform"
-          }
           initialNodes={initialNodesForUI}
           initialEdges={initialEdgesForUI}
           nodeTypes={nodeTypes || []}
@@ -306,11 +290,9 @@ export function EditorPage() {
           workflowName={effectiveWorkflowMetadata.name || ""}
           workflowDescription={effectiveWorkflowMetadata.description}
           onWorkflowUpdate={handleWorkflowUpdate}
+          onPersistRuntime={handlePersistRuntime}
           orgId={orgId}
           wsExecuteWorkflow={wsExecuteWorkflow}
-          isEnabled={isEnabled}
-          isTogglingEnabled={isTogglingEnabled}
-          onToggleEnabled={handleToggleEnabled}
           workflowSettingsOpen={workflowSettingsOpen}
           onWorkflowSettingsOpenChange={setWorkflowSettingsOpen}
           initialViewportOneToOne={initialViewportOneToOneRef.current}
@@ -321,4 +303,3 @@ export function EditorPage() {
     </ReactFlowProvider>
   );
 }
-

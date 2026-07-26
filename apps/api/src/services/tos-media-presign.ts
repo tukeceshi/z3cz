@@ -44,7 +44,7 @@ export async function presignTosMediaUpload(
     readonly workflowId?: string;
     readonly mimeType: string;
     readonly contentLength: number;
-    readonly mediaKind: "ai-image" | "ai-video" | "reference";
+    readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
   }
 ): Promise<TosPresignUploadResult | null> {
   const db = createDatabase(env);

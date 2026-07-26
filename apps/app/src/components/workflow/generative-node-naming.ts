@@ -34,3 +34,20 @@ export function resolveGenerativeNodeDisplayName(params: {
 
   return `${baseName} ${existingCount + additionalSameTypeCount + 1}`;
 }
+
+export function formatLocalizedGenerativeNodeDisplayName(params: {
+  readonly nodeType: string;
+  readonly storedName: string;
+  readonly localizedBaseName: string;
+}): string {
+  if (!isGenerativeNodeType(params.nodeType)) {
+    return params.storedName;
+  }
+
+  const suffixMatch = params.storedName.match(/\s(\d+)$/);
+  if (!suffixMatch) {
+    return params.localizedBaseName;
+  }
+
+  return `${params.localizedBaseName} ${suffixMatch[1]}`;
+}

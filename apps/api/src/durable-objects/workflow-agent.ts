@@ -26,7 +26,6 @@
 import type { RuntimeParams } from "@dafthunk/runtime";
 import type {
   ClientMessage,
-  WorkflowErrorMessage,
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
@@ -42,6 +41,12 @@ import { buildMultiplexWorkflowSendEvent } from "../runtime/workflow-event-utils
 import { ExecutionManager } from "../services/execution-manager";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
+import {
+  canAccessExecutions,
+  canEditWorkflows,
+} from "../utils/sub-account-permissions";
+import type { OrgMembershipContext } from "../middleware/org-permissions";
+import { readWsMembershipFromHeaders } from "../middleware/org-permissions";
 
 // ── Agent SDK type shim ──────────────────────────────────────────────────
 // The agents bundled d.ts doesn't resolve some inherited Agent/Server methods
@@ -80,6 +85,30 @@ interface PendingPersist {
   workflowState: WorkflowState;
   organizationId: string;
   apiHost?: string;
+}
+
+interface ConnectionMembershipState {
+  membership?: OrgMembershipContext;
+  executionId?: string;
+}
+
+function getConnectionMembership(
+  connection: Connection
+): OrgMembershipContext | null {
+  const state = connection.state as ConnectionMembershipState | undefined;
+  return state?.membership ?? null;
+}
+
+function mergeConnectionState(
+  connection: Connection,
+  patch: ConnectionMembershipState
+): void {
+  const current = (connection.state as ConnectionMembershipState | undefined) ?? {};
+  connection.setState({ ...current, ...patch });
+}
+
+function denyConnection(connection: Connection, reason: string): void {
+  connection.close(1008, reason);
 }
 
 interface BufferedExecution {
@@ -160,6 +189,11 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     if (!(await this.tryLoadState(workflowId, userId))) {
       connection.close(1008, "Failed to load workflow state");
       return;
+    }
+
+    const membership = readWsMembershipFromHeaders(ctx.request.headers);
+    if (membership) {
+      mergeConnectionState(connection, { membership });
     }
 
     if (this.workflowState) {
@@ -366,7 +400,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       name: workflow.name,
       description: workflow.description ?? undefined,
       schemeId: workflow.schemeId,
-      billingMode: workflow.billingMode ?? "platform",
       trigger: workflow.trigger,
       runtime: workflow.runtime,
       nodes: [],
@@ -378,8 +411,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       name: workflowData.name,
       description: workflowData.description,
       schemeId: workflowData.schemeId,
-      billingMode:
-        workflowData.billingMode ?? workflow.billingMode ?? "platform",
       trigger: workflowData.trigger as WorkflowState["trigger"],
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,
@@ -409,6 +440,15 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     connection: Connection,
     message: WorkflowUpdateMessage
   ): Promise<void> {
+    const membership = getConnectionMembership(connection);
+    if (
+      !membership ||
+      !canEditWorkflows(membership.role, membership.permissions)
+    ) {
+      denyConnection(connection, "Permission denied");
+      return;
+    }
+
     if (!this.workflowState) return;
     if (message.state.id !== this.workflowState.id) return;
     if (!message.state.name || !message.state.trigger) return;
@@ -456,6 +496,15 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     connection: Connection,
     message: WorkflowExecuteMessage
   ): Promise<void> {
+    const membership = getConnectionMembership(connection);
+    if (
+      !membership ||
+      !canAccessExecutions(membership.role, membership.permissions)
+    ) {
+      denyConnection(connection, "Permission denied");
+      return;
+    }
+
     if (message.executionId) {
       await this.subscribeToExecution(connection, message.executionId);
     } else {
@@ -467,7 +516,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     connection: Connection,
     executionId: string
   ): Promise<void> {
-    connection.setState({ executionId });
+    mergeConnectionState(connection, { executionId });
 
     // Check DO storage for a buffered execution update
     const key = WorkflowAgent.STORAGE_PREFIX_EXEC_BUFFER + executionId;
@@ -514,7 +563,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
           parameters
         );
 
-      connection.setState({ executionId });
+      mergeConnectionState(connection, { executionId });
       this.sendExecutionUpdate(connection, execution);
     } catch (error) {
       console.error("Failed to execute workflow:", error);
@@ -802,7 +851,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         name: pending.workflowState.name,
         description: pending.workflowState.description,
         schemeId: pending.workflowState.schemeId,
-        billingMode: pending.workflowState.billingMode ?? "platform",
         trigger: pending.workflowState.trigger,
         runtime: pending.workflowState.runtime,
         organizationId: pending.organizationId,
@@ -818,7 +866,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         workflowStore.update(pending.workflowState.id, pending.organizationId, {
           name: pending.workflowState.name,
           description: pending.workflowState.description ?? null,
-          billingMode: pending.workflowState.billingMode ?? "platform",
           trigger: pending.workflowState.trigger,
           runtime: pending.workflowState.runtime,
         }),

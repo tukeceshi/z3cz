@@ -48,6 +48,15 @@ export const VOLCANO_MODEL_PRICING_CATALOG: readonly VolcanoModelPricingRow[] = 
     monthlyFreeQuota: 500_000,
   },
   {
+    canonicalId: "glm-5-2",
+    alias: "GLM-5.2",
+    modality: "text",
+    unitLabel: "元/百万 tokens",
+    priceLabel: "按量计费",
+    pricingNotes: ["价格以火山引擎官网为准"],
+    monthlyFreeQuota: 500_000,
+  },
+  {
     canonicalId: "doubao-seedance-2",
     alias: "Seedance 2.0",
     modality: "video",

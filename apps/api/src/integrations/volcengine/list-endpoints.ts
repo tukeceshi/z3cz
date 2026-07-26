@@ -24,7 +24,14 @@ export function readEndpointId(item: unknown): string | null {
 export function extractVolcanoListItems(
   result: Record<string, unknown>
 ): unknown[] {
-  for (const key of ["Items", "items", "ApiKeys", "apiKeys"]) {
+  for (const key of [
+    "Items",
+    "items",
+    "Endpoints",
+    "endpoints",
+    "ApiKeys",
+    "apiKeys",
+  ]) {
     const value = result[key];
     if (Array.isArray(value)) {
       return value;
@@ -36,19 +43,41 @@ export function extractVolcanoListItems(
 export async function listVolcanoEndpointIds(
   credentials: VolcengineCredentials
 ): Promise<string[]> {
-  const result = await callVolcengineArkApi<Record<string, unknown>>({
-    credentials,
-    action: "ListEndpoints",
-    queryParams: {
-      PageNumber: "1",
-      PageSize: "100",
-    },
-    body: {
-      ProjectName: VOLCANO_DEFAULT_PROJECT_NAME,
-    },
-  });
+  const collected: string[] = [];
+  let pageNumber = 1;
+  const pageSize = 100;
 
-  return extractVolcanoListItems(result)
-    .map(readEndpointId)
-    .filter((id): id is string => id !== null);
+  while (pageNumber <= 100) {
+    const result = await callVolcengineArkApi<Record<string, unknown>>({
+      credentials,
+      action: "ListEndpoints",
+      body: {
+        PageNumber: pageNumber,
+        PageSize: pageSize,
+        ProjectName: VOLCANO_DEFAULT_PROJECT_NAME,
+      },
+    });
+
+    const items = extractVolcanoListItems(result);
+    if (items.length === 0) {
+      break;
+    }
+
+    collected.push(
+      ...items
+        .map(readEndpointId)
+        .filter((id): id is string => id !== null)
+    );
+
+    const total = result.TotalCount ?? result.totalCount;
+    if (typeof total === "number" && collected.length >= total) {
+      break;
+    }
+    if (items.length < pageSize) {
+      break;
+    }
+    pageNumber += 1;
+  }
+
+  return collected;
 }

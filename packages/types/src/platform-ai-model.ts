@@ -67,10 +67,17 @@ export interface VideoModelParameterRules {
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
+export interface AudioModelParameterRules {
+  readonly schemaVersion: typeof PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION;
+  readonly promptMaxChars: number;
+  readonly generationFields: readonly UpstreamParamProfileField[];
+}
+
 export type PlatformAiModelParameterRules =
   | TextModelParameterRules
   | ImageModelParameterRules
-  | VideoModelParameterRules;
+  | VideoModelParameterRules
+  | AudioModelParameterRules;
 
 export interface PlatformAiModel {
   readonly canonicalId: string;
@@ -171,7 +178,7 @@ export interface UpdateModelInterfacePriorityRequest {
   readonly interfaceIds: readonly string[];
 }
 
-export type AiModelInvocationStatus = "completed" | "failed";
+export type AiModelInvocationStatus = "pending" | "completed" | "failed";
 
 export interface AiModelInvocation {
   readonly id: string;
@@ -186,6 +193,7 @@ export interface AiModelInvocation {
   readonly source: string;
   readonly status: AiModelInvocationStatus;
   readonly error: string | null;
+  readonly generationJobId: string | null;
   readonly createdAt: string;
 }
 
@@ -249,6 +257,7 @@ export interface GenerateAiImageRequest {
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly workflowId?: string;
   readonly nodeId?: string;
+  readonly clientRequestId?: string;
 }
 
 export interface GenerateAiImageResponse {
@@ -256,6 +265,8 @@ export interface GenerateAiImageResponse {
   readonly invocationId: string;
   readonly aiInterfaceId: string;
   readonly storageMode: "ephemeral" | "cloud";
+  readonly jobId?: string;
+  readonly phase?: "ready_to_persist" | "succeeded";
 }
 
 export type OrgVideoModelUnavailableReason = OrgTextModelUnavailableReason;
@@ -288,19 +299,68 @@ export interface SubmitAiVideoRequest {
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly workflowId?: string;
   readonly nodeId?: string;
+  readonly clientRequestId?: string;
 }
 
 export interface SubmitAiVideoResponse {
   readonly taskId: string;
   readonly invocationId: string;
   readonly aiInterfaceId: string;
+  readonly jobId?: string;
 }
 
 export interface PollAiVideoTaskResponse {
-  readonly status: "queued" | "running" | "succeeded" | "failed" | "expired";
+  readonly status:
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "expired"
+    | "cancelled";
   readonly videoUrl?: string;
   readonly videos?: readonly MediaReference[];
   readonly error?: string;
+  readonly reason?: string;
+}
+
+export type OrgAudioModelUnavailableReason = OrgTextModelUnavailableReason;
+
+export interface OrgAudioModelOption {
+  readonly canonicalId: string;
+  readonly displayName: string;
+  readonly modality: AiModelModality;
+  readonly providerModelId: string;
+  readonly parameterRules: AudioModelParameterRules;
+  readonly selectable: boolean;
+  readonly unavailableReason?: OrgAudioModelUnavailableReason;
+  readonly description: string;
+  readonly groupId: string | null;
+  readonly groupName: string | null;
+  readonly groupDescription: string | null;
+  readonly groupIcon: string | null;
+}
+
+export interface ListOrgAudioModelsResponse {
+  readonly models: readonly OrgAudioModelOption[];
+  readonly groups: readonly PlatformAiModelGroup[];
+}
+
+export interface GenerateAiAudioRequest {
+  readonly modelCanonicalId: string;
+  readonly prompt?: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly workflowId?: string;
+  readonly nodeId?: string;
+  readonly clientRequestId?: string;
+}
+
+export interface GenerateAiAudioResponse {
+  readonly audios: readonly MediaReference[];
+  readonly invocationId: string;
+  readonly aiInterfaceId: string;
+  readonly storageMode: "ephemeral" | "cloud";
+  readonly jobId?: string;
+  readonly phase?: "ready_to_persist" | "succeeded";
 }
 
 export interface AiImageResultHistoryItem {
@@ -492,10 +552,71 @@ export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   generationFields: DEFAULT_VIDEO_GENERATION_FIELDS,
 };
 
+export const DEFAULT_AUDIO_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
+  [
+    {
+      name: "speed",
+      apiName: "voice_setting.speed",
+      type: "number",
+      description: "Speech speed multiplier",
+      default: 1,
+    },
+    {
+      name: "vol",
+      apiName: "voice_setting.vol",
+      type: "number",
+      description: "Speech volume",
+      default: 1,
+    },
+    {
+      name: "pitch",
+      apiName: "voice_setting.pitch",
+      type: "number",
+      description: "Speech pitch adjustment",
+      default: 0,
+    },
+    {
+      name: "emotion",
+      apiName: "voice_setting.emotion",
+      type: "string",
+      description: "Speech emotion style",
+      default: "neutral",
+      enumValues: [
+        "happy",
+        "sad",
+        "angry",
+        "fearful",
+        "disgusted",
+        "surprised",
+        "neutral",
+      ],
+    },
+    {
+      name: "voice_id",
+      apiName: "voice_setting.voice_id",
+      type: "string",
+      description: "Default voice identifier",
+      default: "male-qn-qingse",
+      hidden: true,
+    },
+  ] as const;
+
+export const DEFAULT_AUDIO_MODEL_PARAMETER_RULES: AudioModelParameterRules = {
+  schemaVersion: PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
+  promptMaxChars: 5000,
+  generationFields: DEFAULT_AUDIO_GENERATION_FIELDS,
+};
+
 export function isTextModelParameterRules(
   rules: PlatformAiModelParameterRules
 ): rules is TextModelParameterRules {
-  return "promptMaxChars" in rules;
+  return (
+    "referenceInputs" in rules ||
+    ("promptMaxChars" in rules &&
+      !("generationFields" in rules) &&
+      !("maxReferenceImages" in rules) &&
+      !("maxReferenceVideos" in rules))
+  );
 }
 
 export function isImageModelParameterRules(
@@ -512,6 +633,17 @@ export function isVideoModelParameterRules(
   rules: PlatformAiModelParameterRules
 ): rules is VideoModelParameterRules {
   return "maxReferenceVideos" in rules && !("referenceInputs" in rules);
+}
+
+export function isAudioModelParameterRules(
+  rules: PlatformAiModelParameterRules
+): rules is AudioModelParameterRules {
+  return (
+    "generationFields" in rules &&
+    !("referenceInputs" in rules) &&
+    !("maxReferenceImages" in rules) &&
+    !("maxReferenceVideos" in rules)
+  );
 }
 
 export function normalizeVideoModelParameterRules(
@@ -567,6 +699,24 @@ export function normalizeImageModelParameterRules(
     promptMaxChars:
       rules.promptMaxChars ??
       DEFAULT_IMAGE_MODEL_PARAMETER_RULES.promptMaxChars,
+    generationFields,
+  };
+}
+
+export function normalizeAudioModelParameterRules(
+  rules: AudioModelParameterRules
+): AudioModelParameterRules {
+  const generationFields =
+    rules.generationFields?.length > 0
+      ? rules.generationFields
+      : DEFAULT_AUDIO_MODEL_PARAMETER_RULES.generationFields;
+
+  return {
+    ...DEFAULT_AUDIO_MODEL_PARAMETER_RULES,
+    ...rules,
+    promptMaxChars:
+      rules.promptMaxChars ??
+      DEFAULT_AUDIO_MODEL_PARAMETER_RULES.promptMaxChars,
     generationFields,
   };
 }

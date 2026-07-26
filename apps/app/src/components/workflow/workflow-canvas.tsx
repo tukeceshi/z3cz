@@ -36,6 +36,7 @@ import Play from "lucide-react/icons/play";
 import Scissors from "lucide-react/icons/scissors";
 import Square from "lucide-react/icons/square";
 import Trash2 from "lucide-react/icons/trash-2";
+import Music from "lucide-react/icons/music";
 import Type from "lucide-react/icons/type";
 import Video from "lucide-react/icons/video";
 import X from "lucide-react/icons/x";
@@ -55,6 +56,10 @@ import {
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
 import { WorkflowNode } from "./workflow-node";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
+import {
+  WORKFLOW_CANVAS_CLASS,
+  WORKFLOW_CANVAS_DOT_GAP_PX,
+} from "./workflow-canvas-styles";
 import type {
   ConnectionValidationState,
   WorkflowEdgeType,
@@ -179,7 +184,7 @@ export interface WorkflowCanvasProps {
     >
   ) => void;
   onAddNode?: () => void;
-  onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video") => void;
+  onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => void;
   onAction?: (e: React.MouseEvent) => void;
   workflowStatus?: WorkflowExecutionStatus;
   workflowErrorMessage?: string;
@@ -326,8 +331,10 @@ function SidebarToggle({ onClick, isSidebarVisible }: SidebarToggleProps) {
       }
       className={actionBarButtonOutlineClassName}
     >
-      <Bot className="size-4!" />
-      <span className="text-sm font-medium">{t("workflow.canvas.agent")}</span>
+      <span className="inline-flex items-center gap-2">
+        <Bot className="size-4 shrink-0" />
+        <span className="text-sm font-medium">{t("workflow.canvas.agent")}</span>
+      </span>
     </ActionBarButton>
   );
 }
@@ -786,6 +793,7 @@ export function WorkflowCanvas({
         minZoom={0.05}
         maxZoom={4}
         className={cn(
+          WORKFLOW_CANVAS_CLASS,
           "h-full w-full",
           showBackground && "bg-neutral-100/50",
           disabled && "cursor-default"
@@ -819,9 +827,9 @@ export function WorkflowCanvas({
         {showBackground && (
           <Background
             variant={BackgroundVariant.Dots}
-            gap={12}
+            gap={WORKFLOW_CANVAS_DOT_GAP_PX}
             size={1}
-            className="stroke-foreground/5 opacity-50"
+            className="stroke-foreground/5 opacity-50 dark:opacity-100"
           />
         )}
 
@@ -903,6 +911,15 @@ export function WorkflowCanvas({
                     onClick={(e) => {
                       e.stopPropagation();
                       onQuickAddAiNode("ai-video");
+                    }}
+                    disabled={disabled}
+                  />
+                  <QuickAddAiNodeButton
+                    label={t("workflow.canvas.aiAudio")}
+                    icon={<Music className="size-4!" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddAiNode("ai-audio");
                     }}
                     disabled={disabled}
                   />

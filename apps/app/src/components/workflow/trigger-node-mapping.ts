@@ -1,14 +1,14 @@
 import type { Node, NodeType, WorkflowTrigger } from "@dafthunk/types";
 
 /**
- * Maps workflow trigger types to the node type(s) that should be auto-added.
- * `manual` has no trigger nodes.
+ * Mainline canvas workflows no longer auto-insert trigger nodes.
+ * Legacy trigger mappings are kept for archived workflows only.
  */
 const TRIGGER_TO_NODE_TYPES: Record<WorkflowTrigger, string[]> = {
   manual: [],
+  http_request: [],
   scheduled: ["receive-scheduled-trigger"],
   http_webhook: ["http-webhook"],
-  http_request: ["http-request", "http-response"],
   form_webhook: ["form-webhook"],
   form_request: ["form-request", "form-response"],
   email_message: ["receive-email"],

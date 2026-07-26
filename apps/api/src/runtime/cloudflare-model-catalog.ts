@@ -414,7 +414,7 @@ export function buildModelNodeType(
         name: "schema",
         type: "schema",
         description:
-          "Constrain the model's output to a Dafthunk schema (sets response_format).",
+          "Constrain the model's output to a z3cz.com schema (sets response_format).",
         hidden: true,
       }
     : null;

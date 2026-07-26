@@ -35,7 +35,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import type { TranslateFn } from "@/i18n";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -177,6 +179,21 @@ export const createColumns = (
 ];
 
 export function ExecutionsPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessExecutions) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.executions")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <ExecutionsPageContent />;
+}
+
+function ExecutionsPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

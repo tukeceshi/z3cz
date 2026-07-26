@@ -21,9 +21,9 @@ interface BlogPost {
 const { posts } = blogData as { posts: BlogPost[] };
 
 export const meta: MetaFunction = () => {
-  const title = "Blog - Dafthunk";
+  const title = "Blog - z3cz.com";
   const description =
-    "Notes from the Dafthunk team on building agents and workflows on Cloudflare: design patterns, runtime internals, and lessons from production.";
+    "Notes from the z3cz.com team on building agents and workflows on Cloudflare: design patterns, runtime internals, and lessons from production.";
   const url = `${websiteUrl}/blog`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -35,7 +35,7 @@ export const meta: MetaFunction = () => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -54,7 +54,7 @@ export default function BlogIndexPage() {
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    name: "Dafthunk Blog",
+    name: "z3cz.com Blog",
     url: `${websiteUrl}/blog`,
     blogPost: published.map((post) => ({
       "@type": "BlogPosting",

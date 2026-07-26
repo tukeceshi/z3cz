@@ -26,6 +26,7 @@ import {
   updateDataset,
 } from "../db";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 
 // Extend the ApiContext with our custom variable
 type ExtendedApiContext = ApiContext & {
@@ -38,6 +39,7 @@ const datasetRoutes = new Hono<ExtendedApiContext>();
 
 // Apply early access middleware to all dataset routes
 datasetRoutes.use("*", jwtMiddleware);
+datasetRoutes.use("*", requireOrganizationOwner());
 datasetRoutes.use("*", createRequireFeatureMiddleware("datasets"));
 
 /**

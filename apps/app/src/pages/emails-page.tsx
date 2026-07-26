@@ -9,6 +9,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -47,14 +48,14 @@ function downloadVCard(email: EmailRow, t: TranslateFn) {
   const rawName = email.name || t("pages.emails.untitled");
   const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
   const emailAddress = email.address;
-  const fullName = `Dafthunk (${displayName})`;
+  const fullName = `z3cz.com (${displayName})`;
   const vcard = [
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${fullName}`,
-    `N:Dafthunk;${displayName};;;`,
+    `N:z3cz.com;${displayName};;;`,
     `EMAIL:${emailAddress}`,
-    `ORG:Dafthunk`,
+    `ORG:z3cz.com`,
     "END:VCARD",
   ].join("\r\n");
 
@@ -143,6 +144,12 @@ function createColumns(
 }
 
 export function EmailsPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.emails");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <EmailsPageContent />;
+}
+
+function EmailsPageContent() {
   const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

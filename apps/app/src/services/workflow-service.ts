@@ -11,6 +11,8 @@ import {
   GetWorkflowResponse,
   ListWorkflowsResponse,
   Node,
+  UpdateWorkflowListMetadataRequest,
+  UpdateWorkflowListMetadataResponse,
   UpdateWorkflowRequest,
   UpdateWorkflowResponse,
   WorkflowExecution,
@@ -46,19 +48,25 @@ export type ConnectionValidationResult =
   | { status: "invalid"; reason: string };
 
 /**
- * Hook to list all workflows for the current organization
+ * Hook to list workflows for the current organization (optionally scoped to a folder).
  */
-export const useWorkflows = (): {
+export const useWorkflows = (folderId?: string | null): {
   workflows: WorkflowWithMetadata[];
   workflowsError: Error | null;
   isWorkflowsLoading: boolean;
-  mutateWorkflows: () => Promise<any>;
+  mutateWorkflows: () => Promise<WorkflowWithMetadata[] | undefined>;
 } => {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
-  // Create a unique SWR key that includes the organization ID
-  const swrKey = orgId ? `/${orgId}${API_ENDPOINT_BASE}` : null;
+  const folderQuery =
+    folderId === undefined
+      ? ""
+      : `?folderId=${folderId === null ? "root" : encodeURIComponent(folderId)}`;
+
+  const swrKey = orgId
+    ? `/${orgId}${API_ENDPOINT_BASE}${folderQuery}`
+    : null;
 
   const { data, error, isLoading, mutate } = useSWR(
     swrKey,
@@ -67,7 +75,7 @@ export const useWorkflows = (): {
           const response = await makeOrgRequest<ListWorkflowsResponse>(
             orgId,
             API_ENDPOINT_BASE,
-            ""
+            folderQuery
           );
           return response.workflows;
         }
@@ -191,6 +199,22 @@ export const updateWorkflow = async (
   return response;
 };
 
+export const updateWorkflowListMetadata = async (
+  id: string,
+  request: UpdateWorkflowListMetadataRequest,
+  orgId: string
+): Promise<WorkflowWithMetadata> => {
+  return makeOrgRequest<UpdateWorkflowListMetadataResponse>(
+    orgId,
+    API_ENDPOINT_BASE,
+    `/${id}/list-metadata`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(request),
+    }
+  );
+};
+
 /**
  * Get a workflow by ID
  */
@@ -246,25 +270,6 @@ export const deleteWorkflow = async (
     `/${id}`,
     {
       method: "DELETE",
-    }
-  );
-};
-
-/**
- * Set the enabled state of a workflow
- */
-export const setWorkflowEnabled = async (
-  workflowId: string,
-  enabled: boolean,
-  orgId: string
-): Promise<void> => {
-  await makeOrgRequest<void>(
-    orgId,
-    API_ENDPOINT_BASE,
-    `/${workflowId}/enabled`,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ enabled }),
     }
   );
 };

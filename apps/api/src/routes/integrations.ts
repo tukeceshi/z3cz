@@ -23,12 +23,14 @@ import {
   updateIntegration,
 } from "../db";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 
 // Create a new Hono instance for integration endpoints
 const integrationRoutes = new Hono<ApiContext>();
 
 // Apply authentication middleware to all routes
 integrationRoutes.use("*", jwtMiddleware);
+integrationRoutes.use("*", requireOrganizationOwner());
 integrationRoutes.use("*", createRequireFeatureMiddleware("integrations"));
 
 /**

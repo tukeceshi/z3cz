@@ -2,6 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   normalizeImageModelParameterRules,
+  type LocalMediaReference,
   type MediaReference,
   type ObjectReference,
   type OrgImageModelOption,
@@ -25,16 +26,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
-import { useOrgImageModels, generateAiImage, resolveOrgImageModel, useOrgCloudStorageStatus } from "@/services/platform-ai-model-service";
+import { useOrgImageModels, generateAiImage, resolveOrgImageModel } from "@/services/platform-ai-model-service";
+import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
-import {
-  cacheMediaFromUrl,
-} from "@/services/ai-media-cache-service";
-import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
+import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
 import { resolveReferencesForGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
+import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
+import type { PersistGenerativeMediaPhase } from "@/services/persist-generative-media-from-url";
 
+import {
+  clearGenerativeProgress,
+  withGenerativeProgress,
+} from "./generative-progress-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
   GenerativePickNodeDialog,
@@ -74,6 +79,7 @@ import {
   withAiImageGenerateError,
 } from "./ai-image-node-utils";
 import { formatGenerativeApiError } from "./format-generative-api-error";
+import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
@@ -92,6 +98,7 @@ import {
 } from "./ai-image-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
+import { useGenerativeCloudJobProgress, generativeProgressButtonKey } from "@/hooks/use-generative-cloud-job";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export interface AiImageConfigPanelProps {
@@ -122,7 +129,8 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
-  const { configured: cloudConfigured } = useOrgCloudStorageStatus(orgId);
+  const { configured: cloudConfigured, blocksGenerativeMedia } =
+    useCloudStorageCanvasContext();
 
   const resolveMediaPreviewUrl = useCallback(
     (media: MediaReference) =>
@@ -132,6 +140,9 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
   const { models, groups, isLoading } = useOrgImageModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
+    null
+  );
   const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const [generationParams, setGenerationParams] = useState<
@@ -368,6 +379,93 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;
 
+  const handleResumeSuccess = useCallback(
+    (finalImages: readonly MediaReference[]) => {
+      if (!updateNodeData) return;
+      updateNodeData(nodeId, (current) => {
+        const withResult = withAiImageGeneratedResult(current, finalImages, {
+          prompt: promptForGenerate.trim(),
+          params: generationParams,
+        });
+        return {
+          ...withResult,
+          metadata: withAiImageGenerateError(
+            withAiImageGeneratingFlag(
+              clearGenerativeProgress(withResult.metadata),
+              false
+            ),
+            null
+          ),
+        };
+      });
+      toast.success("workflow.aiImagePanel.generated");
+    },
+    [generationParams, nodeId, promptForGenerate, toast, updateNodeData]
+  );
+
+  const handleResumeError = useCallback(
+    (error: unknown) => {
+      const formatted = formatGenerativeApiError(
+        error instanceof Error ? error.message : String(error),
+        t
+      );
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withAiImageGenerateError(
+          withAiImageGeneratingFlag(
+            clearGenerativeProgress(current.metadata),
+            false
+          ),
+          prepareGenerativeCardError(formatted, t)
+        ),
+      }));
+      toast.errorRaw(formatted);
+    },
+    [nodeId, t, toast, updateNodeData]
+  );
+
+  const handleStaged = useCallback(
+    (localMedia: readonly LocalMediaReference[]) => {
+      if (!updateNodeData) return;
+      updateNodeData(nodeId, (current) => {
+        const withResult = withAiImageGeneratedResult(current, localMedia, {
+          prompt: promptForGenerate.trim(),
+          params: generationParams,
+        });
+        return {
+          ...withResult,
+          metadata: withAiImageGenerateError(
+            withGenerativeProgress(
+              withAiImageGeneratingFlag(withResult.metadata, true),
+              {
+                phase: "uploading",
+                stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+              }
+            ),
+            null
+          ),
+        };
+      });
+    },
+    [generationParams, nodeId, promptForGenerate, updateNodeData]
+  );
+
+  const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
+    useGenerativeCloudJobProgress({
+      nodeId,
+      orgId,
+      workflowId,
+      cloudConfigured,
+      metadata: data.metadata,
+      isGenerating,
+      persistPhase,
+      updateNodeData,
+      setPersistPhase,
+      setIsGenerating,
+      onStaged: handleStaged,
+      onResumeSuccess: handleResumeSuccess,
+      onResumeError: handleResumeError,
+    });
+
   const promptReferenceSourceName = useMemo(() => {
     const edge = edges.find(
       (entry) =>
@@ -423,6 +521,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
       const verdict = evaluateAiImagePromptReferenceStructural({
         targetNodeId: nodeId,
+        targetNodeMetadata: data.metadata,
         sourceNodeId,
         sourceNodeType: source.data.nodeType,
         edges,
@@ -601,7 +700,14 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       return;
     }
 
-    if (!canGenerateAiImage({ prompt, referenceCount, rules: modelRules })) {
+    if (
+      !canGenerateAiImage({
+        prompt,
+        referenceCount,
+        rules: modelRules,
+        blocksGenerativeMedia,
+      })
+    ) {
       toast.error("workflow.aiImagePanel.promptRequired");
       return;
     }
@@ -617,9 +723,13 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     }
 
     setIsGenerating(true);
+    syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
       metadata: withAiImageGenerateError(
-        withAiImageGeneratingFlag(current.metadata, true),
+        withGenerativeProgress(
+          withAiImageGeneratingFlag(current.metadata, true),
+          { phase: "generating" }
+        ),
         null
       ),
     }));
@@ -662,18 +772,24 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             : undefined,
         nodeId,
         workflowId,
+        clientRequestId: crypto.randomUUID(),
       });
 
+      let finalImages = response.images;
+      if (response.jobId && response.phase === "ready_to_persist") {
+        syncProgress({ jobId: response.jobId, phase: "generating" });
+        finalImages = await resolveJobMedia(response.jobId);
+      }
+      setPersistPhase(null);
+      clearProgress();
+
       if (workflowId && orgId) {
-        for (const image of response.images) {
-          void cacheMediaFromUrl({
+        for (const image of finalImages) {
+          void ensureGenerativeMediaCached({
             organizationId: orgId,
             workflowId,
-            workflowName: workflowId,
             media: image,
             nodeType: "ai-image",
-          }).then((cachedOk) => {
-            if (cachedOk) notifyAiMediaCacheChanged();
           });
         }
       }
@@ -681,7 +797,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       if (!updateNodeData) return;
 
       updateNodeData(nodeId, (current) => {
-        const withResult = withAiImageGeneratedResult(current, response.images, {
+        const withResult = withAiImageGeneratedResult(current, finalImages, {
           prompt,
           params: generationParams,
         });
@@ -705,6 +821,45 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
       toast.success("workflow.aiImagePanel.generated");
     } catch (error) {
+      const activeJobId = readActiveGenerationJobId(error);
+      if (activeJobId && orgId) {
+        try {
+          syncProgress({ jobId: activeJobId, phase: "generating" });
+          const finalImages = await resolveJobMedia(activeJobId);
+          setPersistPhase(null);
+          clearProgress();
+          if (workflowId) {
+            for (const image of finalImages) {
+              void ensureGenerativeMediaCached({
+                organizationId: orgId,
+                workflowId,
+                media: image,
+                nodeType: "ai-image",
+              });
+            }
+          }
+          if (updateNodeData) {
+            updateNodeData(nodeId, (current) => {
+              const withResult = withAiImageGeneratedResult(current, finalImages, {
+                prompt,
+                params: generationParams,
+              });
+              return {
+                ...withResult,
+                metadata: withAiImageGenerateError(
+                  withAiImageGeneratingFlag(withResult.metadata, false),
+                  null
+                ),
+              };
+            });
+          }
+          toast.success("workflow.aiImagePanel.generated");
+          return;
+        } catch {
+          // fall through to generic error handling
+        }
+      }
+
       const formatted = formatGenerativeApiError(
         error instanceof Error ? error.message : String(error),
         t
@@ -712,14 +867,18 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiImageGenerateError(
           withAiImageGeneratingFlag(current.metadata, false),
-          formatted
+          prepareGenerativeCardError(formatted, t)
         ),
       }));
       toast.errorRaw(formatted);
     } finally {
       updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiImageGeneratingFlag(current.metadata, false),
+        metadata: withAiImageGeneratingFlag(
+          clearGenerativeProgress(current.metadata),
+          false
+        ),
       }));
+      setPersistPhase(null);
       setIsGenerating(false);
     }
   };
@@ -734,11 +893,13 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       prompt: promptForGenerate,
       referenceCount,
       rules: modelRules,
+      blocksGenerativeMedia,
     });
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
     const textEntries = listPickableAiImagePromptSources({
       targetNodeId: nodeId,
+      targetNodeMetadata: data.metadata,
       edges,
       nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
     }).map((entry) => {
@@ -911,9 +1072,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             ) : (
               <SparklesIcon className="h-3.5 w-3.5" />
             )}
-            {isGenerating
-              ? t("workflow.aiImagePanel.generating")
-              : t("workflow.aiImagePanel.generate")}
+            {t(generativeProgressButtonKey(activeProgressPhase))}
           </Button>
         </div>
       </GenerativeConfigPanelShell>

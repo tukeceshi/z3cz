@@ -42,7 +42,7 @@ interface TourProviderProps {
 }
 
 export function TourProvider({ children }: TourProviderProps) {
-  const { t } = useTranslation();
+  const { t, siteSettings } = useTranslation();
   const tourSteps = useMemo(() => getTourSteps(t), [t]);
   const { profile, mutateProfile } = useProfile();
   const { workflows, isWorkflowsLoading } = useWorkflows();
@@ -58,6 +58,7 @@ export function TourProvider({ children }: TourProviderProps) {
   useEffect(() => {
     if (
       !hasAutoStarted &&
+      siteSettings.newUserTourEnabled &&
       profile &&
       !profile.tourCompleted &&
       !isWorkflowsLoading &&
@@ -70,7 +71,7 @@ export function TourProvider({ children }: TourProviderProps) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [profile, workflows, isWorkflowsLoading, hasAutoStarted]);
+  }, [profile, workflows, isWorkflowsLoading, hasAutoStarted, siteSettings.newUserTourEnabled]);
 
   const completeTour = useCallback(async () => {
     setIsActive(false);

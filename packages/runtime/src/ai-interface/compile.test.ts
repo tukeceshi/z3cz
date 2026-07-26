@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compileAiInterfaceSourceSpec,
+  createAnthropicMessagesSourceSpec,
   createOpenAiCompatibleChatSourceSpec,
   computeAiInterfaceChecksum,
   buildAiInterfaceManifest,
@@ -32,6 +33,31 @@ describe("compileAiInterfaceSourceSpec", () => {
     expect(artifact.nodeType.type).toBe("ai-interface");
     expect(artifact.nodeType.id).toBe("ai-interface-openai-chat-v1");
     expect(artifact.checksum).toHaveLength(64);
+  });
+
+  it("compiles Anthropic Messages template into runtime artifact", () => {
+    const source = createAnthropicMessagesSourceSpec({
+      id: "claude-messages-v1",
+      name: "Claude Messages",
+      description: "Anthropic Messages API",
+      provider: "custom",
+      baseUrl: "https://api.anthropic.com",
+      defaultModel: "claude-sonnet-5",
+      models: [{ id: "claude-sonnet-5", label: "Claude Sonnet 5" }],
+    });
+
+    const artifact = compileAiInterfaceSourceSpec({ source, version: 1 });
+
+    expect(artifact.execution.sync.path).toBe("/v1/messages");
+    expect(artifact.connection.headerName).toBe("x-api-key");
+    expect(artifact.connection.defaultHeaders["anthropic-version"]).toBe(
+      "2023-06-01"
+    );
+    expect(artifact.execution.sync.responseTextPath).toEqual([
+      "content",
+      "0",
+      "text",
+    ]);
   });
 
   it("builds manifest with full node type list", () => {

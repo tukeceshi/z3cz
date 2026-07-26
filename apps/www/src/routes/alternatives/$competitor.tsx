@@ -72,10 +72,10 @@ export function loader({ params }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  if (!data) return [{ title: "Not Found - Dafthunk" }];
+  if (!data) return [{ title: "Not Found - z3cz.com" }];
 
   const { alternative } = data;
-  const title = `${alternative.name} Alternative: MIT, Serverless | Dafthunk`;
+  const title = `${alternative.name} Alternative: MIT, Serverless | z3cz.com`;
   const description = alternative.metaDescription;
   const url = `${websiteUrl}/alternatives/${alternative.id}`;
 
@@ -87,7 +87,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: `${websiteUrl}/og-image.webp` },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -128,7 +128,7 @@ export default function AlternativePage({
       {
         "@type": "ListItem",
         position: 3,
-        name: `Dafthunk vs ${alternative.name}`,
+        name: `z3cz.com vs ${alternative.name}`,
         item: `${websiteUrl}/alternatives/${alternative.id}`,
       },
     ],
@@ -168,7 +168,7 @@ export default function AlternativePage({
 
         <section className="mb-32" aria-label="Hero">
           <h1 className="text-7xl font-light text-gray-900 mb-10 leading-[1.1]">
-            Dafthunk vs {alternative.name}
+            z3cz.com vs {alternative.name}
           </h1>
           <p className="text-2xl text-gray-600 leading-relaxed max-w-4xl">
             {alternative.intro ?? alternative.tagline}
@@ -199,7 +199,7 @@ export default function AlternativePage({
             id="differentiators-heading"
             className="text-6xl font-light text-gray-900 mb-12"
           >
-            Where Dafthunk is different
+            Where z3cz.com is different
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -207,7 +207,7 @@ export default function AlternativePage({
                 <tr>
                   <th className="pb-6 pr-6 w-1/5" />
                   <th className="pb-6 px-6 text-3xl font-light text-gray-900 w-2/5">
-                    Dafthunk
+                    z3cz.com
                   </th>
                   <th className="pb-6 pl-6 text-3xl font-light text-gray-900 w-2/5">
                     {alternative.name}
@@ -293,7 +293,7 @@ export default function AlternativePage({
             id="cta-heading"
             className="text-6xl font-light text-gray-900 mb-8 leading-[1.1]"
           >
-            Try Dafthunk
+            Try z3cz.com
           </h2>
           <p className="text-2xl text-gray-600 mb-10 leading-relaxed max-w-3xl">
             Start on our hosted SaaS and build your first workflow in about four

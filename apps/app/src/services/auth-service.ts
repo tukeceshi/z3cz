@@ -1,8 +1,10 @@
-import {
+import type {
   AuthProvider,
   AuthSetupStatusResponse,
+  GetSubAccountInvitationPreviewResponse,
   JWTTokenPayload,
   PasswordAuthResponse,
+  RegisterSubAccountRequest,
 } from "@dafthunk/types";
 import { mutate } from "swr";
 
@@ -166,14 +168,15 @@ export const authService = {
 
   async registerWithPassword(
     email: string,
-    password: string
+    password: string,
+    verificationCode?: string
   ): Promise<JWTTokenPayload> {
     try {
       const response = await makeRequest<PasswordAuthResponse>(
         "/auth/register",
         {
           method: "POST",
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, verificationCode }),
         },
         true
       );
@@ -184,6 +187,58 @@ export const authService = {
 
       mutate(AUTH_USER_KEY, response.user, { revalidate: false });
       mutate("/auth/setup-status");
+      return response.user;
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        throw new AuthError(error.message, error.code);
+      }
+      throw error;
+    }
+  },
+
+  async sendRegistrationCode(email: string): Promise<void> {
+    try {
+      await makeRequest<{ success: boolean }>(
+        "/auth/register/send-code",
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+        true
+      );
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        throw new AuthError(error.message, error.code);
+      }
+      throw error;
+    }
+  },
+
+  async getSubAccountInvitationPreview(invitationId: string) {
+    return makeRequest<GetSubAccountInvitationPreviewResponse>(
+      `/auth/sub-account-invitations/${invitationId}`,
+      { method: "GET" }
+    );
+  },
+
+  async registerSubAccount(
+    request: RegisterSubAccountRequest
+  ): Promise<JWTTokenPayload> {
+    try {
+      const response = await makeRequest<PasswordAuthResponse>(
+        "/auth/register/sub-account",
+        {
+          method: "POST",
+          body: JSON.stringify(request),
+        },
+        true
+      );
+
+      if (!response.success || !response.user?.sub) {
+        throw new AuthError("Registration failed");
+      }
+
+      mutate(AUTH_USER_KEY, response.user, { revalidate: false });
       return response.user;
     } catch (error) {
       if (error instanceof ApiRequestError) {

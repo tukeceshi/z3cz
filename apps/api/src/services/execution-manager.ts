@@ -18,7 +18,7 @@ import {
   WorkflowExecutor,
   type WorkflowExecutorParameters,
 } from "../services/workflow-executor";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
+import { isCreditExhausted } from "../utils/credits";
 
 interface ExecutionManagerOptions {
   env: Bindings;
@@ -57,10 +57,7 @@ export class ExecutionManager {
 
     // The throw is caught by the WorkflowAgent DO and surfaced over the
     // WebSocket as a failed execution.
-    if (
-      !shouldSkipPlatformCreditCheck(state.billingMode) &&
-      isCreditExhausted(billingInfo, this.env.CLOUDFLARE_ENV)
-    ) {
+    if (isCreditExhausted(billingInfo, this.env.CLOUDFLARE_ENV)) {
       throw new Error("Insufficient compute credits");
     }
 
@@ -79,7 +76,6 @@ export class ExecutionManager {
       workflow: {
         id: state.id,
         name: state.name,
-        billingMode: state.billingMode,
         trigger: state.trigger,
         runtime: state.runtime,
         nodes: state.nodes,

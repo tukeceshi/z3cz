@@ -13,7 +13,7 @@ import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils
 import { resolveMediaCacheFetchUrl } from "@/services/media-object-url";
 
 const DB_NAME = "dafthunk-ai-media-cache";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const ENTRIES_STORE = "entries";
 const THUMBS_STORE = "thumbs";
 const WORKFLOWS_STORE = "workflows";
@@ -26,7 +26,7 @@ export interface AiMediaCacheEntry {
   readonly workflowId: string;
   readonly workflowName: string;
   readonly mediaId: string;
-  readonly nodeType: "ai-image" | "ai-video";
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly mimeType: string;
   readonly byteSize: number;
   readonly createdAt: string;
@@ -39,9 +39,10 @@ export interface AiMediaWorkflowSummary {
   readonly workflowName: string;
   readonly imageCount: number;
   readonly videoCount: number;
+  readonly audioCount: number;
   readonly totalBytes: number;
   readonly updatedAt: string;
-  /** Distinct cached files (same as imageCount + videoCount after reconcile). */
+  /** Distinct cached files. */
   readonly entryCount: number;
 }
 
@@ -51,7 +52,7 @@ export interface AiMediaCacheEntrySummary {
   readonly workflowId: string;
   readonly workflowName: string;
   readonly mediaId: string;
-  readonly nodeType: "ai-image" | "ai-video";
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly mimeType: string;
   readonly byteSize: number;
   readonly createdAt: string;
@@ -85,6 +86,34 @@ interface MetaRecord {
 }
 
 type WorkflowRecord = AiMediaWorkflowSummary & { key: string };
+
+function modalityCountDelta(
+  nodeType: AiMediaCacheEntry["nodeType"],
+  sign: 1 | -1
+): Pick<AiMediaWorkflowSummary, "imageCount" | "videoCount" | "audioCount"> {
+  return {
+    imageCount: nodeType === "ai-image" ? sign : 0,
+    videoCount: nodeType === "ai-video" ? sign : 0,
+    audioCount: nodeType === "ai-audio" ? sign : 0,
+  };
+}
+
+function applyCountDelta(
+  summary: Pick<
+    AiMediaWorkflowSummary,
+    "imageCount" | "videoCount" | "audioCount" | "entryCount"
+  >,
+  nodeType: AiMediaCacheEntry["nodeType"],
+  sign: 1 | -1
+): Pick<AiMediaWorkflowSummary, "imageCount" | "videoCount" | "audioCount" | "entryCount"> {
+  const delta = modalityCountDelta(nodeType, sign);
+  return {
+    imageCount: summary.imageCount + delta.imageCount,
+    videoCount: summary.videoCount + delta.videoCount,
+    audioCount: summary.audioCount + delta.audioCount,
+    entryCount: Math.max(0, summary.entryCount + sign),
+  };
+}
 
 function clampLimitMb(value: number): number {
   return Math.min(
@@ -127,12 +156,19 @@ function openDatabase(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
     request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
+      const transaction = request.transaction;
       if (!db.objectStoreNames.contains(ENTRIES_STORE)) {
         const store = db.createObjectStore(ENTRIES_STORE, { keyPath: "key" });
         store.createIndex("workflow", "workflowId", { unique: false });
         store.createIndex("lastAccessAt", "lastAccessAt", { unique: false });
+        store.createIndex("mediaId", "mediaId", { unique: false });
+      } else if (event.oldVersion < 3 && transaction) {
+        const store = transaction.objectStore(ENTRIES_STORE);
+        if (!store.indexNames.contains("mediaId")) {
+          store.createIndex("mediaId", "mediaId", { unique: false });
+        }
       }
       if (!db.objectStoreNames.contains(WORKFLOWS_STORE)) {
         db.createObjectStore(WORKFLOWS_STORE, { keyPath: "key" });
@@ -234,15 +270,22 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
     totalBytes += entry.byteSize;
     const wfKey = workflowKey(entry.organizationId, entry.workflowId);
     const prev = workflowMap.get(wfKey);
-    const isVideo = entry.nodeType === "ai-video";
+    const counts = applyCountDelta(
+      prev ?? {
+        imageCount: 0,
+        videoCount: 0,
+        audioCount: 0,
+        entryCount: 0,
+      },
+      entry.nodeType,
+      1
+    );
 
     if (prev) {
       workflowMap.set(wfKey, {
         ...prev,
-        imageCount: prev.imageCount + (isVideo ? 0 : 1),
-        videoCount: prev.videoCount + (isVideo ? 1 : 0),
+        ...counts,
         totalBytes: prev.totalBytes + entry.byteSize,
-        entryCount: prev.entryCount + 1,
         updatedAt:
           entry.lastAccessAt > prev.updatedAt ? entry.lastAccessAt : prev.updatedAt,
       });
@@ -252,10 +295,8 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
         organizationId: entry.organizationId,
         workflowId: entry.workflowId,
         workflowName: entry.workflowName,
-        imageCount: isVideo ? 0 : 1,
-        videoCount: isVideo ? 1 : 0,
+        ...counts,
         totalBytes: entry.byteSize,
-        entryCount: 1,
         updatedAt: entry.lastAccessAt,
       });
     }
@@ -300,24 +341,28 @@ async function deleteEntry(db: IDBDatabase, key: string): Promise<void> {
     }
 
     if (summary) {
-      const isVideo = entry.nodeType === "ai-video";
+      const entryCount =
+        summary.entryCount ??
+        summary.imageCount + summary.videoCount + (summary.audioCount ?? 0);
+      const counts = applyCountDelta(
+        {
+          imageCount: summary.imageCount,
+          videoCount: summary.videoCount,
+          audioCount: summary.audioCount ?? 0,
+          entryCount,
+        },
+        entry.nodeType,
+        -1
+      );
       const next: WorkflowRecord = {
         ...summary,
-        imageCount: summary.imageCount - (isVideo ? 0 : 1),
-        videoCount: summary.videoCount - (isVideo ? 1 : 0),
-        entryCount: Math.max(
-          0,
-          (summary.entryCount ?? summary.imageCount + summary.videoCount) - 1
-        ),
+        ...counts,
         totalBytes: Math.max(0, summary.totalBytes - entry.byteSize),
         updatedAt: new Date().toISOString(),
       };
 
       const wfStore = transaction.objectStore(WORKFLOWS_STORE);
-      if (
-        next.entryCount <= 0 ||
-        (next.imageCount <= 0 && next.videoCount <= 0 && next.totalBytes <= 0)
-      ) {
+      if (next.entryCount <= 0 || next.totalBytes <= 0) {
         wfStore.delete(wfKey);
       } else {
         wfStore.put(next);
@@ -447,12 +492,145 @@ export async function getAiMediaCacheStats(
   });
 }
 
+async function putCacheBlobRecord(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly mediaId: string;
+  readonly nodeType: AiMediaCacheEntry["nodeType"];
+  readonly mimeType: string;
+  readonly blob: Blob;
+  readonly requireEnabled?: boolean;
+}): Promise<boolean> {
+  const settings = await getAiMediaCacheSettings();
+  if (params.requireEnabled !== false && !settings.enabled) return false;
+
+  const storedBlob =
+    params.blob.type === params.mimeType
+      ? params.blob
+      : new Blob([params.blob], { type: params.mimeType });
+  const byteSize = storedBlob.size;
+  const now = new Date().toISOString();
+  const key = entryKey(params.organizationId, params.workflowId, params.mediaId);
+
+  return withDatabase(async (db) => {
+    const existingTx = db.transaction(ENTRIES_STORE, "readonly");
+    const existing = await idbRequest<CacheEntryRecord | undefined>(
+      existingTx.objectStore(ENTRIES_STORE).get(key)
+    );
+
+    const record: CacheEntryRecord = {
+      key,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      workflowName: params.workflowName,
+      mediaId: params.mediaId,
+      nodeType: params.nodeType,
+      mimeType: params.mimeType,
+      byteSize,
+      createdAt: existing?.createdAt ?? now,
+      lastAccessAt: now,
+      blob: storedBlob,
+    };
+
+    const wfKey = workflowKey(params.organizationId, params.workflowId);
+    const wfReadTx = db.transaction(WORKFLOWS_STORE, "readonly");
+    const prev = await idbRequest<WorkflowRecord | undefined>(
+      wfReadTx.objectStore(WORKFLOWS_STORE).get(wfKey)
+    );
+    const meta = await readMeta(db);
+    const deltaBytes = existing ? byteSize - existing.byteSize : byteSize;
+    const prevEntryCount =
+      prev?.entryCount ??
+      (prev?.imageCount ?? 0) + (prev?.videoCount ?? 0) + (prev?.audioCount ?? 0);
+    const counts = existing
+      ? {
+          imageCount: prev?.imageCount ?? 0,
+          videoCount: prev?.videoCount ?? 0,
+          audioCount: prev?.audioCount ?? 0,
+          entryCount: prevEntryCount,
+        }
+      : applyCountDelta(
+          {
+            imageCount: prev?.imageCount ?? 0,
+            videoCount: prev?.videoCount ?? 0,
+            audioCount: prev?.audioCount ?? 0,
+            entryCount: prevEntryCount,
+          },
+          params.nodeType,
+          1
+        );
+
+    await runTransaction(
+      db,
+      [ENTRIES_STORE, WORKFLOWS_STORE, META_STORE],
+      "readwrite",
+      (transaction) => {
+        transaction.objectStore(ENTRIES_STORE).put(record);
+        transaction.objectStore(WORKFLOWS_STORE).put({
+          key: wfKey,
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          workflowName: params.workflowName,
+          ...counts,
+          totalBytes: Math.max(0, (prev?.totalBytes ?? 0) + deltaBytes),
+          updatedAt: now,
+        });
+        transaction.objectStore(META_STORE).put({
+          ...meta,
+          totalBytes: Math.max(0, meta.totalBytes + deltaBytes),
+        });
+      }
+    );
+
+    if (params.nodeType === "ai-image") {
+      const thumb = await generateImageThumbnail(storedBlob, params.mimeType);
+      if (thumb && thumb.size > 0) {
+        await storeThumb(db, key, thumb);
+      }
+    }
+
+    const metaAfterWrite = await readMeta(db);
+    await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
+    return true;
+  });
+}
+
+export async function cacheMediaFromBlob(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly mediaId: string;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+}): Promise<boolean> {
+  return putCacheBlobRecord(params);
+}
+
+/** Writes blob storage even when AI media cache is disabled (generative staging). */
+export async function writeGenerativeMediaCacheBlob(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly workflowName?: string;
+  readonly mediaId: string;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+}): Promise<boolean> {
+  return putCacheBlobRecord({
+    ...params,
+    workflowName: params.workflowName ?? params.workflowId,
+    requireEnabled: false,
+  });
+}
+
 export async function cacheMediaFromUrl(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly workflowName: string;
   readonly media: MediaReference;
-  readonly nodeType: "ai-image" | "ai-video";
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly fetchUrl?: string;
 }): Promise<boolean> {
   const settings = await getAiMediaCacheSettings();
@@ -480,81 +658,102 @@ export async function cacheMediaFromUrl(params: {
   const mimeType =
     params.media.mimeType ||
     blob.type ||
-    (params.nodeType === "ai-video" ? "video/mp4" : "image/jpeg");
-  const storedBlob =
-    blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
-  const byteSize = storedBlob.size;
-  const now = new Date().toISOString();
-  const key = entryKey(params.organizationId, params.workflowId, mediaId);
+    (params.nodeType === "ai-video"
+      ? "video/mp4"
+      : params.nodeType === "ai-audio"
+        ? "audio/mpeg"
+        : "image/jpeg");
 
+  return putCacheBlobRecord({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    workflowName: params.workflowName,
+    mediaId,
+    nodeType: params.nodeType,
+    mimeType,
+    blob,
+  });
+}
+
+async function readCachedMediaEntry(
+  db: IDBDatabase,
+  params: {
+    readonly organizationId: string;
+    readonly workflowId: string;
+    readonly mediaId: string;
+  }
+): Promise<CacheEntryRecord | null> {
+  const key = entryKey(params.organizationId, params.workflowId, params.mediaId);
+  const readTx = db.transaction(ENTRIES_STORE, "readonly");
+  const entry = await idbRequest<CacheEntryRecord | undefined>(
+    readTx.objectStore(ENTRIES_STORE).get(key)
+  );
+
+  if (!entry) {
+    return null;
+  }
+
+  const touchedAt = new Date().toISOString();
+  await runTransaction(db, ENTRIES_STORE, "readwrite", (transaction) => {
+    transaction.objectStore(ENTRIES_STORE).put({
+      ...entry,
+      lastAccessAt: touchedAt,
+    });
+  });
+
+  return entry;
+}
+
+export async function getCachedMediaBlob(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<Blob | null> {
   return withDatabase(async (db) => {
-    const existingTx = db.transaction(ENTRIES_STORE, "readonly");
-    const existing = await idbRequest<CacheEntryRecord | undefined>(
-      existingTx.objectStore(ENTRIES_STORE).get(key)
-    );
+    const entry = await readCachedMediaEntry(db, params);
+    return entry?.blob ?? null;
+  });
+}
 
-    const record: CacheEntryRecord = {
-      key,
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      workflowName: params.workflowName,
-      mediaId,
-      nodeType: params.nodeType,
-      mimeType,
-      byteSize,
-      createdAt: existing?.createdAt ?? now,
-      lastAccessAt: now,
-      blob: storedBlob,
-    };
-
-    const wfKey = workflowKey(params.organizationId, params.workflowId);
-    const wfReadTx = db.transaction(WORKFLOWS_STORE, "readonly");
-    const prev = await idbRequest<WorkflowRecord | undefined>(
-      wfReadTx.objectStore(WORKFLOWS_STORE).get(wfKey)
-    );
-    const meta = await readMeta(db);
-    const isVideo = params.nodeType === "ai-video";
-    const deltaBytes = existing ? byteSize - existing.byteSize : byteSize;
-    const deltaImage = existing ? 0 : isVideo ? 0 : 1;
-    const deltaVideo = existing ? 0 : isVideo ? 1 : 0;
-
-    await runTransaction(
-      db,
-      [ENTRIES_STORE, WORKFLOWS_STORE, META_STORE],
-      "readwrite",
-      (transaction) => {
-        transaction.objectStore(ENTRIES_STORE).put(record);
-        transaction.objectStore(WORKFLOWS_STORE).put({
-          key: wfKey,
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          workflowName: params.workflowName,
-          imageCount: (prev?.imageCount ?? 0) + deltaImage,
-          videoCount: (prev?.videoCount ?? 0) + deltaVideo,
-          entryCount:
-            (prev?.entryCount ?? (prev?.imageCount ?? 0) + (prev?.videoCount ?? 0)) +
-            (existing ? 0 : 1),
-          totalBytes: Math.max(0, (prev?.totalBytes ?? 0) + deltaBytes),
-          updatedAt: now,
-        });
-        transaction.objectStore(META_STORE).put({
-          ...meta,
-          totalBytes: Math.max(0, meta.totalBytes + deltaBytes),
-        });
+export async function readCachedMediaEntryByMediaId(
+  mediaId: string
+): Promise<AiMediaCacheEntry | null> {
+  return withDatabase(async (db) => {
+    const readTx = db.transaction(ENTRIES_STORE, "readonly");
+    const store = readTx.objectStore(ENTRIES_STORE);
+    if (store.indexNames.contains("mediaId")) {
+      const entries = await idbRequest<CacheEntryRecord[]>(
+        store.index("mediaId").getAll(mediaId)
+      );
+      if (entries.length === 0) {
+        return null;
       }
-    );
-
-    if (params.nodeType === "ai-image") {
-      const thumb = await generateImageThumbnail(storedBlob, mimeType);
-      if (thumb && thumb.size > 0) {
-        await storeThumb(db, key, thumb);
-      }
+      const entry = entries.sort((a, b) =>
+        b.lastAccessAt.localeCompare(a.lastAccessAt)
+      )[0]!;
+      return entry;
     }
 
-    const metaAfterWrite = await readMeta(db);
-    await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
-    return true;
+    const all = await readAllEntries(db);
+    const matches = all.filter((entry) => entry.mediaId === mediaId);
+    if (matches.length === 0) {
+      return null;
+    }
+    return matches.sort((a, b) =>
+      b.lastAccessAt.localeCompare(a.lastAccessAt)
+    )[0]!;
   });
+}
+
+export async function readCachedMediaBlobByMediaId(
+  mediaId: string
+): Promise<{ readonly blob: Blob; readonly mimeType: string } | null> {
+  const entry = await readCachedMediaEntryByMediaId(mediaId);
+  if (!entry) {
+    return null;
+  }
+  const record = entry as CacheEntryRecord;
+  return { blob: record.blob, mimeType: entry.mimeType };
 }
 
 export async function getCachedMediaBlobUrl(params: {
@@ -564,21 +763,8 @@ export async function getCachedMediaBlobUrl(params: {
   readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
   return withDatabase(async (db) => {
-    const key = entryKey(params.organizationId, params.workflowId, params.mediaId);
-    const readTx = db.transaction(ENTRIES_STORE, "readonly");
-    const entry = await idbRequest<CacheEntryRecord | undefined>(
-      readTx.objectStore(ENTRIES_STORE).get(key)
-    );
-
+    const entry = await readCachedMediaEntry(db, params);
     if (!entry) return null;
-
-    const touchedAt = new Date().toISOString();
-    await runTransaction(db, ENTRIES_STORE, "readwrite", (transaction) => {
-      transaction.objectStore(ENTRIES_STORE).put({
-        ...entry,
-        lastAccessAt: touchedAt,
-      });
-    });
 
     if (params.size === "thumb") {
       const thumbBlob = await getOrCreateThumbBlob(db, entry);
@@ -654,7 +840,7 @@ function toEntrySummary(entry: AiMediaCacheEntry): AiMediaCacheEntrySummary {
 
 function mimeToExtension(
   mimeType: string,
-  nodeType: "ai-image" | "ai-video"
+  nodeType: "ai-image" | "ai-video" | "ai-audio"
 ): string {
   const base = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
   const map: Record<string, string> = {
@@ -665,8 +851,14 @@ function mimeToExtension(
     "image/gif": "gif",
     "video/mp4": "mp4",
     "video/webm": "webm",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
   };
-  return map[base] ?? (nodeType === "ai-video" ? "mp4" : "png");
+  if (nodeType === "ai-video") return map[base] ?? "mp4";
+  if (nodeType === "ai-audio") return map[base] ?? "mp3";
+  return map[base] ?? "png";
 }
 
 export function cacheEntryDownloadFilename(
@@ -674,7 +866,12 @@ export function cacheEntryDownloadFilename(
   index: number
 ): string {
   const ext = mimeToExtension(entry.mimeType, entry.nodeType);
-  const prefix = entry.nodeType === "ai-video" ? "video" : "image";
+  const prefix =
+    entry.nodeType === "ai-video"
+      ? "video"
+      : entry.nodeType === "ai-audio"
+        ? "audio"
+        : "image";
   const idPart = entry.mediaId.slice(0, 8);
   return `${prefix}-${idPart}-${index + 1}.${ext}`;
 }

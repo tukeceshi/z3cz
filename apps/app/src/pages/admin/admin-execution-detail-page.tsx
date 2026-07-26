@@ -235,7 +235,6 @@ export function AdminExecutionDetailPage() {
               initialWorkflowExecution={workflowBuilderExecution}
               createObjectUrl={createObjectUrl}
               mode="readonly"
-              disabledFeedback={true}
               orgId={execution.organizationId || ""}
             />
           ) : (

@@ -8,6 +8,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,12 @@ import { useDatabase } from "@/services/database-service";
 import { makeOrgRequest } from "@/services/utils";
 
 export function DatabaseConsolePage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.databases");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <DatabaseConsolePageContent />;
+}
+
+function DatabaseConsolePageContent() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { organization } = useAuth();

@@ -167,6 +167,8 @@ services:
   # Optional single-origin edge for parity with docker-host (default off).
   # Usage: docker compose --profile gateway up -d
   # Browser: http://localhost:8080  (do not mix cookies with :3101)
+  # Gateway parity: set in .env.docker — VITE_WWW_BASENAME=/m,
+  # VITE_WEBSITE_URL=http://localhost:8080/m, VITE_APP_URL=http://localhost:8080
   caddy-gateway:
     profiles: ["gateway"]
     image: caddy:2.9-alpine
@@ -174,6 +176,7 @@ services:
     depends_on:
       - app
       - api
+      - www
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     volumes:

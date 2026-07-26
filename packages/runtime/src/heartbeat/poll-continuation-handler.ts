@@ -21,9 +21,9 @@ import {
 export interface PollContinuationHandlerDeps {
   readonly objectStore: ObjectStore;
   readonly env: NodeEnv;
-  readonly relayAccountService?: import("../relay-account-service").RelayAccountService;
   readonly aiInterfaceService?: import("../ai-interface-service").AiInterfaceService;
   readonly resolveAiVideoStorage?: import("../ai-image-storage").ResolveAiImageStorage;
+  readonly trackWorkflowGenerationJob?: import("../generation-job-tracker").WorkflowGenerationJobTracker;
   readonly findNode: (workflowContext: WorkflowExecutionContext, nodeId: string) => Node | undefined;
 }
 
@@ -160,9 +160,9 @@ export function createPollContinuationHandler(
           organizationId: workflowContext.organizationId,
           executionId: workflowContext.executionId,
           env: deps.env,
-          relayAccountService: deps.relayAccountService,
           aiInterfaceService: deps.aiInterfaceService,
           resolveAiVideoStorage: deps.resolveAiVideoStorage,
+          trackWorkflowGenerationJob: deps.trackWorkflowGenerationJob,
           workflowId: workflowContext.workflowId,
           nodeOutputs: node.outputs,
         });

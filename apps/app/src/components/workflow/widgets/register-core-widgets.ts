@@ -1,3 +1,4 @@
+import { aiAudioWidget } from "./ai/ai-audio-widget";
 import { aiImageWidget } from "./ai/ai-image-widget";
 import { aiTextWidget } from "./ai/ai-text-widget";
 import { aiVideoWidget } from "./ai/ai-video-widget";
@@ -11,6 +12,7 @@ const coreWidgets: readonly WidgetDescriptor[] = [
   aiTextWidget,
   aiImageWidget,
   aiVideoWidget,
+  aiAudioWidget,
 ];
 
 export function registerCoreWidgets(registry: WidgetRegistryLike): void {

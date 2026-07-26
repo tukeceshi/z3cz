@@ -1,6 +1,7 @@
 import {
-  VOLCANO_AI_MODEL_CATALOG,
   VOLCANO_ARK_API_KEY_DURATION_SECONDS,
+  VOLCANO_AGGREGATE_MODEL_CATALOG,
+  normalizeVolcanoArkEndpoints,
   type AiModelCatalogEntry,
   type VolcanoActivationProbeResult,
   type VolcanoInterfaceMetadata,
@@ -24,10 +25,10 @@ export function isVolcanoMetadata(
 
 export function buildDefaultVolcanoModels(
   enabledCanonicalIds?: readonly string[],
-  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AI_MODEL_CATALOG
+  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AGGREGATE_MODEL_CATALOG
 ): Record<string, VolcanoModelConfig> {
   const catalog =
-    catalogEntries.length > 0 ? catalogEntries : VOLCANO_AI_MODEL_CATALOG;
+    catalogEntries.length > 0 ? catalogEntries : VOLCANO_AGGREGATE_MODEL_CATALOG;
   const enabledSet = new Set(
     enabledCanonicalIds ?? catalog.map((entry) => entry.canonicalId)
   );
@@ -53,7 +54,7 @@ export function createVolcanoMetadata(params: {
   catalogEntries?: readonly AiModelCatalogEntry[];
 }): VolcanoInterfaceMetadata {
   const catalog = mergeCatalogEntries(
-    VOLCANO_AI_MODEL_CATALOG,
+    VOLCANO_AGGREGATE_MODEL_CATALOG,
     params.catalogEntries
   );
   return {
@@ -81,9 +82,12 @@ function mergeCatalogEntries(
 
 export function pruneVolcanoMetadataToCatalog(
   metadata: VolcanoInterfaceMetadata,
-  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AI_MODEL_CATALOG
+  catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AGGREGATE_MODEL_CATALOG
 ): VolcanoInterfaceMetadata {
-  const catalog = mergeCatalogEntries(VOLCANO_AI_MODEL_CATALOG, catalogEntries);
+  const catalog = mergeCatalogEntries(
+    VOLCANO_AGGREGATE_MODEL_CATALOG,
+    catalogEntries
+  );
   const models = buildDefaultVolcanoModels(undefined, catalog);
   for (const entry of catalog) {
     const existing = metadata.models[entry.canonicalId];
@@ -114,7 +118,7 @@ export function mergeVolcanoModelEnabled(
   catalogEntries?: readonly AiModelCatalogEntry[]
 ): VolcanoInterfaceMetadata {
   const catalog = mergeCatalogEntries(
-    VOLCANO_AI_MODEL_CATALOG,
+    VOLCANO_AGGREGATE_MODEL_CATALOG,
     catalogEntries
   );
   const catalogById = new Map(
@@ -166,7 +170,7 @@ export function resolveVolcanoCatalogEntries(
   catalogEntries?: readonly AiModelCatalogEntry[]
 ): readonly AiModelCatalogEntry[] {
   const catalog = mergeCatalogEntries(
-    VOLCANO_AI_MODEL_CATALOG,
+    VOLCANO_AGGREGATE_MODEL_CATALOG,
     catalogEntries
   );
   if (!canonicalIds || canonicalIds.length === 0) {
@@ -187,14 +191,30 @@ export function parseInterfaceMetadata(
   if (raw == null) return null;
   // listOrganizationAiInterfaces already returns parsed objects — do not re-parse.
   if (typeof raw === "object") {
-    return raw as VolcanoInterfaceMetadata | Record<string, unknown>;
+    return normalizeVolcanoInterfaceMetadata(
+      raw as VolcanoInterfaceMetadata | Record<string, unknown>
+    );
   }
   if (typeof raw !== "string" || raw.length === 0) return null;
   try {
-    return JSON.parse(raw) as VolcanoInterfaceMetadata | Record<string, unknown>;
+    return normalizeVolcanoInterfaceMetadata(
+      JSON.parse(raw) as VolcanoInterfaceMetadata | Record<string, unknown>
+    );
   } catch {
     return null;
   }
+}
+
+export function normalizeVolcanoInterfaceMetadata(
+  metadata: VolcanoInterfaceMetadata | Record<string, unknown> | null
+): VolcanoInterfaceMetadata | Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== "object") {
+    return metadata;
+  }
+  if (!isVolcanoMetadata(metadata)) {
+    return metadata;
+  }
+  return normalizeVolcanoArkEndpoints(metadata);
 }
 
 export function serializeInterfaceMetadata(

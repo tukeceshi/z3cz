@@ -20,8 +20,10 @@ export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    // Redirect to login, preserving the intended destination
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const returnTo = encodeURIComponent(
+      `${location.pathname}${location.search}`
+    );
+    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
   if (user?.role !== "admin") {

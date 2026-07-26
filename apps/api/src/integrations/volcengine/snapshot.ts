@@ -1,5 +1,5 @@
 import {
-  VOLCANO_AI_MODEL_CATALOG,
+  VOLCANO_AGGREGATE_MODEL_CATALOG,
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
   type VolcanoModelUsage,
@@ -19,6 +19,7 @@ import {
   getVolcanoCredentials,
   maskApiKey,
 } from "./ensure-api-key";
+import { isVolcanoArkApiKeyPending } from "./deferred-api-key";
 import { listPlatformAiModels } from "../../db/platform-ai-model-queries";
 import {
   ensureVolcanoModelsIncludePlatformCatalog,
@@ -37,6 +38,7 @@ import {
   buildUsageMapsFromPackageRows,
   resolveVolcanoPackageRows,
 } from "./resolve-package-rows";
+import { resolveVolcanoEffectiveActivationStatus } from "./resolve-volcano-activation";
 import { buildVolcanoTosStorageSnapshot } from "./tos-storage-snapshot";
 
 function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
@@ -61,7 +63,11 @@ export async function buildVolcanoSnapshot(params: {
   organizationId: string;
   interfaceId: string;
   refreshPackages?: boolean;
-}): Promise<VolcanoSnapshotResponse> {
+}): Promise<{
+  snapshot: VolcanoSnapshotResponse;
+  refreshLimited?: boolean;
+  nextRefreshAt?: string;
+}> {
   const db = createDatabase(params.env);
   const row = await getOrganizationAiInterfaceRow(
     db,
@@ -84,10 +90,10 @@ export async function buildVolcanoSnapshot(params: {
     apiKeyEncrypted: row.apiKeyEncrypted,
   });
 
-  if (ensured.renewed) {
+  if (ensured.renewed || ensured.metadataChanged) {
     await updateOrganizationAiInterface(db, params.organizationId, row.id, {
       metadata: ensured.metadataRaw,
-      apiKeyEncrypted: ensured.apiKeyEncrypted,
+      ...(ensured.renewed ? { apiKeyEncrypted: ensured.apiKeyEncrypted } : {}),
     });
   }
 
@@ -134,6 +140,8 @@ export async function buildVolcanoSnapshot(params: {
   let usageFetchError: string | undefined;
   let packageListCachedAt: string | undefined;
   let packageRows: VolcanoResourcePackageRow[] = [];
+  let refreshLimited = false;
+  let nextRefreshAt: string | undefined;
 
   try {
     const resolved = await resolveVolcanoPackageRows({
@@ -154,6 +162,8 @@ export async function buildVolcanoSnapshot(params: {
     packageRows = [...resolved.rows];
     usageFetchError = resolved.usageFetchError;
     packageListCachedAt = resolved.packageListCachedAt;
+    refreshLimited = resolved.refreshLimited === true;
+    nextRefreshAt = resolved.nextRefreshAt;
   } catch (error) {
     usageFetchError =
       error instanceof VolcengineApiRequestError
@@ -170,7 +180,7 @@ export async function buildVolcanoSnapshot(params: {
   const activationCache = refreshedMetadata.modelActivationCache ?? {};
 
   const modelCatalogById = new Map(
-    [...VOLCANO_AI_MODEL_CATALOG, ...platformCatalog].map((entry) => [
+    [...VOLCANO_AGGREGATE_MODEL_CATALOG, ...platformCatalog].map((entry) => [
       entry.canonicalId,
       entry,
     ])
@@ -178,8 +188,25 @@ export async function buildVolcanoSnapshot(params: {
   const modelRows = [...modelCatalogById.values()].map((entry) => {
     const config = refreshedMetadata.models[entry.canonicalId];
     const enabled = config?.enabled ?? false;
-    const activation = activationCache[entry.canonicalId] ?? null;
+    const activationCacheEntry = activationCache[entry.canonicalId] ?? null;
     const packageSnapshot = packageByModel.get(entry.canonicalId) ?? null;
+    const effectiveStatus = resolveVolcanoEffectiveActivationStatus({
+      probe: activationCacheEntry,
+      packageSnapshot,
+      canonicalId: entry.canonicalId,
+    });
+    const activation =
+      effectiveStatus !== null
+        ? {
+            status: effectiveStatus,
+            probedAt:
+              activationCacheEntry?.probedAt ??
+              packageListCachedAt ??
+              new Date().toISOString(),
+            errorCode: activationCacheEntry?.errorCode ?? null,
+            message: activationCacheEntry?.message ?? null,
+          }
+        : activationCacheEntry;
     const base = {
       canonicalId: entry.canonicalId,
       alias: entry.alias,
@@ -193,7 +220,7 @@ export async function buildVolcanoSnapshot(params: {
     if (!enabled) {
       return {
         ...base,
-        usage: null,
+        usage: usageByModel.get(entry.canonicalId) ?? null,
       };
     }
 
@@ -213,30 +240,44 @@ export async function buildVolcanoSnapshot(params: {
 
   let balance: VolcanoSnapshotResponse["balance"] = null;
   let balanceError: string | undefined;
-  try {
-    balance = await queryVolcanoBalance({ credentials });
-  } catch (error) {
-    balanceError =
-      error instanceof Error ? error.message : "Failed to fetch balance";
+  if (!refreshLimited) {
+    try {
+      balance = await queryVolcanoBalance({ credentials });
+    } catch (error) {
+      balanceError =
+        error instanceof Error ? error.message : "Failed to fetch balance";
+    }
   }
 
+  const ensuredMetadata = parseInterfaceMetadata(ensured.metadataRaw);
+  const keyPending =
+    isVolcanoMetadata(ensuredMetadata) &&
+    isVolcanoArkApiKeyPending(ensuredMetadata, ensured.apiKey || null);
+
   return {
-    fetchedAt: new Date().toISOString(),
-    apiKey: {
-      masked: maskApiKey(ensured.apiKey),
-      expiresAt: ensured.expiresAt,
-      status: getVolcanoApiKeyStatus(ensured.expiresAt),
+    snapshot: {
+      fetchedAt: packageListCachedAt ?? new Date().toISOString(),
+      apiKey: {
+        masked: maskApiKey(ensured.apiKey),
+        expiresAt: ensured.expiresAt,
+        status: getVolcanoApiKeyStatus(
+          ensured.expiresAt,
+          !ensured.apiKey && keyPending
+        ),
+      },
+      balance,
+      ...(balanceError ? { balanceError } : {}),
+      ...(usageFetchError ? { usageError: usageFetchError } : {}),
+      ...(packageListCachedAt ? { packageListCachedAt } : {}),
+      pricing: buildPricingSection(),
+      models: modelRows,
+      tosStorage: buildVolcanoTosStorageSnapshot({
+        metadata: refreshedMetadata,
+        packageRows,
+        usageError: usageFetchError,
+      }),
     },
-    balance,
-    ...(balanceError ? { balanceError } : {}),
-    ...(usageFetchError ? { usageError: usageFetchError } : {}),
-    ...(packageListCachedAt ? { packageListCachedAt } : {}),
-    pricing: buildPricingSection(),
-    models: modelRows,
-    tosStorage: buildVolcanoTosStorageSnapshot({
-      metadata: refreshedMetadata,
-      packageRows,
-      usageError: usageFetchError,
-    }),
+    ...(refreshLimited ? { refreshLimited: true } : {}),
+    ...(nextRefreshAt ? { nextRefreshAt } : {}),
   };
 }

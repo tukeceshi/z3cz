@@ -148,7 +148,6 @@ export function AdminWorkflowDetailPage() {
             validateConnection={handleValidateConnection}
             createObjectUrl={createObjectUrl}
             mode="readonly"
-            disabledFeedback={true}
             orgId={workflow.organizationId}
           />
         </div>

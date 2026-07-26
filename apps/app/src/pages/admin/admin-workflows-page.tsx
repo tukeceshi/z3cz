@@ -66,16 +66,6 @@ function createColumns(
       ),
     },
     {
-      accessorKey: "enabled",
-      header: t("admin.common.enabled"),
-      cell: ({ row }) =>
-        row.original.enabled ? (
-          <Badge variant="default">{t("admin.common.yes")}</Badge>
-        ) : (
-          <Badge variant="secondary">{t("admin.common.no")}</Badge>
-        ),
-    },
-    {
       accessorKey: "updatedAt",
       header: t("admin.common.updated"),
       cell: ({ row }) => (

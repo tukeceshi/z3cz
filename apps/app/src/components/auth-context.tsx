@@ -8,15 +8,12 @@ import {
   ReactNode,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
-import { useParams } from "react-router";
 import useSWR from "swr";
 
 import { AuthError, authService } from "@/services/auth-service";
-import { useOrganizations } from "@/services/organizations-service";
 
 export const AUTH_USER_KEY = "/auth/user";
 
@@ -27,7 +24,6 @@ type AuthContextType = {
   readonly error: Error | null;
   readonly loginError: Error | null;
   readonly organization: OrganizationInfo | null;
-  setSelectedOrganization: (org: OrganizationInfo | null) => void;
   login: (provider: AuthProvider, returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAllSessions: () => Promise<void>;
@@ -52,19 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     AUTH_USER_KEY,
     authService.getCurrentUser,
     {
-      keepPreviousData: true,
-      revalidateOnFocus: false,
       dedupingInterval: 2000,
-      // Retry failed requests, but not for auth errors
       shouldRetryOnError: (error) => !(error instanceof AuthError),
-      // Refresh user data every 5 minutes when tab is focused
       refreshInterval: 5 * 60 * 1000,
-      // Only refresh when tab is visible
       refreshWhenHidden: false,
-      // Validate user data structure
       onSuccess: (data) => {
         if (data && (!data.sub || !data.name)) {
           console.error("Invalid user data structure received");
+          mutateUser(null, { revalidate: false });
+        }
+      },
+      onError: (error) => {
+        if (error instanceof AuthError) {
           mutateUser(null, { revalidate: false });
         }
       },
@@ -73,92 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [loginError, setLoginError] = useState<Error | null>(null);
 
-  const isAuthenticated = !!user?.sub;
-
-  // Extract organization information with validation
-  const defaultOrganization =
-    user?.organization && user.organization.id ? user.organization : null;
-
-  // Only fetch organizations if authenticated
-  const { organizations: orgList } = useOrganizations(isAuthenticated);
-
-  const params = useParams<{ organizationId?: string }>();
-  const urlOrgId = params.organizationId;
-
-  const [selectedOrganization, setSelectedOrganizationState] =
-    useState<OrganizationInfo | null>(null);
-
-  const SELECTED_ORG_KEY = "dafthunk-selected-organization" as const;
-
-  // Set selected only for non-URL routes (e.g., /settings/organizations)
-  useEffect(() => {
-    if (urlOrgId) return; // Skip if URL provides organizationId
-
-    const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
-
-    if (savedOrgId && orgList.length > 0) {
-      const targetOrg = orgList.find((org) => org.id === savedOrgId);
-      if (targetOrg) {
-        const orgInfo: OrganizationInfo = {
-          id: targetOrg.id,
-          name: targetOrg.name,
-          role: defaultOrganization?.role || "owner",
-        };
-        setSelectedOrganizationState(orgInfo);
-        return;
-      }
-    }
-
-    // Fallback to default
-    if (defaultOrganization) {
-      setSelectedOrganizationState(defaultOrganization);
-    } else {
-      setSelectedOrganizationState(null);
-    }
-  }, [defaultOrganization, orgList, urlOrgId]);
+  const isAuthenticated = !!user?.sub && !(swrError instanceof AuthError);
 
   const organization = useMemo<OrganizationInfo | null>(() => {
-    if (urlOrgId) {
-      const targetOrg = orgList?.find((org) => org.id === urlOrgId);
-      if (targetOrg) {
-        return {
-          id: targetOrg.id,
-          name: targetOrg.name,
-          role: defaultOrganization?.role || "owner",
-        };
-      } else {
-        // Minimal stub until orgList loads
-        return {
-          id: urlOrgId,
-          name: "",
-          role: "member",
-        };
-      }
+    if (!user?.organization?.id) {
+      return null;
     }
-    // No URL organizationId: use selected or default
-    return selectedOrganization || defaultOrganization;
-  }, [urlOrgId, orgList, defaultOrganization, selectedOrganization]);
-
-  // Persist current org ID to localStorage for default fallback
-  useEffect(() => {
-    if (organization?.id) {
-      localStorage.setItem(SELECTED_ORG_KEY, organization.id);
-    } else {
-      localStorage.removeItem(SELECTED_ORG_KEY);
-    }
-  }, [organization?.id]);
-
-  const setSelectedOrganization = useCallback(
-    (org: OrganizationInfo | null) => {
-      setSelectedOrganizationState(org);
-      if (org) {
-        localStorage.setItem(SELECTED_ORG_KEY, org.id);
-      } else {
-        localStorage.removeItem(SELECTED_ORG_KEY);
-      }
-    },
-    []
-  );
+    return user.organization;
+  }, [user?.organization]);
 
   const clearError = useCallback(() => {
     setLoginError(null);
@@ -193,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.logout();
     } catch (error) {
       console.error("Logout error:", error);
-      // Don't throw - logout should always succeed from user perspective
     }
   }, []);
 
@@ -202,7 +118,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.logoutAllSessions();
     } catch (error) {
       console.error("Logout all sessions error:", error);
-      // Don't throw - logout should always succeed from user perspective
     }
   }, []);
 
@@ -214,11 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await authService.refreshToken();
 
-      // If refresh was successful, update the SWR cache
       if (result.success && result.user) {
         mutateUser(result.user, { revalidate: false });
       } else if (!result.success) {
-        // If refresh failed, clear the user data to trigger re-authentication
         console.warn("Token refresh failed, clearing user data");
         mutateUser(null, { revalidate: false });
       }
@@ -226,7 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return result;
     } catch (error) {
       console.error("Token refresh error:", error);
-      // Clear user data on refresh error to trigger re-authentication
       mutateUser(null, { revalidate: false });
       return {
         success: false,
@@ -235,7 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [mutateUser]);
 
-  // Process errors for user-friendly messages
   const processedError =
     swrError instanceof AuthError
       ? new Error("Authentication failed. Please log in again.")
@@ -250,7 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: processedError,
         loginError,
         organization,
-        setSelectedOrganization,
         login,
         logout,
         logoutAllSessions,

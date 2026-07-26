@@ -1,5 +1,4 @@
-import type { AppLocale, UpdateSiteSettingsRequest } from "@dafthunk/types";
-import { APP_LOCALES } from "@dafthunk/types";
+import type { HomepageMode, UpdateSiteSettingsRequest } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { mutate as mutateGlobal } from "swr";
@@ -26,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   updateAdminSiteSettings,
   useAdminSiteSettings,
@@ -39,8 +39,9 @@ export function AdminSettingsPage() {
 
   const [siteName, setSiteName] = useState("");
   const [siteTagline, setSiteTagline] = useState("");
-  const [defaultLocale, setDefaultLocale] = useState<AppLocale>("en");
   const [supportEmail, setSupportEmail] = useState("");
+  const [newUserTourEnabled, setNewUserTourEnabled] = useState(true);
+  const [homepageMode, setHomepageMode] = useState<HomepageMode>("console");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -54,8 +55,9 @@ export function AdminSettingsPage() {
     }
     setSiteName(settings.siteName);
     setSiteTagline(settings.siteTagline);
-    setDefaultLocale(settings.defaultLocale);
     setSupportEmail(settings.supportEmail ?? "");
+    setNewUserTourEnabled(settings.newUserTourEnabled);
+    setHomepageMode(settings.homepageMode);
   }, [settings]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -65,8 +67,9 @@ export function AdminSettingsPage() {
     const payload: UpdateSiteSettingsRequest = {
       siteName: siteName.trim(),
       siteTagline: siteTagline.trim(),
-      defaultLocale,
       supportEmail: supportEmail.trim() ? supportEmail.trim() : null,
+      newUserTourEnabled,
+      homepageMode,
     };
 
     try {
@@ -145,32 +148,6 @@ export function AdminSettingsPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="defaultLocale">
-                {t("siteSettings.defaultLocale")}
-              </Label>
-              <Select
-                value={defaultLocale}
-                onValueChange={(value) => setDefaultLocale(value as AppLocale)}
-              >
-                <SelectTrigger id="defaultLocale">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {APP_LOCALES.map((localeOption) => (
-                    <SelectItem key={localeOption} value={localeOption}>
-                      {localeOption === "en"
-                        ? t("language.en")
-                        : t("language.zh")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                {t("siteSettings.defaultLocaleHelp")}
-              </p>
-            </div>
-
-            <div className="grid gap-2">
               <Label htmlFor="supportEmail">
                 {t("siteSettings.supportEmail")}
               </Label>
@@ -184,6 +161,44 @@ export function AdminSettingsPage() {
               <p className="text-sm text-muted-foreground">
                 {t("siteSettings.supportEmailHelp")}
               </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="homepageMode">{t("siteSettings.homepageMode")}</Label>
+              <Select
+                value={homepageMode}
+                onValueChange={(value) => setHomepageMode(value as HomepageMode)}
+              >
+                <SelectTrigger id="homepageMode" className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="console">
+                    {t("siteSettings.homepageModeConsole")}
+                  </SelectItem>
+                  <SelectItem value="marketing">
+                    {t("siteSettings.homepageModeMarketing")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {t("siteSettings.homepageModeHelp")}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">
+                  {t("siteSettings.newUserTourToggle")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("siteSettings.newUserTourHint")}
+                </p>
+              </div>
+              <Switch
+                checked={newUserTourEnabled}
+                onCheckedChange={setNewUserTourEnabled}
+              />
             </div>
 
             <div className="flex justify-end">

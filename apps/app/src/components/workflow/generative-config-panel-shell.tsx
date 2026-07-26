@@ -6,6 +6,7 @@ import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_WIDTH_PX,
 } from "./ai-generative-panel-utils";
+import { GENERATIVE_NODE_PANEL_CLASS } from "./generative-card-styles";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
 
 export interface GenerativeConfigPanelShellProps {
@@ -26,8 +27,9 @@ export function GenerativeConfigPanelShell({
     <div
       className={cn(
         "nodrag nopan nowheel absolute top-full left-1/2 z-20 -mt-px",
-        "overflow-hidden rounded-b-xl border border-t-0 border-border/70",
-        "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:bg-neutral-900/95"
+        "overflow-hidden border border-t-0 border-border/70",
+        "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
+        GENERATIVE_NODE_PANEL_CLASS
       )}
       style={{
         width: AI_GENERATIVE_PANEL_WIDTH_PX,

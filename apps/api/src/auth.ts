@@ -1,9 +1,10 @@
 import type {
   AuthSetupStatusResponse,
+  GetSubAccountInvitationPreviewResponse,
   JWTTokenPayload,
   OrganizationInfo,
-  OrganizationRoleType,
   PasswordAuthResponse,
+  SendRegistrationCodeResponse,
 } from "@dafthunk/types";
 import { githubAuth } from "@hono/oauth-providers/github";
 import { googleAuth } from "@hono/oauth-providers/google";
@@ -20,14 +21,19 @@ import {
   createDatabase,
   EmailAlreadyRegisteredError,
   getLocalUserByEmail,
+  getPublicSiteSettings,
+  getSubAccountInvitationPreview,
   hasAnyUsers,
   OrganizationRole,
   registerLocalUser,
+  registerSubAccountFromInvitation,
   resolveAuthProvider,
   saveUser,
+  SubAccountInvitationError,
   userExists,
   users,
   verifyApiKey,
+  getAuthConfig,
 } from "./db";
 import type { UserData } from "./db/queries";
 import { memberships, organizations } from "./db/schema";
@@ -39,7 +45,17 @@ import {
   verifyPassword,
 } from "./auth/password";
 import { validateJwtSecret } from "./auth/jwt-config";
+import { resolveOAuthCredentials } from "./services/auth-config";
+import {
+  generateRegistrationVerificationCode,
+  getRegistrationCodeCooldownRemaining,
+  markRegistrationCodeSent,
+  storeRegistrationVerificationCode,
+  verifyRegistrationVerificationCode,
+} from "./services/registration-verification";
+import { sendRegistrationVerificationEmail } from "./services/send-registration-verification-email";
 import { sendWelcomeEmail } from "./services/welcome-email";
+import { buildOrganizationInfo } from "./utils/sub-account-permissions";
 
 // Constants
 export const JWT_ACCESS_TOKEN_NAME = "access_token";
@@ -66,10 +82,58 @@ const passwordLoginSchema = z.object({
 const passwordRegisterSchema = z.object({
   email: emailSchema,
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  verificationCode: z.string().trim().length(6).optional(),
+});
+
+const sendRegistrationCodeSchema = z.object({
+  email: emailSchema,
+});
+
+const subAccountRegisterSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  invitationId: z.string().uuid(),
+  verificationCode: z.string().trim().length(6).optional(),
 });
 
 const isJwtConfigError = (error: unknown): boolean =>
   error instanceof Error && error.message.includes("JWT_SECRET");
+
+async function loadOrganizationInfoForUser(
+  db: ReturnType<typeof createDatabase>,
+  userId: string,
+  organizationId: string
+): Promise<OrganizationInfo | null> {
+  const [organization] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+
+  if (!organization) {
+    return null;
+  }
+
+  const [membership] = await db
+    .select({
+      role: memberships.role,
+      permissions: memberships.permissions,
+    })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.organizationId, organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return null;
+  }
+
+  return buildOrganizationInfo(organization, membership);
+}
 
 // Utility functions
 const createAccessToken = async (
@@ -286,22 +350,11 @@ export const jwtMiddleware = async (
     c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   if (organizationIdFromUrl) {
-    // Resolve organization from URL param
-    const [membership] = await db
-      .select({ organizationId: memberships.organizationId })
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, payload.sub),
-          eq(memberships.organizationId, organizationIdFromUrl)
-        )
-      );
-
-    if (!membership) {
-      return c.json({ error: "Organization not found or access denied" }, 403);
+    if (payload.organization?.id !== organizationIdFromUrl) {
+      return c.json({ error: "Organization access denied" }, 403);
     }
 
-    c.set("organizationId", membership.organizationId);
+    c.set("organizationId", organizationIdFromUrl);
   } else if (c.req.path.startsWith("/admin")) {
     // Platform admin routes are cross-tenant; org context is optional here.
   } else if (payload.organization?.id) {
@@ -352,23 +405,7 @@ export const wsUpgradeAuthMiddleware = async (
     c.req.param("organizationId") ?? c.req.header(LAZY_ROUTE_ORG_HEADER);
 
   if (organizationIdFromUrl) {
-    if (payload.organization?.id === organizationIdFromUrl) {
-      c.set("organizationId", organizationIdFromUrl);
-      return next();
-    }
-
-    const db = createDatabase(c.env);
-    const [membership] = await db
-      .select({ organizationId: memberships.organizationId })
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, payload.sub),
-          eq(memberships.organizationId, organizationIdFromUrl)
-        )
-      );
-
-    if (!membership) {
+    if (payload.organization?.id !== organizationIdFromUrl) {
       console.warn("[NodeWS] upgrade rejected: org access denied");
       return c.body(null, 403);
     }
@@ -566,7 +603,10 @@ auth.post("/refresh", async (c) => {
 
     // Verify user is still a member of the organization
     const membershipResults = await db
-      .select({ role: memberships.role })
+      .select({
+        role: memberships.role,
+        permissions: memberships.permissions,
+      })
       .from(memberships)
       .where(
         and(
@@ -583,7 +623,8 @@ auth.post("/refresh", async (c) => {
       return respondRefreshUnauthorized(c);
     }
 
-    const membershipRole = membershipResults[0].role as OrganizationRoleType;
+    const membership = membershipResults[0];
+    const organizationInfo = buildOrganizationInfo(orgResult, membership);
 
     const provider = resolveAuthProvider(result);
 
@@ -595,11 +636,7 @@ auth.post("/refresh", async (c) => {
       role: result.role,
       developerMode: result.developerMode,
       provider,
-      organization: {
-        id: orgResult.id,
-        name: orgResult.name,
-        role: membershipRole,
-      },
+      organization: organizationInfo,
     };
 
     await setAuthTokens(c, accessPayload, {
@@ -657,11 +694,15 @@ async function completeOAuthLogin(
     }
   }
 
-  const organizationInfo: OrganizationInfo = {
-    id: savedOrganization.id,
-    name: savedOrganization.name,
-    role: OrganizationRole.OWNER,
-  };
+  const organizationInfo = await loadOrganizationInfoForUser(
+    db,
+    savedUser.id,
+    savedOrganization.id
+  );
+
+  if (!organizationInfo) {
+    return c.json({ error: "Organization membership not found" }, 500);
+  }
 
   const accessPayload: JWTTokenPayload = {
     sub: savedUser.id,
@@ -725,10 +766,71 @@ auth.get("/setup-status", async (c) => {
 });
 
 auth.post(
+  "/register/send-code",
+  zValidator("json", sendRegistrationCodeSchema),
+  async (c) => {
+    const { email } = c.req.valid("json");
+    const db = createDatabase(c.env);
+    const authConfig = await getAuthConfig(db);
+
+    if (!authConfig.email.requireVerificationOnRegister) {
+      return c.json({ error: "Registration verification is not enabled" }, 400);
+    }
+
+    if (!(await hasAnyUsers(db))) {
+      return c.json(
+        { error: "Bootstrap registration does not require verification" },
+        400
+      );
+    }
+
+    const existingUser = await getLocalUserByEmail(db, email);
+    if (existingUser) {
+      return c.json({ error: "Email already registered" }, 409);
+    }
+
+    const cooldown = await getRegistrationCodeCooldownRemaining(c.env, email);
+    if (cooldown > 0) {
+      return c.json(
+        {
+          error: `Please wait ${cooldown} seconds before requesting another code`,
+          code: "COOLDOWN",
+        },
+        429
+      );
+    }
+
+    const siteSettings = await getPublicSiteSettings(db);
+    const code = generateRegistrationVerificationCode();
+    const sendResult = await sendRegistrationVerificationEmail(
+      c.env,
+      authConfig,
+      {
+        to: email,
+        code,
+        siteName: siteSettings.siteName,
+      }
+    );
+
+    if (!sendResult.ok) {
+      return c.json(
+        { error: sendResult.error ?? "Failed to send verification code" },
+        502
+      );
+    }
+
+    await storeRegistrationVerificationCode(c.env, email, code);
+    await markRegistrationCodeSent(c.env, email);
+
+    return c.json({ success: true } satisfies SendRegistrationCodeResponse);
+  }
+);
+
+auth.post(
   "/register",
   zValidator("json", passwordRegisterSchema),
   async (c) => {
-    const { email, password } = c.req.valid("json");
+    const { email, password, verificationCode } = c.req.valid("json");
     const passwordError = validatePasswordStrength(password);
     if (passwordError) {
       return c.json({ error: passwordError }, 400);
@@ -737,6 +839,36 @@ auth.post(
     const db = createDatabase(c.env);
 
     try {
+      const authConfig = await getAuthConfig(db);
+      const isBootstrap = !(await hasAnyUsers(db));
+
+      if (authConfig.email.requireVerificationOnRegister && !isBootstrap) {
+        if (!verificationCode) {
+          return c.json(
+            {
+              error: "Verification code is required",
+              code: "VERIFICATION_REQUIRED",
+            },
+            400
+          );
+        }
+
+        const codeValid = await verifyRegistrationVerificationCode(
+          c.env,
+          email,
+          verificationCode
+        );
+        if (!codeValid) {
+          return c.json(
+            {
+              error: "Invalid or expired verification code",
+              code: "INVALID_CODE",
+            },
+            400
+          );
+        }
+      }
+
       const passwordHash = await hashPassword(password);
       const { user, organization } = await registerLocalUser(db, {
         email,
@@ -757,6 +889,96 @@ auth.post(
         return c.json({ error: "Authentication service misconfigured" }, 503);
       }
       console.error("Registration error:", error);
+      return c.json({ error: "Registration failed" }, 500);
+    }
+  }
+);
+
+auth.get("/sub-account-invitations/:id", async (c) => {
+  const invitationId = c.req.param("id");
+  const db = createDatabase(c.env);
+
+  try {
+    const preview = await getSubAccountInvitationPreview(db, invitationId);
+    if (!preview) {
+      return c.json({ error: "Invitation not found or expired" }, 404);
+    }
+
+    return c.json({
+      invitation: {
+        id: preview.id,
+        email: preview.email,
+        organizationName: preview.organizationName,
+        expiresAt: preview.expiresAt.toISOString(),
+      },
+    } satisfies GetSubAccountInvitationPreviewResponse);
+  } catch (error) {
+    console.error("Sub-account invitation preview error:", error);
+    return c.json({ error: "Failed to load invitation" }, 500);
+  }
+});
+
+auth.post(
+  "/register/sub-account",
+  zValidator("json", subAccountRegisterSchema),
+  async (c) => {
+    const { email, password, invitationId, verificationCode } = c.req.valid("json");
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) {
+      return c.json({ error: passwordError }, 400);
+    }
+
+    const db = createDatabase(c.env);
+
+    try {
+      const authConfig = await getAuthConfig(db);
+
+      if (authConfig.email.requireVerificationOnRegister) {
+        if (!verificationCode) {
+          return c.json(
+            {
+              error: "Verification code is required",
+              code: "VERIFICATION_REQUIRED",
+            },
+            400
+          );
+        }
+
+        const codeValid = await verifyRegistrationVerificationCode(
+          c.env,
+          email,
+          verificationCode
+        );
+        if (!codeValid) {
+          return c.json(
+            {
+              error: "Invalid or expired verification code",
+              code: "INVALID_CODE",
+            },
+            400
+          );
+        }
+      }
+
+      const passwordHash = await hashPassword(password);
+      const { user, organization, membership } =
+        await registerSubAccountFromInvitation(db, {
+          email,
+          passwordHash,
+          invitationId,
+        });
+
+      const organizationInfo = buildOrganizationInfo(organization, membership);
+      return completePasswordLogin(c, user, organizationInfo);
+    } catch (error) {
+      if (error instanceof SubAccountInvitationError) {
+        return c.json({ error: error.message }, 400);
+      }
+      if (isJwtConfigError(error)) {
+        console.error("Sub-account registration JWT config error:", error);
+        return c.json({ error: "Authentication service misconfigured" }, 503);
+      }
+      console.error("Sub-account registration error:", error);
       return c.json({ error: "Registration failed" }, 500);
     }
   }
@@ -799,21 +1021,17 @@ auth.post(
         return c.json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
       }
 
-      const [membership] = await db
-        .select({ role: memberships.role })
-        .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, organization.id)
-          )
-        );
+      const organizationInfo = await loadOrganizationInfoForUser(
+        db,
+        user.id,
+        organization.id
+      );
 
-      return completePasswordLogin(c, user, {
-        id: organization.id,
-        name: organization.name,
-        role: (membership?.role as OrganizationRoleType) ?? OrganizationRole.OWNER,
-      });
+      if (!organizationInfo) {
+        return c.json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
+      }
+
+      return completePasswordLogin(c, user, organizationInfo);
     } catch (error) {
       if (isJwtConfigError(error)) {
         console.error("Password login JWT config error:", error);
@@ -827,11 +1045,18 @@ auth.post(
 
 auth.get(
   "/login/github",
-  (c, next) => {
+  async (c, next) => {
+    const db = createDatabase(c.env);
+    const authConfig = await getAuthConfig(db);
+    const credentials = resolveOAuthCredentials("github", authConfig, c.env);
+    if (!credentials) {
+      return c.json({ error: "GitHub login is disabled" }, 403);
+    }
+
     storeReturnTo(c);
     const githubAuthHandler = githubAuth({
-      client_id: c.env.GITHUB_CLIENT_ID,
-      client_secret: c.env.GITHUB_CLIENT_SECRET,
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
       scope: ["read:user", "user:email"],
       oauthApp: true,
     });
@@ -870,11 +1095,18 @@ auth.get(
 
 auth.get(
   "/login/google",
-  (c, next) => {
+  async (c, next) => {
+    const db = createDatabase(c.env);
+    const authConfig = await getAuthConfig(db);
+    const credentials = resolveOAuthCredentials("google", authConfig, c.env);
+    if (!credentials) {
+      return c.json({ error: "Google login is disabled" }, 403);
+    }
+
     storeReturnTo(c);
     const googleAuthHandler = googleAuth({
-      client_id: c.env.GOOGLE_CLIENT_ID,
-      client_secret: c.env.GOOGLE_CLIENT_SECRET,
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
       scope: ["openid", "email", "profile"],
     });
     return googleAuthHandler(c, next);

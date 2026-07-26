@@ -2,6 +2,12 @@ import { JWTTokenPayload } from "@dafthunk/types";
 
 import { buildApiUrl } from "@/config/api";
 
+import { handleSessionExpired } from "./session-expired";
+import {
+  isCloudStorageApiErrorCode,
+  reportCloudStorageError,
+} from "./cloud-storage-error-reporter";
+
 // Track if we're currently refreshing to avoid multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -63,13 +69,16 @@ interface ApiErrorBody {
   error?: string;
   message?: string;
   code?: string;
+  jobId?: string;
+  reason?: string;
 }
 
 export class ApiRequestError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code?: string
+    public readonly code?: string,
+    public readonly jobId?: string
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -84,7 +93,19 @@ const throwApiRequestError = (
     errorData?.message ||
     errorData?.error ||
     `Request failed with status: ${status}`;
-  throw new ApiRequestError(message, status, errorData?.code);
+
+  if (isCloudStorageApiErrorCode(errorData?.code)) {
+    reportCloudStorageError(
+      errorData?.reason === "cors_not_configured" ? "cors_upload" : "api"
+    );
+  }
+
+  throw new ApiRequestError(
+    message,
+    status,
+    errorData?.code,
+    errorData?.jobId
+  );
 };
 
 /**
@@ -144,6 +165,14 @@ export const makeRequest = async <T>(
           }
           return retryResponse.json();
         }
+
+        if (retryResponse.status === 401) {
+          await handleSessionExpired();
+          throw new ApiRequestError("Session expired", 401, "UNAUTHORIZED");
+        }
+      } else {
+        await handleSessionExpired();
+        throw new ApiRequestError("Session expired", 401, "UNAUTHORIZED");
       }
     }
 

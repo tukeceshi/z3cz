@@ -4,10 +4,19 @@ import type {
   OrgTextModelOption,
   OrgTextModelUnavailableReason,
   PlatformAiModel,
+  SingleModelModelConfig,
+  VolcanoArkApiKeyScope,
   VolcanoInterfaceMetadata,
   VolcanoModelConfig,
 } from "@dafthunk/types";
-import { isVolcanoAiInterfaceProvider } from "@dafthunk/types";
+import {
+  isExternalBrandOnlyCanonicalId,
+  isVolcanoAiInterfaceProvider,
+  resolveVolcanoInferenceModelId,
+} from "@dafthunk/types";
+import {
+  parseSingleModelMetadata,
+} from "../integrations/single-model/metadata";
 
 import type { Database } from "../db";
 import {
@@ -31,10 +40,28 @@ export interface ResolvedTextModelInterface {
   readonly parameterRules: ReturnType<typeof getTextParameterRules>;
 }
 
+export type TextModelChannelKind = "aggregate" | "api";
+
+export interface TextModelInterfaceCandidate {
+  readonly interfaceId: string;
+  readonly interfaceName: string;
+  readonly channelKind: TextModelChannelKind;
+  readonly providerModelId: string;
+}
+
 export interface VolcanoInterfaceCandidate {
   readonly id: string;
   readonly createdAt: Date;
   readonly models: Readonly<Record<string, VolcanoModelConfig>>;
+  readonly arkEndpoints?: Readonly<Record<string, string>>;
+  readonly arkApiKeyScope?: VolcanoArkApiKeyScope;
+}
+
+export interface SingleModelInterfaceCandidate {
+  readonly id: string;
+  readonly createdAt: Date;
+  readonly singleModelPresetId: string;
+  readonly models: Readonly<Record<string, SingleModelModelConfig>>;
 }
 
 export function sortInterfacesByPriority(
@@ -60,33 +87,37 @@ export function sortInterfacesByPriority(
   });
 }
 
-/**
- * Rule B:
- * - List = Admin platform text models with platformEnabled=true
- * - selectable = at least one enabled org volcano interface has the same canonicalId enabled
- */
 export function evaluateOrgTextModelAvailability(
   canonicalId: string,
-  volcanoInterfaces: readonly VolcanoInterfaceCandidate[]
+  volcanoInterfaces: readonly VolcanoInterfaceCandidate[],
+  singleModelInterfaces: readonly SingleModelInterfaceCandidate[] = []
 ): {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgTextModelUnavailableReason;
 } {
-  if (volcanoInterfaces.length === 0) {
+  if (volcanoInterfaces.length === 0 && singleModelInterfaces.length === 0) {
     return { selectable: false, unavailableReason: "no_org_interface" };
   }
 
-  const enabledOnInterface = volcanoInterfaces.some(
-    (entry) => entry.models[canonicalId]?.enabled === true
-  );
-  if (enabledOnInterface) {
+  const enabledOnAny =
+    volcanoInterfaces.some(
+      (entry) => entry.models[canonicalId]?.enabled === true
+    ) ||
+    singleModelInterfaces.some(
+      (entry) => entry.models[canonicalId]?.enabled === true
+    );
+  if (enabledOnAny) {
     return { selectable: true };
   }
 
-  const keyPresent = volcanoInterfaces.some(
-    (entry) => entry.models[canonicalId] !== undefined
-  );
-  if (!keyPresent) {
+  const keyPresentOnAny =
+    volcanoInterfaces.some(
+      (entry) => entry.models[canonicalId] !== undefined
+    ) ||
+    singleModelInterfaces.some(
+      (entry) => entry.models[canonicalId] !== undefined
+    );
+  if (!keyPresentOnAny) {
     return {
       selectable: false,
       unavailableReason: "model_missing_on_interface",
@@ -102,12 +133,14 @@ export function evaluateOrgTextModelAvailability(
 export function toVolcanoCatalogEntriesFromPlatform(
   models: readonly PlatformAiModel[]
 ): readonly AiModelCatalogEntry[] {
-  return models.map((model) => ({
-    canonicalId: model.canonicalId,
-    alias: model.displayName,
-    modality: model.modality,
-    providerModelId: model.providerModelId,
-  }));
+  return models
+    .filter((model) => !isExternalBrandOnlyCanonicalId(model.canonicalId))
+    .map((model) => ({
+      canonicalId: model.canonicalId,
+      alias: model.displayName,
+      modality: model.modality,
+      providerModelId: model.providerModelId,
+    }));
 }
 
 function collectVolcanoInterfaces(
@@ -118,13 +151,37 @@ function collectVolcanoInterfaces(
       (row) => row.enabled && isVolcanoAiInterfaceProvider(row.provider)
     )
     .flatMap((row) => {
-      // OrganizationAiInterface.metadata is already parsed by rowToOrgInterface.
       const metadata = parseInterfaceMetadata(row.metadata);
       if (!isVolcanoMetadata(metadata)) return [];
       return [
         {
           id: row.id,
           createdAt: new Date(row.createdAt),
+          models: metadata.models,
+          arkEndpoints: metadata.arkEndpoints,
+          arkApiKeyScope: metadata.arkApiKeyScope,
+        },
+      ];
+    });
+}
+
+export function collectSingleModelInterfaces(
+  interfaces: Awaited<ReturnType<typeof listOrganizationAiInterfaces>>
+): SingleModelInterfaceCandidate[] {
+  return interfaces
+    .filter((row) => row.enabled && row.provider === "custom")
+    .flatMap((row) => {
+      const metadata = parseSingleModelMetadata(
+        parseInterfaceMetadata(row.metadata)
+      );
+      if (!metadata) {
+        return [];
+      }
+      return [
+        {
+          id: row.id,
+          createdAt: new Date(row.createdAt),
+          singleModelPresetId: metadata.singleModelPresetId,
           models: metadata.models,
         },
       ];
@@ -144,11 +201,13 @@ export async function listOrgTextModelOptions(
   const groupById = new Map(groups.map((group) => [group.id, group]));
   const visibleModels = platformModels.filter((model) => model.platformEnabled);
   const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
+  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
 
   return visibleModels.map((model) => {
     const availability = evaluateOrgTextModelAvailability(
       model.canonicalId,
-      volcanoInterfaces
+      volcanoInterfaces,
+      singleModelInterfaces
     );
     const group = model.groupId ? groupById.get(model.groupId) : undefined;
 
@@ -169,6 +228,99 @@ export async function listOrgTextModelOptions(
   });
 }
 
+export async function listTextModelInterfaceCandidates(
+  db: Database,
+  organizationId: string,
+  canonicalId: string
+): Promise<readonly TextModelInterfaceCandidate[]> {
+  const options = await listOrgTextModelOptions(db, organizationId);
+  const option = options.find((entry) => entry.canonicalId === canonicalId);
+  if (!option?.selectable) {
+    return [];
+  }
+
+  const [interfaces, priorities] = await Promise.all([
+    listOrganizationAiInterfaces(db, organizationId),
+    listModelInterfacePriorities(db, organizationId),
+  ]);
+
+  const priorityIds =
+    priorities.find((entry) => entry.canonicalId === canonicalId)
+      ?.interfaceIds ?? [];
+
+  const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
+  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
+
+  const volcanoCandidates = volcanoInterfaces
+    .filter((entry) => entry.models[canonicalId]?.enabled === true)
+    .map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt,
+      volcano: entry,
+    }));
+
+  const directCandidates = singleModelInterfaces
+    .filter((entry) => entry.models[canonicalId]?.enabled === true)
+    .map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt,
+      upstreamModelId: entry.models[canonicalId]!.upstreamModelId,
+    }));
+
+  const sorted = sortInterfacesByPriority(priorityIds, [
+    ...volcanoCandidates,
+    ...directCandidates,
+  ]);
+
+  return sorted.flatMap((entry) => {
+    const directMatch = directCandidates.find(
+      (candidate) => candidate.id === entry.id
+    );
+    if (directMatch) {
+      const ifaceRow = interfaces.find((row) => row.id === entry.id);
+      if (!ifaceRow) {
+        return [];
+      }
+      return [
+        {
+          interfaceId: ifaceRow.id,
+          interfaceName: ifaceRow.name,
+          channelKind: "api" as const,
+          providerModelId: directMatch.upstreamModelId,
+        },
+      ];
+    }
+
+    const volcanoMatch = volcanoCandidates.find(
+      (candidate) => candidate.id === entry.id
+    );
+    if (!volcanoMatch) {
+      return [];
+    }
+
+    const ifaceRow = interfaces.find((row) => row.id === entry.id);
+    if (!ifaceRow) {
+      return [];
+    }
+
+    return [
+      {
+        interfaceId: ifaceRow.id,
+        interfaceName: ifaceRow.name,
+        channelKind: "aggregate" as const,
+        providerModelId: resolveVolcanoInferenceModelId({
+          canonicalId,
+          providerModelId: option.providerModelId,
+          metadata: {
+            arkEndpoints: volcanoMatch.volcano.arkEndpoints,
+            arkApiKeyScope: volcanoMatch.volcano.arkApiKeyScope,
+          },
+        }),
+      },
+    ];
+  });
+}
+
 export async function resolveTextModelInterface(
   db: Database,
   organizationId: string,
@@ -178,51 +330,27 @@ export async function resolveTextModelInterface(
   const option = options.find((entry) => entry.canonicalId === canonicalId);
   if (!option?.selectable) return null;
 
-  const [interfaces, priorities] = await Promise.all([
-    listOrganizationAiInterfaces(db, organizationId),
-    listModelInterfacePriorities(db, organizationId),
-  ]);
-
-  const priorityIds =
-    priorities.find((entry) => entry.canonicalId === canonicalId)?.interfaceIds ??
-    [];
-
-  const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
-  const candidates = volcanoInterfaces.filter(
-    (entry) => entry.models[canonicalId]?.enabled === true
+  const candidates = await listTextModelInterfaceCandidates(
+    db,
+    organizationId,
+    canonicalId
   );
-
-  const sorted = sortInterfacesByPriority(
-    priorityIds,
-    candidates.map((entry) => ({
-      id: entry.id,
-      createdAt: entry.createdAt,
-    }))
-  );
-
-  const match = sorted[0];
-  if (!match) return null;
-
-  const row = volcanoInterfaces.find((entry) => entry.id === match.id);
-  if (!row) return null;
-
-  const providerModelId =
-    row.models[canonicalId]?.providerModelId ?? option.providerModelId;
-
-  const ifaceRow = interfaces.find((entry) => entry.id === match.id);
-  if (!ifaceRow) return null;
+  const first = candidates[0];
+  if (!first) {
+    return null;
+  }
 
   return {
     canonicalId,
     displayName: option.displayName,
-    interfaceId: ifaceRow.id,
-    interfaceName: ifaceRow.name,
-    providerModelId,
+    interfaceId: first.interfaceId,
+    interfaceName: first.interfaceName,
+    providerModelId: first.providerModelId,
     parameterRules: option.parameterRules,
   };
 }
 
-/** Ensure volcano metadata includes all platform catalog keys (enabled defaults to false). */
+/** Ensure volcano metadata includes all platform catalog keys and sync providerModelIds. */
 export function ensureVolcanoModelsIncludePlatformCatalog(
   metadata: VolcanoInterfaceMetadata,
   platformCatalog: readonly AiModelCatalogEntry[]
@@ -233,7 +361,20 @@ export function ensureVolcanoModelsIncludePlatformCatalog(
 
   const models = { ...metadata.models };
   for (const entry of platformCatalog) {
-    if (models[entry.canonicalId]) continue;
+    const existing = models[entry.canonicalId];
+    if (existing) {
+      if (
+        existing.providerModelId !== entry.providerModelId ||
+        existing.modality !== entry.modality
+      ) {
+        models[entry.canonicalId] = {
+          ...existing,
+          providerModelId: entry.providerModelId,
+          modality: entry.modality,
+        };
+      }
+      continue;
+    }
     models[entry.canonicalId] = {
       enabled: false,
       providerModelId: entry.providerModelId,

@@ -57,14 +57,12 @@ export {
 } from "./heartbeat/poll-continuation-handler";
 export { upstreamPollContinuation } from "./upstream/upstream-types";
 export { REPLICATE_PROVIDER } from "./upstream/replicate-upstream";
-export { NEWAPI_RELAY_PROVIDER } from "./upstream/newapi-relay-upstream";
 export { VOLCANO_VIDEO_PROVIDER } from "./ai-interface/execute-volcano-video";
-export type {
-  RelayAccountService,
-  ResolvedRelayAccount,
-} from "./relay-account-service";
+export { VEO_VIDEO_PROVIDER } from "./ai-interface/execute-veo-video";
+export { GROK_VIDEO_PROVIDER } from "./ai-interface/execute-grok-video";
 export type { AiInterfaceService } from "./ai-interface-service";
 export type {
+  ExecuteRuntimeTextModelResult,
   ResolvedRuntimeTextModel,
   TextModelService,
 } from "./text-model-service";
@@ -76,7 +74,10 @@ export type {
   VideoModelService,
   ResolvedRuntimeVideoModel,
 } from "./video-model-service";
-export { SEEDANCE_2_0_T2V_PROFILE } from "./upstream/upstream-param-profiles";
+export type {
+  AudioModelService,
+  ResolvedRuntimeAudioModel,
+} from "./audio-model-service";
 export {
   isSubscriptionRequiredError,
   nodeNotFoundMessage,
@@ -126,6 +127,11 @@ export type {
 } from "./mailbox-service";
 export type { MonitoringService } from "./monitoring-service";
 export { NodeToolProvider } from "./node-tool-provider";
+export type {
+  WorkflowGenerationJobModality,
+  WorkflowGenerationJobTerminalStatus,
+  WorkflowGenerationJobTracker,
+} from "./generation-job-tracker";
 export type {
   AudioParameter,
   BlobParameter,

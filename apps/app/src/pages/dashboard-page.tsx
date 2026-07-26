@@ -1,19 +1,15 @@
-import type {
-  CreateWorkflowRequest,
-  WorkflowRuntime,
-  WorkflowTrigger,
-} from "@dafthunk/types";
-import Logs from "lucide-react/icons/logs";
+import Sparkles from "lucide-react/icons/sparkles";
 import Plug from "lucide-react/icons/plug";
 import Workflow from "lucide-react/icons/workflow";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
-import { Badge } from "@/components/ui/badge";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,40 +18,44 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CreateWorkflowDialog } from "@/components/workflow/create-workflow-dialog";
-import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
-import { buildInitialTriggerNodes } from "@/components/workflow/trigger-node-mapping";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
-import { useBilling } from "@/services/billing-service";
 import { useDashboard } from "@/services/dashboard-service";
-import { prefetchNodeTypes, useNodeTypes } from "@/services/type-service";
-import { createWorkflow, useWorkflows } from "@/services/workflow-service";
 import { useOrganizationAiInterfaces } from "@/services/organization-ai-interface-service";
-import {
-  prefetchWorkflowEditorSession,
-  schedulePrefetchWorkflowEditorChunks,
-} from "@/utils/workflow-editor-prefetch";
+import { useModelCalls } from "@/services/platform-ai-model-service";
+import { schedulePrefetchWorkflowEditorChunks } from "@/utils/workflow-editor-prefetch";
 
 const AI_SETUP_DISMISS_KEY = "dafthunk:dashboard-ai-setup-dismissed";
 
 export function DashboardPage() {
   const { t } = useTranslation();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const navigate = useNavigate();
+  const perms = useOrgPermissions();
+
+  if (!perms.canViewWorkflows && !perms.canAccessModelCalls) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.dashboard")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <DashboardPageContent />;
+}
+
+function DashboardPageContent() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { dashboardStats, dashboardStatsError, isDashboardStatsLoading } =
     useDashboard();
-  const { billing, billingError, isBillingLoading } = useBilling();
   const { getOrgUrl } = useOrgUrl();
   const { organization } = useAuth();
   const orgId = organization?.id || "";
-  const { mutateWorkflows } = useWorkflows();
-  const { nodeTypes } = useNodeTypes(undefined, {
-    revalidateOnFocus: false,
-    enabled: isCreateDialogOpen,
-  });
-  const { interfaces, isInterfacesLoading } = useOrganizationAiInterfaces(orgId || undefined);
+  const { interfaces, isInterfacesLoading } = useOrganizationAiInterfaces(
+    orgId || undefined
+  );
+  const { total: modelCallsTotal, isLoading: isModelCallsLoading } =
+    useModelCalls(orgId || undefined, { limit: 1 });
   const [setupDismissed, setSetupDismissed] = useState(() => {
     if (!orgId) return false;
     try {
@@ -73,55 +73,18 @@ export function DashboardPage() {
     schedulePrefetchWorkflowEditorChunks();
   }, []);
 
-  useEffect(() => {
-    if (isCreateDialogOpen) {
-      prefetchNodeTypes();
-    }
-  }, [isCreateDialogOpen]);
-
-  const handleCreateWorkflow = async (
-    schemeId: string,
-    name: string,
-    trigger: WorkflowTrigger,
-    description?: string,
-    runtime?: WorkflowRuntime
-  ) => {
-    if (!orgId) return;
-
-    try {
-      const initialNodes = buildInitialTriggerNodes(trigger, nodeTypes || []);
-      const request: CreateWorkflowRequest = {
-        name,
-        description,
-        schemeId,
-        trigger,
-        runtime,
-        nodes: initialNodes,
-        edges: [],
-      };
-
-      const newWorkflow = await createWorkflow(request, orgId);
-
-      mutateWorkflows();
-      prefetchWorkflowEditorSession(newWorkflow.id, orgId, schemeId);
-      navigate(getOrgUrl(`workflows/${newWorkflow.id}`), {
-        state: createWorkflowEditorLocationState(),
-      });
-    } catch (error) {
-      console.error("Failed to create workflow:", error);
-    }
-  };
-
-  if (isDashboardStatsLoading || isBillingLoading || isInterfacesLoading) {
+  if (
+    isDashboardStatsLoading ||
+    isInterfacesLoading ||
+    (perms.canAccessModelCalls && isModelCallsLoading)
+  ) {
     return <InsetLoading title={t("pages.dashboard.title")} />;
-  } else if (dashboardStatsError || billingError) {
+  } else if (dashboardStatsError) {
     return (
       <InsetError
         title={t("pages.dashboard.title")}
         errorMessage={
-          dashboardStatsError?.message ||
-          billingError?.message ||
-          t("common.errorOccurred")
+          dashboardStatsError?.message || t("common.errorOccurred")
         }
       />
     );
@@ -137,19 +100,8 @@ export function DashboardPage() {
     );
   }
 
-  const isPro = billing?.plan === "pro";
-  const usageThisPeriod = billing?.usageThisPeriod ?? 0;
-  const includedCredits = billing?.includedCredits ?? 0;
-  const usagePercent = includedCredits
-    ? Math.min(100, (usageThisPeriod / includedCredits) * 100)
-    : 0;
-  const hasOverageLimit = billing?.overageLimit != null;
-  const currentOverage = Math.max(0, usageThisPeriod - includedCredits);
-  const isOverageAtLimit =
-    hasOverageLimit && currentOverage >= billing!.overageLimit!;
-
   const showAiSetupBanner =
-    interfaces.length === 0 && !setupDismissed;
+    perms.canAccessAiInterfaces && interfaces.length === 0 && !setupDismissed;
 
   const dismissAiSetupBanner = () => {
     setSetupDismissed(true);
@@ -185,7 +137,6 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 mb-6">
         <Card data-tour="workflows-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
@@ -211,138 +162,33 @@ export function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
-        <Card data-tour="executions-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xl">
-              {t("pages.dashboard.executions.title")}
-            </CardTitle>
-            <Logs className="size-8 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">
-              {dashboardStats.executions.total}
-            </div>
-            <p className="text-xs text-muted-foreground pt-1">
-              {t("pages.dashboard.executions.countLabel")}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 text-xs h-8"
-              asChild
-            >
-              <Link to={getOrgUrl("executions")}>
-                {t("pages.dashboard.executions.viewAll")}
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Credits Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                {t("pages.dashboard.usage.title")}
-                <Badge variant={isPro ? "default" : "secondary"}>
-                  {isPro
-                    ? t("pages.dashboard.usage.earlyAdopter")
-                    : t("pages.dashboard.usage.trial")}
-                </Badge>
+        {perms.canAccessModelCalls ? (
+          <Card data-tour="model-calls-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-xl">
+                {t("pages.dashboard.modelCalls.title")}
               </CardTitle>
-              <CardDescription>
-                {isPro
-                  ? t("pages.dashboard.usage.proDescription")
-                  : t("pages.dashboard.usage.trialDescription")}
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link to={getOrgUrl("billing")}>
-                {t("pages.dashboard.usage.manageBilling")}
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Included Usage Gauge */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium">
-                {isPro
-                  ? t("pages.dashboard.usage.includedUsage")
-                  : t("pages.dashboard.usage.availableUsage")}
-              </span>
-              <span>
-                {Math.min(usageThisPeriod, includedCredits).toLocaleString()} /{" "}
-                {includedCredits.toLocaleString()}
-              </span>
-            </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all rounded-full"
-                style={{ width: `${usagePercent}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {usagePercent < 100
-                ? t("pages.dashboard.usage.remaining", {
-                    count: (
-                      includedCredits - usageThisPeriod
-                    ).toLocaleString(),
-                  })
-                : isPro
-                  ? t("pages.dashboard.usage.includedExhausted")
-                  : t("pages.dashboard.usage.exhausted")}
-            </p>
-          </div>
-
-          {/* Overage Section - Pro only */}
-          {isPro && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium">
-                  {t("pages.dashboard.usage.additionalUsage")}
-                </span>
-                <span>
-                  {currentOverage.toLocaleString()}
-                  {hasOverageLimit &&
-                    ` / ${billing!.overageLimit!.toLocaleString()}`}
-                </span>
-              </div>
-              <div className="h-3 bg-muted rounded-full overflow-hidden">
-                {currentOverage > 0 && (
-                  <div
-                    className={`h-full transition-all rounded-full ${isOverageAtLimit ? "bg-red-500" : "bg-orange-500"}`}
-                    style={{
-                      width: hasOverageLimit
-                        ? `${Math.min(100, (currentOverage / billing!.overageLimit!) * 100)}%`
-                        : `${Math.min(100, (currentOverage / includedCredits) * 100)}%`,
-                    }}
-                  />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {currentOverage > 0
-                  ? isOverageAtLimit
-                    ? t("pages.dashboard.usage.limitReached")
-                    : t("pages.dashboard.usage.billedEndOfPeriod")
-                  : hasOverageLimit
-                    ? t("pages.dashboard.usage.limitCredits", {
-                        count: billing!.overageLimit!.toLocaleString(),
-                      })
-                    : t("pages.dashboard.usage.noOverageYet")}
+              <Sparkles className="size-8 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{modelCallsTotal}</div>
+              <p className="text-xs text-muted-foreground pt-1">
+                {t("pages.dashboard.modelCalls.countLabel")}
               </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      <CreateWorkflowDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onCreateWorkflow={handleCreateWorkflow}
-      />
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 text-xs h-8"
+                asChild
+              >
+                <Link to={getOrgUrl("model-calls")}>
+                  {t("pages.dashboard.modelCalls.viewAll")}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
     </InsetLayout>
   );
 }

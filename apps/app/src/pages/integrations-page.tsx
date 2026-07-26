@@ -5,6 +5,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,12 @@ import {
 } from "@/integrations";
 
 export function IntegrationsPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.integrations");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <IntegrationsPageContent />;
+}
+
+function IntegrationsPageContent() {
   const { t } = useTranslation();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
   const { integrations, error, isLoading, mutate } = useIntegrations();

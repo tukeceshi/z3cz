@@ -15,10 +15,11 @@ const adminSettingsRoutes = new Hono<ApiContext>();
 const updateSiteSettingsSchema = z.object({
   siteName: z.string().trim().min(1).max(120).optional(),
   siteTagline: z.string().trim().min(1).max(240).optional(),
-  defaultLocale: z.enum(["en", "zh"]).optional(),
   supportEmail: z
     .union([z.string().trim().email(), z.literal(""), z.null()])
     .optional(),
+  newUserTourEnabled: z.boolean().optional(),
+  homepageMode: z.enum(["console", "marketing"]).optional(),
 });
 adminSettingsRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
@@ -47,14 +48,17 @@ adminSettingsRoutes.patch(
     const input: UpdateSiteSettingsRequest = {
       ...(body.siteName !== undefined ? { siteName: body.siteName } : {}),
       ...(body.siteTagline !== undefined ? { siteTagline: body.siteTagline } : {}),
-      ...(body.defaultLocale !== undefined
-        ? { defaultLocale: body.defaultLocale }
-        : {}),
       ...(body.supportEmail !== undefined
         ? {
             supportEmail:
               body.supportEmail === "" ? null : body.supportEmail,
           }
+        : {}),
+      ...(body.newUserTourEnabled !== undefined
+        ? { newUserTourEnabled: body.newUserTourEnabled }
+        : {}),
+      ...(body.homepageMode !== undefined
+        ? { homepageMode: body.homepageMode }
         : {}),
     };
 

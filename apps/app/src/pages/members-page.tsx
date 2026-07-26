@@ -1,4 +1,5 @@
-import type { Invitation } from "@dafthunk/types";
+import type { Invitation, SubAccountPermissions } from "@dafthunk/types";
+import { DEFAULT_SUB_ACCOUNT_PERMISSIONS } from "@dafthunk/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import Clock from "lucide-react/icons/clock";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
@@ -6,7 +7,12 @@ import PlusCircle from "lucide-react/icons/plus-circle";
 import X from "lucide-react/icons/x";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
+
 import { useTranslation } from "@/components/locale-provider";
+import {
+  createDefaultInvitePermissions,
+  SubAccountPermissionsForm,
+} from "@/components/sub-account-permissions-form";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -34,146 +40,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import type { TranslateFn } from "@/i18n";
 import {
-  createInvitation,
+  createSubAccountInvitation,
   deleteInvitation,
   removeMembership,
-  updateMembership,
+  updateMembershipPermissions,
   useInvitations,
   useMemberships,
 } from "@/services/organizations-service";
 import { formatDate } from "@/utils/date";
 
-const getRoleBadgeVariant = (role: string) => {
-  switch (role) {
-    case "owner":
-      return "default" as const;
-    case "admin":
-      return "secondary" as const;
-    default:
-      return "outline" as const;
-  }
-};
-
-const getRoleLabel = (role: string, t: TranslateFn) => {
-  if (role === "owner") return t("pages.members.roles.owner");
-  if (role === "admin") return t("pages.members.roles.admin");
-  return t("pages.members.roles.member");
-};
-
-const createInvitationColumns = (t: TranslateFn): ColumnDef<Invitation>[] => [
-  {
-    accessorKey: "email",
-    header: t("pages.members.email"),
-    cell: ({ row }) => {
-      return (
-        <div className="flex items-center space-x-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>
-              {row.original.email.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="font-medium">{row.original.email}</div>
-          </div>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "role",
-    header: t("pages.members.role"),
-    cell: ({ row }) => {
-      const role = row.getValue("role") as string;
-      return (
-        <Badge variant={getRoleBadgeVariant(role)}>
-          {getRoleLabel(role, t)}
-        </Badge>
-      );
-    },
-  },
-  {
-    accessorKey: "expiresAt",
-    header: t("pages.members.expires"),
-    cell: ({ row }) => {
-      const date = new Date(row.getValue("expiresAt"));
-      const now = new Date();
-      const isExpired = date < now;
-      return (
-        <div className={isExpired ? "text-red-500" : ""}>
-          {formatDate(date)}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "inviter",
-    header: t("pages.members.invitedBy"),
-    cell: ({ row }) => {
-      const inviter = row.original.inviter;
-      return (
-        <div className="flex items-center space-x-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={inviter.avatarUrl} alt={inviter.name} />
-            <AvatarFallback>
-              {inviter.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm text-muted-foreground">{inviter.name}</span>
-        </div>
-      );
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const invitation = row.original;
-      return (
-        <div className="text-right">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() =>
-              document.dispatchEvent(
-                new CustomEvent("cancelInvitationTrigger", {
-                  detail: {
-                    invitationId: invitation.id,
-                    email: invitation.email,
-                  },
-                })
-              )
-            }
-            title={t("pages.members.cancelInvitation")}
-          >
-            <X className="h-4 w-4 text-muted-foreground hover:text-red-500" />
-          </Button>
-        </div>
-      );
-    },
-  },
-];
-
-const createMemberColumns = (
-  t: TranslateFn
-): ColumnDef<{
+type MembershipRow = {
   userId: string;
   organizationId: string;
-  role: "member" | "admin" | "owner";
+  role: "member" | "owner";
+  permissions: SubAccountPermissions | null;
   createdAt: Date;
   updatedAt: Date;
   user: {
@@ -182,17 +68,93 @@ const createMemberColumns = (
     email?: string;
     avatarUrl?: string;
   };
-}>[] => [
+};
+
+const getRoleLabel = (role: string, t: TranslateFn) => {
+  if (role === "owner") return t("pages.members.roles.owner");
+  return t("pages.members.roles.member");
+};
+
+const summarizePermissions = (
+  permissions: SubAccountPermissions | null | undefined,
+  t: TranslateFn
+): string => {
+  const effective = permissions ?? DEFAULT_SUB_ACCOUNT_PERMISSIONS;
+  const parts: string[] = [];
+  parts.push(
+    effective.workflows === "edit"
+      ? t("pages.members.permissions.edit")
+      : t("pages.members.permissions.viewOnly")
+  );
+  if (effective.executions) parts.push(t("pages.members.permissions.executions"));
+  if (effective.modelCalls) parts.push(t("pages.members.permissions.modelCalls"));
+  if (effective.aiInterfaces) parts.push(t("pages.members.permissions.aiInterfaces"));
+  if (effective.apiKeys) parts.push(t("pages.members.permissions.apiKeys"));
+  return parts.join(" · ");
+};
+
+const createInvitationColumns = (t: TranslateFn): ColumnDef<Invitation>[] => [
+  {
+    accessorKey: "email",
+    header: t("pages.members.email"),
+    cell: ({ row }) => (
+      <div className="font-medium">{row.original.email}</div>
+    ),
+  },
+  {
+    id: "permissions",
+    header: t("pages.members.role"),
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground">
+        {summarizePermissions(row.original.permissions, t)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "expiresAt",
+    header: t("pages.members.expires"),
+    cell: ({ row }) => {
+      const date = new Date(row.getValue("expiresAt"));
+      const isExpired = date < new Date();
+      return (
+        <div className={isExpired ? "text-red-500" : ""}>
+          {formatDate(date)}
+        </div>
+      );
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <div className="text-right">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() =>
+            document.dispatchEvent(
+              new CustomEvent("cancelInvitationTrigger", {
+                detail: {
+                  invitationId: row.original.id,
+                  email: row.original.email,
+                },
+              })
+            )
+          }
+          title={t("pages.members.cancelInvitation")}
+        >
+          <X className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+        </Button>
+      </div>
+    ),
+  },
+];
+
+const createMemberColumns = (t: TranslateFn): ColumnDef<MembershipRow>[] => [
   {
     accessorKey: "user",
     header: t("pages.members.member"),
     cell: ({ row }) => {
-      const user = row.getValue("user") as {
-        id: string;
-        name: string;
-        email?: string;
-        avatarUrl?: string;
-      };
+      const user = row.getValue("user") as MembershipRow["user"];
       return (
         <div className="flex items-center space-x-3">
           <Avatar className="h-8 w-8">
@@ -221,28 +183,41 @@ const createMemberColumns = (
     cell: ({ row }) => {
       const role = row.getValue("role") as string;
       return (
-        <Badge variant={getRoleBadgeVariant(role)}>
+        <Badge variant={role === "owner" ? "default" : "outline"}>
           {getRoleLabel(role, t)}
         </Badge>
       );
     },
   },
   {
+    id: "permissions",
+    header: t("pages.members.editPermissions"),
+    cell: ({ row }) => {
+      const membership = row.original;
+      if (membership.role === "owner") {
+        return <span className="text-sm text-muted-foreground">—</span>;
+      }
+      return (
+        <span className="text-sm text-muted-foreground">
+          {summarizePermissions(
+            membership.permissions ?? DEFAULT_SUB_ACCOUNT_PERMISSIONS,
+            t
+          )}
+        </span>
+      );
+    },
+  },
+  {
     accessorKey: "createdAt",
     header: t("pages.members.joined"),
-    cell: ({ row }) => {
-      const date = row.getValue("createdAt") as Date;
-      return <div>{formatDate(date)}</div>;
-    },
+    cell: ({ row }) => formatDate(row.getValue("createdAt") as Date),
   },
   {
     id: "actions",
     cell: ({ row }) => {
       const membership = row.original;
-      const isOwner = membership.role === "owner";
-
-      if (isOwner) {
-        return <div></div>;
+      if (membership.role === "owner") {
+        return null;
       }
 
       return (
@@ -251,25 +226,24 @@ const createMemberColumns = (
             <DropdownMenuTrigger asChild>
               <Button aria-haspopup="true" size="icon" variant="ghost">
                 <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">{t("common.openMenu")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() =>
                   document.dispatchEvent(
-                    new CustomEvent("updateMemberRoleTrigger", {
+                    new CustomEvent("editPermissionsTrigger", {
                       detail: {
-                        userId: membership.userId,
-                        userName: membership.user.name,
                         userEmail: membership.user.email || "",
-                        currentRole: membership.role,
+                        userName: membership.user.name,
+                        permissions:
+                          membership.permissions ?? DEFAULT_SUB_ACCOUNT_PERMISSIONS,
                       },
                     })
                   )
                 }
               >
-                {t("pages.members.changeRole")}
+                {t("pages.members.editPermissions")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -277,7 +251,6 @@ const createMemberColumns = (
                   document.dispatchEvent(
                     new CustomEvent("removeMemberTrigger", {
                       detail: {
-                        userId: membership.userId,
                         userName: membership.user.name,
                         userEmail: membership.user.email || "",
                       },
@@ -297,6 +270,12 @@ const createMemberColumns = (
 ];
 
 export function MembersPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.members");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <MembersPageContent />;
+}
+
+function MembersPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -313,9 +292,8 @@ export function MembersPage() {
     organizationId || ""
   );
 
-  const [isInviteMemberDialogOpen, setIsInviteMemberDialogOpen] =
-    useState(false);
-  const [isUpdateRoleDialogOpen, setIsUpdateRoleDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isEditPermissionsOpen, setIsEditPermissionsOpen] = useState(false);
   const [isRemoveMemberDialogOpen, setIsRemoveMemberDialogOpen] =
     useState(false);
   const [isCancelInvitationDialogOpen, setIsCancelInvitationDialogOpen] =
@@ -323,20 +301,17 @@ export function MembersPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [newMemberRole, setNewMemberRole] = useState<"member" | "admin">(
-    "member"
+  const [invitePermissions, setInvitePermissions] = useState(
+    createDefaultInvitePermissions()
   );
 
-  const [memberToUpdate, setMemberToUpdate] = useState<{
-    userId: string;
+  const [memberToEdit, setMemberToEdit] = useState<{
     userName: string;
     userEmail: string;
-    currentRole: string;
+    permissions: SubAccountPermissions;
   } | null>(null);
-  const [newRole, setNewRole] = useState<"member" | "admin">("member");
 
   const [memberToRemove, setMemberToRemove] = useState<{
-    userId: string;
     userName: string;
     userEmail: string;
   } | null>(null);
@@ -349,7 +324,7 @@ export function MembersPage() {
   const memberColumns = useMemo(() => createMemberColumns(t), [t]);
   const invitationColumns = useMemo(() => createInvitationColumns(t), [t]);
 
-  const handleInviteMember = useCallback(async (): Promise<void> => {
+  const handleInvite = useCallback(async (): Promise<void> => {
     if (!newMemberEmail.trim()) {
       appToast.error("pages.members.emailRequired");
       return;
@@ -357,52 +332,51 @@ export function MembersPage() {
 
     setIsProcessing(true);
     try {
-      await createInvitation(organizationId || "", {
+      await createSubAccountInvitation(organizationId || "", {
         email: newMemberEmail.trim(),
-        role: newMemberRole,
+        permissions: invitePermissions,
       });
 
       appToast.success("pages.members.inviteSent");
-      setIsInviteMemberDialogOpen(false);
+      setIsInviteDialogOpen(false);
       setNewMemberEmail("");
-      setNewMemberRole("member");
+      setInvitePermissions(createDefaultInvitePermissions());
       await mutateInvitations();
     } catch (error) {
       appToast.error("pages.members.inviteFailed");
-      console.error("Send Invitation Error:", error);
+      console.error("Send invitation error:", error);
     } finally {
       setIsProcessing(false);
     }
   }, [
-    newMemberEmail,
-    newMemberRole,
-    organizationId,
-    mutateInvitations,
     appToast,
+    invitePermissions,
+    mutateInvitations,
+    newMemberEmail,
+    organizationId,
   ]);
 
-  const handleUpdateRole = useCallback(async (): Promise<void> => {
-    if (!memberToUpdate) return;
+  const handleSavePermissions = useCallback(async (): Promise<void> => {
+    if (!memberToEdit) return;
 
     setIsProcessing(true);
     try {
-      await updateMembership(organizationId || "", {
-        email: memberToUpdate.userEmail,
-        role: newRole,
+      await updateMembershipPermissions(organizationId || "", {
+        email: memberToEdit.userEmail,
+        permissions: memberToEdit.permissions,
       });
 
-      appToast.success("pages.members.roleUpdated");
-      setIsUpdateRoleDialogOpen(false);
-      setMemberToUpdate(null);
-      setNewRole("member");
+      appToast.success("pages.members.permissionsUpdated");
+      setIsEditPermissionsOpen(false);
+      setMemberToEdit(null);
       await mutateMemberships();
     } catch (error) {
-      appToast.error("pages.members.roleUpdateFailed");
-      console.error("Update Role Error:", error);
+      appToast.error("pages.members.permissionsUpdateFailed");
+      console.error("Update permissions error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [memberToUpdate, newRole, organizationId, mutateMemberships, appToast]);
+  }, [appToast, memberToEdit, mutateMemberships, organizationId]);
 
   const handleRemoveMember = useCallback(async (): Promise<void> => {
     if (!memberToRemove) return;
@@ -419,11 +393,11 @@ export function MembersPage() {
       await mutateMemberships();
     } catch (error) {
       appToast.error("pages.members.memberRemoveFailed");
-      console.error("Remove Member Error:", error);
+      console.error("Remove member error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [memberToRemove, organizationId, mutateMemberships, appToast]);
+  }, [appToast, memberToRemove, mutateMemberships, organizationId]);
 
   const handleCancelInvitation = useCallback(async (): Promise<void> => {
     if (!invitationToCancel) return;
@@ -441,76 +415,57 @@ export function MembersPage() {
       await mutateInvitations();
     } catch (error) {
       appToast.error("pages.members.inviteCancelFailed");
-      console.error("Cancel Invitation Error:", error);
+      console.error("Cancel invitation error:", error);
     } finally {
       setIsProcessing(false);
     }
-  }, [invitationToCancel, organizationId, mutateInvitations, appToast]);
-
-  const handleUpdateRoleEvent = useCallback((e: Event) => {
-    const custom = e as CustomEvent<{
-      userId: string;
-      userName: string;
-      userEmail: string;
-      currentRole: string;
-    }>;
-    if (custom.detail) {
-      setMemberToUpdate(custom.detail);
-      setNewRole(custom.detail.currentRole as "member" | "admin");
-      setIsUpdateRoleDialogOpen(true);
-    }
-  }, []);
-
-  const handleRemoveMemberEvent = useCallback((e: Event) => {
-    const custom = e as CustomEvent<{
-      userId: string;
-      userName: string;
-      userEmail: string;
-    }>;
-    if (custom.detail) {
-      setMemberToRemove(custom.detail);
-      setIsRemoveMemberDialogOpen(true);
-    }
-  }, []);
-
-  const handleCancelInvitationEvent = useCallback((e: Event) => {
-    const custom = e as CustomEvent<{
-      invitationId: string;
-      email: string;
-    }>;
-    if (custom.detail) {
-      setInvitationToCancel(custom.detail);
-      setIsCancelInvitationDialogOpen(true);
-    }
-  }, []);
+  }, [appToast, invitationToCancel, mutateInvitations, organizationId]);
 
   useEffect(() => {
-    document.addEventListener("updateMemberRoleTrigger", handleUpdateRoleEvent);
-    document.addEventListener("removeMemberTrigger", handleRemoveMemberEvent);
-    document.addEventListener(
-      "cancelInvitationTrigger",
-      handleCancelInvitationEvent
-    );
+    const onEdit = (e: Event) => {
+      const custom = e as CustomEvent<{
+        userName: string;
+        userEmail: string;
+        permissions: SubAccountPermissions;
+      }>;
+      if (custom.detail) {
+        setMemberToEdit(custom.detail);
+        setIsEditPermissionsOpen(true);
+      }
+    };
+
+    const onRemove = (e: Event) => {
+      const custom = e as CustomEvent<{
+        userName: string;
+        userEmail: string;
+      }>;
+      if (custom.detail) {
+        setMemberToRemove(custom.detail);
+        setIsRemoveMemberDialogOpen(true);
+      }
+    };
+
+    const onCancelInvite = (e: Event) => {
+      const custom = e as CustomEvent<{
+        invitationId: string;
+        email: string;
+      }>;
+      if (custom.detail) {
+        setInvitationToCancel(custom.detail);
+        setIsCancelInvitationDialogOpen(true);
+      }
+    };
+
+    document.addEventListener("editPermissionsTrigger", onEdit);
+    document.addEventListener("removeMemberTrigger", onRemove);
+    document.addEventListener("cancelInvitationTrigger", onCancelInvite);
 
     return () => {
-      document.removeEventListener(
-        "updateMemberRoleTrigger",
-        handleUpdateRoleEvent
-      );
-      document.removeEventListener(
-        "removeMemberTrigger",
-        handleRemoveMemberEvent
-      );
-      document.removeEventListener(
-        "cancelInvitationTrigger",
-        handleCancelInvitationEvent
-      );
+      document.removeEventListener("editPermissionsTrigger", onEdit);
+      document.removeEventListener("removeMemberTrigger", onRemove);
+      document.removeEventListener("cancelInvitationTrigger", onCancelInvite);
     };
-  }, [
-    handleUpdateRoleEvent,
-    handleRemoveMemberEvent,
-    handleCancelInvitationEvent,
-  ]);
+  }, []);
 
   useEffect(() => {
     setBreadcrumbs([{ label: t("sidebar.members") }]);
@@ -518,7 +473,9 @@ export function MembersPage() {
 
   if (isMembershipsLoading && !memberships) {
     return <InsetLoading title={t("pages.members.loadingTitle")} />;
-  } else if (membershipsError) {
+  }
+
+  if (membershipsError) {
     return (
       <InsetError
         title={t("pages.members.loadingTitle")}
@@ -533,7 +490,7 @@ export function MembersPage() {
         <div className="text-sm text-muted-foreground max-w-2xl">
           {t("pages.members.description")}
         </div>
-        <Button onClick={() => setIsInviteMemberDialogOpen(true)}>
+        <Button onClick={() => setIsInviteDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
           {t("pages.members.inviteButton")}
         </Button>
@@ -575,11 +532,8 @@ export function MembersPage() {
         </TabsContent>
       </Tabs>
 
-      <AlertDialog
-        open={isInviteMemberDialogOpen}
-        onOpenChange={setIsInviteMemberDialogOpen}
-      >
-        <AlertDialogContent>
+      <AlertDialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>{t("pages.members.inviteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -592,102 +546,62 @@ export function MembersPage() {
               <Input
                 id="user-email"
                 type="email"
-                placeholder={t("pages.members.emailPlaceholder")}
                 value={newMemberEmail}
                 onChange={(e) => setNewMemberEmail(e.target.value)}
                 disabled={isProcessing}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">{t("pages.members.role")}</Label>
-              <Select
-                value={newMemberRole}
-                onValueChange={(value: "member" | "admin") =>
-                  setNewMemberRole(value)
-                }
-                disabled={isProcessing}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">
-                    {t("pages.members.roles.member")}
-                  </SelectItem>
-                  <SelectItem value="admin">
-                    {t("pages.members.roles.admin")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <SubAccountPermissionsForm
+              value={invitePermissions}
+              onChange={setInvitePermissions}
+              disabled={isProcessing}
+            />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setNewMemberEmail("");
-                setNewMemberRole("member");
-              }}
-            >
-              {t("common.cancel")}
-            </AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleInviteMember}
+              onClick={() => void handleInvite()}
               disabled={isProcessing || !newMemberEmail.trim()}
             >
-              {isProcessing
-                ? t("common.loading")
-                : t("pages.members.sendInvitation")}
+              {isProcessing ? t("common.loading") : t("pages.members.sendInvitation")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog
-        open={isUpdateRoleDialogOpen}
-        onOpenChange={setIsUpdateRoleDialogOpen}
+        open={isEditPermissionsOpen}
+        onOpenChange={setIsEditPermissionsOpen}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.members.updateRoleTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.members.editPermissionsTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("pages.members.updateRoleDescription", {
-                name: memberToUpdate?.userName ?? "",
+              {t("pages.members.editPermissionsDescription", {
+                name: memberToEdit?.userName ?? "",
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-role">{t("pages.members.newRole")}</Label>
-              <Select
-                value={newRole}
-                onValueChange={(value: "member" | "admin") => setNewRole(value)}
-                disabled={isProcessing}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">
-                    {t("pages.members.roles.member")}
-                  </SelectItem>
-                  <SelectItem value="admin">
-                    {t("pages.members.roles.admin")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {memberToEdit && (
+            <SubAccountPermissionsForm
+              value={memberToEdit.permissions}
+              onChange={(permissions) =>
+                setMemberToEdit({ ...memberToEdit, permissions })
+              }
+              disabled={isProcessing}
+            />
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setMemberToUpdate(null)}>
+            <AlertDialogCancel onClick={() => setMemberToEdit(null)}>
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleUpdateRole}
+              onClick={() => void handleSavePermissions()}
               disabled={isProcessing}
             >
               {isProcessing
                 ? t("common.loading")
-                : t("pages.members.updateRole")}
+                : t("pages.members.savePermissions")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -714,7 +628,7 @@ export function MembersPage() {
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleRemoveMember}
+              onClick={() => void handleRemoveMember()}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
@@ -741,10 +655,10 @@ export function MembersPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setInvitationToCancel(null)}>
-              {t("pages.members.keepInvitation")}
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleCancelInvitation}
+              onClick={() => void handleCancelInvitation()}
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >

@@ -1,10 +1,22 @@
 import type { Bindings } from "../../context";
 import { decryptSecret, encryptSecret } from "../../utils/encryption";
+import { canDeferVolcanoArkApiKey } from "./can-defer-volcano-ark-api-key";
 import type { VolcengineCredentials } from "./client";
 import { VOLCANO_API_KEY_RENEW_THRESHOLD_MS } from "./constants";
+import {
+  decryptVolcanoArkApiKeyIfPresent,
+  isDeferredVolcanoArkApiKey,
+  isVolcanoArkApiKeyPending,
+} from "./deferred-api-key";
+import {
+  applyVolcanoArkKeyScope,
+  ensureVolcanoModelEndpoints,
+} from "./ensure-volcano-endpoints";
+import { isVolcanoArkNotOpenedError } from "./errors";
 import { getVolcanoArkApiKey } from "./get-api-key";
 import {
   isVolcanoMetadata,
+  normalizeVolcanoInterfaceMetadata,
   parseInterfaceMetadata,
   serializeInterfaceMetadata,
 } from "./metadata";
@@ -55,6 +67,10 @@ export async function getVolcanoCredentials(
   };
 }
 
+/**
+ * Unified Volcano Ark access: ensure endpoints, issue one interface-level API key,
+ * persist scope + endpoint map on metadata.
+ */
 export async function ensureVolcanoApiKey(params: {
   env: Bindings;
   organizationId: string;
@@ -66,8 +82,11 @@ export async function ensureVolcanoApiKey(params: {
   apiKey: string;
   expiresAt: string | null;
   renewed: boolean;
+  metadataChanged: boolean;
 }> {
-  const metadata = parseInterfaceMetadata(params.metadataRaw);
+  let metadata = normalizeVolcanoInterfaceMetadata(
+    parseInterfaceMetadata(params.metadataRaw)
+  );
   if (!isVolcanoMetadata(metadata)) {
     throw new Error("Volcano metadata not configured");
   }
@@ -85,40 +104,91 @@ export async function ensureVolcanoApiKey(params: {
   let apiKey = "";
   let expiresAt = metadata.arkApiKeyExpiresAt ?? null;
   let renewed = false;
+  let metadataChanged = false;
 
-  if (!apiKeyEncrypted || shouldRenewVolcanoApiKey(expiresAt)) {
-    const issued = await getVolcanoArkApiKey(credentials);
-    apiKey = issued.apiKey;
-    expiresAt = issued.expiresAt;
-    apiKeyEncrypted = await encryptSecret(
-      issued.apiKey,
-      params.env,
-      params.organizationId
-    );
-    renewed = true;
-  } else {
-    apiKey = await decryptSecret(
-      apiKeyEncrypted,
-      params.env,
-      params.organizationId
-    );
+  const endpointEnsure = await ensureVolcanoModelEndpoints({
+    credentials,
+    metadata,
+  });
+  if (endpointEnsure.changed) {
+    metadata = endpointEnsure.metadata;
+    metadataChanged = true;
+  }
+
+  const decryptedExisting = await decryptVolcanoArkApiKeyIfPresent(
+    apiKeyEncrypted,
+    params.env,
+    params.organizationId
+  );
+  const keyPending = isVolcanoArkApiKeyPending(metadata, decryptedExisting);
+
+  if (keyPending || shouldRenewVolcanoApiKey(expiresAt)) {
+    try {
+      const issued = await getVolcanoArkApiKey(credentials, { metadata });
+      apiKey = issued.apiKey;
+      expiresAt = issued.expiresAt;
+      apiKeyEncrypted = await encryptSecret(
+        issued.apiKey,
+        params.env,
+        params.organizationId
+      );
+      metadata = applyVolcanoArkKeyScope({
+        metadata,
+        scope: issued.scope,
+      });
+      renewed = true;
+      metadataChanged = true;
+    } catch (error) {
+      if (!isVolcanoArkNotOpenedError(error)) {
+        throw error;
+      }
+
+      if (
+        decryptedExisting &&
+        !isDeferredVolcanoArkApiKey(decryptedExisting)
+      ) {
+        apiKey = decryptedExisting;
+      } else if (await canDeferVolcanoArkApiKey({ credentials })) {
+        apiKey = "";
+        expiresAt = null;
+      } else {
+        throw error;
+      }
+    }
+  } else if (decryptedExisting) {
+    apiKey = decryptedExisting;
   }
 
   const nextMetadata = {
     ...metadata,
     arkApiKeyExpiresAt: expiresAt ?? undefined,
+    arkApiKeyPending: apiKey ? undefined : true,
   };
 
+  const nextMetadataRaw = serializeInterfaceMetadata(nextMetadata);
+  if (nextMetadataRaw !== params.metadataRaw) {
+    metadataChanged = true;
+  }
+
   return {
-    metadataRaw: serializeInterfaceMetadata(nextMetadata),
+    metadataRaw: nextMetadataRaw,
     apiKeyEncrypted,
     apiKey,
     expiresAt,
     renewed,
+    metadataChanged,
   };
 }
 
 export function maskApiKey(apiKey: string): string {
+  if (!apiKey) return "—";
+  if (isDeferredVolcanoArkApiKey(apiKey)) return "—";
   if (apiKey.length <= 8) return "****";
   return `${apiKey.slice(0, 4)}…${apiKey.slice(-4)}`;
 }
+
+export {
+  decryptVolcanoArkApiKeyIfPresent,
+  encryptDeferredVolcanoArkApiKey,
+  isVolcanoArkApiKeyPending,
+} from "./deferred-api-key";

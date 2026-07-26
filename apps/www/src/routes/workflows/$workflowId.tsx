@@ -42,10 +42,10 @@ export function loader({ params }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  if (!data) return [{ title: "Not Found - Dafthunk" }];
+  if (!data) return [{ title: "Not Found - z3cz.com" }];
 
   const { workflow } = data;
-  const title = `${workflow.name} Workflow Template | Dafthunk`;
+  const title = `${workflow.name} Workflow Template | z3cz.com`;
   const description = workflow.metaDescription;
   const url = `${websiteUrl}/workflows/${workflow.id}`;
   const ogImage = `${websiteUrl}/og-image.webp`;
@@ -58,7 +58,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },

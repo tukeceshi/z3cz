@@ -16,6 +16,7 @@ import {
   collectGenerativeReferenceChips,
   type GenerativeReferenceChip,
 } from "./generative-reference-utils";
+import { isGenerativeManualContent } from "./generative-card-mode-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export interface AiVideoPromptReferenceEdge {
@@ -108,6 +109,7 @@ export function hasAiVideoPromptReference(params: {
 
 export function listPickableAiVideoPromptSources(params: {
   readonly targetNodeId: string;
+  readonly targetNodeMetadata?: Record<string, string> | undefined;
   readonly edges: readonly Pick<
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "targetHandle"
@@ -117,6 +119,10 @@ export function listPickableAiVideoPromptSources(params: {
     "id" | "data"
   >[];
 }): readonly { readonly nodeId: string; readonly sourceHandle: string }[] {
+  if (isGenerativeManualContent(params.targetNodeMetadata)) {
+    return [];
+  }
+
   const results: { nodeId: string; sourceHandle: string }[] = [];
 
   for (const node of params.nodes) {
@@ -146,6 +152,7 @@ export function listPickableAiVideoPromptSources(params: {
 
 export function evaluateAiVideoPromptReferenceStructural(params: {
   readonly targetNodeId: string;
+  readonly targetNodeMetadata?: Record<string, string> | undefined;
   readonly sourceNodeId: string;
   readonly sourceNodeType: string | undefined;
   readonly edges?: readonly Pick<
@@ -153,6 +160,9 @@ export function evaluateAiVideoPromptReferenceStructural(params: {
     "source" | "target" | "targetHandle"
   >[];
 }): { readonly ok: boolean } {
+  if (isGenerativeManualContent(params.targetNodeMetadata)) {
+    return { ok: false };
+  }
   if (params.sourceNodeId === params.targetNodeId) {
     return { ok: false };
   }
@@ -232,6 +242,7 @@ export function buildAiVideoPromptReferenceConnectionFromCardDrop(params: {
   );
   if (sourceNode?.data.nodeType !== AI_TEXT_NODE_TYPE) return null;
   if (targetNode?.data.nodeType !== AI_VIDEO_NODE_TYPE) return null;
+  if (isGenerativeManualContent(targetNode.data.metadata)) return null;
 
   return {
     source: params.dragFromNodeId,

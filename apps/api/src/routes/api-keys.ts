@@ -19,12 +19,14 @@ import {
   getApiKeys,
   rollApiKey,
 } from "../db";
+import { requireApiKeysAccess } from "../middleware/org-permissions";
 
 // Create a new Hono instance for API keys endpoints
 const apiKeyRoutes = new Hono<ApiContext>();
 
 // Apply authentication middleware to all routes
 apiKeyRoutes.use("*", jwtMiddleware);
+apiKeyRoutes.use("*", requireApiKeysAccess());
 
 /**
  * GET /api/api-keys

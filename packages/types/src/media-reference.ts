@@ -39,9 +39,43 @@ export interface AiMediaCacheSettings {
   readonly limitMb: number;
 }
 
-export interface OrgCloudStorageStatus {
+import type { CloudStorageHealthSnapshot } from "./cloud-storage-health";
+import { blocksGenerativeMediaForHealth } from "./cloud-storage-health";
+
+export interface OrgCloudStorageConfiguredStatus {
   readonly configured: boolean;
   readonly interfaceId?: string;
+}
+
+export interface OrgCloudStorageStatus extends OrgCloudStorageConfiguredStatus {
+  readonly health?: CloudStorageHealthSnapshot | null;
+  readonly blocksGenerativeMedia: boolean;
+}
+
+export function buildOrgCloudStorageConfiguredStatus(params: {
+  readonly configured: boolean;
+  readonly interfaceId?: string;
+}): OrgCloudStorageConfiguredStatus {
+  return {
+    configured: params.configured,
+    interfaceId: params.interfaceId,
+  };
+}
+
+export function buildOrgCloudStorageStatus(params: {
+  readonly configured: boolean;
+  readonly interfaceId?: string;
+  readonly health?: CloudStorageHealthSnapshot | null;
+}): OrgCloudStorageStatus {
+  return {
+    configured: params.configured,
+    interfaceId: params.interfaceId,
+    health: params.health ?? null,
+    blocksGenerativeMedia: blocksGenerativeMediaForHealth(
+      params.configured,
+      params.health
+    ),
+  };
 }
 
 export function isEphemeralMediaReference(

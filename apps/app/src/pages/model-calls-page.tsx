@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useEffect, useState } from "react";
 
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-context";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import {
   fetchModelCallDetail,
@@ -20,6 +22,21 @@ import {
 } from "@/services/platform-ai-model-service";
 
 export function ModelCallsPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessModelCalls) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.modelCalls")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <ModelCallsPageContent />;
+}
+
+function ModelCallsPageContent() {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const { getOrgUrl } = useOrgUrl();

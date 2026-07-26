@@ -22,7 +22,7 @@ interface WorkflowData {
 const { workflows } = workflowsData as { workflows: WorkflowData[] };
 
 export const meta: MetaFunction = () => {
-  const title = "Workflow Automation Templates & Use Cases | Dafthunk";
+  const title = "Workflow Automation Templates & Use Cases | z3cz.com";
   const description =
     "AI image generation, translation, web scraping, speech-to-text and more. Open source, MIT-licensed workflow templates running serverless on Cloudflare Workers.";
   const url = `${websiteUrl}/workflows`;
@@ -36,7 +36,7 @@ export const meta: MetaFunction = () => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -60,7 +60,7 @@ export default function WorkflowsPage() {
   const collectionJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Dafthunk workflow automation templates",
+    name: "z3cz.com workflow automation templates",
     url: `${websiteUrl}/workflows`,
     description:
       "Open source, MIT-licensed workflow automation templates for AI, browser automation, and data pipelines, running serverless on Cloudflare Workers.",

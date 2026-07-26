@@ -1,4 +1,5 @@
 import type { PlatformAiModelParameterRules } from "@dafthunk/types";
+import type { GenerationJobResultJson } from "@dafthunk/types";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -27,7 +28,6 @@ export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 // Organization member roles
 export const OrganizationRole = {
   MEMBER: "member",
-  ADMIN: "admin",
   OWNER: "owner",
 } as const;
 
@@ -69,21 +69,6 @@ export const WorkflowRuntime = {
 
 export type WorkflowRuntimeType =
   (typeof WorkflowRuntime)[keyof typeof WorkflowRuntime];
-
-export const WorkflowBillingMode = {
-  PLATFORM: "platform",
-  UPSTREAM: "upstream",
-} as const;
-
-export type WorkflowBillingModeType =
-  (typeof WorkflowBillingMode)[keyof typeof WorkflowBillingMode];
-
-export const RelayAccountProvider = {
-  NEWAPI: "newapi",
-} as const;
-
-export type RelayAccountProviderType =
-  (typeof RelayAccountProvider)[keyof typeof RelayAccountProvider];
 
 // Bot provider types
 export const BotProvider = {
@@ -252,13 +237,23 @@ export const WORKFLOW_SCHEME_OMNIPOTENT_ID = "omnipotent";
 
 export const platformSettings = pgTable("platform_settings", {
   id: text("id").primaryKey(),
-  siteName: text("site_name").notNull().default("Dafthunk"),
+  siteName: text("site_name").notNull().default("z3cz.com"),
   siteTagline: text("site_tagline")
     .notNull()
     .default("Build serverless workflows visually."),
   defaultLocale: text("default_locale").notNull().default("en"),
   supportEmail: text("support_email"),
   featureConfig: text("feature_config"),
+  authConfig: text("auth_config"),
+  newUserTourEnabled: boolean("new_user_tour_enabled").notNull().default(true),
+  homepageMode: text("homepage_mode")
+    .$type<"console" | "marketing">()
+    .notNull()
+    .default("console"),
+  legalConfig: text("legal_config"),
+  persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
+    .notNull()
+    .default(false),
   updatedAt: createUpdatedAt(),
   updatedBy: text("updated_by").references(() => users.id),
 });
@@ -277,6 +272,7 @@ export const memberships = pgTable(
       .$type<OrganizationRoleType>()
       .notNull()
       .default(OrganizationRole.MEMBER),
+    permissions: jsonb("permissions").$type<Record<string, unknown> | null>(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -335,30 +331,6 @@ export const workflowSchemes = pgTable(
     index("workflow_schemes_enabled_idx").on(table.enabled),
     index("workflow_schemes_sort_order_idx").on(table.sortOrder),
     index("workflow_schemes_is_default_idx").on(table.isDefault),
-  ]
-);
-
-export const platformRelayAccounts = pgTable(
-  "platform_relay_accounts",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    provider: text("provider")
-      .$type<RelayAccountProviderType>()
-      .notNull()
-      .default(RelayAccountProvider.NEWAPI),
-    baseUrl: text("base_url").notNull(),
-    apiKeyEncrypted: text("api_key_encrypted").notNull(),
-    enabled: boolean("enabled").notNull().default(true),
-    isDefault: boolean("is_default").notNull().default(false),
-    createdAt: createCreatedAt(),
-    updatedAt: createUpdatedAt(),
-    updatedBy: text("updated_by").references(() => users.id),
-  },
-  (table) => [
-    index("platform_relay_accounts_provider_idx").on(table.provider),
-    index("platform_relay_accounts_enabled_idx").on(table.enabled),
-    index("platform_relay_accounts_is_default_idx").on(table.isDefault),
   ]
 );
 
@@ -437,12 +409,103 @@ export const aiModelInvocations = pgTable(
     source: text("source").notNull(),
     status: text("status").notNull(),
     error: text("error"),
+    generationJobId: text("generation_job_id"),
     createdAt: createCreatedAt(),
   },
   (table) => [
     index("ai_model_invocations_org_created_idx").on(
       table.organizationId,
       table.createdAt
+    ),
+    index("ai_model_invocations_generation_job_idx").on(
+      table.generationJobId
+    ),
+  ]
+);
+
+export const organizationCloudStorageHealth = pgTable(
+  "organization_cloud_storage_health",
+  {
+    organizationId: text("organization_id")
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    interfaceId: text("interface_id").notNull(),
+    status: text("status").notNull(),
+    reason: text("reason"),
+    message: text("message"),
+    bucket: text("bucket").notNull(),
+    region: text("region").notNull(),
+    consecutiveFailureCount: integer("consecutive_failure_count")
+      .notNull()
+      .default(0),
+    checkedAt: timestamp("checked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("organization_cloud_storage_health_status_checked_idx").on(
+      table.status,
+      table.checkedAt
+    ),
+  ]
+);
+
+export const persistWorkers = pgTable(
+  "persist_workers",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    secretHash: text("secret_hash").notNull(),
+    maxConcurrentJobs: integer("max_concurrent_jobs").notNull().default(1),
+    activeJobCount: integer("active_job_count").notNull().default(0),
+    host: text("host"),
+    sshPort: integer("ssh_port").notNull().default(22),
+    sshUsername: text("ssh_username"),
+    deployStatus: text("deploy_status").notNull().default("manual"),
+    deployError: text("deploy_error"),
+    lastDeployAt: timestamp("last_deploy_at", { withTimezone: true }),
+    initializedAt: timestamp("initialized_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    updatedBy: text("updated_by").references(() => users.id),
+  },
+  (table) => [index("persist_workers_enabled_idx").on(table.enabled)]
+);
+
+export const generationJobs = pgTable(
+  "generation_jobs",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    workflowId: text("workflow_id"),
+    nodeId: text("node_id"),
+    modality: text("modality").notNull(),
+    status: text("status").notNull(),
+    upstreamTaskId: text("upstream_task_id"),
+    modelCanonicalId: text("model_canonical_id").notNull(),
+    interfaceId: text("interface_id").notNull(),
+    failureReason: text("failure_reason"),
+    healthReason: text("health_reason"),
+    readyAt: timestamp("ready_at", { withTimezone: true }),
+    resultJson: jsonb("result_json").$type<GenerationJobResultJson>(),
+    clientRequestId: text("client_request_id"),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("generation_jobs_org_status_idx").on(
+      table.organizationId,
+      table.status
+    ),
+    index("generation_jobs_org_upstream_task_idx").on(
+      table.organizationId,
+      table.upstreamTaskId
     ),
   ]
 );
@@ -466,6 +529,25 @@ export const organizationModelInterfacePriorities = pgTable(
 
 // Workflows - Workflow definitions created and edited by users
 // Note: Full workflow data is stored in R2, only metadata is in the database
+export const workflowFolders = pgTable(
+  "workflow_folders",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    coverObjectId: text("cover_object_id"),
+    coverMimeType: text("cover_mime_type"),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+  },
+  (table) => [
+    index("workflow_folders_organization_id_idx").on(table.organizationId),
+    index("workflow_folders_updated_at_idx").on(table.updatedAt),
+  ]
+);
+
 export const workflows = pgTable(
   "workflows",
   {
@@ -484,14 +566,14 @@ export const workflows = pgTable(
       .$type<WorkflowRuntimeType>()
       .notNull()
       .default(WorkflowRuntime.WORKFLOW),
-    billingMode: text("billing_mode")
-      .$type<WorkflowBillingModeType>()
-      .notNull()
-      .default(WorkflowBillingMode.PLATFORM),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    enabled: boolean("enabled").notNull().default(true),
+    folderId: text("folder_id").references(() => workflowFolders.id, {
+      onDelete: "set null",
+    }),
+    coverObjectId: text("cover_object_id"),
+    coverMimeType: text("cover_mime_type"),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -500,9 +582,8 @@ export const workflows = pgTable(
     index("workflows_scheme_id_idx").on(table.schemeId),
     index("workflows_trigger_idx").on(table.trigger),
     index("workflows_runtime_idx").on(table.runtime),
-    index("workflows_billing_mode_idx").on(table.billingMode),
     index("workflows_organization_id_idx").on(table.organizationId),
-    index("workflows_enabled_idx").on(table.enabled),
+    index("workflows_folder_id_idx").on(table.folderId),
     index("workflows_created_at_idx").on(table.createdAt),
     index("workflows_updated_at_idx").on(table.updatedAt),
   ]
@@ -971,6 +1052,7 @@ export const invitations = pgTable(
       .$type<OrganizationRoleType>()
       .notNull()
       .default(OrganizationRole.MEMBER),
+    permissions: jsonb("permissions").$type<Record<string, unknown> | null>(),
     status: text("status")
       .$type<InvitationStatusType>()
       .notNull()
@@ -1090,6 +1172,10 @@ export const workflowsRelations = relations(workflows, ({ one, many }) => ({
     fields: [workflows.organizationId],
     references: [organizations.id],
   }),
+  folder: one(workflowFolders, {
+    fields: [workflows.folderId],
+    references: [workflowFolders.id],
+  }),
   scheduledTrigger: one(scheduledTriggers, {
     fields: [workflows.id],
     references: [scheduledTriggers.workflowId],
@@ -1108,6 +1194,17 @@ export const workflowsRelations = relations(workflows, ({ one, many }) => ({
   }),
   feedbackCriteria: many(feedbackCriteria),
 }));
+
+export const workflowFoldersRelations = relations(
+  workflowFolders,
+  ({ one, many }) => ({
+    organization: one(organizations, {
+      fields: [workflowFolders.organizationId],
+      references: [organizations.id],
+    }),
+    workflows: many(workflows),
+  })
+);
 
 export const scheduledTriggersRelations = relations(
   scheduledTriggers,
@@ -1322,6 +1419,7 @@ export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type ApiKeyInsert = typeof apiKeys.$inferInsert;
 
 export type WorkflowRow = typeof workflows.$inferSelect;
+export type WorkflowFolderRow = typeof workflowFolders.$inferSelect;
 export type WorkflowInsert = typeof workflows.$inferInsert;
 
 export type ScheduledTriggerRow = typeof scheduledTriggers.$inferSelect;
@@ -1383,7 +1481,3 @@ export type PlatformSettingsInsert = typeof platformSettings.$inferInsert;
 
 export type WorkflowSchemeRow = typeof workflowSchemes.$inferSelect;
 export type WorkflowSchemeInsert = typeof workflowSchemes.$inferInsert;
-
-export type PlatformRelayAccountRow = typeof platformRelayAccounts.$inferSelect;
-export type PlatformRelayAccountInsert =
-  typeof platformRelayAccounts.$inferInsert;

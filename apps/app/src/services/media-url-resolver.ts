@@ -8,9 +8,9 @@ import {
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 import {
-  getCachedLocalMediaPreviewUrl,
-  readLocalMediaBlob,
-} from "@/services/local-media-staging";
+  getGenerativeStagingPreviewUrl,
+  readGenerativeStagingBlob,
+} from "@/services/generative-media-staging";
 import {
   createCloudObjectUrl,
   resolveMediaCacheFetchUrl,
@@ -28,9 +28,10 @@ export { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils
 
 export function inferMediaNodeType(
   media: MediaReference
-): "ai-image" | "ai-video" | null {
+): "ai-image" | "ai-video" | "ai-audio" | null {
   const mime = media.mimeType.toLowerCase();
   if (mime.startsWith("video/")) return "ai-video";
+  if (mime.startsWith("audio/")) return "ai-audio";
   if (mime.startsWith("image/")) return "ai-image";
   return null;
 }
@@ -40,14 +41,26 @@ export async function resolveMediaDisplayUrl(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly workflowName?: string;
-  readonly nodeType?: "ai-image" | "ai-video";
+  readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
   readonly warmCache?: boolean;
   readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
   if (isLocalMediaReference(params.media)) {
-    const cached = getCachedLocalMediaPreviewUrl(params.media.mediaId);
+    const cached = await getCachedMediaBlobUrl({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      mediaId: params.media.mediaId,
+      size: params.size,
+    });
     if (cached) return cached;
-    const entry = await readLocalMediaBlob(params.media.mediaId);
+
+    const stagingPreview = getGenerativeStagingPreviewUrl(params.media.mediaId);
+    if (stagingPreview) return stagingPreview;
+    const entry = await readGenerativeStagingBlob({
+      mediaId: params.media.mediaId,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    });
     if (!entry) return null;
     return URL.createObjectURL(entry.blob);
   }

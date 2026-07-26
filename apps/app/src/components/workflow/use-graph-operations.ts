@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -26,6 +26,7 @@ import {
 } from "./trigger-node-mapping";
 import { collectAiTextFirstDegreeEdgeIds } from "./ai-text-edge-selection";
 import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
+import { collectAiAudioFirstDegreeEdgeIds } from "./ai-audio-edge-selection";
 import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
 import { shouldSuppressGenerativePanelDeselect } from "./generative-panel-pointer-guard";
 import {
@@ -38,6 +39,7 @@ import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-pr
 import {
   buildAiVideoReferenceConnectionFromCardDrop,
 } from "./ai-video-reference-policy";
+import { buildAiAudioPromptReferenceConnectionFromCardDrop } from "./ai-audio-prompt-reference";
 import { buildAiVideoPromptReferenceConnectionFromCardDrop } from "./ai-video-prompt-reference";
 import {
   mergeAiTextNodeCatalogInputs,
@@ -48,11 +50,17 @@ import {
   mergeAiImageNodeCatalogInputs,
 } from "./ai-image-node-utils";
 import {
+  AI_AUDIO_PROMPT_HANDLE_ID,
+  mergeAiAudioNodeCatalogInputs,
+} from "./ai-audio-node-utils";
+import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
+import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
+import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import type {
@@ -67,6 +75,13 @@ import type {
 
 // --- Pure helper functions ---
 
+function isGenerativeAiNodeType(nodeType: string | undefined): boolean {
+  return (
+    nodeType !== undefined &&
+    (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType)
+  );
+}
+
 function updateNodesWithExecutionState(
   nodes: ReactFlowNode<WorkflowNodeType>[],
   nodeId: string,
@@ -80,6 +95,10 @@ function updateNodesWithExecutionState(
             ...node.data,
             executionState: state,
             error: state === "error" ? node.data.error : null,
+            metadata:
+              state !== "error" && isGenerativeAiNodeType(node.data.nodeType)
+                ? withGenerativeCardGenerateError(node.data.metadata, null)
+                : node.data.metadata,
           },
         }
       : node
@@ -122,6 +141,12 @@ function updateNodesWithExecutionError(
           data: {
             ...node.data,
             error,
+            metadata: isGenerativeAiNodeType(node.data.nodeType)
+              ? withGenerativeCardGenerateError(
+                  node.data.metadata,
+                  error ? prepareGenerativeCardError(error) : null
+                )
+              : node.data.metadata,
           },
         }
       : node
@@ -133,11 +158,15 @@ function mergeGenerativeNodeCatalogInputs(
   inputs: readonly WorkflowParameter[],
   catalog: NodeType | undefined
 ): WorkflowParameter[] {
-  return mergeAiVideoNodeCatalogInputs(
+  return mergeAiAudioNodeCatalogInputs(
     nodeType,
-    mergeAiImageNodeCatalogInputs(
+    mergeAiVideoNodeCatalogInputs(
       nodeType,
-      mergeAiTextNodeCatalogInputs(nodeType, inputs, catalog),
+      mergeAiImageNodeCatalogInputs(
+        nodeType,
+        mergeAiTextNodeCatalogInputs(nodeType, inputs, catalog),
+        catalog
+      ),
       catalog
     ),
     catalog
@@ -358,7 +387,9 @@ export function useGraphOperations({
           ? collectAiImageFirstDegreeEdgeIds(soleSelectedNodeId, edges)
           : selectedNode?.data.nodeType === AI_VIDEO_NODE_TYPE && soleSelectedNodeId
             ? collectAiVideoFirstDegreeEdgeIds(soleSelectedNodeId, edges)
-            : new Set<string>();
+            : selectedNode?.data.nodeType === AI_AUDIO_NODE_TYPE && soleSelectedNodeId
+              ? collectAiAudioFirstDegreeEdgeIds(soleSelectedNodeId, edges)
+              : new Set<string>();
 
     setEdges((current) => {
       let changed = false;
@@ -652,6 +683,12 @@ export function useGraphOperations({
               nodes: policyNodes,
             }) ??
             buildAiVideoReferenceConnectionFromCardDrop({
+              dragFromNodeId: connectionState.fromNode.id,
+              dragFromHandle: connectionState.fromHandle,
+              hoveredNodeId,
+              nodes: policyNodes,
+            }) ??
+            buildAiAudioPromptReferenceConnectionFromCardDrop({
               dragFromNodeId: connectionState.fromNode.id,
               dragFromHandle: connectionState.fromHandle,
               hoveredNodeId,

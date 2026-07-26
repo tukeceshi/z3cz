@@ -2,10 +2,11 @@ import type {
   AiInterfaceProvider,
   AiInterfaceRuntimeArtifact,
 } from "@dafthunk/types";
-import { VOLCANO_PRODUCT_DISPLAY_NAME_ZH } from "@dafthunk/types";
+import { CLAUDE_PROVIDER_CARD_ID, VOLCANO_PRODUCT_DISPLAY_NAME_ZH } from "@dafthunk/types";
 
 import {
   compileAiInterfaceSourceSpec,
+  createAnthropicMessagesSourceSpec,
   createOpenAiCompatibleChatSourceSpec,
 } from "./compile";
 
@@ -41,11 +42,11 @@ const PROVIDER_DEFAULTS: Readonly<
     id: "builtin:deepseek",
     name: "DeepSeek Chat",
     description: "DeepSeek OpenAI-compatible chat API.",
-    baseUrl: "https://api.deepseek.com/v1",
-    defaultModel: "deepseek-chat",
+    baseUrl: "https://api.deepseek.com",
+    defaultModel: "deepseek-v4-flash",
     models: [
-      { id: "deepseek-chat", label: "DeepSeek Chat" },
-      { id: "deepseek-reasoner", label: "DeepSeek Reasoner" },
+      { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
+      { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
     ],
     tags: ["AI", "DeepSeek"],
   },
@@ -70,6 +71,7 @@ export function buildBuiltinAiInterfaceArtifact(
   options?: {
     readonly baseUrl?: string | null;
     readonly defaultModel?: string | null;
+    readonly singleModelPresetId?: string | null;
   }
 ): AiInterfaceRuntimeArtifact {
   if (provider === "custom") {
@@ -78,6 +80,22 @@ export function buildBuiltinAiInterfaceArtifact(
       throw new Error("Custom AI interfaces require a base URL");
     }
     const defaultModel = options?.defaultModel?.trim() || "default";
+    if (options?.singleModelPresetId === CLAUDE_PROVIDER_CARD_ID) {
+      const source = createAnthropicMessagesSourceSpec({
+        id: "builtin:claude",
+        name: "Claude Messages",
+        description: "Anthropic Claude Messages API.",
+        provider: "custom",
+        baseUrl,
+        defaultModel,
+        models: [{ id: defaultModel, label: defaultModel }],
+        tags: ["AI", "Claude", "Anthropic"],
+      });
+      return compileAiInterfaceSourceSpec({
+        source,
+        version: BUILTIN_VERSION,
+      });
+    }
     const source = createOpenAiCompatibleChatSourceSpec({
       id: "builtin:custom",
       name: "Custom OpenAI-compatible",

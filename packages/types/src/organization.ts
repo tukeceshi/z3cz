@@ -2,11 +2,26 @@
  * Organization-related types for API requests and responses
  */
 
+import type { SubAccountPermissions } from "./sub-account-permissions";
+
 export interface CreateOrganizationRequest {
   name: string;
 }
 
 export interface CreateOrganizationResponse {
+  organization: {
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+export interface UpdateOrganizationRequest {
+  name: string;
+}
+
+export interface UpdateOrganizationResponse {
   organization: {
     id: string;
     name: string;
@@ -23,6 +38,7 @@ export interface ListOrganizationsResponse {
   organizations: Array<{
     id: string;
     name: string;
+    role: "member" | "owner";
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -36,7 +52,8 @@ export interface ListMembershipsResponse {
   memberships: Array<{
     userId: string;
     organizationId: string;
-    role: "member" | "admin" | "owner";
+    role: "member" | "owner";
+    permissions: SubAccountPermissions | null;
     createdAt: Date;
     updatedAt: Date;
     user: {
@@ -48,38 +65,6 @@ export interface ListMembershipsResponse {
   }>;
 }
 
-export interface AddMembershipRequest {
-  organizationId: string;
-  email: string;
-  role: "member" | "admin";
-}
-
-export interface AddMembershipResponse {
-  membership: {
-    userId: string;
-    organizationId: string;
-    role: "member" | "admin" | "owner";
-    createdAt: Date;
-    updatedAt: Date;
-  };
-}
-
-export interface UpdateMembershipRequest {
-  organizationId: string;
-  email: string;
-  role: "member" | "admin";
-}
-
-export interface UpdateMembershipResponse {
-  membership: {
-    userId: string;
-    organizationId: string;
-    role: "member" | "admin" | "owner";
-    createdAt: Date;
-    updatedAt: Date;
-  };
-}
-
 export interface RemoveMembershipRequest {
   organizationId: string;
   email: string;
@@ -89,8 +74,25 @@ export interface RemoveMembershipResponse {
   success: boolean;
 }
 
+export interface UpdateMembershipPermissionsRequest {
+  organizationId: string;
+  email: string;
+  permissions: Partial<SubAccountPermissions>;
+}
+
+export interface UpdateMembershipPermissionsResponse {
+  membership: {
+    userId: string;
+    organizationId: string;
+    role: "member" | "owner";
+    permissions: SubAccountPermissions | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
 /**
- * Invitation-related types
+ * Sub-account invitation types
  */
 
 export type InvitationStatus = "pending" | "accepted" | "declined" | "expired";
@@ -99,7 +101,7 @@ export interface Invitation {
   id: string;
   email: string;
   organizationId: string;
-  role: "member" | "admin";
+  permissions: SubAccountPermissions;
   status: InvitationStatus;
   expiresAt: Date;
   createdAt: Date;
@@ -112,10 +114,95 @@ export interface Invitation {
   };
 }
 
+export interface CreateSubAccountInvitationRequest {
+  email: string;
+  permissions?: Partial<SubAccountPermissions>;
+}
+
+export interface CreateSubAccountInvitationResponse {
+  invitation: Invitation;
+}
+
+export interface ListInvitationsResponse {
+  invitations: Invitation[];
+}
+
+export interface GetSubAccountInvitationPreviewResponse {
+  invitation: {
+    id: string;
+    email: string;
+    organizationName: string;
+    expiresAt: Date;
+  };
+}
+
+export interface RegisterSubAccountRequest {
+  email: string;
+  password: string;
+  invitationId: string;
+  verificationCode?: string;
+}
+
+export interface DeleteInvitationResponse {
+  success: boolean;
+}
+
+export interface AcceptInvitationResponse {
+  membership: {
+    userId: string;
+    organizationId: string;
+    role: "member" | "owner";
+    permissions: SubAccountPermissions | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+export interface DeclineInvitationResponse {
+  success: boolean;
+}
+
+/** @deprecated Sub-accounts register via invitation link; kept for API compatibility. */
+export interface AddMembershipRequest {
+  organizationId: string;
+  email: string;
+  role: "member";
+}
+
+/** @deprecated */
+export interface AddMembershipResponse {
+  membership: {
+    userId: string;
+    organizationId: string;
+    role: "member" | "owner";
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+/** @deprecated */
+export interface UpdateMembershipRequest {
+  organizationId: string;
+  email: string;
+  role: "member";
+}
+
+/** @deprecated */
+export interface UpdateMembershipResponse {
+  membership: {
+    userId: string;
+    organizationId: string;
+    role: "member" | "owner";
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+/** @deprecated */
 export interface UserInvitation {
   id: string;
   email: string;
-  role: "member" | "admin";
+  role: "member";
   status: InvitationStatus;
   expiresAt: Date;
   createdAt: Date;
@@ -131,37 +218,18 @@ export interface UserInvitation {
   };
 }
 
+/** @deprecated */
 export interface CreateInvitationRequest {
   email: string;
-  role: "member" | "admin";
+  role: "member";
 }
 
+/** @deprecated */
 export interface CreateInvitationResponse {
   invitation: Invitation;
 }
 
-export interface ListInvitationsResponse {
-  invitations: Invitation[];
-}
-
+/** @deprecated */
 export interface ListUserInvitationsResponse {
   invitations: UserInvitation[];
-}
-
-export interface AcceptInvitationResponse {
-  membership: {
-    userId: string;
-    organizationId: string;
-    role: "member" | "admin" | "owner";
-    createdAt: Date;
-    updatedAt: Date;
-  };
-}
-
-export interface DeclineInvitationResponse {
-  success: boolean;
-}
-
-export interface DeleteInvitationResponse {
-  success: boolean;
 }

@@ -43,6 +43,16 @@ export function buildBodyFromSlots(params: {
       continue;
     }
 
+    if (slot.kind === "anthropic-messages") {
+      const promptField = slot.promptField ?? "prompt";
+      const prompt = inputs[promptField];
+      if (typeof prompt !== "string" || prompt.trim().length === 0) {
+        return { error: `${promptField} is required` };
+      }
+      body[slot.to] = [{ role: "user", content: prompt }];
+      continue;
+    }
+
     const fieldName = slot.from ?? slot.to;
     const field = fieldByName.get(fieldName);
     const raw = inputs[fieldName];

@@ -1,6 +1,8 @@
 import {
   isEphemeralMediaReference,
   isLocalMediaReference,
+  isGrokImagineVideoCanonicalId,
+  isVeoCanonicalId,
   type MediaReference,
   type NodeExecution,
   type NodeType,
@@ -8,6 +10,14 @@ import {
 } from "@dafthunk/types";
 
 import { submitVolcanoVideoTask } from "../../ai-interface/execute-volcano-video";
+import {
+  createGrokVideoPollContinuation,
+  submitGrokVideoTask,
+} from "../../ai-interface/execute-grok-video";
+import {
+  createVeoVideoPollContinuation,
+  submitVeoVideoTask,
+} from "../../ai-interface/execute-veo-video";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode, isObjectReference } from "../../node-types";
 import {
@@ -198,18 +208,58 @@ export class AiVideoNode extends ExecutableNode {
     }
 
     const storageResolution = context.resolveAiVideoStorage
-      ? await context.resolveAiVideoStorage()
+      ? await context.resolveAiVideoStorage().catch((error: unknown) => {
+          return {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Cloud storage is unavailable for video generation",
+          } as const;
+        })
       : { storageMode: "ephemeral" as const };
 
-    const submitResult = await submitVolcanoVideoTask({
-      apiKey: resolvedInterface.apiKey,
-      baseUrl: resolvedInterface.baseUrl,
-      providerModelId: resolvedModel.providerModelId,
-      prompt: typeof prompt === "string" ? prompt : "",
-      parameterRules: resolvedModel.parameterRules,
-      generationParams,
-      referenceImageUrls,
-    });
+    if ("error" in storageResolution) {
+      return this.createErrorResult(storageResolution.error);
+    }
+
+    const trimmedModelId = modelCanonicalId.trim();
+    const isGrokVideo = isGrokImagineVideoCanonicalId(trimmedModelId);
+    const isVeo = isVeoCanonicalId(trimmedModelId);
+    if ((isGrokVideo || isVeo) && referenceImageUrls.length > 0) {
+      return this.createErrorResult(
+        isGrokVideo
+          ? "Reference images are not supported for Grok Imagine Video in this version."
+          : "Reference images are not supported for Veo in this version."
+      );
+    }
+
+    const submitResult = isGrokVideo
+      ? await submitGrokVideoTask({
+          apiKey: resolvedInterface.apiKey,
+          baseUrl: resolvedInterface.baseUrl,
+          providerModelId: resolvedModel.providerModelId,
+          prompt: typeof prompt === "string" ? prompt : "",
+          parameterRules: resolvedModel.parameterRules,
+          generationParams,
+        })
+      : isVeo
+        ? await submitVeoVideoTask({
+            apiKey: resolvedInterface.apiKey,
+            baseUrl: resolvedInterface.baseUrl,
+            providerModelId: resolvedModel.providerModelId,
+            prompt: typeof prompt === "string" ? prompt : "",
+            parameterRules: resolvedModel.parameterRules,
+            generationParams,
+          })
+        : await submitVolcanoVideoTask({
+            apiKey: resolvedInterface.apiKey,
+            baseUrl: resolvedInterface.baseUrl,
+            providerModelId: resolvedModel.providerModelId,
+            prompt: typeof prompt === "string" ? prompt : "",
+            parameterRules: resolvedModel.parameterRules,
+            generationParams,
+            referenceImageUrls,
+          });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
       return this.createErrorResult(
@@ -217,15 +267,56 @@ export class AiVideoNode extends ExecutableNode {
       );
     }
 
-    const continuation = createVolcanoVideoPollContinuation({
-      nodeId: this.node.id,
-      taskId: submitResult.taskId,
-      pollUrl: submitResult.pollUrl ?? submitResult.taskId,
-      interfaceId,
-      organizationId: context.organizationId,
-      pollIntervalMs: 10_000,
-      timeoutMinutes: 60,
-    });
+    let generationJobId: string | null = null;
+    if (
+      storageResolution.storageMode === "cloud" &&
+      context.trackWorkflowGenerationJob
+    ) {
+      generationJobId = await context.trackWorkflowGenerationJob.begin({
+        organizationId: context.organizationId,
+        workflowId: context.workflowId,
+        executionId: context.executionId,
+        nodeId: context.nodeId,
+        modality: "video",
+        modelCanonicalId: modelCanonicalId.trim(),
+        interfaceId,
+        upstreamTaskId: submitResult.taskId,
+        videoPollUrl: submitResult.pollUrl,
+      });
+    }
+
+    const continuation = isGrokVideo
+      ? createGrokVideoPollContinuation({
+          nodeId: this.node.id,
+          taskId: submitResult.taskId,
+          pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+          interfaceId,
+          organizationId: context.organizationId,
+          pollIntervalMs: 10_000,
+          timeoutMinutes: 60,
+          generationJobId: generationJobId ?? undefined,
+        })
+      : isVeo
+        ? createVeoVideoPollContinuation({
+            nodeId: this.node.id,
+            taskId: submitResult.taskId,
+            pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+            interfaceId,
+            organizationId: context.organizationId,
+            pollIntervalMs: 10_000,
+            timeoutMinutes: 60,
+            generationJobId: generationJobId ?? undefined,
+          })
+        : createVolcanoVideoPollContinuation({
+            nodeId: this.node.id,
+            taskId: submitResult.taskId,
+            pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+            interfaceId,
+            organizationId: context.organizationId,
+            pollIntervalMs: 10_000,
+            timeoutMinutes: 60,
+            generationJobId: generationJobId ?? undefined,
+          });
 
     return awaitVolcanoVideoOrPending({
       context,
@@ -234,6 +325,7 @@ export class AiVideoNode extends ExecutableNode {
       timeoutLabel: "60 minutes",
       storageMode: storageResolution.storageMode,
       cloudUpload: storageResolution.cloudUpload,
+      generationJobId: generationJobId ?? undefined,
       nodeOutputs: AiVideoNode.nodeType.outputs ?? [],
       createSuccessResult: (outputs, usage) =>
         this.createSuccessResult(outputs, usage),

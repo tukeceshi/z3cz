@@ -1,16 +1,11 @@
-import Building2 from "lucide-react/icons/building-2";
-import Database from "lucide-react/icons/database";
+import FileText from "lucide-react/icons/file-text";
+import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
+import KeyRound from "lucide-react/icons/key-round";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
-import ListTodo from "lucide-react/icons/list-todo";
-import Mail from "lucide-react/icons/mail";
 import Play from "lucide-react/icons/play";
 import Settings from "lucide-react/icons/settings";
-import SlidersHorizontal from "lucide-react/icons/sliders-horizontal";
-import Shapes from "lucide-react/icons/shapes";
-import Server from "lucide-react/icons/server";
 import Sparkles from "lucide-react/icons/sparkles";
-import Table from "lucide-react/icons/table";
 import UserMinus from "lucide-react/icons/user-minus";
 import Users from "lucide-react/icons/users";
 import Workflow from "lucide-react/icons/workflow";
@@ -44,13 +39,28 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           icon: LayoutDashboard,
           end: true,
         },
+      ],
+    },
+    {
+      label: t("sidebar.groups.workflows"),
+      items: [
         {
-          id: "support",
-          title: t("sidebar.support"),
-          url: "/admin/support",
-          icon: Inbox,
-          badgeCount: unreadCount,
+          id: "workflows",
+          title: t("sidebar.workflows"),
+          url: "/admin/workflows",
+          icon: Workflow,
         },
+        {
+          id: "executions",
+          title: t("sidebar.executions"),
+          url: "/admin/executions",
+          icon: Play,
+        },
+      ],
+    },
+    {
+      label: t("sidebar.groups.users"),
+      items: [
         {
           id: "users",
           title: t("sidebar.users"),
@@ -64,58 +74,34 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           icon: UserMinus,
         },
         {
-          id: "organizations",
-          title: t("sidebar.organizations"),
-          url: "/admin/organizations",
-          icon: Building2,
+          id: "support",
+          title: t("sidebar.support"),
+          url: "/admin/support",
+          icon: Inbox,
+          badgeCount: unreadCount,
+        },
+      ],
+    },
+    {
+      label: t("sidebar.groups.systemSettings"),
+      items: [
+        {
+          id: "site-settings",
+          title: t("sidebar.siteSettings"),
+          url: "/admin/settings",
+          icon: Settings,
         },
         {
-          id: "workflows",
-          title: t("sidebar.workflows"),
-          url: "/admin/workflows",
-          icon: Workflow,
+          id: "login-methods",
+          title: t("sidebar.loginMethods"),
+          url: "/admin/login-methods",
+          icon: KeyRound,
         },
         {
-          id: "executions",
-          title: t("sidebar.executions"),
-          url: "/admin/executions",
-          icon: Play,
-        },
-        {
-          id: "emails",
-          title: t("sidebar.emails"),
-          url: "/admin/emails",
-          icon: Mail,
-        },
-        {
-          id: "queues",
-          title: t("sidebar.queues"),
-          url: "/admin/queues",
-          icon: ListTodo,
-        },
-        {
-          id: "datasets",
-          title: t("sidebar.datasets"),
-          url: "/admin/datasets",
-          icon: Table,
-        },
-        {
-          id: "databases",
-          title: t("sidebar.databases"),
-          url: "/admin/databases",
-          icon: Database,
-        },
-        {
-          id: "workflow-schemes",
-          title: t("sidebar.workflowSchemes"),
-          url: "/admin/workflow-schemes",
-          icon: Shapes,
-        },
-        {
-          id: "platform-relay-accounts",
-          title: t("sidebar.relayAccounts"),
-          url: "/admin/platform-relay-accounts",
-          icon: Server,
+          id: "legal-documents",
+          title: t("sidebar.legalDocuments"),
+          url: "/admin/legal-documents",
+          icon: FileText,
         },
         {
           id: "ai-models",
@@ -130,16 +116,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           icon: Sparkles,
         },
         {
-          id: "feature-settings",
-          title: t("sidebar.featureSettings"),
-          url: "/admin/feature-settings",
-          icon: SlidersHorizontal,
-        },
-        {
-          id: "site-settings",
-          title: t("sidebar.siteSettings"),
-          url: "/admin/settings",
-          icon: Settings,
+          id: "persist-workers",
+          title: t("sidebar.persistWorkers"),
+          url: "/admin/persist-workers",
+          icon: HardDriveUpload,
         },
       ],
     },

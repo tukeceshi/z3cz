@@ -2,10 +2,8 @@ import type { NodeExecution, NodeType } from "@dafthunk/types";
 import {
   buildAiTextUserPrompt,
   normalizeAiTextReferences,
-  withSelectedModel,
 } from "@dafthunk/types";
 
-import { executeAiInterfaceSync } from "../../ai-interface/execute-sync";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
 
@@ -100,74 +98,31 @@ export class AiTextNode extends ExecutableNode {
       );
     }
 
-    if (!context.resolveAiInterface) {
-      return this.createErrorResult(
-        "No AI interface configured. Please set up an AI interface in your organization settings."
-      );
-    }
-
     const modelCanonicalId =
       typeof context.inputs.model === "string" &&
       context.inputs.model.trim().length > 0
         ? context.inputs.model.trim()
         : undefined;
 
-    let interfaceId =
-      typeof context.inputs.ai_interface_id === "string" &&
-      context.inputs.ai_interface_id.trim().length > 0
-        ? context.inputs.ai_interface_id.trim()
-        : undefined;
-
-    let providerModelId: string | undefined;
-
-    if (modelCanonicalId) {
-      if (!context.resolveTextModel) {
-        return this.createErrorResult(
-          "Text model resolution is unavailable in this runtime."
-        );
-      }
-
-      const resolvedModel = await context.resolveTextModel(modelCanonicalId);
-      if (!resolvedModel) {
-        return this.createErrorResult(
-          `Model "${modelCanonicalId}" is not available for this organization.`
-        );
-      }
-
-      interfaceId = resolvedModel.interfaceId;
-      providerModelId = resolvedModel.providerModelId;
+    if (!modelCanonicalId) {
+      return this.createErrorResult("A platform model must be selected.");
     }
 
-    const resolved = await context.resolveAiInterface({ interfaceId });
-
-    if (!resolved) {
+    if (!context.executeTextModel) {
       return this.createErrorResult(
-        "Could not resolve an AI interface. Please configure an AI interface in your organization settings."
+        "Text model execution is unavailable in this runtime."
       );
     }
 
-    const selected = withSelectedModel(resolved, providerModelId);
-
-    const result = await executeAiInterfaceSync({
-      resolved: selected,
-      inputs: {
-        ...context.inputs,
-        prompt: effectivePrompt,
-      },
+    const result = await context.executeTextModel({
+      canonicalId: modelCanonicalId,
+      effectivePrompt,
     });
 
-    if (result.status === "failed") {
-      return this.createErrorResult(
-        result.error ?? "AI interface request failed"
-      );
+    if (!result.ok || !result.text) {
+      return this.createErrorResult(result.error ?? "AI text generation failed.");
     }
 
-    const text =
-      result.outputs?.text ?? result.outputs?.content ?? result.outputs?.result;
-
-    return this.createSuccessResult(
-      { text: typeof text === "string" ? text : JSON.stringify(text) },
-      result.usage ?? 1
-    );
+    return this.createSuccessResult({ text: result.text }, 1);
   }
 }

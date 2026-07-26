@@ -21,9 +21,9 @@ describe("upstream poll helpers", () => {
   it("detects timed out continuations", () => {
     const continuation = upstreamPollContinuation({
       nodeId: "node-1",
-      provider: "newapi",
-      taskId: "task-1",
-      pollUrl: "https://relay.example/tasks/task-1",
+      provider: "replicate",
+      taskId: "pred-2",
+      pollUrl: "https://api.replicate.com/v1/predictions/pred-2",
       pollIntervalMs: 5000,
       timeoutAt: "2026-01-01T00:05:00.000Z",
       now: new Date("2026-01-01T00:00:00.000Z"),

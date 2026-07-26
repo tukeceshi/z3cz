@@ -16,7 +16,7 @@ import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 
 interface UseMediaDisplayUrlParams {
   readonly media: MediaReference | null;
-  readonly nodeType?: "ai-image" | "ai-video";
+  readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
   readonly size?: MediaDisplaySize;
 }
 

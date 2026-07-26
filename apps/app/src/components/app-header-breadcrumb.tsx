@@ -21,25 +21,29 @@ export function AppHeaderBreadcrumb() {
   }
 
   return (
-    <Breadcrumb className="hidden md:flex">
+    <Breadcrumb className="flex min-w-0">
       <BreadcrumbList className="flex-nowrap">
         {breadcrumbs.map((item, index) => {
           const isLast = index === breadcrumbs.length - 1;
           return (
             <React.Fragment key={`${item.label}-${index}`}>
-              <BreadcrumbItem>
+              <BreadcrumbItem className="min-w-0">
                 {isLast || !item.to ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  <span className="inline-flex items-center gap-1.5 min-w-0">
+                    <BreadcrumbPage className="truncate max-w-[10rem] sm:max-w-[16rem]">
+                      {item.label}
+                    </BreadcrumbPage>
                     {item.trailing}
                   </span>
                 ) : (
-                  <BreadcrumbLink asChild>
+                  <BreadcrumbLink asChild className="hidden sm:inline-flex">
                     <RouterLink to={item.to}>{item.label}</RouterLink>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
-              {!isLast && <BreadcrumbSeparator />}
+              {!isLast && (
+                <BreadcrumbSeparator className="hidden sm:block" />
+              )}
             </React.Fragment>
           );
         })}

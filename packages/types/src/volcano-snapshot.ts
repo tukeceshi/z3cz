@@ -19,6 +19,8 @@ export interface VolcanoModelConfig {
   readonly modality: AiModelModality;
 }
 
+export type VolcanoArkApiKeyScope = "endpoint" | "model";
+
 export interface VolcanoPackageListCache {
   readonly fetchedAt: string;
   readonly mode: VolcanoResourcePackageFetchMode;
@@ -40,6 +42,12 @@ export interface VolcanoInterfaceMetadata {
   readonly accessKeyId: string;
   readonly secretAccessKeyEncrypted: string;
   readonly arkApiKeyExpiresAt?: string;
+  /** True when create deferred Ark API key issuance (packages provisioned). */
+  readonly arkApiKeyPending?: boolean;
+  /** canonicalId -> ep-*; managed centrally for the whole interface. */
+  readonly arkEndpoints?: Readonly<Record<string, string>>;
+  /** Whether inference uses endpoint ids or provider ModelIds. */
+  readonly arkApiKeyScope?: VolcanoArkApiKeyScope;
   readonly arkApiKeyDurationSeconds: number;
   readonly region: string;
   readonly models: Readonly<Record<string, VolcanoModelConfig>>;
@@ -47,6 +55,8 @@ export interface VolcanoInterfaceMetadata {
     Record<string, VolcanoModelActivationCacheEntry>
   >;
   readonly packageListCache?: VolcanoPackageListCache;
+  /** ISO timestamps of successful billing package fetches (server rate limit). */
+  readonly packageListRefreshLog?: readonly string[];
   readonly tosStorage?: VolcanoTosStorageConfig;
 }
 
@@ -122,6 +132,12 @@ export interface VolcanoSnapshotPricing {
   readonly docUrl: string;
   readonly effectiveDate: string;
   readonly rows: readonly VolcanoSnapshotPricingRow[];
+}
+
+export interface VolcanoSnapshotFetchResponse {
+  readonly snapshot: VolcanoSnapshotResponse;
+  readonly refreshLimited?: boolean;
+  readonly nextRefreshAt?: string;
 }
 
 export interface VolcanoSnapshotResponse {

@@ -12,6 +12,7 @@ import { apiKeyOrJwtMiddleware, jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { createDatabase } from "../db";
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 import { CloudflareObjectStore } from "../runtime/cloudflare-object-store";
 import { resolveOrgCloudStorage } from "../services/resolve-org-cloud-storage";
 import { decryptSecret } from "../utils/encryption";
@@ -20,7 +21,7 @@ const objectRoutes = new Hono<ApiContext>();
 
 const STORAGE_KEY_PATTERN = /^[a-zA-Z0-9_\-/.]+$/;
 
-objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, async (c) => {
+objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, requireOrganizationOwner(), async (c) => {
   const storageKey = c.req.query("storageKey");
   const mimeType = c.req.query("mimeType");
 
@@ -76,7 +77,7 @@ objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, async (c) => {
 // organizationId is guaranteed by jwtMiddleware / apiKeyOrJwtMiddleware,
 // so route handlers use c.get("organizationId")! without null checks.
 
-objectRoutes.get("/", apiKeyOrJwtMiddleware, async (c) => {
+objectRoutes.get("/", apiKeyOrJwtMiddleware, requireOrganizationOwner(), async (c) => {
   const objectId = c.req.query("id");
   const mimeType = c.req.query("mimeType");
 
@@ -144,7 +145,7 @@ objectRoutes.get("/", apiKeyOrJwtMiddleware, async (c) => {
   }
 });
 
-objectRoutes.post("/", jwtMiddleware, async (c) => {
+objectRoutes.post("/", jwtMiddleware, requireOrganizationOwner(), async (c) => {
   const contentType = c.req.header("content-type") || "";
   if (!contentType.includes("multipart/form-data")) {
     return c.json({ error: "Content type must be multipart/form-data" }, 400);
@@ -177,7 +178,7 @@ objectRoutes.post("/", jwtMiddleware, async (c) => {
   }
 });
 
-objectRoutes.delete("/:id", jwtMiddleware, async (c) => {
+objectRoutes.delete("/:id", jwtMiddleware, requireOrganizationOwner(), async (c) => {
   const objectId = c.req.param("id");
   const mimeType = c.req.query("mimeType");
 
@@ -219,7 +220,7 @@ objectRoutes.delete("/:id", jwtMiddleware, async (c) => {
   }
 });
 
-objectRoutes.get("/metadata/:id", jwtMiddleware, async (c) => {
+objectRoutes.get("/metadata/:id", jwtMiddleware, requireOrganizationOwner(), async (c) => {
   const objectId = c.req.param("id");
   const mimeType = c.req.query("mimeType");
 
@@ -272,7 +273,7 @@ objectRoutes.get("/metadata/:id", jwtMiddleware, async (c) => {
   }
 });
 
-objectRoutes.get("/list", jwtMiddleware, async (c) => {
+objectRoutes.get("/list", jwtMiddleware, requireOrganizationOwner(), async (c) => {
   const organizationId = c.get("organizationId")!;
 
   try {

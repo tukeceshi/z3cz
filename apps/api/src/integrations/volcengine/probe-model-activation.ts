@@ -42,11 +42,15 @@ export function classifyInferenceProbe(
   return "transient_error";
 }
 
-function buildProbeRequest(
-  entry: AiModelCatalogEntry
-): { path: string; body: Record<string, unknown> } {
-  const modelId = entry.providerModelId;
+function stripVolcanoModelVersionSuffix(modelId: string): string | null {
+  const stripped = modelId.replace(/-\d{6}$/, "");
+  return stripped !== modelId ? stripped : null;
+}
 
+function buildProbeRequest(
+  entry: AiModelCatalogEntry,
+  modelId = entry.providerModelId
+): { path: string; body: Record<string, unknown> } {
   if (entry.modality === "text") {
     return {
       path: "/chat/completions",
@@ -63,8 +67,9 @@ function buildProbeRequest(
       path: "/images/generations",
       body: {
         model: modelId,
-        prompt: "probe",
-        size: "1x1",
+        prompt: "solid red square",
+        size: "1024x1024",
+        response_format: "url",
         watermark: false,
       },
     };
@@ -74,8 +79,8 @@ function buildProbeRequest(
     path: "/contents/generations/tasks",
     body: {
       model: modelId,
-      content: [{ type: "text", text: "probe" }],
-      duration: 0,
+      content: [{ type: "text", text: "static test frame" }],
+      duration: 4,
       ratio: "1:1",
       watermark: false,
     },
@@ -96,7 +101,16 @@ async function postInferenceProbe(
     body: JSON.stringify(body),
   });
 
-  const payload = (await response.json()) as ArkErrorBody;
+  const text = await response.text();
+  let payload: ArkErrorBody = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as ArkErrorBody;
+    } catch {
+      payload = {};
+    }
+  }
+
   const errorCode = payload.error?.code;
   const message = payload.error?.message ?? null;
 
@@ -107,11 +121,12 @@ async function postInferenceProbe(
   };
 }
 
-export async function probeVolcanoModelActivation(params: {
+async function probeVolcanoModelWithModelId(params: {
   apiKey: string;
   entry: AiModelCatalogEntry;
+  modelId: string;
 }): Promise<VolcanoActivationProbeResult> {
-  const { path, body } = buildProbeRequest(params.entry);
+  const { path, body } = buildProbeRequest(params.entry, params.modelId);
   const { httpStatus, errorCode, message } = await postInferenceProbe(
     params.apiKey,
     path,
@@ -126,6 +141,51 @@ export async function probeVolcanoModelActivation(params: {
     message,
     probedAt: new Date().toISOString(),
   };
+}
+
+export async function probeVolcanoModelActivation(params: {
+  apiKey: string;
+  entry: AiModelCatalogEntry;
+}): Promise<VolcanoActivationProbeResult> {
+  try {
+    const primary = await probeVolcanoModelWithModelId({
+      apiKey: params.apiKey,
+      entry: params.entry,
+      modelId: params.entry.providerModelId,
+    });
+
+    if (primary.status !== "not_open") {
+      return primary;
+    }
+
+    const fallbackModelId = stripVolcanoModelVersionSuffix(
+      params.entry.providerModelId
+    );
+    if (!fallbackModelId) {
+      return primary;
+    }
+
+    const fallback = await probeVolcanoModelWithModelId({
+      apiKey: params.apiKey,
+      entry: params.entry,
+      modelId: fallbackModelId,
+    });
+
+    if (fallback.status === "open") {
+      return fallback;
+    }
+
+    return primary;
+  } catch (error) {
+    return {
+      canonicalId: params.entry.canonicalId,
+      providerModelId: params.entry.providerModelId,
+      status: "transient_error",
+      errorCode: null,
+      message: error instanceof Error ? error.message : null,
+      probedAt: new Date().toISOString(),
+    };
+  }
 }
 
 const PROBE_CONCURRENCY = 3;

@@ -11,7 +11,12 @@ import type {
 import type { WSContext } from "hono/ws";
 
 import type { Bindings } from "../context";
+import type { OrgMembershipContext } from "../middleware/org-permissions";
 import { ExecutionManager } from "../services/execution-manager";
+import {
+  canAccessExecutions,
+  canEditWorkflows,
+} from "../utils/sub-account-permissions";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
 
@@ -20,6 +25,7 @@ const PERSIST_DEBOUNCE_MS = 500;
 interface NodeWsClient {
   readonly id: string;
   readonly ws: WSContext;
+  readonly membership: OrgMembershipContext;
   executionId?: string;
 }
 
@@ -44,12 +50,13 @@ class NodeWorkflowSessionHub {
     workflowId: string,
     userId: string,
     env: Bindings,
-    ws: WSContext
+    ws: WSContext,
+    membership: OrgMembershipContext
   ): Promise<void> {
     const clientId = crypto.randomUUID();
     const session = await this.loadSession(workflowId, userId, env);
 
-    const client: NodeWsClient = { id: clientId, ws };
+    const client: NodeWsClient = { id: clientId, ws, membership };
     session.clients.set(clientId, client);
 
     const initMessage: WorkflowInitMessage = {
@@ -64,7 +71,8 @@ class NodeWorkflowSessionHub {
     userId: string,
     env: Bindings,
     ws: WSContext,
-    rawMessage: string | ArrayBuffer
+    rawMessage: string | ArrayBuffer,
+    _membership: OrgMembershipContext
   ): Promise<void> {
     if (typeof rawMessage !== "string") {
       ws.close(1003, "Binary messages not supported");
@@ -229,6 +237,13 @@ class NodeWorkflowSessionHub {
     source: NodeWsClient,
     message: WorkflowUpdateMessage
   ): Promise<void> {
+    if (
+      !canEditWorkflows(source.membership.role, source.membership.permissions)
+    ) {
+      source.ws.close(1008, "Permission denied");
+      return;
+    }
+
     if (message.state.id !== session.workflowState.id) {
       return;
     }
@@ -286,6 +301,13 @@ class NodeWorkflowSessionHub {
     client: NodeWsClient,
     message: WorkflowExecuteMessage
   ): Promise<void> {
+    if (
+      !canAccessExecutions(client.membership.role, client.membership.permissions)
+    ) {
+      client.ws.close(1008, "Permission denied");
+      return;
+    }
+
     if (message.executionId) {
       client.executionId = message.executionId;
       return;

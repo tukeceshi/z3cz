@@ -281,9 +281,13 @@ export function AiMediaCachePanel({
                       <div className="text-xs text-muted-foreground">
                         {t("workflow.aiMediaCache.workflowCounts", {
                           total:
-                            row.entryCount ?? row.imageCount + row.videoCount,
+                            row.entryCount ??
+                            row.imageCount +
+                              row.videoCount +
+                              (row.audioCount ?? 0),
                           images: row.imageCount,
                           videos: row.videoCount,
+                          audios: row.audioCount ?? 0,
                           size: formatBytes(row.totalBytes),
                         })}
                       </div>

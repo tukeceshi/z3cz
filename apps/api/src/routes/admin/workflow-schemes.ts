@@ -6,6 +6,7 @@ import type {
   WorkflowScheme,
   WorkflowTrigger,
 } from "@dafthunk/types";
+import { WORKFLOW_SCHEME_OMNIPOTENT_ID } from "@dafthunk/types";
 import {
   ALL_WORKFLOW_RUNTIMES,
   ALL_WORKFLOW_TRIGGERS,
@@ -73,7 +74,9 @@ adminWorkflowSchemeRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
 
   try {
-    const schemes = await listWorkflowSchemes(db);
+    const schemes = (await listWorkflowSchemes(db)).filter(
+      (scheme) => scheme.id !== WORKFLOW_SCHEME_OMNIPOTENT_ID
+    );
     return c.json({ schemes } satisfies ListWorkflowSchemesResponse);
   } catch (error) {
     console.error("Error listing admin workflow schemes:", error);

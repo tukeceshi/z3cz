@@ -1,5 +1,5 @@
 import type { Node, Workflow as WorkflowType } from "@dafthunk/types";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { Bindings } from "../context";
 import { createDatabase, Database } from "../db";
@@ -28,10 +28,12 @@ export interface SaveWorkflowRecord {
   name: string;
   description?: string;
   schemeId: string;
-  billingMode?: string;
   trigger: string;
   runtime?: string;
   organizationId: string;
+  folderId?: string | null;
+  coverObjectId?: string | null;
+  coverMimeType?: string | null;
   nodes: any[];
   edges: any[];
   editorViewport?: WorkflowType["editorViewport"];
@@ -630,7 +632,6 @@ export class WorkflowStore {
       name: record.name,
       description: record.description,
       schemeId: record.schemeId,
-      billingMode: (record.billingMode as WorkflowType["billingMode"]) ?? "platform",
       trigger: record.trigger as any,
       runtime: (record.runtime as any) || "workflow",
       nodes,
@@ -698,7 +699,6 @@ export class WorkflowStore {
           name: workflow.name,
           description: workflow.description ?? undefined,
           schemeId: workflow.schemeId,
-          billingMode: workflow.billingMode,
           trigger: workflow.trigger,
           runtime: workflow.runtime,
           nodes: [],
@@ -710,8 +710,11 @@ export class WorkflowStore {
   /**
    * List workflows for an organization
    */
-  async list(organizationId: string): Promise<WorkflowRow[]> {
-    return this.listFromD1(organizationId);
+  async list(
+    organizationId: string,
+    options?: { folderId?: string | null }
+  ): Promise<WorkflowRow[]> {
+    return this.listFromD1(organizationId, options);
   }
 
   /**
@@ -923,24 +926,35 @@ export class WorkflowStore {
   /**
    * List workflows from D1
    */
-  private async listFromD1(organizationId: string): Promise<WorkflowRow[]> {
+  private async listFromD1(
+    organizationId: string,
+    options?: { folderId?: string | null }
+  ): Promise<WorkflowRow[]> {
     try {
+      const conditions = [eq(workflows.organizationId, organizationId)];
+      if (options?.folderId === null) {
+        conditions.push(isNull(workflows.folderId));
+      } else if (options?.folderId) {
+        conditions.push(eq(workflows.folderId, options.folderId));
+      }
+
       const results = await this.db
         .select({
           id: workflows.id,
           name: workflows.name,
           description: workflows.description,
           schemeId: workflows.schemeId,
-          billingMode: workflows.billingMode,
           trigger: workflows.trigger,
           runtime: workflows.runtime,
-          enabled: workflows.enabled,
+          folderId: workflows.folderId,
+          coverObjectId: workflows.coverObjectId,
+          coverMimeType: workflows.coverMimeType,
           organizationId: workflows.organizationId,
           createdAt: workflows.createdAt,
           updatedAt: workflows.updatedAt,
         })
         .from(workflows)
-        .where(eq(workflows.organizationId, organizationId))
+        .where(and(...conditions))
         .orderBy(desc(workflows.updatedAt));
 
       return results;

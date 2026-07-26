@@ -17,13 +17,9 @@ export const AdminUserDetailPage = lazyRoutePage(
   () => import("@/pages/admin/admin-user-detail-page"),
   "AdminUserDetailPage"
 );
-export const AdminOrganizationsPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-organizations-page"),
-  "AdminOrganizationsPage"
-);
-export const AdminOrganizationDetailPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-organization-detail-page"),
-  "AdminOrganizationDetailPage"
+export const AdminOrganizationRedirectPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-organization-redirect-page"),
+  "AdminOrganizationRedirectPage"
 );
 export const AdminWorkflowsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-workflows-page"),
@@ -73,13 +69,21 @@ export const AdminSettingsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-settings-page"),
   "AdminSettingsPage"
 );
+export const AdminLoginMethodsPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-login-methods-page"),
+  "AdminLoginMethodsPage"
+);
+export const AdminLegalDocumentsPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-legal-documents-page"),
+  "AdminLegalDocumentsPage"
+);
 export const AdminWorkflowSchemesPage = lazyRoutePage(
   () => import("@/pages/admin/admin-workflow-schemes-page"),
   "AdminWorkflowSchemesPage"
 );
-export const AdminPlatformRelayAccountsPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-platform-relay-accounts-page"),
-  "AdminPlatformRelayAccountsPage"
+export const AdminPersistWorkersPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-persist-workers-page"),
+  "AdminPersistWorkersPage"
 );
 export const AdminDatabasesPage = lazyRoutePage(
   () => import("@/pages/admin/admin-databases-page"),
@@ -91,14 +95,6 @@ export const ProfilePage = lazyRoutePage(
   () => import("@/pages/profile-page"),
   "ProfilePage"
 );
-export const OrganizationsPage = lazyRoutePage(
-  () => import("@/pages/organizations-page"),
-  "OrganizationsPage"
-);
-export const InvitationsPage = lazyRoutePage(
-  () => import("@/pages/invitations-page"),
-  "InvitationsPage"
-);
 export const DashboardPage = lazyRoutePage(
   () => import("@/pages/dashboard-page"),
   "DashboardPage"
@@ -106,6 +102,10 @@ export const DashboardPage = lazyRoutePage(
 export const WorkflowsPage = lazyRoutePage(
   () => import("@/pages/workflows-page"),
   "WorkflowsPage"
+);
+export const WorkflowFolderPage = lazyRoutePage(
+  () => import("@/pages/workflow-folder-page"),
+  "WorkflowFolderPage"
 );
 export const TemplatesPage = lazyRoutePage(
   () => import("@/pages/templates-page"),
@@ -130,10 +130,6 @@ export const ModelCallsPage = lazyRoutePage(
 export const DatasetsPage = lazyRoutePage(
   () => import("@/pages/datasets-page"),
   "DatasetsPage"
-);
-export const FeedbackPage = lazyRoutePage(
-  () => import("@/pages/feedback-page"),
-  "FeedbackPage"
 );
 export const ApiKeysPage = lazyRoutePage(
   () => import("@/pages/api-keys-page"),
@@ -237,11 +233,6 @@ export const FormPage = lazyRoutePage(
 export const FormTriggerPage = lazyRoutePage(
   () => import("@/pages/form-trigger-page"),
   "FormTriggerPage",
-  "full"
-);
-export const FeedbackFormPage = lazyRoutePage(
-  () => import("@/pages/feedback-form-page"),
-  "FeedbackFormPage",
   "full"
 );
 export const TemplatePreviewPage = lazyRoutePage(

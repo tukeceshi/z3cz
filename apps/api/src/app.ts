@@ -6,6 +6,8 @@ import { lazyRoute } from "./lazy-route";
 import { corsMiddleware } from "./middleware/cors";
 import { createNodeRateLimitMiddleware } from "./middleware/rate-limit-node";
 import health from "./routes/health";
+import publicAuthConfigRoutes from "./routes/auth-config";
+import legalDocumentsRoutes from "./routes/legal-documents";
 import siteSettingsRoutes from "./routes/site-settings";
 
 export interface CreateAppOptions {
@@ -30,6 +32,8 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
       c.req.path.startsWith("/auth/login") ||
       c.req.path === "/auth/refresh" ||
       c.req.path === "/auth/register" ||
+      c.req.path === "/auth/register/send-code" ||
+      c.req.path === "/auth/register/sub-account" ||
       c.req.path === "/auth/login/password" ||
       c.req.path === "/auth/clear-session";
 
@@ -51,6 +55,8 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   });
 
   app.route("/health", health);
+  app.route("/auth/config", publicAuthConfigRoutes);
+  app.route("/legal-documents", legalDocumentsRoutes);
   app.route("/site-settings", siteSettingsRoutes);
   if (options.runtime === "node") {
     app.route(
@@ -60,6 +66,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   }
   app.route("/auth", auth);
   app.route("/admin", lazyRoute(() => import("./routes/admin")));
+  app.route(
+    "/internal/persist-workers",
+    lazyRoute(() => import("./routes/internal/persist-workers"))
+  );
   app.route("/oauth", lazyRoute(() => import("./routes/oauth")));
   app.route("/profile", lazyRoute(() => import("./routes/profile")));
   app.route(
@@ -160,6 +170,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route(
     "/:organizationId/workflows",
     lazyRoute(() => import("./routes/workflows"))
+  );
+  app.route(
+    "/:organizationId/workflow-folders",
+    lazyRoute(() => import("./routes/workflow-folders"))
   );
   app.route(
     "/:organizationId/objects",

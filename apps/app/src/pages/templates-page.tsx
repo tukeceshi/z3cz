@@ -8,11 +8,13 @@ import { Link } from "react-router";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TagFilterButtons } from "@/components/ui/tag-filter-buttons";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useTagCounts } from "@/hooks/use-tag-counts";
@@ -48,6 +50,21 @@ function highlightMatch(text: string, searchTerm: string) {
 }
 
 export function TemplatesPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canViewWorkflows) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.templates")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <TemplatesPageContent />;
+}
+
+function TemplatesPageContent() {
   const { t } = useTranslation();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");

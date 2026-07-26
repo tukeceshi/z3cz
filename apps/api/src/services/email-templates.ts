@@ -21,7 +21,7 @@ export function getWelcomeEmail(params: WelcomeEmailParams): {
   const { userName, appUrl, websiteUrl, discordUrl, githubUrl } = params;
   const docsUrl = `${appUrl}/docs/concepts`;
 
-  const subject = "Welcome to Dafthunk";
+  const subject = "Welcome to z3cz.com";
 
   const text = `Welcome${userName ? `, ${userName}` : ""}.
 
@@ -29,7 +29,7 @@ What would you like to automate?
 
 Just hit reply with one thing you want to automate and I'll try to point you at a template or starting workflow. I do my best to read every message. If this landed in spam, mark it as "not spam" so my reply reaches you.
 
-Dafthunk is a visual way to build serverless workflows on Cloudflare. Drag nodes, connect them, deploy to the edge.
+z3cz.com is a visual way to build serverless workflows on Cloudflare. Drag nodes, connect them, deploy to the edge.
 
 Here are some quick tips:
 • Start from a use case template to see how nodes wire together
@@ -47,13 +47,13 @@ Happy automating,
 Bertil Chapuis
 
 —
-Dafthunk · Visual workflow automation
+z3cz.com · Visual workflow automation
 ${websiteUrl}`;
 
   const html = `<p>Welcome${userName ? `, ${userName}` : ""}.</p>
 <p>What would you like to automate?</p>
 <p>Just hit reply with one thing you want to automate and I'll try to point you at a template or starting workflow. I do my best to read every message. If this landed in spam, mark it as "not spam" so my reply reaches you.</p>
-<p>Dafthunk is a visual way to build serverless workflows on Cloudflare. Drag nodes, connect them, deploy to the edge.</p>
+<p>z3cz.com is a visual way to build serverless workflows on Cloudflare. Drag nodes, connect them, deploy to the edge.</p>
 <p>Here are some quick tips:</p>
 <ul>
 <li>Start from a use case template to see how nodes wire together</li>
@@ -67,54 +67,52 @@ ${websiteUrl}`;
 ${discordUrl ? `<p>Prefer a quick chat? <a href="${discordUrl}">Join us on Discord</a></p>\n` : ""}${githubUrl ? `<p>Want to help? <a href="${githubUrl}">Contribute on GitHub</a></p>\n` : ""}
 <p>Happy automating</p>
 <p>Bertil Chapuis</p>
-<p>—<br>Dafthunk · Visual workflow automation<br><a href="${websiteUrl}">${websiteUrl}</a></p>`;
+<p>—<br>z3cz.com · Visual workflow automation<br><a href="${websiteUrl}">${websiteUrl}</a></p>`;
 
   return { subject, text, html };
 }
 
-export interface InvitationEmailParams {
-  inviteeEmail: string;
+export interface SubAccountInvitationEmailParams {
   organizationName: string;
   inviterName: string;
-  role: string;
+  invitationId: string;
   expiresAt: Date;
   appUrl: string;
   websiteUrl: string;
 }
 
-/**
- * Generate invitation email content
- */
-export function getInvitationEmail(params: InvitationEmailParams): {
+export function getSubAccountInvitationEmail(
+  params: SubAccountInvitationEmailParams
+): {
   subject: string;
   text: string;
   html: string;
 } {
-  const { organizationName, inviterName, role, expiresAt, appUrl, websiteUrl } =
+  const { organizationName, inviterName, invitationId, expiresAt, appUrl, websiteUrl } =
     params;
-  const invitationsUrl = `${appUrl}/settings/invitations`;
+  const registerUrl = `${appUrl}/login?subAccountInvitation=${invitationId}`;
   const expiresFormatted = expiresAt.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 
-  const subject = `${inviterName} invited you to ${organizationName}`;
+  const subject = `${inviterName} invited you as a sub-account on ${organizationName}`;
 
-  const text = `${inviterName} invited you to join ${organizationName} on Dafthunk as a ${role}.
+  const text = `${inviterName} invited you to join ${organizationName} on z3cz.com as a sub-account.
 
-Join here: ${invitationsUrl}
+Create your account here: ${registerUrl}
 
 This invite expires on ${expiresFormatted}.
 
 —
-Dafthunk · Visual workflow automation
+z3cz.com · Visual workflow automation
 ${websiteUrl}`;
 
-  const html = `<p>${inviterName} invited you to join ${organizationName} on Dafthunk as a ${role}.</p>
-<p><a href="${invitationsUrl}">View Invitation</a></p>
+  const html = `<p>${inviterName} invited you to join ${organizationName} on z3cz.com as a sub-account.</p>
+<p><a href="${registerUrl}">Create sub-account</a></p>
 <p>This invite expires on ${expiresFormatted}.</p>
-<p>—<br>Dafthunk · Visual workflow automation<br><a href="${websiteUrl}">${websiteUrl}</a></p>`;
+<p>—<br>z3cz.com · Visual workflow automation<br><a href="${websiteUrl}">${websiteUrl}</a></p>`;
 
   return { subject, text, html };
 }

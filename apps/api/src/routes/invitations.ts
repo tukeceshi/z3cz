@@ -1,5 +1,4 @@
 import type {
-  AcceptInvitationResponse,
   DeclineInvitationResponse,
   ListUserInvitationsResponse,
 } from "@dafthunk/types";
@@ -9,7 +8,6 @@ import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { createDatabase } from "../db";
 import {
-  acceptInvitation,
   declineInvitation,
   getUserInvitations,
 } from "../db/queries";
@@ -45,7 +43,7 @@ invitationRoutes.get("/", async (c) => {
     const response: ListUserInvitationsResponse = {
       invitations: invitations.map((inv) => ({
         ...inv,
-        role: inv.role as "member" | "admin",
+        role: inv.role as "member" | "owner",
         status: inv.status as "pending" | "accepted" | "declined" | "expired",
       })),
     };
@@ -62,33 +60,13 @@ invitationRoutes.get("/", async (c) => {
  * Accept an invitation
  */
 invitationRoutes.post("/:id/accept", async (c) => {
-  const jwtPayload = c.get("jwtPayload");
-  if (!jwtPayload) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const db = createDatabase(c.env);
-  const invitationId = c.req.param("id");
-
-  try {
-    const membership = await acceptInvitation(db, invitationId, jwtPayload.sub);
-
-    if (!membership) {
-      return c.json(
-        {
-          error:
-            "Invitation not found, expired, or email does not match your account",
-        },
-        403
-      );
-    }
-
-    const response: AcceptInvitationResponse = { membership };
-    return c.json(response);
-  } catch (error) {
-    console.error("Error accepting invitation:", error);
-    return c.json({ error: "Failed to accept invitation" }, 500);
-  }
+  return c.json(
+    {
+      error:
+        "Organization invitations are no longer accepted here. Sub-accounts must register via the invitation link.",
+    },
+    403
+  );
 });
 
 /**

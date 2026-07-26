@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
-import { useOrgCloudStorageStatus } from "@/services/platform-ai-model-service";
+import { useGenerativeMediaBeforeUnloadGuard } from "@/hooks/use-generative-media-before-unload";
 
 import { AiCloudStorageBanner } from "./ai-cloud-storage-banner";
 import { AiMediaCacheBar } from "./ai-media-cache-panel";
+import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import type { WorkflowNodeType } from "./workflow-types";
 
 interface AiEditorOverlaysProps {
@@ -15,11 +16,20 @@ interface AiEditorOverlaysProps {
 }
 
 export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
+  useGenerativeMediaBeforeUnloadGuard();
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
-  const { configured, isLoading } = useOrgCloudStorageStatus(orgId);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const {
+    configured,
+    blocksGenerativeMedia,
+    health,
+    isLoading,
+    autoFixState,
+  } = useCloudStorageCanvasContext();
+  const [notConfiguredDismissed, setNotConfiguredDismissed] = useState(false);
+  const [degradedDismissed, setDegradedDismissed] = useState(false);
+  const [unhealthyDismissed, setUnhealthyDismissed] = useState(false);
 
   const hasGenerativeNodes = useMemo(
     () =>
@@ -31,16 +41,57 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
     [nodes]
   );
 
-  const showBanner =
-    hasGenerativeNodes && !isLoading && !configured && !bannerDismissed;
+  const showAutoFixingBanner =
+    hasGenerativeNodes && autoFixState === "fixing_cors";
+
+  const showNotConfiguredBanner =
+    hasGenerativeNodes &&
+    !isLoading &&
+    !configured &&
+    !notConfiguredDismissed &&
+    !showAutoFixingBanner;
+
+  const showDegradedBanner =
+    hasGenerativeNodes &&
+    !isLoading &&
+    configured &&
+    health?.status === "degraded" &&
+    !blocksGenerativeMedia &&
+    !degradedDismissed &&
+    !showAutoFixingBanner;
+
+  const showUnhealthyBanner =
+    hasGenerativeNodes &&
+    !isLoading &&
+    configured &&
+    blocksGenerativeMedia &&
+    !unhealthyDismissed &&
+    autoFixState !== "fixing_cors";
 
   if (!orgId) return null;
 
   return (
     <>
       <AiCloudStorageBanner
-        visible={showBanner}
-        onDismiss={() => setBannerDismissed(true)}
+        visible={showAutoFixingBanner}
+        variant="auto_fixing"
+        showConfigureAction={false}
+      />
+      <AiCloudStorageBanner
+        visible={showNotConfiguredBanner}
+        variant="not_configured"
+        onDismiss={() => setNotConfiguredDismissed(true)}
+      />
+      <AiCloudStorageBanner
+        visible={showDegradedBanner}
+        variant="degraded"
+        onDismiss={() => setDegradedDismissed(true)}
+      />
+      <AiCloudStorageBanner
+        visible={showUnhealthyBanner}
+        variant="unhealthy"
+        reason={health?.reason}
+        onDismiss={() => setUnhealthyDismissed(true)}
       />
       <div className="absolute bottom-16 left-4 z-50 flex flex-col items-start gap-2">
         <AiMediaCacheBar

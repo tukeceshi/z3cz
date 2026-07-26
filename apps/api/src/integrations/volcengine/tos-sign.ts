@@ -17,6 +17,7 @@ interface SignTosRequestParams {
   readonly body?: Uint8Array;
   readonly contentType?: string;
   readonly payloadHash?: string;
+  readonly queryEntries?: readonly (readonly [string, string])[];
 }
 
 function toHex(bytes: Uint8Array): string {
@@ -25,7 +26,7 @@ function toHex(bytes: Uint8Array): string {
     .join("");
 }
 
-async function sha256Hex(data: string | Uint8Array): Promise<string> {
+export async function sha256Hex(data: string | Uint8Array): Promise<string> {
   const buffer =
     typeof data === "string" ? new TextEncoder().encode(data) : data;
   const digest = await crypto.subtle.digest("SHA-256", buffer);
@@ -183,10 +184,11 @@ export async function signTosRequest(
     .map((name) => `${name}:${headerEntries[name]!.trim()}`)
     .join("\n");
   const signedHeaders = sortedHeaderNames.join(";");
+  const canonicalQueryString = buildCanonicalQueryString(params.queryEntries);
   const canonicalRequest = [
     params.method.toUpperCase(),
     params.path,
-    buildCanonicalQueryString(),
+    canonicalQueryString,
     `${canonicalHeaders}\n`,
     signedHeaders,
     payloadHash,
@@ -221,8 +223,12 @@ export async function signTosRequest(
     headers["Content-Length"] = String(params.body.byteLength);
   }
 
+  const url = canonicalQueryString
+    ? `${params.endpoint}${params.path}?${canonicalQueryString}`
+    : `${params.endpoint}${params.path}`;
+
   return {
-    url: `${params.endpoint}${params.path}`,
+    url,
     headers,
   };
 }

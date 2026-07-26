@@ -8,6 +8,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { getApiBaseUrl } from "@/config/api";
@@ -19,6 +20,12 @@ import { useDiscordBot } from "@/services/bot-service";
 import { BotDiscordEditDialog } from "./bot-discord-edit-dialog";
 
 export function BotDiscordDetailPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.bots");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <BotDiscordDetailPageContent />;
+}
+
+function BotDiscordDetailPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { id } = useParams<{ id: string }>();

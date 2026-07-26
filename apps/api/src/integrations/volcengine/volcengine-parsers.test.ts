@@ -20,7 +20,12 @@ import {
   indexResourcePackagesByConfigurationCode,
   type VolcanoResourcePackageRow,
 } from "./parse-resource-packages";
-import { resolveVolcanoEffectiveActivationStatus } from "./resolve-volcano-activation";
+import {
+  buildVolcanoProbeResultsFromPackages,
+  enrichVolcanoProbeResultsWithPackages,
+  normalizeVolcanoWizardProbeResults,
+  resolveVolcanoEffectiveActivationStatus,
+} from "./resolve-volcano-activation";
 import { pruneVolcanoMetadataToCatalog } from "./metadata";
 import { volcengineUriEscape } from "./signature";
 
@@ -466,10 +471,10 @@ describe("computeUsageBarSegments", () => {
 });
 
 describe("resolveVolcanoActivation", () => {
-  it("prefers probe not_open over package provisioned", () => {
+  it("treats provisioned package as open when probe is stale not_open", () => {
     expect(
       resolveVolcanoEffectiveActivationStatus({
-        canonicalId: "doubao-seedance-2",
+        canonicalId: "glm-5-2",
         probe: {
           status: "not_open",
           probedAt: "2026-07-11T00:00:00.000Z",
@@ -478,12 +483,12 @@ describe("resolveVolcanoActivation", () => {
         },
         packageSnapshot: {
           provisioned: true,
-          matchedCodes: ["Doubao_Seedance_2.0_pack_free_infer"],
+          matchedCodes: ["GLM_5.2_free_inference_resource_pack"],
           instanceNos: ["rpi-1"],
           configurationNames: ["pkg"],
         },
       })
-    ).toBe("not_open");
+    ).toBe("open");
   });
 
   it("infers not_open from missing package when probe has not run", () => {
@@ -516,7 +521,7 @@ describe("resolveVolcanoActivation", () => {
     ).toBeNull();
   });
 
-  it("returns unknown for required models with package but no probe", () => {
+  it("returns open for required models with provisioned package but stale probe", () => {
     expect(
       resolveVolcanoEffectiveActivationStatus({
         canonicalId: "doubao-seedream-5",
@@ -528,7 +533,145 @@ describe("resolveVolcanoActivation", () => {
           configurationNames: ["pkg"],
         },
       })
-    ).toBe("unknown");
+    ).toBe("open");
+  });
+});
+
+describe("enrichVolcanoProbeResultsWithPackages", () => {
+  it("marks provisioned models as open when inference probe is inconclusive", () => {
+    const enriched = enrichVolcanoProbeResultsWithPackages({
+      results: [
+        {
+          canonicalId: "doubao-seedance-2",
+          providerModelId: "doubao-seedance-2-0-260128",
+          status: "not_open",
+          errorCode: "ModelNotOpen",
+          message: null,
+          probedAt: "2026-07-11T00:00:00.000Z",
+        },
+      ],
+      packageByCanonicalId: new Map([
+        [
+          "doubao-seedance-2",
+          {
+            provisioned: true,
+            matchedCodes: ["Doubao_Seedance_2.0_pack_free_infer"],
+            instanceNos: ["rpi-1"],
+            configurationNames: ["pkg"],
+          },
+        ],
+      ]),
+    });
+
+    expect(enriched[0]?.status).toBe("open");
+  });
+
+  it("preserves auth_error even when a package exists", () => {
+    const enriched = enrichVolcanoProbeResultsWithPackages({
+      results: [
+        {
+          canonicalId: "doubao-seedance-2",
+          providerModelId: "doubao-seedance-2-0-260128",
+          status: "auth_error",
+          errorCode: "AuthenticationError",
+          message: null,
+          probedAt: "2026-07-11T00:00:00.000Z",
+        },
+      ],
+      packageByCanonicalId: new Map([
+        [
+          "doubao-seedance-2",
+          {
+            provisioned: true,
+            matchedCodes: ["Doubao_Seedance_2.0_pack_free_infer"],
+            instanceNos: ["rpi-1"],
+            configurationNames: ["pkg"],
+          },
+        ],
+      ]),
+    });
+
+    expect(enriched[0]?.status).toBe("auth_error");
+  });
+});
+
+describe("buildVolcanoProbeResultsFromPackages", () => {
+  it("marks provisioned models as open without inference probe", () => {
+    const results = buildVolcanoProbeResultsFromPackages({
+      entries: [
+        {
+          canonicalId: "doubao-seedance-2",
+          alias: "Seedance 2.0",
+          modality: "video",
+          providerModelId: "doubao-seedance-2-0-260128",
+        },
+      ],
+      packageByCanonicalId: new Map([
+        [
+          "doubao-seedance-2",
+          {
+            provisioned: true,
+            matchedCodes: ["Doubao_Seedance_2.0_pack_free_infer"],
+            instanceNos: ["rpi-1"],
+            configurationNames: ["pkg"],
+          },
+        ],
+      ]),
+    });
+
+    expect(results[0]?.status).toBe("open");
+  });
+
+  it("reports not_open for required models without packages", () => {
+    const results = buildVolcanoProbeResultsFromPackages({
+      entries: [
+        {
+          canonicalId: "doubao-seedream-5",
+          alias: "Seedream 5.0",
+          modality: "image",
+          providerModelId: "doubao-seedream-5-0-260128",
+        },
+      ],
+      packageByCanonicalId: new Map([
+        [
+          "doubao-seedream-5",
+          {
+            provisioned: false,
+            matchedCodes: [],
+            instanceNos: [],
+            configurationNames: [],
+          },
+        ],
+      ]),
+    });
+
+    expect(results[0]?.status).toBe("not_open");
+  });
+});
+
+describe("normalizeVolcanoWizardProbeResults", () => {
+  it("maps inconclusive probe statuses to not_open", () => {
+    const normalized = normalizeVolcanoWizardProbeResults([
+      {
+        canonicalId: "doubao-seedance-2",
+        providerModelId: "doubao-seedance-2-0-260128",
+        status: "unknown",
+        errorCode: null,
+        message: null,
+        probedAt: "2026-07-11T00:00:00.000Z",
+      },
+      {
+        canonicalId: "doubao-seedream-5",
+        providerModelId: "doubao-seedream-5-0-260128",
+        status: "open",
+        errorCode: null,
+        message: null,
+        probedAt: "2026-07-11T00:00:00.000Z",
+      },
+    ]);
+
+    expect(normalized[0]?.status).toBe("not_open");
+    expect(normalized[1]?.status).toBe("open");
   });
 });
 
@@ -590,6 +733,12 @@ describe("volcengine list parsers", () => {
     expect(
       extractVolcanoListItems({
         ApiKeys: [{ Id: "b" }],
+      })
+    ).toHaveLength(1);
+
+    expect(
+      extractVolcanoListItems({
+        Endpoints: [{ Id: "c" }],
       })
     ).toHaveLength(1);
   });

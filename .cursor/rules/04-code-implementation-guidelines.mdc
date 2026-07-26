@@ -28,6 +28,23 @@ alwaysApply: true
 - Use the `cn` utility from `@/utils/utils` for conditional class names.
   - Avoid ternaries in className strings.
 
+## Form inputs (non-login)
+
+Settings, wizards, and admin config forms are **not** login forms. Avoid `type="email"`, `type="password"`, and names like `email` / `username` / `password` — browsers and password managers will autofill them incorrectly.
+
+Use `@/components/credential-secret-input` instead:
+
+| Field | Component |
+|-------|-----------|
+| Text, hostname, API key id, port, etc. | `CredentialPlainInput` |
+| Secrets (API keys, tokens, SMTP password) | `CredentialSecretInput` |
+
+Also: `autoComplete="off"` on the `<form>`, semantic `name` (e.g. `auth_config_smtp_host`), unique `id` prefix per page.
+
+Reference: `credential-secret-input.tsx`, `volcano-credential-fields.tsx`, `admin-login-methods-page.tsx`.
+
+Login/sign-up pages may use normal `Input` with appropriate `autoComplete` (`email`, `current-password`, `one-time-code`).
+
 ## Naming Conventions
 - **kebab-case** for file names (e.g., `my-component.tsx`).
 - **camelCase** for hooks and utility functions (e.g., `useMyHook`, `formatDate`).

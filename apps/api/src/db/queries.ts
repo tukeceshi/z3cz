@@ -7,6 +7,12 @@ import { deriveDisplayNameFromEmail } from "../auth/display-name";
 import { Bindings } from "../context";
 import { encryptSecret } from "../utils/encryption";
 import {
+  DEFAULT_SUB_ACCOUNT_PERMISSIONS,
+  mergeSubAccountPermissions,
+  parseSubAccountPermissions,
+} from "../utils/sub-account-permissions";
+import type { SubAccountPermissions } from "@dafthunk/types";
+import {
   type ApiKeyInsert,
   apiKeys,
   type BotInsert,
@@ -278,6 +284,137 @@ export async function registerLocalUser(
     await tx.insert(memberships).values(newMembership);
 
     return { user, organization: organizationRecord };
+  });
+}
+
+export class SubAccountInvitationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SubAccountInvitationError";
+  }
+}
+
+export async function getSubAccountInvitationPreview(
+  db: ReturnType<typeof createDatabase>,
+  invitationId: string
+) {
+  const [row] = await db
+    .select({
+      id: invitations.id,
+      email: invitations.email,
+      expiresAt: invitations.expiresAt,
+      status: invitations.status,
+      organizationName: organizations.name,
+    })
+    .from(invitations)
+    .innerJoin(organizations, eq(invitations.organizationId, organizations.id))
+    .where(eq(invitations.id, invitationId))
+    .limit(1);
+
+  if (!row || row.status !== InvitationStatus.PENDING) {
+    return null;
+  }
+
+  if (row.expiresAt < new Date()) {
+    return null;
+  }
+
+  return row;
+}
+
+export async function registerSubAccountFromInvitation(
+  db: ReturnType<typeof createDatabase>,
+  params: {
+    email: string;
+    passwordHash: string;
+    invitationId: string;
+  }
+): Promise<{
+  user: UserRow;
+  organization: typeof organizations.$inferSelect;
+  membership: MembershipRow;
+}> {
+  const normalizedEmail = params.email.trim().toLowerCase();
+  const now = new Date();
+
+  const [invitation] = await db
+    .select()
+    .from(invitations)
+    .where(eq(invitations.id, params.invitationId))
+    .limit(1);
+
+  if (!invitation || invitation.status !== InvitationStatus.PENDING) {
+    throw new SubAccountInvitationError("Invitation not found or no longer valid");
+  }
+
+  if (invitation.expiresAt < now) {
+    throw new SubAccountInvitationError("Invitation has expired");
+  }
+
+  if (invitation.email.trim().toLowerCase() !== normalizedEmail) {
+    throw new SubAccountInvitationError("Email does not match invitation");
+  }
+
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+
+  if (existingUser) {
+    throw new SubAccountInvitationError(
+      "An account with this email already exists"
+    );
+  }
+
+  const permissions = parseSubAccountPermissions(invitation.permissions);
+
+  return db.transaction(async (tx) => {
+    const [organization] = await tx
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, invitation.organizationId))
+      .limit(1);
+
+    if (!organization) {
+      throw new SubAccountInvitationError("Organization not found");
+    }
+
+    const userId = uuidv7();
+    const displayName = deriveDisplayNameFromEmail(normalizedEmail);
+
+    const [user] = await tx
+      .insert(users)
+      .values({
+        id: userId,
+        name: displayName,
+        email: normalizedEmail,
+        passwordHash: params.passwordHash,
+        organizationId: invitation.organizationId,
+        role: UserRole.USER,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+
+    const [membership] = await tx
+      .insert(memberships)
+      .values({
+        userId,
+        organizationId: invitation.organizationId,
+        role: OrganizationRole.MEMBER,
+        permissions,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+
+    await tx
+      .update(invitations)
+      .set({ status: InvitationStatus.ACCEPTED, updatedAt: now })
+      .where(eq(invitations.id, invitation.id));
+
+    return { user, organization, membership };
   });
 }
 
@@ -2236,17 +2373,27 @@ export async function getUserOrganizations(
   db: ReturnType<typeof createDatabase>,
   userId: string
 ) {
-  return await db
+  const [row] = await db
     .select({
       id: organizations.id,
       name: organizations.name,
+      role: memberships.role,
       createdAt: organizations.createdAt,
       updatedAt: organizations.updatedAt,
     })
-    .from(memberships)
-    .innerJoin(organizations, eq(memberships.organizationId, organizations.id))
-    .where(eq(memberships.userId, userId))
-    .orderBy(organizations.createdAt);
+    .from(users)
+    .innerJoin(organizations, eq(users.organizationId, organizations.id))
+    .innerJoin(
+      memberships,
+      and(
+        eq(memberships.userId, users.id),
+        eq(memberships.organizationId, organizations.id)
+      )
+    )
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return row ? [row] : [];
 }
 
 /**
@@ -2290,6 +2437,40 @@ export async function createOrganization(
   });
 
   return { organization, membership };
+}
+
+/**
+ * Rename an organization (owners only)
+ */
+export async function updateOrganizationName(
+  db: ReturnType<typeof createDatabase>,
+  organizationId: string,
+  userId: string,
+  name: string
+): Promise<{
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+} | null> {
+  const isOwner = await isOrganizationOwner(db, organizationId, userId);
+  if (!isOwner) {
+    return null;
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(organizations)
+    .set({ name, updatedAt: now })
+    .where(eq(organizations.id, organizationId))
+    .returning({
+      id: organizations.id,
+      name: organizations.name,
+      createdAt: organizations.createdAt,
+      updatedAt: organizations.updatedAt,
+    });
+
+  return updated ?? null;
 }
 
 /**
@@ -2357,155 +2538,7 @@ export async function isOrganizationAdminOrOwner(
   organizationId: string,
   userId: string
 ): Promise<boolean> {
-  const [membership] = await db
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, userId),
-        eq(memberships.organizationId, organizationId)
-      )
-    )
-    .limit(1);
-
-  return (
-    membership?.role === OrganizationRole.OWNER ||
-    membership?.role === OrganizationRole.ADMIN
-  );
-}
-
-/**
- * Add or update a user's membership in an organization
- *
- * Role-based permissions:
- * - Only owners and admins can add/update memberships
- * - Only owners can assign admin roles
- * - Only owners can assign owner roles (but owner role cannot be changed)
- * - Members cannot add/update memberships
- *
- * @param db Database instance
- * @param organizationId Organization ID
- * @param targetUserEmail Email of the user to add/update membership for
- * @param role Role to assign (member, admin, owner)
- * @param adminUserId User ID of the admin/owner making the change
- * @returns The created or updated membership record, or null if permission denied or user not found
- */
-export async function addOrUpdateMembership(
-  db: ReturnType<typeof createDatabase>,
-  organizationId: string,
-  targetUserEmail: string,
-  role: OrganizationRoleType,
-  adminUserId: string
-): Promise<MembershipRow | null> {
-  // Check if the admin user is the organization owner
-  const isAdminOwner = await isOrganizationOwner(
-    db,
-    organizationId,
-    adminUserId
-  );
-
-  // If not the owner, check if they have admin role
-  let hasAdminRole = false;
-  if (!isAdminOwner) {
-    const [adminMembership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, adminUserId),
-          eq(memberships.organizationId, organizationId),
-          eq(memberships.role, OrganizationRole.ADMIN)
-        )
-      )
-      .limit(1);
-    hasAdminRole = !!adminMembership;
-  }
-
-  // Permission check: Only owners and admins can add/update memberships
-  if (!isAdminOwner && !hasAdminRole) {
-    return null; // User doesn't have permission
-  }
-
-  // Role assignment restrictions
-  if (role === OrganizationRole.OWNER) {
-    return null; // Owner role cannot be assigned - there's only one owner (the creator)
-  }
-
-  if (role === OrganizationRole.ADMIN && !isAdminOwner) {
-    return null; // Only owners can assign admin roles
-  }
-
-  // Look up the target user by email
-  const [targetUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, targetUserEmail))
-    .limit(1);
-
-  if (!targetUser) {
-    return null; // User not found with this email
-  }
-
-  const targetUserId = targetUser.id;
-
-  // Prevent adding the organization owner as a member (they're already the owner)
-  const isTargetUserOwner = await isOrganizationOwner(
-    db,
-    organizationId,
-    targetUserId
-  );
-  if (isTargetUserOwner) {
-    return null; // Cannot add/change role of the organization owner
-  }
-
-  const now = new Date();
-
-  // Check if the target user is already a member
-  const [existingMembership] = await db
-    .select()
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, targetUserId),
-        eq(memberships.organizationId, organizationId)
-      )
-    )
-    .limit(1);
-
-  if (existingMembership) {
-    // Update existing membership
-    const [updatedMembership] = await db
-      .update(memberships)
-      .set({
-        role,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(memberships.userId, targetUserId),
-          eq(memberships.organizationId, organizationId)
-        )
-      )
-      .returning();
-
-    return updatedMembership;
-  } else {
-    // Create new membership
-    const newMembership: MembershipInsert = {
-      userId: targetUserId,
-      organizationId,
-      role,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const [createdMembership] = await db
-      .insert(memberships)
-      .values(newMembership)
-      .returning();
-
-    return createdMembership;
-  }
+  return isOrganizationOwner(db, organizationId, userId);
 }
 
 /**
@@ -2527,96 +2560,40 @@ export async function deleteMembership(
   db: ReturnType<typeof createDatabase>,
   organizationId: string,
   targetUserEmail: string,
-  adminUserId: string
+  ownerUserId: string
 ): Promise<boolean> {
-  // Check if the admin user is the organization owner
-  const isAdminOwner = await isOrganizationOwner(
-    db,
-    organizationId,
-    adminUserId
-  );
-
-  // If not the owner, check if they have admin role
-  let hasAdminRole = false;
-  if (!isAdminOwner) {
-    const [adminMembership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, adminUserId),
-          eq(memberships.organizationId, organizationId),
-          eq(memberships.role, OrganizationRole.ADMIN)
-        )
-      )
-      .limit(1);
-    hasAdminRole = !!adminMembership;
+  const isOwner = await isOrganizationOwner(db, organizationId, ownerUserId);
+  if (!isOwner) {
+    return false;
   }
 
-  // Permission check: Only owners and admins can remove memberships
-  if (!isAdminOwner && !hasAdminRole) {
-    return false; // User doesn't have permission
-  }
-
-  // Look up the target user by email
   const [targetUser] = await db
     .select()
     .from(users)
-    .where(eq(users.email, targetUserEmail))
+    .where(eq(users.email, targetUserEmail.trim().toLowerCase()))
     .limit(1);
 
   if (!targetUser) {
-    return false; // User not found with this email
+    return false;
   }
 
-  const targetUserId = targetUser.id;
-
-  // Prevent removing the organization owner
-  const isTargetUserOwner = await isOrganizationOwner(
-    db,
-    organizationId,
-    targetUserId
-  );
-  if (isTargetUserOwner) {
-    return false; // Cannot remove the organization owner
+  if (await isOrganizationOwner(db, organizationId, targetUser.id)) {
+    return false;
   }
 
-  // Prevent users from removing themselves
-  if (targetUserId === adminUserId) {
-    return false; // Users cannot remove their own membership
+  if (targetUser.id === ownerUserId) {
+    return false;
   }
 
-  // Get the target user's membership to check their role
-  const [targetMembership] = await db
-    .select()
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, targetUserId),
-        eq(memberships.organizationId, organizationId)
-      )
-    )
-    .limit(1);
-
-  if (!targetMembership) {
-    return false; // Target user is not a member
-  }
-
-  // Only owners can remove admins
-  if (targetMembership.role === OrganizationRole.ADMIN && !isAdminOwner) {
-    return false; // Only owners can remove admins
-  }
-
-  // Delete the membership
   const [deletedMembership] = await db
     .delete(memberships)
     .where(
       and(
-        eq(memberships.userId, targetUserId),
+        eq(memberships.userId, targetUser.id),
         eq(memberships.organizationId, organizationId)
       )
     )
-    .returning({ id: memberships.userId });
+    .returning({ userId: memberships.userId });
 
   return !!deletedMembership;
 }
@@ -2659,6 +2636,7 @@ export async function getOrganizationMembershipsWithUsers(
       userId: memberships.userId,
       organizationId: memberships.organizationId,
       role: memberships.role,
+      permissions: memberships.permissions,
       createdAt: memberships.createdAt,
       updatedAt: memberships.updatedAt,
       user: {
@@ -2689,93 +2667,64 @@ export async function getOrganizationMembershipsWithUsers(
  */
 
 /**
- * Create an invitation to join an organization
- *
- * @param db Database instance
- * @param organizationId Organization ID
- * @param email Email of the user to invite
- * @param role Role to assign when invitation is accepted
- * @param invitedByUserId User ID of the person sending the invitation
- * @param expiresInDays Number of days until the invitation expires (default: 7)
- * @returns The created invitation or null if permission denied
+ * Create a sub-account invitation (owner only).
  */
 export async function createInvitation(
   db: ReturnType<typeof createDatabase>,
   organizationId: string,
   email: string,
-  role: OrganizationRoleType,
+  permissionsInput: Partial<SubAccountPermissions> | undefined,
   invitedByUserId: string,
   expiresInDays: number = 7
 ): Promise<InvitationRow | null> {
-  // Check if the inviter is the organization owner
   const isInviterOwner = await isOrganizationOwner(
     db,
     organizationId,
     invitedByUserId
   );
 
-  // If not the owner, check if they have admin role
-  let hasAdminRole = false;
   if (!isInviterOwner) {
-    const [adminMembership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, invitedByUserId),
-          eq(memberships.organizationId, organizationId),
-          eq(memberships.role, OrganizationRole.ADMIN)
-        )
-      )
-      .limit(1);
-    hasAdminRole = !!adminMembership;
+    return null;
   }
 
-  // Permission check: Only owners and admins can create invitations
-  if (!isInviterOwner && !hasAdminRole) {
-    return null; // User doesn't have permission
-  }
+  const normalizedEmail = email.trim().toLowerCase();
+  const permissions = mergeSubAccountPermissions(
+    DEFAULT_SUB_ACCOUNT_PERMISSIONS,
+    permissionsInput ?? {}
+  );
 
-  // Role assignment restrictions
-  if (role === OrganizationRole.OWNER) {
-    return null; // Owner role cannot be assigned via invitation
-  }
-
-  if (role === OrganizationRole.ADMIN && !isInviterOwner) {
-    return null; // Only owners can invite admins
-  }
-
-  // Check if user is already a member
   const [existingUser] = await db
-    .select()
+    .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, email))
+    .where(eq(users.email, normalizedEmail))
     .limit(1);
 
   if (existingUser) {
-    const [existingMembership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, existingUser.id),
-          eq(memberships.organizationId, organizationId)
-        )
-      )
-      .limit(1);
-
-    if (existingMembership) {
-      return null; // User is already a member
-    }
+    return null;
   }
 
-  // Check if there's already a pending invitation for this email
+  const [existingMembership] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .innerJoin(users, eq(memberships.userId, users.id))
+    .where(
+      and(
+        eq(users.email, normalizedEmail),
+        eq(memberships.organizationId, organizationId)
+      )
+    )
+    .limit(1);
+
+  if (existingMembership) {
+    return null;
+  }
+
   const [existingInvitation] = await db
     .select()
     .from(invitations)
     .where(
       and(
-        eq(invitations.email, email),
+        eq(invitations.email, normalizedEmail),
         eq(invitations.organizationId, organizationId),
         eq(invitations.status, InvitationStatus.PENDING)
       )
@@ -2783,7 +2732,7 @@ export async function createInvitation(
     .limit(1);
 
   if (existingInvitation) {
-    return null; // Pending invitation already exists
+    return null;
   }
 
   const now = new Date();
@@ -2793,9 +2742,10 @@ export async function createInvitation(
 
   const newInvitation: InvitationInsert = {
     id: uuidv7(),
-    email,
+    email: normalizedEmail,
     organizationId,
-    role,
+    role: OrganizationRole.MEMBER,
+    permissions,
     status: InvitationStatus.PENDING,
     invitedBy: invitedByUserId,
     expiresAt,
@@ -2809,6 +2759,66 @@ export async function createInvitation(
     .returning();
 
   return invitation;
+}
+
+export async function updateMembershipPermissions(
+  db: ReturnType<typeof createDatabase>,
+  organizationId: string,
+  targetUserEmail: string,
+  permissionsPatch: Partial<SubAccountPermissions>,
+  ownerUserId: string
+): Promise<MembershipRow | null> {
+  const isOwner = await isOrganizationOwner(db, organizationId, ownerUserId);
+  if (!isOwner) {
+    return null;
+  }
+
+  const [targetUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, targetUserEmail.trim().toLowerCase()))
+    .limit(1);
+
+  if (!targetUser) {
+    return null;
+  }
+
+  if (await isOrganizationOwner(db, organizationId, targetUser.id)) {
+    return null;
+  }
+
+  const [existingMembership] = await db
+    .select()
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, targetUser.id),
+        eq(memberships.organizationId, organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!existingMembership) {
+    return null;
+  }
+
+  const permissions = mergeSubAccountPermissions(
+    parseSubAccountPermissions(existingMembership.permissions),
+    permissionsPatch
+  );
+
+  const [updatedMembership] = await db
+    .update(memberships)
+    .set({ permissions, updatedAt: new Date() })
+    .where(
+      and(
+        eq(memberships.userId, targetUser.id),
+        eq(memberships.organizationId, organizationId)
+      )
+    )
+    .returning();
+
+  return updatedMembership ?? null;
 }
 
 /**
@@ -2828,6 +2838,7 @@ export async function getOrganizationInvitations(
       email: invitations.email,
       organizationId: invitations.organizationId,
       role: invitations.role,
+      permissions: invitations.permissions,
       status: invitations.status,
       expiresAt: invitations.expiresAt,
       createdAt: invitations.createdAt,
@@ -2915,102 +2926,6 @@ export async function getUserInvitations(
 }
 
 /**
- * Accept an invitation and create membership
- *
- * @param db Database instance
- * @param invitationId Invitation ID
- * @param userId User ID accepting the invitation
- * @returns The created membership or null if failed
- */
-export async function acceptInvitation(
-  db: ReturnType<typeof createDatabase>,
-  invitationId: string,
-  userId: string
-): Promise<MembershipRow | null> {
-  // Get the invitation
-  const [invitation] = await db
-    .select()
-    .from(invitations)
-    .where(eq(invitations.id, invitationId))
-    .limit(1);
-
-  if (!invitation) {
-    return null; // Invitation not found
-  }
-
-  // Check if invitation is still pending
-  if (invitation.status !== InvitationStatus.PENDING) {
-    return null; // Invitation is no longer pending
-  }
-
-  // Check if invitation has expired
-  const now = new Date();
-  if (invitation.expiresAt < now) {
-    // Mark as expired
-    await db
-      .update(invitations)
-      .set({ status: InvitationStatus.EXPIRED, updatedAt: now })
-      .where(eq(invitations.id, invitationId));
-    return null; // Invitation has expired
-  }
-
-  // Get the user to verify email matches
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  if (!user || user.email !== invitation.email) {
-    return null; // User email doesn't match invitation
-  }
-
-  // Check if user is already a member
-  const [existingMembership] = await db
-    .select()
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, userId),
-        eq(memberships.organizationId, invitation.organizationId)
-      )
-    )
-    .limit(1);
-
-  if (existingMembership) {
-    // Mark invitation as accepted anyway
-    await db
-      .update(invitations)
-      .set({ status: InvitationStatus.ACCEPTED, updatedAt: now })
-      .where(eq(invitations.id, invitationId));
-    return existingMembership; // Return existing membership
-  }
-
-  // Create the membership
-  const newMembership: MembershipInsert = {
-    userId,
-    organizationId: invitation.organizationId,
-    role: invitation.role,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const membershipResult = await db.transaction(async (tx) => {
-    const [membership] = await tx
-      .insert(memberships)
-      .values(newMembership)
-      .returning();
-    await tx
-      .update(invitations)
-      .set({ status: InvitationStatus.ACCEPTED, updatedAt: now })
-      .where(eq(invitations.id, invitationId));
-    return membership;
-  });
-
-  return membershipResult;
-}
-
-/**
  * Decline an invitation
  *
  * @param db Database instance
@@ -3074,38 +2989,13 @@ export async function deleteInvitation(
   db: ReturnType<typeof createDatabase>,
   invitationId: string,
   organizationId: string,
-  adminUserId: string
+  ownerUserId: string
 ): Promise<boolean> {
-  // Check if the admin user is the organization owner
-  const isAdminOwner = await isOrganizationOwner(
-    db,
-    organizationId,
-    adminUserId
-  );
-
-  // If not the owner, check if they have admin role
-  let hasAdminRole = false;
-  if (!isAdminOwner) {
-    const [adminMembership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, adminUserId),
-          eq(memberships.organizationId, organizationId),
-          eq(memberships.role, OrganizationRole.ADMIN)
-        )
-      )
-      .limit(1);
-    hasAdminRole = !!adminMembership;
+  const isOwner = await isOrganizationOwner(db, organizationId, ownerUserId);
+  if (!isOwner) {
+    return false;
   }
 
-  // Permission check: Only owners and admins can cancel invitations
-  if (!isAdminOwner && !hasAdminRole) {
-    return false; // User doesn't have permission
-  }
-
-  // Delete the invitation
   const [deletedInvitation] = await db
     .delete(invitations)
     .where(

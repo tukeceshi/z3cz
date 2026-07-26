@@ -10,6 +10,7 @@ import { Link, useNavigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -140,6 +141,12 @@ function createColumns(
 }
 
 export function BotsPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.bots");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <BotsPageContent />;
+}
+
+function BotsPageContent() {
   const { t } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

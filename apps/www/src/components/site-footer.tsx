@@ -9,10 +9,10 @@ export function SiteFooter() {
           <a href="/" className="flex items-center gap-3">
             <img
               src="/icon.svg"
-              alt="Dafthunk"
+              alt="z3cz.com"
               className="h-8 w-8 brightness-0 invert"
             />
-            <span className="text-2xl font-semibold text-white">dafthunk</span>
+            <span className="text-2xl font-semibold text-white">z3cz.com</span>
           </a>
           <p className="text-base text-gray-400 leading-relaxed">
             Build and deploy serverless workflows by connecting AI models, web
@@ -109,7 +109,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-white/10 pt-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <p className="text-base text-gray-400">
-          © 2025 Dafthunk. All rights reserved.
+          © 2025 z3cz.com. All rights reserved.
         </p>
         <nav className="flex flex-wrap items-center gap-8">
           <a

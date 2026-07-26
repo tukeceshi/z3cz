@@ -1,47 +1,38 @@
 import type {
-  AcceptInvitationResponse,
-  AddMembershipRequest,
-  AddMembershipResponse,
-  CreateInvitationRequest,
-  CreateInvitationResponse,
-  CreateOrganizationRequest,
-  CreateOrganizationResponse,
-  DeclineInvitationResponse,
+  CreateSubAccountInvitationRequest,
+  CreateSubAccountInvitationResponse,
   DeleteInvitationResponse,
-  DeleteOrganizationResponse,
   Invitation,
   ListInvitationsResponse,
   ListMembershipsResponse,
   ListOrganizationsResponse,
-  ListUserInvitationsResponse,
   RemoveMembershipRequest,
   RemoveMembershipResponse,
-  UpdateMembershipRequest,
-  UpdateMembershipResponse,
-  UserInvitation,
+  SubAccountPermissions,
+  UpdateMembershipPermissionsRequest,
+  UpdateMembershipPermissionsResponse,
+  UpdateOrganizationRequest,
+  UpdateOrganizationResponse,
 } from "@dafthunk/types";
 import useSWR from "swr";
 
 import { makeRequest } from "./utils";
 
-// Base endpoint for organizations
 const API_ENDPOINT_BASE = "/organizations";
 
 interface UseOrganizations {
   organizations: Array<{
     id: string;
     name: string;
+    role: "member" | "owner";
     createdAt: Date;
     updatedAt: Date;
   }>;
   organizationsError: Error | null;
   isOrganizationsLoading: boolean;
-  mutateOrganizations: () => Promise<any>;
+  mutateOrganizations: () => Promise<unknown>;
 }
 
-/**
- * Hook to list all organizations for the current user
- */
 export const useOrganizations = (enabled: boolean = true): UseOrganizations => {
   const swrKey = enabled ? API_ENDPOINT_BASE : null;
 
@@ -59,72 +50,48 @@ export const useOrganizations = (enabled: boolean = true): UseOrganizations => {
   };
 };
 
-/**
- * Create a new organization
- */
-export const createOrganization = async (
-  request: CreateOrganizationRequest
-): Promise<CreateOrganizationResponse> => {
-  const response = await makeRequest<CreateOrganizationResponse>(
-    API_ENDPOINT_BASE,
+export const updateOrganization = async (
+  organizationId: string,
+  request: UpdateOrganizationRequest
+): Promise<UpdateOrganizationResponse> => {
+  return makeRequest<UpdateOrganizationResponse>(
+    `${API_ENDPOINT_BASE}/${organizationId}`,
     {
-      method: "POST",
+      method: "PATCH",
       body: JSON.stringify(request),
     }
   );
-
-  return response;
 };
 
-/**
- * Delete an organization
- */
-export const deleteOrganization = async (
-  organizationId: string
-): Promise<boolean> => {
-  const response = await makeRequest<DeleteOrganizationResponse>(
-    `${API_ENDPOINT_BASE}/${organizationId}`,
-    {
-      method: "DELETE",
-    }
-  );
-
-  return response.success;
-};
-
-// Membership Management Services
-
-interface UseMemberships {
-  memberships: Array<{
-    userId: string;
-    organizationId: string;
-    role: "member" | "admin" | "owner";
-    createdAt: Date;
-    updatedAt: Date;
-    user: {
-      id: string;
-      name: string;
-      email?: string;
-      avatarUrl?: string;
-    };
-  }>;
-  membershipsError: Error | null;
-  isMembershipsLoading: boolean;
-  mutateMemberships: () => Promise<any>;
+interface MembershipRow {
+  userId: string;
+  organizationId: string;
+  role: "member" | "owner";
+  permissions: SubAccountPermissions | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user: {
+    id: string;
+    name: string;
+    email?: string;
+    avatarUrl?: string;
+  };
 }
 
-/**
- * Hook to list all memberships for an organization
- */
-export const useMemberships = (organizationId: string): UseMemberships => {
-  const swrKey = `${API_ENDPOINT_BASE}/${organizationId}/memberships`;
+interface UseMemberships {
+  memberships: MembershipRow[];
+  membershipsError: Error | null;
+  isMembershipsLoading: boolean;
+  mutateMemberships: () => Promise<unknown>;
+}
 
-  // Debug: Log the constructed URL
-  console.log("useMemberships - organizationId:", organizationId);
-  console.log("useMemberships - swrKey:", swrKey);
+export const useMemberships = (organizationId: string): UseMemberships => {
+  const swrKey = organizationId
+    ? `${API_ENDPOINT_BASE}/${organizationId}/memberships`
+    : null;
 
   const { data, error, isLoading, mutate } = useSWR(swrKey, async () => {
-    const response = await makeRequest<ListMembershipsResponse>(swrKey);
+    const response = await makeRequest<ListMembershipsResponse>(swrKey!);
     return response.memberships;
   });
 
@@ -136,45 +103,19 @@ export const useMemberships = (organizationId: string): UseMemberships => {
   };
 };
 
-/**
- * Add a user to an organization or update their role
- */
-export const addMembership = async (
+export const updateMembershipPermissions = async (
   organizationId: string,
-  request: Omit<AddMembershipRequest, "organizationId">
-): Promise<AddMembershipResponse> => {
-  const response = await makeRequest<AddMembershipResponse>(
-    `${API_ENDPOINT_BASE}/${organizationId}/memberships`,
+  request: Omit<UpdateMembershipPermissionsRequest, "organizationId">
+): Promise<UpdateMembershipPermissionsResponse> => {
+  return makeRequest<UpdateMembershipPermissionsResponse>(
+    `${API_ENDPOINT_BASE}/${organizationId}/memberships/permissions`,
     {
-      method: "POST",
+      method: "PATCH",
       body: JSON.stringify(request),
     }
   );
-
-  return response;
 };
 
-/**
- * Update a user's role in an organization
- */
-export const updateMembership = async (
-  organizationId: string,
-  request: Omit<UpdateMembershipRequest, "organizationId">
-): Promise<UpdateMembershipResponse> => {
-  const response = await makeRequest<UpdateMembershipResponse>(
-    `${API_ENDPOINT_BASE}/${organizationId}/memberships`,
-    {
-      method: "PUT",
-      body: JSON.stringify(request),
-    }
-  );
-
-  return response;
-};
-
-/**
- * Remove a user from an organization
- */
 export const removeMembership = async (
   organizationId: string,
   request: Omit<RemoveMembershipRequest, "organizationId">
@@ -190,23 +131,20 @@ export const removeMembership = async (
   return response.success;
 };
 
-// Invitation Management Services
-
 interface UseInvitations {
   invitations: Invitation[];
   invitationsError: Error | null;
   isInvitationsLoading: boolean;
-  mutateInvitations: () => Promise<any>;
+  mutateInvitations: () => Promise<unknown>;
 }
 
-/**
- * Hook to list all pending invitations for an organization
- */
 export const useInvitations = (organizationId: string): UseInvitations => {
-  const swrKey = `${API_ENDPOINT_BASE}/${organizationId}/invitations`;
+  const swrKey = organizationId
+    ? `${API_ENDPOINT_BASE}/${organizationId}/invitations`
+    : null;
 
   const { data, error, isLoading, mutate } = useSWR(swrKey, async () => {
-    const response = await makeRequest<ListInvitationsResponse>(swrKey);
+    const response = await makeRequest<ListInvitationsResponse>(swrKey!);
     return response.invitations;
   });
 
@@ -218,27 +156,19 @@ export const useInvitations = (organizationId: string): UseInvitations => {
   };
 };
 
-/**
- * Create an invitation to join an organization
- */
-export const createInvitation = async (
+export const createSubAccountInvitation = async (
   organizationId: string,
-  request: CreateInvitationRequest
-): Promise<CreateInvitationResponse> => {
-  const response = await makeRequest<CreateInvitationResponse>(
+  request: CreateSubAccountInvitationRequest
+): Promise<CreateSubAccountInvitationResponse> => {
+  return makeRequest<CreateSubAccountInvitationResponse>(
     `${API_ENDPOINT_BASE}/${organizationId}/invitations`,
     {
       method: "POST",
       body: JSON.stringify(request),
     }
   );
-
-  return response;
 };
 
-/**
- * Cancel/delete an invitation
- */
 export const deleteInvitation = async (
   organizationId: string,
   invitationId: string
@@ -247,70 +177,6 @@ export const deleteInvitation = async (
     `${API_ENDPOINT_BASE}/${organizationId}/invitations/${invitationId}`,
     {
       method: "DELETE",
-    }
-  );
-
-  return response.success;
-};
-
-// User Invitation Services (for accepting/declining invitations)
-
-const INVITATIONS_ENDPOINT = "/invitations";
-
-interface UseUserInvitations {
-  invitations: UserInvitation[];
-  invitationsError: Error | null;
-  isInvitationsLoading: boolean;
-  mutateInvitations: () => Promise<any>;
-}
-
-/**
- * Hook to list all pending invitations for the current user
- */
-export const useUserInvitations = (): UseUserInvitations => {
-  const { data, error, isLoading, mutate } = useSWR(
-    INVITATIONS_ENDPOINT,
-    async () => {
-      const response =
-        await makeRequest<ListUserInvitationsResponse>(INVITATIONS_ENDPOINT);
-      return response.invitations;
-    }
-  );
-
-  return {
-    invitations: data || [],
-    invitationsError: error || null,
-    isInvitationsLoading: isLoading,
-    mutateInvitations: mutate,
-  };
-};
-
-/**
- * Accept an invitation
- */
-export const acceptInvitation = async (
-  invitationId: string
-): Promise<AcceptInvitationResponse> => {
-  const response = await makeRequest<AcceptInvitationResponse>(
-    `${INVITATIONS_ENDPOINT}/${invitationId}/accept`,
-    {
-      method: "POST",
-    }
-  );
-
-  return response;
-};
-
-/**
- * Decline an invitation
- */
-export const declineInvitation = async (
-  invitationId: string
-): Promise<boolean> => {
-  const response = await makeRequest<DeclineInvitationResponse>(
-    `${INVITATIONS_ENDPOINT}/${invitationId}/decline`,
-    {
-      method: "POST",
     }
   );
 

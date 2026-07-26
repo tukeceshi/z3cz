@@ -85,6 +85,174 @@
       "when": 1784200000000,
       "tag": "0011_retire_ai_interface_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784280000000,
+      "tag": "0012_add_glm_kimi_text_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784360000000,
+      "tag": "0013_fix_glm_kimi_provider_model_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784440000000,
+      "tag": "0014_remove_kimi_k2_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784520000000,
+      "tag": "0015_sub_account_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0016_rename_site_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784680000000,
+      "tag": "0017_add_kimi_platform_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784760000000,
+      "tag": "0018_cloud_storage_health_and_generation_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784840000000,
+      "tag": "0019_generation_job_persist_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784920000000,
+      "tag": "0020_cloud_storage_failure_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785000000000,
+      "tag": "0021_invocation_generation_job",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785080000000,
+      "tag": "0022_persist_workers",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785160000000,
+      "tag": "0023_persist_worker_bootstrap",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785240000000,
+      "tag": "0024_workflow_folders_and_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1785400000000,
+      "tag": "0026_add_openai_text_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1785480000000,
+      "tag": "0027_add_openai_image_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1785560000000,
+      "tag": "0028_add_gemini_text_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785640000000,
+      "tag": "0029_add_nano_banana_image_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1785720000000,
+      "tag": "0030_add_veo_video_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785800000000,
+      "tag": "0031_add_grok_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785880000000,
+      "tag": "0032_add_claude_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1786040000000,
+      "tag": "0034_add_ai_audio_to_basic_canvas_scheme",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1786120000000,
+      "tag": "0035_add_auth_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786200000000,
+      "tag": "0036_site_settings_tour_and_legal",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1786280000000,
+      "tag": "0037_add_homepage_mode",
+      "breakpoints": true
     }
   ]
 }

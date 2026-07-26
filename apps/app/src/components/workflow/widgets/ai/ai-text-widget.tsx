@@ -1,5 +1,5 @@
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,11 @@ import {
   readAiTextResultHistory,
   withAiTextHistorySelection,
 } from "../../ai-text-node-utils";
+import {
+  GenerativeCardErrorBlock,
+  GenerativeCardErrorDetailDialog,
+} from "../../generative-card-error-block";
+import { readGenerativeCardError } from "../../generative-card-error-utils";
 import {
   shouldShowGenerativeHistoryIcon,
   withGenerativeCardEditing,
@@ -52,11 +57,13 @@ function AiTextWidget({
   const [editing, setEditing] = useState(false);
   const [expandOpen, setExpandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const displayValue = text ?? "";
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
   );
+  const generateError = readGenerativeCardError(metadata);
   const cardPlaceholder = t("workflow.aiTextPanel.cardInputPlaceholder");
 
   const commitText = useCallback(
@@ -68,6 +75,12 @@ function AiTextWidget({
   );
 
   const textBuffer = useBufferedTextValue(displayValue, commitText);
+
+  useEffect(() => {
+    if (generateError && editing) {
+      setEditing(false);
+    }
+  }, [generateError, editing]);
 
   useEffect(() => {
     if (!updateNodeData) return;
@@ -102,6 +115,17 @@ function AiTextWidget({
     );
   };
 
+  const handleDoubleClick = (event: MouseEvent) => {
+    if (generateError) {
+      event.stopPropagation();
+      setErrorDetailOpen(true);
+      return;
+    }
+    if (disabled || editing) return;
+    event.stopPropagation();
+    setEditing(true);
+  };
+
   return (
     <>
       <div
@@ -111,13 +135,9 @@ function AiTextWidget({
           className
         )}
         style={{ height: AI_TEXT_CARD_HEIGHT_PX }}
-        onDoubleClick={(event) => {
-          if (disabled || editing) return;
-          event.stopPropagation();
-          setEditing(true);
-        }}
+        onDoubleClick={handleDoubleClick}
       >
-        {editing ? (
+        {editing && !generateError ? (
           <Textarea
             autoFocus
             value={textBuffer.value}
@@ -140,16 +160,31 @@ function AiTextWidget({
             )}
           </div>
         )}
-        <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
-          {showHistoryIcon ? (
-            <AiTextHistoryButton
-              count={historyItems.items.length}
-              onClick={() => setHistoryOpen(true)}
-            />
-          ) : null}
-          <AiTextExpandButton onClick={() => setExpandOpen(true)} />
-        </div>
+
+        {generateError ? (
+          <GenerativeCardErrorBlock error={generateError} />
+        ) : null}
+
+        {!generateError ? (
+          <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
+            {showHistoryIcon ? (
+              <AiTextHistoryButton
+                count={historyItems.items.length}
+                onClick={() => setHistoryOpen(true)}
+              />
+            ) : null}
+            <AiTextExpandButton onClick={() => setExpandOpen(true)} />
+          </div>
+        ) : null}
       </div>
+
+      {generateError ? (
+        <GenerativeCardErrorDetailDialog
+          error={generateError}
+          open={errorDetailOpen}
+          onOpenChange={setErrorDetailOpen}
+        />
+      ) : null}
 
       <AiTextExpandOverlay
         open={expandOpen}

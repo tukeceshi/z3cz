@@ -2,11 +2,11 @@
   "posts": [
     {
       "id": "building-effective-agents",
-      "title": "Building Effective Agents on Dafthunk",
-      "description": "How Anthropic's agent patterns map onto the Dafthunk runtime. The augmented LLM, prompt chaining, routing, parallelization, and autonomous agents, each shown as a shape on the canvas, with one catalog feeding both the node and tool registries.",
+      "title": "Building Effective Agents on z3cz.com",
+      "description": "How Anthropic's agent patterns map onto the z3cz.com runtime. The augmented LLM, prompt chaining, routing, parallelization, and autonomous agents, each shown as a shape on the canvas, with one catalog feeding both the node and tool registries.",
       "tagline": "Anthropic's patterns drawn on a canvas where nodes and tools share one catalog.",
       "date": "2026-04-29",
-      "author": "The Dafthunk team",
+      "author": "The z3cz.com team",
       "readingMinutes": 5,
       "tags": ["Agents", "Architecture", "Runtime"],
       "published": true

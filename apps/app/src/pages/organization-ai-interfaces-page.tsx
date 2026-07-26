@@ -1,12 +1,17 @@
-﻿import type { OrganizationAiInterface } from "@dafthunk/types";
-import { isVolcanoAiInterfaceProvider } from "@dafthunk/types";
+import type { OrganizationAiInterface } from "@dafthunk/types";
+import {
+  isSingleModelAiInterface,
+  isVolcanoAiInterfaceProvider,
+} from "@dafthunk/types";
 import { useState } from "react";
 import { useParams } from "react-router";
 
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,8 +41,9 @@ import {
 
 import { DeleteAiInterfaceDialog } from "./organization-ai-interfaces/delete-ai-interface-dialog";
 import { ModelInterfacePriorityDialog } from "./organization-ai-interfaces/model-interface-priority-dialog";
+import { AddInterfaceWizardDialog } from "./organization-ai-interfaces/add-interface-wizard-dialog";
+import { SingleModelProviderPanel } from "./organization-ai-interfaces/single-model-provider-panel";
 import { VolcanoInterfacePanel } from "./organization-ai-interfaces/volcano-interface-panel";
-import { VolcanoWizardDialog } from "./organization-ai-interfaces/volcano-wizard-dialog";
 
 interface InterfaceFormState {
   name: string;
@@ -72,6 +78,21 @@ function formFromInterface(
 
 export function OrganizationAiInterfacesPage() {
   const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessAiInterfaces) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.aiInterfaces")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <OrganizationAiInterfacesPageContent />;
+}
+
+function OrganizationAiInterfacesPageContent() {
+  const { t } = useTranslation();
   const appToast = useAppToast();
   const { organizationId } = useParams<{ organizationId: string }>();
   const {
@@ -82,7 +103,7 @@ export function OrganizationAiInterfacesPage() {
   } = useOrganizationAiInterfaces(organizationId);
 
   const [legacyDialogOpen, setLegacyDialogOpen] = useState(false);
-  const [volcanoWizardOpen, setVolcanoWizardOpen] = useState(false);
+  const [addWizardOpen, setAddWizardOpen] = useState(false);
   const [editingInterface, setEditingInterface] =
     useState<OrganizationAiInterface | null>(null);
   const [form, setForm] = useState<InterfaceFormState>(emptyForm);
@@ -93,9 +114,16 @@ export function OrganizationAiInterfacesPage() {
   const volcanoInterfaces = interfaces.filter((iface) =>
     isVolcanoAiInterfaceProvider(iface.provider)
   );
-  const legacyInterfaces = interfaces.filter(
-    (iface) => !isVolcanoAiInterfaceProvider(iface.provider)
+  const singleModelInterfaces = interfaces.filter((iface) =>
+    isSingleModelAiInterface(iface)
   );
+  const legacyInterfaces = interfaces.filter(
+    (iface) =>
+      !isVolcanoAiInterfaceProvider(iface.provider) &&
+      !isSingleModelAiInterface(iface)
+  );
+
+  const cardInterfaces = [...volcanoInterfaces, ...singleModelInterfaces];
 
   usePageBreadcrumbs([
     {
@@ -105,7 +133,7 @@ export function OrganizationAiInterfacesPage() {
   ]);
 
   const handleOpenCreate = () => {
-    setVolcanoWizardOpen(true);
+    setAddWizardOpen(true);
   };
 
   const handleOpenEdit = (iface: OrganizationAiInterface) => {
@@ -178,10 +206,19 @@ export function OrganizationAiInterfacesPage() {
         {t("pages.aiInterfaces.description")}
       </p>
 
-      {volcanoInterfaces.length > 0 ? (
+      {cardInterfaces.length > 0 ? (
         <div className="mb-6 space-y-3">
           {volcanoInterfaces.map((iface) => (
             <VolcanoInterfacePanel
+              key={iface.id}
+              organizationId={organizationId!}
+              iface={iface}
+              onUpdated={refreshInterfaces}
+              onDelete={() => handleRequestDelete(iface)}
+            />
+          ))}
+          {singleModelInterfaces.map((iface) => (
+            <SingleModelProviderPanel
               key={iface.id}
               organizationId={organizationId!}
               iface={iface}
@@ -218,11 +255,6 @@ export function OrganizationAiInterfacesPage() {
                         {t("adminWorkflowSchemes.disabledBadge")}
                       </Badge>
                     )}
-                    {iface.isDefault ? (
-                      <Badge variant="outline">
-                        {t("adminWorkflowSchemes.defaultBadge")}
-                      </Badge>
-                    ) : null}
                   </div>
                 </TableCell>
                 <TableCell className="space-x-2 text-right">
@@ -245,9 +277,9 @@ export function OrganizationAiInterfacesPage() {
             ))}
           </TableBody>
         </Table>
-      ) : volcanoInterfaces.length === 0 ? (
+      ) : cardInterfaces.length === 0 && legacyInterfaces.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          {t("pages.aiInterfaces.volcano.empty")}
+          {t("pages.aiInterfaces.empty")}
         </p>
       ) : null}
 
@@ -264,10 +296,10 @@ export function OrganizationAiInterfacesPage() {
       ) : null}
 
       {organizationId ? (
-        <VolcanoWizardDialog
-          open={volcanoWizardOpen}
+        <AddInterfaceWizardDialog
+          open={addWizardOpen}
           organizationId={organizationId}
-          onOpenChange={setVolcanoWizardOpen}
+          onOpenChange={setAddWizardOpen}
           onCreated={refreshInterfaces}
         />
       ) : null}
@@ -344,18 +376,6 @@ export function OrganizationAiInterfacesPage() {
                 checked={form.enabled}
                 onCheckedChange={(checked) =>
                   setForm((current) => ({ ...current, enabled: checked }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="iface-default">
-                {t("pages.aiInterfaces.defaultForProvider")}
-              </Label>
-              <Switch
-                id="iface-default"
-                checked={form.isDefault}
-                onCheckedChange={(checked) =>
-                  setForm((current) => ({ ...current, isDefault: checked }))
                 }
               />
             </div>

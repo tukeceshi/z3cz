@@ -2,6 +2,10 @@
 
 单域名 · Caddy · 无 SMTP · monorepo 内旁路栈（`name: dafthunk-host`，与开发 `docker compose` 隔离）。
 
+- 控制台：`/`
+- 营销站：`/m/`（app 容器 nginx 反代 www）
+- Admin「首页」开关控制 `/` 跳控制台或 `/m/`
+
 ## 首次安装
 
 ```bash

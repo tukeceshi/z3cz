@@ -1,6 +1,7 @@
 export const VOLCANO_PACKAGE_CONFIG_BY_CANONICAL_ID = {
   "deepseek-v4-pro": ["DeepSeek_V4_pro_free_inference_resource_pack"],
   "deepseek-v4-flash": ["DeepSeek_V4_flash_free_inference_resource_pack"],
+  "glm-5-2": ["GLM_5.2_free_inference_resource_pack"],
   "doubao-seedance-2": ["Doubao_Seedance_2.0_pack_free_infer"],
   "doubao-seedance-2-fast": ["Doubao_Seedance_2.0_fast_pack_free_infer"],
   "doubao-seedance-2-mini": ["Doubao_Seedance_2.0_mini_pack_free_infer"],
@@ -27,6 +28,7 @@ export type VolcanoPackageProvisionMode = "required" | "optional" | "none";
 export const VOLCANO_PACKAGE_PROVISION_MODE_BY_CANONICAL_ID = {
   "deepseek-v4-pro": "required",
   "deepseek-v4-flash": "required",
+  "glm-5-2": "required",
   "doubao-seedance-2": "required",
   "doubao-seedance-2-fast": "required",
   "doubao-seedance-2-mini": "required",

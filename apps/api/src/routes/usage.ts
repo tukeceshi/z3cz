@@ -4,11 +4,13 @@ import { Hono } from "hono";
 import { jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
 import { createDatabase, getOrganizationComputeCredits } from "../db";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 import { getOrganizationComputeUsage } from "../utils/credits";
 
 const usage = new Hono<ApiContext>();
 
 usage.use("*", jwtMiddleware);
+usage.use("*", requireOrganizationOwner());
 
 // Get usage for an organization
 usage.get("/", async (c) => {

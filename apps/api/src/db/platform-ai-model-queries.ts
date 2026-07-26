@@ -14,15 +14,19 @@ import type {
   UpdatePlatformAiModelRequest,
 } from "@dafthunk/types";
 import {
+  DEFAULT_AUDIO_MODEL_PARAMETER_RULES,
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  isAudioModelParameterRules,
   isImageModelParameterRules,
   isTextModelParameterRules,
   isVideoModelParameterRules,
+  normalizeAudioModelParameterRules,
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
+  type AudioModelParameterRules,
   type ImageModelParameterRules,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
@@ -84,6 +88,7 @@ function mapInvocationRow(
     source: row.source,
     status: row.status as AiModelInvocation["status"],
     error: row.error,
+    generationJobId: row.generationJobId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -130,7 +135,9 @@ export async function updatePlatformAiModel(
       ? normalizeImageModelParameterRules(nextRulesRaw)
       : isVideoModelParameterRules(nextRulesRaw)
         ? normalizeVideoModelParameterRules(nextRulesRaw)
-        : nextRulesRaw;
+        : isAudioModelParameterRules(nextRulesRaw)
+          ? normalizeAudioModelParameterRules(nextRulesRaw)
+          : nextRulesRaw;
 
   await db
     .update(platformAiModels)
@@ -291,6 +298,7 @@ export async function createAiModelInvocation(
     readonly source: string;
     readonly status: AiModelInvocation["status"];
     readonly error?: string;
+    readonly generationJobId?: string;
   }
 ): Promise<AiModelInvocation> {
   await db.insert(aiModelInvocations).values({
@@ -306,6 +314,7 @@ export async function createAiModelInvocation(
     source: params.source,
     status: params.status,
     error: params.error ?? null,
+    generationJobId: params.generationJobId ?? null,
   });
 
   const rows = await db
@@ -315,6 +324,74 @@ export async function createAiModelInvocation(
     .limit(1);
 
   return mapInvocationRow(rows[0]!);
+}
+
+export async function getAiModelInvocationByGenerationJobId(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly generationJobId: string;
+  }
+): Promise<AiModelInvocation | null> {
+  const [row] = await db
+    .select()
+    .from(aiModelInvocations)
+    .where(
+      and(
+        eq(aiModelInvocations.organizationId, params.organizationId),
+        eq(aiModelInvocations.generationJobId, params.generationJobId)
+      )
+    )
+    .limit(1);
+
+  return row ? mapInvocationRow(row) : null;
+}
+
+export async function completeAiModelInvocationForGenerationJob(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly generationJobId: string;
+    readonly content: string;
+  }
+): Promise<void> {
+  await db
+    .update(aiModelInvocations)
+    .set({
+      status: "completed",
+      content: params.content,
+      error: null,
+    })
+    .where(
+      and(
+        eq(aiModelInvocations.organizationId, params.organizationId),
+        eq(aiModelInvocations.generationJobId, params.generationJobId),
+        eq(aiModelInvocations.status, "pending")
+      )
+    );
+}
+
+export async function failAiModelInvocationForGenerationJob(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly generationJobId: string;
+    readonly error: string;
+  }
+): Promise<void> {
+  await db
+    .update(aiModelInvocations)
+    .set({
+      status: "failed",
+      error: params.error,
+    })
+    .where(
+      and(
+        eq(aiModelInvocations.organizationId, params.organizationId),
+        eq(aiModelInvocations.generationJobId, params.generationJobId),
+        eq(aiModelInvocations.status, "pending")
+      )
+    );
 }
 
 export async function listAiModelInvocations(
@@ -427,4 +504,13 @@ export function getVideoParameterRules(
     return normalizeVideoModelParameterRules(model.parameterRules);
   }
   return DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
+}
+
+export function getAudioParameterRules(
+  model: PlatformAiModel
+): AudioModelParameterRules {
+  if (isAudioModelParameterRules(model.parameterRules)) {
+    return normalizeAudioModelParameterRules(model.parameterRules);
+  }
+  return DEFAULT_AUDIO_MODEL_PARAMETER_RULES;
 }

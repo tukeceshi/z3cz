@@ -1,5 +1,5 @@
 import type { ObjectReference, ToolReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -44,17 +44,30 @@ import {
 import {
   AI_IMAGE_CARD_WIDTH_PX,
   isAiImageGenerating,
-  readAiImageGenerateError,
 } from "./ai-image-node-utils";
+import {
+  AI_AUDIO_CARD_WIDTH_PX,
+  isAiAudioGenerating,
+} from "./ai-audio-node-utils";
 import {
   AI_VIDEO_CARD_WIDTH_PX,
   isAiVideoGenerating,
-  readAiVideoGenerateError,
 } from "./ai-video-node-utils";
+import { readGenerativeCardError } from "./generative-card-error-utils";
+import { formatLocalizedGenerativeNodeDisplayName } from "./generative-node-naming";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
-import { shouldShowGenerativeBottomPanel } from "./generative-card-mode-utils";
+import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
+import {
+  GENERATIVE_NODE_CARD_CLASS,
+  GENERATIVE_NODE_CARD_RADIUS_CLASS,
+} from "./generative-card-styles";
+import {
+  WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
+  WORKFLOW_NODE_SELECTED_BORDER_CLASS,
+} from "./workflow-canvas-styles";
 import { AiTextConnectionSides } from "./ai-text-connection-handles";
 import { AiImageConnectionSides } from "./ai-image-connection-handles";
+import { AiAudioConnectionSides } from "./ai-audio-connection-handles";
 import { AiVideoConnectionSides } from "./ai-video-connection-handles";
 import { useGenerativeConnectionHighlight } from "./generative-connection-highlight";
 import { PropertyField } from "./fields";
@@ -241,8 +254,8 @@ export const TypeBadge = memo(
               "border-green-500": !selected && executionState === "completed",
               "border-red-500": !selected && executionState === "error",
               "border-blue-400": !selected && executionState === "skipped",
-              "border-blue-500": selected,
-            }
+            },
+            selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS
           )}
           style={{
             width: "20px",
@@ -267,8 +280,8 @@ export const TypeBadge = memo(
             "border-green-500!": !selected && executionState === "completed",
             "border-red-500!": !selected && executionState === "error",
             "border-blue-400!": !selected && executionState === "skipped",
-            "border-blue-500!": selected,
           },
+          selected && WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
           className
         )}
         isConnectableStart={!disabled}
@@ -333,14 +346,17 @@ export const WorkflowNode = memo(
     const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
     const isAiImageNode = nodeType === AI_IMAGE_NODE_TYPE;
     const isAiVideoNode = nodeType === AI_VIDEO_NODE_TYPE;
+    const isAiAudioNode = nodeType === AI_AUDIO_NODE_TYPE;
+    const isGenerativeCanvasNode =
+      isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode;
     const showBottomPanel =
       isWorkflowBottomPanelVisible(viewportZoom) &&
-      (!isAiTextNode && !isAiImageNode && !isAiVideoNode
+      (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
         : shouldShowGenerativeBottomPanel(data.metadata));
     const isGenerativeConnectionTarget = useGenerativeConnectionHighlight(
       id,
-      isAiTextNode || isAiImageNode || isAiVideoNode
+      isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
     );
 
     const resolvedNodeType = useMemo(() => {
@@ -403,7 +419,7 @@ export const WorkflowNode = memo(
       ]);
       return data.inputs.filter(
         (input) =>
-          resourceTypes.has(input.type) && !widget?.managedFields.has(input.id)
+          resourceTypes.has(input.type) && !widget?.managedFields?.has(input.id)
       );
     }, [data.inputs, widget]);
 
@@ -541,15 +557,37 @@ export const WorkflowNode = memo(
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
     const isAiImageBusy = isAiImageNode && isAiImageGenerating(data.metadata);
     const isAiVideoBusy = isAiVideoNode && isAiVideoGenerating(data.metadata);
-    const isAiImageGenerateError =
-      isAiImageNode && Boolean(readAiImageGenerateError(data.metadata));
-    const isAiVideoGenerateError =
-      isAiVideoNode && Boolean(readAiVideoGenerateError(data.metadata));
-    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy;
+    const isAiAudioBusy = isAiAudioNode && isAiAudioGenerating(data.metadata);
+    const generativeCardError =
+      isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
+        ? readGenerativeCardError(data.metadata)
+        : undefined;
+    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
     const isError =
       (data.executionState === "error" && !!data.error) ||
-      isAiImageGenerateError ||
-      isAiVideoGenerateError;
+      Boolean(generativeCardError);
+
+    const localizedGenerativeBaseName = isAiTextNode
+      ? t("workflow.canvas.aiText")
+      : isAiImageNode
+        ? t("workflow.canvas.aiImage")
+        : isAiVideoNode
+          ? t("workflow.canvas.aiVideo")
+          : isAiAudioNode
+            ? t("workflow.canvas.aiAudio")
+            : null;
+
+    const nodeDisplayName =
+      localizedGenerativeBaseName !== null
+        ? formatLocalizedGenerativeNodeDisplayName({
+            nodeType,
+            storedName: data.name,
+            localizedBaseName: localizedGenerativeBaseName,
+          })
+        : data.name;
+
+    const headerIconName =
+      isAiAudioNode && data.icon === "audio" ? "music" : data.icon;
 
     return (
       <TooltipProvider>
@@ -563,7 +601,7 @@ export const WorkflowNode = memo(
           )}
         >
           <DynamicIcon
-            name={data.icon as any}
+            name={headerIconName as any}
             className={cn(
               "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
               resolvedNodeType?.trigger || resolvedNodeType?.responder
@@ -572,7 +610,7 @@ export const WorkflowNode = memo(
             )}
           />
           <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
-            {data.name}
+            {nodeDisplayName}
           </span>
           {resolvedNodeType?.subscription && (
             <SubscriptionBadge variant="muted" size="sm" />
@@ -603,24 +641,30 @@ export const WorkflowNode = memo(
           <CircleHelp className="h-2.5 w-2.5" />
         </button>
 
-        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode) && "inline-block")}>
+        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode) && "inline-block")}>
         <div
           className={cn(
-            "bg-card shadow-xs rounded-md border relative",
-            isAiTextNode && "ai-text-node-card group/aitext overflow-visible",
-            isAiImageNode && "ai-image-node-card group/aiimage overflow-visible",
-            isAiVideoNode && "ai-video-node-card group/aivideo overflow-visible",
+            "bg-card shadow-xs border relative",
+            isGenerativeCanvasNode
+              ? GENERATIVE_NODE_CARD_CLASS
+              : "rounded-md",
+            isAiTextNode && "ai-text-node-card group/aitext",
+            isAiImageNode && "ai-image-node-card group/aiimage",
+            isAiVideoNode && "ai-video-node-card group/aivideo",
+            isAiAudioNode && "ai-audio-node-card group/aiaudio",
             {
-            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode,
-            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode,
-            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy,
+            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode,
+            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode,
+            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy,
             "border-yellow-400":
-              !selected && (isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy),
+              !selected && (isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy || isAiAudioBusy),
             "border-green-500":
-              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy,
-            "border-red-500": !selected && data.executionState === "error",
+              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy,
+            "border-red-500": !selected && isError,
             "border-blue-400": !selected && data.executionState === "skipped",
-            "border-blue-500": selected,
+          },
+          selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS,
+          {
             "generative-connect-target": isGenerativeConnectionTarget,
           }
           )}
@@ -631,18 +675,27 @@ export const WorkflowNode = memo(
                 ? { width: AI_IMAGE_CARD_WIDTH_PX }
                 : isAiVideoNode
                   ? { width: AI_VIDEO_CARD_WIDTH_PX }
-                  : undefined
+                  : isAiAudioNode
+                    ? { width: AI_AUDIO_CARD_WIDTH_PX }
+                    : undefined
           }
         >
           {/* Execution / generate overlay */}
           {showBusyOverlay && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-card/70 backdrop-blur-[1px]">
+            <div
+              className={cn(
+                "absolute inset-0 z-10 flex items-center justify-center bg-card/70 backdrop-blur-[1px]",
+                isGenerativeCanvasNode
+                  ? GENERATIVE_NODE_CARD_RADIUS_CLASS
+                  : "rounded-md"
+              )}
+            >
               <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
             </div>
           )}
 
-          {/* Error overlay */}
-          {isError && data.error ? (
+          {/* Error overlay — generative nodes render errors inside their widgets */}
+          {isError && data.error && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode ? (
             <div className="absolute inset-0 z-10 flex items-start justify-start rounded-md bg-red-500/10 p-2">
               <p className="text-[10px] text-red-600 dark:text-red-400 line-clamp-3">
                 {data.error}
@@ -655,10 +708,10 @@ export const WorkflowNode = memo(
             <div
               className={cn(
                 "px-0 py-0",
-                isAiImageNode || isAiVideoNode
-                  ? "overflow-hidden rounded-md"
+                isAiImageNode || isAiVideoNode || isAiAudioNode
+                  ? cn("overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS)
                   : "border-b",
-                !isAiTextNode && !isAiImageNode && !isAiVideoNode && "nodrag"
+                !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode && "nodrag"
               )}
             >
               {createElement(widget.Component, {
@@ -680,6 +733,13 @@ export const WorkflowNode = memo(
 
           {isAiVideoNode ? (
             <AiVideoConnectionSides disabled={disabled} />
+          ) : null}
+
+          {isAiAudioNode ? (
+            <AiAudioConnectionSides
+              disabled={disabled}
+              promptInputDisabled={isGenerativeManualContent(data.metadata)}
+            />
           ) : null}
 
           {/* Resource Selectors (database, dataset, queue, email, integration) */}
@@ -816,7 +876,7 @@ export const WorkflowNode = memo(
           )}
 
           {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
-          {(!isAiTextNode && !isAiImageNode && !isAiVideoNode) ? (
+          {(!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode) ? (
           <div className="py-2 grid grid-cols-2 justify-between gap-3">
             {/* Input Parameters */}
             <div className="flex flex-col gap-1 flex-1">

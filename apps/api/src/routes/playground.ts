@@ -8,6 +8,7 @@ import type {
 import { Hono } from "hono";
 import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
+import { requireModelCallsAccess } from "../middleware/org-permissions";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
 import { createCloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import {
@@ -20,6 +21,7 @@ import { createToolContext } from "../runtime/tool-context";
 const playgroundRoutes = new Hono<ApiContext>();
 
 playgroundRoutes.use("*", jwtMiddleware);
+playgroundRoutes.use("*", requireModelCallsAccess());
 
 playgroundRoutes.post("/", async (c) => {
   const organizationId = c.get("organizationId")!;

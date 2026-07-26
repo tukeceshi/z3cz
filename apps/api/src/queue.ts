@@ -7,7 +7,7 @@ import {
   resolveOrganizationBillingOptions,
 } from "./db/queries";
 import { WorkflowStore } from "./stores/workflow-store";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "./utils/credits";
+import { isCreditExhausted } from "./utils/credits";
 
 // This function handles the actual execution triggering
 async function executeWorkflow(
@@ -37,12 +37,7 @@ async function executeWorkflow(
       return;
     }
 
-    const billingMode = workflowData.billingMode ?? "platform";
-
-    if (
-      !shouldSkipPlatformCreditCheck(billingMode) &&
-      isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)
-    ) {
+    if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
       console.log(
         `Skipping queue trigger for workflow ${workflowInfo.id}: credits exhausted`
       );
@@ -62,7 +57,6 @@ async function executeWorkflow(
         id: workflowInfo.id,
         name: workflowData.name,
         schemeId: workflowData.schemeId,
-        billingMode,
         trigger: workflowData.trigger,
         runtime: workflowData.runtime,
         nodes: workflowData.nodes,
@@ -140,12 +134,6 @@ export async function handleQueueMessages(
 
           if (workflowCache.has(workflow.id)) {
             continue; // Already loaded this workflow
-          }
-
-          // Skip workflows that are not enabled
-          if (!workflow.enabled) {
-            console.log(`Skipping workflow ${workflow.id}: not enabled`);
-            continue;
           }
 
           console.log(`Loading workflow: ${workflow.id}`);

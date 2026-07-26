@@ -7,19 +7,21 @@ import {
   WorkflowExecution,
   WorkflowExecutionStatus,
 } from "@dafthunk/types";
-import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { apiKeyOrJwtMiddleware, jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
-import { createDatabase } from "../db";
-import { feedback } from "../db/schema";
+import { requireExecutionsAccess } from "../middleware/org-permissions";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { isUuid, parseUuid } from "../utils/validation";
 
 const executionRoutes = new Hono<ApiContext>();
 
-executionRoutes.get("/:id", apiKeyOrJwtMiddleware, async (c) => {
+executionRoutes.get(
+  "/:id",
+  apiKeyOrJwtMiddleware,
+  requireExecutionsAccess(),
+  async (c) => {
   const organizationId = c.get("organizationId")!;
   const id = c.req.param("id")!;
 
@@ -28,7 +30,6 @@ executionRoutes.get("/:id", apiKeyOrJwtMiddleware, async (c) => {
   }
 
   const executionStore = new CloudflareExecutionStore(c.env);
-  const db = createDatabase(c.env);
 
   try {
     const execution = await executionStore.getWithData(id, organizationId);
@@ -48,30 +49,8 @@ executionRoutes.get("/:id", apiKeyOrJwtMiddleware, async (c) => {
       endedAt: execution.endedAt ?? execution.data.endedAt,
     };
 
-    // Get execution feedback (multi-criteria)
-    const feedbackRows = await db.query.feedback.findMany({
-      where: eq(feedback.executionId, id),
-      with: {
-        criterion: { columns: { question: true } },
-      },
-    });
-
     const response: GetExecutionResponse = {
       execution: workflowExecution,
-      feedback:
-        feedbackRows.length > 0
-          ? feedbackRows.map((f) => ({
-              id: f.id,
-              executionId: f.executionId,
-              criterionId: f.criterionId,
-              criterionQuestion: (f.criterion as { question: string } | null)
-                ?.question,
-              sentiment: f.sentiment,
-              comment: f.comment ?? undefined,
-              createdAt: f.createdAt,
-              updatedAt: f.updatedAt,
-            }))
-          : undefined,
     };
     return c.json(response);
   } catch (error) {
@@ -80,7 +59,7 @@ executionRoutes.get("/:id", apiKeyOrJwtMiddleware, async (c) => {
   }
 });
 
-executionRoutes.get("/", jwtMiddleware, async (c) => {
+executionRoutes.get("/", jwtMiddleware, requireExecutionsAccess(), async (c) => {
   const executionStore = new CloudflareExecutionStore(c.env);
   const { workflowId, status, startDate, endDate, limit, offset } =
     c.req.query();

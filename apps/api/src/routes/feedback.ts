@@ -1,3 +1,5 @@
+/** Mainline removed from product nav. Serves legacy create-feedback-form node. See LEGACY_ARCHIVE.md. */
+
 import type {
   BatchCreateFeedbackRequest,
   BatchCreateFeedbackResponse,
@@ -26,11 +28,13 @@ import {
   feedbackCriteria,
   workflows,
 } from "../db/schema";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 
 const feedbackRoutes = new Hono<ApiContext>();
 
 feedbackRoutes.use("*", jwtMiddleware);
+feedbackRoutes.use("*", requireOrganizationOwner());
 
 // ─────────────────────────────────────────────
 // Criteria CRUD

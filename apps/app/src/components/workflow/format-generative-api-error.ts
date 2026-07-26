@@ -50,6 +50,14 @@ const KNOWN_GENERATIVE_ERROR_RULES: readonly KnownGenerativeErrorRule[] = [
     pattern: /local browser-only reference/i,
     key: "workflow.generativeErrors.localReferenceUnsupported",
   },
+  {
+    pattern: /cloud_storage_unhealthy|cloud storage is unavailable|bucket cors does not allow/i,
+    key: "workflow.generativeErrors.cloudStorageUnavailable",
+  },
+  {
+    pattern: /cloud upload failed|failed to fetch|browser direct upload/i,
+    key: "workflow.generativeErrors.cloudUploadFailed",
+  },
 ] as const;
 
 function readNestedMessage(value: unknown): string | null {

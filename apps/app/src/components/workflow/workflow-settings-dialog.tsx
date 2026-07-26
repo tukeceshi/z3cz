@@ -1,8 +1,3 @@
-import type {
-  WorkflowBillingMode,
-  WorkflowRuntime,
-  WorkflowTrigger,
-} from "@dafthunk/types";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import { useState } from "react";
 
@@ -15,57 +10,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { WorkflowCriteriaManager } from "./workflow-criteria-manager";
-import { WorkflowFeedbackSection } from "./workflow-feedback-section";
 import { WorkflowPropertiesForm } from "./workflow-properties-form";
 import type { WorkflowExecutionStatus } from "./workflow-types";
 
 export interface WorkflowSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workflowId?: string;
   workflowName?: string;
   workflowDescription?: string;
-  workflowTrigger?: WorkflowTrigger;
-  workflowRuntime?: WorkflowRuntime;
-  workflowBillingMode?: WorkflowBillingMode;
-  onWorkflowUpdate?: (
-    name: string,
-    description?: string,
-    trigger?: WorkflowTrigger,
-    runtime?: WorkflowRuntime,
-    billingMode?: WorkflowBillingMode
-  ) => void;
+  onWorkflowUpdate?: (name: string, description?: string) => void;
   disabledWorkflow?: boolean;
-  disabledFeedback?: boolean;
   workflowStatus?: WorkflowExecutionStatus;
   workflowErrorMessage?: string;
-  executionId?: string;
-  isEnabled?: boolean;
-  isTogglingEnabled?: boolean;
-  onToggleEnabled?: (checked: boolean) => void;
-  onTriggerChange?: (newTrigger: WorkflowTrigger) => void;
 }
 
 export function WorkflowSettingsDialog({
   open,
   onOpenChange,
-  workflowId,
   workflowName,
   workflowDescription,
-  workflowTrigger,
-  workflowRuntime,
-  workflowBillingMode,
   onWorkflowUpdate,
   disabledWorkflow = false,
-  disabledFeedback = false,
   workflowStatus,
   workflowErrorMessage,
-  executionId,
-  isEnabled,
-  isTogglingEnabled,
-  onToggleEnabled,
-  onTriggerChange,
 }: WorkflowSettingsDialogProps) {
   const { t } = useTranslation();
   const [errorExpanded, setErrorExpanded] = useState(true);
@@ -80,15 +47,8 @@ export function WorkflowSettingsDialog({
         <WorkflowPropertiesForm
           workflowName={workflowName}
           workflowDescription={workflowDescription}
-          workflowTrigger={workflowTrigger}
-          workflowRuntime={workflowRuntime}
-          workflowBillingMode={workflowBillingMode}
           onWorkflowUpdate={onWorkflowUpdate}
           disabled={disabledWorkflow}
-          isEnabled={isEnabled}
-          isTogglingEnabled={isTogglingEnabled}
-          onToggleEnabled={onToggleEnabled}
-          onTriggerChange={onTriggerChange}
         />
 
         {workflowStatus === "error" && workflowErrorMessage ? (
@@ -114,21 +74,6 @@ export function WorkflowSettingsDialog({
             ) : null}
           </div>
         ) : null}
-
-        <div className="border-t border-border pt-4">
-          {executionId && workflowStatus === "completed" ? (
-            <WorkflowFeedbackSection
-              executionId={executionId}
-              workflowId={workflowId}
-              disabled={disabledFeedback}
-            />
-          ) : (
-            workflowId &&
-            !disabledWorkflow && (
-              <WorkflowCriteriaManager workflowId={workflowId} />
-            )
-          )}
-        </div>
       </DialogContent>
     </Dialog>
   );

@@ -6,6 +6,17 @@ import type {
 import { buildBodyFromSlots } from "./build-body";
 import { readDotPath } from "./extract-path";
 
+export function resolveSyncRequestUrl(baseUrl: string, path: string): string {
+  const normalizedBase = baseUrl.trim().replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (normalizedBase.endsWith(normalizedPath)) {
+    return normalizedBase;
+  }
+
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 export interface AiInterfaceSyncExecutionResult {
   readonly status: "completed" | "failed";
   readonly outputs?: Readonly<Record<string, unknown>>;
@@ -38,8 +49,7 @@ export async function executeAiInterfaceSync(params: {
     return { status: "failed", error: failure.error };
   }
 
-  const baseUrl = resolved.baseUrl.replace(/\/$/, "");
-  const url = `${baseUrl}${sync.path}`;
+  const url = resolveSyncRequestUrl(resolved.baseUrl, sync.path);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...artifact.connection.defaultHeaders,

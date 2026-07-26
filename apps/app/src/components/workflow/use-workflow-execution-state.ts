@@ -1,4 +1,4 @@
-import type { WorkflowTrigger } from "@dafthunk/types";
+import type { WorkflowRuntime } from "@dafthunk/types";
 import {
   isSubscriptionRequiredError,
   parseSubscriptionRequiredError,
@@ -6,8 +6,8 @@ import {
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { EmailData } from "@/components/workflow/execution-email-dialog";
 import type { HttpRequestConfig } from "@/components/workflow/http-request-config-dialog";
+import type { WorkflowRunConfig } from "@/components/workflow/workflow-run-config-dialog";
 import { useBilling } from "@/services/billing-service";
 import { useWorkflowExecution } from "@/services/workflow-service";
 
@@ -23,11 +23,12 @@ import type {
 
 interface UseWorkflowExecutionStateProps {
   workflowId: string;
-  workflowTrigger?: WorkflowTrigger;
+  workflowRuntime: WorkflowRuntime;
   orgId: string;
   nodes: ReactFlowNode<WorkflowNodeType>[];
   nodeTypes: NodeType[];
   initialWorkflowExecution?: WorkflowExecution;
+  onPersistRuntime?: (runtime: WorkflowRuntime) => void;
   executeWorkflow?: (
     workflowId: string,
     onExecution: (execution: WorkflowExecution) => void,
@@ -51,22 +52,19 @@ interface UseWorkflowExecutionStateReturn {
   errorDialogOpen: boolean;
   setErrorDialogOpen: (open: boolean) => void;
   handleActionButtonClick: (e: React.MouseEvent) => void;
-  isEmailFormDialogVisible: boolean;
+  isRunConfigDialogVisible: boolean;
+  setRunConfigDialogVisible: (open: boolean) => void;
+  confirmRunConfig: (config: WorkflowRunConfig) => void;
   isHttpRequestConfigDialogVisible: boolean;
   submitHttpRequestConfig: (data: HttpRequestConfig) => void;
-  submitEmailFormData: (data: EmailData) => void;
   closeExecutionForm: () => void;
   executeRef: React.RefObject<((triggerData?: unknown) => void) | null>;
-  /** Open when a run is blocked by a subscription requirement (pre- or post-flight). */
   upgradeDialogOpen: boolean;
   setUpgradeDialogOpen: (open: boolean) => void;
-  /** "preflight" = blocked before execution; "post-failure" = surfaced after failure. */
   upgradeDialogVariant: "preflight" | "post-failure";
-  /** Subscription-gated node types that triggered the upgrade prompt. */
   upgradeDialogGatedNodeTypes: NodeType[];
 }
 
-// Apply initial execution state to nodes
 function applyInitialExecution(
   execution: WorkflowExecution,
   nodes: ReactFlowNode<WorkflowNodeType>[],
@@ -98,11 +96,12 @@ function applyInitialExecution(
 
 export function useWorkflowExecutionState({
   workflowId,
-  workflowTrigger,
+  workflowRuntime,
   orgId,
   nodes,
   nodeTypes,
   initialWorkflowExecution,
+  onPersistRuntime,
   executeWorkflow,
   wsExecuteWorkflow,
   updateNodeExecution,
@@ -137,9 +136,8 @@ export function useWorkflowExecutionState({
   const [currentExecutionId, setCurrentExecutionId] = useState<
     string | undefined
   >(initialWorkflowExecution?.id);
+  const [isRunConfigDialogVisible, setRunConfigDialogVisible] = useState(false);
 
-  // Subscription upgrade prompt — surfaced for both pre-flight gating and
-  // post-failure detection of `subscriptionRequiredMessage` errors.
   const { billing } = useBilling();
   const isPro = billing?.plan === "pro";
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
@@ -149,17 +147,12 @@ export function useWorkflowExecutionState({
   const [upgradeDialogGatedNodeTypes, setUpgradeDialogGatedNodeTypes] =
     useState<NodeType[]>([]);
 
-  // Map of nodeType id → NodeType for fast lookup of subscription metadata
   const nodeTypeById = useMemo(() => {
     const map = new Map<string, NodeType>();
     for (const nt of nodeTypes) map.set(nt.type, nt);
     return map;
   }, [nodeTypes]);
 
-  /**
-   * Returns the subscription-gated node types currently present in the
-   * workflow. Empty array means the workflow can run on any plan.
-   */
   const findGatedNodeTypes = useCallback((): NodeType[] => {
     const seen = new Set<string>();
     const gated: NodeType[] = [];
@@ -182,7 +175,6 @@ export function useWorkflowExecutionState({
     ((execution: WorkflowExecution) => void) | null
   >(null);
 
-  // WebSocket execution wrapper
   const wsExecuteWorkflowWrapper = useCallback(
     (options?: { parameters?: Record<string, unknown> }) => {
       if (executeWorkflow && executionCallbackRef.current) {
@@ -198,17 +190,13 @@ export function useWorkflowExecutionState({
     [executeWorkflow, wsExecuteWorkflow, workflowId]
   );
 
-  // Execution form dialogs
   const {
     executeWorkflow: executeWorkflowWithForm,
-    isEmailFormDialogVisible,
     isHttpRequestConfigDialogVisible,
     submitHttpRequestConfig,
-    submitEmailFormData,
     closeExecutionForm,
   } = useWorkflowExecution(orgId, wsExecuteWorkflowWrapper);
 
-  // Apply initial execution state once
   useEffect(() => {
     if (
       initialWorkflowExecution &&
@@ -241,7 +229,6 @@ export function useWorkflowExecutionState({
     [applyExecutionUpdates, nodes]
   );
 
-  // Unified execution callback factory — eliminates the two duplicate closures
   const createExecutionCallback = useCallback(
     (eagerStart: boolean) => {
       return (execution: WorkflowExecution) => {
@@ -249,13 +236,10 @@ export function useWorkflowExecutionState({
           setCurrentExecutionId(execution.id);
         }
 
-        // Once cancelled by the user, ignore late server callbacks
         if (statusRef.current === "cancelled") {
           return;
         }
 
-        // Check if we need to reset node states before updating status
-        // (must happen outside the state updater to avoid side effects)
         if (!eagerStart && statusRef.current === "idle") {
           resetNodeStates("executing");
         }
@@ -263,7 +247,6 @@ export function useWorkflowExecutionState({
         setWorkflowStatus((currentStatus) => {
           let newStatus: WorkflowExecutionStatus;
           if (eagerStart) {
-            // handleExecute path: already set to "executing", ignore "submitted" echoes
             if (
               currentStatus === "executing" &&
               execution.status === "submitted"
@@ -272,18 +255,15 @@ export function useWorkflowExecutionState({
             } else {
               newStatus = execution.status;
             }
+          } else if (currentStatus === "idle") {
+            newStatus = "executing";
+          } else if (
+            currentStatus === "executing" &&
+            execution.status === "submitted"
+          ) {
+            newStatus = currentStatus;
           } else {
-            // handleExecuteRequest path: wait for first real callback
-            if (currentStatus === "idle") {
-              newStatus = "executing";
-            } else if (
-              currentStatus === "executing" &&
-              execution.status === "submitted"
-            ) {
-              newStatus = currentStatus;
-            } else {
-              newStatus = execution.status;
-            }
+            newStatus = execution.status;
           }
           statusRef.current = newStatus;
           return newStatus;
@@ -305,10 +285,6 @@ export function useWorkflowExecutionState({
           setErrorDialogOpen(true);
         }
 
-        // Post-failure: if any node failed because it requires a subscription,
-        // surface the upgrade dialog. Covers triggered/scheduled runs that
-        // bypass the pre-flight gate (and any race where billing was still
-        // loading on Run).
         if (execution.status === "error") {
           const subscriptionErrorTypes: string[] = [];
           for (const ne of execution.nodeExecutions) {
@@ -329,8 +305,6 @@ export function useWorkflowExecutionState({
               if (seen.has(typeId)) continue;
               seen.add(typeId);
               const nt = nodeTypeById.get(typeId);
-              // Synthesize a minimal NodeType if the registry hasn't loaded
-              // it (e.g. in read-only views with a partial type list).
               gated.push(
                 nt ?? {
                   id: typeId,
@@ -351,44 +325,7 @@ export function useWorkflowExecutionState({
         }
       };
     },
-    [applyExecutionUpdates, resetNodeStates, nodes, nodeTypeById]
-  );
-
-  const handleExecuteRequest = useCallback(
-    (execute: (triggerData?: unknown) => void) => {
-      if (
-        !workflowTrigger ||
-        workflowTrigger === "manual" ||
-        workflowTrigger === "scheduled" ||
-        workflowTrigger === "queue_message"
-      ) {
-        execute(undefined);
-        return;
-      }
-
-      executeRef.current = execute;
-
-      const executionCallback = createExecutionCallback(false);
-      executionCallbackRef.current = executionCallback;
-
-      if (workflowId) {
-        executeWorkflowWithForm(
-          workflowId,
-          executionCallback,
-          nodes,
-          nodeTypes,
-          workflowTrigger
-        );
-      }
-    },
-    [
-      workflowTrigger,
-      workflowId,
-      executeWorkflowWithForm,
-      nodes,
-      nodeTypes,
-      createExecutionCallback,
-    ]
+    [applyExecutionUpdates, resetNodeStates, nodeTypeById]
   );
 
   const handleExecute = useCallback(
@@ -407,35 +344,65 @@ export function useWorkflowExecutionState({
     [executeWorkflow, workflowId, resetNodeStates, createExecutionCallback]
   );
 
-  const startExecution = useCallback(() => {
-    deselectAll();
+  const runWithConfig = useCallback(
+    (config: WorkflowRunConfig) => {
+      if (config.runtime !== workflowRuntime) {
+        onPersistRuntime?.(config.runtime);
+      }
 
-    // Pre-flight gate: if the workflow contains subscription-gated nodes and
-    // the user isn't on Pro, intercept and prompt for upgrade rather than
-    // letting the runtime fail the execution. Skipped while billing is still
-    // loading (no `billing`) — the runtime remains the authoritative gate.
-    if (billing && !isPro) {
-      const gated = findGatedNodeTypes();
-      if (gated.length > 0) {
-        setUpgradeDialogGatedNodeTypes(gated);
-        setUpgradeDialogVariant("preflight");
-        setUpgradeDialogOpen(true);
+      if (config.runAs === "manual") {
+        const cleanup = handleExecute(undefined);
+        if (cleanup) cleanupRef.current = cleanup;
         return;
       }
-    }
 
-    handleExecuteRequest((triggerData) => {
-      const cleanup = handleExecute(triggerData);
-      if (cleanup) cleanupRef.current = cleanup;
-    });
-  }, [
-    deselectAll,
-    handleExecute,
-    handleExecuteRequest,
-    billing,
-    isPro,
-    findGatedNodeTypes,
-  ]);
+      executeRef.current = (triggerData) => {
+        const cleanup = handleExecute(triggerData);
+        if (cleanup) cleanupRef.current = cleanup;
+      };
+
+      const executionCallback = createExecutionCallback(false);
+      executionCallbackRef.current = executionCallback;
+
+      executeWorkflowWithForm(
+        workflowId,
+        executionCallback,
+        nodes,
+        nodeTypes,
+        "http_request"
+      );
+    },
+    [
+      workflowRuntime,
+      onPersistRuntime,
+      handleExecute,
+      createExecutionCallback,
+      executeWorkflowWithForm,
+      workflowId,
+      nodes,
+      nodeTypes,
+    ]
+  );
+
+  const confirmRunConfig = useCallback(
+    (config: WorkflowRunConfig) => {
+      setRunConfigDialogVisible(false);
+      deselectAll();
+
+      if (billing && !isPro) {
+        const gated = findGatedNodeTypes();
+        if (gated.length > 0) {
+          setUpgradeDialogGatedNodeTypes(gated);
+          setUpgradeDialogVariant("preflight");
+          setUpgradeDialogOpen(true);
+          return;
+        }
+      }
+
+      runWithConfig(config);
+    },
+    [deselectAll, billing, isPro, findGatedNodeTypes, runWithConfig]
+  );
 
   const handleActionButtonClick = useCallback(
     (e: React.MouseEvent) => {
@@ -443,7 +410,8 @@ export function useWorkflowExecutionState({
       e.stopPropagation();
 
       if (workflowStatus === "idle") {
-        startExecution();
+        deselectAll();
+        setRunConfigDialogVisible(true);
       } else if (
         workflowStatus === "submitted" ||
         workflowStatus === "executing"
@@ -464,7 +432,7 @@ export function useWorkflowExecutionState({
         setWorkflowStatus("idle");
       }
     },
-    [workflowStatus, resetNodeStates, startExecution, deselectAll]
+    [workflowStatus, resetNodeStates, deselectAll]
   );
 
   return {
@@ -474,10 +442,11 @@ export function useWorkflowExecutionState({
     errorDialogOpen,
     setErrorDialogOpen,
     handleActionButtonClick,
-    isEmailFormDialogVisible,
+    isRunConfigDialogVisible,
+    setRunConfigDialogVisible,
+    confirmRunConfig,
     isHttpRequestConfigDialogVisible,
     submitHttpRequestConfig,
-    submitEmailFormData,
     closeExecutionForm,
     executeRef,
     upgradeDialogOpen,

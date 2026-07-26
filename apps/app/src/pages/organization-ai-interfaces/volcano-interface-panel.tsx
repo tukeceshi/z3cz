@@ -1,22 +1,36 @@
 import {
 
+  buildVolcanoSnapshotFromMetadata,
+
+  canClientTriggerRealPackageRefresh,
+
+  hasVolcanoPackageListCache,
+
   isVolcanoAiInterfaceProvider,
 
+  readPackageListCache,
+
   resolveVolcanoInterfaceDisplayName,
+
+  shouldAutoRefreshPackageListOnExpand,
+
+  defaultVolcanoTosRegionForLocale,
 
   type OrganizationAiInterface,
 
   type VolcanoActivationProbeResult,
 
+  type VolcanoInterfaceMetadata,
+
   type VolcanoSnapshotResponse,
+
+  type VolcanoTosServiceStatus,
 
 } from "@dafthunk/types";
 
 import RefreshCw from "lucide-react/icons/refresh-cw";
-
-import Trash2 from "lucide-react/icons/trash-2";
-
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 
 
@@ -32,31 +46,52 @@ import {
 
   fetchVolcanoSnapshot,
 
+  listVolcanoTosBuckets,
+
   probeVolcanoActivation,
 
   updateVolcanoModelEnabled,
+
+  VOLCANO_ARK_NOT_OPENED_CODE,
 
 } from "@/services/organization-ai-interface-service";
 
 import { ApiRequestError } from "@/services/utils";
 
-import { isVolcanoModelActivationBlocking } from "@/utils/volcano-activation";
+import {
+  getVolcanoEffectiveActivationStatus,
+  isVolcanoModelActivationBlocking,
+} from "@/utils/volcano-activation";
 
 
 
 import { VolcanoModelRow } from "./volcano-model-row";
 
+import {
+  countNotOpenModelsFromMetadata,
+  isTosStorageEnabled,
+} from "./volcano-panel-utils";
+
 import { VolcanoStorageRow } from "./volcano-storage-row";
+
+import { VolcanoPanelSetupBanners } from "./volcano-setup-banners";
+import { InterfaceCardShell, AggregateChannelBadge } from "./interface-card-shell";
 
 
 
 const CREDENTIALS_DECRYPT_FAILED = "CREDENTIALS_DECRYPT_FAILED";
 
-
-
 const PRICING_DOC_URL =
 
   "https://docs.volcengine.com/docs/82379/1544106?lang=zh";
+
+const REFRESH_BUTTON_MIN_ANIMATION_MS = 900;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
 
 
 
@@ -77,6 +112,32 @@ interface VolcanoInterfacePanelProps {
 function isVolcanoInterface(iface: OrganizationAiInterface): boolean {
 
   return isVolcanoAiInterfaceProvider(iface.provider);
+
+}
+
+
+
+function readVolcanoPackageListCache(iface: OrganizationAiInterface) {
+
+  const metadata = iface.metadata;
+
+  if (
+
+    !metadata ||
+
+    typeof metadata !== "object" ||
+
+    !("credentialMode" in metadata) ||
+
+    metadata.credentialMode !== "volcengine_iam"
+
+  ) {
+
+    return null;
+
+  }
+
+  return readPackageListCache(metadata as VolcanoInterfaceMetadata);
 
 }
 
@@ -170,7 +231,7 @@ export function VolcanoInterfacePanel({
 
 }: VolcanoInterfacePanelProps) {
 
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const appToast = useAppToast();
 
@@ -178,9 +239,30 @@ export function VolcanoInterfacePanel({
 
   const [isLoading, setIsLoading] = useState(false);
 
+  const [isRefreshAnimating, setIsRefreshAnimating] = useState(false);
+
   const [expanded, setExpanded] = useState(false);
 
+  const [arkNotOpened, setArkNotOpened] = useState(false);
+
+  const [tosServiceStatus, setTosServiceStatus] =
+    useState<VolcanoTosServiceStatus | null>(null);
+
+  const [isProbingTos, setIsProbingTos] = useState(false);
+
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const loadInFlightRef = useRef(false);
+
+  const lastRealPackageRefreshAtRef = useRef<number | null>(null);
+
+  const tosProbeInFlightRef = useRef(false);
+
+  const tosProbedForIfaceRef = useRef<string | null>(null);
+
+
+
+  const skipTosHints = isTosStorageEnabled(iface, snapshot);
 
 
 
@@ -198,149 +280,188 @@ export function VolcanoInterfacePanel({
 
 
 
-  if (!isVolcanoInterface(iface)) {
-
-    return null;
-
-  }
-
-
-
-  const loadSnapshot = async () => {
-
-    setIsLoading(true);
-
-    try {
-
-      const next = await fetchVolcanoSnapshot(organizationId, iface.id, {
-
-        refreshPackages: true,
-
-      });
-
-      let merged = next;
+  const notOpenModelCount = useMemo(() => {
+    if (snapshot) {
+      return snapshot.models.filter((row) => {
+        const status = getVolcanoEffectiveActivationStatus(row);
+        return status === "not_open" || status === "service_not_open";
+      }).length;
+    }
+    return countNotOpenModelsFromMetadata(iface);
+  }, [iface, snapshot]);
 
 
 
-      if (snapshotNeedsActivationProbe(next)) {
-
-        const { results } = await probeVolcanoActivation(organizationId, iface.id);
-
-        merged = mergeActivationIntoSnapshot(next, results);
-
-        await onUpdated();
-
+  const probeTosService = useCallback(
+    async (
+      region: string,
+      snapshotForCheck: VolcanoSnapshotResponse | null = null
+    ) => {
+      if (isTosStorageEnabled(iface, snapshotForCheck)) {
+        return;
       }
+      if (tosProbeInFlightRef.current) {
+        return;
+      }
+      tosProbeInFlightRef.current = true;
+      setIsProbingTos(true);
+      try {
+        const result = await listVolcanoTosBuckets(
+          organizationId,
+          iface.id,
+          region
+        );
+        setTosServiceStatus(result.status);
+        tosProbedForIfaceRef.current = iface.id;
+      } catch {
+        setTosServiceStatus("transient_error");
+      } finally {
+        setIsProbingTos(false);
+        tosProbeInFlightRef.current = false;
+      }
+    },
+    [iface, organizationId]
+  );
 
 
 
-      setSnapshot(merged);
+  const loadSnapshot = useCallback(
 
-    } catch (error) {
+    async (options?: {
+      readonly refreshTos?: boolean;
+      readonly refreshPackages?: boolean;
+      readonly showRefreshLimitedToast?: boolean;
+    }) => {
 
-      if (
-
-        error instanceof ApiRequestError &&
-
-        error.code === CREDENTIALS_DECRYPT_FAILED
-
-      ) {
-
-        appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+      if (loadInFlightRef.current) {
 
         return;
 
       }
 
-      appToast.errorRaw(
+      loadInFlightRef.current = true;
 
-        error instanceof Error ? error.message : t("pages.aiInterfaces.volcano.loadFailed")
+      setIsLoading(true);
 
-      );
-
-    } finally {
-
-      setIsLoading(false);
-
-    }
-
-  };
-
-
-
-  const handleExpand = async () => {
-
-    const nextExpanded = !expanded;
-
-    setExpanded(nextExpanded);
-
-    if (nextExpanded && !snapshot && !isLoading) {
-
-      await loadSnapshot();
-
-    }
-
-  };
-
-
-
-  const handleToggle = async (canonicalId: string, enabled: boolean) => {
-
-    if (enabled) {
-
-      setTogglingId(canonicalId);
+      setArkNotOpened(false);
 
       try {
 
-        const { results } = await probeVolcanoActivation(organizationId, iface.id, [
+        const response = await fetchVolcanoSnapshot(organizationId, iface.id, {
 
-          canonicalId,
+          refreshPackages: options?.refreshPackages === true,
 
-        ]);
+        });
 
-        const probe = results[0];
+        let syncParent = false;
 
-        const row = snapshot?.models.find(
+        if (response.refreshLimited) {
 
-          (model) => model.canonicalId === canonicalId
+          if (options?.showRefreshLimitedToast) {
 
-        );
+            toast(t("pages.aiInterfaces.volcano.refreshTooFrequent"));
 
-        if (
+          }
 
-          probe &&
+          const local = buildVolcanoSnapshotFromMetadata(iface);
 
-          isVolcanoModelActivationBlocking({
+          if (local) {
 
-            activation: {
+            setSnapshot((previous) => {
 
-              status: probe.status,
+              if (previous?.balance && !local.balance) {
 
-              probedAt: probe.probedAt,
+                return {
 
-              errorCode: probe.errorCode,
+                  ...local,
 
-              message: probe.message,
+                  balance: previous.balance,
 
-            },
+                  balanceError: previous.balanceError,
 
-            package: row?.package ?? null,
+                };
 
-            canonicalId,
+              }
 
-          })
+              return local;
 
-        ) {
-
-          appToast.error("pages.aiInterfaces.volcano.activation.blockedEnable");
-
-          if (snapshot) {
-
-            setSnapshot(mergeActivationIntoSnapshot(snapshot, results));
+            });
 
           }
 
           return;
+
+        }
+
+        syncParent = true;
+
+        let merged = response.snapshot;
+
+        if (snapshotNeedsActivationProbe(response.snapshot)) {
+
+          try {
+
+            const { results } = await probeVolcanoActivation(
+
+              organizationId,
+
+              iface.id
+
+            );
+
+            merged = mergeActivationIntoSnapshot(response.snapshot, results);
+
+            syncParent = true;
+
+          } catch (probeError) {
+
+            if (
+
+              probeError instanceof ApiRequestError &&
+
+              probeError.code === VOLCANO_ARK_NOT_OPENED_CODE
+
+            ) {
+
+              setArkNotOpened(true);
+
+            } else {
+
+              throw probeError;
+
+            }
+
+          }
+
+        }
+
+        setSnapshot(merged);
+
+        if (syncParent) {
+
+          await onUpdated();
+
+        }
+
+        const shouldProbeTos =
+
+          options?.refreshTos !== false &&
+
+          !isTosStorageEnabled(iface, merged) &&
+
+          (options?.refreshTos === true ||
+
+            tosProbedForIfaceRef.current !== iface.id);
+
+        if (shouldProbeTos) {
+
+          const tosRegion =
+
+            merged.tosStorage?.region ||
+
+            defaultVolcanoTosRegionForLocale(locale);
+
+          await probeTosService(tosRegion, merged);
 
         }
 
@@ -360,66 +481,389 @@ export function VolcanoInterfacePanel({
 
         }
 
+        if (
+
+          error instanceof ApiRequestError &&
+
+          error.code === VOLCANO_ARK_NOT_OPENED_CODE
+
+        ) {
+
+          setArkNotOpened(true);
+
+          setExpanded(true);
+
+          return;
+
+        }
+
         appToast.errorRaw(
 
           error instanceof Error
 
             ? error.message
 
-            : t("pages.aiInterfaces.volcano.activation.probeFailed")
+            : t("pages.aiInterfaces.volcano.loadFailed")
 
         );
 
-        return;
-
       } finally {
 
-        setTogglingId(null);
+        setIsLoading(false);
+
+        loadInFlightRef.current = false;
 
       }
 
+    },
+
+    [appToast, iface, locale, onUpdated, organizationId, probeTosService, t]
+
+  );
+
+
+
+  useEffect(() => {
+
+    if (!expanded || loadInFlightRef.current) {
+
+      return;
+
     }
 
+    if (!hasVolcanoPackageListCache(iface)) {
+
+      return;
+
+    }
+
+    const local = buildVolcanoSnapshotFromMetadata(iface);
+
+    if (!local) {
+
+      return;
+
+    }
+
+    setSnapshot((previous) => {
+
+      if (previous?.balance && !local.balance) {
+
+        return {
+
+          ...local,
+
+          balance: previous.balance,
+
+          balanceError: previous.balanceError,
+
+        };
+
+      }
+
+      return local;
+
+    });
+
+  }, [expanded, iface]);
 
 
-    setTogglingId(canonicalId);
 
-    try {
+  useEffect(() => {
+    tosProbedForIfaceRef.current = null;
+    lastRealPackageRefreshAtRef.current = null;
+    setTosServiceStatus(null);
+    setSnapshot(null);
+    setExpanded(false);
+    setArkNotOpened(false);
+  }, [iface.id]);
 
-      await updateVolcanoModelEnabled(organizationId, iface.id, {
+  useEffect(() => {
+    if (skipTosHints) {
+      setTosServiceStatus(null);
+      setIsProbingTos(false);
+      tosProbedForIfaceRef.current = iface.id;
+      return;
+    }
+    if (tosProbedForIfaceRef.current === iface.id) {
+      return;
+    }
+    const region = defaultVolcanoTosRegionForLocale(locale);
+    void probeTosService(region);
+  }, [iface.id, locale, probeTosService, skipTosHints]);
 
-        [canonicalId]: enabled,
 
-      });
 
-      await onUpdated();
+  const handleRetryTosProbe = useCallback(async () => {
+    const region =
+      snapshot?.tosStorage?.region || defaultVolcanoTosRegionForLocale(locale);
+    await probeTosService(region, snapshot);
+  }, [locale, probeTosService, snapshot]);
 
-      if (snapshot) {
 
-        setSnapshot({
 
-          ...snapshot,
+  const enabledModelChips = useMemo(() => {
+    const source = snapshot ?? buildVolcanoSnapshotFromMetadata(iface);
+    if (!source) {
+      return [];
+    }
+    return source.models
+      .filter((row) => row.enabled)
+      .map((row) => ({
+        canonicalId: row.canonicalId,
+        alias: row.alias,
+        modality: row.modality,
+      }));
+  }, [iface, snapshot]);
 
-          models: snapshot.models.map((row) =>
+  const panelBannerProps = {
+    arkNotOpened,
+    notOpenModelCount,
+    tosServiceStatus,
+    isProbingTos,
+    skipTosHints,
+    onRetryTos: skipTosHints ? undefined : () => void handleRetryTosProbe(),
+  };
 
-            row.canonicalId === canonicalId ? { ...row, enabled } : row
 
-          ),
+
+  if (!isVolcanoInterface(iface)) {
+
+    return null;
+
+  }
+
+
+
+  const handleExpand = async () => {
+
+    const nextExpanded = !expanded;
+
+    setExpanded(nextExpanded);
+
+    if (!nextExpanded) {
+
+      return;
+
+    }
+
+    if (hasVolcanoPackageListCache(iface)) {
+
+      const cache = readVolcanoPackageListCache(iface);
+
+      if (
+
+        cache &&
+
+        shouldAutoRefreshPackageListOnExpand(cache) &&
+
+        !loadInFlightRef.current &&
+
+        canClientTriggerRealPackageRefresh(lastRealPackageRefreshAtRef.current)
+
+      ) {
+
+        lastRealPackageRefreshAtRef.current = Date.now();
+
+        await loadSnapshot({ refreshTos: false, refreshPackages: true });
+
+        return;
+
+      }
+
+      const local = buildVolcanoSnapshotFromMetadata(iface);
+
+      if (local) {
+
+        setSnapshot((previous) => {
+
+          if (previous?.balance && !local.balance) {
+
+            return {
+
+              ...local,
+
+              balance: previous.balance,
+
+              balanceError: previous.balanceError,
+
+            };
+
+          }
+
+          return local;
 
         });
 
+        if (
+
+          !isTosStorageEnabled(iface, local) &&
+
+          tosProbedForIfaceRef.current !== iface.id
+
+        ) {
+
+          const tosRegion =
+
+            local.tosStorage?.region ||
+
+            defaultVolcanoTosRegionForLocale(locale);
+
+          await probeTosService(tosRegion, local);
+
+        }
+
+        return;
+
       }
-
-    } catch {
-
-      appToast.error("pages.aiInterfaces.volcano.toggleFailed");
-
-    } finally {
-
-      setTogglingId(null);
 
     }
 
+    if (!snapshot && !loadInFlightRef.current) {
+
+      if (canClientTriggerRealPackageRefresh(lastRealPackageRefreshAtRef.current)) {
+
+        lastRealPackageRefreshAtRef.current = Date.now();
+
+        await loadSnapshot({ refreshTos: false, refreshPackages: true });
+
+      }
+
+    }
+
+  };
+
+
+
+  const handleRefresh = async () => {
+
+    setIsRefreshAnimating(true);
+
+    const startedAt = Date.now();
+
+    try {
+
+      if (!canClientTriggerRealPackageRefresh(lastRealPackageRefreshAtRef.current)) {
+
+        return;
+
+      }
+
+      lastRealPackageRefreshAtRef.current = Date.now();
+
+      await loadSnapshot({
+
+        refreshTos: true,
+
+        refreshPackages: true,
+
+        showRefreshLimitedToast: true,
+
+      });
+
+    } finally {
+
+      const elapsed = Date.now() - startedAt;
+
+      const remaining = REFRESH_BUTTON_MIN_ANIMATION_MS - elapsed;
+
+      if (remaining > 0) {
+
+        await delay(remaining);
+
+      }
+
+      setIsRefreshAnimating(false);
+
+    }
+
+  };
+
+
+
+  const handleToggle = async (canonicalId: string, enabled: boolean) => {
+    const row = snapshot?.models.find(
+      (model) => model.canonicalId === canonicalId
+    );
+
+    if (enabled && row) {
+      if (isVolcanoModelActivationBlocking(row)) {
+        return;
+      }
+
+      const alreadyOpen = getVolcanoEffectiveActivationStatus(row) === "open";
+      if (!alreadyOpen) {
+        setTogglingId(canonicalId);
+        try {
+          const { results } = await probeVolcanoActivation(
+            organizationId,
+            iface.id,
+            [canonicalId]
+          );
+          const probe = results[0];
+
+          if (
+            probe &&
+            isVolcanoModelActivationBlocking({
+              activation: {
+                status: probe.status,
+                probedAt: probe.probedAt,
+                errorCode: probe.errorCode,
+                message: probe.message,
+              },
+              package: row.package ?? null,
+              canonicalId,
+            })
+          ) {
+            appToast.error("pages.aiInterfaces.volcano.activation.blockedEnable");
+            if (snapshot) {
+              setSnapshot(mergeActivationIntoSnapshot(snapshot, results));
+            }
+            return;
+          }
+        } catch (error) {
+          if (
+            error instanceof ApiRequestError &&
+            error.code === CREDENTIALS_DECRYPT_FAILED
+          ) {
+            appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+            return;
+          }
+
+          appToast.errorRaw(
+            error instanceof Error
+              ? error.message
+              : t("pages.aiInterfaces.volcano.activation.probeFailed")
+          );
+          return;
+        } finally {
+          setTogglingId(null);
+        }
+      }
+    }
+
+    setTogglingId(canonicalId);
+    try {
+      await updateVolcanoModelEnabled(organizationId, iface.id, {
+        [canonicalId]: enabled,
+      });
+      await onUpdated();
+
+      if (snapshot) {
+        setSnapshot({
+          ...snapshot,
+          models: snapshot.models.map((modelRow) =>
+            modelRow.canonicalId === canonicalId
+              ? { ...modelRow, enabled }
+              : modelRow
+          ),
+        });
+      }
+    } catch {
+      appToast.error("pages.aiInterfaces.volcano.toggleFailed");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
 
@@ -448,169 +892,76 @@ export function VolcanoInterfacePanel({
 
 
 
+  const panelBanners = (
+
+    <VolcanoPanelSetupBanners {...panelBannerProps} />
+
+  );
+
+
+
   return (
-
-    <div className="rounded-lg border p-4 space-y-3">
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-
-        <div className="min-w-0 flex-1 space-y-1">
-
-          <p className="truncate font-medium" title={displayName}>
-
-            {displayName}
-
-          </p>
-
-          {snapshot ? (
-
-            <div className="space-y-0.5">
-
-              {snapshot.balance ? (
-
-                <>
-
-                  <p className="text-lg font-semibold tabular-nums tracking-tight">
-
-                    ¥ {formatBalance(snapshot.balance.available)}
-
-                  </p>
-
-                  <p className="text-muted-foreground text-xs">
-
-                    {t("pages.aiInterfaces.volcano.accountBalance")}
-
-                  </p>
-
-                </>
-
-              ) : (
-
-                <p className="text-muted-foreground text-sm">
-
-                  {t("pages.aiInterfaces.volcano.balanceUnavailable")}
-
-                </p>
-
-              )}
-
-              {snapshot.balanceError ? (
-
-                <p className="text-destructive text-xs">{snapshot.balanceError}</p>
-
-              ) : null}
-
-            </div>
-
-          ) : null}
-
-          <p className="text-muted-foreground text-sm">
-
-            {t("pages.aiInterfaces.volcano.billingOverageHint")}
-
-          </p>
-
-          <p className="text-muted-foreground text-sm">
-
-            {t("pages.aiInterfaces.volcano.resourcePackHint")}{" "}
-
-            <a
-
-              href={PRICING_DOC_URL}
-
-              target="_blank"
-
-              rel="noreferrer"
-
-              className="text-primary underline-offset-4 hover:underline"
-
-            >
-
-              {t("pages.aiInterfaces.volcano.pricingDoc")}
-
-            </a>
-
-          </p>
-
-          {!expanded ? (
-
-            <p className="text-muted-foreground text-xs">
-
-              {t("pages.aiInterfaces.volcano.expandHint")}
-
+    <InterfaceCardShell
+      title={displayName}
+      titleBadge={<AggregateChannelBadge />}
+      enabledModelChips={enabledModelChips}
+      expanded={expanded}
+      onExpandToggle={() => void handleExpand()}
+      onDelete={onDelete}
+      collapsedHint={<VolcanoPanelSetupBanners compact {...panelBannerProps} />}
+      leadingActions={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void handleRefresh()}
+        >
+          <RefreshCw
+            className={`mr-2 size-4 ${isRefreshAnimating ? "animate-spin" : ""}`}
+          />
+          {t("pages.aiInterfaces.volcano.refresh")}
+        </Button>
+      }
+    >
+      <div className="space-y-3">
+        <div className="space-y-0.5">
+          {snapshot?.balance ? (
+            <>
+              <p className="text-lg font-semibold tabular-nums tracking-tight">
+                ¥ {formatBalance(snapshot.balance.available)}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {t("pages.aiInterfaces.volcano.accountBalance")}
+              </p>
+            </>
+          ) : snapshot ? (
+            <p className="text-muted-foreground text-sm">
+              {t("pages.aiInterfaces.volcano.balanceUnavailable")}
             </p>
-
           ) : null}
-
+          {snapshot?.balanceError ? (
+            <p className="text-destructive text-xs">{snapshot.balanceError}</p>
+          ) : null}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <p className="text-muted-foreground text-sm">
+          {t("pages.aiInterfaces.volcano.billingOverageHint")}
+        </p>
 
-          <Button variant="outline" size="sm" onClick={handleExpand}>
-
-            {expanded
-
-              ? t("pages.aiInterfaces.volcano.collapse")
-
-              : t("pages.aiInterfaces.volcano.expand")}
-
-          </Button>
-
-          <Button
-
-            variant="outline"
-
-            size="sm"
-
-            onClick={onDelete}
-
-            className="text-destructive hover:text-destructive"
-
+        <p className="text-muted-foreground text-sm">
+          {t("pages.aiInterfaces.volcano.resourcePackHint")}{" "}
+          <a
+            href={PRICING_DOC_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline-offset-4 hover:underline"
           >
+            {t("pages.aiInterfaces.volcano.pricingDoc")}
+          </a>
+        </p>
 
-            <Trash2 className="mr-2 size-4" />
+        {panelBanners}
 
-            {t("pages.aiInterfaces.deleteButton")}
-
-          </Button>
-
-          {expanded ? (
-
-            <Button
-
-              variant="outline"
-
-              size="sm"
-
-              onClick={() => void loadSnapshot()}
-
-              disabled={isLoading}
-
-            >
-
-              <RefreshCw
-
-                className={`mr-2 size-4 ${isLoading ? "animate-spin" : ""}`}
-
-              />
-
-              {t("pages.aiInterfaces.volcano.refresh")}
-
-            </Button>
-
-          ) : null}
-
-        </div>
-
-      </div>
-
-
-
-      {expanded ? (
-
-        <div className="space-y-3">
-
-          {isLoading && !snapshot ? (
+        {isLoading && !snapshot ? (
 
             <div className="columns-1 gap-3 md:columns-2">
 
@@ -646,9 +997,11 @@ export function VolcanoInterfacePanel({
 
                     snapshot={tosSnapshot}
 
+                    tosServiceStatus={tosServiceStatus}
+
                     onUpdated={onUpdated}
 
-                    onRefreshSnapshot={loadSnapshot}
+                    onRefreshSnapshot={handleRefresh}
 
                   />
 
@@ -676,7 +1029,7 @@ export function VolcanoInterfacePanel({
 
                       onEnabledChange={(enabled) =>
 
-                        handleToggle(row.canonicalId, enabled)
+                        void handleToggle(row.canonicalId, enabled)
 
                       }
 
@@ -690,13 +1043,13 @@ export function VolcanoInterfacePanel({
 
 
 
-              {snapshot.fetchedAt ? (
+              {snapshot.packageListCachedAt ? (
 
                 <p className="text-muted-foreground text-xs">
 
                   {t("pages.aiInterfaces.volcano.updatedAt", {
 
-                    time: new Date(snapshot.fetchedAt).toLocaleString(),
+                    time: new Date(snapshot.packageListCachedAt).toLocaleString(),
 
                   })}
 
@@ -707,15 +1060,7 @@ export function VolcanoInterfacePanel({
             </>
 
           ) : null}
-
-        </div>
-
-      ) : null}
-
-    </div>
-
+      </div>
+    </InterfaceCardShell>
   );
-
 }
-
-

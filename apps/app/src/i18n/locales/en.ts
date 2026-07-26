@@ -19,6 +19,8 @@ export const en = {
     collapse: "Collapse",
     toggleSidebar: "Toggle sidebar",
     noEmail: "No email provided",
+    accessDenied: "Access denied",
+    permissionDenied: "You do not have permission to access this page.",
     send: "Send",
     sending: "Sending…",
     continue: "Continue",
@@ -34,6 +36,7 @@ export const en = {
   },
   nav: {
     organization: "Organization",
+    console: "Console",
     settings: "Settings",
     administration: "Administration",
     login: "Login",
@@ -59,12 +62,11 @@ export const en = {
       organization: {
         title: "Organization",
         content:
-          "This is your current organization. You can switch between organizations or create new ones to manage different contexts.",
+          "Use the sidebar to navigate your workspace — dashboard, workflows, resources, and settings.",
       },
       workflows: {
         title: "Workflows",
-        content:
-          "Build and manage your workflows, monitor executions, explore templates, and test individual nodes in the playground.",
+        content: "Build and manage workflows, and review model call history.",
       },
       resources: {
         title: "Resources",
@@ -79,14 +81,12 @@ export const en = {
       documentation: {
         title: "Documentation",
         content:
-          "Explore our documentation to learn more about Dafthunk features, nodes, and best practices. You're all set!",
+          "Explore our documentation to learn more about z3cz.com features, nodes, and best practices. You're all set!",
       },
     },
   },
   userMenu: {
     profile: "Profile",
-    organizations: "Organizations",
-    invitations: "Invitations",
     logout: "Log out",
   },
   sidebar: {
@@ -104,9 +104,11 @@ export const en = {
     datasets: "Datasets",
     databases: "Databases",
     siteSettings: "Site Settings",
+    loginMethods: "Login Methods",
+    legalDocuments: "Terms & Privacy",
     featureSettings: "Feature Settings",
     workflowSchemes: "Workflow Schemes",
-    relayAccounts: "Relay Accounts",
+    persistWorkers: "Load Balancing",
     aiInterfaceTemplates: "AI Interface Templates",
     aiModels: "AI Models",
     modelInvocations: "Model Invocations",
@@ -120,18 +122,28 @@ export const en = {
     templates: "Templates",
     playground: "Playground",
     apiKeys: "API Keys",
-    members: "Members",
+    members: "Sub-accounts",
     billing: "Billing",
+    groups: {
+      workflows: "Workflows",
+      users: "Users",
+      systemSettings: "System Settings",
+    },
   },
   auth: {
     email: "Email",
     password: "Password",
     loginRegister: "Sign in / Register",
+    loginOnly: "Sign in",
     confirmRegister: "Confirm registration",
     processing: "Processing...",
     or: "Or",
     loginWithGoogle: "Sign in with Google",
     loginWithGithub: "Sign in with GitHub",
+    verificationCode: "Verification code",
+    sendVerificationCode: "Send code",
+    resendVerificationCode: "Resend code",
+    verificationCodeSent: "Verification code sent. Check your email.",
     termsPrefix: "By signing up, you agree to our",
     termsOfService: "Terms of Service",
     and: "and",
@@ -142,6 +154,16 @@ export const en = {
     pendingRegisterTitle: "Email not registered",
     pendingRegisterDescription:
       "This email will be registered with the password you entered. Click Confirm registration to continue.",
+    subAccountInviteTitle: "Sub-account invitation",
+    subAccountInviteDescription:
+      "Create your account to join {{organization}} as a sub-account.",
+    subAccountInviteInvalidTitle: "Invitation unavailable",
+    subAccountInviteInvalidDescription:
+      "This invitation link is invalid or has expired.",
+    subAccountInviteActiveSessionTitle: "Sign out to accept invitation",
+    subAccountInviteActiveSessionDescription:
+      "You are signed in to another account. Sign out first, then open the invitation link again.",
+    createSubAccount: "Create sub-account",
     missingOrgAfterLogin:
       "Signed in, but organization info is missing. Refresh and try again.",
     errors: {
@@ -155,6 +177,9 @@ export const en = {
         "Authentication is misconfigured. Check JWT_SECRET in apps/api/.dev.vars.",
       apiUnavailable:
         "API is starting. Wait a few minutes and try again.",
+      verificationRequired: "Enter the verification code sent to your email",
+      invalidVerificationCode: "Invalid or expired verification code",
+      sendCodeFailed: "Failed to send verification code. Try again later.",
     },
   },
   error: {
@@ -169,9 +194,6 @@ export const en = {
     siteNameHelp: "Shown in the header, login page, and browser title.",
     siteTagline: "Tagline",
     siteTaglineHelp: "Short description on the login page.",
-    defaultLocale: "Default language",
-    defaultLocaleHelp:
-      "Used for new visitors who have not chosen a language yet.",
     supportEmail: "Support email",
     supportEmailHelp: "Optional contact address for support workflows.",
     supportEmailPlaceholder: "support@example.com",
@@ -179,6 +201,72 @@ export const en = {
     saveError: "Failed to save site settings.",
     preview: "Preview",
     previewHint: "After saving, the site name and tagline update in the header, login page, and browser tab.",
+    newUserTourToggle: "New user tour",
+    newUserTourHint:
+      "When enabled, new users with no workflows see the in-app guided tour on first visit.",
+    homepageMode: "Homepage",
+    homepageModeConsole: "Console",
+    homepageModeMarketing: "Marketing site",
+    homepageModeHelp:
+      "Controls where visitors land at /. Marketing opens /m/ on the same domain; console opens login or the dashboard.",
+  },
+  legalDocuments: {
+    title: "Terms & Privacy",
+    description:
+      "Edit the Terms of Service and Privacy Policy shown in login-page dialogs. Both English and Chinese are supported.",
+    save: "Save content",
+    saving: "Saving...",
+    saveSuccess: "Legal documents saved.",
+    saveError: "Failed to save legal documents.",
+    tabs: {
+      terms: "Terms of Service",
+      privacy: "Privacy Policy",
+    },
+    locales: {
+      zh: "中文",
+      en: "English",
+    },
+    fields: {
+      title: "Title",
+      effectiveDate: "Effective date",
+      body: "Body (Markdown)",
+      bodyHelp: "Supports Markdown headings and lists. Rendered in the login dialog.",
+    },
+  },
+  loginMethods: {
+    title: "Login Methods",
+    save: "Save settings",
+    saving: "Saving...",
+    saveSuccess: "Login methods saved.",
+    saveError: "Failed to save login methods.",
+    email: {
+      title: "Email login",
+      description:
+        "Email sign-in and registration are always available. Configure delivery to require a verification code on registration.",
+      alwaysAvailable:
+        "Without configuration, users can still sign in and register with email.",
+      fromAddress: "From address",
+      smtpHost: "SMTP host",
+      smtpPort: "SMTP port",
+      smtpUser: "SMTP username",
+      smtpPassword: "SMTP password",
+      verificationToggle: "Registration verification code",
+      verificationHint:
+        "When enabled, new users must verify their email with a code before registering.",
+    },
+    github: {
+      title: "GitHub login",
+      description: "Fill in OAuth app credentials to enable GitHub sign-in.",
+    },
+    google: {
+      title: "Google login",
+      description: "Fill in OAuth app credentials to enable Google sign-in.",
+    },
+    oauth: {
+      clientId: "Client ID",
+      clientSecret: "Client Secret",
+      enable: "Enable",
+    },
   },
   featureSettings: {
     title: "Feature Settings",
@@ -186,7 +274,7 @@ export const en = {
     navDescription:
       "Control which resource modules appear in the organization sidebar. Workflow menus are always available.",
     resourcesHint:
-      "Resource modules are for workflow orchestration. Enable only what your canvas workflows need. AI Interfaces stays on by default. Workflow menus (workflows, executions, feedback, templates, playground) are always visible.",
+      "Resource modules are for workflow orchestration. Enable only what your canvas workflows need. AI Interfaces stays on by default. Workflow menus (workflows, model calls) are always visible.",
     schemeTitle: "Default workflow scheme",
     schemeDescription:
       "New workflows use this scheme. Basic Canvas includes AI text, image, and video nodes only.",
@@ -257,9 +345,11 @@ export const en = {
       adminQueues: "Queues - Admin - {{siteName}}",
       adminDatasets: "Datasets - Admin - {{siteName}}",
       adminSettings: "Site Settings - Admin - {{siteName}}",
+      adminLoginMethods: "Login Methods - Admin - {{siteName}}",
+      adminLegalDocuments: "Terms & Privacy - Admin - {{siteName}}",
       adminFeatureSettings: "Feature Settings - Admin - {{siteName}}",
       adminWorkflowSchemes: "Workflow Schemes - Admin - {{siteName}}",
-      adminRelayAccounts: "Relay Accounts - Admin - {{siteName}}",
+      adminPersistWorkers: "Load Balancing - Admin - {{siteName}}",
       adminAiTemplates: "AI Interface Templates - Admin - {{siteName}}",
       adminAiModels: "AI Models - Admin - {{siteName}}",
       adminModelInvocations: "Model Invocations - Admin - {{siteName}}",
@@ -405,7 +495,7 @@ export const en = {
       name: "Name",
       empty: "No results found",
       status: "Status",
-      members: "Members",
+      members: "Sub-accounts",
       workflows: "Workflows",
       workflow: "Workflow",
       usage: "Usage",
@@ -519,34 +609,58 @@ export const en = {
       lastMessage: "Last message",
       open: "Open",
     },
-    relayAccounts: {
-      title: "Relay Accounts",
-      description: "Manage NewAPI relay credentials for upstream AI billing.",
-      add: "Add relay account",
-      edit: "Edit relay account",
-      empty:
-        "No relay accounts configured. Workers fall back to NEWAPI_* env vars.",
+    persistWorkers: {
+      title: "Load Balancing",
+      description:
+        "Distributes AI image and video download-and-cloud-upload work across Linux servers to offload bandwidth and CPU from the main API. This balances generative media persist tasks, not HTTP traffic.",
+      poolToggle: "Enable load balancing",
+      poolDescription:
+        "When enabled, AI image/video download-and-upload tasks that time out or cannot be completed in the browser are dispatched to the servers below. When disabled, the main API handles persist inline. Off by default.",
+      initialize: "Initialize server",
+      initializeDescription:
+        "Enter SSH credentials to deploy a load node that pulls generated media from upstream URLs and uploads it to org TOS. Node.js is installed if needed; the service runs via systemd (or a background process). SSH passwords are not stored.",
+      initializeSubmit: "Initialize now",
+      redeploy: "Redeploy",
+      redeploySubmit: "Redeploy now",
+      redeployDescription: 'Reinstall and restart the load node on "{{name}}".',
+      redeploySuccess: "Load node redeployed",
+      redeployFailed: "Load node redeploy failed",
+      bootstrapSuccess: "Load node initialized",
+      bootstrapFailed: "Load node initialization failed",
+      deployLogTitle: "Deploy log",
+      deployLogEmpty: "No deploy output captured.",
+      empty: "No load nodes yet. Click Initialize server to add the first one.",
       enabled: "Enabled",
       disabled: "Disabled",
-      default: "Default",
-      keySet: "Key set",
-      deleteConfirm: 'Delete relay account "{{name}}"?',
-      updated: "Relay account updated",
-      created: "Relay account created",
-      deleted: "Relay account deleted",
-      saveFailed: "Failed to save relay account",
-      deleteFailed: "Failed to delete relay account",
-      loadFailed: "Failed to load relay accounts",
-      idOptional: "ID (optional)",
-      baseUrl: "Base URL",
-      apiKey: "API key",
-      apiKeyKeep: "API key (leave blank to keep current)",
-      defaultAccount: "Default account",
+      deleteConfirm: 'Delete load node "{{name}}"?',
+      deleted: "Load node deleted",
+      deleteFailed: "Failed to delete load node",
+      loadFailed: "Failed to load load nodes",
+      poolUpdated: "Load balancing setting updated",
+      poolUpdateFailed: "Failed to update load balancing setting",
+      deployStatus: {
+        manual: "Manual",
+        deploying: "Deploying",
+        active: "Active",
+        failed: "Failed",
+      },
+      form: {
+        name: "Display name",
+        namePlaceholder: "Tokyo load node",
+        host: "Server host",
+        sshPort: "SSH port",
+        sshUsername: "SSH username",
+        sshPassword: "SSH password",
+        maxConcurrentJobs: "Max concurrent jobs",
+        apiBaseUrl: "API base URL (optional)",
+        apiBaseUrlPlaceholder: "https://api.example.com",
+      },
       columns: {
         name: "Name",
-        provider: "Provider",
-        baseUrl: "Base URL",
-        status: "Status",
+        host: "Server",
+        capacity: "Active / max",
+        deployStatus: "Deploy",
+        heartbeat: "Last heartbeat",
         actions: "Actions",
       },
     },
@@ -618,6 +732,11 @@ export const en = {
       notConnected: "Not connected",
       developer: "Developer",
       userId: "User ID",
+      subAccountNotice: "This is a sub-account. Primary account:",
+      subAccounts: "Sub-accounts",
+      subAccountsDesc: "Sub-accounts under this organization ({{count}})",
+      noSubAccounts: "No sub-accounts",
+      noSubAccountsDesc: "This organization has no sub-accounts yet.",
       orgMemberships: "Organization Memberships",
       orgMembershipsDesc:
         "Organizations this user belongs to ({{count}})",
@@ -676,7 +795,7 @@ export const en = {
       subscriptionId: "Subscription ID",
       periodStart: "Period Start",
       periodEnd: "Period End",
-      members: "Members",
+      members: "Sub-accounts",
       membersDesc: "Users who belong to this organization ({{count}})",
       noMembers: "No members",
       noMembersDesc: "This organization has no members.",
@@ -700,6 +819,8 @@ export const en = {
     createTitle: "Create Workflow",
     configureTitle: "Configure Workflow",
     createDescription: "Choose a scheme first. It controls available triggers, execution modes, and nodes.",
+    createDescriptionSimple:
+      "Create a blank canvas workflow. Choose execution mode and run method when you run.",
     workflowName: "Workflow Name",
     workflowNamePlaceholder: "Enter workflow name",
     workflowDescription: "Description (Optional)",
@@ -831,8 +952,6 @@ export const en = {
     nodeNotFound: "Node not found",
     noExecutionResult: "No execution result returned",
     runNodeFailed: "Failed to run node",
-    workflowEnabled: "Workflow enabled",
-    workflowDisabled: "Workflow disabled",
     workflowUpdateFailed: "Failed to update workflow",
     workflowSaveFailed: "Workflow saving error: {{message}}",
     connectionFailed: "Connection error: {{message}}",
@@ -842,39 +961,51 @@ export const en = {
   pages: {
     workflows: {
       title: "Workflows",
-      description: "Build and test your workflows.",
+      back: "Back",
       create: "Create Workflow",
-      browseTemplates: "Browse Templates",
+      createCardTitle: "Start creating",
+      createCardCaption: "Create a new workflow",
       searchPlaceholder: "Search workflows...",
       emptyAll: "No workflows found. Create a new workflow to get started.",
       emptySearch: "No workflows match your search.",
-      count: "{{filtered}} of {{total}} workflows",
       untitled: "Untitled Workflow",
+      defaultName: "Untitled",
       updated: "Updated {{date}}",
-      executions: "Executions",
-      feedback: "Feedback",
       openMenu: "Open menu",
       openWorkflow: "Open {{name}}",
-      editWorkflow: "Edit Workflow",
-      editMetadata: "Edit Metadata",
-      deleteWorkflow: "Delete Workflow",
+      rename: "Rename",
+      renameTitle: "Rename",
+      deleteWorkflow: "Delete",
       deleteTitle: "Delete Workflow",
       deleteConfirm:
         'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
-      renameTitle: "Edit Metadata",
-      triggers: {
-        manual: "Manual",
-        scheduled: "Scheduled",
-        http_webhook: "HTTP Webhook",
-        http_request: "HTTP Request",
-        form_webhook: "Form Webhook",
-        form_request: "Form Request",
-        email_message: "Email Message",
-        queue_message: "Queue Message",
-        discord_event: "Discord Event",
-        telegram_event: "Telegram Event",
-        whatsapp_event: "WhatsApp Event",
-        slack_event: "Slack Event",
+      deleted: "Workflow deleted",
+      folders: {
+        create: "New Folder",
+        defaultName: "Untitled folder",
+        created: "Folder created",
+        deleted: "Folder deleted",
+        loading: "Loading folder…",
+        notFound: "Folder not found",
+        deleteTitle: "Delete folder",
+        deleteDescription:
+          'Deleting "{{name}}" will permanently remove {{count}} workflow(s) inside it.',
+        deleteTypeName: "Type the folder name to confirm",
+        deleteConfirm: "Delete folder and workflows",
+      },
+      cover: {
+        title: "Change cover",
+        change: "Change cover",
+        uploadHint: "Upload an image from your device.",
+        chooseImage: "Choose image",
+        uploading: "Uploading…",
+        updated: "Cover updated",
+        removed: "Cover removed",
+        remove: "Remove cover",
+        uploadFailed: "Failed to upload cover",
+        cloudStorageRequired:
+          "Cloud storage must be configured before uploading covers.",
+        configureCloudStorage: "Configure cloud storage",
       },
     },
     editor: {
@@ -895,6 +1026,11 @@ export const en = {
         title: "Workflows",
         countLabel: "Number of workflows",
         viewAll: "View Workflows",
+      },
+      modelCalls: {
+        title: "Model Calls",
+        countLabel: "Number of model calls",
+        viewAll: "View Model Calls",
       },
       executions: {
         title: "Executions",
@@ -1182,7 +1318,7 @@ export const en = {
         createFailed: "Failed to create email",
         nameLabel: "Name",
         namePlaceholder: "e.g. Support Inbox",
-        nameHint: "A display name for this email in Dafthunk.",
+        nameHint: "A display name for this email in z3cz.com.",
         createdBadge: "Created",
         creating: "Creating...",
         create: "Create Email",
@@ -1318,10 +1454,116 @@ export const en = {
     aiInterfaces: {
       title: "AI & Resource APIs",
       description:
-        "Configure upstream AI and resource APIs. Volcengine Ark (ByteDance) inference keys are issued automatically; usage is queried with your Access Key.",
+        "Configure upstream AI and resource APIs for workflows and canvas nodes. Expand a card to enable or disable models; aggregated interfaces show usage and balance.",
+      aggregateChannelBadge: "Aggregate",
+      noEnabledModels: "No enabled models",
+      apiChannelBadge: "API",
       noTemplates:
         "No enabled templates. Ask a platform admin to configure templates first.",
       addButton: "Add Interface",
+      empty: "No interfaces yet. Click Add Interface to connect an AI provider.",
+      addWizard: {
+        title: "Add AI Interface",
+        step0Title: "Select channel",
+        progress: "{{step}}/{{total}}",
+        volcanoStep1Title: "IAM credentials",
+        volcanoStep2Title: "Model activation",
+        volcanoStep3Title: "Name & save",
+        volcanoStep4Title: "Cloud storage (optional)",
+        singleModelStep1Title: "Select model / resource",
+        singleModelStep2Title: "Configure parameters",
+        singleModelStep3Title: "Name & save",
+      },
+      channels: {
+        description: "Choose how you want to connect AI and resource APIs.",
+        recommended: "Recommended",
+        supportedModels: "Supported models",
+        volcano: {
+          title: "Volcano Engine · Ark",
+          subtitle: "ByteDance cloud platform",
+          description:
+            "Official integration for Doubao and Seedance models, with usage tracking and cloud storage.",
+          tags: {
+            cloudStorage: "Cloud storage",
+            seedance: "Seedance 2.0",
+            doubao: "Doubao",
+            usage: "Usage tracking",
+          },
+          freeQuota: "Free quota",
+          freeQuotaLine1: "500K tokens gifted per model",
+          freeQuotaLine2: "Up to 5M additional tokens daily",
+          freeQuotaLine3: "10 GB TOS cloud storage capacity and traffic",
+        },
+        singleModel: {
+          title: "Single model / resource API",
+          description:
+            "Connect with an API key and endpoint. Simple setup, but no unified usage tracking on this platform.",
+          tags: {
+            openAiCompatible: "OpenAI compatible",
+            customBaseUrl: "Custom base URL",
+            textImage: "Text / image",
+          },
+        },
+      },
+      singleModel: {
+        step1Description:
+          "Choose a model or feature. Filter by category above; All shows everything by default.",
+        step2Description: "Review connection parameters and credentials, then save.",
+        defaultsHint:
+          "Defaults are shown below. Leave them unchanged unless you know what they mean. List names default to the selected model card label.",
+        categories: {
+          all: "All",
+          text: "Text",
+          image: "Image",
+          video: "Video",
+          audio: "Audio",
+          storage: "Cloud storage",
+        },
+        storageTabEmpty:
+          "Cloud storage is only available via Volcano Engine. Use Back below to return and choose Volcano Ark.",
+        endpointUrl: "Endpoint URL",
+        endpointRequired: "Endpoint URL is required",
+        accessKeyId: "Access Key ID",
+        secretAccessKey: "Secret Access Key",
+        accessKeyRequired: "Access Key ID and Secret Access Key are required",
+        tosRegion: "Region",
+        tosBucket: "Bucket (optional)",
+        tosBucketPlaceholder: "my-bucket",
+        presets: {
+          volcanoTos: "Volcano TOS",
+          deepseekProvider: "DeepSeek",
+          seedProvider: "Seed",
+          glmProvider: "GLM",
+          kimiProvider: "Kimi",
+          openaiProvider: "OpenAI GPT",
+          openaiImageProvider: "OpenAI GPT Image",
+          nanoBananaProvider: "Nano Banana",
+          veoProvider: "Veo",
+          geminiProvider: "Gemini",
+          grokProvider: "Grok",
+          grokImagineImageProvider: "Grok Imagine",
+          grokImagineVideoProvider: "Grok Imagine Video",
+          minimaxSpeechProvider: "MiniMax Speech",
+          claudeProvider: "Claude",
+          seedanceProvider: "Seedance",
+          seedreamProvider: "Seedream",
+        },
+        kimiRegionDomestic: "Domestic",
+        kimiRegionOverseas: "Overseas",
+        modelIdRequired: "Model ID is required",
+        modelId: "Model ID",
+        modelColumn: "Model",
+        interfaceListName: "List name",
+        interfaceListNameHint: "Shown on the AI / resources interface list",
+        selectModels: "Select models",
+        brandName: "Brand name",
+        toggleFailed: "Failed to update model toggle",
+        apiKeyConfigured: "Configured",
+        editConfig: "Edit configuration",
+        editConfigTitle: "Edit connection",
+        saveHint:
+          "This interface uses your credentials directly. Usage is not aggregated on this platform.",
+      },
       template: "Template",
       provider: "Provider",
       version: "Version",
@@ -1343,6 +1585,8 @@ export const en = {
       apiKeyRequired: "API key is required",
       updated: "AI interface updated",
       created: "AI interface created",
+      duplicateName:
+        "An AI interface with this name already exists in this organization. Choose a different name.",
       saveFailed: "Failed to save AI interface",
       deleteConfirm: 'Delete "{{name}}"? This cannot be undone.',
       deleteTitle: "Delete AI interface",
@@ -1356,6 +1600,7 @@ export const en = {
         text: "Text",
         image: "Image",
         video: "Video",
+        audio: "Audio",
       },
       usageUnit: {
         tokens: "tokens",
@@ -1367,22 +1612,31 @@ export const en = {
         empty:
           "No interfaces yet. Click Add Interface to connect Volcengine Ark (ByteDance).",
         wizardTitle: "Connect Volcengine Ark ({{step}}/4)",
-        step1Description:
-          "Create an IAM Access Key in Volcano Engine. It is used for usage queries and automatic inference key renewal. Inference keys are managed silently.",
+        step1Guide: {
+          signInPrefix: "Sign in or register, then open the ",
+          officialSite: "Volcano Engine site",
+          signInSuffix: ".",
+          createKeyPrefix: "Create an Access Key in the console — ",
+          iamQuickLink: "create one now",
+          createKeySuffix: ".",
+          pasteKeys: "Paste the Access Key ID and Secret below.",
+        },
+        openIamConsole: "Open key management",
         step2Description:
           "The system will check activation for each model automatically. Activated models are enabled by default; others can be enabled manually after setup.",
         step3Description:
           "Name the interface and save. A temporary inference key valid for 30 days will be issued automatically.",
-        openIamConsole: "Open key management",
-        getApiKeyDoc: "GetApiKey documentation",
         accessKeyId: "Access Key ID",
         secretAccessKey: "Secret Access Key",
         credentialsRequired: "Access Key ID and Secret are required",
         selectedModels: "{{count}} models selected",
         autoKeyHint: "A temporary inference key will be issued via GetApiKey after save.",
-        expand: "Show usage",
-        collapse: "Hide",
+        createdStorageFailed:
+          "Interface created, but cloud storage setup failed. Retry from the interface panel.",
+        expand: "Expand",
+        collapse: "Collapse",
         refresh: "Refresh",
+        refreshTooFrequent: "Refreshing too often. Please try again later.",
         expandHint: "Expand to view model usage and enablement",
         usageBarTooltip: "Used {{usedPercent}}% · Remaining {{remainPercent}}%",
         usageBarTooltipWithExpired:
@@ -1444,10 +1698,27 @@ export const en = {
           probeRetry: "Retry check",
           probeDone: "Activation status updated",
           probeFailed: "Failed to check activation",
+          sessionExpired:
+            "Your login session expired. Refresh the page or sign in again, then retry.",
           authGlobalError:
             "Access Key is invalid or lacks permissions. Go back and verify your credentials.",
+          arkNotOpened: {
+            prefix: "Volcano Ark is not enabled yet. Open ",
+            link: "Volcano Ark",
+            suffix:
+              " to enable all models in one click. New accounts may receive free model and cloud storage credits. Return here and click Retry when done.",
+          },
           wizardDeferredEnable:
             "Finish setup first, activate the model in Volcengine console, then enable it manually in the interface panel.",
+          wizardNotOpenHint:
+            "Some models are not activated yet. Finish adding the interface first, then activate them in the Volcengine console.",
+          panelNotOpenHint:
+            "{{count}} model(s) are not activated yet. Go to",
+          panelNotOpenHintAfterLink:
+            " to activate. When done, click Refresh to sync status, then enable each model.",
+          panelTosNotOpenHint: "Cloud storage (TOS) is not activated. Go to",
+          panelTosNotOpenHintAfterLink:
+            " to activate. When done, click Refresh to sync status, then enable cloud storage.",
           blockedEnable:
             "This model is not activated in the Volcano console. Enable it in Open Management first.",
           openConsole: "Activate this model in the Volcano console:",
@@ -1463,6 +1734,9 @@ export const en = {
       tosStorage: {
         cardTitle: "Cloud storage",
         notConfigured: "Cloud storage is not configured",
+        optOutHint: "Skip cloud storage (you can configure it later in the interface panel)",
+        requiresTosOpen: "Activate Volcano TOS in the console first",
+        probing: "Checking cloud storage activation…",
         standardStoragePrice: "Standard storage",
         publicEgressPrice: "Public egress traffic",
         pricingDoc: "View official TOS pricing",
@@ -1473,11 +1747,25 @@ export const en = {
         trafficPack: "Traffic pack",
         usageRemaining: "{{remaining}} / {{total}} remaining",
         saved: "Cloud storage settings saved",
+        saveFailed: "Failed to save cloud storage settings",
+        loadFailed: "Failed to load bucket list",
+        authErrorHint:
+          "This Access Key lacks TOS permissions. Grant TOSFullAccess or tos:ListBuckets to the IAM user.",
+        notOpened: {
+          prefix: "Volcano TOS is not enabled yet. Open ",
+          link: "Volcano TOS console",
+          suffix: " to activate the service, then configure cloud storage.",
+          saveSkipped:
+            "Interface saved. Cloud storage was skipped because TOS is not enabled.",
+          configureBlocked:
+            "TOS is not enabled. Activate it in the console before saving.",
+        },
         disabled: "Cloud storage disabled",
         impactTitle: "Enabling cloud storage affects the canvas",
         impactDescription:
           "When enabled, AI-generated images and videos in workflows are written to cloud storage. Disabling or changing settings may break display of existing canvas assets.",
         setupRegionTitle: "Select region",
+        setupTitle: "Configure cloud storage",
         setupRegionHint: "Choose the object storage region.",
         setupBucketTitle: "Select bucket",
         setupConfirmTitle: "Confirm settings",
@@ -1503,6 +1791,7 @@ export const en = {
         wizardStepTitle: "Cloud storage (optional)",
         wizardStepHint:
           "We recommend cloud storage to persist AI-generated images and videos. You can skip and configure later in the interface panel.",
+        wizardSaveHint: "Cloud storage settings will be saved with the interface.",
         wizardSkip: "Skip",
         regions: {
           guangzhou: "Guangzhou",
@@ -1514,6 +1803,12 @@ export const en = {
       },
       prioritySettings: "Interface priority",
       priorityDialogTitle: "Model interface priority",
+      priorityDialogDescription:
+        "When the same model is enabled on multiple brand interfaces, set which channel is tried first.",
+      priorityEmpty:
+        "No models need priority settings (at least two brands must enable the same model).",
+      priorityBrandCount: "{{count}} brands",
+      priorityBrandOrder: "Brand order (higher = tried first)",
       selectModel: "Select model",
       prioritySaved: "Interface priority saved",
       prioritySaveFailed: "Failed to save interface priority",
@@ -1643,7 +1938,7 @@ export const en = {
       editSlackDescription: "Update your Slack bot settings.",
       editWhatsAppTitle: "Edit WhatsApp Account",
       editWhatsAppDescription: "Update your WhatsApp Business API settings.",
-      displayNameHint: "A display name for this account in Dafthunk.",
+      displayNameHint: "A display name for this account in z3cz.com.",
       appSecretHint:
         "Found at Apps > App Settings > Basic in the Meta Developer Portal.",
       accessTokenHint:
@@ -1707,9 +2002,9 @@ export const en = {
         createBotFailed: "Failed to create bot",
         createAccountFailed: "Failed to create account",
         botNameHint:
-          "A display name for this bot in Dafthunk. This is not visible to your {{platform}} users.",
+          "A display name for this bot in z3cz.com. This is not visible to your {{platform}} users.",
         accountNameHint:
-          "A display name for this account in Dafthunk. This is not visible to your WhatsApp users.",
+          "A display name for this account in z3cz.com. This is not visible to your WhatsApp users.",
         triggers: {
           receiveDiscordMessage: "Receive Discord Message",
           receiveTelegramMessage: "Receive Telegram Message",
@@ -1736,7 +2031,7 @@ export const en = {
             name: {
               title: "Create a Discord Bot",
               description:
-                "Choose a display name to identify this Discord bot in Dafthunk.",
+                "Choose a display name to identify this Discord bot in z3cz.com.",
             },
             application: {
               title: "Application Info",
@@ -1789,7 +2084,7 @@ export const en = {
             name: {
               title: "Create a Telegram Bot",
               description:
-                "Choose a display name to identify this Telegram bot in Dafthunk.",
+                "Choose a display name to identify this Telegram bot in z3cz.com.",
             },
             botToken: {
               title: "Bot Token",
@@ -1811,7 +2106,7 @@ export const en = {
             name: {
               title: "Create a Slack Bot",
               description:
-                "Choose a display name to identify this Slack bot in Dafthunk.",
+                "Choose a display name to identify this Slack bot in z3cz.com.",
             },
             signingSecret: {
               title: "Signing Secret",
@@ -1858,7 +2153,7 @@ export const en = {
             name: {
               title: "Add a WhatsApp Account",
               description:
-                "Choose a display name to identify this WhatsApp account in Dafthunk.",
+                "Choose a display name to identify this WhatsApp account in z3cz.com.",
             },
             appSecret: {
               title: "App Secret",
@@ -1905,13 +2200,14 @@ export const en = {
       },
     },
     members: {
-      title: "Members",
-      loadingTitle: "Organization Members",
-      description: "Manage organization members and invitations.",
-      inviteButton: "Invite Member",
+      title: "Sub-accounts",
+      loadingTitle: "Sub-accounts",
+      description: "Invite sub-accounts and manage their permissions.",
+      ownerOnly: "Only the organization owner can manage sub-accounts.",
+      inviteButton: "Invite sub-account",
       tabs: {
-        members: "Members ({{count}})",
-        invitations: "Invitations ({{count}})",
+        members: "Sub-accounts ({{count}})",
+        invitations: "Pending invitations ({{count}})",
       },
       member: "Member",
       role: "Role",
@@ -1919,7 +2215,22 @@ export const en = {
       email: "Email",
       expires: "Expires",
       invitedBy: "Invited By",
-      changeRole: "Change Role",
+      changeRole: "Edit permissions",
+      editPermissions: "Edit permissions",
+      editPermissionsTitle: "Edit sub-account permissions",
+      editPermissionsDescription: "Update permissions for {{name}}.",
+      savePermissions: "Save permissions",
+      permissionsUpdated: "Permissions updated",
+      permissionsUpdateFailed: "Failed to update permissions",
+      permissions: {
+        workflows: "Workflows",
+        viewOnly: "View only",
+        edit: "Edit",
+        executions: "Execution history",
+        modelCalls: "Model call history",
+        aiInterfaces: "AI interfaces",
+        apiKeys: "API keys",
+      },
       removeMember: "Remove Member",
       cancelInvitation: "Cancel invitation",
       emptyMembersTitle: "No members found",
@@ -1927,9 +2238,9 @@ export const en = {
       emptyInvitationsTitle: "No pending invitations",
       emptyInvitationsDescription:
         "Invitations you send will appear here until they are accepted or expire.",
-      inviteTitle: "Invite New Member",
+      inviteTitle: "Invite sub-account",
       inviteDescription:
-        "Send an invitation to join your organization. The recipient will need to accept the invitation to become a member.",
+        "Send an invitation link. The recipient creates an account via the link to join as a sub-account.",
       emailAddress: "Email Address",
       emailPlaceholder: "Enter email address",
       sendInvitation: "Send Invitation",
@@ -1948,8 +2259,7 @@ export const en = {
       keepInvitation: "Keep Invitation",
       cancelInvitationAction: "Cancel Invitation",
       roles: {
-        member: "Member",
-        admin: "Admin",
+        member: "Sub-account",
         owner: "Owner",
       },
       emailRequired: "Email address is required",
@@ -2057,6 +2367,17 @@ export const en = {
       roles: {
         user: "User",
       },
+      organization: "Organization",
+      orgRole: "Organization role",
+      orgRoleHint: "Your role within the current organization workspace.",
+      orgRoles: {
+        owner: "Owner",
+        subAccount: "Sub-account",
+      },
+      orgPermissions: "Organization permissions",
+      orgPermissionsHint: "Features you can access in this organization.",
+      orgPermissionsOwner: "Full access (organization owner)",
+      orgPermissionsNone: "No additional permissions",
       earlyAccessEnabled: "Early access enabled",
       earlyAccessDisabled: "Early access disabled",
       updateFailed: "Failed to update early access setting. Please try again.",
@@ -2067,6 +2388,12 @@ export const en = {
       createButton: "Create Organization",
       id: "ID",
       created: "Created",
+      renameOrganization: "Rename Organization",
+      renameDialogTitle: "Rename Organization",
+      renameDialogDescription:
+        "Choose a new name for this organization. This will update it everywhere in the console.",
+      renamedToast: "Organization renamed successfully",
+      renameFailed: "Failed to rename organization. Please try again.",
       deleteOrganization: "Delete Organization",
       emptyTitle: "No organizations found",
       emptyDescription: "Create your first organization to get started.",
@@ -2210,6 +2537,22 @@ export const en = {
       title: "Workflow Properties",
       errorSection: "Error",
     },
+    runConfig: {
+      title: "Run Configuration",
+      executionMode: "Execution Mode",
+      runAs: "Run As",
+      confirm: "Start Run",
+      runAsOptions: {
+        manual: {
+          title: "Manual",
+          description: "Run the canvas directly",
+        },
+        http_request: {
+          title: "HTTP Request",
+          description: "Simulate HTTP trigger parameters",
+        },
+      },
+    },
     execution: {
       errorTitle: "Workflow Execution Error",
       errorDescription:
@@ -2231,13 +2574,23 @@ export const en = {
         "Generation parameters are invalid for this model. Adjust them and retry",
       localReferenceUnsupported:
         "Local browser-only references cannot be used in workflow runs. Generate from the canvas panel instead",
+      cloudUploadFailed:
+        "Cloud upload failed. Check bucket CORS and try again",
+      cloudUploadFailedSavedLocally:
+        "Cloud upload failed. The file was saved locally in this browser",
+      cloudStorageUnavailable:
+        "Cloud storage is unavailable. Check AI interface storage settings",
       generic: "Generation failed: {{detail}}",
+      viewDetails: "Details",
+      detailTitle: "Error details",
+      doubleClickDetailHint: "Double-click for full error details",
     },
     canvas: {
       addNode: "Add Node",
       aiText: "Text",
       aiImage: "Image",
       aiVideo: "Video",
+      aiAudio: "Audio",
       agent: "Agent",
       showAgent: "Show Agent",
       hideAgent: "Hide Agent",
@@ -2482,15 +2835,6 @@ export const en = {
       workflowNamePlaceholder: "Enter workflow name",
       workflowDescription: "Description (Optional)",
       workflowDescriptionPlaceholder: "Describe what you are building",
-      triggerType: "Trigger Type",
-      selectTrigger: "Select trigger type",
-      executionMode: "Execution Mode",
-      selectRuntime: "Select execution mode",
-      billingMode: "Billing Mode",
-      selectBillingMode: "Select billing mode",
-      billingPlatform: "Platform credits",
-      billingUpstream: "Upstream billing",
-      enabled: "Enabled",
     },
     archivedNodes: {
       banner:
@@ -2599,6 +2943,7 @@ export const en = {
       injectEmpty: "This text reference has no content to insert.",
       injectExceedsPrompt: "Inserting would exceed the prompt length limit.",
       modelRecent: "Recent",
+      modelPickerTitle: "Models",
       modelGroupOther: "Other",
     },
     aiCloudStorageBanner: {
@@ -2606,6 +2951,42 @@ export const en = {
       description:
         "Cloud storage is not configured. Images and videos use temporary links that may stop working after about 1 hour. Download promptly or use local cache (bottom-left).",
       configure: "Configure cloud storage",
+      autoFixing: {
+        title: "Attempting to auto-fix cloud storage",
+        description:
+          "A browser direct-upload issue was detected. Configuring CORS rules automatically, please wait…",
+      },
+      degraded: {
+        title: "Cloud storage is temporarily degraded",
+        description:
+          "Generation is still allowed, but uploads may fail. Repeated failures will block new tasks until storage recovers.",
+      },
+      unhealthy: {
+        title: "Cloud storage is unavailable",
+        description:
+          "New image and video generation is blocked until cloud storage is healthy again. In-progress tasks may be cancelled.",
+        serviceNotOpened: "Cloud storage service is not enabled",
+        serviceNotOpenedDescription:
+          "Enable Volcano TOS for this account, then verify credentials in AI interfaces.",
+        authInvalid: "Cloud storage credentials are invalid",
+        authInvalidDescription:
+          "Update the access key and secret on your volcano interface, then save again.",
+        bucketMissing: "Configured storage bucket was not found",
+        bucketMissingDescription:
+          "Check the bucket name in AI interfaces or create the bucket in TOS.",
+        quotaExceeded: "Cloud storage quota is full",
+        quotaExceededDescription:
+          "Free space or upgrade your TOS plan, then retry generation.",
+        accountSuspended: "Cloud storage account is suspended",
+        accountSuspendedDescription:
+          "Resolve billing or account issues with Volcano Engine, then refresh storage status.",
+        permissionDenied: "Cloud storage permissions are insufficient",
+        permissionDeniedDescription:
+          "Grant the configured keys permission to read and write the selected bucket.",
+        corsNotConfigured: "Bucket CORS is not configured for browser upload",
+        corsNotConfiguredDescription:
+          "Save cloud storage again in AI interfaces or run repair to allow direct browser upload.",
+      },
     },
     aiMediaCache: {
       barLabel: "AI cache",
@@ -2622,7 +3003,7 @@ export const en = {
       browserQuota: "Browser quota ~{{quota}}",
       selectAll: "Select all",
       empty: "No cached files",
-      workflowCounts: "{{total}} items ({{images}} images · {{videos}} videos) · {{size}}",
+      workflowCounts: "{{total}} items ({{images}} images · {{videos}} videos · {{audios}} audio) · {{size}}",
       clearSelected: "Clear selected",
       clearAll: "Clear all",
       confirmTitle: "Clear local cache?",
@@ -2631,8 +3012,10 @@ export const en = {
       confirmAction: "Clear",
       imageUnavailable: "Image unavailable (link expired or not cached locally)",
       videoUnavailable: "Video unavailable (link expired or not cached locally)",
+      audioUnavailable: "Audio unavailable (link expired or not cached locally)",
       entryImage: "Image",
       entryVideo: "Video",
+      entryAudio: "Audio",
       downloadSelected: "Download selected ({{count}})",
       downloading: "Downloading…",
       downloadWarningTitle: "Download only as a last resort",
@@ -2650,6 +3033,9 @@ export const en = {
       selectModel: "Select model…",
       generate: "Generate",
       generating: "Generating…",
+      persistDownloading: "Downloading…",
+      persistUploading: "Uploading…",
+      serverPersisting: "Saving on server…",
       generated: "Images generated",
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt to generate",
@@ -2663,10 +3049,19 @@ export const en = {
       outputPlaceholder: "Generated images appear here…",
       cardUploadPlaceholder: "Double-click to upload an image…",
       cardGenerating: "Generating…",
+      cardDownloading: "Downloading…",
+      cardUploading: "Uploading…",
+      cardServerPersisting: "Saving on server…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local image replaces AI generation setup. The current prompt will be cleared. Continue?",
       cardUploadClearPromptConfirm: "Upload anyway",
+      cardUploadBlockedCloud:
+        "Configure cloud storage in AI & Resource APIs before uploading.",
+      cardUploadReplaceNotAllowed:
+        "Clear the current output before uploading a replacement.",
+      cardUploadCloudFailedSavedLocally:
+        "Cloud upload failed. The file was saved locally in this browser.",
       enableModelsHint: "Enable this model under AI & Resource APIs.",
       openAiInterfaces: "Open settings",
       historyTitle: "Generation history",
@@ -2698,6 +3093,9 @@ export const en = {
       selectModel: "Select model…",
       generate: "Generate",
       generating: "Generating…",
+      persistDownloading: "Downloading…",
+      persistUploading: "Uploading…",
+      serverPersisting: "Saving on server…",
       generated: "Video generated",
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt to generate",
@@ -2711,10 +3109,19 @@ export const en = {
       outputPlaceholder: "Generated videos appear here…",
       cardUploadPlaceholder: "Double-click to upload a video…",
       cardGenerating: "Generating…",
+      cardDownloading: "Downloading…",
+      cardUploading: "Uploading…",
+      cardServerPersisting: "Saving on server…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local video replaces AI generation setup. The current prompt will be cleared. Continue?",
       cardUploadClearPromptConfirm: "Upload anyway",
+      cardUploadBlockedCloud:
+        "Configure cloud storage in AI & Resource APIs before uploading.",
+      cardUploadReplaceNotAllowed:
+        "Clear the current output before uploading a replacement.",
+      cardUploadCloudFailedSavedLocally:
+        "Cloud upload failed. The file was saved locally in this browser.",
       enableModelsHint: "Enable this model under AI & Resource APIs.",
       openAiInterfaces: "Open settings",
       historyTitle: "Generation history",
@@ -2753,6 +3160,55 @@ export const en = {
       captureCurrentFrame: "Current frame",
       captureFrameSuccess: "Created image node “{{nodeName}}”",
       captureFrameFailed: "Failed to capture frame",
+    },
+    aiAudioPanel: {
+      promptTitle: "Prompt",
+      promptPlaceholder: "Describe the speech you want to generate…",
+      selectModel: "Select model…",
+      generate: "Generate",
+      generating: "Generating…",
+      persistDownloading: "Downloading…",
+      persistUploading: "Uploading…",
+      serverPersisting: "Saving on server…",
+      generated: "Audio generated",
+      generateFailed: "Generation failed",
+      promptRequired: "Enter a prompt to generate",
+      referencedPromptEmpty:
+        "The linked text node has no content yet. Add or generate text there first",
+      referencedPromptTooLong:
+        "The linked prompt exceeds this model's {{max}}-character limit. Shorten the upstream text node",
+      outputTitle: "Output",
+      cardUploadPlaceholder: "Double-click to upload audio…",
+      cardGenerating: "Generating…",
+      cardDownloading: "Downloading…",
+      cardUploading: "Uploading…",
+      cardServerPersisting: "Saving on server…",
+      cardUploadClearPromptTitle: "Upload will clear the prompt",
+      cardUploadClearPromptDescription:
+        "Uploading a local audio file replaces AI generation setup. The current prompt will be cleared. Continue?",
+      cardUploadClearPromptConfirm: "Upload anyway",
+      cardUploadBlockedCloud:
+        "Configure cloud storage in AI & Resource APIs before uploading.",
+      cardUploadReplaceNotAllowed:
+        "Clear the current output before uploading a replacement.",
+      cardUploadCloudFailedSavedLocally:
+        "Cloud upload failed. The file was saved locally in this browser.",
+      enableModelsHint: "Enable this model under AI & Resource APIs.",
+      openAiInterfaces: "Open settings",
+      pickCanvasNode: "Pick from canvas",
+      noPickableNodes: "No compatible nodes on the canvas.",
+      referenceRejected: "This reference is not allowed for the current model.",
+      params: "Params",
+      paramsTitle: "Voice parameters",
+      selectEmotion: "Select emotion…",
+      linkPrompt: "Link prompt from canvas",
+      pickPromptNode: "Pick text node for prompt",
+      promptReferenceEditHint:
+        "Edit the linked “{{nodeName}}” node’s output to use it as the prompt",
+      promptReferenceEditHintFallback: "upstream AI text",
+      play: "Play",
+      pause: "Pause",
+      download: "Download",
     },
     widgets: {
       schema: {

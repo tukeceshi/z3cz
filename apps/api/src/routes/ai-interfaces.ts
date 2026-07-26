@@ -6,6 +6,8 @@ import type {
   UpdateOrganizationAiInterfaceRequest,
   VolcanoProbeActivationResponse,
   VolcanoProbeCredentialsRequest,
+  VolcanoProbeTosBucketsResponse,
+  VolcanoSnapshotFetchResponse,
   VolcanoSnapshotResponse,
 } from "@dafthunk/types";
 import {
@@ -18,6 +20,9 @@ import { z } from "zod";
 
 import { jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
+import {
+  requireAiInterfacesAccess,
+} from "../middleware/org-permissions";
 import { createDatabase } from "../db";
 import {
   createOrganizationAiInterface,
@@ -34,7 +39,15 @@ import {
 } from "../utils/encryption-errors";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { getVolcanoArkApiKey } from "../integrations/volcengine/get-api-key";
+import { issueVolcanoArkApiKeyForInterface } from "../integrations/volcengine/issue-volcano-api-key";
+import {
+  isVolcanoArkNotOpenedError,
+  isAiInterfaceNameConflictError,
+  VOLCANO_ARK_NOT_OPENED_CODE,
+  AI_INTERFACE_NAME_CONFLICT_CODE,
+} from "../integrations/volcengine/errors";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
+import { encryptDeferredVolcanoArkApiKey } from "../integrations/volcengine/deferred-api-key";
 import { toVolcanoCatalogEntriesFromPlatform } from "../services/resolve-text-model-interface";
 import {
   createVolcanoMetadata,
@@ -45,14 +58,47 @@ import {
   resolveVolcanoCatalogEntries,
   serializeInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
+import {
+  mergeSingleModelModelEnabledMetadata,
+  mergeSingleModelUpstreamModelIdsMetadata,
+  parseSingleModelMetadata,
+} from "../integrations/single-model/metadata";
 import { probeVolcanoModelsActivation } from "../integrations/volcengine/probe-model-activation";
+import { buildVolcanoPackageUsageMap } from "../integrations/volcengine/aggregate-package-usage";
+import { fetchVolcanoResourcePackages } from "../integrations/volcengine/list-resource-packages";
+import { indexResourcePackagesByConfigurationCode } from "../integrations/volcengine/parse-resource-packages";
+import {
+  buildVolcanoProbeResultsFromPackages,
+  enrichVolcanoProbeResultsWithPackages,
+  hasProvisionedVolcanoPackageModels,
+  normalizeVolcanoWizardProbeResults,
+} from "../integrations/volcengine/resolve-volcano-activation";
 import { buildVolcanoSnapshot } from "../integrations/volcengine/snapshot";
+import { seedVolcanoPackageListCache } from "../integrations/volcengine/seed-volcano-package-list-cache";
 import { VOLCANO_ARK_INFERENCE_BASE_URL } from "../integrations/volcengine/constants";
 import { defaultBaseUrlForProvider } from "@dafthunk/runtime/ai-interface/builtin-artifact";
 import { mergeVolcanoTosStorage } from "../services/resolve-org-cloud-storage";
+import { refreshOrgCloudStorageHealthAfterConfigChange } from "../services/assert-cloud-storage-healthy-for-generative-media";
+import {
+  ensureOrgDirectUploadCors,
+  readOrgDirectUploadCorsStatus,
+} from "../services/ensure-direct-upload-cors";
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
+import {
+  probeVolcanoTosServiceStatus,
+} from "../integrations/volcengine/probe-volcano-tos-service";
+import {
+  isVolcanoTosNotOpenedError,
+  VOLCANO_TOS_NOT_OPENED_CODE,
+} from "../integrations/volcengine/tos-errors";
 import { getVolcanoCredentials } from "../integrations/volcengine/ensure-api-key";
+import { ensureVolcanoTosBucketCreated } from "../integrations/volcengine/create-volcano-tos-bucket";
 import { VOLCANO_TOS_DEFAULT_PREFIX } from "@dafthunk/types";
+import {
+  mergeApiKeyHintIntoMetadata,
+  readApiKeyHint,
+  withApiKeyHint,
+} from "../utils/api-key-hint";
 
 function mapAiInterfaceError(
   c: { json: (body: unknown, status?: number) => Response },
@@ -66,6 +112,13 @@ function mapAiInterfaceError(
     );
   }
 
+  if (isVolcanoArkNotOpenedError(error)) {
+    return c.json(
+      { error: error.message, code: VOLCANO_ARK_NOT_OPENED_CODE },
+      400
+    );
+  }
+
   const message = error instanceof Error ? error.message : fallbackMessage;
   const status = message === "AI interface not found" ? 404 : 400;
   return c.json({ error: message }, status);
@@ -74,6 +127,7 @@ function mapAiInterfaceError(
 const aiInterfaceRoutes = new Hono<ApiContext>();
 
 aiInterfaceRoutes.use("*", jwtMiddleware);
+aiInterfaceRoutes.use("*", requireAiInterfacesAccess());
 aiInterfaceRoutes.use("*", createRequireFeatureMiddleware("ai-interfaces"));
 
 const providerSchema = z.enum(
@@ -152,6 +206,8 @@ const updateSchema = z
     selectedModel: z.string().nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     volcanoModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    singleModelModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    singleModelUpstreamModelIds: z.record(z.string(), z.string()).optional(),
     tosStorage: z
       .object({
         enabled: z.boolean(),
@@ -181,6 +237,12 @@ const probeCredentialsSchema = z.object({
   canonicalIds: z.array(z.string()).optional(),
 }) satisfies z.ZodType<VolcanoProbeCredentialsRequest>;
 
+const probeTosBucketsSchema = z.object({
+  accessKeyId: z.string().trim().min(1),
+  secretAccessKey: z.string().trim().min(1),
+  region: z.string().trim().min(1),
+});
+
 const probeActivationSchema = z.object({
   canonicalIds: z.array(z.string()).optional(),
 });
@@ -204,14 +266,24 @@ aiInterfaceRoutes.get("/:id/volcano-snapshot", async (c) => {
   const refreshPackages = c.req.query("refreshPackages") === "1";
 
   try {
-    const snapshot = await buildVolcanoSnapshot({
+    const result = await buildVolcanoSnapshot({
       env: c.env,
       organizationId,
       interfaceId: id,
       refreshPackages,
     });
-    return c.json({ snapshot } satisfies { snapshot: VolcanoSnapshotResponse });
+    return c.json({
+      snapshot: result.snapshot,
+      ...(result.refreshLimited ? { refreshLimited: true } : {}),
+      ...(result.nextRefreshAt ? { nextRefreshAt: result.nextRefreshAt } : {}),
+    } satisfies VolcanoSnapshotFetchResponse);
   } catch (error) {
+    if (isVolcanoArkNotOpenedError(error)) {
+      return c.json(
+        { error: error.message, code: VOLCANO_ARK_NOT_OPENED_CODE },
+        400
+      );
+    }
     const message =
       error instanceof Error ? error.message : "Failed to fetch volcano snapshot";
     console.error("Error fetching volcano snapshot:", error);
@@ -249,17 +321,50 @@ aiInterfaceRoutes.get("/:id/tos-buckets", async (c) => {
       return c.json({ error: "Volcano credentials not configured" }, 400);
     }
 
-    const client = VolcengineTosClient.forRegion({
+    const result = await probeVolcanoTosServiceStatus({
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
       region,
     });
-    const buckets = await client.listBuckets();
-    return c.json({ buckets });
+    return c.json(result satisfies VolcanoProbeTosBucketsResponse);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to list TOS buckets";
     console.error("Error listing TOS buckets:", error);
+    return c.json({ error: message }, 400);
+  }
+});
+
+aiInterfaceRoutes.post("/:id/ensure-tos-cors", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const id = c.req.param("id");
+  const db = createDatabase(c.env);
+
+  try {
+    const existing = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    if (!existing) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+
+    const applied = await ensureOrgDirectUploadCors(c.env, organizationId);
+    const health = await refreshOrgCloudStorageHealthAfterConfigChange(
+      c.env,
+      organizationId
+    );
+    const corsStatus = await readOrgDirectUploadCorsStatus(c.env, organizationId);
+
+    return c.json({
+      applied: applied.applied,
+      origins: applied.origins,
+      configured: corsStatus.configured,
+      health,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to configure bucket CORS";
+    console.error("Error ensuring TOS CORS:", error);
     return c.json({ error: message }, 400);
   }
 });
@@ -272,11 +377,11 @@ aiInterfaceRoutes.post(
     const db = createDatabase(c.env);
 
     try {
-      const issued = await getVolcanoArkApiKey({
+      const credentials = {
         accessKeyId: body.accessKeyId,
         secretAccessKey: body.secretAccessKey,
-        region: "cn-beijing",
-      });
+        region: "cn-beijing" as const,
+      };
       const platformModels = await listPlatformAiModels(db);
       const catalogEntries =
         toVolcanoCatalogEntriesFromPlatform(platformModels);
@@ -284,17 +389,90 @@ aiInterfaceRoutes.post(
         body.canonicalIds,
         catalogEntries
       );
-      const results = await probeVolcanoModelsActivation({
-        apiKey: issued.apiKey,
-        entries,
+
+      const packageFetch = await fetchVolcanoResourcePackages({
+        credentials,
+        mode: "metering",
+      }).catch(() => null);
+      const packagesByCode = packageFetch
+        ? indexResourcePackagesByConfigurationCode(packageFetch.rows)
+        : new Map();
+      const { packageByCanonicalId } = buildVolcanoPackageUsageMap({
+        catalog: entries,
+        packagesByCode,
       });
-      return c.json({ results } satisfies VolcanoProbeActivationResponse);
+
+      let issued: Awaited<ReturnType<typeof getVolcanoArkApiKey>> | null = null;
+      try {
+        issued = await getVolcanoArkApiKey(credentials);
+      } catch (error) {
+        if (!isVolcanoArkNotOpenedError(error)) {
+          throw error;
+        }
+        if (hasProvisionedVolcanoPackageModels(packageByCanonicalId)) {
+          const results = normalizeVolcanoWizardProbeResults(
+            buildVolcanoProbeResultsFromPackages({
+              entries,
+              packageByCanonicalId,
+            })
+          );
+          return c.json({ results } satisfies VolcanoProbeActivationResponse);
+        }
+        throw error;
+      }
+
+      const [probeResults] = await Promise.all([
+        probeVolcanoModelsActivation({
+          apiKey: issued.apiKey,
+          entries,
+        }),
+      ]);
+
+      let results = probeResults;
+      if (packageFetch) {
+        results = enrichVolcanoProbeResultsWithPackages({
+          results: probeResults,
+          packageByCanonicalId,
+        });
+      }
+
+      return c.json({
+        results: normalizeVolcanoWizardProbeResults(results),
+      } satisfies VolcanoProbeActivationResponse);
     } catch (error) {
+      if (isVolcanoArkNotOpenedError(error)) {
+        return c.json(
+          { error: error.message, code: VOLCANO_ARK_NOT_OPENED_CODE },
+          400
+        );
+      }
       const message =
         error instanceof Error
           ? error.message
           : "Failed to probe model activation";
       console.error("Error probing volcano credentials:", error);
+      return c.json({ error: message }, 400);
+    }
+  }
+);
+
+aiInterfaceRoutes.post(
+  "/volcano-probe-tos-buckets",
+  zValidator("json", probeTosBucketsSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+
+    try {
+      const result = await probeVolcanoTosServiceStatus({
+        accessKeyId: body.accessKeyId,
+        secretAccessKey: body.secretAccessKey,
+        region: body.region,
+      });
+      return c.json(result satisfies VolcanoProbeTosBucketsResponse);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to list TOS buckets";
+      console.error("Error probing TOS buckets:", error);
       return c.json({ error: message }, 400);
     }
   }
@@ -327,10 +505,10 @@ aiInterfaceRoutes.post(
         apiKeyEncrypted: row.apiKeyEncrypted,
       });
 
-      if (ensured.renewed) {
+      if (ensured.renewed || ensured.metadataChanged) {
         await updateOrganizationAiInterface(db, organizationId, row.id, {
           metadata: ensured.metadataRaw,
-          apiKeyEncrypted: ensured.apiKeyEncrypted,
+          ...(ensured.renewed ? { apiKeyEncrypted: ensured.apiKeyEncrypted } : {}),
         });
       }
 
@@ -341,10 +519,58 @@ aiInterfaceRoutes.post(
         body.canonicalIds,
         catalogEntries
       );
-      const results = await probeVolcanoModelsActivation({
-        apiKey: ensured.apiKey,
-        entries,
-      });
+
+      const credentials = await getVolcanoCredentials(
+        c.env,
+        organizationId,
+        row.metadata
+      );
+      if (!credentials) {
+        return c.json({ error: "Volcano credentials not configured" }, 400);
+      }
+
+      let results;
+      if (ensured.apiKey) {
+        results = await probeVolcanoModelsActivation({
+          apiKey: ensured.apiKey,
+          entries,
+        });
+
+        const packageFetch = await fetchVolcanoResourcePackages({
+          credentials,
+          mode: "metering",
+        }).catch(() => null);
+
+        if (packageFetch) {
+          const packagesByCode = indexResourcePackagesByConfigurationCode(
+            packageFetch.rows
+          );
+          const { packageByCanonicalId } = buildVolcanoPackageUsageMap({
+            catalog: entries,
+            packagesByCode,
+          });
+          results = enrichVolcanoProbeResultsWithPackages({
+            results,
+            packageByCanonicalId,
+          });
+        }
+      } else {
+        const packageFetch = await fetchVolcanoResourcePackages({
+          credentials,
+          mode: "metering",
+        });
+        const packagesByCode = indexResourcePackagesByConfigurationCode(
+          packageFetch.rows
+        );
+        const { packageByCanonicalId } = buildVolcanoPackageUsageMap({
+          catalog: entries,
+          packagesByCode,
+        });
+        results = buildVolcanoProbeResultsFromPackages({
+          entries,
+          packageByCanonicalId,
+        });
+      }
 
       const nextMetadata = mergeVolcanoActivationCache(
         metadata,
@@ -374,6 +600,7 @@ aiInterfaceRoutes.get("/:id", async (c) => {
       return c.json({ error: "AI interface not found" }, 404);
     }
 
+    const metadata = row.metadata ? parseInterfaceMetadata(row.metadata) : null;
     const iface: OrganizationAiInterface = {
       id: row.id,
       organizationId: row.organizationId,
@@ -386,7 +613,8 @@ aiInterfaceRoutes.get("/:id", async (c) => {
       enabled: row.enabled,
       isDefault: row.isDefault,
       hasApiKey: row.apiKeyEncrypted.length > 0,
-      metadata: row.metadata ? parseInterfaceMetadata(row.metadata) : null,
+      apiKeyHint: readApiKeyHint(metadata),
+      metadata,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -431,20 +659,40 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
             catalogEntries
           )
         : metadata;
-      const issued = await getVolcanoArkApiKey({
+      const credentials = {
         accessKeyId: body.accessKeyId!,
         secretAccessKey: body.secretAccessKey!,
         region: metadataWithActivation.region,
+      };
+      const issued = await issueVolcanoArkApiKeyForInterface({
+        credentials,
+        catalogEntries,
       });
-      metadataRaw = serializeInterfaceMetadata({
-        ...metadataWithActivation,
-        arkApiKeyExpiresAt: issued.expiresAt,
-      });
-      apiKeyEncrypted = await encryptSecret(
-        issued.apiKey,
-        c.env,
-        organizationId
-      );
+      if (issued) {
+        metadataRaw = serializeInterfaceMetadata(
+          withApiKeyHint(
+            {
+              ...metadataWithActivation,
+              arkApiKeyExpiresAt: issued.expiresAt,
+            },
+            issued.apiKey
+          )
+        );
+        apiKeyEncrypted = await encryptSecret(
+          issued.apiKey,
+          c.env,
+          organizationId
+        );
+      } else {
+        metadataRaw = serializeInterfaceMetadata({
+          ...metadataWithActivation,
+          arkApiKeyPending: true,
+        });
+        apiKeyEncrypted = await encryptDeferredVolcanoArkApiKey(
+          c.env,
+          organizationId
+        );
+      }
       baseUrl = body.baseUrl ?? VOLCANO_ARK_INFERENCE_BASE_URL;
     } else {
       apiKeyEncrypted = await encryptSecret(
@@ -452,9 +700,12 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
         c.env,
         organizationId
       );
-      metadataRaw = body.metadata
-        ? serializeInterfaceMetadata(body.metadata)
-        : null;
+      metadataRaw = serializeInterfaceMetadata(
+        mergeApiKeyHintIntoMetadata(
+          (body.metadata as Record<string, unknown> | undefined) ?? undefined,
+          body.apiKey!
+        )
+      );
     }
 
     const iface = await createOrganizationAiInterface(db, organizationId, {
@@ -469,8 +720,54 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
       metadata: metadataRaw,
     });
 
+    if (isVolcanoAiInterfaceProvider(provider)) {
+      try {
+        await seedVolcanoPackageListCache({
+          env: c.env,
+          organizationId,
+          interfaceId: iface.id,
+        });
+        const refreshed = await getOrganizationAiInterfaceRow(
+          db,
+          organizationId,
+          iface.id
+        );
+        if (refreshed) {
+          return c.json(
+            {
+              interface: {
+                ...iface,
+                metadata: refreshed.metadata
+                  ? parseInterfaceMetadata(refreshed.metadata)
+                  : iface.metadata,
+                updatedAt: refreshed.updatedAt.toISOString(),
+              },
+            },
+            201
+          );
+        }
+      } catch (error) {
+        console.error("Failed to seed volcano package list cache:", error);
+      }
+    }
+
     return c.json({ interface: iface }, 201);
   } catch (error) {
+    if (isVolcanoArkNotOpenedError(error)) {
+      return c.json(
+        { error: error.message, code: VOLCANO_ARK_NOT_OPENED_CODE },
+        400
+      );
+    }
+    if (isAiInterfaceNameConflictError(error)) {
+      return c.json(
+        {
+          error: "An AI interface with this name already exists in the organization",
+          code: AI_INTERFACE_NAME_CONFLICT_CODE,
+        },
+        409
+      );
+    }
     const message =
       error instanceof Error ? error.message : "Failed to create AI interface";
     console.error("Error creating organization AI interface:", error);
@@ -523,6 +820,48 @@ aiInterfaceRoutes.patch(
         );
       }
 
+      if (body.singleModelModelEnabled) {
+        const current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        metadataUpdate = mergeSingleModelModelEnabledMetadata(
+          current,
+          body.singleModelModelEnabled
+        );
+      }
+
+      if (body.singleModelUpstreamModelIds) {
+        for (const modelId of Object.values(body.singleModelUpstreamModelIds)) {
+          if (!modelId.trim()) {
+            return c.json({ error: "Model ID cannot be empty" }, 400);
+          }
+        }
+        const current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        metadataUpdate = mergeSingleModelUpstreamModelIdsMetadata(
+          current,
+          body.singleModelUpstreamModelIds
+        );
+      }
+
+      if (body.apiKey !== undefined) {
+        const baseMetadata =
+          metadataUpdate ??
+          parseInterfaceMetadata(existing.metadata) ??
+          {};
+        metadataUpdate = mergeApiKeyHintIntoMetadata(
+          baseMetadata as Record<string, unknown>,
+          body.apiKey
+        );
+      }
+
       if (body.tosStorage) {
         const current = parseInterfaceMetadata(existing.metadata);
         if (!isVolcanoMetadata(current)) {
@@ -531,6 +870,8 @@ aiInterfaceRoutes.patch(
         const baseMetadata = isVolcanoMetadata(metadataUpdate)
           ? metadataUpdate
           : current;
+
+        let tosBucket = body.tosStorage.bucket;
 
         if (body.tosStorage.enabled && body.tosStorage.createBucket) {
           const credentials = await getVolcanoCredentials(
@@ -541,17 +882,60 @@ aiInterfaceRoutes.patch(
           if (!credentials) {
             return c.json({ error: "Volcano credentials not configured" }, 400);
           }
+
+          const probe = await probeVolcanoTosServiceStatus({
+            accessKeyId: credentials.accessKeyId,
+            secretAccessKey: credentials.secretAccessKey,
+            region: body.tosStorage.region,
+          });
+          if (probe.status === "not_opened") {
+            return c.json(
+              {
+                error:
+                  probe.message ??
+                  "The account does not open TOS service.",
+                code: VOLCANO_TOS_NOT_OPENED_CODE,
+              },
+              409
+            );
+          }
+          if (probe.status !== "opened") {
+            return c.json(
+              {
+                error: probe.message ?? "Failed to verify TOS access",
+              },
+              400
+            );
+          }
+
           const client = VolcengineTosClient.forRegion({
             accessKeyId: credentials.accessKeyId,
             secretAccessKey: credentials.secretAccessKey,
             region: body.tosStorage.region,
           });
-          await client.createBucket(body.tosStorage.bucket);
+          try {
+            tosBucket = await ensureVolcanoTosBucketCreated({
+              client,
+              bucket: tosBucket,
+              organizationId,
+            });
+          } catch (error) {
+            if (isVolcanoTosNotOpenedError(error)) {
+              return c.json(
+                {
+                  error: error.message,
+                  code: VOLCANO_TOS_NOT_OPENED_CODE,
+                },
+                409
+              );
+            }
+            throw error;
+          }
         }
 
         metadataUpdate = mergeVolcanoTosStorage(baseMetadata, {
           enabled: body.tosStorage.enabled,
-          bucket: body.tosStorage.bucket,
+          bucket: tosBucket,
           region: body.tosStorage.region,
           prefix: VOLCANO_TOS_DEFAULT_PREFIX,
         });
@@ -573,6 +957,13 @@ aiInterfaceRoutes.patch(
             : {}),
         }
       );
+
+      if (body.tosStorage) {
+        await refreshOrgCloudStorageHealthAfterConfigChange(
+          c.env,
+          organizationId
+        );
+      }
 
       return c.json({ interface: iface });
     } catch (error) {

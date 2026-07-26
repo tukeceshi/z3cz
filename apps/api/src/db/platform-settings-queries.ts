@@ -1,9 +1,19 @@
 import type {
+  AdminAuthConfig,
+  AdminLegalDocumentsConfig,
   AppLocale,
+  AuthConfig,
+  HomepageMode,
+  LegalDocumentType,
+  LegalDocumentsConfig,
   PlatformFeatureConfig,
+  PublicAuthConfig,
+  PublicLegalDocumentResponse,
   PublicSiteSettings,
   SiteSettings,
+  UpdateAuthConfigRequest,
   UpdateFeatureConfigRequest,
+  UpdateLegalDocumentsRequest,
   UpdateSiteSettingsRequest,
 } from "@dafthunk/types";
 import {
@@ -12,6 +22,7 @@ import {
 } from "@dafthunk/types";
 import { eq } from "drizzle-orm";
 
+import type { Bindings } from "../context";
 import type { Database } from "./index";
 import {
   PLATFORM_SETTINGS_ID,
@@ -21,17 +32,32 @@ import {
   getWorkflowSchemeById,
   setDefaultWorkflowSchemeById,
 } from "./workflow-scheme-queries";
+import {
+  mergeAuthConfigUpdate,
+  parseAuthConfig,
+  serializeAuthConfig,
+  toAdminAuthConfig,
+  toPublicAuthConfig,
+  validateAuthConfigUpdate,
+} from "../services/auth-config";
+import {
+  getLegalDocument,
+  parseLegalConfig,
+  serializeLegalConfig,
+  toAdminLegalDocumentsConfig,
+} from "../services/legal-documents";
 
 const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
-  siteName: "Dafthunk",
+  siteName: "z3cz.com",
   siteTagline: "Build serverless workflows visually.",
-  defaultLocale: "en",
   supportEmail: null,
+  newUserTourEnabled: true,
+  homepageMode: "console",
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 
-function isAppLocale(value: string): value is AppLocale {
-  return value === "en" || value === "zh";
+function parseHomepageMode(value: string | null | undefined): HomepageMode {
+  return value === "marketing" ? "marketing" : "console";
 }
 
 function parseFeatureConfig(value: string | null): PlatformFeatureConfig {
@@ -59,8 +85,9 @@ function rowToPublicSettings(
   return {
     siteName: row.siteName,
     siteTagline: row.siteTagline,
-    defaultLocale: isAppLocale(row.defaultLocale) ? row.defaultLocale : "en",
     supportEmail: row.supportEmail,
+    newUserTourEnabled: row.newUserTourEnabled,
+    homepageMode: parseHomepageMode(row.homepageMode),
     featureConfig: parseFeatureConfig(row.featureConfig),
   };
 }
@@ -126,14 +153,19 @@ export async function updateSiteSettings(
       input.siteTagline ??
       existing?.siteTagline ??
       DEFAULT_PUBLIC_SETTINGS.siteTagline,
-    defaultLocale:
-      input.defaultLocale ??
-      existing?.defaultLocale ??
-      DEFAULT_PUBLIC_SETTINGS.defaultLocale,
     supportEmail:
       input.supportEmail !== undefined
         ? input.supportEmail
         : (existing?.supportEmail ?? null),
+    newUserTourEnabled:
+      input.newUserTourEnabled ??
+      existing?.newUserTourEnabled ??
+      DEFAULT_PUBLIC_SETTINGS.newUserTourEnabled,
+    homepageMode:
+      input.homepageMode ??
+      (existing
+        ? parseHomepageMode(existing.homepageMode)
+        : DEFAULT_PUBLIC_SETTINGS.homepageMode),
     updatedBy,
     updatedAt: new Date(),
   };
@@ -205,4 +237,182 @@ export async function updateFeatureConfig(
     .returning();
 
   return rowToSiteSettings(row);
+}
+
+export async function getAuthConfig(db: Database): Promise<AuthConfig> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  return parseAuthConfig(row?.authConfig ?? null);
+}
+
+export async function getAdminAuthConfig(db: Database): Promise<AdminAuthConfig> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const config = parseAuthConfig(row?.authConfig ?? null);
+  return toAdminAuthConfig(
+    config,
+    row?.updatedAt.toISOString() ?? new Date(0).toISOString(),
+    row?.updatedBy ?? null
+  );
+}
+
+export async function getPublicAuthConfig(db: Database): Promise<PublicAuthConfig> {
+  const config = await getAuthConfig(db);
+  return toPublicAuthConfig(config);
+}
+
+export async function updateAuthConfig(
+  db: Database,
+  env: Bindings,
+  input: UpdateAuthConfigRequest,
+  updatedBy: string
+): Promise<AdminAuthConfig> {
+  const [existing] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const current = parseAuthConfig(existing?.authConfig ?? null);
+  const next = mergeAuthConfigUpdate(current, input);
+  const validationError = validateAuthConfigUpdate(next, env);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const values = {
+    authConfig: serializeAuthConfig(next),
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    const [row] = await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+      .returning();
+    return toAdminAuthConfig(
+      parseAuthConfig(row.authConfig),
+      row.updatedAt.toISOString(),
+      row.updatedBy
+    );
+  }
+
+  const [row] = await db
+    .insert(platformSettings)
+    .values({
+      id: PLATFORM_SETTINGS_ID,
+      featureConfig: serializeFeatureConfig(DEFAULT_PLATFORM_FEATURE_CONFIG),
+      authConfig: values.authConfig,
+      updatedBy,
+      updatedAt: values.updatedAt,
+    })
+    .returning();
+
+  return toAdminAuthConfig(
+    parseAuthConfig(row.authConfig),
+    row.updatedAt.toISOString(),
+    row.updatedBy
+  );
+}
+
+export async function getLegalDocumentsConfig(
+  db: Database
+): Promise<LegalDocumentsConfig> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  return parseLegalConfig(row?.legalConfig ?? null);
+}
+
+export async function getAdminLegalDocumentsConfig(
+  db: Database
+): Promise<AdminLegalDocumentsConfig> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const config = parseLegalConfig(row?.legalConfig ?? null);
+  return toAdminLegalDocumentsConfig(
+    config,
+    row?.updatedAt.toISOString() ?? new Date(0).toISOString(),
+    row?.updatedBy ?? null
+  );
+}
+
+export async function getPublicLegalDocument(
+  db: Database,
+  type: LegalDocumentType,
+  locale: AppLocale
+): Promise<PublicLegalDocumentResponse> {
+  const config = await getLegalDocumentsConfig(db);
+  return {
+    type,
+    locale,
+    document: getLegalDocument(config, type, locale),
+  };
+}
+
+export async function updateLegalDocumentsConfig(
+  db: Database,
+  input: UpdateLegalDocumentsRequest,
+  updatedBy: string
+): Promise<AdminLegalDocumentsConfig> {
+  const next = parseLegalConfig(JSON.stringify(input.legalConfig));
+
+  const [existing] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const values = {
+    legalConfig: serializeLegalConfig(next),
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    const [row] = await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+      .returning();
+    return toAdminLegalDocumentsConfig(
+      parseLegalConfig(row.legalConfig),
+      row.updatedAt.toISOString(),
+      row.updatedBy
+    );
+  }
+
+  const [row] = await db
+    .insert(platformSettings)
+    .values({
+      id: PLATFORM_SETTINGS_ID,
+      featureConfig: serializeFeatureConfig(DEFAULT_PLATFORM_FEATURE_CONFIG),
+      legalConfig: values.legalConfig,
+      updatedBy,
+      updatedAt: values.updatedAt,
+    })
+    .returning();
+
+  return toAdminLegalDocumentsConfig(
+    parseLegalConfig(row.legalConfig),
+    row.updatedAt.toISOString(),
+    row.updatedBy
+  );
 }

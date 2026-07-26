@@ -22,12 +22,14 @@ import {
   updateSecret,
 } from "../db";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
+import { requireOrganizationOwner } from "../middleware/org-permissions";
 
 // Create a new Hono instance for secrets endpoints
 const secretRoutes = new Hono<ApiContext>();
 
 // Apply authentication middleware to all routes
 secretRoutes.use("*", jwtMiddleware);
+secretRoutes.use("*", requireOrganizationOwner());
 secretRoutes.use("*", createRequireFeatureMiddleware("secrets"));
 
 /**

@@ -1,5 +1,5 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { useNodes } from "@xyflow/react";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import { createElement, useState } from "react";
@@ -10,6 +10,7 @@ import { useTranslation } from "@/components/locale-provider";
 
 import { AiTextConfigPanel } from "./ai-text-config-panel";
 import { AiImageConfigPanel } from "./ai-image-config-panel";
+import { AiAudioConfigPanel } from "./ai-audio-config-panel";
 import { AiVideoConfigPanel } from "./ai-video-config-panel";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
 import { PropertyField } from "./fields";
@@ -62,6 +63,10 @@ export function WorkflowNodeBottomPanel({
 
   if (data.nodeType === AI_VIDEO_NODE_TYPE) {
     return <AiVideoConfigPanel nodeId={nodeId} data={data} />;
+  }
+
+  if (data.nodeType === AI_AUDIO_NODE_TYPE) {
+    return <AiAudioConfigPanel nodeId={nodeId} data={data} />;
   }
 
   if (

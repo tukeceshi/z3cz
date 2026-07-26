@@ -1,4 +1,16 @@
-import { signTosRequest } from "./tos-sign";
+import { parseTosErrorResponse } from "./parse-tos-error";
+import { sha256Hex, signTosRequest } from "./tos-sign";
+import { TosRequestError } from "./tos-errors";
+
+function throwTosRequestError(httpStatus: number, body: string, action: string): never {
+  const parsed = parseTosErrorResponse(httpStatus, body);
+  const detail = parsed.message ?? body.slice(0, 300);
+  throw new TosRequestError({
+    message: `TOS ${action} failed (${httpStatus}): ${detail}`,
+    httpStatus,
+    tosCode: parsed.code,
+  });
+}
 
 export interface VolcengineTosCredentials {
   readonly accessKeyId: string;
@@ -104,8 +116,12 @@ export class VolcengineTosClient {
     readonly endpoint?: string;
     readonly body?: Uint8Array;
     readonly contentType?: string;
+    readonly queryEntries?: readonly (readonly [string, string])[];
   }): Promise<Response> {
     const endpoint = params.endpoint ?? this.endpoint;
+    const payloadHash = params.body
+      ? await sha256Hex(params.body)
+      : undefined;
     const signed = await signTosRequest({
       method: params.method,
       endpoint,
@@ -115,6 +131,8 @@ export class VolcengineTosClient {
       region: this.credentials.region,
       body: params.body,
       contentType: params.contentType,
+      queryEntries: params.queryEntries,
+      payloadHash,
     });
 
     return fetch(signed.url, {
@@ -131,9 +149,7 @@ export class VolcengineTosClient {
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `TOS list buckets failed (${response.status}): ${text.slice(0, 300)}`
-      );
+      throwTosRequestError(response.status, text, "list buckets");
     }
     const payload = await response.text();
     return parseBucketNamesFromListPayload(payload, this.credentials.region);
@@ -146,9 +162,20 @@ export class VolcengineTosClient {
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `TOS create bucket failed (${response.status}): ${text.slice(0, 300)}`
-      );
+      throwTosRequestError(response.status, text, "create bucket");
+    }
+  }
+
+  async headBucket(): Promise<void> {
+    const bucket = this.requireBucket();
+    const response = await this.signedFetch({
+      method: "HEAD",
+      endpoint: buildTosBucketEndpoint(this.credentials.region, bucket),
+      path: "/",
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throwTosRequestError(response.status, text, "head bucket");
     }
   }
 
@@ -180,9 +207,7 @@ export class VolcengineTosClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `TOS upload failed (${response.status}): ${text.slice(0, 300)}`
-      );
+      throwTosRequestError(response.status, text, "put object");
     }
   }
 
@@ -215,7 +240,7 @@ export class VolcengineTosClient {
   buildObjectKey(params: {
     readonly prefix: string;
     readonly workflowId: string;
-    readonly mediaKind: "ai-image" | "ai-video";
+    readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
     readonly objectId: string;
     readonly mimeType: string;
   }): string {

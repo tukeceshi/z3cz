@@ -1,8 +1,18 @@
-import type { ResolvedRuntimeTextModel } from "@dafthunk/runtime";
+import type {
+  ExecuteRuntimeTextModelResult,
+  ResolvedRuntimeTextModel,
+} from "@dafthunk/runtime";
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
-import { resolveTextModelInterface } from "../services/resolve-text-model-interface";
+import { executeTextModel } from "../services/execute-text-model";
+import { disableTextModelOnInterface } from "../services/disable-text-model-on-interface";
+import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
+import {
+  listOrgTextModelOptions,
+  listTextModelInterfaceCandidates,
+  resolveTextModelInterface,
+} from "../services/resolve-text-model-interface";
 
 export class CloudflareTextModelService {
   constructor(private readonly env: Bindings) {}
@@ -26,5 +36,69 @@ export class CloudflareTextModelService {
       interfaceId: resolved.interfaceId,
       providerModelId: resolved.providerModelId,
     };
+  }
+
+  async executeTextModel(params: {
+    organizationId: string;
+    canonicalId: string;
+    effectivePrompt: string;
+  }): Promise<ExecuteRuntimeTextModelResult> {
+    const db = createDatabase(this.env);
+    return executeTextModel({
+      env: this.env,
+      db,
+      organizationId: params.organizationId,
+      canonicalId: params.canonicalId,
+      effectivePrompt: params.effectivePrompt,
+    });
+  }
+
+  async listTextModelCandidates(params: {
+    organizationId: string;
+    canonicalId: string;
+  }) {
+    const db = createDatabase(this.env);
+    return listTextModelInterfaceCandidates(
+      db,
+      params.organizationId,
+      params.canonicalId
+    );
+  }
+
+  async disableTextModelOnInterface(params: {
+    organizationId: string;
+    interfaceId: string;
+    canonicalId: string;
+  }): Promise<boolean> {
+    const db = createDatabase(this.env);
+    return disableTextModelOnInterface(
+      db,
+      params.organizationId,
+      params.interfaceId,
+      params.canonicalId
+    );
+  }
+
+  async resolveTextModelInferenceId(params: {
+    organizationId: string;
+    interfaceId: string;
+    canonicalId: string;
+  }): Promise<string | undefined> {
+    const db = createDatabase(this.env);
+    const catalogProviderModelId = (
+      await listOrgTextModelOptions(db, params.organizationId)
+    ).find((entry) => entry.canonicalId === params.canonicalId)?.providerModelId;
+
+    if (!catalogProviderModelId) {
+      return undefined;
+    }
+
+    return resolveVolcanoInferenceModelIdAfterEnsure({
+      db,
+      organizationId: params.organizationId,
+      interfaceId: params.interfaceId,
+      canonicalId: params.canonicalId,
+      catalogProviderModelId,
+    });
   }
 }

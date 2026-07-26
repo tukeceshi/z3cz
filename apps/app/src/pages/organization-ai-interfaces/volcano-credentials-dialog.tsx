@@ -80,11 +80,7 @@ export function VolcanoCredentialsDialog({
             {t("pages.aiInterfaces.volcano.credentialsDialogTitle")}
           </DialogTitle>
         </DialogHeader>
-        <form
-          className="space-y-4"
-          autoComplete="off"
-          onSubmit={(event) => event.preventDefault()}
-        >
+        <div className="space-y-4">
           <p className="text-muted-foreground text-sm">
             {t("pages.aiInterfaces.volcano.credentialsDialogDescription")}
           </p>
@@ -104,7 +100,7 @@ export function VolcanoCredentialsDialog({
             {t("pages.aiInterfaces.volcano.openIamConsole")}
             <ExternalLink className="size-3.5" />
           </a>
-        </form>
+        </div>
         <DialogFooter>
           <Button
             variant="outline"

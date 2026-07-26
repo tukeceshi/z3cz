@@ -17,6 +17,7 @@ import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
+import { readSingleModelPresetId } from "@dafthunk/types";
 import { decryptSecret } from "../utils/encryption";
 
 export class CloudflareAiInterfaceService implements AiInterfaceService {
@@ -42,11 +43,13 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
     }
 
     const provider = row.provider as AiInterfaceProvider;
+    const singleModelPresetId = readSingleModelPresetId(row.metadata);
     let artifact;
     try {
       artifact = buildBuiltinAiInterfaceArtifact(provider, {
         baseUrl: row.baseUrl,
         defaultModel: row.selectedModel,
+        singleModelPresetId,
       });
     } catch (error) {
       console.error(
@@ -57,8 +60,6 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
     }
 
     try {
-      let apiKeyEncrypted = row.apiKeyEncrypted;
-
       if (isVolcanoMetadata(parseInterfaceMetadata(row.metadata))) {
         const ensured = await ensureVolcanoApiKey({
           env: this.env,
@@ -66,23 +67,36 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
           metadataRaw: row.metadata,
           apiKeyEncrypted: row.apiKeyEncrypted,
         });
-        apiKeyEncrypted = ensured.apiKeyEncrypted;
 
-        if (ensured.renewed) {
+        if (ensured.renewed || ensured.metadataChanged) {
           await updateOrganizationAiInterface(
             db,
             params.organizationId,
             row.id,
             {
               metadata: ensured.metadataRaw,
-              apiKeyEncrypted: ensured.apiKeyEncrypted,
+              ...(ensured.renewed
+                ? { apiKeyEncrypted: ensured.apiKeyEncrypted }
+                : {}),
             }
           );
         }
+
+        if (!ensured.apiKey) {
+          return undefined;
+        }
+
+        return mergeResolvedAiInterface({
+          artifact,
+          interfaceId: row.id,
+          baseUrl: row.baseUrl,
+          selectedModel: row.selectedModel,
+          apiKey: ensured.apiKey,
+        });
       }
 
       const apiKey = await decryptSecret(
-        apiKeyEncrypted,
+        row.apiKeyEncrypted,
         this.env,
         params.organizationId
       );

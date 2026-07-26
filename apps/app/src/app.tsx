@@ -1,8 +1,10 @@
 import {
+  isRouteErrorResponse,
   Outlet,
   ScrollRestoration,
   useLocation,
   useMatches,
+  useRouteError,
 } from "react-router";
 
 import { HeadSeo } from "@/components/head-seo";
@@ -15,15 +17,27 @@ import { RouteHandle } from "./routes";
 
 export function FallbackErrorUI() {
   const { t } = useTranslation();
+  const error = useRouteError();
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : isRouteErrorResponse(error)
+        ? error.statusText || String(error.status)
+        : String(error);
 
   return (
     <main className="h-screen w-screen flex items-center justify-center">
       <div className="relative h-full p-6 overflow-auto">
-        <div className="flex flex-col items-center justify-center h-full">
+        <div className="flex flex-col items-center justify-center h-full max-w-2xl">
           <h1 className="text-2xl font-bold">{t("error.unexpectedTitle")}</h1>
           <p className="text-neutral-500 text-lg mt-2 mb-6">
             {t("error.unexpectedDescription")}
           </p>
+          {import.meta.env.DEV && errorMessage ? (
+            <pre className="mb-6 w-full overflow-auto rounded-md bg-neutral-900 p-4 text-left text-sm text-red-300">
+              {errorMessage}
+            </pre>
+          ) : null}
           <Button onClick={() => window.location.reload()}>
             {t("error.refresh")}
           </Button>

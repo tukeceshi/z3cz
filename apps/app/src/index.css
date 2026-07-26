@@ -189,6 +189,8 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 0 70% 60%;
+    --workflow-canvas-bg-dark: #0b0b0f;
+    --workflow-node-selected-border-dark: #959595;
     /* 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -468,6 +470,18 @@ html.dark .react-flow__attribution:hover {
 
 html.dark .react-flow__attribution a {
   color: #bbb !important;
+}
+
+html.dark .workflow-canvas {
+  background-color: var(--workflow-canvas-bg-dark);
+}
+
+html.dark .workflow-canvas .react-flow__background {
+  opacity: 1;
+}
+
+html.dark .workflow-canvas .react-flow__background pattern circle {
+  fill: rgba(255, 255, 255, 0.25);
 }
 
 /* Generative nodes (AI text / AI image): connect-target border light */

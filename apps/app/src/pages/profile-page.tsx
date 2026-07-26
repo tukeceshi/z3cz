@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
@@ -11,6 +12,7 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import type { TranslateFn } from "@/i18n";
 import { updateProfile, useProfile } from "@/services/profile-service";
+import { getEffectivePermissions } from "@/utils/sub-account-permissions";
 import { getInitials } from "@/utils/user-utils";
 
 const formatProviderName = (
@@ -29,9 +31,38 @@ const formatRoleName = (role: string | undefined, t: TranslateFn) => {
 
 export function ProfilePage() {
   const { t } = useTranslation();
-  const appToast = useAppToast();
   const { profile, isProfileLoading, profileError, mutateProfile } =
     useProfile();
+
+  if (isProfileLoading) {
+    return <InsetLoading title={t("pages.profile.title")} />;
+  } else if (profileError) {
+    return (
+      <InsetError
+        title={t("pages.profile.title")}
+        errorMessage={profileError.message}
+      />
+    );
+  }
+
+  if (!profile) {
+    return null;
+  }
+
+  return (
+    <ProfilePageContent profile={profile} mutateProfile={mutateProfile} />
+  );
+}
+
+interface ProfilePageContentProps {
+  profile: NonNullable<ReturnType<typeof useProfile>["profile"]>;
+  mutateProfile: ReturnType<typeof useProfile>["mutateProfile"];
+}
+
+function ProfilePageContent({ profile, mutateProfile }: ProfilePageContentProps) {
+  const { t } = useTranslation();
+  const { organization } = useAuth();
+  const appToast = useAppToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const { setBreadcrumbs } = usePageBreadcrumbs([]);
 
@@ -62,27 +93,48 @@ export function ProfilePage() {
     setBreadcrumbs([{ label: t("userMenu.profile") }]);
   }, [setBreadcrumbs, t]);
 
-  if (isProfileLoading) {
-    return <InsetLoading title={t("pages.profile.title")} />;
-  } else if (profileError) {
-    return (
-      <InsetError
-        title={t("pages.profile.title")}
-        errorMessage={profileError.message}
-      />
-    );
-  }
-
-  if (!profile) {
-    return null;
-  }
-
   const formatPlanName = (plan: string | undefined) => {
     if (!plan) return t("pages.profile.plans.free");
     return plan.charAt(0).toUpperCase() + plan.slice(1);
   };
 
   const avatarSrc = profile.avatarUrl;
+  const orgPermissions = useMemo(
+    () => getEffectivePermissions(organization),
+    [organization]
+  );
+  const permissionSummary = useMemo(() => {
+    if (!organization || organization.role === "owner") {
+      return t("pages.profile.orgPermissionsOwner");
+    }
+
+    const enabled: string[] = [];
+    if (orgPermissions.workflows === "edit") {
+      enabled.push(
+        `${t("pages.members.permissions.workflows")} (${t("pages.members.permissions.edit")})`
+      );
+    } else if (orgPermissions.workflows === "view") {
+      enabled.push(
+        `${t("pages.members.permissions.workflows")} (${t("pages.members.permissions.viewOnly")})`
+      );
+    }
+    if (orgPermissions.executions) {
+      enabled.push(t("pages.members.permissions.executions"));
+    }
+    if (orgPermissions.modelCalls) {
+      enabled.push(t("pages.members.permissions.modelCalls"));
+    }
+    if (orgPermissions.aiInterfaces) {
+      enabled.push(t("pages.members.permissions.aiInterfaces"));
+    }
+    if (orgPermissions.apiKeys) {
+      enabled.push(t("pages.members.permissions.apiKeys"));
+    }
+
+    return enabled.length > 0
+      ? enabled.join(", ")
+      : t("pages.profile.orgPermissionsNone");
+  }, [organization, orgPermissions, t]);
 
   return (
     <InsetLayout title={t("pages.profile.title")}>
@@ -148,6 +200,43 @@ export function ProfilePage() {
               {t("pages.profile.roleHint")}
             </p>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              {t("pages.profile.orgRole")}
+            </label>
+            <Input
+              type="text"
+              value={
+                organization?.role === "owner"
+                  ? t("pages.profile.orgRoles.owner")
+                  : t("pages.profile.orgRoles.subAccount")
+              }
+              readOnly
+              disabled
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("pages.profile.orgRoleHint")}
+            </p>
+          </div>
+          {organization ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                {t("pages.profile.organization")}
+              </label>
+              <Input type="text" value={organization.name} readOnly disabled />
+            </div>
+          ) : null}
+          {organization && organization.role !== "owner" ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                {t("pages.profile.orgPermissions")}
+              </label>
+              <Input type="text" value={permissionSummary} readOnly disabled />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("pages.profile.orgPermissionsHint")}
+              </p>
+            </div>
+          ) : null}
           <div>
             <label className="block text-sm font-medium mb-1">
               {t("pages.profile.plan")}

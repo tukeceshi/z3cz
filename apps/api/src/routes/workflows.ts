@@ -15,17 +15,16 @@ import {
   type ListWorkflowsResponse,
   type Node,
   type Edge,
+  type UpdateWorkflowListMetadataRequest,
+  type UpdateWorkflowListMetadataResponse,
   type UpdateWorkflowRequest,
   type UpdateWorkflowResponse,
   type UpsertQueueTriggerRequest,
   type UpsertQueueTriggerResponse,
   type WorkflowWithMetadata,
-  WORKFLOW_SCHEME_OMNIPOTENT_ID,
-  ALL_WORKFLOW_BILLING_MODES,
-  type WorkflowBillingMode,
+  WORKFLOW_SCHEME_BASIC_CANVAS_ID,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { v7 as uuid } from "uuid";
@@ -48,16 +47,22 @@ import {
   resolveOrganizationBillingOptions,
   stampOnboardingStage,
   upsertQueueTrigger as upsertDbQueueTrigger,
-  workflows,
 } from "../db";
+import type { WorkflowRow } from "../db/schema";
+import {
+  getWorkflowFolder,
+  touchWorkflowFolderUpdatedAt,
+} from "../db/workflow-folder-queries";
 import { getAgentByName } from "../durable-objects/agent-utils";
 import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
+import { requireWorkflowRouteAccess } from "../middleware/org-permissions";
+import { assertOrgCloudStorageConfigured } from "../services/assert-org-cloud-storage-configured";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { executeSingleNodeWorkflow } from "../services/single-node-executor";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
 import { getAuthContext } from "../utils/auth-context";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "../utils/credits";
+import { isCreditExhausted } from "../utils/credits";
 import { decryptSecret } from "../utils/encryption";
 import { getAllNodeTypes } from "../utils/node-types";
 import {
@@ -88,42 +93,53 @@ type ExtendedApiContext = ApiContext & {
 
 const workflowRoutes = new Hono<ExtendedApiContext>();
 
-const workflowBillingModeSchema = z.enum(
-  ALL_WORKFLOW_BILLING_MODES as unknown as [
-    WorkflowBillingMode,
-    ...WorkflowBillingMode[],
-  ]
-);
+workflowRoutes.use("*", jwtMiddleware);
+workflowRoutes.use("*", requireWorkflowRouteAccess());
+
+function toWorkflowListItem(workflow: WorkflowRow): WorkflowWithMetadata {
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    description: workflow.description ?? undefined,
+    schemeId: workflow.schemeId,
+    trigger: workflow.trigger,
+    runtime: workflow.runtime,
+    folderId: workflow.folderId,
+    coverObjectId: workflow.coverObjectId,
+    coverMimeType: workflow.coverMimeType,
+    createdAt: workflow.createdAt,
+    updatedAt: workflow.updatedAt,
+    nodes: [],
+    edges: [],
+  };
+}
 
 /**
  * List all workflows for the current organization
  */
-workflowRoutes.get("/", jwtMiddleware, async (c) => {
+workflowRoutes.get("/", async (c) => {
   const workflowStore = new WorkflowStore(c.env);
 
   const organizationId = c.get("organizationId")!;
+  const folderIdParam = c.req.query("folderId");
+  const folderId =
+    folderIdParam === undefined || folderIdParam === "root"
+      ? null
+      : folderIdParam;
 
-  const allWorkflows = await workflowStore.list(organizationId);
+  if (folderId) {
+    const db = createDatabase(c.env);
+    const folder = await getWorkflowFolder(db, folderId, organizationId);
+    if (!folder) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
+  }
 
-  // Convert DB workflow objects to WorkflowWithMetadata objects
-  const workflows: WorkflowWithMetadata[] = allWorkflows.map((workflow) => {
-    return {
-      id: workflow.id,
-      name: workflow.name,
-      description: workflow.description ?? undefined,
-      schemeId: workflow.schemeId,
-      billingMode: workflow.billingMode,
-      trigger: workflow.trigger,
-      runtime: workflow.runtime,
-      enabled: workflow.enabled,
-      createdAt: workflow.createdAt,
-      updatedAt: workflow.updatedAt,
-      nodes: [],
-      edges: [],
-    };
-  });
+  const allWorkflows = await workflowStore.list(organizationId, { folderId });
 
-  const response: ListWorkflowsResponse = { workflows };
+  const response: ListWorkflowsResponse = {
+    workflows: allWorkflows.map(toWorkflowListItem),
+  };
   return c.json(response);
 });
 
@@ -132,18 +148,17 @@ workflowRoutes.get("/", jwtMiddleware, async (c) => {
  */
 workflowRoutes.post(
   "/",
-  jwtMiddleware,
   zValidator(
     "json",
     z.object({
       name: z.string().min(1, "Workflow name is required"),
       description: z.string().optional(),
       schemeId: z.string().min(1).optional(),
-      billingMode: workflowBillingModeSchema.optional(),
-      trigger: z.string(),
+      trigger: z.string().optional().default("manual"),
       runtime: z.enum(["worker", "workflow"]).optional().default("workflow"),
-      nodes: z.array(z.any()).optional(),
-      edges: z.array(z.any()).optional(),
+      folderId: z.string().nullable().optional(),
+      nodes: z.array(z.any()).optional().default([]),
+      edges: z.array(z.any()).optional().default([]),
     }) as z.ZodType<CreateWorkflowRequest>
   ),
   async (c) => {
@@ -154,7 +169,7 @@ workflowRoutes.post(
     const userId = c.var.jwtPayload?.sub;
     const db = createDatabase(c.env);
 
-    const schemeId = data.schemeId ?? WORKFLOW_SCHEME_OMNIPOTENT_ID;
+    const schemeId = data.schemeId ?? WORKFLOW_SCHEME_BASIC_CANVAS_ID;
     const scheme =
       (await getEnabledWorkflowSchemeById(db, schemeId)) ??
       (await getDefaultWorkflowScheme(db));
@@ -170,6 +185,13 @@ workflowRoutes.post(
         { error: error instanceof Error ? error.message : "Invalid scheme selection" },
         400
       );
+    }
+
+    if (data.folderId) {
+      const folder = await getWorkflowFolder(db, data.folderId, organizationId);
+      if (!folder) {
+        return c.json({ error: "Folder not found" }, 404);
+      }
     }
 
     const workflowId = uuid();
@@ -234,16 +256,20 @@ workflowRoutes.post(
       name: workflowData.name,
       description: data.description,
       schemeId: scheme.id,
-      billingMode: data.billingMode ?? "platform",
       trigger: workflowData.trigger,
       runtime: workflowData.runtime,
       organizationId: organizationId,
+      folderId: data.folderId ?? null,
       nodes: workflowData.nodes,
       edges: workflowData.edges,
       createdAt: now,
       updatedAt: now,
       apiHost: new URL(c.req.url).origin,
     });
+
+    if (data.folderId) {
+      await touchWorkflowFolderUpdatedAt(db, data.folderId, organizationId);
+    }
 
     // Best-effort onboarding stamp; never fail the request on a stamp error.
     if (userId) {
@@ -260,9 +286,9 @@ workflowRoutes.post(
       name: savedWorkflow.name,
       description: savedWorkflow.description,
       schemeId: scheme.id,
-      billingMode: data.billingMode ?? "platform",
       trigger: savedWorkflow.trigger,
       runtime: savedWorkflow.runtime,
+      folderId: data.folderId ?? null,
       createdAt: now,
       updatedAt: now,
       nodes: savedWorkflow.nodes,
@@ -276,7 +302,7 @@ workflowRoutes.post(
 /**
  * Get a specific workflow by ID
  */
-workflowRoutes.get("/:id", jwtMiddleware, async (c) => {
+workflowRoutes.get("/:id", async (c) => {
   const id = c.req.param("id")!;
   const organizationId = c.get("organizationId")!;
   const userId = c.var.jwtPayload?.sub;
@@ -299,10 +325,8 @@ workflowRoutes.get("/:id", jwtMiddleware, async (c) => {
       name: workflow.name,
       description: workflow.description ?? undefined,
       schemeId: workflow.schemeId,
-      billingMode: workflow.billingMode,
       trigger: workflow.trigger,
       runtime: workflow.runtime,
-      enabled: workflow.enabled,
       createdAt: workflow.createdAt || new Date(),
       updatedAt: workflow.updatedAt || new Date(),
       nodes: workflow.data.nodes || [],
@@ -324,13 +348,11 @@ workflowRoutes.get("/:id", jwtMiddleware, async (c) => {
  */
 workflowRoutes.put(
   "/:id",
-  jwtMiddleware,
   zValidator(
     "json",
     z.object({
       name: z.string().min(1, "Workflow name is required"),
       description: z.string().optional(),
-      billingMode: workflowBillingModeSchema.optional(),
       trigger: z.string().optional(),
       runtime: z.enum(["worker", "workflow"]).optional(),
       nodes: z.array(z.any()).optional(),
@@ -444,8 +466,6 @@ workflowRoutes.put(
       description:
         data.description ?? existingWorkflow.description ?? undefined,
       schemeId: existingWorkflow.schemeId,
-      billingMode:
-        data.billingMode ?? existingWorkflow.billingMode ?? "platform",
       trigger: nextTrigger,
       runtime: nextRuntime,
       organizationId: organizationId,
@@ -457,16 +477,21 @@ workflowRoutes.put(
       apiHost: new URL(c.req.url).origin,
     });
 
+    if (existingWorkflow.folderId) {
+      await touchWorkflowFolderUpdatedAt(
+        db,
+        existingWorkflow.folderId,
+        organizationId
+      );
+    }
+
     const response: UpdateWorkflowResponse = {
       id: updatedWorkflowData.id,
       name: updatedWorkflowData.name,
       description: updatedWorkflowData.description ?? undefined,
       schemeId: existingWorkflow.schemeId,
-      billingMode:
-        data.billingMode ?? existingWorkflow.billingMode ?? "platform",
       trigger: updatedWorkflowData.trigger,
       runtime: updatedWorkflowData.runtime,
-      enabled: existingWorkflow.enabled,
       createdAt: existingWorkflow.createdAt,
       updatedAt: now,
       nodes: updatedWorkflowData.nodes || [],
@@ -483,16 +508,25 @@ workflowRoutes.put(
 /**
  * Delete a workflow by ID
  */
-workflowRoutes.delete("/:id", jwtMiddleware, async (c) => {
+workflowRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id")!;
   const workflowStore = new WorkflowStore(c.env);
 
   const organizationId = c.get("organizationId")!;
+  const db = createDatabase(c.env);
 
   const deletedWorkflow = await workflowStore.delete(id, organizationId);
 
   if (!deletedWorkflow) {
     return c.json({ error: "Workflow not found" }, 404);
+  }
+
+  if (deletedWorkflow.folderId) {
+    await touchWorkflowFolderUpdatedAt(
+      db,
+      deletedWorkflow.folderId,
+      organizationId
+    );
   }
 
   const response: DeleteWorkflowResponse = { id: deletedWorkflow.id };
@@ -504,7 +538,7 @@ workflowRoutes.delete("/:id", jwtMiddleware, async (c) => {
  */
 async function executeWorkflow(
   c: Context<ExtendedApiContext>,
-  workflow: { id: string; name: string; billingMode?: WorkflowBillingMode },
+  workflow: { id: string; name: string },
   workflowData: any
 ): Promise<Response> {
   const db = createDatabase(c.env);
@@ -516,13 +550,7 @@ async function executeWorkflow(
     return c.json({ error: "Organization not found" }, 404);
   }
 
-  const billingMode =
-    workflow.billingMode ?? workflowData.billingMode ?? "platform";
-
-  if (
-    !shouldSkipPlatformCreditCheck(billingMode) &&
-    isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
-  ) {
+  if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
     return c.json({ error: "Insufficient compute credits" }, 402 as const);
   }
 
@@ -539,7 +567,6 @@ async function executeWorkflow(
     workflow: {
       id: workflow.id,
       name: workflow.name,
-      billingMode,
       trigger: workflowData.trigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,
@@ -566,12 +593,10 @@ async function executeWorkflow(
 
 /**
  * Execute a workflow in production mode (GET/POST)
- * Requires the workflow to be enabled
  */
 workflowRoutes.on(
   ["GET", "POST"],
   "/:workflowId/execute",
-  jwtMiddleware,
   createExecuteRateLimitMiddleware(),
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
@@ -599,21 +624,7 @@ workflowRoutes.on(
       return c.json({ error: "Workflow not found" }, 404);
     }
 
-    // Require workflow to be enabled for prod execution
-    if (!workflowWithData.enabled) {
-      return c.json(
-        {
-          error:
-            "Workflow is not enabled. Use /execute/dev for development or enable the workflow.",
-        },
-        400
-      );
-    }
-
-    return executeWorkflow(c, workflowWithData, {
-      ...workflowWithData.data,
-      billingMode: workflowWithData.billingMode,
-    });
+    return executeWorkflow(c, workflowWithData, workflowWithData.data);
   }
 );
 
@@ -624,7 +635,6 @@ workflowRoutes.on(
 workflowRoutes.on(
   ["GET", "POST"],
   "/:workflowId/execute/dev",
-  jwtMiddleware,
   createExecuteRateLimitMiddleware(),
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
@@ -652,10 +662,7 @@ workflowRoutes.on(
       return c.json({ error: "Workflow not found" }, 404);
     }
 
-    return executeWorkflow(c, workflowWithData, {
-      ...workflowWithData.data,
-      billingMode: workflowWithData.billingMode,
-    });
+    return executeWorkflow(c, workflowWithData, workflowWithData.data);
   }
 );
 
@@ -666,7 +673,6 @@ workflowRoutes.on(
  */
 workflowRoutes.post(
   "/:workflowId/nodes/:nodeId/execute",
-  jwtMiddleware,
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
     const nodeId = c.req.param("nodeId")!;
@@ -725,12 +731,7 @@ workflowRoutes.post(
       return c.json({ error: "Organization not found" }, 404);
     }
 
-    const billingMode = workflowWithData.billingMode ?? "platform";
-
-    if (
-      !shouldSkipPlatformCreditCheck(billingMode) &&
-      isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)
-    ) {
+    if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
       return c.json({ error: "Insufficient compute credits" }, 402 as const);
     }
 
@@ -762,7 +763,6 @@ workflowRoutes.post(
       workflow: {
         id: workflowWithData.id,
         name: workflowWithData.name,
-        billingMode,
         trigger: workflowWithData.data.trigger,
         nodes: executionNodes,
         edges: executionEdges,
@@ -799,7 +799,6 @@ workflowRoutes.post(
  */
 workflowRoutes.post(
   "/:workflowId/executions/:executionId/cancel",
-  jwtMiddleware,
   async (c) => {
     const organizationId = c.get("organizationId")!;
     const executionId = c.req.param("executionId")!;
@@ -895,7 +894,7 @@ workflowRoutes.post(
 /**
  * Get queue trigger for a workflow
  */
-workflowRoutes.get("/:workflowId/queue-trigger", jwtMiddleware, async (c) => {
+workflowRoutes.get("/:workflowId/queue-trigger", async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
@@ -934,7 +933,6 @@ const UpsertQueueTriggerRequestSchema = z.object({
 
 workflowRoutes.put(
   "/:workflowId/queue-trigger",
-  jwtMiddleware,
   zValidator("json", UpsertQueueTriggerRequestSchema),
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
@@ -998,7 +996,6 @@ workflowRoutes.put(
  */
 workflowRoutes.delete(
   "/:workflowId/queue-trigger",
-  jwtMiddleware,
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
     const organizationId = c.get("organizationId")!;
@@ -1033,7 +1030,7 @@ workflowRoutes.delete(
 /**
  * Get email trigger for a workflow
  */
-workflowRoutes.get("/:workflowId/email-trigger", jwtMiddleware, async (c) => {
+workflowRoutes.get("/:workflowId/email-trigger", async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
@@ -1065,7 +1062,7 @@ workflowRoutes.get("/:workflowId/email-trigger", jwtMiddleware, async (c) => {
 /**
  * Get bot trigger for a workflow
  */
-workflowRoutes.get("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
+workflowRoutes.get("/:workflowId/bot-trigger", async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
@@ -1099,7 +1096,6 @@ workflowRoutes.get("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
  */
 workflowRoutes.post(
   "/:workflowId/bot-trigger/sync",
-  jwtMiddleware,
   async (c) => {
     const workflowId = c.req.param("workflowId")!;
     const organizationId = c.get("organizationId")!;
@@ -1180,7 +1176,7 @@ workflowRoutes.post(
 /**
  * Delete a bot trigger for a workflow
  */
-workflowRoutes.delete("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
+workflowRoutes.delete("/:workflowId/bot-trigger", async (c) => {
   const workflowId = c.req.param("workflowId")!;
   const organizationId = c.get("organizationId")!;
   const workflowStore = new WorkflowStore(c.env);
@@ -1237,56 +1233,85 @@ workflowRoutes.delete("/:workflowId/bot-trigger", jwtMiddleware, async (c) => {
 });
 
 /**
- * Toggle workflow enabled state
+ * Update list-page metadata (name, description, cover) without resubmitting the graph.
  */
 workflowRoutes.patch(
-  "/:workflowId/enabled",
-  jwtMiddleware,
+  "/:id/list-metadata",
   zValidator(
     "json",
-    z.object({
-      enabled: z.boolean(),
-    })
+    z
+      .object({
+        name: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        coverObjectId: z.string().min(1).nullable().optional(),
+        coverMimeType: z.string().min(1).nullable().optional(),
+      })
+      .refine(
+        (value) =>
+          value.name !== undefined ||
+          value.description !== undefined ||
+          value.coverObjectId !== undefined ||
+          value.coverMimeType !== undefined,
+        { message: "At least one field is required" }
+      ) as z.ZodType<UpdateWorkflowListMetadataRequest>
   ),
   async (c) => {
-    const workflowId = c.req.param("workflowId")!;
+    const id = c.req.param("id")!;
     const organizationId = c.get("organizationId")!;
-    const { enabled } = c.req.valid("json");
-
+    const data = c.req.valid("json");
     const workflowStore = new WorkflowStore(c.env);
     const db = createDatabase(c.env);
 
-    const workflow = await workflowStore.get(workflowId, organizationId);
-    if (!workflow) {
+    const existing = await workflowStore.get(id, organizationId);
+    if (!existing) {
       return c.json({ error: "Workflow not found" }, 404);
     }
 
-    try {
-      await db
-        .update(workflows)
-        .set({
-          enabled,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(workflows.id, workflow.id),
-            eq(workflows.organizationId, organizationId)
-          )
+    if (
+      data.coverObjectId !== undefined ||
+      data.coverMimeType !== undefined
+    ) {
+      const hasCover =
+        data.coverObjectId !== null && data.coverMimeType !== null;
+      const clearingCover =
+        data.coverObjectId === null && data.coverMimeType === null;
+      if (hasCover || clearingCover) {
+        const cloudCheck = await assertOrgCloudStorageConfigured(
+          c,
+          organizationId
         );
-
-      return c.json({
-        workflowId: workflow.id,
-        enabled,
-      });
-    } catch (error) {
-      return c.json(
-        {
-          error: `Failed to update workflow: ${error instanceof Error ? error.message : String(error)}`,
-        },
-        500
-      );
+        if (!cloudCheck.ok) {
+          return cloudCheck.response;
+        }
+      }
+      if (hasCover && (!data.coverObjectId || !data.coverMimeType)) {
+        return c.json({ error: "Cover requires object id and mime type" }, 400);
+      }
     }
+
+    const now = new Date();
+    const updated = await workflowStore.update(id, organizationId, {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.description !== undefined
+        ? { description: data.description ?? null }
+        : {}),
+      ...(data.coverObjectId !== undefined
+        ? { coverObjectId: data.coverObjectId }
+        : {}),
+      ...(data.coverMimeType !== undefined
+        ? { coverMimeType: data.coverMimeType }
+        : {}),
+      updatedAt: now,
+    });
+
+    if (existing.folderId) {
+      await touchWorkflowFolderUpdatedAt(db, existing.folderId, organizationId);
+    }
+
+    const response: UpdateWorkflowListMetadataResponse = toWorkflowListItem(
+      updated
+    );
+    return c.json(response);
   }
 );
 

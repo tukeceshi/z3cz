@@ -28,6 +28,18 @@ export function mapAuthErrorMessage(
     return t("auth.errors.emailNotFound");
   }
 
+  if (error instanceof AuthError && error.code === "VERIFICATION_REQUIRED") {
+    return t("auth.errors.verificationRequired");
+  }
+
+  if (error instanceof AuthError && error.code === "INVALID_CODE") {
+    return t("auth.errors.invalidVerificationCode");
+  }
+
+  if (error instanceof AuthError && error.code === "COOLDOWN") {
+    return error.message;
+  }
+
   if (!(error instanceof Error)) {
     return t("auth.errors.generic");
   }
@@ -43,6 +55,10 @@ export function mapAuthErrorMessage(
       return t("auth.errors.loginFailed");
     case "Authentication service misconfigured":
       return t("auth.errors.authMisconfigured");
+    case "Verification code is required":
+      return t("auth.errors.verificationRequired");
+    case "Invalid or expired verification code":
+      return t("auth.errors.invalidVerificationCode");
     case "API unavailable":
       return t("auth.errors.apiUnavailable");
     default:

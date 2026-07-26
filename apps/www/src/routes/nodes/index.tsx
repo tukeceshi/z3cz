@@ -21,7 +21,7 @@ const { categories: allCategories } = categories as {
 
 export const meta: MetaFunction = () => {
   const title =
-    "470+ Workflow Nodes for AI, Browser & Data Automation | Dafthunk";
+    "470+ Workflow Nodes for AI, Browser & Data Automation | z3cz.com";
   const description =
     "470+ visual workflow nodes for AI agents, headless browsers, data pipelines, media, and APIs. Open source, MIT licensed, serverless on Cloudflare Workers.";
   const url = `${websiteUrl}/nodes`;
@@ -35,7 +35,7 @@ export const meta: MetaFunction = () => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -50,7 +50,7 @@ export default function NodesPage() {
   const collectionJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Dafthunk workflow automation nodes",
+    name: "z3cz.com workflow automation nodes",
     url: `${websiteUrl}/nodes`,
     description:
       "Open source, MIT-licensed workflow automation nodes for AI, browser automation, data processing, media, and integrations, running serverless on Cloudflare Workers.",

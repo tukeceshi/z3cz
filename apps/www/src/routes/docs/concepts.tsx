@@ -3,9 +3,9 @@ import { DocsLayout } from "../../components/docs/docs-layout";
 const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
-  const title = "Core Concepts - Dafthunk Documentation";
+  const title = "Core Concepts - z3cz.com Documentation";
   const description =
-    "Learn the building blocks of Dafthunk: workflows, nodes, executions, triggers, resources, and organizations — and how they fit together to automate work.";
+    "Learn the building blocks of z3cz.com: workflows, nodes, executions, triggers, resources, and organizations — and how they fit together to automate work.";
   const url = `${websiteUrl}/docs/concepts`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -17,7 +17,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -57,10 +57,10 @@ export default function DocsConcepts() {
       />
       <h1>Core Concepts</h1>
       <p className="lead">
-        Dafthunk is a platform for creating, executing, and monitoring visual
+        z3cz.com is a platform for creating, executing, and monitoring visual
         workflows. It enables you to automate complex tasks by connecting
         different processing units, called nodes, in a drag-and-drop interface.
-        Built on Cloudflare, Dafthunk leverages serverless functions for
+        Built on Cloudflare, z3cz.com leverages serverless functions for
         scalable execution and AI capabilities for intelligent processing.
       </p>
 
@@ -98,7 +98,7 @@ export default function DocsConcepts() {
       <p>
         <strong>Triggers</strong> define how workflows are started. A workflow
         can have one or more triggers that initiate execution when a specific
-        event occurs. Dafthunk supports several trigger types:
+        event occurs. z3cz.com supports several trigger types:
       </p>
       <ul>
         <li>
@@ -168,7 +168,7 @@ export default function DocsConcepts() {
 
       <h2 id="organizations">Organizations</h2>
       <p>
-        Dafthunk is designed for collaboration. <strong>Organizations</strong>{" "}
+        z3cz.com is designed for collaboration. <strong>Organizations</strong>{" "}
         serve as containers for your workflows, triggers, resources, and
         executions. <strong>Users</strong> belong to organizations and can
         collaborate on building and managing workflows based on their roles and
@@ -182,7 +182,7 @@ export default function DocsConcepts() {
       </p>
       <ol>
         <li>
-          <strong>Design a Workflow</strong>: In your Dafthunk organization, you
+          <strong>Design a Workflow</strong>: In your z3cz.com organization, you
           create a new <code>Workflow</code>. You connect the following nodes:
           <ul>
             <li>
@@ -211,7 +211,7 @@ export default function DocsConcepts() {
           <code>Execution</code>.
         </li>
         <li>
-          <strong>Monitor the Result</strong>: In Dafthunk, you can observe the{" "}
+          <strong>Monitor the Result</strong>: In z3cz.com, you can observe the{" "}
           <code>Execution</code>. You'll see the input prompt, the successful
           generation of the image by the AI node, and the confirmation that the
           HTTP request node successfully sent the image data to your specified
@@ -220,7 +220,7 @@ export default function DocsConcepts() {
         </li>
       </ol>
       <p>
-        This example shows how Dafthunk can orchestrate standard web tasks, all
+        This example shows how z3cz.com can orchestrate standard web tasks, all
         visually configured and monitored through <code>Workflows</code>,{" "}
         <code>Triggers</code>, and <code>Executions</code>.
       </p>

@@ -7,6 +7,7 @@ import { Hono } from "hono";
 
 import { jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
+import { requireDashboardAccess } from "../middleware/org-permissions";
 import type { ExecutionRow } from "../runtime/cloudflare-execution-store";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { WorkflowStore } from "../stores/workflow-store";
@@ -15,6 +16,7 @@ const dashboard = new Hono<ApiContext>();
 
 // Apply authentication middleware to all routes
 dashboard.use("*", jwtMiddleware);
+dashboard.use("*", requireDashboardAccess());
 
 /**
  * GET /:organizationId/dashboard

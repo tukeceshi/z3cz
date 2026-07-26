@@ -407,14 +407,8 @@ export function resolveAiTextEdgeAnchors(params: {
 
   if (inboundReference) {
     const node = params.nodeLookup.get(params.target);
-    const sourceNode = params.nodeLookup.get(params.source);
     if (node) {
-      const sourceType = readNodeType(sourceNode);
-      const targetType = readNodeType(node);
-      const snapPoint =
-        sourceType === AI_IMAGE_NODE_TYPE && targetType === AI_TEXT_NODE_TYPE
-          ? snapAiTextOutputBorderPoint(node)
-          : snapAiTextKeywordsBorderPoint(node);
+      const snapPoint = snapAiTextKeywordsBorderPoint(node);
       targetX = snapPoint.x;
       targetY = snapPoint.y;
     }

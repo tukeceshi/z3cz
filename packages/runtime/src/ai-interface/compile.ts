@@ -45,6 +45,13 @@ function mapBodySlot(mapping: AiInterfaceBodyMapping): AiInterfaceBodySlot {
   if (mapping.kind === "model") {
     return { kind: "model", to: mapping.to };
   }
+  if (mapping.kind === "anthropic-messages") {
+    return {
+      kind: "anthropic-messages",
+      to: "messages",
+      promptField: mapping.promptField,
+    };
+  }
   return {
     kind: "openai-messages",
     to: "messages",
@@ -260,6 +267,87 @@ export function createOpenAiCompatibleChatSourceSpec(params: {
         responseTextPath: "choices.0.message.content",
         usagePromptPath: "usage.prompt_tokens",
         usageCompletionPath: "usage.completion_tokens",
+      },
+    },
+    io: {
+      defaultModel: params.defaultModel,
+      models: params.models,
+      configInputs: ["ai_interface_id", "model"],
+      fields: [
+        {
+          name: "instructions",
+          apiName: "instructions",
+          type: "string",
+          description: "Optional system instructions",
+        },
+        {
+          name: "prompt",
+          apiName: "prompt",
+          type: "string",
+          description: "User prompt",
+          required: true,
+        },
+      ],
+      outputs: [{ name: "text", type: "string" }],
+    },
+  };
+}
+
+export const ANTHROPIC_MESSAGES_API_VERSION = "2023-06-01" as const;
+
+export function createAnthropicMessagesSourceSpec(params: {
+  id: string;
+  name: string;
+  description: string;
+  provider: AiInterfaceSourceSpec["meta"]["provider"];
+  baseUrl: string;
+  defaultModel: string;
+  models: readonly { id: string; label: string }[];
+  icon?: string;
+  tags?: readonly string[];
+  isSystem?: boolean;
+  sortOrder?: number;
+}): AiInterfaceSourceSpec {
+  return {
+    schemaVersion: 1,
+    meta: {
+      id: params.id,
+      name: params.name,
+      description: params.description,
+      provider: params.provider,
+      icon: params.icon ?? "bot",
+      tags: params.tags ?? ["AI", "LLM"],
+      enabled: true,
+      isSystem: params.isSystem ?? true,
+      sortOrder: params.sortOrder ?? 0,
+    },
+    connection: {
+      baseUrl: params.baseUrl,
+      authType: "header",
+      headerName: "x-api-key",
+      authPrefix: "",
+      defaultHeaders: {
+        "anthropic-version": ANTHROPIC_MESSAGES_API_VERSION,
+      },
+      timeoutMs: 60_000,
+    },
+    execution: {
+      mode: "sync",
+      sync: {
+        method: "POST",
+        path: "/v1/messages",
+        bodyMappings: [
+          { kind: "model", to: "model" },
+          { kind: "const", to: "max_tokens", value: 8192 },
+          { kind: "field", from: "instructions", to: "system" },
+          {
+            kind: "anthropic-messages",
+            promptField: "prompt",
+          },
+        ],
+        responseTextPath: "content.0.text",
+        usagePromptPath: "usage.input_tokens",
+        usageCompletionPath: "usage.output_tokens",
       },
     },
     io: {

@@ -12,6 +12,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { DataTable } from "@/components/ui/data-table";
@@ -131,6 +132,12 @@ export const createColumns = (
 ];
 
 export function FeedbackPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.feedback");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <FeedbackPageContent />;
+}
+
+function FeedbackPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

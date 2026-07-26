@@ -29,6 +29,7 @@ import { useParams } from "react-router";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useDatabase, useDatabaseSchema } from "@/services/database-service";
 import { cn } from "@/utils/utils";
@@ -227,6 +228,12 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
 }
 
 export function DatabaseExplorerPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.databases");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <DatabaseExplorerPageContent />;
+}
+
+function DatabaseExplorerPageContent() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

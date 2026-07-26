@@ -22,7 +22,6 @@ interface TestWorkflowInput {
   schemeId?: string;
   description?: string;
   runtime?: Workflow["runtime"];
-  billingMode?: Workflow["billingMode"];
 }
 
 /**
@@ -40,9 +39,6 @@ export const createParams = (workflow: TestWorkflowInput): RuntimeParams => ({
       ? { description: workflow.description }
       : {}),
     ...(workflow.runtime !== undefined ? { runtime: workflow.runtime } : {}),
-    ...(workflow.billingMode !== undefined
-      ? { billingMode: workflow.billingMode }
-      : {}),
   },
   userId: "test-user",
   organizationId: "test-org",

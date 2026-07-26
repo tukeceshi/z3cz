@@ -29,12 +29,6 @@ export async function handleScheduledEvent(
 
   for (const { scheduledTrigger, workflow, organizationBilling } of triggers) {
     try {
-      // Skip workflows that are not enabled
-      if (!workflow.enabled) {
-        console.log(`Skipping scheduled workflow ${workflow.id}: not enabled`);
-        continue;
-      }
-
       // Parse schedule expression
       const interval = CronParser.parse(scheduledTrigger.scheduleExpression, {
         currentDate: new Date(now),
@@ -101,5 +95,14 @@ export async function handleScheduledEvent(
         error
       );
     }
+  }
+
+  try {
+    const { runCloudStorageMaintenanceCron } = await import(
+      "./services/cloud-storage-maintenance-cron"
+    );
+    await runCloudStorageMaintenanceCron(env);
+  } catch (error) {
+    console.error("[cloud-storage-cron] Maintenance run failed:", error);
   }
 }

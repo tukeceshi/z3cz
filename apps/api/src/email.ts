@@ -14,7 +14,7 @@ import { parseAndStageEmail } from "./mailbox-staging";
 import { WorkflowStore } from "./stores/workflow-store";
 import { handleSupportEmail, isAuthenticated } from "./support-email";
 import { verifyReplyToken } from "./support-reply-token";
-import { isCreditExhausted, shouldSkipPlatformCreditCheck } from "./utils/credits";
+import { isCreditExhausted } from "./utils/credits";
 
 async function streamToBytes(
   stream: ReadableStream<Uint8Array>
@@ -289,11 +289,6 @@ async function triggerWorkflowForEmail({
 
   let workflowData: Workflow;
 
-  if (!workflow.enabled) {
-    console.log(`Discarding email for workflow ${workflow.id}: not enabled`);
-    return;
-  }
-
   try {
     const workflowWithData = await workflowStore.getWithData(
       workflow.id,
@@ -304,12 +299,6 @@ async function triggerWorkflowForEmail({
       return;
     }
     workflowData = workflowWithData.data;
-    if (!workflowData.billingMode) {
-      workflowData = {
-        ...workflowData,
-        billingMode: workflowWithData.billingMode ?? "platform",
-      };
-    }
   } catch (error) {
     console.error(
       `Failed to load workflow data from R2 for ${workflow.id}:`,
@@ -333,12 +322,7 @@ async function triggerWorkflowForEmail({
     return;
   }
 
-  const billingMode = workflowData.billingMode ?? "platform";
-
-  if (
-    !shouldSkipPlatformCreditCheck(billingMode) &&
-    isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)
-  ) {
+  if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
     console.log(
       `Discarding email for workflow ${workflow.id}: credits exhausted`
     );
@@ -358,7 +342,6 @@ async function triggerWorkflowForEmail({
       id: workflow.id,
       name: workflow.name,
       schemeId: workflowData.schemeId,
-      billingMode,
       trigger: workflow.trigger,
       runtime: workflowData.runtime,
       nodes: workflowData.nodes,

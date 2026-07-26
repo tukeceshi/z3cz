@@ -3,9 +3,9 @@ import { DocsLayout } from "../../components/docs/docs-layout";
 const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
-  const title = "开发者指南 - Dafthunk 文档";
+  const title = "开发者指南 - z3cz.com 文档";
   const description =
-    "使用 Docker 在本地运行 Dafthunk 完整开发栈，了解项目结构、技术栈与贡献方式。";
+    "使用 Docker 在本地运行 z3cz.com 完整开发栈，了解项目结构、技术栈与贡献方式。";
   const url = `${websiteUrl}/docs/developers`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -17,7 +17,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -57,8 +57,8 @@ export default function DocsDevelopers() {
       />
       <h1>开发者指南</h1>
       <p className="lead">
-        欢迎阅读 Dafthunk 开发者指南。本文介绍如何在本地启动项目、理解架构，以及参与贡献。
-        Dafthunk 是开源项目，欢迎提交 Issue 与 Pull Request。
+        欢迎阅读 z3cz.com 开发者指南。本文介绍如何在本地启动项目、理解架构，以及参与贡献。
+        z3cz.com 是开源项目，欢迎提交 Issue 与 Pull Request。
       </p>
 
       <h2 id="changelog">更新说明</h2>

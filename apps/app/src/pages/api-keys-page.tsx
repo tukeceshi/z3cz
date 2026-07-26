@@ -5,7 +5,9 @@ import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-context";
+import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -101,6 +103,21 @@ const createColumns = (t: TranslateFn): ColumnDef<ApiKey>[] => [
 ];
 
 export function ApiKeysPage() {
+  const { t } = useTranslation();
+  const perms = useOrgPermissions();
+
+  if (!perms.canAccessApiKeys) {
+    return (
+      <OrgPermissionGate allowed={false} title={t("sidebar.apiKeys")}>
+        {null}
+      </OrgPermissionGate>
+    );
+  }
+
+  return <ApiKeysPageContent />;
+}
+
+function ApiKeysPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { setBreadcrumbs } = usePageBreadcrumbs([]);

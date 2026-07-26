@@ -1,6 +1,7 @@
 import { useCallback, useState, type MouseEvent, type RefObject } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { useAppToast } from "@/hooks/use-app-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +24,13 @@ interface UseGenerativeCardDoubleClickUploadParams {
   readonly isGenerating: boolean;
   readonly disabled?: boolean;
   readonly uploading?: boolean;
+  readonly blocksGenerativeMedia?: boolean;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
   readonly onClearPrompt: () => void;
-  readonly i18nPrefix: "workflow.aiImagePanel" | "workflow.aiVideoPanel";
+  readonly i18nPrefix:
+    | "workflow.aiImagePanel"
+    | "workflow.aiVideoPanel"
+    | "workflow.aiAudioPanel";
 }
 
 export function useGenerativeCardDoubleClickUpload({
@@ -34,17 +39,19 @@ export function useGenerativeCardDoubleClickUpload({
   isGenerating,
   disabled = false,
   uploading = false,
+  blocksGenerativeMedia = false,
   fileInputRef,
   onClearPrompt,
   i18nPrefix,
 }: UseGenerativeCardDoubleClickUploadParams) {
   const { t } = useTranslation();
+  const toast = useAppToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const canUpload = canGenerativeCardDoubleClickUpload({
     hasMedia,
     isGenerating,
-    disabled,
+    disabled: disabled || blocksGenerativeMedia,
     uploading,
   });
 
@@ -54,17 +61,40 @@ export function useGenerativeCardDoubleClickUpload({
 
   const handleCardDoubleClick = useCallback(
     (event: MouseEvent) => {
+      event.stopPropagation();
+
+      if (blocksGenerativeMedia) {
+        toast.error(`${i18nPrefix}.cardUploadBlockedCloud`);
+        return;
+      }
+
+      if (hasMedia && !isGenerating && !disabled && !uploading) {
+        toast.error(`${i18nPrefix}.cardUploadReplaceNotAllowed`);
+        return;
+      }
+
       if (!canUpload) {
         return;
       }
-      event.stopPropagation();
+
       if (hasGenerativePrompt(prompt)) {
         setConfirmOpen(true);
         return;
       }
       openFilePicker();
     },
-    [canUpload, openFilePicker, prompt]
+    [
+      blocksGenerativeMedia,
+      canUpload,
+      disabled,
+      hasMedia,
+      i18nPrefix,
+      isGenerating,
+      openFilePicker,
+      prompt,
+      toast,
+      uploading,
+    ]
   );
 
   const handleConfirmUpload = useCallback(() => {

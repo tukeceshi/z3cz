@@ -3,9 +3,9 @@ import { Layout } from "../components/layout";
 const websiteUrl = import.meta.env.VITE_WEBSITE_URL;
 
 export function meta() {
-  const title = "Terms of Service - Dafthunk";
+  const title = "Terms of Service - z3cz.com";
   const description =
-    "Terms of Service for Dafthunk: alpha release disclosures, acceptable use, prohibited activities, AI-generated components, and data handling in workflows.";
+    "Terms of Service for z3cz.com: alpha release disclosures, acceptable use, prohibited activities, AI-generated components, and data handling in workflows.";
   const url = `${websiteUrl}/terms`;
   const ogImage = `${websiteUrl}/og-image.webp`;
 
@@ -17,7 +17,7 @@ export function meta() {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:url", content: url },
     { name: "twitter:title", content: title },
@@ -49,11 +49,11 @@ export default function Terms() {
           <div className="space-y-16">
             <div>
               <p className="text-xl text-gray-600 leading-relaxed mb-6">
-                These Terms of Service govern your use of Dafthunk and outline
+                These Terms of Service govern your use of z3cz.com and outline
                 the conditions under which we provide our service.
               </p>
               <p className="text-xl text-gray-600 leading-relaxed">
-                By using Dafthunk, you agree to these Terms of Service. Please
+                By using z3cz.com, you agree to these Terms of Service. Please
                 also review our{" "}
                 <a
                   href="/privacy"
@@ -70,7 +70,7 @@ export default function Terms() {
                 1. Alpha Release and AI-Generated Components
               </h2>
               <p className="text-xl text-gray-600 leading-relaxed mb-6">
-                Dafthunk is currently in an <strong>alpha release stage</strong>{" "}
+                z3cz.com is currently in an <strong>alpha release stage</strong>{" "}
                 and is under active development. Parts of the service, including
                 its core functionalities, are developed using{" "}
                 <strong>generative AI technologies</strong>. As such:
@@ -86,7 +86,7 @@ export default function Terms() {
                 </li>
               </ul>
               <p className="text-xl text-gray-600 leading-relaxed">
-                By using Dafthunk, you acknowledge and accept these limitations
+                By using z3cz.com, you acknowledge and accept these limitations
                 and understand that you are using the service{" "}
                 <strong>at your own risk</strong>.
               </p>
@@ -97,7 +97,7 @@ export default function Terms() {
                 2. Acceptable Use and Prohibited Activities
               </h2>
               <p className="text-xl text-gray-600 leading-relaxed mb-6">
-                You agree to use Dafthunk in compliance with all applicable laws
+                You agree to use z3cz.com in compliance with all applicable laws
                 and regulations and not to engage in any of the following
                 prohibited activities:
               </p>

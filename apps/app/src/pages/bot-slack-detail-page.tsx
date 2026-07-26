@@ -8,6 +8,7 @@ import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
+import { useOwnerPageGuard } from "@/hooks/use-owner-page-guard";
 import { Button } from "@/components/ui/button";
 import { DetailRow } from "@/components/ui/detail-row";
 import { getApiBaseUrl } from "@/config/api";
@@ -19,6 +20,12 @@ import { useSlackBot } from "@/services/bot-service";
 import { BotSlackEditDialog } from "./bot-slack-edit-dialog";
 
 export function BotSlackDetailPage() {
+  const ownerGuard = useOwnerPageGuard("sidebar.bots");
+  if (ownerGuard.blocked) return ownerGuard.gate;
+  return <BotSlackDetailPageContent />;
+}
+
+function BotSlackDetailPageContent() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const { id } = useParams<{ id: string }>();

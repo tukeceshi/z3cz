@@ -5,11 +5,12 @@ import type {
   WorkflowScheme,
   WorkflowTrigger,
 } from "@dafthunk/types";
+import { WORKFLOW_SCHEME_OMNIPOTENT_ID } from "@dafthunk/types";
 import {
   ALL_WORKFLOW_RUNTIMES,
   ALL_WORKFLOW_TRIGGERS,
 } from "@dafthunk/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -143,6 +144,11 @@ export function AdminWorkflowSchemesPage() {
   );
   const [form, setForm] = useState<SchemeFormState>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
+
+  const visibleSchemes = useMemo(
+    () => schemes.filter((scheme) => scheme.id !== WORKFLOW_SCHEME_OMNIPOTENT_ID),
+    [schemes]
+  );
 
   useEffect(() => {
     setBreadcrumbs([{ label: t("adminWorkflowSchemes.title") }]);
@@ -307,7 +313,7 @@ export function AdminWorkflowSchemesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {schemes.map((scheme) => (
+            {visibleSchemes.map((scheme) => (
               <TableRow key={scheme.id}>
                 <TableCell>
                   <div className="font-medium">{scheme.name}</div>

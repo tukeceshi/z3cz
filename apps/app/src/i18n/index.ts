@@ -108,7 +108,7 @@ export function readStoredLocale(): AppLocale | null {
 }
 
 export function detectBrowserLocale(): AppLocale {
-  if (typeof navigator === "undefined") return "zh";
+  if (typeof navigator === "undefined") return "en";
   const lang = navigator.language.toLowerCase();
   return lang.startsWith("zh") ? "zh" : "en";
 }

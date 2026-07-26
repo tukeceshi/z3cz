@@ -25,7 +25,7 @@ export const buildingEffectiveAgentsContent = (
       keep asking is whether there is a structural move underneath. What if the
       descriptions the model reads were the descriptions everyone reads? What if
       there were no separate tool surface to invest in? But first let's see how
-      some of the patterns identified in the article map in Dafthunk.
+      some of the patterns identified in the article map in z3cz.com.
     </p>
 
     <h2 id="workflow-or-agent">Workflow or Agent</h2>
@@ -37,7 +37,7 @@ export const buildingEffectiveAgentsContent = (
     </p>
 
     <p>
-      Two nodes do the work in Dafthunk. A <em>regular node</em> calls a model
+      Two nodes do the work in z3cz.com. A <em>regular node</em> calls a model
       once and returns the answer. An <em>agentic node</em> runs the model in a
       loop, picks a tool, reads the result, and chooses what to do next. You
       decide where the workflow ends and the agent begins.
@@ -55,7 +55,7 @@ export const buildingEffectiveAgentsContent = (
       add a fork. A router becomes an agent when one of its nodes turns agentic.
       An agent goes fully autonomous when you remove the surrounding graph.
       Let's walk through a few of the patterns Anthropic identifies and see how
-      they map to Dafthunk's building blocks.
+      they map to z3cz.com's building blocks.
     </p>
 
     <h3 id="augmented-llm">The Augmented LLM</h3>
@@ -237,7 +237,7 @@ export const buildingEffectiveAgentsContent = (
     </p>
 
     <p>
-      In Dafthunk the tools are just a subset of the nodes: the ones that can be
+      In z3cz.com the tools are just a subset of the nodes: the ones that can be
       called from an agentic node. Since nodes have several inputs, settings let
       the user define presets. The agent fills in the blanks at runtime using
       the descriptions and schemas on the node.
@@ -247,7 +247,7 @@ export const buildingEffectiveAgentsContent = (
       To see the patterns in action, browse the{" "}
       <Link to="/nodes">nodes reference</Link>. The{" "}
       <Link to="/docs/concepts">core concepts</Link> page describes how
-      triggers, executions, and resources fit together. Dafthunk is{" "}
+      triggers, executions, and resources fit together. z3cz.com is{" "}
       <a
         href="https://github.com/dafthunk-com/dafthunk"
         target="_blank"

@@ -3,30 +3,21 @@ import type {
   VolcanoPackageListCache,
   VolcanoResourcePackageFetchMode,
 } from "@dafthunk/types";
+import {
+  isPackageListCacheFresh,
+  readPackageListCache,
+  VOLCANO_PACKAGE_LIST_CACHE_TTL_MS,
+  getPackageListNextRefreshAt,
+} from "@dafthunk/types";
+
 import type { VolcanoResourcePackageRow } from "./parse-resource-packages";
 
-export const VOLCANO_PACKAGE_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
-
-export function isPackageListCacheFresh(
-  cache: VolcanoPackageListCache,
-  nowMs: number = Date.now()
-): boolean {
-  const fetchedAt = Date.parse(cache.fetchedAt);
-  if (Number.isNaN(fetchedAt)) {
-    return false;
-  }
-  return nowMs - fetchedAt < VOLCANO_PACKAGE_LIST_CACHE_TTL_MS;
-}
-
-export function readPackageListCache(
-  metadata: VolcanoInterfaceMetadata
-): VolcanoPackageListCache | null {
-  const cache = metadata.packageListCache;
-  if (!cache || !Array.isArray(cache.rows)) {
-    return null;
-  }
-  return cache;
-}
+export {
+  isPackageListCacheFresh,
+  readPackageListCache,
+  VOLCANO_PACKAGE_LIST_CACHE_TTL_MS,
+  getPackageListNextRefreshAt,
+};
 
 export function buildPackageListCache(params: {
   mode: VolcanoResourcePackageFetchMode;

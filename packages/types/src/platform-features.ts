@@ -13,8 +13,7 @@ export const RESOURCE_FEATURE_IDS = [
 /** Org sidebar workflow section — always visible, not controlled by featureConfig */
 export const WORKFLOW_NAV_ITEM_IDS = [
   "workflows",
-  "executions",
-  "feedback",
+  "model-calls",
   "templates",
   "playground",
 ] as const;

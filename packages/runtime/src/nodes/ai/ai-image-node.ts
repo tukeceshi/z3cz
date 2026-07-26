@@ -386,13 +386,36 @@ export class AiImageNode extends ExecutableNode {
 
 
 
-    const storageResolution = context.resolveAiImageStorage
+    let storageResolution: Awaited<
+      ReturnType<NonNullable<typeof context.resolveAiImageStorage>>
+    >;
+    try {
+      storageResolution = context.resolveAiImageStorage
+        ? await context.resolveAiImageStorage()
+        : { storageMode: "ephemeral" as const };
+    } catch (error) {
+      return this.createErrorResult(
+        error instanceof Error
+          ? error.message
+          : "Cloud storage is unavailable for image persistence"
+      );
+    }
 
-      ? await context.resolveAiImageStorage()
-
-      : { storageMode: "ephemeral" as const };
-
-
+    let generationJobId: string | null = null;
+    if (
+      storageResolution.storageMode === "cloud" &&
+      context.trackWorkflowGenerationJob
+    ) {
+      generationJobId = await context.trackWorkflowGenerationJob.begin({
+        organizationId: context.organizationId,
+        workflowId: context.workflowId,
+        executionId: context.executionId,
+        nodeId: context.nodeId,
+        modality: "image",
+        modelCanonicalId,
+        interfaceId,
+      });
+    }
 
     const result = await executeVolcanoImageGeneration({
 
@@ -426,11 +449,26 @@ export class AiImageNode extends ExecutableNode {
 
     if (result.status === "failed") {
 
+      if (generationJobId && context.trackWorkflowGenerationJob) {
+        await context.trackWorkflowGenerationJob.complete({
+          organizationId: context.organizationId,
+          jobId: generationJobId,
+          status: "failed",
+          failureReason: result.error ?? "Image generation failed",
+        });
+      }
+
       return this.createErrorResult(result.error ?? "Image generation failed");
 
     }
 
-
+    if (generationJobId && context.trackWorkflowGenerationJob) {
+      await context.trackWorkflowGenerationJob.complete({
+        organizationId: context.organizationId,
+        jobId: generationJobId,
+        status: "succeeded",
+      });
+    }
 
     return this.createSuccessResult(
 

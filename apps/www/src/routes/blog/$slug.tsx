@@ -44,10 +44,10 @@ export function loader({ params }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  if (!data) return [{ title: "Not Found - Dafthunk" }];
+  if (!data) return [{ title: "Not Found - z3cz.com" }];
 
   const { post } = data;
-  const title = `${post.title} - Dafthunk Blog`;
+  const title = `${post.title} - z3cz.com Blog`;
   const description = post.description;
   const url = `${websiteUrl}/blog/${post.id}`;
   const ogImage = `${websiteUrl}/og-image.webp`;
@@ -60,7 +60,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: ogImage },
-    { property: "og:site_name", content: "Dafthunk" },
+    { property: "og:site_name", content: "z3cz.com" },
     { property: "article:published_time", content: post.date },
     { property: "article:author", content: post.author },
     ...post.tags.map((tag) => ({ property: "article:tag", content: tag })),
@@ -95,7 +95,7 @@ export default function BlogPostPage({
     author: { "@type": "Organization", name: post.author },
     publisher: {
       "@type": "Organization",
-      name: "Dafthunk",
+      name: "z3cz.com",
       logo: {
         "@type": "ImageObject",
         url: `${websiteUrl}/logo-black.png`,

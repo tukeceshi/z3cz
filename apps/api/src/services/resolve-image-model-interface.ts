@@ -3,9 +3,11 @@ import type {
   ImageModelParameterRules,
   OrgImageModelOption,
   OrgTextModelUnavailableReason,
-  PlatformAiModel,
 } from "@dafthunk/types";
-import { isVolcanoAiInterfaceProvider } from "@dafthunk/types";
+import {
+  isVolcanoAiInterfaceProvider,
+  resolveVolcanoInferenceModelId,
+} from "@dafthunk/types";
 
 import type { Database } from "../db";
 import {
@@ -20,6 +22,8 @@ import {
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
 import {
+  collectSingleModelInterfaces,
+  evaluateOrgTextModelAvailability,
   sortInterfacesByPriority,
   type VolcanoInterfaceCandidate,
 } from "./resolve-text-model-interface";
@@ -48,43 +52,11 @@ function collectVolcanoInterfaces(
           id: row.id,
           createdAt: new Date(row.createdAt),
           models: metadata.models,
+          arkEndpoints: metadata.arkEndpoints,
+          arkApiKeyScope: metadata.arkApiKeyScope,
         },
       ];
     });
-}
-
-export function evaluateOrgImageModelAvailability(
-  canonicalId: string,
-  volcanoInterfaces: readonly VolcanoInterfaceCandidate[]
-): {
-  readonly selectable: boolean;
-  readonly unavailableReason?: OrgTextModelUnavailableReason;
-} {
-  if (volcanoInterfaces.length === 0) {
-    return { selectable: false, unavailableReason: "no_org_interface" };
-  }
-
-  const enabledOnInterface = volcanoInterfaces.some(
-    (entry) => entry.models[canonicalId]?.enabled === true
-  );
-  if (enabledOnInterface) {
-    return { selectable: true };
-  }
-
-  const existsOnInterface = volcanoInterfaces.some(
-    (entry) => canonicalId in entry.models
-  );
-  if (!existsOnInterface) {
-    return {
-      selectable: false,
-      unavailableReason: "model_missing_on_interface",
-    };
-  }
-
-  return {
-    selectable: false,
-    unavailableReason: "model_disabled_on_interface",
-  };
 }
 
 export async function listOrgImageModelOptions(
@@ -100,11 +72,13 @@ export async function listOrgImageModelOptions(
   const groupById = new Map(groups.map((group) => [group.id, group]));
   const visibleModels = platformModels.filter((model) => model.platformEnabled);
   const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
+  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
 
   return visibleModels.map((model) => {
-    const availability = evaluateOrgImageModelAvailability(
+    const availability = evaluateOrgTextModelAvailability(
       model.canonicalId,
-      volcanoInterfaces
+      volcanoInterfaces,
+      singleModelInterfaces
     );
     const group = model.groupId ? groupById.get(model.groupId) : undefined;
 
@@ -115,7 +89,8 @@ export async function listOrgImageModelOptions(
       providerModelId: model.providerModelId,
       parameterRules: getImageParameterRules(model),
       selectable: availability.selectable,
-      unavailableReason: availability.unavailableReason,
+      unavailableReason:
+        availability.unavailableReason as OrgTextModelUnavailableReason | undefined,
       description: model.description,
       groupId: model.groupId,
       groupName: group?.name ?? null,
@@ -144,26 +119,62 @@ export async function resolveImageModelInterface(
     [];
 
   const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
-  const candidates = volcanoInterfaces.filter(
-    (entry) => entry.models[canonicalId]?.enabled === true
-  );
+  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
 
-  const sorted = sortInterfacesByPriority(
-    priorityIds,
-    candidates.map((entry) => ({
+  const volcanoCandidates = volcanoInterfaces
+    .filter((entry) => entry.models[canonicalId]?.enabled === true)
+    .map((entry) => ({
       id: entry.id,
       createdAt: entry.createdAt,
-    }))
-  );
+      volcano: entry,
+    }));
+
+  const directCandidates = singleModelInterfaces
+    .filter((entry) => entry.models[canonicalId]?.enabled === true)
+    .map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt,
+      upstreamModelId: entry.models[canonicalId]!.upstreamModelId,
+    }));
+
+  const sorted = sortInterfacesByPriority(priorityIds, [
+    ...volcanoCandidates,
+    ...directCandidates,
+  ]);
 
   const match = sorted[0];
   if (!match) return null;
 
+  const directMatch = directCandidates.find((entry) => entry.id === match.id);
+  if (directMatch) {
+    const ifaceRow = interfaces.find((entry) => entry.id === match.id);
+    if (!ifaceRow) return null;
+
+    return {
+      canonicalId,
+      displayName: option.displayName,
+      interfaceId: ifaceRow.id,
+      interfaceName: ifaceRow.name,
+      providerModelId: directMatch.upstreamModelId,
+      parameterRules: option.parameterRules,
+    };
+  }
+
+  const volcanoMatch = volcanoCandidates.find((entry) => entry.id === match.id);
+  if (!volcanoMatch) return null;
+
   const row = volcanoInterfaces.find((entry) => entry.id === match.id);
   if (!row) return null;
 
-  const providerModelId =
-    row.models[canonicalId]?.providerModelId ?? option.providerModelId;
+  const providerModelId = resolveVolcanoInferenceModelId({
+    canonicalId,
+    providerModelId:
+      row.models[canonicalId]?.providerModelId ?? option.providerModelId,
+    metadata: {
+      arkEndpoints: volcanoMatch.volcano.arkEndpoints,
+      arkApiKeyScope: volcanoMatch.volcano.arkApiKeyScope,
+    },
+  });
 
   const ifaceRow = interfaces.find((entry) => entry.id === match.id);
   if (!ifaceRow) return null;
