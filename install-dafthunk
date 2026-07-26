@@ -3,7 +3,7 @@
 # Dafthunk One-Line Installer (Discourse-style)
 #
 # Usage (one shot: env prep + clone + setup + rebuild):
-#   wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+#   sudo bash <(wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk)
 #
 # Resume after disconnect / re-run safely:
 #   sudo bash /var/dafthunk/install-dafthunk --resume
@@ -21,6 +21,7 @@
 #
 set -euo pipefail
 
+INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
@@ -34,6 +35,7 @@ NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
 TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 APT_LOG="${TEMP_LOG}.apt.log"
 LOG_FILE="$TEMP_LOG"
+LOGGING_STARTED=0
 
 RESUME=0
 SKIP_DOCKER=0
@@ -83,6 +85,9 @@ M() {
         skip_swap) echo "Skipping swap setup (--skip-swap)" ;;
         step_memory) echo "Memory check" ;;
         mem_pass) echo "Memory check passed (required $1, usable ≈ $2)" ;;
+        mem_skip_swap) echo "Memory target met — skipping swap prompt" ;;
+        pipe_stdin) echo "Interactive install needs a terminal on stdin." ;;
+        pipe_stdin_hint) echo "Run: sudo bash <(wget -qO- $INSTALLER_URL)" ;;
         mem_need_req) echo "Required memory: $1" ;;
         mem_need_actual) echo "Detected RAM: $1" ;;
         mem_need_swap_prompt) echo "Swap is needed. Enter for 2G, or type 2–4 (0 to skip): " ;;
@@ -163,6 +168,9 @@ M() {
         skip_swap) echo "跳过 swap 设置 (--skip-swap)" ;;
         step_memory) echo "内存检查" ;;
         mem_pass) echo "内存检查通过（要求 $1，当前可用约 $2）" ;;
+        mem_skip_swap) echo "内存已达标，跳过 swap 配置" ;;
+        pipe_stdin) echo "交互安装需要终端 stdin，不能用 wget 管道直接喂给 bash。" ;;
+        pipe_stdin_hint) echo "请改用: sudo bash <(wget -qO- $INSTALLER_URL)" ;;
         mem_need_req) echo "要求内存：$1" ;;
         mem_need_actual) echo "实际内存：$1" ;;
         mem_need_swap_prompt) echo "需要增加 swap。回车默认 2G，或输入 2~4（0 跳过）：" ;;
@@ -303,7 +311,7 @@ choose_ui_lang_interactive() {
   echo "  1) 中文（默认）" >&2
   echo "  2) English" >&2
   local choice
-  choice="$(ask "选择 / Choice [1]: " "1")"
+  ask_into choice "选择 / Choice [1]: " "1"
   case "$choice" in
     2|en|EN|english|English) UI_LANG="en" ;;
     *) UI_LANG="zh" ;;
@@ -374,32 +382,33 @@ read_interactive_line() {
   printf -v "$__var" '%s' "$value"
 }
 
-# prompt default → prints ONLY the answer on stdout (safe for answer="$(ask …)").
-ask() {
-  local prompt="$1"
-  local default="$2"
-  local answer=""
+# Set answer in caller variable (never use $(ask…) — subshell hides exit).
+ask_into() {
+  local __var="$1"
+  local prompt="$2"
+  local default="$3"
+  local value=""
 
   if ! can_prompt; then
     ask_status "$(M non_interactive_default "$prompt" "$default")"
-    printf '%s' "$default"
+    printf -v "$__var" '%s' "$default"
     return 0
   fi
 
   printf '%s\n' "$prompt" >&2
-  read_interactive_line answer
-  if [[ -z "${answer:-}" ]]; then
-    printf '%s' "$default"
+  read_interactive_line value
+  if [[ -z "${value:-}" ]]; then
+    printf -v "$__var" '%s' "$default"
   else
-    printf '%s' "$answer"
+    printf -v "$__var" '%s' "$value"
   fi
 }
 
 ask_yes_no() {
   local prompt="$1"
   local default="${2:-Y}"
-  local answer
-  answer="$(ask "$prompt" "$default")"
+  local answer=""
+  ask_into answer "$prompt" "$default"
   answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
   case "$answer" in
     y|yes|是|"") return 0 ;;
@@ -413,13 +422,30 @@ ask_yes_no() {
   esac
 }
 
+reject_piped_stdin() {
+  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ -t 0 ]]; then
+    return 0
+  fi
+  log_error "$(M pipe_stdin)"
+  echo "$(M pipe_stdin_hint)" >&2
+  exit 1
+}
+
+ensure_logging() {
+  if [[ "$LOGGING_STARTED" == "1" ]]; then
+    return 0
+  fi
+  setup_logging
+  LOGGING_STARTED=1
+}
+
 show_help() {
   if [[ "$UI_LANG" == "en" ]]; then
     cat <<EOF
 Dafthunk one-line installer
 
 Usage:
-  wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+  sudo bash <(wget -qO- $INSTALLER_URL)
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 Options:
@@ -444,7 +470,7 @@ EOF
 Dafthunk 一键安装脚本
 
 用法:
-  wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+  sudo bash <(wget -qO- $INSTALLER_URL)
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 选项:
@@ -545,7 +571,7 @@ check_root() {
     log_error "$(M need_root)"
     echo
     echo "$(M run_with_sudo)"
-    echo "  wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash"
+    echo "  sudo bash <(wget -qO- $INSTALLER_URL)"
     echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
     exit 1
   fi
@@ -639,12 +665,13 @@ ensure_swap() {
   # Soft-meet: within slack of target → pass, no prompts.
   if ((usable + RAM_SLACK_MIB >= TARGET_TOTAL_MIB)); then
     log_info "$(M mem_pass "$req_label" "$(mib_to_gib_tier "$usable")")"
+    log_info "$(M mem_skip_swap)"
     return 0
   fi
 
   echo "$(M mem_need_req "$req_label")" >&2
   echo "$(M mem_need_actual "$ram_label")" >&2
-  answer="$(ask "$(M mem_need_swap_prompt)" "$default_gib")"
+  ask_into answer "$(M mem_need_swap_prompt)" "$default_gib"
   if ! size_mib="$(parse_swap_gib_choice "$answer" "$default_gib")"; then
     log_warn "$(M swap_invalid "$answer" "$default_gib")"
     size_mib=$((default_gib * 1024))
@@ -713,7 +740,8 @@ ensure_timezone() {
     return 0
   fi
 
-  new_tz="$(ask "$(M tz_new_prompt "$TZ_SUGGEST")" "$TZ_SUGGEST")"
+  new_tz=""
+  ask_into new_tz "$(M tz_new_prompt "$TZ_SUGGEST")" "$TZ_SUGGEST"
   if [[ -z "$new_tz" ]]; then
     new_tz="$TZ_SUGGEST"
   fi
@@ -803,19 +831,13 @@ install_packages_get_docker() {
   ask_status "$(M interactive_next)"
 }
 
-prepare_host() {
+prepare_host_interactive() {
   log_step "$(M step_host)"
   if can_prompt; then
     ask_status "$(M interactive_section)"
   fi
   ensure_swap
   ensure_timezone
-
-  if command -v apt-get >/dev/null 2>&1; then
-    install_packages_apt
-  else
-    install_packages_get_docker
-  fi
 }
 
 setup_repo() {
@@ -864,11 +886,11 @@ print_resume_hint() {
 
 try_attach_tmux() {
   local session="$1"
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    # wget|bash + tee often cannot give tmux a usable terminal — never abort install.
-    if tmux attach -t "$session" </dev/tty >/dev/tty 2>/dev/null; then
-      return 0
-    fi
+  if ! can_prompt; then
+    return 0
+  fi
+  if tmux attach -t "$session" 2>/dev/null; then
+    return 0
   fi
   log_warn "$(M tmux_attach_fail "$session")"
   return 0
@@ -876,10 +898,11 @@ try_attach_tmux() {
 
 try_attach_screen() {
   local session="$1"
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    if screen -r "$session" </dev/tty >/dev/tty 2>/dev/null; then
-      return 0
-    fi
+  if ! can_prompt; then
+    return 0
+  fi
+  if screen -r "$session" 2>/dev/null; then
+    return 0
   fi
   log_warn "$(M screen_attach_fail "$session")"
   return 0
@@ -978,8 +1001,18 @@ run_setup_and_rebuild() {
 
 apply_lang_from_flag_or_env
 check_root
+reject_piped_stdin
 choose_ui_lang_interactive
-setup_logging
+
+if [[ "$SKIP_DOCKER" != "1" ]]; then
+  prepare_host_interactive
+else
+  if [[ "$SKIP_SWAP" != "1" ]]; then
+    ensure_swap
+  fi
+fi
+
+ensure_logging
 lang_label="中文"
 [[ "$UI_LANG" == "en" ]] && lang_label="English"
 log_info "$(M lang_using "$lang_label")"
@@ -989,12 +1022,13 @@ if [[ "$RESUME" == "1" ]]; then
 fi
 
 if [[ "$SKIP_DOCKER" != "1" ]]; then
-  prepare_host
+  if command -v apt-get >/dev/null 2>&1; then
+    install_packages_apt
+  else
+    install_packages_get_docker
+  fi
 else
   log_info "$(M skip_pkgs)"
-  if [[ "$SKIP_SWAP" != "1" ]]; then
-    ensure_swap
-  fi
   if ! command -v docker >/dev/null 2>&1; then
     log_error "$(M docker_not_found)"
     exit 1

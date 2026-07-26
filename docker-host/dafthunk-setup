@@ -238,23 +238,24 @@ read_interactive_line() {
   printf -v "$__var" '%s' "$value"
 }
 
-ask_line() {
-  local prompt="$1"
-  local default="${2:-}"
+ask_into() {
+  local __var="$1"
+  local prompt="$2"
+  local default="${3:-}"
   local value=""
 
   if ! can_prompt; then
     printf '%s\n' "(non-interactive) $prompt → $default" >&2
-    printf '%s' "$default"
+    printf -v "$__var" '%s' "$default"
     return 0
   fi
 
   printf '%s\n' "$prompt" >&2
   read_interactive_line value
   if [[ -z "${value:-}" ]]; then
-    printf '%s' "$default"
+    printf -v "$__var" '%s' "$default"
   else
-    printf '%s' "$value"
+    printf -v "$__var" '%s' "$value"
   fi
 }
 
@@ -264,14 +265,16 @@ echo "$(M admin_hint)"
 echo "$(M need_input)"
 echo ""
 
-hostname="$(ask_line "$(M hostname)" "localhost")"
+hostname=""
+ask_into hostname "$(M hostname)" "localhost"
 
 https="true"
 if looks_like_local "$hostname"; then
   echo "$(M local_http)"
   https="false"
 else
-  https_answer="$(ask_line "$(M https)" "Y")"
+  https_answer=""
+  ask_into https_answer "$(M https)" "Y"
   https_answer="$(echo "${https_answer:-}" | tr '[:upper:]' '[:lower:]')"
   if [[ "$https_answer" == "n" || "$https_answer" == "no" || "$https_answer" == "否" ]]; then
     https="false"
@@ -280,14 +283,14 @@ fi
 
 le_email=""
 if [[ "$https" == "true" ]]; then
-  le_email="$(ask_line "$(M le_email)" "")"
+  ask_into le_email "$(M le_email)" ""
 fi
 
 read_port() {
   local prompt="$1"
   local default="$2"
-  local value
-  value="$(ask_line "$prompt" "$default")"
+  local value=""
+  ask_into value "$prompt" "$default"
   if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1 || value > 65535)); then
     echo "$(M bad_port "$value" "$default")" >&2
     value="$default"

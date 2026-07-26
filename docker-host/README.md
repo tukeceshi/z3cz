@@ -14,18 +14,18 @@
 
 ```bash
 sudo apt-get update && sudo apt-get upgrade -y   # 可选；耗时长，建议 tmux/screen
-wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+sudo bash <(wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk)
 ```
 
 推荐 Ubuntu。一键脚本会：
 
 1. 提示语言默认中文（`--lang en`；菜单用 `--lang ask`）  
-2. 内存检查：达标直接通过；不足则询问 swap（默认 2G，可选 2～4 / `0` 跳过）  
+2. 内存检查：达标则跳过 swap 问答；不足则询问 swap（默认 2G，可选 2～4 / `0` 跳过）  
 3. 显示当前时区，默认保持；可选修改  
 4. `apt update` 并安装 `docker.io` + Compose + `git`（静默；详情见 `install.log` / `*.apt.log`）  
 5. clone → setup → 串行 `launcher rebuild`
 
-目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-swap`、`--force-setup`、`--non-interactive`。交互读失败不会静默用默认；rebuild 进 tmux 后台，必要时 `tmux attach -t dafthunk-install`。
+目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-swap`、`--force-setup`、`--non-interactive`。请用 `sudo bash <(wget …)`，勿用 `wget | bash`。rebuild 进 tmux 后台，必要时 `tmux attach -t dafthunk-install`。
 
 ## 更新
 
