@@ -88,6 +88,9 @@ importers:
       nanoid:
         specifier: ^5.1.11
         version: 5.1.11
+      nodemailer:
+        specifier: ^6.10.1
+        version: 6.10.1
       openai:
         specifier: ^6.37.0
         version: 6.37.0(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
@@ -4515,6 +4518,10 @@ packages:
 
   node-releases@2.0.44:
     resolution: {integrity: sha512-5WUyunoPMsvvEhS8AxHtRzP+oA8UCkJ7YRxatWKjngndhDGLiqEVAQKWjFAiAiuL8zMRGzGSJxFnLetoa43qGQ==}
+
+  nodemailer@6.10.1:
+    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
+    engines: {node: '>=6.0.0'}
 
   nodemailer@9.0.3:
     resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
@@ -10081,6 +10088,8 @@ snapshots:
     optional: true
 
   node-releases@2.0.44: {}
+
+  nodemailer@6.10.1: {}
 
   nodemailer@9.0.3: {}
 

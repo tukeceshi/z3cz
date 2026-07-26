@@ -125,8 +125,15 @@ async function main() {
     case "bootstrap":
     case "rebuild": {
       render();
-      const code = compose(["up", "-d", "--build", "--remove-orphans"]);
-      process.exit(code === 0 ? 0 : code);
+      // Sequential builds avoid OOM on small VPS (parallel bake).
+      console.log("Building images sequentially (api → www → app)...");
+      for (const service of ["api", "www", "app"]) {
+        const buildCode = compose(["build", service]);
+        if (buildCode !== 0) {
+          process.exit(buildCode);
+        }
+      }
+      process.exit(compose(["up", "-d", "--remove-orphans"]) === 0 ? 0 : 1);
       return;
     }
     case "start": {

@@ -22,9 +22,9 @@
 
 #### 系统要求
 
-- Linux（推荐 Ubuntu）
-- root 或 sudo
-- 可访问外网（脚本会按需安装 Docker、Git）
+- Linux（推荐 **Ubuntu**）
+- root 或 sudo、可访问外网
+- 建议可用内存约 **4G**（内存 + swap；不足时脚本会对话引导加 swap）
 
 #### 安装
 
@@ -32,7 +32,15 @@
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-一条命令完成：装 Docker/Git（若缺）→ clone → 向导写配置 → `launcher rebuild`。默认目录 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖）。有 `tmux`/`screen` 时 rebuild 会放进会话，降低 SSH 断线中断概率。打开打印的 URL 注册登录；**首个用户**为平台管理员。本地默认 `http://localhost:8080`。补充说明见下方「部署」。
+一条命令会依次：
+
+1. 选择提示语言（默认中文；`--lang en` 或 `DAFTHUNK_LANG=en`）  
+2. 检测内存，对话确认 swap（默认凑满约 4G；可改大小或填 `0` 跳过）  
+3. 显示服务器当前时区，默认保持；可选改为其他 IANA（建议默认 `Asia/Shanghai`）  
+4. `apt update && apt upgrade`，安装 `docker.io`、Compose、`git`  
+5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
+
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。有 `tmux`/`screen` 时 rebuild 进会话。打开打印的 URL 注册；**首个用户**为平台管理员。本地无公网域名时可用 `localhost` + 端口。补充见下方「部署」。
 
 #### 更新
 

@@ -1,17 +1,37 @@
-import type { LegalDocumentsConfig } from "./legal-documents";
+import type { AppLocale } from "./site-settings";
 import { DEFAULT_LEGAL_DOCUMENTS } from "./default-legal-documents";
 
-export type {
-  AdminLegalDocumentsConfig,
-  LegalDocumentContent,
-  LegalDocumentType,
-  LegalDocumentsConfig,
-  LocalizedLegalDocument,
-  PublicLegalDocumentResponse,
-  UpdateLegalDocumentsRequest,
-} from "./legal-documents";
-
 export { DEFAULT_LEGAL_DOCUMENTS };
+
+export type LegalDocumentType = "terms" | "privacy";
+
+export interface LegalDocumentContent {
+  readonly title: string;
+  readonly effectiveDate: string;
+  readonly body: string;
+}
+
+export type LocalizedLegalDocument = Record<AppLocale, LegalDocumentContent>;
+
+export interface LegalDocumentsConfig {
+  readonly terms: LocalizedLegalDocument;
+  readonly privacy: LocalizedLegalDocument;
+}
+
+export interface AdminLegalDocumentsConfig extends LegalDocumentsConfig {
+  readonly updatedAt: string;
+  readonly updatedBy: string | null;
+}
+
+export interface UpdateLegalDocumentsRequest {
+  readonly legalConfig: LegalDocumentsConfig;
+}
+
+export interface PublicLegalDocumentResponse {
+  readonly type: LegalDocumentType;
+  readonly locale: AppLocale;
+  readonly document: LegalDocumentContent;
+}
 
 export function mergeLegalDocumentsConfig(
   partial: Partial<LegalDocumentsConfig> | null | undefined

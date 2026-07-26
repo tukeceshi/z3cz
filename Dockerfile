@@ -104,6 +104,8 @@ ENV VITE_API_HOST=${VITE_API_HOST}
 ENV VITE_WEBSITE_URL=${VITE_WEBSITE_URL}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_WS_VIA_PROXY=${VITE_WS_VIA_PROXY}
+# Small VPS (2GB): allow Vite to use swap instead of dying at ~1GB default heap.
+ENV NODE_OPTIONS=--max-old-space-size=1536
 
 RUN pnpm --filter '@dafthunk/types' build \
   && pnpm --filter '@dafthunk/app' build:docker-prod
@@ -132,6 +134,7 @@ ENV VITE_WWW_BASENAME=${VITE_WWW_BASENAME}
 ENV VITE_CONTACT_EMAIL=${VITE_CONTACT_EMAIL}
 
 ENV DAFTHUNK_WWW_TARGET=node
+ENV NODE_OPTIONS=--max-old-space-size=1536
 
 RUN pnpm --filter '@dafthunk/www' extract-nodes \
   && pnpm --filter '@dafthunk/www' build:node

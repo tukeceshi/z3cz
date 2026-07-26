@@ -126,18 +126,25 @@ if [[ "$https" == "true" ]]; then
   read -r -p "ACME notification email (optional, Enter to skip): " le_email
 fi
 
+read_port() {
+  local prompt="$1"
+  local default="$2"
+  local value=""
+  read -r -p "$prompt" value
+  value="${value:-$default}"
+  if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1 || value > 65535)); then
+    echo "Invalid port '$value' — using default $default" >&2
+    value="$default"
+  fi
+  printf '%s' "$value"
+}
+
 if [[ "$https" == "true" ]]; then
-  http_port=80
-  https_port=443
-  read -r -p "HTTP port [80]: " http_answer
-  [[ -n "${http_answer:-}" ]] && http_port="$http_answer"
-  read -r -p "HTTPS port [443]: " https_answer_port
-  [[ -n "${https_answer_port:-}" ]] && https_port="$https_answer_port"
+  http_port="$(read_port "HTTP port [80]: " "80")"
+  https_port="$(read_port "HTTPS port [443]: " "443")"
 else
-  http_port=8080
+  http_port="$(read_port "HTTP port [8080]: " "8080")"
   https_port=443
-  read -r -p "HTTP port [8080]: " port_answer
-  [[ -n "${port_answer:-}" ]] && http_port="$port_answer"
 fi
 
 jwt=""

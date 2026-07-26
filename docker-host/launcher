@@ -61,10 +61,14 @@ require_app_yml() {
 }
 
 compose() {
-  docker compose \
-    -f "$COMPOSE_FILE" \
-    --env-file "$ENV_FILE" \
-    "$@"
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  else
+    echo "Neither 'docker compose' nor 'docker-compose' found." >&2
+    exit 1
+  fi
 }
 
 run_render() {
@@ -114,7 +118,12 @@ case "$COMMAND" in
     echo "      (shared/ data is kept; log may be in ../install.log)"
     echo ""
     run_render
-    compose up -d --build --remove-orphans
+    # Build one service at a time — parallel bake OOMs on 2GB VPS.
+    echo "Building images sequentially (api → www → app)..."
+    compose build api
+    compose build www
+    compose build app
+    compose up -d --remove-orphans
     ;;
   start)
     run_render

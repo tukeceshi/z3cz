@@ -293,7 +293,7 @@ export type VolcanoResourcePackageFetchMode = "metering" | "full";
 
 export function volcanoResourcePackageStatusesForMode(
   mode: VolcanoResourcePackageFetchMode
-): readonly VolcanoUsagePackageStatus[] {
+): readonly VolcanoResourcePackageStatus[] {
   if (mode === "full") {
     return VOLCANO_RESOURCE_PACKAGE_LIST_STATUSES;
   }

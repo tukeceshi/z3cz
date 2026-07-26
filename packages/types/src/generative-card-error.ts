@@ -28,7 +28,10 @@ function readCardLines(value: unknown): readonly string[] | undefined {
     return undefined;
   }
   const lines = value
-    .filter((line): line is string => typeof line === "string" && line.trim())
+    .filter(
+      (line): line is string =>
+        typeof line === "string" && line.trim().length > 0
+    )
     .map((line) => line.trim());
   return lines.length > 0 ? lines : undefined;
 }
@@ -70,7 +73,7 @@ export function parseGenerativeCardErrorStored(
     if (!isGenerativeCardError(parsed)) {
       return undefined;
     }
-    const record = parsed as Record<string, unknown>;
+    const record = parsed as unknown as Record<string, unknown>;
     const cardLines = readCardLines(record.cardLines);
     return {
       summary: parsed.summary.trim(),

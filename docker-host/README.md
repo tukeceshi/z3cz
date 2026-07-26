@@ -14,7 +14,15 @@
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-一条命令：装 Docker/Git（若缺）→ clone 到 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）→ setup → rebuild。有 `tmux`/`screen` 时 rebuild 进会话。日志：`/var/dafthunk/install.log`。
+推荐 Ubuntu。脚本会：
+
+1. 选择提示语言（默认中文；`--lang en` / `DAFTHUNK_LANG=en`）  
+2. 检测内存，对话加 swap（默认目标约 4G 总可用）  
+3. 显示当前时区，默认保持；可选修改  
+4. `apt update/upgrade`，安装 `docker.io` + Compose + `git`  
+5. clone → setup → 串行 `launcher rebuild`
+
+目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-upgrade`、`--skip-swap`、`--force-setup`。
 
 ## 更新
 

@@ -9,12 +9,14 @@ const MODALITY_LABEL_ZH: Record<AiModelModality, string> = {
   text: "文字",
   image: "图片",
   video: "视频",
+  audio: "音频",
 };
 
 const MODALITY_LABEL_EN: Record<AiModelModality, string> = {
   text: "Text",
   image: "Image",
   video: "Video",
+  audio: "Audio",
 };
 
 function channelTag(

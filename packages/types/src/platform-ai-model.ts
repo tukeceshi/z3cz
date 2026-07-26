@@ -6,7 +6,6 @@ import {
   type ReferenceImageInline,
 } from "./reference-image-input";
 import type { MediaReference } from "./media-reference";
-import type { ObjectReference } from "./workflow";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 

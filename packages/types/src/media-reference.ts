@@ -113,8 +113,8 @@ export function isObjectReference(value: unknown): value is ObjectReference {
     typeof (value as ObjectReference).mimeType === "string" &&
     !(
       "kind" in value &&
-      ((value as EphemeralMediaReference).kind === "ephemeral" ||
-        (value as LocalMediaReference).kind === "local")
+      ((value as unknown as EphemeralMediaReference).kind === "ephemeral" ||
+        (value as unknown as LocalMediaReference).kind === "local")
     )
   );
 }
