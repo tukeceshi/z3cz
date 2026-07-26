@@ -227,25 +227,34 @@ normalize_lang() {
   case "$raw" in
     zh|zh-cn|zh_cn|cn|chinese|中文) echo "zh" ;;
     en|en-us|en_us|english) echo "en" ;;
+    ask) echo "ask" ;;
     *) return 1 ;;
   esac
 }
 
-# --lang / DAFTHUNK_LANG only (no interactive menu)
+# --lang / DAFTHUNK_LANG (zh|en|ask). "ask" defers to choose_ui_lang_interactive.
 apply_lang_from_flag_or_env() {
   local normalized
   if [[ -n "$LANG_FLAG" ]]; then
     if ! normalized="$(normalize_lang "$LANG_FLAG")"; then
-      echo "Invalid --lang '$LANG_FLAG' (use zh or en). / 无效 --lang（请用 zh 或 en）" >&2
+      echo "Invalid --lang '$LANG_FLAG' (use zh, en, or ask)." >&2
       exit 1
+    fi
+    if [[ "$normalized" == "ask" ]]; then
+      UI_LANG="zh"
+      return 0
     fi
     UI_LANG="$normalized"
     return 0
   fi
   if [[ -n "${DAFTHUNK_LANG:-}" ]]; then
     if ! normalized="$(normalize_lang "$DAFTHUNK_LANG")"; then
-      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh or en)." >&2
+      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh, en, or ask)." >&2
       exit 1
+    fi
+    if [[ "$normalized" == "ask" ]]; then
+      UI_LANG="zh"
+      return 0
     fi
     UI_LANG="$normalized"
     return 0
@@ -253,26 +262,32 @@ apply_lang_from_flag_or_env() {
   UI_LANG="zh"
 }
 
-# Interactive menu when no flag/env; default zh when no console
+# Default zh. Interactive menu only with --lang ask / DAFTHUNK_LANG=ask.
 choose_ui_lang_interactive() {
-  if [[ -n "$LANG_FLAG" || -n "${DAFTHUNK_LANG:-}" ]]; then
+  if [[ -n "$LANG_FLAG" ]]; then
+    if [[ "$(echo "$LANG_FLAG" | tr '[:upper:]' '[:lower:]')" == "ask" ]]; then
+      :
+    else
+      return 0
+    fi
+  elif [[ -n "${DAFTHUNK_LANG:-}" ]]; then
+    if [[ "$(echo "$DAFTHUNK_LANG" | tr '[:upper:]' '[:lower:]')" == "ask" ]]; then
+      :
+    else
+      return 0
+    fi
+  else
+    UI_LANG="zh"
     return 0
   fi
   if ! can_prompt; then
     UI_LANG="zh"
     return 0
   fi
-  {
-    echo
-    echo "提示语言 / Prompt language"
-    echo "  1) 中文（默认）"
-    echo "  2) English"
-  } >/dev/tty 2>/dev/null || {
-    echo
-    echo "提示语言 / Prompt language"
-    echo "  1) 中文（默认）"
-    echo "  2) English"
-  }
+  echo >&2
+  echo "提示语言 / Prompt language" >&2
+  echo "  1) 中文（默认）" >&2
+  echo "  2) English" >&2
   local choice
   choice="$(ask "选择 / Choice [1]: " "1")"
   case "$choice" in
@@ -281,44 +296,33 @@ choose_ui_lang_interactive() {
   esac
 }
 
-# Status / prompts for ask() — never stdout (stdout is reserved for $() capture).
-# stderr is tee'd into the install log when setup_logging has run.
+# Status / prompts — never stdout (reserved for $() capture).
+# Write once to stderr (tee → log + console). Do NOT also write /dev/tty (duplicates).
 ask_status() {
   local msg="$1"
   echo -e "${GREEN}→${NC} $msg" >&2
-  if [[ -w /dev/tty ]]; then
-    echo -e "${GREEN}→${NC} $msg" >/dev/tty
-  fi
 }
 
 announce() {
   local msg="$1"
   echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $msg${NC}"
-  if [[ -w /dev/tty ]]; then
-    echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $msg${NC}" >/dev/tty
-  fi
 }
 
 ask_timeout_exit() {
   ask_status "$(M ask_timeout "$ASK_TIMEOUT_SEC")"
   echo "$(M ask_timeout_hint)" >&2
   echo "$(M ask_timeout_hint2)" >&2
-  if [[ -w /dev/tty ]]; then
-    echo "$(M ask_timeout_hint)" >/dev/tty
-    echo "$(M ask_timeout_hint2)" >/dev/tty
-  fi
   exit 1
 }
 
 # prompt default → prints ONLY the answer on stdout (safe for answer="$(ask …)").
-# Prompt text goes to /dev/tty + stderr (install log). Answers from /dev/tty.
+# Prompt on stderr once; read answers from /dev/tty when available.
 ask() {
   local prompt="$1"
   local default="$2"
   local answer=""
   if [[ -r /dev/tty && -w /dev/tty ]]; then
-    printf '%s' "$prompt" >/dev/tty
-    printf '%s\n' "$prompt" >&2
+    printf '%s' "$prompt" >&2
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" answer </dev/tty; then
         ask_timeout_exit
@@ -327,7 +331,6 @@ ask() {
       read -r answer </dev/tty || true
     fi
   elif [[ -t 0 ]]; then
-    # read -p writes prompt to stderr (captured by install log tee)
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" -p "$prompt" answer; then
         ask_timeout_exit
@@ -375,7 +378,7 @@ Usage:
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 Options:
-  --lang zh|en     Prompt language (default: zh; or DAFTHUNK_LANG)
+  --lang zh|en|ask Prompt language (default: zh; ask=menu; or DAFTHUNK_LANG)
   --resume         Skip Docker/package install; update repo; setup if needed; rebuild
   --skip-docker    Skip Docker/Git install (same as part of --resume)
   --skip-swap      Skip swap dialogue and creation
@@ -399,7 +402,7 @@ Dafthunk 一键安装脚本
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 选项:
-  --lang zh|en     提示语言（默认 zh；也可用 DAFTHUNK_LANG）
+  --lang zh|en|ask 提示语言（默认 zh；ask=菜单；也可用 DAFTHUNK_LANG）
   --resume         跳过 Docker/软件包安装；更新仓库；按需 setup；rebuild
   --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
   --skip-swap      跳过 swap 对话与创建
@@ -421,7 +424,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --lang)
       if [[ $# -lt 2 ]]; then
-        echo "Missing value for --lang / --lang 缺少参数" >&2
+        echo "Missing value for --lang / --lang 缺少参数 (zh|en|ask)" >&2
         exit 1
       fi
       LANG_FLAG="$2"
@@ -470,17 +473,18 @@ done
 if [[ "$SHOW_HELP" == "1" ]]; then
   if [[ -n "$LANG_FLAG" ]]; then
     UI_LANG="$(normalize_lang "$LANG_FLAG")" || {
-      echo "Invalid --lang '$LANG_FLAG' (use zh or en)." >&2
+      echo "Invalid --lang '$LANG_FLAG' (use zh, en, or ask)." >&2
       exit 1
     }
   elif [[ -n "${DAFTHUNK_LANG:-}" ]]; then
     UI_LANG="$(normalize_lang "$DAFTHUNK_LANG")" || {
-      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh or en)." >&2
+      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh, en, or ask)." >&2
       exit 1
     }
   else
     UI_LANG="zh"
   fi
+  [[ "$UI_LANG" == "ask" ]] && UI_LANG="zh"
   show_help
   exit 0
 fi

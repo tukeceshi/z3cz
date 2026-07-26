@@ -177,22 +177,16 @@ ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
 ask_timeout_exit() {
   echo "$(M ask_timeout "$ASK_TIMEOUT_SEC")" >&2
   echo "$(M ask_timeout_hint)" >&2
-  if [[ -w /dev/tty ]]; then
-    echo "$(M ask_timeout "$ASK_TIMEOUT_SEC")" >/dev/tty
-    echo "$(M ask_timeout_hint)" >/dev/tty
-  fi
   exit 1
 }
 
-# wget|bash leaves stdin as a pipe — read answers from the real console when possible.
-# Prompt → /dev/tty + stderr (install log); answer only on stdout for $(ask_line).
+# wget|bash: read answers from /dev/tty; prompt once on stderr (tee → log + console).
 ask_line() {
   local prompt="$1"
   local default="${2:-}"
   local value=""
   if [[ -r /dev/tty && -w /dev/tty ]]; then
-    printf '%s' "$prompt" >/dev/tty
-    printf '%s\n' "$prompt" >&2
+    printf '%s' "$prompt" >&2
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
         ask_timeout_exit
@@ -224,10 +218,6 @@ echo "$(M rule)"
 echo "$(M admin_hint)"
 echo "$(M need_input)"
 echo ""
-if [[ -w /dev/tty ]]; then
-  echo "$(M need_input)" >/dev/tty
-  echo "" >/dev/tty
-fi
 
 hostname="$(ask_line "$(M hostname)" "localhost")"
 
