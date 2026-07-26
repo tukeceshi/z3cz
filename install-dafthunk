@@ -3,8 +3,7 @@
 # Dafthunk One-Line Installer (Discourse-style)
 #
 # Usage (one shot: env prep + clone + setup + rebuild):
-#   wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >"$f"; exec bash "$f" </dev/tty' _
-# Do NOT use: sudo bash <(wget …) — /dev/fd is lost under sudo.
+#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
 #
 # Resume after disconnect / re-run safely:
 #   sudo bash /var/dafthunk/install-dafthunk --resume
@@ -15,7 +14,7 @@
 #   DAFTHUNK_BRANCH=main
 #   DAFTHUNK_TARGET_RAM_MIB=4096   # default total memory+swap target
 #   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack for "memory check passed"
-#   DAFTHUNK_LANG=zh|en            # prompt language (default zh)
+#   DAFTHUNK_LANG=zh|en|ask         # prompt language (interactive default: menu)
 #   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
 #   DAFTHUNK_ASK_TIMEOUT=900       # interactive prompt timeout seconds (0=disable)
 #   DAFTHUNK_NON_INTERACTIVE=1     # use defaults without prompting (CI only)
@@ -23,7 +22,8 @@
 set -euo pipefail
 
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
-INSTALL_ONE_LINER="wget -qO- ${INSTALLER_URL} | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >\"\$f\"; exec bash \"\$f\" </dev/tty' _"
+BOOTSTRAP_URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install}"
+INSTALL_ONE_LINER="curl -fsSL ${BOOTSTRAP_URL} | sudo bash"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
@@ -88,7 +88,7 @@ M() {
         step_memory) echo "Memory check" ;;
         mem_pass) echo "Memory check passed (required $1, usable ≈ $2)" ;;
         mem_skip_swap) echo "Memory target met — skipping swap prompt" ;;
-        pipe_stdin) echo "Do not run: wget … | sudo bash (stdin is a pipe)." ;;
+        pipe_stdin) echo "Do not run install-dafthunk with piped stdin (wget | sudo bash install-dafthunk)." ;;
         pipe_stdin_hint) echo "Run: $INSTALL_ONE_LINER" ;;
         mem_need_req) echo "Required memory: $1" ;;
         mem_need_actual) echo "Detected RAM: $1" ;;
@@ -171,7 +171,7 @@ M() {
         step_memory) echo "内存检查" ;;
         mem_pass) echo "内存检查通过（要求 $1，当前可用约 $2）" ;;
         mem_skip_swap) echo "内存已达标，跳过 swap 配置" ;;
-        pipe_stdin) echo "不要用 wget … | sudo bash（stdin 是管道）。" ;;
+        pipe_stdin) echo "不要用 wget | sudo bash 直接跑 install-dafthunk（stdin 是管道）。" ;;
         pipe_stdin_hint) echo "请用: $INSTALL_ONE_LINER" ;;
         mem_need_req) echo "要求内存：$1" ;;
         mem_need_actual) echo "实际内存：$1" ;;
@@ -286,7 +286,7 @@ apply_lang_from_flag_or_env() {
   UI_LANG="zh"
 }
 
-# Default zh. Interactive menu only with --lang ask / DAFTHUNK_LANG=ask.
+# Interactive: language menu when TTY and no --lang / DAFTHUNK_LANG. Explicit zh|en skips menu.
 choose_ui_lang_interactive() {
   if [[ -n "$LANG_FLAG" ]]; then
     if [[ "$(echo "$LANG_FLAG" | tr '[:upper:]' '[:lower:]')" == "ask" ]]; then
@@ -300,7 +300,7 @@ choose_ui_lang_interactive() {
     else
       return 0
     fi
-  else
+  elif ! can_prompt; then
     UI_LANG="zh"
     return 0
   fi
@@ -353,6 +353,7 @@ read_interactive_line() {
   local rc=0
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
+    stty -F /dev/tty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
         rc=$?
@@ -451,7 +452,7 @@ Usage:
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 Options:
-  --lang zh|en|ask Prompt language (default: zh; ask=menu; or DAFTHUNK_LANG)
+  --lang zh|en|ask Prompt language (interactive default: menu; zh|en=skip menu; or DAFTHUNK_LANG)
   --resume         Skip Docker/package install; update repo; setup if needed; rebuild
   --skip-docker    Skip Docker/Git install (same as part of --resume)
   --skip-swap      Skip swap dialogue and creation
@@ -476,7 +477,7 @@ Dafthunk 一键安装脚本
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 选项:
-  --lang zh|en|ask 提示语言（默认 zh；ask=菜单；也可用 DAFTHUNK_LANG）
+  --lang zh|en|ask 提示语言（交互默认出菜单；zh|en=跳过菜单；也可用 DAFTHUNK_LANG）
   --resume         跳过 Docker/软件包安装；更新仓库；按需 setup；rebuild
   --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
   --skip-swap      跳过 swap 对话与创建

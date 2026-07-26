@@ -207,6 +207,7 @@ read_interactive_line() {
   local rc=0
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
+    stty -F /dev/tty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
         rc=$?

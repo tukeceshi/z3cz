@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Dafthunk one-line bootstrap — download install-dafthunk, then run interactively.
+# Usage: curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
+set -euo pipefail
+
+INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
+TARGET="${DAFTHUNK_INSTALL_SCRIPT:-/tmp/dafthunk-install.sh}"
+
+if command -v wget >/dev/null 2>&1; then
+  wget -qO "$TARGET" "$INSTALLER_URL"
+elif command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$INSTALLER_URL" -o "$TARGET"
+else
+  echo "Need wget or curl to download the installer." >&2
+  exit 1
+fi
+
+chmod +x "$TARGET"
+exec bash "$TARGET" --lang ask "$@" </dev/tty

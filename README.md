@@ -34,21 +34,27 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后一键安装（一条命令，需 bash）：
+然后一键安装：
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >"$f"; exec bash "$f" </dev/tty' _
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
+```
+
+无 `curl` 时可用：
+
+```bash
+wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
 ```
 
 一键脚本会依次：
 
-1. 提示语言默认中文（`--lang en` / `DAFTHUNK_LANG=en`；需菜单时用 `--lang ask`）  
+1. 选择提示语言（中文 / English；`--lang zh|en` 可跳过菜单）  
 2. 内存检查：已满足约 4G+ 则跳过 swap 问答；不足则询问 swap（回车默认 2G，可输入 2～4，或 `0` 跳过）  
-3. 显示服务器当前时区，默认保持；可选改为其他 IANA（建议默认 `Asia/Shanghai`）  
+3. 显示服务器当前时区，默认保持；可选改为其他 IANA（建议 `Asia/Shanghai`）  
 4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`；详细 apt 日志见 `install.log` / `*.apt.log`）  
 5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
 
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。勿用 `sudo bash <(wget …)`（sudo 下 `/dev/fd` 会失效）或裸 `wget | sudo bash`。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。bootstrap 会下载脚本到 `/tmp/dafthunk-install.sh` 并从终端交互。勿用 `sudo bash <(wget …)` 或直接 `wget | sudo bash install-dafthunk`。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
 
 #### 更新
 
