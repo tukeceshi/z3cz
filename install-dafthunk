@@ -38,6 +38,7 @@ TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 APT_LOG="${TEMP_LOG}.apt.log"
 LOG_FILE="$TEMP_LOG"
 LOGGING_STARTED=0
+INTERACTIVE_FD=""
 
 RESUME=0
 SKIP_DOCKER=0
@@ -60,6 +61,27 @@ log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
 # True when we should ask a human (SSH console), even if stdin is a pipe (wget | bash).
+init_interactive_tty() {
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    return 0
+  fi
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    exec 3>/dev/tty
+    INTERACTIVE_FD=3
+    stty -F /dev/tty sane 2>/dev/null || true
+  fi
+}
+
+write_prompt_tty() {
+  local msg="$1"
+  init_interactive_tty
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    printf '%s\n' "$msg" >&${INTERACTIVE_FD}
+  else
+    printf '%s\n' "$msg" >&2
+  fi
+}
+
 can_prompt() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then
     return 1
@@ -308,10 +330,10 @@ choose_ui_lang_interactive() {
     UI_LANG="zh"
     return 0
   fi
-  echo >&2
-  echo "提示语言 / Prompt language" >&2
-  echo "  1) 中文（默认）" >&2
-  echo "  2) English" >&2
+  write_prompt_tty ""
+  write_prompt_tty "提示语言 / Prompt language"
+  write_prompt_tty "  1) 中文（默认）"
+  write_prompt_tty "  2) English"
   local choice
   ask_into choice "选择 / Choice [1]: " "1"
   case "$choice" in
@@ -352,7 +374,21 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
+  init_interactive_tty
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    stty -F /dev/tty sane 2>/dev/null || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value <&${INTERACTIVE_FD}; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value <&${INTERACTIVE_FD}; then
+      ask_read_failed_exit
+    fi
+  elif [[ -r /dev/tty && -w /dev/tty ]]; then
     stty -F /dev/tty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
@@ -398,7 +434,7 @@ ask_into() {
     return 0
   fi
 
-  printf '%s\n' "$prompt" >&2
+  write_prompt_tty "$prompt"
   read_interactive_line value
   if [[ -z "${value:-}" ]]; then
     printf -v "$__var" '%s' "$default"
@@ -997,8 +1033,13 @@ run_setup_and_rebuild() {
   log_step "$(M step_setup_rebuild)"
   ask_status "$(M interactive_next)"
   echo
-  DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-    DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
+      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild </dev/tty
+  else
+    DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
+      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
+  fi
   run_launcher_rebuild
 }
 

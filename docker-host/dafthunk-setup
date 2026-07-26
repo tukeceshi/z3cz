@@ -178,6 +178,29 @@ read_env_value() {
 
 ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
 NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
+INTERACTIVE_FD=""
+
+# Dedicated fd for prompts/input — works when stdout/stderr go through tee (install-dafthunk).
+init_interactive_tty() {
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    return 0
+  fi
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    exec 3>/dev/tty
+    INTERACTIVE_FD=3
+    stty -F /dev/tty sane 2>/dev/null || true
+  fi
+}
+
+write_prompt_tty() {
+  local msg="$1"
+  init_interactive_tty
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    printf '%s\n' "$msg" >&${INTERACTIVE_FD}
+  else
+    printf '%s\n' "$msg" >&2
+  fi
+}
 
 can_prompt() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then
@@ -206,7 +229,21 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
+  init_interactive_tty
+  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+    stty -F /dev/tty sane 2>/dev/null || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value <&${INTERACTIVE_FD}; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value <&${INTERACTIVE_FD}; then
+      ask_read_failed_exit
+    fi
+  elif [[ -r /dev/tty && -w /dev/tty ]]; then
     stty -F /dev/tty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
@@ -251,7 +288,7 @@ ask_into() {
     return 0
   fi
 
-  printf '%s\n' "$prompt" >&2
+  write_prompt_tty "$prompt"
   read_interactive_line value
   if [[ -z "${value:-}" ]]; then
     printf -v "$__var" '%s' "$default"
@@ -263,7 +300,7 @@ ask_into() {
 echo "$(M title)"
 echo "$(M rule)"
 echo "$(M admin_hint)"
-echo "$(M need_input)"
+write_prompt_tty "$(M need_input)"
 echo ""
 
 hostname=""
