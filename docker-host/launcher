@@ -1,4 +1,142 @@
-#!/usr/bin/env sh
-set -e
-cd "$(dirname "$0")"
-exec node ./launcher.mjs "$@"
+#!/usr/bin/env bash
+# Discourse-style launcher for Dafthunk Docker self-host.
+# Host requirements: bash + Docker. Node optional (used if present for render).
+set -euo pipefail
+
+HOST_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$HOST_DIR/.." && pwd)"
+APP_YML="$HOST_DIR/containers/app.yml"
+COMPOSE_FILE="$HOST_DIR/docker-compose.generated.yml"
+ENV_FILE="$HOST_DIR/.env.generated"
+NODE_IMAGE="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
+
+COMMAND="${1:-help}"
+shift || true
+
+print_help() {
+  cat <<EOF
+Dafthunk host launcher
+
+Usage: ./launcher <command>
+
+Commands:
+  render      Generate compose / Caddyfile / env from containers/app.yml
+  bootstrap   Alias of rebuild (first install)
+  rebuild     Build images, recreate stack (keeps shared/ data)
+  start       Start existing stack
+  stop        Stop stack
+  restart     Restart stack
+  destroy     Remove containers (keeps shared/)
+  logs        docker compose logs (pass-through args)
+  enter       Shell into a service: enter api|app|caddy|postgres
+  status      docker compose ps
+  help        Show this help
+
+First install:
+  ./dafthunk-setup
+  ./launcher rebuild
+EOF
+}
+
+require_app_yml() {
+  if [[ ! -f "$APP_YML" ]]; then
+    echo "Missing containers/app.yml." >&2
+    echo "Run: ./dafthunk-setup" >&2
+    echo "Or:  cp samples/standalone.yml containers/app.yml" >&2
+    exit 1
+  fi
+}
+
+compose() {
+  docker compose \
+    -f "$COMPOSE_FILE" \
+    --env-file "$ENV_FILE" \
+    "$@"
+}
+
+run_render() {
+  require_app_yml
+  mkdir -p \
+    "$HOST_DIR/shared/postgres" \
+    "$HOST_DIR/shared/storage" \
+    "$HOST_DIR/shared/caddy" \
+    "$HOST_DIR/shared/caddy-config" \
+    "$HOST_DIR/shared/backups"
+
+  if command -v node >/dev/null 2>&1; then
+    (cd "$REPO_ROOT" && node docker-host/launcher.mjs render)
+    return
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is required (and Node is not installed for local render)." >&2
+    exit 1
+  fi
+
+  echo "→ Rendering config with $NODE_IMAGE (no host Node)..."
+  docker run --rm \
+    -v "$REPO_ROOT:/repo:rw" \
+    -w /repo \
+    "$NODE_IMAGE" \
+    node docker-host/launcher.mjs render
+}
+
+ensure_generated() {
+  require_app_yml
+  if [[ ! -f "$COMPOSE_FILE" || ! -f "$ENV_FILE" ]]; then
+    run_render
+  fi
+}
+
+case "$COMMAND" in
+  help|-h|--help)
+    print_help
+    ;;
+  render)
+    run_render
+    ;;
+  bootstrap|rebuild)
+    run_render
+    compose up -d --build --remove-orphans
+    ;;
+  start)
+    run_render
+    compose up -d
+    ;;
+  stop)
+    ensure_generated
+    compose stop
+    ;;
+  restart)
+    ensure_generated
+    compose restart
+    ;;
+  destroy)
+    ensure_generated
+    echo "Removing containers (shared/ data kept)..."
+    compose down --remove-orphans
+    ;;
+  logs)
+    ensure_generated
+    compose logs "$@"
+    ;;
+  status|ps)
+    ensure_generated
+    compose ps "$@"
+    ;;
+  enter)
+    service="${1:-}"
+    if [[ -z "$service" ]]; then
+      echo "Usage: ./launcher enter api|app|caddy|postgres" >&2
+      exit 1
+    fi
+    shift || true
+    ensure_generated
+    compose exec -it "$service" sh "$@"
+    ;;
+  *)
+    echo "Unknown command: $COMMAND" >&2
+    print_help
+    exit 1
+    ;;
+esac
