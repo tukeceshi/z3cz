@@ -73,4 +73,4 @@ EOF
 
 info "Wrote $APP_YML"
 info "Site: $web_host"
-info "Next: sudo ${INSTALL_DIR}/scripts/host/deploy.sh"
+info "Next: sudo bash ${INSTALL_DIR}/scripts/host/deploy.sh"

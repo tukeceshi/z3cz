@@ -7,6 +7,7 @@ set -euo pipefail
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
+RAW_BASE="${DAFTHUNK_RAW_BASE:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host}"
 
 log() { printf '==> %s\n' "$*"; }
 info() { printf ' -> %s\n' "$*"; }
@@ -76,8 +77,20 @@ ensure_repo() {
   git clone --branch "$BRANCH" --depth 1 "$REPO" "$INSTALL_DIR"
 }
 
+sync_host_scripts() {
+  need_cmd curl || return 0
+  local dir="${INSTALL_DIR}/scripts/host"
+  mkdir -p "$dir"
+  log "Syncing scripts/host from GitHub"
+  for name in bootstrap configure deploy; do
+    curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"
+    chmod +x "${dir}/${name}.sh"
+  done
+}
+
 log "Bootstrap"
 ensure_packages
 ensure_swap
 ensure_repo
-info "Done. Next: sudo ${INSTALL_DIR}/scripts/host/configure.sh"
+sync_host_scripts
+info "Done. Next: sudo bash ${INSTALL_DIR}/scripts/host/configure.sh"

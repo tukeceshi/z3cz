@@ -32,10 +32,16 @@
 curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
 # 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME）
-sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
+sudo bash /var/dafthunk/scripts/host/configure.sh
 
 # 3. 构建并启动（较慢；后台：加 --detach）
-sudo /var/dafthunk/scripts/host/deploy.sh
+sudo bash /var/dafthunk/scripts/host/deploy.sh
+```
+
+若第 2 步报 `command not found`，先下载再执行：
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/configure.sh" -o "/tmp/configure.sh" && sudo bash "/tmp/configure.sh"
 ```
 
 若不用管道，第 1 步可用（**必须整行一条**）：
@@ -53,7 +59,7 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/ho
 #### 更新
 
 ```bash
-cd /var/dafthunk && git pull && sudo scripts/host/deploy.sh
+cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 ```
 
 #### 应急
@@ -62,8 +68,8 @@ cd /var/dafthunk && git pull && sudo scripts/host/deploy.sh
 |------|------|
 | 构建日志 | `less /var/dafthunk/rebuild.log` |
 | 后台构建 | `tmux attach -t dafthunk-deploy` |
-| 只重构建 | `sudo /var/dafthunk/scripts/host/deploy.sh` |
-| 改域名 | `sudo /var/dafthunk/scripts/host/configure.sh --force`，再 `deploy.sh` |
+| 只重构建 | `sudo bash /var/dafthunk/scripts/host/deploy.sh` |
+| 改域名 | `sudo bash /var/dafthunk/scripts/host/configure.sh --force`，再 deploy |
 | 手动配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 
 `shared/` 默认保留。

@@ -9,9 +9,9 @@
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
-sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
+sudo bash /var/dafthunk/scripts/host/configure.sh
 
-sudo /var/dafthunk/scripts/host/deploy.sh
+sudo bash /var/dafthunk/scripts/host/deploy.sh
 # 后台：sudo /var/dafthunk/scripts/host/deploy.sh --detach
 ```
 
@@ -20,7 +20,7 @@ sudo /var/dafthunk/scripts/host/deploy.sh
 ## 更新
 
 ```bash
-cd /var/dafthunk && git pull && sudo scripts/host/deploy.sh
+cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 ```
 
 ## 应急
