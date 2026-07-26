@@ -8,6 +8,7 @@
 #   sudo bash /var/dafthunk/install-dafthunk --resume
 #
 # Env: DAFTHUNK_HOSTNAME, DAFTHUNK_INSTALL_DIR, DAFTHUNK_REPO, DAFTHUNK_BRANCH, DAFTHUNK_FORCE_SETUP=1
+# DAFTHUNK_INSTALL_VERSION=2
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
