@@ -37,7 +37,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 然后一键安装（一条命令，需 bash）：
 
 ```bash
-sudo bash <(wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk)
+wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >"$f"; exec bash "$f" </dev/tty' _
 ```
 
 一键脚本会依次：
@@ -48,7 +48,7 @@ sudo bash <(wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/
 4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`；详细 apt 日志见 `install.log` / `*.apt.log`）  
 5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
 
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。安装命令保留终端 stdin 以交互；不要用 `wget | bash`。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。勿用 `sudo bash <(wget …)`（sudo 下 `/dev/fd` 会失效）或裸 `wget | sudo bash`。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
 
 #### 更新
 

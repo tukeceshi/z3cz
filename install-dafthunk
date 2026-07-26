@@ -3,7 +3,8 @@
 # Dafthunk One-Line Installer (Discourse-style)
 #
 # Usage (one shot: env prep + clone + setup + rebuild):
-#   sudo bash <(wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk)
+#   wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >"$f"; exec bash "$f" </dev/tty' _
+# Do NOT use: sudo bash <(wget …) — /dev/fd is lost under sudo.
 #
 # Resume after disconnect / re-run safely:
 #   sudo bash /var/dafthunk/install-dafthunk --resume
@@ -22,6 +23,7 @@
 set -euo pipefail
 
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
+INSTALL_ONE_LINER="wget -qO- ${INSTALLER_URL} | sudo bash -c 'f=/tmp/dafthunk-install.sh; cat >\"\$f\"; exec bash \"\$f\" </dev/tty' _"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
@@ -86,8 +88,8 @@ M() {
         step_memory) echo "Memory check" ;;
         mem_pass) echo "Memory check passed (required $1, usable ≈ $2)" ;;
         mem_skip_swap) echo "Memory target met — skipping swap prompt" ;;
-        pipe_stdin) echo "Interactive install needs a terminal on stdin." ;;
-        pipe_stdin_hint) echo "Run: sudo bash <(wget -qO- $INSTALLER_URL)" ;;
+        pipe_stdin) echo "Do not run: wget … | sudo bash (stdin is a pipe)." ;;
+        pipe_stdin_hint) echo "Run: $INSTALL_ONE_LINER" ;;
         mem_need_req) echo "Required memory: $1" ;;
         mem_need_actual) echo "Detected RAM: $1" ;;
         mem_need_swap_prompt) echo "Swap is needed. Enter for 2G, or type 2–4 (0 to skip): " ;;
@@ -169,8 +171,8 @@ M() {
         step_memory) echo "内存检查" ;;
         mem_pass) echo "内存检查通过（要求 $1，当前可用约 $2）" ;;
         mem_skip_swap) echo "内存已达标，跳过 swap 配置" ;;
-        pipe_stdin) echo "交互安装需要终端 stdin，不能用 wget 管道直接喂给 bash。" ;;
-        pipe_stdin_hint) echo "请改用: sudo bash <(wget -qO- $INSTALLER_URL)" ;;
+        pipe_stdin) echo "不要用 wget … | sudo bash（stdin 是管道）。" ;;
+        pipe_stdin_hint) echo "请用: $INSTALL_ONE_LINER" ;;
         mem_need_req) echo "要求内存：$1" ;;
         mem_need_actual) echo "实际内存：$1" ;;
         mem_need_swap_prompt) echo "需要增加 swap。回车默认 2G，或输入 2~4（0 跳过）：" ;;
@@ -445,7 +447,7 @@ show_help() {
 Dafthunk one-line installer
 
 Usage:
-  sudo bash <(wget -qO- $INSTALLER_URL)
+  $INSTALL_ONE_LINER
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 Options:
@@ -470,7 +472,7 @@ EOF
 Dafthunk 一键安装脚本
 
 用法:
-  sudo bash <(wget -qO- $INSTALLER_URL)
+  $INSTALL_ONE_LINER
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 选项:
@@ -571,7 +573,7 @@ check_root() {
     log_error "$(M need_root)"
     echo
     echo "$(M run_with_sudo)"
-    echo "  sudo bash <(wget -qO- $INSTALLER_URL)"
+    echo "  $INSTALL_ONE_LINER"
     echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
     exit 1
   fi
