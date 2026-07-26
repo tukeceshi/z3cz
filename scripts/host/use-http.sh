@@ -34,7 +34,8 @@ sed -i "s|https://${hostname}|http://${hostname}|g" "$APP_YML"
 
 cd "$HOST_DIR"
 ./launcher render
-info "Rebuilding www and app (HTTP URLs baked into frontend)..."
+info "Rebuilding api, www and app..."
+compose build api
 compose build www
 compose build app
 info "Recreating caddy and api (apply HTTP config)..."

@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import { ApiContext } from "./context";
 import { LAZY_ROUTE_ORG_HEADER } from "./lazy-route";
+import { authCookieSecure } from "./utils/auth-cookie";
 import {
   createDatabase,
   EmailAlreadyRegisteredError,
@@ -264,7 +265,7 @@ const setCookieOptions = (c: Context<ApiContext>, maxAge: number) => {
 
   return {
     httpOnly: true,
-    secure: isLocalhost ? false : c.env.CLOUDFLARE_ENV !== "development",
+    secure: authCookieSecure(c.env.WEB_HOST),
     sameSite: "Lax" as const,
     ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
     maxAge,
@@ -293,7 +294,7 @@ const storeReturnTo = (c: Context<ApiContext>) => {
   if (returnTo && isValidReturnTo(returnTo)) {
     setCookie(c, OAUTH_RETURN_TO_COOKIE, returnTo, {
       httpOnly: true,
-      secure: c.env.CLOUDFLARE_ENV !== "development",
+      secure: authCookieSecure(c.env.WEB_HOST),
       sameSite: "Lax",
       maxAge: OAUTH_RETURN_TO_MAX_AGE,
       path: "/",
