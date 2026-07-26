@@ -78,6 +78,9 @@ write_prompt_tty() {
   if has_tty; then
     stty -F /dev/tty sane 2>/dev/null || true
     printf '%s\n' "$msg" >/dev/tty
+  elif [[ -t 1 ]]; then
+    stty sane 2>/dev/null || true
+    printf '%s\n' "$msg"
   else
     printf '%s\n' "$msg" >&2
   fi
@@ -87,7 +90,7 @@ can_prompt() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then
     return 1
   fi
-  has_tty
+  [[ -t 0 ]] || has_tty
 }
 
 # Localized message: M <key> [args...]
@@ -372,20 +375,33 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  if ! has_tty; then
-    ask_read_failed_exit
-  fi
-
-  stty -F /dev/tty sane 2>/dev/null || true
-  if ((ASK_TIMEOUT_SEC > 0)); then
-    if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
-      rc=$?
-      if ((rc == 142 || rc == 143)); then
-        ask_timeout_exit
+  if [[ -t 0 ]]; then
+    stty sane 2>/dev/null || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
       fi
+    elif ! read -r value; then
       ask_read_failed_exit
     fi
-  elif ! read -r value </dev/tty; then
+  elif has_tty; then
+    stty -F /dev/tty sane 2>/dev/null || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value </dev/tty; then
+      ask_read_failed_exit
+    fi
+  else
     ask_read_failed_exit
   fi
 
