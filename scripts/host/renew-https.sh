@@ -47,8 +47,7 @@ info "Rebuilding www and app..."
 compose build www
 compose build app
 info "Recreating caddy (will request a new certificate)..."
-compose up -d --force-recreate caddy
-compose up -d --remove-orphans
+compose up -d --force-recreate caddy api www app
 
 info "Site: https://${hostname}"
 info "If HTTPS still fails: sudo docker logs dafthunk-host-caddy-1 2>&1 | tail -30"

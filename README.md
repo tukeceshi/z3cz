@@ -65,6 +65,8 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/ho
 cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 ```
 
+`git pull` 会同步 `scripts/host/`（含 `use-http.sh`、`renew-https.sh`）。仅改 HTTP/HTTPS 时不必全量 rebuild，可直接运行对应脚本。
+
 #### 应急
 
 | 情况 | 命令 |

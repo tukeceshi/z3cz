@@ -37,6 +37,7 @@ cd "$HOST_DIR"
 info "Rebuilding www and app (HTTP URLs baked into frontend)..."
 compose build www
 compose build app
-compose up -d --remove-orphans
+info "Recreating caddy and api (apply HTTP config)..."
+compose up -d --force-recreate caddy api www app
 
 info "Site: http://${hostname}"

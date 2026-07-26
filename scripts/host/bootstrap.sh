@@ -83,8 +83,11 @@ sync_host_scripts() {
   mkdir -p "$dir"
   log "Syncing scripts/host from GitHub"
   for name in bootstrap configure deploy use-http renew-https; do
-    curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"
-    chmod +x "${dir}/${name}.sh"
+    if curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"; then
+      chmod +x "${dir}/${name}.sh"
+    else
+      info "Skip ${name}.sh (not on ${RAW_BASE} yet — use git pull after clone)"
+    fi
   done
 }
 

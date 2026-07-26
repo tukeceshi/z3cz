@@ -26,6 +26,8 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 ```
 
+仅切换 HTTP/HTTPS 时不必全量 `deploy.sh`，直接运行 `use-http.sh` 或 `renew-https.sh` 即可（需先 `git pull` 拿到脚本）。
+
 ## 应急
 
 | 情况 | 命令 |
@@ -45,7 +47,7 @@ cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 | 运行中切 HTTP | `sudo bash scripts/host/use-http.sh` |
 | 删旧证、重开 HTTPS | `sudo bash scripts/host/renew-https.sh` |
 
-`use-http.sh` / `renew-https.sh` 会改 `containers/app.yml`、执行 `launcher render`，并重建 www/app（URL 写入前端镜像）。`renew-https.sh` 还会删除 `shared/caddy/caddy/certificates/` 并重建 caddy。
+`use-http.sh` / `renew-https.sh` 会改 `containers/app.yml`、执行 `launcher render`、重建 www/app，并 `--force-recreate` caddy（及 api）。`renew-https.sh` 还会删除 `shared/caddy/caddy/certificates/`。
 
 Let's Encrypt 7 天内同一域名申请次数有限；反复重装易触发限流。限流期间用 HTTP，解除后再 `renew-https.sh`。
 
