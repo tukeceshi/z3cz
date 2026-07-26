@@ -14,7 +14,7 @@
 
 ```bash
 sudo apt-get update && sudo apt-get upgrade -y   # 可选；耗时长，建议 tmux/screen
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive
 ```
 
 推荐 Ubuntu。一键脚本会：

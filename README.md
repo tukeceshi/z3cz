@@ -37,10 +37,12 @@ sudo apt-get update && sudo apt-get upgrade -y
 然后**一条命令**完成安装（自动 tmux，断线 `tmux attach -t dafthunk-install` 续接；将 `z3cz.com` 换成你的域名）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash -s -- --lang zh --non-interactive 0</dev/tty
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash -s -- --lang zh --non-interactive
 ```
 
-需要交互填域名时，去掉 `DAFTHUNK_HOSTNAME=…` 和 `--non-interactive` 即可（仍会自动进 tmux）。
+**不要在命令末尾加 `0</dev/tty`** — 会把 `bash -s` 的输入从 curl 管道改成终端，脚本读不到、会静默退出。
+
+需要交互填域名时，去掉 `DAFTHUNK_HOSTNAME=…` 和 `--non-interactive` 即可（仍会自动进 tmux）。交互时同样不要加 `0</dev/tty`。
 
 无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
 

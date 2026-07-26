@@ -25,7 +25,7 @@ ORIGINAL_ARGS=("$@")
 
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 BOOTSTRAP_URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install}"
-INSTALL_ONE_LINER="curl -fsSL ${BOOTSTRAP_URL} | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive 0</dev/tty"
+INSTALL_ONE_LINER="curl -fsSL ${BOOTSTRAP_URL} | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
