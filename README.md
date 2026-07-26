@@ -61,11 +61,17 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/ho
 
 #### 更新
 
+`/var/dafthunk` 由 bootstrap 以 **root** 克隆，请用 **sudo** 拉代码（不要用 `git config safe.directory`）：
+
 ```bash
-cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
+# 推荐：一条命令
+sudo bash /var/dafthunk/scripts/host/update.sh
+
+# 或分步
+cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
 ```
 
-`git pull` 会同步 `scripts/host/`（含 `use-http.sh`、`renew-https.sh`）。仅改 HTTP/HTTPS 时不必全量 rebuild，可直接运行对应脚本。
+若已用普通用户执行 `git pull` 报 `dubious ownership`，改用上面命令即可。
 
 #### 应急
 
@@ -278,6 +284,7 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 | `bootstrap.sh` | Docker / Git / 拉代码 |
 | `configure.sh` | 写 `app.yml`（`--http` 仅 HTTP；`--force` 覆盖） |
 | `deploy.sh` | 构建并启动（`--detach` 后台） |
+| `update.sh` | `git pull` + deploy（需 sudo） |
 | `use-http.sh` | 运行中切换为 HTTP |
 | `renew-https.sh` | 删除旧证书并重新申请 HTTPS |
 

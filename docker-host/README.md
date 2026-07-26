@@ -22,11 +22,19 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 ## 更新
 
+仓库由 bootstrap 以 root 克隆，更新时必须 **sudo git pull**（勿改 `git config safe.directory`）：
+
 ```bash
-cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
+sudo bash /var/dafthunk/scripts/host/update.sh
 ```
 
-仅切换 HTTP/HTTPS 时不必全量 `deploy.sh`，直接运行 `use-http.sh` 或 `renew-https.sh` 即可（需先 `git pull` 拿到脚本）。
+或：
+
+```bash
+cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
+```
+
+仅切换 HTTP/HTTPS 时：`sudo git pull` 后运行 `use-http.sh` 或 `renew-https.sh`，不必全量 deploy。
 
 ## 应急
 
@@ -72,7 +80,7 @@ cd docker-host && ./dafthunk-setup
 |------|------|
 | `containers/app.yml` | configure / setup 生成 |
 | `shared/` | Postgres / 存储 / Caddy（证书在 `shared/caddy/caddy/certificates/`） |
-| `../scripts/host/` | bootstrap / configure / deploy / use-http / renew-https |
+| `../scripts/host/` | bootstrap / configure / deploy / update / use-http / renew-https |
 
 ## 与开发栈
 
