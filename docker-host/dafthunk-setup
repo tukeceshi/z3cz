@@ -57,6 +57,9 @@ M() {
         then_register) echo "Then open $1 and register the first user (platform admin)." ;;
         starting_rebuild) echo "Starting ./launcher rebuild..." ;;
         when_ready) echo "When ready, open $1 and register the first user (platform admin)." ;;
+        need_input) echo ">>> Waiting for input below (also logged). Scroll up if you do not see the prompt." ;;
+        ask_timeout) echo "Timed out waiting for input (${1}s)." ;;
+        ask_timeout_hint) echo "Re-run: ./dafthunk-setup   or   sudo bash ../install-dafthunk --resume --force-setup" ;;
         *) echo "[$key $*]"; ;;
       esac
       ;;
@@ -79,6 +82,9 @@ M() {
         then_register) echo "然后打开 $1 注册首个用户（平台管理员）。" ;;
         starting_rebuild) echo "正在执行 ./launcher rebuild..." ;;
         when_ready) echo "就绪后打开 $1 注册首个用户（平台管理员）。" ;;
+        need_input) echo ">>> 请在下方输入（提示会写入日志；若看不见请往上滚）" ;;
+        ask_timeout) echo "等待输入超时（${1}s）。" ;;
+        ask_timeout_hint) echo "请重新运行: ./dafthunk-setup   或   sudo bash ../install-dafthunk --resume --force-setup" ;;
         *) echo "[$key $*]"; ;;
       esac
       ;;
@@ -166,17 +172,44 @@ read_env_value() {
   printf '%s' "$value"
 }
 
+ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
+
+ask_timeout_exit() {
+  echo "$(M ask_timeout "$ASK_TIMEOUT_SEC")" >&2
+  echo "$(M ask_timeout_hint)" >&2
+  if [[ -w /dev/tty ]]; then
+    echo "$(M ask_timeout "$ASK_TIMEOUT_SEC")" >/dev/tty
+    echo "$(M ask_timeout_hint)" >/dev/tty
+  fi
+  exit 1
+}
+
 # wget|bash leaves stdin as a pipe — read answers from the real console when possible.
+# Prompt → /dev/tty + stderr (install log); answer only on stdout for $(ask_line).
 ask_line() {
   local prompt="$1"
   local default="${2:-}"
   local value=""
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     printf '%s' "$prompt" >/dev/tty
-    read -r value </dev/tty || true
+    printf '%s\n' "$prompt" >&2
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
+        ask_timeout_exit
+      fi
+    else
+      read -r value </dev/tty || true
+    fi
   elif [[ -t 0 ]]; then
-    read -r -p "$prompt" value || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" -p "$prompt" value; then
+        ask_timeout_exit
+      fi
+    else
+      read -r -p "$prompt" value || true
+    fi
   else
+    printf '%s\n' "(non-interactive) $prompt → $default" >&2
     value="$default"
   fi
   if [[ -z "${value:-}" ]]; then
@@ -189,7 +222,12 @@ ask_line() {
 echo "$(M title)"
 echo "$(M rule)"
 echo "$(M admin_hint)"
+echo "$(M need_input)"
 echo ""
+if [[ -w /dev/tty ]]; then
+  echo "$(M need_input)" >/dev/tty
+  echo "" >/dev/tty
+fi
 
 hostname="$(ask_line "$(M hostname)" "localhost")"
 

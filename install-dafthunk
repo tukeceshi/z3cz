@@ -16,6 +16,7 @@
 #   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack for "memory check passed"
 #   DAFTHUNK_LANG=zh|en            # prompt language (default zh)
 #   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
+#   DAFTHUNK_ASK_TIMEOUT=900       # interactive prompt timeout seconds (0=disable)
 #
 set -euo pipefail
 
@@ -26,6 +27,7 @@ TARGET_TOTAL_MIB="${DAFTHUNK_TARGET_RAM_MIB:-4096}"
 RAM_SLACK_MIB="${DAFTHUNK_RAM_SLACK_MIB:-256}"
 SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
 TZ_SUGGEST="${DAFTHUNK_TZ_SUGGEST:-Asia/Shanghai}"
+ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
 # Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
 TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 LOG_FILE="$TEMP_LOG"
@@ -97,6 +99,11 @@ M() {
         step_docker_pkgs) echo "Installing Docker, Compose, Git" ;;
         docker_missing) echo "docker not found after apt install" ;;
         compose_missing) echo "Neither 'docker compose' nor 'docker-compose' is available" ;;
+        docker_ready) echo "Docker is ready" ;;
+        interactive_next) echo "Next steps need your input in the terminal (prompts also appear in the install log)." ;;
+        ask_timeout) echo "Timed out waiting for input (${1}s). Re-run setup when ready." ;;
+        ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
+        ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
         step_get_docker) echo "Installing Docker via get.docker.com (non-apt distro)" ;;
         need_curl_wget) echo "Need curl or wget to install Docker on this distro" ;;
         step_host) echo "Host preparation" ;;
@@ -168,6 +175,11 @@ M() {
         step_docker_pkgs) echo "安装 Docker、Compose、Git" ;;
         docker_missing) echo "apt 安装后未找到 docker" ;;
         compose_missing) echo "未找到 docker compose 或 docker-compose" ;;
+        docker_ready) echo "Docker 已就绪" ;;
+        interactive_next) echo "接下来需要在终端交互输入（提示会同时写入安装日志；若看不见请往上滚）" ;;
+        ask_timeout) echo "等待输入超时（${1}s）。就绪后请重新运行配置：" ;;
+        ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
+        ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
         step_get_docker) echo "通过 get.docker.com 安装 Docker（非 apt 发行版）" ;;
         need_curl_wget) echo "此发行版安装 Docker 需要 curl 或 wget" ;;
         step_host) echo "主机准备" ;;
@@ -269,27 +281,60 @@ choose_ui_lang_interactive() {
   esac
 }
 
-# Status line for ask() — never stdout (stdout is reserved for $() capture).
+# Status / prompts for ask() — never stdout (stdout is reserved for $() capture).
+# stderr is tee'd into the install log when setup_logging has run.
 ask_status() {
   local msg="$1"
+  echo -e "${GREEN}→${NC} $msg" >&2
   if [[ -w /dev/tty ]]; then
     echo -e "${GREEN}→${NC} $msg" >/dev/tty
-  else
-    echo -e "${GREEN}→${NC} $msg" >&2
   fi
 }
 
+announce() {
+  local msg="$1"
+  echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $msg${NC}"
+  if [[ -w /dev/tty ]]; then
+    echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $msg${NC}" >/dev/tty
+  fi
+}
+
+ask_timeout_exit() {
+  ask_status "$(M ask_timeout "$ASK_TIMEOUT_SEC")"
+  echo "$(M ask_timeout_hint)" >&2
+  echo "$(M ask_timeout_hint2)" >&2
+  if [[ -w /dev/tty ]]; then
+    echo "$(M ask_timeout_hint)" >/dev/tty
+    echo "$(M ask_timeout_hint2)" >/dev/tty
+  fi
+  exit 1
+}
+
 # prompt default → prints ONLY the answer on stdout (safe for answer="$(ask …)").
-# Always read from /dev/tty when available so wget|bash does not skip prompts.
+# Prompt text goes to /dev/tty + stderr (install log). Answers from /dev/tty.
 ask() {
   local prompt="$1"
   local default="$2"
   local answer=""
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     printf '%s' "$prompt" >/dev/tty
-    read -r answer </dev/tty || true
+    printf '%s\n' "$prompt" >&2
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" answer </dev/tty; then
+        ask_timeout_exit
+      fi
+    else
+      read -r answer </dev/tty || true
+    fi
   elif [[ -t 0 ]]; then
-    read -r -p "$prompt" answer || true
+    # read -p writes prompt to stderr (captured by install log tee)
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" -p "$prompt" answer; then
+        ask_timeout_exit
+      fi
+    else
+      read -r -p "$prompt" answer || true
+    fi
   else
     ask_status "$(M non_interactive_default "$prompt" "$default")"
   fi
@@ -645,6 +690,8 @@ install_packages_apt() {
   # Docs recommend optional: apt-get update && apt-get upgrade -y
   log_step "$(M step_apt)"
   export DEBIAN_FRONTEND=noninteractive
+  # Avoid interactive needrestart prompts that look like failures after apt.
+  export NEEDRESTART_MODE="${NEEDRESTART_MODE:-a}"
   apt-get update -y
 
   log_step "$(M step_docker_pkgs)"
@@ -667,8 +714,10 @@ install_packages_apt() {
     log_error "$(M compose_missing)"
     exit 1
   fi
+  announce "$(M docker_ready)"
   log_info "Docker $(docker --version 2>/dev/null | head -n1)"
   docker compose version 2>/dev/null || docker-compose version 2>/dev/null || true
+  ask_status "$(M interactive_next)"
 }
 
 install_packages_get_docker() {
@@ -687,6 +736,8 @@ install_packages_get_docker() {
   elif command -v yum >/dev/null 2>&1; then
     yum -y install git || true
   fi
+  announce "$(M docker_ready)"
+  ask_status "$(M interactive_next)"
 }
 
 prepare_host() {
@@ -852,8 +903,9 @@ run_setup_and_rebuild() {
   fi
 
   log_step "$(M step_setup_rebuild)"
+  ask_status "$(M interactive_next)"
   echo
-  DAFTHUNK_LANG="$UI_LANG" bash ./dafthunk-setup --no-rebuild
+  DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" bash ./dafthunk-setup --no-rebuild
   run_launcher_rebuild
 }
 
