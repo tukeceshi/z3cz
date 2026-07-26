@@ -416,7 +416,6 @@ ask_into() {
   local __var="$1"
   local prompt="$2"
   local default="$3"
-  local value=""
 
   if ! can_prompt; then
     ask_status "$(M non_interactive_default "$prompt" "$default")"
@@ -425,11 +424,9 @@ ask_into() {
   fi
 
   write_prompt_tty "$prompt"
-  read_interactive_line value
-  if [[ -z "${value:-}" ]]; then
+  read_interactive_line "$__var"
+  if [[ -z "${!__var:-}" ]]; then
     printf -v "$__var" '%s' "$default"
-  else
-    printf -v "$__var" '%s' "$value"
   fi
 }
 
