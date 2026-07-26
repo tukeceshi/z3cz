@@ -48,7 +48,7 @@ wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-daft
 4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`）  
 5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
 
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。SSH 下一键管道安装仍会通过 `/dev/tty` 交互提问；无控制台时才全用默认值。有 `tmux`/`screen` 时 rebuild 进会话。打开打印的 URL 注册；**首个用户**为平台管理员。本地无公网域名时可用 `localhost` + 端口。补充见下方「部署」。
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。SSH 下一键管道安装仍会通过 `/dev/tty` 交互提问；无控制台时才全用默认值。有 `tmux`/`screen` 时 rebuild 在**后台会话**中启动（`wget|bash` 下可能需手动 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。本地无公网域名时可用 `localhost` + 端口。补充见下方「部署」。
 
 #### 更新
 
@@ -60,7 +60,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 
 | 情况 | 命令 |
 |------|------|
-| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` 或 `tmux attach -t dafthunk-install` |
 | 尚未生成配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 | 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
 | 查看安装日志 | `less /var/dafthunk/install.log` |

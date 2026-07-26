@@ -109,11 +109,16 @@ M() {
         disconnect_hint) echo "If this session disconnects, SSH back and run:" ;;
         or_resume) echo "Or resume the installer:" ;;
         log_label) echo "Log: $1" ;;
-        tmux_start) echo "Starting rebuild in tmux session '$1' (survives SSH disconnect)" ;;
+        tmux_start) echo "Starting rebuild in tmux session '$1' (detached; survives SSH disconnect)" ;;
         tmux_reattach) echo "Reattach: tmux attach -t $1" ;;
-        tmux_exists) echo "tmux session '$1' already exists — attaching" ;;
-        screen_start) echo "Starting rebuild in screen session '$1' (survives SSH disconnect)" ;;
+        tmux_exists) echo "tmux session '$1' already exists" ;;
+        tmux_start_fail) echo "Failed to start tmux session — running rebuild in foreground" ;;
+        tmux_attach_fail) echo "Could not attach automatically. Rebuild is running in tmux; run: tmux attach -t $1" ;;
+        screen_start) echo "Starting rebuild in screen session '$1' (detached; survives SSH disconnect)" ;;
+        screen_exists) echo "screen session '$1' already exists" ;;
         screen_reattach) echo "Reattach: screen -r $1" ;;
+        screen_start_fail) echo "Failed to start screen session — running rebuild in foreground" ;;
+        screen_attach_fail) echo "Could not attach automatically. Rebuild is running in screen; run: screen -r $1" ;;
         no_tty_rebuild) echo "No interactive TTY — running rebuild in foreground" ;;
         no_tmux_screen) echo "tmux/screen not installed — rebuild runs in this session" ;;
         setup_missing) echo "Setup/launcher scripts not found in $1" ;;
@@ -175,11 +180,16 @@ M() {
         disconnect_hint) echo "若会话断开，请重新 SSH 后执行：" ;;
         or_resume) echo "或续跑安装器：" ;;
         log_label) echo "日志: $1" ;;
-        tmux_start) echo "在 tmux 会话「$1」中开始 rebuild（SSH 断开可续）" ;;
+        tmux_start) echo "在 tmux 会话「$1」中后台开始 rebuild（SSH 断开可续）" ;;
         tmux_reattach) echo "重新接入: tmux attach -t $1" ;;
-        tmux_exists) echo "tmux 会话「$1」已存在 — 正在接入" ;;
-        screen_start) echo "在 screen 会话「$1」中开始 rebuild（SSH 断开可续）" ;;
+        tmux_exists) echo "tmux 会话「$1」已存在" ;;
+        tmux_start_fail) echo "无法启动 tmux 会话 — 改为前台 rebuild" ;;
+        tmux_attach_fail) echo "无法自动接入 tmux。rebuild 已在后台运行，请执行: tmux attach -t $1" ;;
+        screen_start) echo "在 screen 会话「$1」中后台开始 rebuild（SSH 断开可续）" ;;
+        screen_exists) echo "screen 会话「$1」已存在" ;;
         screen_reattach) echo "重新接入: screen -r $1" ;;
+        screen_start_fail) echo "无法启动 screen 会话 — 改为前台 rebuild" ;;
+        screen_attach_fail) echo "无法自动接入 screen。rebuild 已在后台运行，请执行: screen -r $1" ;;
         no_tty_rebuild) echo "无交互终端 — 在前台执行 rebuild" ;;
         no_tmux_screen) echo "未安装 tmux/screen — rebuild 在本会话中运行" ;;
         setup_missing) echo "未找到 setup/launcher 脚本: $1" ;;
@@ -735,48 +745,90 @@ print_resume_hint() {
   echo
 }
 
+try_attach_tmux() {
+  local session="$1"
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    # wget|bash + tee often cannot give tmux a usable terminal — never abort install.
+    if tmux attach -t "$session" </dev/tty >/dev/tty 2>/dev/null; then
+      return 0
+    fi
+  fi
+  log_warn "$(M tmux_attach_fail "$session")"
+  return 0
+}
+
+try_attach_screen() {
+  local session="$1"
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    if screen -r "$session" </dev/tty >/dev/tty 2>/dev/null; then
+      return 0
+    fi
+  fi
+  log_warn "$(M screen_attach_fail "$session")"
+  return 0
+}
+
 run_launcher_rebuild() {
   print_resume_hint
   cd "$INSTALL_DIR/docker-host"
 
-  if can_prompt && command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
+  local done_msg
+  if [[ "$UI_LANG" == "en" ]]; then
+    done_msg="Rebuild finished. Detach: Ctrl+b d"
+  else
+    done_msg="Rebuild 已结束。脱离会话: Ctrl+b d"
+  fi
+
+  # Prefer detached tmux/screen so rebuild starts even when /dev/tty is unusable for attach.
+  if command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
     local session="dafthunk-install"
-    log_info "$(M tmux_start "$session")"
-    log_info "$(M tmux_reattach "$session")"
     if tmux has-session -t "$session" 2>/dev/null; then
       log_warn "$(M tmux_exists "$session")"
-      tmux attach -t "$session" </dev/tty >/dev/tty 2>&1
+    else
+      log_info "$(M tmux_start "$session")"
+      if ! tmux new-session -d -s "$session" \
+        "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; bash"; then
+        log_warn "$(M tmux_start_fail)"
+        ./launcher rebuild
+        return 0
+      fi
+    fi
+    if ! tmux has-session -t "$session" 2>/dev/null; then
+      log_warn "$(M tmux_start_fail)"
+      ./launcher rebuild
       return 0
     fi
-    local done_msg
-    if [[ "$UI_LANG" == "en" ]]; then
-      done_msg="Rebuild finished. Detach: Ctrl+b d"
-    else
-      done_msg="Rebuild 已结束。脱离会话: Ctrl+b d"
-    fi
-    tmux new-session -s "$session" "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; bash" \
-      </dev/tty >/dev/tty 2>&1
+    log_info "$(M tmux_reattach "$session")"
+    try_attach_tmux "$session"
     return 0
   fi
 
-  if can_prompt && command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
+  if command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
     local session="dafthunk-install"
-    log_info "$(M screen_start "$session")"
-    log_info "$(M screen_reattach "$session")"
-    local done_msg
-    if [[ "$UI_LANG" == "en" ]]; then
-      done_msg="Rebuild finished."
+    if screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
+      log_warn "$(M screen_exists "$session")"
     else
-      done_msg="Rebuild 已结束。"
+      log_info "$(M screen_start "$session")"
+      if ! screen -dmS "$session" bash -c \
+        "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; exec bash"; then
+        log_warn "$(M screen_start_fail)"
+        ./launcher rebuild
+        return 0
+      fi
     fi
-    screen -S "$session" bash -c "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; exec bash" \
-      </dev/tty >/dev/tty 2>&1
+    if ! screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
+      log_warn "$(M screen_start_fail)"
+      ./launcher rebuild
+      return 0
+    fi
+    log_info "$(M screen_reattach "$session")"
+    try_attach_screen "$session"
     return 0
   fi
 
   if ! can_prompt; then
     log_warn "$(M no_tty_rebuild)"
-  elif ! command -v tmux >/dev/null 2>&1 && ! command -v screen >/dev/null 2>&1; then
+  else
     log_warn "$(M no_tmux_screen)"
   fi
 
@@ -801,7 +853,7 @@ run_setup_and_rebuild() {
 
   log_step "$(M step_setup_rebuild)"
   echo
-  bash ./dafthunk-setup --no-rebuild
+  DAFTHUNK_LANG="$UI_LANG" bash ./dafthunk-setup --no-rebuild
   run_launcher_rebuild
 }
 

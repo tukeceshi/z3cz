@@ -20,6 +20,71 @@ for arg in "$@"; do
   esac
 done
 
+# Language: DAFTHUNK_LANG > .install-lang > zh
+UI_LANG="zh"
+if [[ -n "${DAFTHUNK_LANG:-}" ]]; then
+  case "$(echo "$DAFTHUNK_LANG" | tr '[:upper:]' '[:lower:]')" in
+    en|en-us|en_us|english) UI_LANG="en" ;;
+    *) UI_LANG="zh" ;;
+  esac
+elif [[ -f "$HOST_DIR/.install-lang" ]]; then
+  case "$(tr -d '[:space:]' <"$HOST_DIR/.install-lang" | tr '[:upper:]' '[:lower:]')" in
+    en|en-us|en_us|english) UI_LANG="en" ;;
+    *) UI_LANG="zh" ;;
+  esac
+fi
+
+M() {
+  local key="$1"
+  shift || true
+  case "$UI_LANG" in
+    en)
+      case "$key" in
+        title) echo "Dafthunk self-host setup" ;;
+        rule) echo "------------------------" ;;
+        admin_hint) echo "Admin account: open the site after rebuild and register — the first user becomes platform admin." ;;
+        hostname) echo "Hostname / domain [localhost]: " ;;
+        local_http) echo "Local hostname detected — HTTPS disabled (HTTP only)." ;;
+        https) echo "Enable HTTPS / Let's Encrypt? [Y/n]: " ;;
+        le_email) echo "ACME notification email (optional, Enter to skip): " ;;
+        http_port) echo "HTTP port [$1]: " ;;
+        https_port) echo "HTTPS port [$1]: " ;;
+        bad_port) echo "Invalid port '$1' — using default $2" ;;
+        existing_yml) echo "Existing containers/app.yml found — preserving secrets when valid." ;;
+        wrote) echo "Wrote docker-host/containers/app.yml" ;;
+        public_url) echo "Public URL: $1" ;;
+        skip_rebuild) echo "Skipped rebuild (--no-rebuild). Next: ./launcher rebuild" ;;
+        then_register) echo "Then open $1 and register the first user (platform admin)." ;;
+        starting_rebuild) echo "Starting ./launcher rebuild..." ;;
+        when_ready) echo "When ready, open $1 and register the first user (platform admin)." ;;
+        *) echo "[$key $*]"; ;;
+      esac
+      ;;
+    *)
+      case "$key" in
+        title) echo "Dafthunk 自托管配置" ;;
+        rule) echo "------------------------" ;;
+        admin_hint) echo "管理员账号：重建完成后打开站点注册 — 首个用户将成为平台管理员。" ;;
+        hostname) echo "域名 / Hostname [localhost]: " ;;
+        local_http) echo "检测到本地主机名 — 已关闭 HTTPS（仅 HTTP）。" ;;
+        https) echo "启用 HTTPS / Let's Encrypt？ [Y/n]: " ;;
+        le_email) echo "ACME 通知邮箱（可选，回车跳过）: " ;;
+        http_port) echo "HTTP 端口 [$1]: " ;;
+        https_port) echo "HTTPS 端口 [$1]: " ;;
+        bad_port) echo "无效端口「$1」— 改用默认 $2" ;;
+        existing_yml) echo "发现已有 containers/app.yml — 在密钥有效时予以保留。" ;;
+        wrote) echo "已写入 docker-host/containers/app.yml" ;;
+        public_url) echo "公网地址: $1" ;;
+        skip_rebuild) echo "已跳过 rebuild (--no-rebuild)。下一步: ./launcher rebuild" ;;
+        then_register) echo "然后打开 $1 注册首个用户（平台管理员）。" ;;
+        starting_rebuild) echo "正在执行 ./launcher rebuild..." ;;
+        when_ready) echo "就绪后打开 $1 注册首个用户（平台管理员）。" ;;
+        *) echo "[$key $*]"; ;;
+      esac
+      ;;
+  esac
+}
+
 mkdir -p \
   "$HOST_DIR/containers" \
   "$HOST_DIR/shared/postgres" \
@@ -121,28 +186,28 @@ ask_line() {
   fi
 }
 
-echo "Dafthunk self-host setup"
-echo "------------------------"
-echo "Admin account: open the site after rebuild and register — the first user becomes platform admin."
+echo "$(M title)"
+echo "$(M rule)"
+echo "$(M admin_hint)"
 echo ""
 
-hostname="$(ask_line "Hostname [localhost]: " "localhost")"
+hostname="$(ask_line "$(M hostname)" "localhost")"
 
 https="true"
 if looks_like_local "$hostname"; then
-  echo "Local hostname detected — HTTPS disabled (HTTP only)."
+  echo "$(M local_http)"
   https="false"
 else
-  https_answer="$(ask_line "Enable HTTPS / Let's Encrypt? [Y/n]: " "Y")"
+  https_answer="$(ask_line "$(M https)" "Y")"
   https_answer="$(echo "${https_answer:-}" | tr '[:upper:]' '[:lower:]')"
-  if [[ "$https_answer" == "n" || "$https_answer" == "no" ]]; then
+  if [[ "$https_answer" == "n" || "$https_answer" == "no" || "$https_answer" == "否" ]]; then
     https="false"
   fi
 fi
 
 le_email=""
 if [[ "$https" == "true" ]]; then
-  le_email="$(ask_line "ACME notification email (optional, Enter to skip): " "")"
+  le_email="$(ask_line "$(M le_email)" "")"
 fi
 
 read_port() {
@@ -151,24 +216,24 @@ read_port() {
   local value
   value="$(ask_line "$prompt" "$default")"
   if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1 || value > 65535)); then
-    echo "Invalid port '$value' — using default $default" >&2
+    echo "$(M bad_port "$value" "$default")" >&2
     value="$default"
   fi
   printf '%s' "$value"
 }
 
 if [[ "$https" == "true" ]]; then
-  http_port="$(read_port "HTTP port [80]: " "80")"
-  https_port="$(read_port "HTTPS port [443]: " "443")"
+  http_port="$(read_port "$(M http_port "80")" "80")"
+  https_port="$(read_port "$(M https_port "443")" "443")"
 else
-  http_port="$(read_port "HTTP port [8080]: " "8080")"
+  http_port="$(read_port "$(M http_port "8080")" "8080")"
   https_port=443
 fi
 
 jwt=""
 master=""
 if [[ -f "$APP_YML" ]]; then
-  echo "Existing containers/app.yml found — preserving secrets when valid."
+  echo "$(M existing_yml)"
   jwt="$(read_env_value JWT_SECRET "$APP_YML")"
   master="$(read_env_value SECRET_MASTER_KEY "$APP_YML")"
 fi
@@ -200,17 +265,17 @@ web_host="$(public_origin "$hostname" "$https" "$http_port" "$https_port")"
 } >"$APP_YML"
 
 echo ""
-echo "Wrote docker-host/containers/app.yml"
-echo "Public URL: $web_host"
+echo "$(M wrote)"
+echo "$(M public_url "$web_host")"
 echo ""
 
 if [[ "$SKIP_REBUILD" == "1" ]]; then
-  echo "Skipped rebuild (--no-rebuild). Next: ./launcher rebuild"
-  echo "Then open $web_host and register the first user (platform admin)."
+  echo "$(M skip_rebuild)"
+  echo "$(M then_register "$web_host")"
   exit 0
 fi
 
-echo "Starting ./launcher rebuild..."
-echo "When ready, open $web_host and register the first user (platform admin)."
+echo "$(M starting_rebuild)"
+echo "$(M when_ready "$web_host")"
 echo ""
 exec "$HOST_DIR/launcher" rebuild

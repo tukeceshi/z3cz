@@ -25,7 +25,7 @@ wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-daft
 4. `apt update` 并安装 `docker.io` + Compose + `git`（不含 `apt upgrade`）  
 5. clone → setup → 串行 `launcher rebuild`
 
-目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-swap`、`--force-setup`。SSH 下 `wget|bash` 经 `/dev/tty` 交互，无控制台才跳过问答。
+目录默认 `/var/dafthunk`。日志：`/var/dafthunk/install.log`。选项：`--lang`、`--resume`、`--skip-swap`、`--force-setup`。SSH 下 `wget|bash` 经 `/dev/tty` 交互；rebuild 默认进 tmux 后台，必要时 `tmux attach -t dafthunk-install`。
 
 ## 更新
 
@@ -37,7 +37,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 
 | 情况 | 命令 |
 |------|------|
-| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` 或 `tmux attach -t dafthunk-install` |
 | 无 app.yml | `./dafthunk-setup` |
 | 接着跑安装器 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
 | 重配 hostname | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
