@@ -38,7 +38,7 @@ export function publicOrigin(hostname, https, httpPort = 80, httpsPort = 443) {
 export function loadAppConfig() {
   if (!fs.existsSync(appYmlPath)) {
     throw new Error(
-      `Missing ${path.relative(repoRoot, appYmlPath)}. Run: node docker-host/dafthunk-setup.mjs`
+      `Missing ${path.relative(repoRoot, appYmlPath)}. Run: docker-host/dafthunk-setup`
     );
   }
   const config = parseAppYml(fs.readFileSync(appYmlPath, "utf8"));

@@ -28,7 +28,8 @@ const rest = process.argv.slice(3);
 function printHelp() {
   console.log(`Dafthunk host launcher
 
-Usage: node docker-host/launcher.mjs <command>
+Usage: ./launcher <command>
+       (fallback: node docker-host/launcher.mjs <command>)
 
 Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
@@ -44,15 +45,15 @@ Commands:
   help        Show this help
 
 First install:
-  node docker-host/dafthunk-setup.mjs
-  node docker-host/launcher.mjs rebuild
+  ./dafthunk-setup
+  ./launcher rebuild
 `);
 }
 
 function requireAppYml() {
   if (!fs.existsSync(appYmlPath)) {
     console.error(
-      `Missing containers/app.yml.\nRun: node docker-host/dafthunk-setup.mjs\nOr:  cp docker-host/samples/standalone.yml docker-host/containers/app.yml`
+      `Missing containers/app.yml.\nRun: ./dafthunk-setup\nOr:  cp samples/standalone.yml containers/app.yml`
     );
     process.exit(1);
   }

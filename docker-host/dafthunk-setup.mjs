@@ -143,7 +143,7 @@ async function main() {
   console.log(`Public URL: ${webHost}`);
   console.log("");
   console.log("Next:");
-  console.log("  node docker-host/launcher.mjs rebuild");
+  console.log("  cd docker-host && ./launcher rebuild");
   console.log(`  open ${webHost} and register the first user (platform admin)`);
 }
 

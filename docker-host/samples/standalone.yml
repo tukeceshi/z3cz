@@ -1,6 +1,6 @@
 # Dafthunk 自托管（单机）模板
 # 复制：cp samples/standalone.yml containers/app.yml
-# 或运行：node dafthunk-setup.mjs
+# 或运行：./dafthunk-setup
 
 # 对外主机名（单域名）。本地可用 localhost
 hostname: workflow.example.com

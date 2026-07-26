@@ -2,32 +2,59 @@
 
 单域名 · Caddy · 无 SMTP · monorepo 内旁路栈（`name: dafthunk-host`，与开发 `docker compose` 隔离）。
 
+宿主机只需 **Docker + Git + bash**（无需本机 Node）。`./launcher` 在无 Node 时会用临时 Node 容器生成 compose。
+
 - 控制台：`/`
 - 营销站：`/m/`（app 容器 nginx 反代 www）
 - Admin「首页」开关控制 `/` 跳控制台或 `/m/`
 
-## 首次安装
+## 一键安装（Linux 服务器）
 
 ```bash
-node docker-host/dafthunk-setup.mjs
-node docker-host/launcher.mjs rebuild
+wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-浏览器打开 setup 打印的 URL，**注册第一个用户** → 自动成为 platform admin（无需在 setup 里填邮箱）。
+会安装 Docker/Git（若缺失）、clone 到 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖），然后进入 `./dafthunk-setup`。
+
+完成后在安装目录执行：
+
+```bash
+cd /var/dafthunk/docker-host
+./launcher rebuild
+```
+
+## 更新
+
+```bash
+cd /var/dafthunk          # 或你的 DAFTHUNK_INSTALL_DIR
+git pull
+cd docker-host
+./launcher rebuild
+```
+
+## 首次安装（已有仓库）
+
+```bash
+cd docker-host
+./dafthunk-setup
+./launcher rebuild
+```
+
+浏览器打开 setup 打印的 URL，**注册第一个用户** → 自动成为 platform admin。
 
 本地默认（hostname=`localhost`）为 HTTP，端口 **8080**。
 
 ## 常用命令
 
 ```bash
-node docker-host/launcher.mjs status
-node docker-host/launcher.mjs logs -f api
-node docker-host/launcher.mjs stop
-node docker-host/launcher.mjs rebuild    # 升级：git pull 后执行
-node docker-host/launcher.mjs destroy    # 删容器，保留 shared/ 数据
+./launcher status
+./launcher logs -f api
+./launcher stop
+./launcher rebuild    # 升级见上方「更新」
+./launcher destroy    # 删容器，保留 shared/ 数据
 ```
 
-Windows 可用 `docker-host\launcher.cmd rebuild`。
+Windows：优先 Git Bash 跑上述命令；或 `launcher.cmd rebuild` / `pnpm host:*`（无 bash 时回退 Node）。
 
 ## 布局
 
@@ -37,6 +64,8 @@ Windows 可用 `docker-host\launcher.cmd rebuild`。
 | `containers/app.yml` | setup 生成（gitignore） |
 | `shared/` | Postgres / 对象存储 / Caddy 数据 |
 | `docker-compose.generated.yml` | launcher 生成，勿手改 |
+| `dafthunk-setup` / `launcher` | bash 入口（主推） |
+| `*.mjs` | 渲染逻辑与无 bash 时的回退 |
 
 ## 与开发栈
 

@@ -6,7 +6,7 @@
 dafthunk_ensure_dev_vars() {
   if [ ! -f apps/api/.dev.vars ]; then
     echo "[entrypoint] 未找到 apps/api/.dev.vars，已从示例文件创建。"
-    echo "[entrypoint] OAuth 等非敏感项可编辑该文件；JWT/MASTER 密钥由 API 写入 /data/secrets/.dev.vars。"
+    echo "[entrypoint] 非密钥项可编辑该文件；登录 OAuth 请在 Admin → 登录方式配置；JWT/MASTER 由 API 写入 /data/secrets/.dev.vars。"
     cp apps/api/.dev.vars.example apps/api/.dev.vars
   fi
 }
