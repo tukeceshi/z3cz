@@ -30,19 +30,14 @@
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
-cd /var/dafthunk/docker-host   # 若未改 DAFTHUNK_INSTALL_DIR
-./launcher rebuild
 ```
 
-按向导填写 hostname 后构建启动。打开打印的 URL 注册登录；**首个用户**为平台管理员。本地默认 `http://localhost:8080`。补充说明见下方「部署」。
+一条命令完成：装 Docker/Git（若缺）→ clone → 向导写配置 → `launcher rebuild`。默认目录 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖）。打开打印的 URL 注册登录；**首个用户**为平台管理员。本地默认 `http://localhost:8080`。补充说明见下方「部署」。
 
 #### 更新
 
 ```bash
-cd /var/dafthunk          # 或你的 DAFTHUNK_INSTALL_DIR
-git pull
-cd docker-host
-./launcher rebuild
+cd /var/dafthunk && git pull && docker-host/launcher rebuild
 ```
 
 ---
@@ -229,13 +224,7 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 单域名 + Caddy，与开发栈隔离（compose project `dafthunk-host`）。详见 [docker-host/README.md](./docker-host/README.md)。
 
-**已有仓库（非一键）：**
-
-```bash
-cd docker-host
-./dafthunk-setup
-./launcher rebuild
-```
+**已有仓库（非一键）：** `cd docker-host && ./dafthunk-setup`（写配置后自动 rebuild）。
 
 | 操作 | 命令 |
 |------|------|

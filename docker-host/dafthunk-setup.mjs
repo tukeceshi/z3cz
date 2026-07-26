@@ -2,22 +2,28 @@
 /**
  * Interactive first-time setup for Docker self-host (Discourse-style).
  * Does NOT create an admin user — first register in the app becomes platform admin.
+ * Prefer ./dafthunk-setup (bash). This .mjs is a fallback; ends with ./launcher rebuild unless --no-rebuild.
  */
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { stringifyAppYml } from "./lib/parse-app-yml.mjs";
 import {
   appYmlPath,
   containersDir,
+  dockerHostRoot,
   ensureHostDirs,
   repoRoot,
   samplesDir,
 } from "./lib/paths.mjs";
 import { publicOrigin } from "./lib/render.mjs";
 import { generateHexSecret, isPlaceholderSecret } from "./lib/secrets.mjs";
+
+const skipRebuild = process.argv.includes("--no-rebuild");
 
 function looksLikeLocalHost(hostname) {
   if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -142,9 +148,35 @@ async function main() {
   console.log(`Wrote ${path.relative(repoRoot, appYmlPath)}`);
   console.log(`Public URL: ${webHost}`);
   console.log("");
-  console.log("Next:");
-  console.log("  cd docker-host && ./launcher rebuild");
-  console.log(`  open ${webHost} and register the first user (platform admin)`);
+
+  if (skipRebuild) {
+    console.log("Skipped rebuild (--no-rebuild). Next: ./launcher rebuild");
+    console.log(
+      `Then open ${webHost} and register the first user (platform admin).`
+    );
+    return;
+  }
+
+  console.log("Starting ./launcher rebuild...");
+  console.log(
+    `When ready, open ${webHost} and register the first user (platform admin).`
+  );
+  console.log("");
+
+  const launcherSh = path.join(dockerHostRoot, "launcher");
+  const launcherMjs = path.join(dockerHostRoot, "launcher.mjs");
+  const viaBash = spawnSync("bash", [launcherSh, "rebuild"], {
+    cwd: dockerHostRoot,
+    stdio: "inherit",
+  });
+  if (!viaBash.error) {
+    process.exit(viaBash.status ?? 1);
+  }
+  const viaNode = spawnSync(process.execPath, [launcherMjs, "rebuild"], {
+    cwd: path.dirname(fileURLToPath(import.meta.url)),
+    stdio: "inherit",
+  });
+  process.exit(viaNode.status ?? 1);
 }
 
 main().catch((error) => {

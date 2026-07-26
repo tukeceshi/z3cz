@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 # Discourse-style interactive setup for Dafthunk Docker self-host.
 # Host requirements: bash, openssl (or /dev/urandom). No Node required.
+# After writing containers/app.yml, runs ./launcher rebuild unless --no-rebuild.
 set -euo pipefail
 
 HOST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HOST_DIR/.." && pwd)"
 APP_YML="$HOST_DIR/containers/app.yml"
+
+SKIP_REBUILD=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-rebuild) SKIP_REBUILD=1 ;;
+    -h|--help)
+      echo "Usage: ./dafthunk-setup [--no-rebuild]"
+      echo "  Writes containers/app.yml, then runs ./launcher rebuild (default)."
+      exit 0
+      ;;
+  esac
+done
 
 mkdir -p \
   "$HOST_DIR/containers" \
@@ -165,6 +178,14 @@ echo ""
 echo "Wrote docker-host/containers/app.yml"
 echo "Public URL: $web_host"
 echo ""
-echo "Next:"
-echo "  ./launcher rebuild"
-echo "  open $web_host and register the first user (platform admin)"
+
+if [[ "$SKIP_REBUILD" == "1" ]]; then
+  echo "Skipped rebuild (--no-rebuild). Next: ./launcher rebuild"
+  echo "Then open $web_host and register the first user (platform admin)."
+  exit 0
+fi
+
+echo "Starting ./launcher rebuild..."
+echo "When ready, open $web_host and register the first user (platform admin)."
+echo ""
+exec "$HOST_DIR/launcher" rebuild

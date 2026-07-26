@@ -14,22 +14,12 @@
 wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-会安装 Docker/Git（若缺失）、clone 到 `/var/dafthunk`（可用 `DAFTHUNK_INSTALL_DIR` 覆盖），然后进入 `./dafthunk-setup`。
-
-完成后在安装目录执行：
-
-```bash
-cd /var/dafthunk/docker-host
-./launcher rebuild
-```
+一条命令：装 Docker/Git（若缺）→ clone 到 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）→ `./dafthunk-setup` → 自动 `./launcher rebuild`。
 
 ## 更新
 
 ```bash
-cd /var/dafthunk          # 或你的 DAFTHUNK_INSTALL_DIR
-git pull
-cd docker-host
-./launcher rebuild
+cd /var/dafthunk && git pull && docker-host/launcher rebuild
 ```
 
 ## 首次安装（已有仓库）
@@ -37,10 +27,11 @@ cd docker-host
 ```bash
 cd docker-host
 ./dafthunk-setup
-./launcher rebuild
 ```
 
-浏览器打开 setup 打印的 URL，**注册第一个用户** → 自动成为 platform admin。
+写完 `containers/app.yml` 后会自动 `./launcher rebuild`。仅生成配置：`./dafthunk-setup --no-rebuild`。
+
+浏览器打开打印的 URL，**注册第一个用户** → 自动成为 platform admin。
 
 本地默认（hostname=`localhost`）为 HTTP，端口 **8080**。
 
@@ -50,7 +41,7 @@ cd docker-host
 ./launcher status
 ./launcher logs -f api
 ./launcher stop
-./launcher rebuild    # 升级见上方「更新」
+./launcher rebuild    # 升级见上方「更新」；若缺 app.yml 会转入 setup
 ./launcher destroy    # 删容器，保留 shared/ 数据
 ```
 

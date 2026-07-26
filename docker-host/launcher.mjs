@@ -53,7 +53,7 @@ First install:
 function requireAppYml() {
   if (!fs.existsSync(appYmlPath)) {
     console.error(
-      `Missing containers/app.yml.\nRun: ./dafthunk-setup\nOr:  cp samples/standalone.yml containers/app.yml`
+      `Missing containers/app.yml.\nRun: ./dafthunk-setup  (writes config and rebuilds)\nOr:  cp samples/standalone.yml containers/app.yml`
     );
     process.exit(1);
   }

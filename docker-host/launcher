@@ -39,12 +39,22 @@ EOF
 }
 
 require_app_yml() {
-  if [[ ! -f "$APP_YML" ]]; then
-    echo "Missing containers/app.yml." >&2
-    echo "Run: ./dafthunk-setup" >&2
-    echo "Or:  cp samples/standalone.yml containers/app.yml" >&2
-    exit 1
+  if [[ -f "$APP_YML" ]]; then
+    return 0
   fi
+
+  case "$COMMAND" in
+    bootstrap|rebuild|start)
+      echo "Missing containers/app.yml — running ./dafthunk-setup (writes config, then rebuilds)..." >&2
+      exec bash "$HOST_DIR/dafthunk-setup"
+      ;;
+    *)
+      echo "Missing containers/app.yml." >&2
+      echo "Run: ./dafthunk-setup" >&2
+      echo "Or:  cp samples/standalone.yml containers/app.yml" >&2
+      exit 1
+      ;;
+  esac
 }
 
 compose() {
