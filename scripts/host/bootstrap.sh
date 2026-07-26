@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Step 1: Docker/Git + swap + clone repo.
-#   curl -fsSL .../scripts/host/bootstrap.sh -o /tmp/bootstrap.sh && sudo bash /tmp/bootstrap.sh
+#   curl -fsSL .../bootstrap-install | sudo bash
+#   或: curl -fsSL ".../bootstrap.sh" -o "/tmp/bootstrap.sh" && sudo bash "/tmp/bootstrap.sh"
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"

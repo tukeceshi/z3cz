@@ -7,8 +7,7 @@
 ## 安装（三步）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
-sudo bash /tmp/bootstrap.sh
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
 sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
 

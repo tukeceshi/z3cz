@@ -28,16 +28,23 @@
 #### 安装（三步）
 
 ```bash
-# 1. 环境 + 拉代码
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
-sudo bash /tmp/bootstrap.sh
+# 1. 环境 + 拉代码（整行复制）
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
-# 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME，按提示输入）
+# 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME）
 sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
 
 # 3. 构建并启动（较慢；后台：加 --detach）
 sudo /var/dafthunk/scripts/host/deploy.sh
 ```
+
+若不用管道，第 1 步可用（**必须整行一条**）：
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh" -o "/tmp/bootstrap.sh" && sudo bash "/tmp/bootstrap.sh"
+```
+
+请在 **Linux 服务器的 bash** 里执行，不要用 Windows PowerShell 的 `curl`。
 
 日志：`/var/dafthunk/rebuild.log`。后台构建时：`tmux attach -t dafthunk-deploy`。
 

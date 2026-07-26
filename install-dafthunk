@@ -15,8 +15,7 @@ install-dafthunk is deprecated.
 
 Use three steps (download each script, then run):
 
-  curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
-  sudo bash /tmp/bootstrap.sh
+  curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
   sudo DAFTHUNK_HOSTNAME=your.domain ${INSTALL_DIR}/scripts/host/configure.sh
 
