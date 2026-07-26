@@ -5,14 +5,24 @@
 # Usage (one shot: Docker/Git + clone + setup + rebuild):
 #   wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 #
-# Or with env:
-#   DAFTHUNK_INSTALL_DIR=/opt/dafthunk wget -qO- ... | sudo bash
+# Resume after disconnect / re-run safely:
+#   sudo bash /var/dafthunk/install-dafthunk --resume
+#
+# Env:
+#   DAFTHUNK_INSTALL_DIR=/opt/dafthunk
+#   DAFTHUNK_REPO_URL=...
+#   DAFTHUNK_BRANCH=main
 #
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
+LOG_FILE="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
+
+RESUME=0
+SKIP_DOCKER=0
+FORCE_SETUP=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -26,14 +36,70 @@ log_warn() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
+show_help() {
+  cat <<EOF
+Dafthunk one-line installer
+
+Usage:
+  wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+  sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
+
+Options:
+  --resume        Skip Docker/Git install; update repo; setup only if needed; rebuild
+  --skip-docker   Same Docker/Git skip as --resume (still runs setup/rebuild flow)
+  --force-setup   Re-run hostname wizard even if containers/app.yml exists
+  -h, --help      Show this help
+
+If SSH drops during rebuild, reconnect and run:
+  cd $INSTALL_DIR/docker-host && ./launcher rebuild
+Or:
+  sudo bash $INSTALL_DIR/install-dafthunk --resume
+
+Log file: $LOG_FILE
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --resume)
+      RESUME=1
+      SKIP_DOCKER=1
+      ;;
+    --skip-docker)
+      SKIP_DOCKER=1
+      ;;
+    --force-setup)
+      FORCE_SETUP=1
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      log_error "Unknown option: $arg"
+      show_help
+      exit 1
+      ;;
+  esac
+done
+
 check_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     log_error "This script must be run as root."
     echo
     echo "Please run with sudo:"
     echo "  wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash"
+    echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
     exit 1
   fi
+}
+
+setup_logging() {
+  mkdir -p "$INSTALL_DIR"
+  touch "$LOG_FILE"
+  # Duplicate stdout/stderr to log (keeps console output)
+  exec > >(tee -a "$LOG_FILE") 2>&1
+  log_info "Logging to $LOG_FILE"
 }
 
 fetch() {
@@ -89,10 +155,14 @@ setup_repo() {
     git reset --hard "origin/$BRANCH"
   else
     if [[ -d "$INSTALL_DIR" ]] && [[ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]; then
-      log_warn "$INSTALL_DIR exists and is not empty"
+      log_warn "$INSTALL_DIR exists but is not a git checkout — backing up"
       local backup="${INSTALL_DIR}.backup.$(date +%Y%m%d%H%M%S)"
       log_info "Backing up to $backup"
       mv "$INSTALL_DIR" "$backup"
+      mkdir -p "$INSTALL_DIR"
+      # Continue logging into the new tree
+      LOG_FILE="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
+      touch "$LOG_FILE"
     fi
 
     log_info "Cloning dafthunk to $INSTALL_DIR..."
@@ -104,20 +174,97 @@ setup_repo() {
   log_info "Repository ready at $INSTALL_DIR"
 }
 
-run_setup_and_rebuild() {
-  log_step "Setup wizard + rebuild (one shot)"
+print_resume_hint() {
   echo
+  log_warn "If this session disconnects, SSH back and run:"
+  echo "  cd $INSTALL_DIR/docker-host && ./launcher rebuild"
+  echo "Or resume the installer:"
+  echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
+  echo "Log: $LOG_FILE"
+  echo
+}
+
+run_launcher_rebuild() {
+  print_resume_hint
   cd "$INSTALL_DIR/docker-host"
-  if [[ ! -f "./dafthunk-setup" ]]; then
-    log_error "Setup script not found in $INSTALL_DIR/docker-host"
+
+  # Prefer tmux/screen so a dropped SSH does not kill a long rebuild
+  if [[ -t 0 ]] && command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
+    local session="dafthunk-install"
+    log_info "Starting rebuild in tmux session '$session' (survives SSH disconnect)"
+    log_info "Reattach: tmux attach -t $session"
+    if tmux has-session -t "$session" 2>/dev/null; then
+      log_warn "tmux session '$session' already exists — attaching"
+      tmux attach -t "$session"
+      return 0
+    fi
+    tmux new-session -s "$session" "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo 'Rebuild finished. Detach: Ctrl+b d'; bash"
+    return 0
+  fi
+
+  if [[ -t 0 ]] && command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
+    local session="dafthunk-install"
+    log_info "Starting rebuild in screen session '$session' (survives SSH disconnect)"
+    log_info "Reattach: screen -r $session"
+    screen -S "$session" bash -c "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo 'Rebuild finished.'; exec bash"
+    return 0
+  fi
+
+  if [[ ! -t 0 ]]; then
+    log_warn "No interactive TTY — running rebuild in foreground (use tmux next time if SSH is unstable)"
+  elif ! command -v tmux >/dev/null 2>&1 && ! command -v screen >/dev/null 2>&1; then
+    log_warn "tmux/screen not installed — rebuild runs in this session (disconnect may abort it)"
+  fi
+
+  ./launcher rebuild
+}
+
+run_setup_and_rebuild() {
+  local app_yml="$INSTALL_DIR/docker-host/containers/app.yml"
+  cd "$INSTALL_DIR/docker-host"
+
+  if [[ ! -f "./dafthunk-setup" ]] || [[ ! -f "./launcher" ]]; then
+    log_error "Setup/launcher scripts not found in $INSTALL_DIR/docker-host"
     exit 1
   fi
-  # dafthunk-setup writes app.yml then runs ./launcher rebuild
-  bash ./dafthunk-setup "$@"
+
+  if [[ -f "$app_yml" ]] && [[ "$FORCE_SETUP" != "1" ]]; then
+    log_step "Config present — skipping wizard (pass --force-setup to reconfigure)"
+    log_info "Found $app_yml"
+    run_launcher_rebuild
+    return 0
+  fi
+
+  log_step "Setup wizard + rebuild"
+  echo
+  # --no-rebuild: we run rebuild ourselves (tmux/hints/logging)
+  bash ./dafthunk-setup --no-rebuild
+  run_launcher_rebuild
 }
 
 check_root
-install_docker
-install_git
+setup_logging
+
+if [[ "$RESUME" == "1" ]]; then
+  log_step "Resume mode"
+fi
+
+if [[ "$SKIP_DOCKER" != "1" ]]; then
+  install_docker
+  install_git
+else
+  log_info "Skipping Docker/Git install"
+  if ! command -v docker >/dev/null 2>&1; then
+    log_error "Docker not found. Re-run without --resume/--skip-docker, or install Docker first."
+    exit 1
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    log_error "Git not found. Re-run without --resume/--skip-docker, or install git first."
+    exit 1
+  fi
+fi
+
 setup_repo
-run_setup_and_rebuild "$@"
+run_setup_and_rebuild
+
+log_info "Done. Open the Public URL from setup output (or check docker-host/containers/app.yml)."
