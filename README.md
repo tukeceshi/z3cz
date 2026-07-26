@@ -34,11 +34,17 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后一键安装（**推荐**：先下载再执行，避免 pipe 丢交互）：
+然后一键安装（**推荐**：先下载再执行；安装器会自动进入 **tmux**，SSH 断线可 `tmux attach -t dafthunk-install` 续接）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install -o /tmp/bootstrap-install.sh
 sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
+```
+
+无人值守（跳过问答，需指定域名）：
+
+```bash
+sudo DAFTHUNK_HOSTNAME=你的域名 bash /tmp/bootstrap-install.sh --lang zh --non-interactive 0</dev/tty
 ```
 
 也可一行（需前台 TTY）：
@@ -79,7 +85,9 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | 查看安装日志 | `less /var/dafthunk/install.log` |
 | 域名配置摘要 | `less /var/dafthunk/setup.log` |
 | 构建日志 | `less /var/dafthunk/rebuild.log` |
-| 构建中断 / 断线 | `tmux attach -t dafthunk-install` 或 `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 安装中断 / SSH 断开 | `tmux attach -t dafthunk-install` |
+| 安装进程僵死 | `sudo pkill -f 'dafthunk-install|dafthunk-setup'; sudo bash /var/dafthunk/install-dafthunk --resume --force-setup --skip-docker 0</dev/tty` |
+| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
 | 尚未生成配置 / 卡在域名 | `cd /var/dafthunk/docker-host && sudo ./dafthunk-setup` |
 | 向导超时后重来 | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
 | 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |

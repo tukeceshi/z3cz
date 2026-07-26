@@ -191,6 +191,14 @@ setup_log() {
   printf '%s\n' "$*" >>"${DAFTHUNK_SETUP_LOG}"
 }
 
+log_wait_input() {
+  local prompt="$1"
+  setup_log "waiting: $prompt"
+  if [[ -n "${DAFTHUNK_INSTALL_LOG:-}" ]]; then
+    printf '%s\n' ">>> waiting: $prompt" >>"${DAFTHUNK_INSTALL_LOG}" 2>/dev/null || true
+  fi
+}
+
 has_tty() {
   [[ -r /dev/tty && -w /dev/tty ]]
 }
@@ -290,6 +298,7 @@ ask_into() {
   fi
 
   write_prompt_tty "$prompt"
+  log_wait_input "$prompt"
   read_interactive_line "$__var"
   if [[ -z "${!__var:-}" ]]; then
     printf -v "$__var" '%s' "$default"
@@ -300,6 +309,7 @@ read_required_into() {
   local __var="$1"
   local prompt="$2"
   write_prompt_tty "$prompt"
+  log_wait_input "$prompt"
   read_interactive_line "$__var"
 }
 

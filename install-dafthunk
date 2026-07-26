@@ -21,6 +21,8 @@
 #
 set -euo pipefail
 
+ORIGINAL_ARGS=("$@")
+
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 BOOTSTRAP_URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install}"
 INSTALL_ONE_LINER="curl -fsSL ${BOOTSTRAP_URL} | sudo bash"
@@ -47,7 +49,8 @@ SKIP_SWAP=0
 FORCE_SETUP=0
 LANG_FLAG=""
 UI_LANG="zh"
-SHOW_HELP=0
+TMUX_SESSION="dafthunk-install"
+NO_TMUX=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -73,6 +76,34 @@ ensure_stdin_tty() {
   if has_tty; then
     exec </dev/tty
   fi
+}
+
+# Re-exec inside tmux so swap/domain/rebuild survive SSH disconnect.
+ensure_install_tmux() {
+  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ "$NO_TMUX" == "1" ]] || [[ "$SHOW_HELP" == "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${TMUX:-}" ]]; then
+    return 0
+  fi
+  if ! command -v tmux >/dev/null 2>&1 || ! has_tty; then
+    return 0
+  fi
+  local script="$0"
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    script="${BASH_SOURCE[0]}"
+  fi
+  if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    echo "$(M tmux_attach_existing "$TMUX_SESSION")" >/dev/tty
+    exec tmux attach -t "$TMUX_SESSION"
+  fi
+  echo "$(M tmux_wrap "$TMUX_SESSION")" >/dev/tty
+  exec tmux new-session -s "$TMUX_SESSION" bash "$script" "$@" 0</dev/tty
+}
+
+log_wait_input() {
+  local prompt="$1"
+  log_info "$(M wait_input "$prompt")"
 }
 
 write_prompt_tty() {
@@ -185,7 +216,11 @@ M() {
         setup_log_label) echo "Setup log: $1" ;;
         setup_terminal_hint) echo "Domain setup runs in the terminal; summary → setup.log" ;;
         prepull_image) echo "Pre-pulling $1 (speeds up first build)..." ;;
+        prepull_done) echo "Pre-pull done: $1" ;;
         prepull_skip) echo "Pre-pull skipped for $1 (non-fatal)" ;;
+        wait_input) echo ">>> Waiting for input: $1 (also logged)" ;;
+        tmux_wrap) echo "Starting install in tmux session '$1' (detach: Ctrl+b d; reconnect: tmux attach -t $1)" ;;
+        tmux_attach_existing) echo "Attaching to existing tmux session '$1'..." ;;
         summary_title) echo "========== Dafthunk Install Summary ==========" ;;
         summary_domain) echo "Domain:  $1" ;;
         summary_url) echo "URL:     $1" ;;
@@ -284,7 +319,11 @@ M() {
         setup_log_label) echo "Setup 日志: $1" ;;
         setup_terminal_hint) echo "域名配置在终端进行，摘要写入 setup.log" ;;
         prepull_image) echo "预拉取 $1（加快首次构建）..." ;;
+        prepull_done) echo "预拉取完成: $1" ;;
         prepull_skip) echo "预拉取 $1 跳过（不影响安装）" ;;
+        wait_input) echo ">>> 等待输入: $1（已写入日志）" ;;
+        tmux_wrap) echo "在 tmux 会话「$1」中安装（脱离: Ctrl+b d；重连: tmux attach -t $1）" ;;
+        tmux_attach_existing) echo "接入已有 tmux 会话「$1」..." ;;
         summary_title) echo "========== Dafthunk 安装摘要 ==========" ;;
         summary_domain) echo "域名:  $1" ;;
         summary_url) echo "地址:  $1" ;;
@@ -458,6 +497,7 @@ ask_into() {
   fi
 
   write_prompt_tty "$prompt"
+  log_wait_input "$prompt"
   read_interactive_line "$__var"
   if [[ -z "${!__var:-}" ]]; then
     printf -v "$__var" '%s' "$default"
@@ -514,7 +554,8 @@ Options:
   --skip-docker    Skip Docker/Git install (same as part of --resume)
   --skip-swap      Skip swap dialogue and creation
   --force-setup    Re-run hostname wizard even if containers/app.yml exists
-  --non-interactive Use defaults without prompts (CI; requires --force-setup or existing app.yml for domain)
+  --non-interactive Use defaults without prompts (set DAFTHUNK_HOSTNAME for domain)
+  --no-tmux         Do not auto-start tmux wrapper
   -h, --help       Show this help
 
 Defaults: target ~${TARGET_TOTAL_MIB}MiB RAM+swap; keep current timezone unless changed.
@@ -539,7 +580,8 @@ Dafthunk 一键安装脚本
   --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
   --skip-swap      跳过 swap 对话与创建
   --force-setup    即使已有 containers/app.yml 也重跑 hostname 向导
-  --non-interactive 不交互，全部用默认值（CI；域名需已有 app.yml 或配合 --force-setup）
+  --non-interactive 不交互，全部用默认值（域名请设 DAFTHUNK_HOSTNAME）
+  --no-tmux         不自动进入 tmux
   -h, --help       显示帮助
 
 默认: 目标约 ${TARGET_TOTAL_MIB}MiB 内存+swap；默认保持服务器当前时区。
@@ -586,6 +628,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --non-interactive)
       NON_INTERACTIVE=1
+      shift
+      ;;
+    --no-tmux)
+      NO_TMUX=1
       shift
       ;;
     -h|--help)
@@ -943,7 +989,10 @@ install_packages_apt() {
   log_info "Docker $(docker --version 2>/dev/null | head -n1)"
   docker compose version 2>/dev/null || docker-compose version 2>/dev/null || true
   log_info "$(M prepull_image "$NODE_IMAGE")"
-  if ! docker pull "$NODE_IMAGE" >>"$APT_LOG" 2>&1; then
+  docker pull "$NODE_IMAGE" 2>&1 | tee -a "$APT_LOG"
+  if ((PIPESTATUS[0] == 0)); then
+    log_info "$(M prepull_done "$NODE_IMAGE")"
+  else
     log_warn "$(M prepull_skip "$NODE_IMAGE")"
   fi
 }
@@ -967,7 +1016,12 @@ install_packages_get_docker() {
   announce "$(M docker_ready)"
   if command -v docker >/dev/null 2>&1; then
     log_info "$(M prepull_image "$NODE_IMAGE")"
-    docker pull "$NODE_IMAGE" >>"$APT_LOG" 2>&1 || log_warn "$(M prepull_skip "$NODE_IMAGE")"
+    docker pull "$NODE_IMAGE" 2>&1 | tee -a "$APT_LOG"
+    if ((PIPESTATUS[0] == 0)); then
+      log_info "$(M prepull_done "$NODE_IMAGE")"
+    else
+      log_warn "$(M prepull_skip "$NODE_IMAGE")"
+    fi
   fi
 }
 
@@ -1063,8 +1117,15 @@ run_launcher_rebuild() {
   cd "$INSTALL_DIR/docker-host"
   log_info "$(M rebuild_log_label "$rebuild_log")"
 
+  if [[ -n "${TMUX:-}" ]] || [[ -n "${STY:-}" ]]; then
+    run_rebuild_logged "$rebuild_log"
+    rc=$?
+    printf '%s\n' "$rc" >"$exit_file"
+    return "$rc"
+  fi
+
   if command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
-    session="dafthunk-install"
+    session="$TMUX_SESSION"
     if tmux has-session -t "$session" 2>/dev/null; then
       log_warn "$(M tmux_exists "$session")"
     else
@@ -1091,7 +1152,7 @@ run_launcher_rebuild() {
   fi
 
   if command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
-    session="dafthunk-install"
+    session="$TMUX_SESSION"
     if screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
       log_warn "$(M screen_exists "$session")"
     else
@@ -1153,10 +1214,12 @@ run_setup_and_rebuild() {
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
       DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
+      DAFTHUNK_INSTALL_LOG="$LOG_FILE" \
       bash ./dafthunk-setup --no-rebuild 0</dev/tty >/dev/tty 2>&1
   else
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
       DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
+      DAFTHUNK_INSTALL_LOG="$LOG_FILE" \
       bash ./dafthunk-setup --no-rebuild
   fi
   run_launcher_rebuild || rebuild_rc=$?
@@ -1167,6 +1230,7 @@ apply_lang_from_flag_or_env
 check_root
 reject_piped_stdin
 ensure_stdin_tty
+ensure_install_tmux "${ORIGINAL_ARGS[@]}"
 choose_ui_lang_interactive
 
 ensure_logging

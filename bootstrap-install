@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Dafthunk one-line bootstrap — download install-dafthunk, then run interactively.
 #
-# Recommended:
+# Recommended (download first; auto-starts tmux session dafthunk-install):
 #   curl -fsSL …/bootstrap-install -o /tmp/bootstrap-install.sh
 #   sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
+# Unattended: sudo DAFTHUNK_HOSTNAME=example.com bash /tmp/bootstrap-install.sh --non-interactive 0</dev/tty
 #
 # One-liner (needs foreground TTY):
 #   curl -fsSL …/bootstrap-install | sudo bash
