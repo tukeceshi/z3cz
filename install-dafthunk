@@ -17,6 +17,7 @@
 #   DAFTHUNK_LANG=zh|en            # prompt language (default zh)
 #   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
 #   DAFTHUNK_ASK_TIMEOUT=900       # interactive prompt timeout seconds (0=disable)
+#   DAFTHUNK_NON_INTERACTIVE=1     # use defaults without prompting (CI only)
 #
 set -euo pipefail
 
@@ -28,8 +29,10 @@ RAM_SLACK_MIB="${DAFTHUNK_RAM_SLACK_MIB:-256}"
 SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
 TZ_SUGGEST="${DAFTHUNK_TZ_SUGGEST:-Asia/Shanghai}"
 ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
+NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
 # Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
 TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
+APT_LOG="${TEMP_LOG}.apt.log"
 LOG_FILE="$TEMP_LOG"
 
 RESUME=0
@@ -52,8 +55,11 @@ log_warn() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
-# True when we can ask a human (SSH console), even if stdin is a pipe (wget | bash).
+# True when we should ask a human (SSH console), even if stdin is a pipe (wget | bash).
 can_prompt() {
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    return 1
+  fi
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     return 0
   fi
@@ -101,6 +107,10 @@ M() {
         compose_missing) echo "Neither 'docker compose' nor 'docker-compose' is available" ;;
         docker_ready) echo "Docker is ready" ;;
         interactive_next) echo "Next steps need your input in the terminal (prompts also appear in the install log)." ;;
+        interactive_section) echo ">>> Answer the prompts below (swap / timezone / domain). Empty line = default." ;;
+        ask_read_failed) echo "Could not read from terminal — will not silently use defaults." ;;
+        ask_read_failed_hint) echo "Use an SSH session (not background), or run: cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
+        apt_failed) echo "apt failed — last lines of $1:" ;;
         ask_timeout) echo "Timed out waiting for input (${1}s). Re-run setup when ready." ;;
         ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
         ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
@@ -177,6 +187,10 @@ M() {
         compose_missing) echo "未找到 docker compose 或 docker-compose" ;;
         docker_ready) echo "Docker 已就绪" ;;
         interactive_next) echo "接下来需要在终端交互输入（提示会同时写入安装日志；若看不见请往上滚）" ;;
+        interactive_section) echo ">>> 请在下方回答问题（swap / 时区 / 域名）；直接回车表示使用默认值" ;;
+        ask_read_failed) echo "无法从终端读取输入 — 不会静默使用默认值" ;;
+        ask_read_failed_hint) echo "请使用 SSH 前台会话，或运行: cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
+        apt_failed) echo "apt 失败 — $1 末尾日志:" ;;
         ask_timeout) echo "等待输入超时（${1}s）。就绪后请重新运行配置：" ;;
         ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
         ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
@@ -315,34 +329,65 @@ ask_timeout_exit() {
   exit 1
 }
 
+ask_read_failed_exit() {
+  log_error "$(M ask_read_failed)"
+  echo "$(M ask_read_failed_hint)" >&2
+  exit 1
+}
+
+# Read one line interactively. Empty line after successful read → caller uses default.
+# Failed read (EOF/error) → exit; never silently substitute defaults.
+read_interactive_line() {
+  local __var="$1"
+  local value=""
+  local rc=0
+
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value </dev/tty; then
+      ask_read_failed_exit
+    fi
+  elif [[ -t 0 ]]; then
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value; then
+      ask_read_failed_exit
+    fi
+  else
+    ask_read_failed_exit
+  fi
+
+  value="$(printf '%s' "${value:-}" | tr -d '\r' | awk 'NF { line=$0 } END { print line }')"
+  printf -v "$__var" '%s' "$value"
+}
+
 # prompt default → prints ONLY the answer on stdout (safe for answer="$(ask …)").
-# Prompt on stderr once; read answers from /dev/tty when available.
 ask() {
   local prompt="$1"
   local default="$2"
   local answer=""
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    printf '%s' "$prompt" >&2
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" answer </dev/tty; then
-        ask_timeout_exit
-      fi
-    else
-      read -r answer </dev/tty || true
-    fi
-  elif [[ -t 0 ]]; then
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" -p "$prompt" answer; then
-        ask_timeout_exit
-      fi
-    else
-      read -r -p "$prompt" answer || true
-    fi
-  else
+
+  if ! can_prompt; then
     ask_status "$(M non_interactive_default "$prompt" "$default")"
+    printf '%s' "$default"
+    return 0
   fi
-  # Keep last non-empty line; strip CR (guards against accidental capture noise)
-  answer="$(printf '%s' "${answer:-}" | tr -d '\r' | awk 'NF { line=$0 } END { print line }')"
+
+  printf '%s\n' "$prompt" >&2
+  read_interactive_line answer
   if [[ -z "${answer:-}" ]]; then
     printf '%s' "$default"
   else
@@ -383,6 +428,7 @@ Options:
   --skip-docker    Skip Docker/Git install (same as part of --resume)
   --skip-swap      Skip swap dialogue and creation
   --force-setup    Re-run hostname wizard even if containers/app.yml exists
+  --non-interactive Use defaults without prompts (CI; requires --force-setup or existing app.yml for domain)
   -h, --help       Show this help
 
 Defaults: target ~${TARGET_TOTAL_MIB}MiB RAM+swap; keep current timezone unless changed.
@@ -407,6 +453,7 @@ Dafthunk 一键安装脚本
   --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
   --skip-swap      跳过 swap 对话与创建
   --force-setup    即使已有 containers/app.yml 也重跑 hostname 向导
+  --non-interactive 不交互，全部用默认值（CI；域名需已有 app.yml 或配合 --force-setup）
   -h, --help       显示帮助
 
 默认: 目标约 ${TARGET_TOTAL_MIB}MiB 内存+swap；默认保持服务器当前时区。
@@ -449,6 +496,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force-setup)
       FORCE_SETUP=1
+      shift
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE=1
       shift
       ;;
     -h|--help)
@@ -591,8 +642,8 @@ ensure_swap() {
     return 0
   fi
 
-  echo "$(M mem_need_req "$req_label")"
-  echo "$(M mem_need_actual "$ram_label")"
+  echo "$(M mem_need_req "$req_label")" >&2
+  echo "$(M mem_need_actual "$ram_label")" >&2
   answer="$(ask "$(M mem_need_swap_prompt)" "$default_gib")"
   if ! size_mib="$(parse_swap_gib_choice "$answer" "$default_gib")"; then
     log_warn "$(M swap_invalid "$answer" "$default_gib")"
@@ -692,21 +743,29 @@ has_docker_compose() {
 install_packages_apt() {
   # System upgrade is intentionally not run here (can restart sshd / drop SSH).
   # Docs recommend optional: apt-get update && apt-get upgrade -y
-  log_step "$(M step_apt)"
+  touch "$APT_LOG"
   export DEBIAN_FRONTEND=noninteractive
-  # Avoid interactive needrestart prompts that look like failures after apt.
   export NEEDRESTART_MODE="${NEEDRESTART_MODE:-a}"
-  apt-get update -y
+
+  log_step "$(M step_apt)"
+  if ! apt-get update -y -qq -o Dpkg::Use-Pty=0 >>"$APT_LOG" 2>&1; then
+    log_error "$(M apt_failed "$APT_LOG")"
+    tail -n 50 "$APT_LOG" >&2 || true
+    exit 1
+  fi
 
   log_step "$(M step_docker_pkgs)"
-  # Prefer Compose V2 plugin when available (docker compose …)
-  local pkgs=(docker.io git ca-certificates curl)
+  local pkgs=(docker.io git ca-certificates curl tmux)
   if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
     pkgs+=(docker-compose-v2)
   else
     pkgs+=(docker-compose)
   fi
-  apt-get install -y "${pkgs[@]}"
+  if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 "${pkgs[@]}" >>"$APT_LOG" 2>&1; then
+    log_error "$(M apt_failed "$APT_LOG")"
+    tail -n 60 "$APT_LOG" >&2 || true
+    exit 1
+  fi
 
   systemctl enable --now docker 2>/dev/null || service docker start 2>/dev/null || true
 
@@ -746,6 +805,9 @@ install_packages_get_docker() {
 
 prepare_host() {
   log_step "$(M step_host)"
+  if can_prompt; then
+    ask_status "$(M interactive_section)"
+  fi
   ensure_swap
   ensure_timezone
 
@@ -909,7 +971,8 @@ run_setup_and_rebuild() {
   log_step "$(M step_setup_rebuild)"
   ask_status "$(M interactive_next)"
   echo
-  DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" bash ./dafthunk-setup --no-rebuild
+  DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
+    DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
   run_launcher_rebuild
 }
 

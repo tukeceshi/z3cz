@@ -45,10 +45,10 @@ wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-daft
 1. 提示语言默认中文（`--lang en` / `DAFTHUNK_LANG=en`；需菜单时用 `--lang ask`）  
 2. 内存检查：已满足约 4G+ 则直接通过；不足则询问 swap（回车默认 2G，可输入 2～4，或 `0` 跳过）  
 3. 显示服务器当前时区，默认保持；可选改为其他 IANA（建议默认 `Asia/Shanghai`）  
-4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`）  
+4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`；详细 apt 日志见 `install.log` / `*.apt.log`）  
 5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
 
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。SSH 下一键管道安装仍会通过 `/dev/tty` 交互提问；无控制台时才全用默认值。Docker 装完后的 apt「Restarting services…」是正常输出，不是报错；随后会出现「域名 / Hostname」向导（提示会进安装日志）。有 `tmux`/`screen` 时 rebuild 在**后台会话**中启动（`wget|bash` 下可能需手动 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。本地无公网域名时可用 `localhost` + 端口。补充见下方「部署」。
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。SSH 下一键安装会通过 `/dev/tty` 交互；读失败不会静默用默认值。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
 
 #### 更新
 

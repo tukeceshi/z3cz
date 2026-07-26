@@ -60,6 +60,8 @@ M() {
         need_input) echo ">>> Waiting for input below (also logged). Scroll up if you do not see the prompt." ;;
         ask_timeout) echo "Timed out waiting for input (${1}s)." ;;
         ask_timeout_hint) echo "Re-run: ./dafthunk-setup   or   sudo bash ../install-dafthunk --resume --force-setup" ;;
+        ask_read_failed) echo "Could not read from terminal — will not silently use defaults." ;;
+        ask_read_failed_hint) echo "Use an SSH foreground session, then re-run ./dafthunk-setup" ;;
         *) echo "[$key $*]"; ;;
       esac
       ;;
@@ -85,6 +87,8 @@ M() {
         need_input) echo ">>> 请在下方输入（提示会写入日志；若看不见请往上滚）" ;;
         ask_timeout) echo "等待输入超时（${1}s）。" ;;
         ask_timeout_hint) echo "请重新运行: ./dafthunk-setup   或   sudo bash ../install-dafthunk --resume --force-setup" ;;
+        ask_read_failed) echo "无法从终端读取输入 — 不会静默使用默认值" ;;
+        ask_read_failed_hint) echo "请使用 SSH 前台会话后重新运行 ./dafthunk-setup" ;;
         *) echo "[$key $*]"; ;;
       esac
       ;;
@@ -173,6 +177,17 @@ read_env_value() {
 }
 
 ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
+NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
+
+can_prompt() {
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    return 1
+  fi
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    return 0
+  fi
+  [[ -t 0 ]]
+}
 
 ask_timeout_exit() {
   echo "$(M ask_timeout "$ASK_TIMEOUT_SEC")" >&2
@@ -180,32 +195,62 @@ ask_timeout_exit() {
   exit 1
 }
 
-# wget|bash: read answers from /dev/tty; prompt once on stderr (tee → log + console).
+ask_read_failed_exit() {
+  echo "✗ $(M ask_read_failed)" >&2
+  echo "$(M ask_read_failed_hint)" >&2
+  exit 1
+}
+
+read_interactive_line() {
+  local __var="$1"
+  local value=""
+  local rc=0
+
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value </dev/tty; then
+      ask_read_failed_exit
+    fi
+  elif [[ -t 0 ]]; then
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value; then
+      ask_read_failed_exit
+    fi
+  else
+    ask_read_failed_exit
+  fi
+
+  value="$(printf '%s' "${value:-}" | tr -d '\r' | awk 'NF { line=$0 } END { print line }')"
+  printf -v "$__var" '%s' "$value"
+}
+
 ask_line() {
   local prompt="$1"
   local default="${2:-}"
   local value=""
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    printf '%s' "$prompt" >&2
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
-        ask_timeout_exit
-      fi
-    else
-      read -r value </dev/tty || true
-    fi
-  elif [[ -t 0 ]]; then
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" -p "$prompt" value; then
-        ask_timeout_exit
-      fi
-    else
-      read -r -p "$prompt" value || true
-    fi
-  else
+
+  if ! can_prompt; then
     printf '%s\n' "(non-interactive) $prompt → $default" >&2
-    value="$default"
+    printf '%s' "$default"
+    return 0
   fi
+
+  printf '%s\n' "$prompt" >&2
+  read_interactive_line value
   if [[ -z "${value:-}" ]]; then
     printf '%s' "$default"
   else
