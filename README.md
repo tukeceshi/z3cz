@@ -34,31 +34,15 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后一键安装（**推荐**：先下载再执行；安装器会自动进入 **tmux**，SSH 断线可 `tmux attach -t dafthunk-install` 续接）：
+然后**一条命令**完成安装（自动 tmux，断线 `tmux attach -t dafthunk-install` 续接；将 `z3cz.com` 换成你的域名）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install -o /tmp/bootstrap-install.sh
-sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash -s -- --lang zh --non-interactive 0</dev/tty
 ```
 
-无人值守（跳过问答，需指定域名）：
+需要交互填域名时，去掉 `DAFTHUNK_HOSTNAME=…` 和 `--non-interactive` 即可（仍会自动进 tmux）。
 
-```bash
-sudo DAFTHUNK_HOSTNAME=你的域名 bash /tmp/bootstrap-install.sh --lang zh --non-interactive 0</dev/tty
-```
-
-也可一行（需前台 TTY）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
-```
-
-无 `curl` 时：
-
-```bash
-wget -qO /tmp/bootstrap-install.sh https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install
-sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
-```
+无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
 
 一键脚本会依次：
 
