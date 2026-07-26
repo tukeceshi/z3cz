@@ -2,7 +2,7 @@
 #
 # Dafthunk One-Line Installer (Discourse-style)
 #
-# Usage (one shot: Docker/Git + clone + setup + rebuild):
+# Usage (one shot: env prep + clone + setup + rebuild):
 #   wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 #
 # Resume after disconnect / re-run safely:
@@ -12,18 +12,23 @@
 #   DAFTHUNK_INSTALL_DIR=/opt/dafthunk
 #   DAFTHUNK_REPO_URL=...
 #   DAFTHUNK_BRANCH=main
+#   DAFTHUNK_TARGET_RAM_MIB=4096   # default total memory+swap target
 #
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
+TARGET_TOTAL_MIB="${DAFTHUNK_TARGET_RAM_MIB:-4096}"
+SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
 # Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
 TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 LOG_FILE="$TEMP_LOG"
 
 RESUME=0
 SKIP_DOCKER=0
+SKIP_UPGRADE=0
+SKIP_SWAP=0
 FORCE_SETUP=0
 
 RED='\033[0;31m'
@@ -38,6 +43,43 @@ log_warn() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
+is_tty() { [[ -t 0 ]]; }
+
+# prompt default → prints answer (default when non-interactive / empty)
+ask() {
+  local prompt="$1"
+  local default="$2"
+  local answer=""
+  if is_tty; then
+    read -r -p "$prompt" answer || true
+  else
+    log_info "(non-interactive) $prompt → $default"
+  fi
+  if [[ -z "${answer:-}" ]]; then
+    printf '%s' "$default"
+  else
+    printf '%s' "$answer"
+  fi
+}
+
+ask_yes_no() {
+  local prompt="$1"
+  local default="${2:-Y}"
+  local answer
+  answer="$(ask "$prompt" "$default")"
+  answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
+  case "$answer" in
+    y|yes|"") return 0 ;;
+    n|no) return 1 ;;
+    *)
+      if [[ "$default" == "Y" || "$default" == "y" ]]; then
+        return 0
+      fi
+      return 1
+      ;;
+  esac
+}
+
 show_help() {
   cat <<EOF
 Dafthunk one-line installer
@@ -47,17 +89,20 @@ Usage:
   sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
 
 Options:
-  --resume        Skip Docker/Git install; update repo; setup only if needed; rebuild
-  --skip-docker   Same Docker/Git skip as --resume (still runs setup/rebuild flow)
-  --force-setup   Re-run hostname wizard even if containers/app.yml exists
-  -h, --help      Show this help
+  --resume         Skip apt upgrade / Docker install; update repo; setup if needed; rebuild
+  --skip-docker    Skip Docker/Git install (same as part of --resume)
+  --skip-upgrade   Skip apt upgrade (still apt update + install packages)
+  --skip-swap      Skip swap dialogue and creation
+  --force-setup    Re-run hostname wizard even if containers/app.yml exists
+  -h, --help       Show this help
 
-If SSH drops during rebuild, reconnect and run:
+Defaults: target ~${TARGET_TOTAL_MIB}MiB RAM+swap; timezone Asia/Shanghai (ask).
+
+If SSH drops during rebuild:
   cd $INSTALL_DIR/docker-host && ./launcher rebuild
-Or:
   sudo bash $INSTALL_DIR/install-dafthunk --resume
 
-Log: $INSTALL_DIR/install.log (and $TEMP_LOG during early steps)
+Log: $INSTALL_DIR/install.log
 EOF
 }
 
@@ -66,9 +111,16 @@ for arg in "$@"; do
     --resume)
       RESUME=1
       SKIP_DOCKER=1
+      SKIP_UPGRADE=1
       ;;
     --skip-docker)
       SKIP_DOCKER=1
+      ;;
+    --skip-upgrade)
+      SKIP_UPGRADE=1
+      ;;
+    --skip-swap)
+      SKIP_SWAP=1
       ;;
     --force-setup)
       FORCE_SETUP=1
@@ -98,12 +150,10 @@ check_root() {
 
 setup_logging() {
   touch "$TEMP_LOG"
-  # Duplicate stdout/stderr to temp log (do not create INSTALL_DIR yet)
   exec > >(tee -a "$TEMP_LOG") 2>&1
   log_info "Logging to $TEMP_LOG"
 }
 
-# After INSTALL_DIR exists, mirror the full temp log into the install tree.
 promote_log() {
   local final="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
   if [[ ! -d "$INSTALL_DIR" ]] || [[ ! -f "$TEMP_LOG" ]]; then
@@ -114,45 +164,208 @@ promote_log() {
   log_info "Install log: $LOG_FILE"
 }
 
-fetch() {
-  if command -v wget >/dev/null 2>&1; then
-    wget -qO- "$1"
-  elif command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$1"
+mem_total_mib() {
+  local kb
+  kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  echo $((kb / 1024))
+}
+
+swap_total_mib() {
+  local kb
+  kb="$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  echo $((kb / 1024))
+}
+
+# Parse 0 | 2G | 2g | 2048M | 2048 → MiB (0 allowed)
+parse_size_mib() {
+  local raw="$1"
+  raw="$(echo "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+  if [[ "$raw" == "0" ]]; then
+    echo 0
+    return 0
+  fi
+  if [[ "$raw" =~ ^([0-9]+)g(ib)?$ ]]; then
+    echo $((BASH_REMATCH[1] * 1024))
+    return 0
+  fi
+  if [[ "$raw" =~ ^([0-9]+)m(ib)?$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if [[ "$raw" =~ ^[0-9]+$ ]]; then
+    echo "$raw"
+    return 0
+  fi
+  return 1
+}
+
+mib_to_display() {
+  local mib="$1"
+  if ((mib % 1024 == 0)); then
+    echo "$((mib / 1024))G"
   else
-    log_error "Neither wget nor curl found. Please install one and re-run."
+    echo "${mib}M"
+  fi
+}
+
+ensure_swap() {
+  if [[ "$SKIP_SWAP" == "1" ]]; then
+    log_info "Skipping swap setup (--skip-swap)"
+    return 0
+  fi
+
+  log_step "Memory check"
+  local mem swap deficit default_swap answer size_mib
+  mem="$(mem_total_mib)"
+  swap="$(swap_total_mib)"
+  log_info "RAM ≈ $(mib_to_display "$mem"), swap ≈ $(mib_to_display "$swap") (target total ≈ $(mib_to_display "$TARGET_TOTAL_MIB"))"
+
+  if ((mem < 2048)); then
+    log_warn "RAM under 2G — builds may be slow or fail; swap is strongly recommended."
+  fi
+
+  deficit=$((TARGET_TOTAL_MIB - mem - swap))
+  if ((deficit < 0)); then
+    deficit=0
+  fi
+  # Round up to whole GiB for the default suggestion
+  if ((deficit == 0)); then
+    default_swap=0
+  else
+    default_swap=$((((deficit + 1023) / 1024) * 1024))
+  fi
+
+  if [[ -f "$SWAPFILE" ]] || ((swap > 0 && deficit == 0)); then
+    if [[ -f "$SWAPFILE" ]]; then
+      log_info "Swap file already present at $SWAPFILE"
+    else
+      log_info "Existing swap already meets the ~$(mib_to_display "$TARGET_TOTAL_MIB") target"
+    fi
+    if ! ask_yes_no "Configure/replace swap anyway? [y/N]: " "N"; then
+      return 0
+    fi
+    default_swap=$((default_swap > 0 ? default_swap : 2048))
+  fi
+
+  echo "建议总可用约 $(mib_to_display "$TARGET_TOTAL_MIB")（内存 + swap）。"
+  echo "Detected RAM ≈ $(mib_to_display "$mem"); suggested extra swap: $(mib_to_display "$default_swap") (enter 0 to skip)."
+  answer="$(ask "Swap size [$(mib_to_display "$default_swap")]: " "$(mib_to_display "$default_swap")")"
+  if ! size_mib="$(parse_size_mib "$answer")"; then
+    log_warn "Invalid size '$answer' — using $(mib_to_display "$default_swap")"
+    size_mib="$default_swap"
+  fi
+
+  if ((size_mib == 0)); then
+    log_info "Skipping swap creation"
+    return 0
+  fi
+
+  if [[ -f "$SWAPFILE" ]]; then
+    log_warn "Removing existing $SWAPFILE"
+    swapoff "$SWAPFILE" 2>/dev/null || true
+    rm -f "$SWAPFILE"
+    # drop old fstab line for this path
+    if [[ -f /etc/fstab ]]; then
+      grep -v "[[:space:]]${SWAPFILE}[[:space:]]" /etc/fstab >"/etc/fstab.dafthunk.bak.$$" || true
+      mv "/etc/fstab.dafthunk.bak.$$" /etc/fstab
+    fi
+  fi
+
+  log_step "Creating $(mib_to_display "$size_mib") swap at $SWAPFILE"
+  if ! fallocate -l "${size_mib}M" "$SWAPFILE" 2>/dev/null; then
+    log_warn "fallocate failed — falling back to dd (slower)"
+    dd if=/dev/zero of="$SWAPFILE" bs=1M count="$size_mib" status=progress
+  fi
+  chmod 600 "$SWAPFILE"
+  mkswap "$SWAPFILE"
+  swapon "$SWAPFILE"
+  if ! grep -q "[[:space:]]${SWAPFILE}[[:space:]]" /etc/fstab 2>/dev/null; then
+    echo "$SWAPFILE none swap sw 0 0" >>/etc/fstab
+  fi
+  log_info "Swap active. RAM+swap ≈ $(mib_to_display "$(($(mem_total_mib) + $(swap_total_mib)))")"
+}
+
+ensure_timezone() {
+  if ! command -v timedatectl >/dev/null 2>&1; then
+    return 0
+  fi
+  if ask_yes_no "Set timezone to Asia/Shanghai? [Y/n]: " "Y"; then
+    timedatectl set-timezone Asia/Shanghai || log_warn "timedatectl failed — skip timezone"
+    log_info "Timezone: $(timedatectl show -p Timezone --value 2>/dev/null || echo Asia/Shanghai)"
+  fi
+}
+
+has_docker_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+install_packages_apt() {
+  log_step "System update (apt)"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  if [[ "$SKIP_UPGRADE" != "1" ]]; then
+    apt-get upgrade -y
+  else
+    log_info "Skipping apt upgrade (--skip-upgrade / --resume)"
+  fi
+
+  log_step "Installing Docker, Compose, Git"
+  # Prefer Compose V2 plugin when available (docker compose …)
+  local pkgs=(docker.io git ca-certificates curl)
+  if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+    pkgs+=(docker-compose-v2)
+  else
+    pkgs+=(docker-compose)
+  fi
+  apt-get install -y "${pkgs[@]}"
+
+  systemctl enable --now docker 2>/dev/null || service docker start 2>/dev/null || true
+
+  if ! command -v docker >/dev/null 2>&1; then
+    log_error "docker not found after apt install"
     exit 1
   fi
+  if ! has_docker_compose; then
+    log_error "Neither 'docker compose' nor 'docker-compose' is available"
+    exit 1
+  fi
+  log_info "Docker $(docker --version 2>/dev/null | head -n1)"
+  docker compose version 2>/dev/null || docker-compose version 2>/dev/null || true
 }
 
-install_docker() {
-  if command -v docker >/dev/null 2>&1; then
-    log_info "Docker is already installed"
-    return 0
+install_packages_get_docker() {
+  log_step "Installing Docker via get.docker.com (non-apt distro)"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL https://get.docker.com | sh
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- https://get.docker.com | sh
+  else
+    log_error "Need curl or wget to install Docker on this distro"
+    exit 1
   fi
-
-  log_step "Installing Docker"
-  fetch https://get.docker.com | sh
-  systemctl start docker 2>/dev/null || true
-  systemctl enable docker 2>/dev/null || true
-  log_info "Docker installed successfully"
-}
-
-install_git() {
-  if command -v git >/dev/null 2>&1; then
-    return 0
-  fi
-
-  log_info "Installing git..."
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -qq && apt-get install -y -qq git
-  elif command -v dnf >/dev/null 2>&1; then
-    dnf -y install git
+  systemctl enable --now docker 2>/dev/null || true
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install git || true
   elif command -v yum >/dev/null 2>&1; then
-    yum -y install git
+    yum -y install git || true
+  fi
+}
+
+prepare_host() {
+  log_step "Host preparation"
+  ensure_swap
+  ensure_timezone
+
+  if command -v apt-get >/dev/null 2>&1; then
+    install_packages_apt
   else
-    log_error "Could not install git. Please install git manually and re-run."
-    exit 1
+    install_packages_get_docker
   fi
 }
 
@@ -177,12 +390,13 @@ setup_repo() {
     fi
 
     log_info "Cloning dafthunk to $INSTALL_DIR..."
-    # git clone creates INSTALL_DIR — do not mkdir/touch files there beforehand
     git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
   fi
 
   cd "$INSTALL_DIR"
   chmod +x docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
+  # Normalize CRLF if scripts were ever edited on Windows
+  sed -i 's/\r$//' docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
   promote_log
   log_info "Repository ready at $INSTALL_DIR"
 }
@@ -201,7 +415,6 @@ run_launcher_rebuild() {
   print_resume_hint
   cd "$INSTALL_DIR/docker-host"
 
-  # Prefer tmux/screen so a dropped SSH does not kill a long rebuild
   if [[ -t 0 ]] && command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
     local session="dafthunk-install"
     log_info "Starting rebuild in tmux session '$session' (survives SSH disconnect)"
@@ -224,9 +437,9 @@ run_launcher_rebuild() {
   fi
 
   if [[ ! -t 0 ]]; then
-    log_warn "No interactive TTY — running rebuild in foreground (use tmux next time if SSH is unstable)"
+    log_warn "No interactive TTY — running rebuild in foreground"
   elif ! command -v tmux >/dev/null 2>&1 && ! command -v screen >/dev/null 2>&1; then
-    log_warn "tmux/screen not installed — rebuild runs in this session (disconnect may abort it)"
+    log_warn "tmux/screen not installed — rebuild runs in this session"
   fi
 
   ./launcher rebuild
@@ -250,7 +463,6 @@ run_setup_and_rebuild() {
 
   log_step "Setup wizard + rebuild"
   echo
-  # --no-rebuild: we run rebuild ourselves (tmux/hints/logging)
   bash ./dafthunk-setup --no-rebuild
   run_launcher_rebuild
 }
@@ -263,16 +475,22 @@ if [[ "$RESUME" == "1" ]]; then
 fi
 
 if [[ "$SKIP_DOCKER" != "1" ]]; then
-  install_docker
-  install_git
+  prepare_host
 else
-  log_info "Skipping Docker/Git install"
+  log_info "Skipping package install (--resume / --skip-docker)"
+  if [[ "$SKIP_SWAP" != "1" ]]; then
+    ensure_swap
+  fi
   if ! command -v docker >/dev/null 2>&1; then
-    log_error "Docker not found. Re-run without --resume/--skip-docker, or install Docker first."
+    log_error "Docker not found. Re-run without --resume/--skip-docker."
+    exit 1
+  fi
+  if ! has_docker_compose; then
+    log_error "docker compose / docker-compose not found."
     exit 1
   fi
   if ! command -v git >/dev/null 2>&1; then
-    log_error "Git not found. Re-run without --resume/--skip-docker, or install git first."
+    log_error "Git not found. Re-run without --resume/--skip-docker."
     exit 1
   fi
 fi
