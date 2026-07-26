@@ -375,20 +375,7 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  if [[ -t 0 ]]; then
-    stty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value; then
-      ask_read_failed_exit
-    fi
-  elif has_tty; then
+  if has_tty; then
     stty -F /dev/tty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
       if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
@@ -399,6 +386,19 @@ read_interactive_line() {
         ask_read_failed_exit
       fi
     elif ! read -r value </dev/tty; then
+      ask_read_failed_exit
+    fi
+  elif [[ -t 0 ]]; then
+    stty sane 2>/dev/null || true
+    if ((ASK_TIMEOUT_SEC > 0)); then
+      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
+        rc=$?
+        if ((rc == 142 || rc == 143)); then
+          ask_timeout_exit
+        fi
+        ask_read_failed_exit
+      fi
+    elif ! read -r value; then
       ask_read_failed_exit
     fi
   else
@@ -1030,7 +1030,8 @@ run_setup_and_rebuild() {
   echo
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild </dev/tty
+      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild \
+      0</dev/tty >/dev/tty 2>&1
   else
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
       DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
