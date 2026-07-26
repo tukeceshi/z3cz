@@ -82,7 +82,7 @@ sync_host_scripts() {
   local dir="${INSTALL_DIR}/scripts/host"
   mkdir -p "$dir"
   log "Syncing scripts/host from GitHub"
-  for name in bootstrap configure deploy; do
+  for name in bootstrap configure deploy use-http renew-https; do
     curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"
     chmod +x "${dir}/${name}.sh"
   done

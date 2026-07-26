@@ -34,6 +34,9 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-
 # 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME）
 sudo bash /var/dafthunk/scripts/host/configure.sh
 
+# 仅 HTTP、不要 HTTPS（可选）
+sudo bash /var/dafthunk/scripts/host/configure.sh --http
+
 # 3. 构建并启动（较慢；后台：加 --detach）
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
@@ -70,9 +73,21 @@ cd /var/dafthunk && git pull && sudo bash scripts/host/deploy.sh
 | 后台构建 | `tmux attach -t dafthunk-deploy` |
 | 只重构建 | `sudo bash /var/dafthunk/scripts/host/deploy.sh` |
 | 改域名 | `sudo bash /var/dafthunk/scripts/host/configure.sh --force`，再 deploy |
+| HTTPS 失败 / LE 限流 | `sudo bash /var/dafthunk/scripts/host/use-http.sh` |
+| 重新申请 HTTPS 证书 | `sudo bash /var/dafthunk/scripts/host/renew-https.sh` |
 | 手动配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 
 `shared/` 默认保留。
+
+#### HTTP / HTTPS
+
+| 目的 | 命令 |
+|------|------|
+| 首次安装即 HTTP | `sudo bash /var/dafthunk/scripts/host/configure.sh --http` |
+| 运行中切 HTTP | `sudo bash /var/dafthunk/scripts/host/use-http.sh` |
+| 删旧证、重开 HTTPS | `sudo bash /var/dafthunk/scripts/host/renew-https.sh` |
+
+HTTPS 因 Let's Encrypt 限流失败时：先 `use-http.sh` 用 `http://域名` 访问；限流解除后再 `renew-https.sh`。证书数据在 `docker-host/shared/caddy/caddy/certificates/`。
 
 ---
 
@@ -254,7 +269,15 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 ## 部署
 
-三步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下为 `bootstrap.sh`、`configure.sh`、`deploy.sh`。
+三步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下脚本：
+
+| 脚本 | 作用 |
+|------|------|
+| `bootstrap.sh` | Docker / Git / 拉代码 |
+| `configure.sh` | 写 `app.yml`（`--http` 仅 HTTP；`--force` 覆盖） |
+| `deploy.sh` | 构建并启动（`--detach` 后台） |
+| `use-http.sh` | 运行中切换为 HTTP |
+| `renew-https.sh` | 删除旧证书并重新申请 HTTPS |
 
 单域名 + Caddy，与开发栈隔离。详见 [docker-host/README.md](./docker-host/README.md)。
 

@@ -31,6 +31,7 @@ done
 [[ -x "${HOST_DIR}/launcher" ]] || die "Missing ${HOST_DIR}/launcher"
 
 hostname="$(grep -E '^hostname:' "$APP_YML" | head -1 | sed 's/^hostname:[[:space:]]*//')"
+use_https="$(grep -E '^https:' "$APP_YML" | head -1 | sed 's/^https:[[:space:]]*//')"
 
 log "Deploy (log: $REBUILD_LOG)"
 docker pull "${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}" >/dev/null 2>&1 || true
@@ -50,8 +51,22 @@ fi
 eval "$rebuild_cmd"
 
 if [[ -n "$hostname" ]] && command -v curl >/dev/null 2>&1; then
-  code="$(curl -sI -m 20 "https://${hostname}" 2>/dev/null | awk 'NR==1{print $2}')"
-  [[ -n "$code" ]] && info "HTTP https://${hostname} → $code"
+  if [[ "$use_https" == "true" ]]; then
+    code="$(curl -sI -m 20 "https://${hostname}" 2>/dev/null | awk 'NR==1{print $2}')"
+    if [[ -n "$code" ]]; then
+      info "https://${hostname} → $code"
+    else
+      info "HTTPS not ready — use: sudo bash ${INSTALL_DIR}/scripts/host/use-http.sh"
+      info "Or renew cert: sudo bash ${INSTALL_DIR}/scripts/host/renew-https.sh"
+    fi
+  else
+    code="$(curl -sI -m 20 "http://${hostname}" 2>/dev/null | awk 'NR==1{print $2}')"
+    [[ -n "$code" ]] && info "http://${hostname} → $code"
+  fi
 fi
 
-info "Open https://${hostname} — first registered user is admin"
+if [[ "$use_https" == "true" ]]; then
+  info "Open https://${hostname} — first registered user is admin"
+else
+  info "Open http://${hostname} — first registered user is admin"
+fi
