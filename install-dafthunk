@@ -1,264 +1,34 @@
 #!/usr/bin/env bash
-# Dafthunk one-click install (minimal).
-#
-# One line:
-#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
-#
-# Resume:
-#   sudo bash /var/dafthunk/install-dafthunk --resume
-#
-# Env: DAFTHUNK_HOSTNAME, DAFTHUNK_INSTALL_DIR, DAFTHUNK_REPO, DAFTHUNK_BRANCH, DAFTHUNK_FORCE_SETUP=1
-# DAFTHUNK_INSTALL_VERSION=2
+# Deprecated wrapper — runs bootstrap → configure → deploy when scripts exist.
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
-REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/dafthunk.git}"
-BRANCH="${DAFTHUNK_BRANCH:-main}"
-HOSTNAME="${DAFTHUNK_HOSTNAME:-}"
-RESUME=0
-FORCE_SETUP=0
-[[ "${DAFTHUNK_FORCE_SETUP:-0}" == "1" ]] && FORCE_SETUP=1
-SELF_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
+BASE="${ROOT}/scripts/host"
 
-log() { printf '==> %s\n' "$*"; }
-info() { printf ' -> %s\n' "$*"; }
-warn() { printf '! %s\n' "$*" >&2; }
-die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+run() {
+  local script="$1"
+  shift
+  [[ -f "$script" ]] || {
+    cat >&2 <<EOF
+install-dafthunk is deprecated.
 
-usage() {
-  cat <<EOF
-Dafthunk install
+Use three steps (download each script, then run):
 
-  curl -fsSL ${SELF_URL} | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
+  sudo bash /tmp/bootstrap.sh
 
-  sudo bash ${INSTALL_DIR}/install-dafthunk --resume
-  sudo bash ${INSTALL_DIR}/install-dafthunk --resume --force-setup
+  sudo DAFTHUNK_HOSTNAME=your.domain ${INSTALL_DIR}/scripts/host/configure.sh
 
-Environment:
-  DAFTHUNK_HOSTNAME       Public domain (optional; prompted if unset)
-  DAFTHUNK_INSTALL_DIR    Default: /var/dafthunk
-  DAFTHUNK_FORCE_SETUP=1  Rewrite containers/app.yml
+  sudo ${INSTALL_DIR}/scripts/host/deploy.sh
+
+See README.md
 EOF
+    exit 1
+  }
+  bash "$script" "$@"
 }
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --resume) RESUME=1; shift ;;
-    --force-setup) FORCE_SETUP=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) die "Unknown option: $1 (try --help)" ;;
-  esac
-done
-
-[[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: curl ... | sudo bash"
-
-LOG="${INSTALL_DIR}/install.log"
-mkdir -p "$(dirname "$LOG")" 2>/dev/null || LOG="/tmp/dafthunk-install.log"
-exec > >(tee -a "$LOG") 2>&1
-info "Log: $LOG"
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-ensure_packages() {
-  if [[ "$RESUME" == "1" ]]; then
-    need_cmd docker && need_cmd git && return 0
-    die "Missing docker or git — run full install without --resume"
-  fi
-  if ! need_cmd apt-get; then
-    need_cmd docker && need_cmd git && return 0
-    die "Need apt-get to install Docker/Git, or pre-install them"
-  fi
-  log "Installing Docker and Git"
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y -qq docker.io git ca-certificates curl
-  if need_cmd systemctl; then
-    systemctl enable --now docker 2>/dev/null || true
-  fi
-  if ! docker compose version >/dev/null 2>&1 && ! need_cmd docker-compose; then
-    apt-get install -y -qq docker-compose-v2 2>/dev/null \
-      || apt-get install -y -qq docker-compose-plugin 2>/dev/null \
-      || apt-get install -y -qq docker-compose 2>/dev/null \
-      || true
-  fi
-  need_cmd docker || die "Docker not available after install"
-  need_cmd git || die "Git not available after install"
-}
-
-mem_mib() {
-  awk -v key="$1" '$1 == key ":" { print int($2 / 1024); exit }' /proc/meminfo
-}
-
-ensure_swap() {
-  if [[ "$RESUME" == "1" ]]; then
-    return 0
-  fi
-  local ram swap total
-  ram="$(mem_mib MemTotal)"
-  swap="$(mem_mib SwapTotal)"
-  total=$((ram + swap))
-  info "Memory ${ram}M + swap ${swap}M ≈ ${total}M (target 4G+)"
-  if ((total >= 3800)); then
-    info "Memory OK — skip swap"
-    return 0
-  fi
-  if swapon --show 2>/dev/null | grep -q .; then
-    info "Swap already active — continue"
-    return 0
-  fi
-  log "Adding 2G swap at /swapfile"
-  if need_cmd fallocate; then
-    fallocate -l 2G /swapfile
-  else
-    dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
-  fi
-  chmod 600 /swapfile
-  mkswap /swapfile
-  swapon /swapfile
-  if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
-    echo '/swapfile none swap sw 0 0' >>/etc/fstab
-  fi
-  info "Swap enabled"
-}
-
-save_installer_copy() {
-  if need_cmd curl; then
-    curl -fsSL "$SELF_URL" -o "${INSTALL_DIR}/install-dafthunk" 2>/dev/null || true
-    chmod +x "${INSTALL_DIR}/install-dafthunk" 2>/dev/null || true
-  fi
-}
-
-ensure_repo() {
-  if [[ -d "${INSTALL_DIR}/.git" ]]; then
-    log "Updating repository"
-    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
-    git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}"
-    save_installer_copy
-    return 0
-  fi
-  if [[ -e "$INSTALL_DIR" ]]; then
-    local backup="${INSTALL_DIR}.backup.$(date +%s)"
-    warn "Moving existing ${INSTALL_DIR} to ${backup}"
-    mv "$INSTALL_DIR" "$backup"
-  fi
-  log "Cloning ${REPO} (${BRANCH})"
-  git clone --branch "$BRANCH" --depth 1 "$REPO" "$INSTALL_DIR"
-  save_installer_copy
-}
-
-read_hostname_interactive() {
-  [[ -n "$HOSTNAME" ]] && return 0
-  if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
-    die "Set DAFTHUNK_HOSTNAME (no interactive terminal)"
-  fi
-  printf '公网域名: ' >/dev/tty
-  read -r HOSTNAME </dev/tty || die "Failed to read domain from /dev/tty"
-  HOSTNAME="${HOSTNAME#"${HOSTNAME%%[![:space:]]*}"}"
-  HOSTNAME="${HOSTNAME%"${HOSTNAME##*[![:space:]]}"}"
-  [[ -n "$HOSTNAME" ]] || die "Domain cannot be empty"
-}
-
-hex_secret() {
-  if need_cmd openssl; then
-    openssl rand -hex 32
-  else
-    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
-  fi
-}
-
-write_app_yml() {
-  local app_dir="${INSTALL_DIR}/docker-host"
-  local app_yml="${app_dir}/containers/app.yml"
-  read_hostname_interactive
-  mkdir -p "${app_dir}/containers" "${app_dir}/shared/postgres" "${app_dir}/shared/storage" "${app_dir}/shared/caddy"
-  local jwt master
-  jwt="$(hex_secret)"
-  master="$(hex_secret)"
-  local web_host="https://${HOSTNAME}"
-  cat >"$app_yml" <<EOF
-# Generated by install-dafthunk — do not commit
-hostname: ${HOSTNAME}
-https: true
-http_port: 80
-https_port: 443
-env:
-  JWT_SECRET: ${jwt}
-  SECRET_MASTER_KEY: ${master}
-  WEB_HOST: ${web_host}
-  WEBSITE_URL: ${web_host}
-EOF
-  info "Wrote ${app_yml}"
-  info "Site: ${web_host}"
-}
-
-ensure_config() {
-  local app_yml="${INSTALL_DIR}/docker-host/containers/app.yml"
-  if [[ -f "$app_yml" && "$FORCE_SETUP" != "1" ]]; then
-    info "Using ${app_yml}"
-    if [[ -z "$HOSTNAME" ]]; then
-      HOSTNAME="$(grep -E '^hostname:' "$app_yml" | head -1 | sed 's/^hostname:[[:space:]]*//')"
-    fi
-    return 0
-  fi
-  write_app_yml
-}
-
-prepull_node() {
-  local image="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
-  info "Pre-pull ${image}"
-  docker pull "$image" >/dev/null 2>&1 || warn "Pre-pull skipped (non-fatal)"
-}
-
-run_rebuild() {
-  local host_dir="${INSTALL_DIR}/docker-host"
-  local rebuild_log="${INSTALL_DIR}/rebuild.log"
-  [[ -x "${host_dir}/launcher" ]] || die "Missing ${host_dir}/launcher"
-  log "Building and starting stack (see ${rebuild_log})"
-  prepull_node
-  cd "$host_dir"
-  local rebuild_cmd="./launcher rebuild 2>&1 | tee -a '${rebuild_log}'"
-
-  if need_cmd tmux && [[ -z "${TMUX:-}" ]]; then
-    tmux kill-session -t dafthunk-install 2>/dev/null || true
-    tmux new-session -d -s dafthunk-install "$rebuild_cmd"
-    info "Rebuild running in tmux 'dafthunk-install' — log: ${rebuild_log}"
-    if tty -s >/dev/null 2>&1; then
-      info "Attaching to tmux (detach: Ctrl+b d)…"
-      tmux attach -t dafthunk-install || true
-    else
-      info "No TTY — waiting for rebuild in background…"
-      while tmux has-session -t dafthunk-install 2>/dev/null; do
-        sleep 10
-      done
-    fi
-    return 0
-  fi
-
-  eval "$rebuild_cmd"
-}
-
-print_done() {
-  local url="https://${HOSTNAME}"
-  log "Install finished"
-  info "Open ${url} and register — first user is platform admin"
-  info "Logs: ${LOG}, ${INSTALL_DIR}/rebuild.log"
-  info "Update: cd ${INSTALL_DIR} && git pull && docker-host/launcher rebuild"
-  if need_cmd curl && [[ -n "$HOSTNAME" ]]; then
-    local code
-    code="$(curl -sI -m 15 "$url" 2>/dev/null | awk 'NR==1{print $2}')"
-    [[ -n "$code" ]] && info "HTTP check: ${code}"
-  fi
-}
-
-main() {
-  ensure_packages
-  ensure_swap
-  ensure_repo
-  ensure_config
-  run_rebuild
-  print_done
-}
-
-main "$@"
+run "${BASE}/bootstrap.sh"
+run "${BASE}/configure.sh" "$@"
+run "${BASE}/deploy.sh" "$@"

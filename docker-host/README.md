@@ -1,88 +1,64 @@
 # Docker self-host (Discourse-style)
 
-单域名 · Caddy · 无 SMTP · monorepo 内旁路栈（`name: dafthunk-host`，与开发 `docker compose` 隔离）。
+单域名 · Caddy · monorepo 旁路栈（`name: dafthunk-host`）。
 
-宿主机只需 **Docker + Git + bash**（无需本机 Node）。`./launcher` 在无 Node 时会用临时 Node 容器生成 compose。
+宿主机只需 **Docker + Git + bash**。`./launcher` 在无 Node 时用临时 Node 容器生成 compose。
 
-- 控制台：`/`
-- 营销站：`/m/`（app 容器 nginx 反代 www）
-- Admin「首页」开关控制 `/` 跳控制台或 `/m/`
-
-## 一键安装（Linux 服务器）
+## 安装（三步）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
+sudo bash /tmp/bootstrap.sh
+
+sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
+
+sudo /var/dafthunk/scripts/host/deploy.sh
+# 后台：sudo /var/dafthunk/scripts/host/deploy.sh --detach
 ```
 
-或：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
-```
-
-安装过程中会提示输入公网域名。无人值守时可设 `DAFTHUNK_HOSTNAME`（需通过已下载的脚本文件执行）。
-
-- 默认目录 `/var/dafthunk`；日志 `install.log`、`rebuild.log`
-- 断线：`tmux attach -t dafthunk-install`
-- 续装：`sudo bash /var/dafthunk/install-dafthunk --resume`
+默认 `/var/dafthunk`。日志：`rebuild.log`。后台：`tmux attach -t dafthunk-deploy`。
 
 ## 更新
 
 ```bash
-cd /var/dafthunk && git pull && docker-host/launcher rebuild
+cd /var/dafthunk && git pull && sudo scripts/host/deploy.sh
 ```
 
 ## 应急
 
 | 情况 | 命令 |
 |------|------|
-| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` 或 `tmux attach -t dafthunk-install` |
+| 构建中断 | `sudo scripts/host/deploy.sh` 或 `tmux attach -t dafthunk-deploy` |
+| 改域名 | `sudo scripts/host/configure.sh --force` 再 deploy |
 | 无 app.yml | `./dafthunk-setup` |
-| 续跑安装器 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 重配 hostname | `sudo DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup` |
-| 日志 | `less /var/dafthunk/install.log` |
+| 日志 | `less /var/dafthunk/rebuild.log` |
 
-`shared/` 默认保留。
-
-## 首次安装（已有仓库）
+## 已有仓库（手动）
 
 ```bash
-cd docker-host
-./dafthunk-setup
+cd docker-host && ./dafthunk-setup
 ```
-
-写完 `containers/app.yml` 后会自动 `./launcher rebuild`。仅生成配置：`./dafthunk-setup --no-rebuild`。
-
-浏览器打开打印的 URL，**注册第一个用户** → 自动成为 platform admin。
-
-本地默认（hostname=`localhost`）为 HTTP，端口 **8080**。
 
 ## 常用命令
 
 ```bash
 ./launcher status
 ./launcher logs -f api
-./launcher stop
 ./launcher rebuild
 ./launcher destroy
 ```
-
-Windows：优先 Git Bash；或 `launcher.cmd rebuild` / `pnpm host:*`。
 
 ## 布局
 
 | 路径 | 说明 |
 |------|------|
-| `samples/standalone.yml` | 配置模板 |
-| `containers/app.yml` | setup / install 生成（gitignore） |
-| `shared/` | Postgres / 对象存储 / Caddy 数据 |
-| `docker-compose.generated.yml` | launcher 生成，勿手改 |
-| `dafthunk-setup` / `launcher` | bash 入口 |
-| `../install-dafthunk` | 一键安装脚本 |
+| `containers/app.yml` | configure / setup 生成 |
+| `shared/` | Postgres / 存储 / Caddy |
+| `../scripts/host/` | bootstrap / configure / deploy |
 
 ## 与开发栈
 
 - 开发：根目录 `docker compose up` → `:3100` / `:3101` / `:3102`
-- 自托管：本目录 launcher → 默认 `:80`/`:443` 或本地 `:8080`
+- 自托管：launcher → `:80` / `:443`
 
-两套 compose project 不同，数据卷不共享。
+两套 compose 数据不共享。

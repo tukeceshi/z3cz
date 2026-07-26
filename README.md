@@ -16,71 +16,56 @@
 
 ## 快速开始
 
-### 一键部署
+### 自托管部署
 
-面向 Linux 服务器自托管，与下方「本地开发」相互独立。
+面向 Linux 服务器，与下方「本地开发」相互独立。
 
-#### 系统要求
+#### 要求
 
-- Linux（推荐 **Ubuntu**）
-- root 或 sudo、可访问外网
-- 建议可用内存约 **4G**（内存 + swap；不足时脚本会对话引导加 swap）
+- Linux（推荐 Ubuntu）、sudo、可访问外网
+- 建议内存 + swap 合计约 4G
 
-#### 安装
-
-建议（可选，非必须）先更新系统；耗时长，且可能重启 SSH，宜在 `tmux`/`screen` 中执行：
+#### 安装（三步）
 
 ```bash
-sudo apt-get update && sudo apt-get upgrade -y
+# 1. 环境 + 拉代码
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh -o /tmp/bootstrap.sh
+sudo bash /tmp/bootstrap.sh
+
+# 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME，按提示输入）
+sudo DAFTHUNK_HOSTNAME=你的域名 /var/dafthunk/scripts/host/configure.sh
+
+# 3. 构建并启动（较慢；后台：加 --detach）
+sudo /var/dafthunk/scripts/host/deploy.sh
 ```
 
-然后**一条命令**完成安装（安装过程中会提示输入公网域名）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
-```
-
-等价入口（先下载脚本再执行）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
-```
-
-无人值守（CI 等）可设环境变量：`sudo DAFTHUNK_HOSTNAME=你的域名 bash …`（需先下载脚本到文件再执行，或配合 `bootstrap-install`）。
-
-无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
-
-脚本会：检查内存（不足则加 2G swap）→ 安装 Docker/Git → clone → 写 `containers/app.yml` → `launcher rebuild`（自动进 tmux，断线 `tmux attach -t dafthunk-install`）。
-
-日志：`/var/dafthunk/install.log`、`/var/dafthunk/rebuild.log`。rebuild 约 **5–20 分钟**（视机器与缓存而定）。
+日志：`/var/dafthunk/rebuild.log`。后台构建时：`tmux attach -t dafthunk-deploy`。
 
 默认目录 `/var/dafthunk`。打开站点注册；**首个用户**为平台管理员。
 
 #### 更新
 
 ```bash
-cd /var/dafthunk && git pull && docker-host/launcher rebuild
+cd /var/dafthunk && git pull && sudo scripts/host/deploy.sh
 ```
 
-#### 应急（卡死 / SSH 断开）
+#### 应急
 
 | 情况 | 命令 |
 |------|------|
-| 查看安装日志 | `less /var/dafthunk/install.log` |
 | 构建日志 | `less /var/dafthunk/rebuild.log` |
-| SSH 断开 / rebuild 在跑 | `tmux attach -t dafthunk-install` |
-| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
-| 续装（保留数据） | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 重写域名配置 | `sudo DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup`（或重新运行安装并在提示下输入新域名） |
-| 手动改配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
+| 后台构建 | `tmux attach -t dafthunk-deploy` |
+| 只重构建 | `sudo /var/dafthunk/scripts/host/deploy.sh` |
+| 改域名 | `sudo /var/dafthunk/scripts/host/configure.sh --force`，再 `deploy.sh` |
+| 手动配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 
-`shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。
+`shared/` 默认保留。
 
 ---
 
 ### 本地开发
 
-多端口开发栈（`:3100` / `:3101` / `:3102`），与一键部署的 compose 项目隔离。
+多端口开发栈（`:3100` / `:3101` / `:3102`），与自托管 compose 项目隔离。
 
 #### 前置要求
 
@@ -256,11 +241,11 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 ## 部署
 
-一键安装与更新见上文「快速开始 → 一键部署」。本节为补充。
+三步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下为 `bootstrap.sh`、`configure.sh`、`deploy.sh`。
 
-单域名 + Caddy，与开发栈隔离（compose project `dafthunk-host`）。详见 [docker-host/README.md](./docker-host/README.md)。
+单域名 + Caddy，与开发栈隔离。详见 [docker-host/README.md](./docker-host/README.md)。
 
-**已有仓库（非一键）：** `cd docker-host && ./dafthunk-setup`（写配置后自动 rebuild）。
+**手动配置（非 scripts/host）：** `cd docker-host && ./dafthunk-setup`（写配置后自动 rebuild）。
 
 | 操作 | 命令 |
 |------|------|

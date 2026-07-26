@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Download install-dafthunk, then exec. Works with: curl .../bootstrap-install | sudo bash
+# Downloads scripts/host/bootstrap.sh and runs it.
 set -euo pipefail
 
-URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
-TARGET="${DAFTHUNK_INSTALL_SCRIPT:-/tmp/dafthunk-install.sh}"
-MARKER="DAFTHUNK_INSTALL_VERSION=2"
-
-rm -f "$TARGET"
+URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh}"
+TARGET="${DAFTHUNK_BOOTSTRAP_SCRIPT:-/tmp/dafthunk-bootstrap.sh}"
 
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$URL" -o "$TARGET"
@@ -17,13 +14,5 @@ else
   exit 1
 fi
 
-if ! grep -q "$MARKER" "$TARGET"; then
-  echo "ERROR: Downloaded installer is outdated or corrupt." >&2
-  echo "Delete ${TARGET} and retry, or check network access to GitHub." >&2
-  rm -f "$TARGET"
-  exit 1
-fi
-
 chmod +x "$TARGET"
-echo "Dafthunk installer ready ($(wc -l <"$TARGET" | tr -d ' ') lines) → starting…" >&2
 exec bash "$TARGET" "$@"
