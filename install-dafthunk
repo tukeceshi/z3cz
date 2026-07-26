@@ -1,1285 +1,252 @@
 #!/usr/bin/env bash
+# Dafthunk one-click install (minimal).
 #
-# Dafthunk One-Line Installer (Discourse-style)
+# One line:
+#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo DAFTHUNK_HOSTNAME=example.com bash
 #
-# Usage (one shot: env prep + clone + setup + rebuild):
-#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
-#
-# Resume after disconnect / re-run safely:
+# Resume:
 #   sudo bash /var/dafthunk/install-dafthunk --resume
 #
-# Env:
-#   DAFTHUNK_INSTALL_DIR=/opt/dafthunk
-#   DAFTHUNK_REPO_URL=...
-#   DAFTHUNK_BRANCH=main
-#   DAFTHUNK_TARGET_RAM_MIB=4096   # default total memory+swap target
-#   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack for "memory check passed"
-#   DAFTHUNK_LANG=zh|en|ask         # prompt language (interactive default: menu)
-#   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
-#   DAFTHUNK_ASK_TIMEOUT=900       # interactive prompt timeout seconds (0=disable)
-#   DAFTHUNK_NON_INTERACTIVE=1     # use defaults without prompting (CI only)
-#
+# Env: DAFTHUNK_HOSTNAME, DAFTHUNK_INSTALL_DIR, DAFTHUNK_REPO, DAFTHUNK_BRANCH, DAFTHUNK_FORCE_SETUP=1
 set -euo pipefail
 
-ORIGINAL_ARGS=("$@")
-
-INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
-BOOTSTRAP_URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install}"
-INSTALL_ONE_LINER="curl -fsSL ${BOOTSTRAP_URL} | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive"
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
-REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
+REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
-TARGET_TOTAL_MIB="${DAFTHUNK_TARGET_RAM_MIB:-4096}"
-RAM_SLACK_MIB="${DAFTHUNK_RAM_SLACK_MIB:-256}"
-SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
-TZ_SUGGEST="${DAFTHUNK_TZ_SUGGEST:-Asia/Shanghai}"
-ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
-NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
-# Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
-TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
-APT_LOG="${TEMP_LOG}.apt.log"
-LOG_FILE="$TEMP_LOG"
-NODE_IMAGE="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
-REBUILD_EXIT_FILE=".rebuild.exit"
-LOGGING_STARTED=0
-
+HOSTNAME="${DAFTHUNK_HOSTNAME:-}"
 RESUME=0
-SKIP_DOCKER=0
-SKIP_SWAP=0
 FORCE_SETUP=0
-LANG_FLAG=""
-UI_LANG="zh"
-TMUX_SESSION="dafthunk-install"
-NO_TMUX=0
+[[ "${DAFTHUNK_FORCE_SETUP:-0}" == "1" ]] && FORCE_SETUP=1
+SELF_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m'
+log() { printf '==> %s\n' "$*"; }
+info() { printf ' -> %s\n' "$*"; }
+warn() { printf '! %s\n' "$*" >&2; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-log_info() { echo -e "${GREEN}→${NC} $1"; }
-log_warn() { echo -e "${YELLOW}!${NC} $1"; }
-log_error() { echo -e "${RED}✗${NC} $1"; }
-log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
+usage() {
+  cat <<EOF
+Dafthunk install
 
-# Interactive I/O goes to /dev/tty only (never stdin — fd 0 may be closed or a dead pipe).
-has_tty() {
-  [[ -r /dev/tty && -w /dev/tty ]]
-}
+  curl -fsSL ${SELF_URL} | sudo DAFTHUNK_HOSTNAME=your.domain bash
 
-ensure_stdin_tty() {
-  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ -t 0 ]]; then
-    return 0
-  fi
-  if has_tty; then
-    exec </dev/tty
-  fi
-}
+  sudo bash ${INSTALL_DIR}/install-dafthunk --resume
+  sudo bash ${INSTALL_DIR}/install-dafthunk --resume --force-setup
 
-# Re-exec inside tmux so swap/domain/rebuild survive SSH disconnect.
-ensure_install_tmux() {
-  if [[ "$NO_TMUX" == "1" ]] || [[ "$SHOW_HELP" == "1" ]]; then
-    return 0
-  fi
-  if [[ -n "${TMUX:-}" ]]; then
-    return 0
-  fi
-  if ! command -v tmux >/dev/null 2>&1 || ! has_tty; then
-    return 0
-  fi
-  local script="$0"
-  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
-    script="${BASH_SOURCE[0]}"
-  fi
-  if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-    echo "$(M tmux_attach_existing "$TMUX_SESSION")" >/dev/tty
-    exec tmux attach -t "$TMUX_SESSION"
-  fi
-  echo "$(M tmux_wrap "$TMUX_SESSION")" >/dev/tty
-  exec tmux new-session -s "$TMUX_SESSION" bash "$script" "$@" 0</dev/tty
-}
-
-log_wait_input() {
-  local prompt="$1"
-  log_info "$(M wait_input "$prompt")"
-}
-
-write_prompt_tty() {
-  local msg="$1"
-  if has_tty; then
-    stty -F /dev/tty sane 2>/dev/null || true
-    printf '%s\n' "$msg" >/dev/tty
-  elif [[ -t 1 ]]; then
-    stty sane 2>/dev/null || true
-    printf '%s\n' "$msg"
-  else
-    printf '%s\n' "$msg" >&2
-  fi
-}
-
-can_prompt() {
-  if [[ "$NON_INTERACTIVE" == "1" ]]; then
-    return 1
-  fi
-  [[ -t 0 ]] || has_tty
-}
-
-# Localized message: M <key> [args...]
-# Keys are stable; only user-facing strings change with UI_LANG.
-M() {
-  local key="$1"
-  shift || true
-  case "$UI_LANG" in
-    en)
-      case "$key" in
-        unknown_opt) echo "Unknown option: $1" ;;
-        need_root) echo "This script must be run as root." ;;
-        run_with_sudo) echo "Please run with sudo:" ;;
-        logging_to) echo "Logging to $1" ;;
-        install_log) echo "Install log: $1" ;;
-        resume_mode) echo "Resume mode" ;;
-        skip_swap) echo "Skipping swap setup (--skip-swap)" ;;
-        step_memory) echo "Memory check" ;;
-        mem_pass) echo "Memory check passed (required $1, usable ≈ $2)" ;;
-        mem_skip_swap) echo "Memory target met — skipping swap prompt" ;;
-        pipe_stdin) echo "Do not run install-dafthunk with piped stdin (wget | sudo bash install-dafthunk)." ;;
-        pipe_stdin_hint) echo "Run: $INSTALL_ONE_LINER" ;;
-        mem_need_req) echo "Required memory: $1" ;;
-        mem_need_actual) echo "Detected RAM: $1" ;;
-        mem_need_swap_prompt) echo "Swap is needed. Enter for 2G, or type 2–4 (0 to skip): " ;;
-        swap_invalid) echo "Invalid size '$1' — using ${2}G" ;;
-        swap_skip_create) echo "Skipping swap creation" ;;
-        swap_replacing) echo "Replacing existing swap file $1" ;;
-        step_swap_create) echo "Creating $1 swap at $2" ;;
-        swap_fallocate_fail) echo "fallocate failed — falling back to dd (slower)" ;;
-        swap_active) echo "Swap active. RAM+swap ≈ $1" ;;
-        step_timezone) echo "Timezone" ;;
-        tz_detect_fail) echo "Could not detect timezone — skipping timezone change" ;;
-        tz_current) echo "Current timezone: $1" ;;
-        tz_keep_prompt) echo "Keep current timezone? [Y/n]: " ;;
-        tz_kept) echo "Keeping timezone: $1" ;;
-        tz_new_prompt) echo "New timezone [$1]: " ;;
-        tz_no_timedatectl) echo "timedatectl not available — cannot change timezone" ;;
-        tz_set_ok) echo "Timezone set to: $1" ;;
-        tz_set_fail) echo "Failed to set timezone '$1' — keeping previous" ;;
-        step_apt) echo "Refreshing apt package lists" ;;
-        step_docker_pkgs) echo "Installing Docker, Compose, Git" ;;
-        docker_missing) echo "docker not found after apt install" ;;
-        compose_missing) echo "Neither 'docker compose' nor 'docker-compose' is available" ;;
-        docker_ready) echo "Docker is ready" ;;
-        interactive_next) echo "Next steps need your input in the terminal (prompts also appear in the install log)." ;;
-        interactive_section) echo ">>> Answer the prompts below (swap / timezone / domain). Empty line = default." ;;
-        ask_read_failed) echo "Could not read from terminal — will not silently use defaults." ;;
-        ask_read_failed_hint) echo "Use an SSH session (not background), or run: cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
-        apt_failed) echo "apt failed — last lines of $1:" ;;
-        ask_timeout) echo "Timed out waiting for input (${1}s). Re-run setup when ready." ;;
-        ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
-        ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
-        step_get_docker) echo "Installing Docker via get.docker.com (non-apt distro)" ;;
-        need_curl_wget) echo "Need curl or wget to install Docker on this distro" ;;
-        step_host) echo "Host preparation" ;;
-        step_repo) echo "Setting up Dafthunk" ;;
-        existing_install) echo "Existing installation found at $1" ;;
-        updating_repo) echo "Updating repository..." ;;
-        backup_dir) echo "$1 exists but is not a git checkout — backing up to $2" ;;
-        cloning) echo "Cloning dafthunk to $1..." ;;
-        repo_ready) echo "Repository ready at $1" ;;
-        disconnect_hint) echo "If this session disconnects, SSH back and run:" ;;
-        or_resume) echo "Or resume the installer:" ;;
-        log_label) echo "Log: $1" ;;
-        tmux_start) echo "Starting rebuild in tmux session '$1' (detached; survives SSH disconnect)" ;;
-        tmux_reattach) echo "Reattach: tmux attach -t $1" ;;
-        tmux_exists) echo "tmux session '$1' already exists" ;;
-        tmux_start_fail) echo "Failed to start tmux session — running rebuild in foreground" ;;
-        tmux_attach_fail) echo "Could not attach automatically. Rebuild is running in tmux; run: tmux attach -t $1" ;;
-        screen_start) echo "Starting rebuild in screen session '$1' (detached; survives SSH disconnect)" ;;
-        screen_exists) echo "screen session '$1' already exists" ;;
-        screen_reattach) echo "Reattach: screen -r $1" ;;
-        screen_start_fail) echo "Failed to start screen session — running rebuild in foreground" ;;
-        screen_attach_fail) echo "Could not attach automatically. Rebuild is running in screen; run: screen -r $1" ;;
-        no_tty_rebuild) echo "No interactive TTY — running rebuild in foreground" ;;
-        no_tmux_screen) echo "tmux/screen not installed — rebuild runs in this session" ;;
-        setup_missing) echo "Setup/launcher scripts not found in $1" ;;
-        config_present) echo "Config present — skipping wizard (pass --force-setup to reconfigure)" ;;
-        found_yml) echo "Found $1" ;;
-        step_setup_rebuild) echo "Setup wizard + rebuild" ;;
-        skip_pkgs) echo "Skipping package install (--resume / --skip-docker)" ;;
-        docker_not_found) echo "Docker not found. Re-run without --resume/--skip-docker." ;;
-        compose_not_found) echo "docker compose / docker-compose not found." ;;
-        git_not_found) echo "Git not found. Re-run without --resume/--skip-docker." ;;
-        done) echo "Done. Open the Public URL from setup output (or check docker-host/containers/app.yml)." ;;
-        rebuild_running) echo "Waiting for rebuild to finish (log: $1)..." ;;
-        rebuild_failed) echo "Rebuild failed — see $1 and re-run: cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
-        rebuild_log_label) echo "Rebuild log: $1" ;;
-        setup_log_label) echo "Setup log: $1" ;;
-        setup_terminal_hint) echo "Domain setup runs in the terminal; summary → setup.log" ;;
-        prepull_image) echo "Pre-pulling $1 (speeds up first build)..." ;;
-        prepull_done) echo "Pre-pull done: $1" ;;
-        prepull_skip) echo "Pre-pull skipped for $1 (non-fatal)" ;;
-        wait_input) echo ">>> Waiting for input: $1 (also logged)" ;;
-        tmux_wrap) echo "Starting install in tmux session '$1' (detach: Ctrl+b d; reconnect: tmux attach -t $1)" ;;
-        tmux_attach_existing) echo "Attaching to existing tmux session '$1'..." ;;
-        summary_title) echo "========== Dafthunk Install Summary ==========" ;;
-        summary_domain) echo "Domain:  $1" ;;
-        summary_url) echo "URL:     $1" ;;
-        summary_logs) echo "Logs:    $1" ;;
-        summary_log_line) echo "         $1" ;;
-        summary_ready) echo "Status:  ready — register first user (platform admin)" ;;
-        summary_failed) echo "Status:  rebuild failed" ;;
-        summary_resume) echo "Resume:  cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
-        summary_end) echo "==============================================" ;;
-        lang_using) echo "Prompt language: $1" ;;
-        non_interactive_default) echo "(non-interactive) $1 → $2" ;;
-        *) echo "[$key $*]"; ;;
-      esac
-      ;;
-    *)
-      case "$key" in
-        unknown_opt) echo "未知选项: $1" ;;
-        need_root) echo "请使用 root 运行本脚本。" ;;
-        run_with_sudo) echo "请使用 sudo：" ;;
-        logging_to) echo "日志写入 $1" ;;
-        install_log) echo "安装日志: $1" ;;
-        resume_mode) echo "续装模式" ;;
-        skip_swap) echo "跳过 swap 设置 (--skip-swap)" ;;
-        step_memory) echo "内存检查" ;;
-        mem_pass) echo "内存检查通过（要求 $1，当前可用约 $2）" ;;
-        mem_skip_swap) echo "内存已达标，跳过 swap 配置" ;;
-        pipe_stdin) echo "不要用 wget | sudo bash 直接跑 install-dafthunk（stdin 是管道）。" ;;
-        pipe_stdin_hint) echo "请用: $INSTALL_ONE_LINER" ;;
-        mem_need_req) echo "要求内存：$1" ;;
-        mem_need_actual) echo "实际内存：$1" ;;
-        mem_need_swap_prompt) echo "需要增加 swap。回车默认 2G，或输入 2~4（0 跳过）：" ;;
-        swap_invalid) echo "无效大小「$1」— 改用 ${2}G" ;;
-        swap_skip_create) echo "跳过创建 swap" ;;
-        swap_replacing) echo "将替换现有 swap 文件 $1" ;;
-        step_swap_create) echo "正在创建 $1 swap：$2" ;;
-        swap_fallocate_fail) echo "fallocate 失败 — 改用 dd（较慢）" ;;
-        swap_active) echo "Swap 已启用。内存+swap ≈ $1" ;;
-        step_timezone) echo "时区" ;;
-        tz_detect_fail) echo "无法检测时区 — 跳过时区设置" ;;
-        tz_current) echo "当前时区: $1" ;;
-        tz_keep_prompt) echo "保持当前时区？ [Y/n]: " ;;
-        tz_kept) echo "保持时区: $1" ;;
-        tz_new_prompt) echo "新时区 [$1]: " ;;
-        tz_no_timedatectl) echo "无 timedatectl — 无法修改时区" ;;
-        tz_set_ok) echo "时区已设为: $1" ;;
-        tz_set_fail) echo "设置时区「$1」失败 — 保持原时区" ;;
-        step_apt) echo "刷新 apt 软件源" ;;
-        step_docker_pkgs) echo "安装 Docker、Compose、Git" ;;
-        docker_missing) echo "apt 安装后未找到 docker" ;;
-        compose_missing) echo "未找到 docker compose 或 docker-compose" ;;
-        docker_ready) echo "Docker 已就绪" ;;
-        interactive_next) echo "接下来需要在终端交互输入（提示会同时写入安装日志；若看不见请往上滚）" ;;
-        interactive_section) echo ">>> 请在下方回答问题（swap / 时区 / 域名）；直接回车表示使用默认值" ;;
-        ask_read_failed) echo "无法从终端读取输入 — 不会静默使用默认值" ;;
-        ask_read_failed_hint) echo "请使用 SSH 前台会话，或运行: cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
-        apt_failed) echo "apt 失败 — $1 末尾日志:" ;;
-        ask_timeout) echo "等待输入超时（${1}s）。就绪后请重新运行配置：" ;;
-        ask_timeout_hint) echo "  cd $INSTALL_DIR/docker-host && ./dafthunk-setup" ;;
-        ask_timeout_hint2) echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume --force-setup" ;;
-        step_get_docker) echo "通过 get.docker.com 安装 Docker（非 apt 发行版）" ;;
-        need_curl_wget) echo "此发行版安装 Docker 需要 curl 或 wget" ;;
-        step_host) echo "主机准备" ;;
-        step_repo) echo "准备 Dafthunk" ;;
-        existing_install) echo "发现已有安装: $1" ;;
-        updating_repo) echo "正在更新仓库..." ;;
-        backup_dir) echo "$1 存在但不是 git 仓库 — 备份到 $2" ;;
-        cloning) echo "正在克隆到 $1..." ;;
-        repo_ready) echo "仓库已就绪: $1" ;;
-        disconnect_hint) echo "若会话断开，请重新 SSH 后执行：" ;;
-        or_resume) echo "或续跑安装器：" ;;
-        log_label) echo "日志: $1" ;;
-        tmux_start) echo "在 tmux 会话「$1」中后台开始 rebuild（SSH 断开可续）" ;;
-        tmux_reattach) echo "重新接入: tmux attach -t $1" ;;
-        tmux_exists) echo "tmux 会话「$1」已存在" ;;
-        tmux_start_fail) echo "无法启动 tmux 会话 — 改为前台 rebuild" ;;
-        tmux_attach_fail) echo "无法自动接入 tmux。rebuild 已在后台运行，请执行: tmux attach -t $1" ;;
-        screen_start) echo "在 screen 会话「$1」中后台开始 rebuild（SSH 断开可续）" ;;
-        screen_exists) echo "screen 会话「$1」已存在" ;;
-        screen_reattach) echo "重新接入: screen -r $1" ;;
-        screen_start_fail) echo "无法启动 screen 会话 — 改为前台 rebuild" ;;
-        screen_attach_fail) echo "无法自动接入 screen。rebuild 已在后台运行，请执行: screen -r $1" ;;
-        no_tty_rebuild) echo "无交互终端 — 在前台执行 rebuild" ;;
-        no_tmux_screen) echo "未安装 tmux/screen — rebuild 在本会话中运行" ;;
-        setup_missing) echo "未找到 setup/launcher 脚本: $1" ;;
-        config_present) echo "已有配置 — 跳过向导（加 --force-setup 可重配）" ;;
-        found_yml) echo "找到 $1" ;;
-        step_setup_rebuild) echo "配置向导 + rebuild" ;;
-        skip_pkgs) echo "跳过软件包安装 (--resume / --skip-docker)" ;;
-        docker_not_found) echo "未找到 Docker。请去掉 --resume/--skip-docker 后重跑。" ;;
-        compose_not_found) echo "未找到 docker compose / docker-compose。" ;;
-        git_not_found) echo "未找到 Git。请去掉 --resume/--skip-docker 后重跑。" ;;
-        done) echo "完成。请打开 setup 输出的 Public URL（或查看 docker-host/containers/app.yml）。" ;;
-        rebuild_running) echo "等待 rebuild 结束（日志: $1）..." ;;
-        rebuild_failed) echo "Rebuild 失败 — 查看 $1，或执行: cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
-        rebuild_log_label) echo "Rebuild 日志: $1" ;;
-        setup_log_label) echo "Setup 日志: $1" ;;
-        setup_terminal_hint) echo "域名配置在终端进行，摘要写入 setup.log" ;;
-        prepull_image) echo "预拉取 $1（加快首次构建）..." ;;
-        prepull_done) echo "预拉取完成: $1" ;;
-        prepull_skip) echo "预拉取 $1 跳过（不影响安装）" ;;
-        wait_input) echo ">>> 等待输入: $1（已写入日志）" ;;
-        tmux_wrap) echo "在 tmux 会话「$1」中安装（脱离: Ctrl+b d；重连: tmux attach -t $1）" ;;
-        tmux_attach_existing) echo "接入已有 tmux 会话「$1」..." ;;
-        summary_title) echo "========== Dafthunk 安装摘要 ==========" ;;
-        summary_domain) echo "域名:  $1" ;;
-        summary_url) echo "地址:  $1" ;;
-        summary_logs) echo "日志:  $1" ;;
-        summary_log_line) echo "       $1" ;;
-        summary_ready) echo "状态:  就绪 — 打开地址注册首个用户（平台管理员）" ;;
-        summary_failed) echo "状态:  rebuild 失败" ;;
-        summary_resume) echo "续跑:  cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
-        summary_end) echo "========================================" ;;
-        lang_using) echo "提示语言: $1" ;;
-        non_interactive_default) echo "（非交互）$1 → $2" ;;
-        *) echo "[$key $*]"; ;;
-      esac
-      ;;
-  esac
-}
-
-normalize_lang() {
-  local raw
-  raw="$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
-  case "$raw" in
-    zh|zh-cn|zh_cn|cn|chinese|中文) echo "zh" ;;
-    en|en-us|en_us|english) echo "en" ;;
-    ask) echo "ask" ;;
-    *) return 1 ;;
-  esac
-}
-
-# --lang / DAFTHUNK_LANG (zh|en|ask). "ask" defers to choose_ui_lang_interactive.
-apply_lang_from_flag_or_env() {
-  local normalized
-  if [[ -n "$LANG_FLAG" ]]; then
-    if ! normalized="$(normalize_lang "$LANG_FLAG")"; then
-      echo "Invalid --lang '$LANG_FLAG' (use zh, en, or ask)." >&2
-      exit 1
-    fi
-    if [[ "$normalized" == "ask" ]]; then
-      UI_LANG="zh"
-      return 0
-    fi
-    UI_LANG="$normalized"
-    return 0
-  fi
-  if [[ -n "${DAFTHUNK_LANG:-}" ]]; then
-    if ! normalized="$(normalize_lang "$DAFTHUNK_LANG")"; then
-      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh, en, or ask)." >&2
-      exit 1
-    fi
-    if [[ "$normalized" == "ask" ]]; then
-      UI_LANG="zh"
-      return 0
-    fi
-    UI_LANG="$normalized"
-    return 0
-  fi
-  UI_LANG="zh"
-}
-
-# Interactive: language menu when TTY and no --lang / DAFTHUNK_LANG. Explicit zh|en skips menu.
-choose_ui_lang_interactive() {
-  if [[ -n "$LANG_FLAG" ]]; then
-    if [[ "$(echo "$LANG_FLAG" | tr '[:upper:]' '[:lower:]')" == "ask" ]]; then
-      :
-    else
-      return 0
-    fi
-  elif [[ -n "${DAFTHUNK_LANG:-}" ]]; then
-    if [[ "$(echo "$DAFTHUNK_LANG" | tr '[:upper:]' '[:lower:]')" == "ask" ]]; then
-      :
-    else
-      return 0
-    fi
-  elif ! can_prompt; then
-    UI_LANG="zh"
-    return 0
-  fi
-  if ! can_prompt; then
-    UI_LANG="zh"
-    return 0
-  fi
-  write_prompt_tty ""
-  write_prompt_tty "提示语言 / Prompt language"
-  write_prompt_tty "  1) 中文（默认）"
-  write_prompt_tty "  2) English"
-  local choice
-  ask_into choice "选择 / Choice [1]: " "1"
-  case "$choice" in
-    2|en|EN|english|English) UI_LANG="en" ;;
-    *) UI_LANG="zh" ;;
-  esac
-}
-
-# Status / prompts — never stdout (reserved for $() capture).
-# Write once to stderr (tee → log + console). Do NOT also write /dev/tty (duplicates).
-ask_status() {
-  local msg="$1"
-  echo -e "${GREEN}→${NC} $msg" >&2
-}
-
-announce() {
-  local msg="$1"
-  echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $msg${NC}"
-}
-
-ask_timeout_exit() {
-  ask_status "$(M ask_timeout "$ASK_TIMEOUT_SEC")"
-  echo "$(M ask_timeout_hint)" >&2
-  echo "$(M ask_timeout_hint2)" >&2
-  exit 1
-}
-
-ask_read_failed_exit() {
-  log_error "$(M ask_read_failed)"
-  echo "$(M ask_read_failed_hint)" >&2
-  exit 1
-}
-
-# Read one line interactively. Empty line after successful read → caller uses default.
-# Failed read (EOF/error) → exit; never silently substitute defaults.
-read_interactive_line() {
-  local __var="$1"
-  local value=""
-  local rc=0
-
-  if has_tty; then
-    stty -F /dev/tty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value </dev/tty; then
-      ask_read_failed_exit
-    fi
-  elif [[ -t 0 ]]; then
-    stty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value; then
-      ask_read_failed_exit
-    fi
-  else
-    ask_read_failed_exit
-  fi
-
-  value="$(printf '%s' "${value:-}" | tr -d '\r')"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf -v "$__var" '%s' "$value"
-}
-
-# Set answer in caller variable (never use $(ask…) — subshell hides exit).
-ask_into() {
-  local __var="$1"
-  local prompt="$2"
-  local default="$3"
-
-  if ! can_prompt; then
-    ask_status "$(M non_interactive_default "$prompt" "$default")"
-    printf -v "$__var" '%s' "$default"
-    return 0
-  fi
-
-  write_prompt_tty "$prompt"
-  log_wait_input "$prompt"
-  read_interactive_line "$__var"
-  if [[ -z "${!__var:-}" ]]; then
-    printf -v "$__var" '%s' "$default"
-  fi
-}
-
-ask_yes_no() {
-  local prompt="$1"
-  local default="${2:-Y}"
-  local answer=""
-  ask_into answer "$prompt" "$default"
-  answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
-  case "$answer" in
-    y|yes|是|"") return 0 ;;
-    n|no|否) return 1 ;;
-    *)
-      if [[ "$default" == "Y" || "$default" == "y" ]]; then
-        return 0
-      fi
-      return 1
-      ;;
-  esac
-}
-
-reject_piped_stdin() {
-  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ -t 0 ]]; then
-    return 0
-  fi
-  log_error "$(M pipe_stdin)"
-  echo "$(M pipe_stdin_hint)" >&2
-  exit 1
-}
-
-ensure_logging() {
-  if [[ "$LOGGING_STARTED" == "1" ]]; then
-    return 0
-  fi
-  setup_logging
-  LOGGING_STARTED=1
-}
-
-show_help() {
-  if [[ "$UI_LANG" == "en" ]]; then
-    cat <<EOF
-Dafthunk one-line installer
-
-Usage:
-  $INSTALL_ONE_LINER
-  sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
-
-Options:
-  --lang zh|en|ask Prompt language (interactive default: menu; zh|en=skip menu; or DAFTHUNK_LANG)
-  --resume         Skip Docker/package install; update repo; setup if needed; rebuild
-  --skip-docker    Skip Docker/Git install (same as part of --resume)
-  --skip-swap      Skip swap dialogue and creation
-  --force-setup    Re-run hostname wizard even if containers/app.yml exists
-  --non-interactive Use defaults without prompts (set DAFTHUNK_HOSTNAME for domain)
-  --no-tmux         Do not auto-start tmux wrapper
-  -h, --help       Show this help
-
-Defaults: target ~${TARGET_TOTAL_MIB}MiB RAM+swap; keep current timezone unless changed.
-
-If SSH drops during rebuild:
-  cd $INSTALL_DIR/docker-host && ./launcher rebuild
-  sudo bash $INSTALL_DIR/install-dafthunk --resume
-
-Log: $INSTALL_DIR/install.log
+Environment:
+  DAFTHUNK_HOSTNAME       Public domain (required if not interactive)
+  DAFTHUNK_INSTALL_DIR    Default: /var/dafthunk
+  DAFTHUNK_FORCE_SETUP=1  Rewrite containers/app.yml
 EOF
-  else
-    cat <<EOF
-Dafthunk 一键安装脚本
-
-用法:
-  $INSTALL_ONE_LINER
-  sudo bash $INSTALL_DIR/install-dafthunk [--resume] [--force-setup]
-
-选项:
-  --lang zh|en|ask 提示语言（交互默认出菜单；zh|en=跳过菜单；也可用 DAFTHUNK_LANG）
-  --resume         跳过 Docker/软件包安装；更新仓库；按需 setup；rebuild
-  --skip-docker    跳过 Docker/Git 安装（同 --resume 的一部分）
-  --skip-swap      跳过 swap 对话与创建
-  --force-setup    即使已有 containers/app.yml 也重跑 hostname 向导
-  --non-interactive 不交互，全部用默认值（域名请设 DAFTHUNK_HOSTNAME）
-  --no-tmux         不自动进入 tmux
-  -h, --help       显示帮助
-
-默认: 目标约 ${TARGET_TOTAL_MIB}MiB 内存+swap；默认保持服务器当前时区。
-
-若 rebuild 时 SSH 断开:
-  cd $INSTALL_DIR/docker-host && ./launcher rebuild
-  sudo bash $INSTALL_DIR/install-dafthunk --resume
-
-日志: $INSTALL_DIR/install.log
-EOF
-  fi
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --lang)
-      if [[ $# -lt 2 ]]; then
-        echo "Missing value for --lang / --lang 缺少参数 (zh|en|ask)" >&2
-        exit 1
-      fi
-      LANG_FLAG="$2"
-      shift 2
-      ;;
-    --lang=*)
-      LANG_FLAG="${1#--lang=}"
-      shift
-      ;;
-    --resume)
-      RESUME=1
-      SKIP_DOCKER=1
-      shift
-      ;;
-    --skip-docker)
-      SKIP_DOCKER=1
-      shift
-      ;;
-    --skip-swap)
-      SKIP_SWAP=1
-      shift
-      ;;
-    --force-setup)
-      FORCE_SETUP=1
-      shift
-      ;;
-    --non-interactive)
-      NON_INTERACTIVE=1
-      shift
-      ;;
-    --no-tmux)
-      NO_TMUX=1
-      shift
-      ;;
-    -h|--help)
-      SHOW_HELP=1
-      shift
-      ;;
-    *)
-      # Language may still be default zh for this early error
-      if [[ -n "$LANG_FLAG" ]] && normalize_lang "$LANG_FLAG" >/dev/null 2>&1; then
-        UI_LANG="$(normalize_lang "$LANG_FLAG")"
-      elif [[ -n "${DAFTHUNK_LANG:-}" ]] && normalize_lang "${DAFTHUNK_LANG}" >/dev/null 2>&1; then
-        UI_LANG="$(normalize_lang "${DAFTHUNK_LANG}")"
-      fi
-      log_error "$(M unknown_opt "$1")"
-      show_help
-      exit 1
-      ;;
+    --resume) RESUME=1; shift ;;
+    --force-setup) FORCE_SETUP=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "Unknown option: $1 (try --help)" ;;
   esac
 done
 
-# Resolve language for --help without interactive menu
-if [[ "$SHOW_HELP" == "1" ]]; then
-  if [[ -n "$LANG_FLAG" ]]; then
-    UI_LANG="$(normalize_lang "$LANG_FLAG")" || {
-      echo "Invalid --lang '$LANG_FLAG' (use zh, en, or ask)." >&2
-      exit 1
-    }
-  elif [[ -n "${DAFTHUNK_LANG:-}" ]]; then
-    UI_LANG="$(normalize_lang "$DAFTHUNK_LANG")" || {
-      echo "Invalid DAFTHUNK_LANG='$DAFTHUNK_LANG' (use zh, en, or ask)." >&2
-      exit 1
-    }
-  else
-    UI_LANG="zh"
+[[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: curl ... | sudo bash"
+
+LOG="${INSTALL_DIR}/install.log"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || LOG="/tmp/dafthunk-install.log"
+exec > >(tee -a "$LOG") 2>&1
+info "Log: $LOG"
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+ensure_packages() {
+  if [[ "$RESUME" == "1" ]]; then
+    need_cmd docker && need_cmd git && return 0
+    die "Missing docker or git — run full install without --resume"
   fi
-  [[ "$UI_LANG" == "ask" ]] && UI_LANG="zh"
-  show_help
-  exit 0
-fi
-
-check_root() {
-  if [[ "${EUID}" -ne 0 ]]; then
-    log_error "$(M need_root)"
-    echo
-    echo "$(M run_with_sudo)"
-    echo "  $INSTALL_ONE_LINER"
-    echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
-    exit 1
+  if ! need_cmd apt-get; then
+    need_cmd docker && need_cmd git && return 0
+    die "Need apt-get to install Docker/Git, or pre-install them"
   fi
-}
-
-setup_logging() {
-  touch "$TEMP_LOG"
-  exec > >(tee -a "$TEMP_LOG") 2>&1
-  log_info "$(M logging_to "$TEMP_LOG")"
-}
-
-promote_log() {
-  local final="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
-  if [[ ! -d "$INSTALL_DIR" ]] || [[ ! -f "$TEMP_LOG" ]]; then
-    return 0
+  log "Installing Docker and Git"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq docker.io git ca-certificates curl
+  if need_cmd systemctl; then
+    systemctl enable --now docker 2>/dev/null || true
   fi
-  mkdir -p "$INSTALL_DIR"
-  cat "$TEMP_LOG" >>"$final"
-  LOG_FILE="$final"
-  exec > >(tee -a "$final") 2>&1
-  log_info "$(M install_log "$LOG_FILE")"
-}
-
-setup_log_path() {
-  printf '%s' "${DAFTHUNK_SETUP_LOG:-$INSTALL_DIR/setup.log}"
-}
-
-rebuild_log_path() {
-  printf '%s' "${DAFTHUNK_REBUILD_LOG:-$INSTALL_DIR/rebuild.log}"
-}
-
-read_rebuild_exit() {
-  local f="$INSTALL_DIR/$REBUILD_EXIT_FILE"
-  local c=""
-  [[ -f "$f" ]] || return 1
-  c="$(tr -d '[:space:]' <"$f")"
-  rm -f "$f"
-  [[ "$c" =~ ^[0-9]+$ ]] || return 1
-  return "$c"
-}
-
-wait_for_tmux_session() {
-  local session="$1"
-  while tmux has-session -t "$session" 2>/dev/null; do
-    sleep 3
-  done
-}
-
-wait_for_screen_session() {
-  local session="$1"
-  while screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; do
-    sleep 3
-  done
-}
-
-run_rebuild_logged() {
-  local log="$1"
-  mkdir -p "$(dirname "$log")"
-  : >"$log"
-  ./launcher rebuild 2>&1 | tee -a "$log"
-  return "${PIPESTATUS[0]}"
-}
-
-print_install_summary() {
-  local rc="$1"
-  local app_yml="$INSTALL_DIR/docker-host/containers/app.yml"
-  local setup_log rebuild_log hostname web_host
-  setup_log="$(setup_log_path)"
-  rebuild_log="$(rebuild_log_path)"
-  hostname=""
-  web_host=""
-  if [[ -f "$app_yml" ]]; then
-    hostname="$(grep -E '^hostname:' "$app_yml" | head -n1 | sed 's/^hostname:[[:space:]]*//')"
-    web_host="$(grep -E 'WEB_HOST:' "$app_yml" | head -n1 | sed 's/.*WEB_HOST:[[:space:]]*//' | tr -d '"')"
+  if ! docker compose version >/dev/null 2>&1 && ! need_cmd docker-compose; then
+    apt-get install -y -qq docker-compose-v2 2>/dev/null \
+      || apt-get install -y -qq docker-compose-plugin 2>/dev/null \
+      || apt-get install -y -qq docker-compose 2>/dev/null \
+      || true
   fi
-  echo ""
-  log_info "$(M summary_title)"
-  [[ -n "$hostname" ]] && log_info "$(M summary_domain "$hostname")"
-  [[ -n "$web_host" ]] && log_info "$(M summary_url "$web_host")"
-  log_info "$(M summary_logs "$LOG_FILE")"
-  log_info "$(M summary_log_line "$setup_log")"
-  log_info "$(M summary_log_line "$rebuild_log")"
-  [[ -f "$APT_LOG" ]] && log_info "$(M summary_log_line "$APT_LOG")"
-  if ((rc == 0)); then
-    log_info "$(M summary_ready)"
-  else
-    log_info "$(M summary_failed)"
-    log_info "$(M summary_resume)"
-  fi
-  log_info "$(M summary_end)"
+  need_cmd docker || die "Docker not available after install"
+  need_cmd git || die "Git not available after install"
 }
 
-mem_total_mib() {
-  local kb
-  kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-  echo $((kb / 1024))
-}
-
-swap_total_mib() {
-  local kb
-  kb="$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-  echo $((kb / 1024))
-}
-
-mib_to_display() {
-  local mib="$1"
-  if ((mib % 1024 == 0)); then
-    echo "$((mib / 1024))G"
-  else
-    echo "${mib}M"
-  fi
-}
-
-# Round MiB to a whole-GiB tier for user-facing "实际内存：2G" (1935 → 2G).
-mib_to_gib_tier() {
-  local mib="$1"
-  local gib=$(((mib + 512) / 1024))
-  if ((gib < 1)); then
-    gib=1
-  fi
-  echo "${gib}G"
-}
-
-target_req_display() {
-  echo "$(((TARGET_TOTAL_MIB + 1023) / 1024))G+"
-}
-
-# Parse swap choice: 0 | 2–4 | 2g → MiB. Default GiB when invalid.
-parse_swap_gib_choice() {
-  local raw="$1"
-  local default_gib="${2:-2}"
-  raw="$(echo "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
-  if [[ -z "$raw" ]]; then
-    echo $((default_gib * 1024))
-    return 0
-  fi
-  if [[ "$raw" == "0" ]]; then
-    echo 0
-    return 0
-  fi
-  if [[ "$raw" =~ ^([2-4])g(ib)?$ ]] || [[ "$raw" =~ ^([2-4])$ ]]; then
-    echo $((BASH_REMATCH[1] * 1024))
-    return 0
-  fi
-  return 1
+mem_mib() {
+  awk -v key="$1" '$1 == key ":" { print int($2 / 1024); exit }' /proc/meminfo
 }
 
 ensure_swap() {
-  if [[ "$SKIP_SWAP" == "1" ]]; then
-    log_info "$(M skip_swap)"
+  if [[ "$RESUME" == "1" ]]; then
     return 0
   fi
-
-  log_step "$(M step_memory)"
-  local mem swap usable answer size_mib req_label ram_label default_gib=2
-  mem="$(mem_total_mib)"
-  swap="$(swap_total_mib)"
-  usable=$((mem + swap))
-  req_label="$(target_req_display)"
-  ram_label="$(mib_to_gib_tier "$mem")"
-
-  # Soft-meet: within slack of target → pass, no prompts.
-  if ((usable + RAM_SLACK_MIB >= TARGET_TOTAL_MIB)); then
-    log_info "$(M mem_pass "$req_label" "$(mib_to_gib_tier "$usable")")"
-    log_info "$(M mem_skip_swap)"
+  local ram swap total
+  ram="$(mem_mib MemTotal)"
+  swap="$(mem_mib SwapTotal)"
+  total=$((ram + swap))
+  info "Memory ${ram}M + swap ${swap}M ≈ ${total}M (target 4G+)"
+  if ((total >= 3800)); then
+    info "Memory OK — skip swap"
     return 0
   fi
-
-  echo "$(M mem_need_req "$req_label")" >&2
-  echo "$(M mem_need_actual "$ram_label")" >&2
-  ask_into answer "$(M mem_need_swap_prompt)" "$default_gib"
-  if ! size_mib="$(parse_swap_gib_choice "$answer" "$default_gib")"; then
-    log_warn "$(M swap_invalid "$answer" "$default_gib")"
-    size_mib=$((default_gib * 1024))
-  fi
-
-  if ((size_mib == 0)); then
-    log_info "$(M swap_skip_create)"
+  if swapon --show 2>/dev/null | grep -q .; then
+    info "Swap already active — continue"
     return 0
   fi
-
-  if [[ -f "$SWAPFILE" ]]; then
-    log_info "$(M swap_replacing "$SWAPFILE")"
-    swapoff "$SWAPFILE" 2>/dev/null || true
-    rm -f "$SWAPFILE"
+  log "Adding 2G swap at /swapfile"
+  if need_cmd fallocate; then
+    fallocate -l 2G /swapfile
+  else
+    dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
   fi
-  # Drop any prior fstab entry for this path (line may start at column 0)
-  if [[ -f /etc/fstab ]]; then
-    grep -vE "(^|[[:space:]])${SWAPFILE}([[:space:]]|$)" /etc/fstab >"/etc/fstab.dafthunk.bak.$$" || true
-    mv "/etc/fstab.dafthunk.bak.$$" /etc/fstab
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
+    echo '/swapfile none swap sw 0 0' >>/etc/fstab
   fi
-
-  log_step "$(M step_swap_create "$(mib_to_display "$size_mib")" "$SWAPFILE")"
-  if ! fallocate -l "${size_mib}M" "$SWAPFILE" 2>/dev/null; then
-    log_warn "$(M swap_fallocate_fail)"
-    dd if=/dev/zero of="$SWAPFILE" bs=1M count="$size_mib" status=progress
-  fi
-  chmod 600 "$SWAPFILE"
-  mkswap "$SWAPFILE"
-  swapon "$SWAPFILE"
-  if ! grep -qE "(^|[[:space:]])${SWAPFILE}([[:space:]]|$)" /etc/fstab 2>/dev/null; then
-    echo "$SWAPFILE none swap sw 0 0" >>/etc/fstab
-  fi
-  log_info "$(M swap_active "$(mib_to_display "$(($(mem_total_mib) + $(swap_total_mib)))")")"
+  info "Swap enabled"
 }
 
-detect_timezone() {
-  local tz=""
-  if command -v timedatectl >/dev/null 2>&1; then
-    tz="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+save_installer_copy() {
+  if need_cmd curl; then
+    curl -fsSL "$SELF_URL" -o "${INSTALL_DIR}/install-dafthunk" 2>/dev/null || true
+    chmod +x "${INSTALL_DIR}/install-dafthunk" 2>/dev/null || true
   fi
-  if [[ -z "$tz" && -f /etc/timezone ]]; then
-    tz="$(tr -d '[:space:]' </etc/timezone || true)"
+}
+
+ensure_repo() {
+  if [[ -d "${INSTALL_DIR}/.git" ]]; then
+    log "Updating repository"
+    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
+    git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}"
+    save_installer_copy
+    return 0
   fi
-  if [[ -z "$tz" && -L /etc/localtime ]]; then
-    local resolved
-    resolved="$(readlink -f /etc/localtime 2>/dev/null || true)"
-    if [[ "$resolved" == *"/zoneinfo/"* ]]; then
-      tz="${resolved##*/zoneinfo/}"
+  if [[ -e "$INSTALL_DIR" ]]; then
+    local backup="${INSTALL_DIR}.backup.$(date +%s)"
+    warn "Moving existing ${INSTALL_DIR} to ${backup}"
+    mv "$INSTALL_DIR" "$backup"
+  fi
+  log "Cloning ${REPO} (${BRANCH})"
+  git clone --branch "$BRANCH" --depth 1 "$REPO" "$INSTALL_DIR"
+  save_installer_copy
+}
+
+read_hostname_interactive() {
+  [[ -n "$HOSTNAME" ]] && return 0
+  if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
+    die "Set DAFTHUNK_HOSTNAME (no interactive terminal)"
+  fi
+  printf '域名 (例 z3cz.com): ' >/dev/tty
+  read -r HOSTNAME </dev/tty || die "Failed to read domain from /dev/tty"
+  HOSTNAME="${HOSTNAME#"${HOSTNAME%%[![:space:]]*}"}"
+  HOSTNAME="${HOSTNAME%"${HOSTNAME##*[![:space:]]}"}"
+  [[ -n "$HOSTNAME" ]] || die "Domain cannot be empty"
+}
+
+hex_secret() {
+  if need_cmd openssl; then
+    openssl rand -hex 32
+  else
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
+  fi
+}
+
+write_app_yml() {
+  local app_dir="${INSTALL_DIR}/docker-host"
+  local app_yml="${app_dir}/containers/app.yml"
+  read_hostname_interactive
+  mkdir -p "${app_dir}/containers" "${app_dir}/shared/postgres" "${app_dir}/shared/storage" "${app_dir}/shared/caddy"
+  local jwt master
+  jwt="$(hex_secret)"
+  master="$(hex_secret)"
+  local web_host="https://${HOSTNAME}"
+  cat >"$app_yml" <<EOF
+# Generated by install-dafthunk — do not commit
+hostname: ${HOSTNAME}
+https: true
+http_port: 80
+https_port: 443
+env:
+  JWT_SECRET: ${jwt}
+  SECRET_MASTER_KEY: ${master}
+  WEB_HOST: ${web_host}
+  WEBSITE_URL: ${web_host}
+EOF
+  info "Wrote ${app_yml}"
+  info "Site: ${web_host}"
+}
+
+ensure_config() {
+  local app_yml="${INSTALL_DIR}/docker-host/containers/app.yml"
+  if [[ -f "$app_yml" && "$FORCE_SETUP" != "1" ]]; then
+    info "Using ${app_yml}"
+    if [[ -z "$HOSTNAME" ]]; then
+      HOSTNAME="$(grep -E '^hostname:' "$app_yml" | head -1 | sed 's/^hostname:[[:space:]]*//')"
     fi
+    return 0
   fi
-  printf '%s' "$tz"
+  write_app_yml
 }
 
-ensure_timezone() {
-  log_step "$(M step_timezone)"
-  local current new_tz
-  current="$(detect_timezone)"
-  if [[ -z "$current" ]]; then
-    log_warn "$(M tz_detect_fail)"
-    return 0
-  fi
+prepull_node() {
+  local image="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
+  info "Pre-pull ${image}"
+  docker pull "$image" >/dev/null 2>&1 || warn "Pre-pull skipped (non-fatal)"
+}
 
-  log_info "$(M tz_current "$current")"
-  if ask_yes_no "$(M tz_keep_prompt)" "Y"; then
-    log_info "$(M tz_kept "$current")"
-    return 0
-  fi
-
-  new_tz=""
-  ask_into new_tz "$(M tz_new_prompt "$TZ_SUGGEST")" "$TZ_SUGGEST"
-  if [[ -z "$new_tz" ]]; then
-    new_tz="$TZ_SUGGEST"
-  fi
-
-  if ! command -v timedatectl >/dev/null 2>&1; then
-    log_warn "$(M tz_no_timedatectl)"
-    return 0
-  fi
-
-  if timedatectl set-timezone "$new_tz"; then
-    log_info "$(M tz_set_ok "$(detect_timezone)")"
+run_rebuild() {
+  local host_dir="${INSTALL_DIR}/docker-host"
+  local rebuild_log="${INSTALL_DIR}/rebuild.log"
+  [[ -x "${host_dir}/launcher" ]] || die "Missing ${host_dir}/launcher"
+  log "Building and starting stack (see ${rebuild_log})"
+  prepull_node
+  cd "$host_dir"
+  if need_cmd tmux && [[ -z "${TMUX:-}" ]] && [[ -r /dev/tty && -w /dev/tty ]]; then
+    info "Rebuild in tmux session 'dafthunk-install' (detach: Ctrl+b d)"
+    tmux kill-session -t dafthunk-install 2>/dev/null || true
+    tmux new-session -s dafthunk-install \
+      "./launcher rebuild 2>&1 | tee -a '${rebuild_log}'"
   else
-    log_warn "$(M tz_set_fail "$new_tz")"
+    ./launcher rebuild 2>&1 | tee -a "$rebuild_log"
   fi
 }
 
-has_docker_compose() {
-  if docker compose version >/dev/null 2>&1; then
-    return 0
-  fi
-  if command -v docker-compose >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-install_packages_apt() {
-  # System upgrade is intentionally not run here (can restart sshd / drop SSH).
-  # Docs recommend optional: apt-get update && apt-get upgrade -y
-  touch "$APT_LOG"
-  export DEBIAN_FRONTEND=noninteractive
-  export NEEDRESTART_MODE="${NEEDRESTART_MODE:-a}"
-
-  log_step "$(M step_apt)"
-  if ! apt-get update -y -qq -o Dpkg::Use-Pty=0 >>"$APT_LOG" 2>&1; then
-    log_error "$(M apt_failed "$APT_LOG")"
-    tail -n 50 "$APT_LOG" >&2 || true
-    exit 1
-  fi
-
-  log_step "$(M step_docker_pkgs)"
-  local pkgs=(docker.io git ca-certificates curl tmux)
-  if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
-    pkgs+=(docker-compose-v2)
-  else
-    pkgs+=(docker-compose)
-  fi
-  if apt-cache show docker-buildx-plugin >/dev/null 2>&1; then
-    pkgs+=(docker-buildx-plugin)
-  fi
-  if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 "${pkgs[@]}" >>"$APT_LOG" 2>&1; then
-    log_error "$(M apt_failed "$APT_LOG")"
-    tail -n 60 "$APT_LOG" >&2 || true
-    exit 1
-  fi
-
-  systemctl enable --now docker 2>/dev/null || service docker start 2>/dev/null || true
-
-  if ! command -v docker >/dev/null 2>&1; then
-    log_error "$(M docker_missing)"
-    exit 1
-  fi
-  if ! has_docker_compose; then
-    log_error "$(M compose_missing)"
-    exit 1
-  fi
-  announce "$(M docker_ready)"
-  log_info "Docker $(docker --version 2>/dev/null | head -n1)"
-  docker compose version 2>/dev/null || docker-compose version 2>/dev/null || true
-  log_info "$(M prepull_image "$NODE_IMAGE")"
-  docker pull "$NODE_IMAGE" 2>&1 | tee -a "$APT_LOG"
-  if ((PIPESTATUS[0] == 0)); then
-    log_info "$(M prepull_done "$NODE_IMAGE")"
-  else
-    log_warn "$(M prepull_skip "$NODE_IMAGE")"
+print_done() {
+  local url="https://${HOSTNAME}"
+  log "Install finished"
+  info "Open ${url} and register — first user is platform admin"
+  info "Logs: ${LOG}, ${INSTALL_DIR}/rebuild.log"
+  info "Update: cd ${INSTALL_DIR} && git pull && docker-host/launcher rebuild"
+  if need_cmd curl && [[ -n "$HOSTNAME" ]]; then
+    local code
+    code="$(curl -sI -m 15 "$url" 2>/dev/null | awk 'NR==1{print $2}')"
+    [[ -n "$code" ]] && info "HTTP check: ${code}"
   fi
 }
 
-install_packages_get_docker() {
-  log_step "$(M step_get_docker)"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL https://get.docker.com | sh
-  elif command -v wget >/dev/null 2>&1; then
-    wget -qO- https://get.docker.com | sh
-  else
-    log_error "$(M need_curl_wget)"
-    exit 1
-  fi
-  systemctl enable --now docker 2>/dev/null || true
-  if command -v dnf >/dev/null 2>&1; then
-    dnf -y install git || true
-  elif command -v yum >/dev/null 2>&1; then
-    yum -y install git || true
-  fi
-  announce "$(M docker_ready)"
-  if command -v docker >/dev/null 2>&1; then
-    log_info "$(M prepull_image "$NODE_IMAGE")"
-    docker pull "$NODE_IMAGE" 2>&1 | tee -a "$APT_LOG"
-    if ((PIPESTATUS[0] == 0)); then
-      log_info "$(M prepull_done "$NODE_IMAGE")"
-    else
-      log_warn "$(M prepull_skip "$NODE_IMAGE")"
-    fi
-  fi
-}
-
-prepare_host_interactive() {
-  log_step "$(M step_host)"
-  if can_prompt; then
-    ask_status "$(M interactive_section)"
-  fi
+main() {
+  ensure_packages
   ensure_swap
-  ensure_timezone
+  ensure_repo
+  ensure_config
+  run_rebuild
+  print_done
 }
 
-setup_repo() {
-  log_step "$(M step_repo)"
-
-  if [[ -d "$INSTALL_DIR/.git" ]]; then
-    log_info "$(M existing_install "$INSTALL_DIR")"
-    log_info "$(M updating_repo)"
-    cd "$INSTALL_DIR"
-    git fetch origin
-    git reset --hard "origin/$BRANCH"
-  else
-    if [[ -d "$INSTALL_DIR" ]]; then
-      if [[ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]; then
-        local backup="${INSTALL_DIR}.backup.$(date +%Y%m%d%H%M%S)"
-        log_warn "$(M backup_dir "$INSTALL_DIR" "$backup")"
-        mv "$INSTALL_DIR" "$backup"
-      else
-        rmdir "$INSTALL_DIR"
-      fi
-    fi
-
-    log_info "$(M cloning "$INSTALL_DIR")"
-    git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
-  fi
-
-  cd "$INSTALL_DIR"
-  chmod +x docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
-  # Optional overlay (e.g. /tmp/deploy/dafthunk-setup) while GitHub raw is catching up.
-  if [[ -f "${DAFTHUNK_SETUP_OVERLAY:-/tmp/deploy/dafthunk-setup}" ]]; then
-    cp "${DAFTHUNK_SETUP_OVERLAY:-/tmp/deploy/dafthunk-setup}" docker-host/dafthunk-setup
-    chmod +x docker-host/dafthunk-setup
-  fi
-  # Normalize CRLF if scripts were ever edited on Windows
-  sed -i 's/\r$//' docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
-  mkdir -p "$INSTALL_DIR/docker-host"
-  printf '%s\n' "$UI_LANG" >"$INSTALL_DIR/docker-host/.install-lang"
-  promote_log
-  log_info "$(M repo_ready "$INSTALL_DIR")"
-}
-
-print_resume_hint() {
-  echo
-  log_warn "$(M disconnect_hint)"
-  echo "  cd $INSTALL_DIR/docker-host && ./launcher rebuild"
-  echo "$(M or_resume)"
-  echo "  sudo bash $INSTALL_DIR/install-dafthunk --resume"
-  echo "$(M log_label "$LOG_FILE")"
-  echo
-}
-
-try_attach_tmux() {
-  local session="$1"
-  if ! can_prompt; then
-    return 0
-  fi
-  if tmux attach -t "$session" 2>/dev/null; then
-    return 0
-  fi
-  log_warn "$(M tmux_attach_fail "$session")"
-  return 0
-}
-
-try_attach_screen() {
-  local session="$1"
-  if ! can_prompt; then
-    return 0
-  fi
-  if screen -r "$session" 2>/dev/null; then
-    return 0
-  fi
-  log_warn "$(M screen_attach_fail "$session")"
-  return 0
-}
-
-run_launcher_rebuild() {
-  local rebuild_log exit_file rc=0 session
-  rebuild_log="$(rebuild_log_path)"
-  exit_file="$INSTALL_DIR/$REBUILD_EXIT_FILE"
-  mkdir -p "$INSTALL_DIR"
-  rm -f "$exit_file"
-  print_resume_hint
-  cd "$INSTALL_DIR/docker-host"
-  log_info "$(M rebuild_log_label "$rebuild_log")"
-
-  if [[ -n "${TMUX:-}" ]] || [[ -n "${STY:-}" ]]; then
-    run_rebuild_logged "$rebuild_log"
-    rc=$?
-    printf '%s\n' "$rc" >"$exit_file"
-    return "$rc"
-  fi
-
-  if command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
-    session="$TMUX_SESSION"
-    if tmux has-session -t "$session" 2>/dev/null; then
-      log_warn "$(M tmux_exists "$session")"
-    else
-      log_info "$(M tmux_start "$session")"
-      if ! tmux new-session -d -s "$session" bash -c \
-        "cd '$INSTALL_DIR/docker-host' && { ./launcher rebuild 2>&1 | tee -a '$rebuild_log'; echo \${PIPESTATUS[0]} > '$exit_file'; exit \${PIPESTATUS[0]}; }"; then
-        log_warn "$(M tmux_start_fail)"
-        run_rebuild_logged "$rebuild_log"
-        return $?
-      fi
-    fi
-    if ! tmux has-session -t "$session" 2>/dev/null; then
-      log_warn "$(M tmux_start_fail)"
-      run_rebuild_logged "$rebuild_log"
-      return $?
-    fi
-    log_info "$(M tmux_reattach "$session")"
-    try_attach_tmux "$session"
-    log_info "$(M rebuild_running "$rebuild_log")"
-    wait_for_tmux_session "$session"
-    read_rebuild_exit
-    rc=$?
-    return "$rc"
-  fi
-
-  if command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
-    session="$TMUX_SESSION"
-    if screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
-      log_warn "$(M screen_exists "$session")"
-    else
-      log_info "$(M screen_start "$session")"
-      if ! screen -dmS "$session" bash -c \
-        "cd '$INSTALL_DIR/docker-host' && { ./launcher rebuild 2>&1 | tee -a '$rebuild_log'; echo \${PIPESTATUS[0]} > '$exit_file'; exit \${PIPESTATUS[0]}; }"; then
-        log_warn "$(M screen_start_fail)"
-        run_rebuild_logged "$rebuild_log"
-        return $?
-      fi
-    fi
-    if ! screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
-      log_warn "$(M screen_start_fail)"
-      run_rebuild_logged "$rebuild_log"
-      return $?
-    fi
-    log_info "$(M screen_reattach "$session")"
-    try_attach_screen "$session"
-    log_info "$(M rebuild_running "$rebuild_log")"
-    wait_for_screen_session "$session"
-    read_rebuild_exit
-    rc=$?
-    return "$rc"
-  fi
-
-  if ! can_prompt; then
-    log_warn "$(M no_tty_rebuild)"
-  else
-    log_warn "$(M no_tmux_screen)"
-  fi
-
-  run_rebuild_logged "$rebuild_log"
-  return $?
-}
-
-run_setup_and_rebuild() {
-  local app_yml="$INSTALL_DIR/docker-host/containers/app.yml"
-  local setup_log rebuild_rc=0
-  cd "$INSTALL_DIR/docker-host"
-
-  if [[ ! -f "./dafthunk-setup" ]] || [[ ! -f "./launcher" ]]; then
-    log_error "$(M setup_missing "$INSTALL_DIR/docker-host")"
-    exit 1
-  fi
-
-  if [[ -f "$app_yml" ]] && [[ "$FORCE_SETUP" != "1" ]]; then
-    log_step "$(M config_present)"
-    log_info "$(M found_yml "$app_yml")"
-    run_launcher_rebuild
-    return $?
-  fi
-
-  log_step "$(M step_setup_rebuild)"
-  setup_log="$(setup_log_path)"
-  : >"$setup_log"
-  log_info "$(M setup_log_label "$setup_log")"
-  log_info "$(M setup_terminal_hint)"
-  echo
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
-      DAFTHUNK_INSTALL_LOG="$LOG_FILE" \
-      bash ./dafthunk-setup --no-rebuild 0</dev/tty >/dev/tty 2>&1
-  else
-    DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
-      DAFTHUNK_INSTALL_LOG="$LOG_FILE" \
-      bash ./dafthunk-setup --no-rebuild
-  fi
-  run_launcher_rebuild || rebuild_rc=$?
-  return "$rebuild_rc"
-}
-
-apply_lang_from_flag_or_env
-check_root
-reject_piped_stdin
-ensure_stdin_tty
-ensure_install_tmux "${ORIGINAL_ARGS[@]}"
-choose_ui_lang_interactive
-
-ensure_logging
-lang_label="中文"
-[[ "$UI_LANG" == "en" ]] && lang_label="English"
-log_info "$(M lang_using "$lang_label")"
-
-if [[ "$SKIP_DOCKER" != "1" ]]; then
-  prepare_host_interactive
-else
-  if [[ "$SKIP_SWAP" != "1" ]]; then
-    ensure_swap
-  fi
-fi
-
-if [[ "$RESUME" == "1" ]]; then
-  log_step "$(M resume_mode)"
-fi
-
-if [[ "$SKIP_DOCKER" != "1" ]]; then
-  if command -v apt-get >/dev/null 2>&1; then
-    install_packages_apt
-  else
-    install_packages_get_docker
-  fi
-else
-  log_info "$(M skip_pkgs)"
-  if ! command -v docker >/dev/null 2>&1; then
-    log_error "$(M docker_not_found)"
-    exit 1
-  fi
-  if ! has_docker_compose; then
-    log_error "$(M compose_not_found)"
-    exit 1
-  fi
-  if ! command -v git >/dev/null 2>&1; then
-    log_error "$(M git_not_found)"
-    exit 1
-  fi
-fi
-
-setup_repo
-rebuild_rc=0
-run_setup_and_rebuild || rebuild_rc=$?
-
-print_install_summary "$rebuild_rc"
-if ((rebuild_rc == 0)); then
-  log_info "$(M done)"
-else
-  log_error "$(M rebuild_failed "$(rebuild_log_path)")"
-  exit "$rebuild_rc"
-fi
+main "$@"

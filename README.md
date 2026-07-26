@@ -34,29 +34,25 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后**一条命令**完成安装（自动 tmux，断线 `tmux attach -t dafthunk-install` 续接；将 `z3cz.com` 换成你的域名）：
+然后**一条命令**完成安装（将 `z3cz.com` 换成你的域名）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash -s -- --lang zh --non-interactive
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo DAFTHUNK_HOSTNAME=z3cz.com bash
 ```
 
-**不要在命令末尾加 `0</dev/tty`** — 会把 `bash -s` 的输入从 curl 管道改成终端，脚本读不到、会静默退出。
+等价入口（先下载脚本再执行，适合需要传 `--resume` 等参数时）：
 
-需要交互填域名时，去掉 `DAFTHUNK_HOSTNAME=…` 和 `--non-interactive` 即可（仍会自动进 tmux）。交互时同样不要加 `0</dev/tty`。
+```bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash
+```
 
-无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
+交互填域名时去掉 `DAFTHUNK_HOSTNAME=…`，在提示下输入即可。无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
 
-一键脚本会依次：
+脚本会：检查内存（不足则加 2G swap）→ 安装 Docker/Git → clone → 写 `containers/app.yml` → `launcher rebuild`（自动进 tmux，断线 `tmux attach -t dafthunk-install`）。
 
-1. 选择提示语言（中文 / English；`--lang zh|en` 可跳过菜单）  
-2. 内存检查：已满足约 4G+ 则跳过 swap 问答；不足则询问 swap（回车默认 2G，可输入 2～4，或 `0` 跳过）  
-3. 显示服务器当前时区，默认保持；可选改为其他 IANA（建议 `Asia/Shanghai`）  
-4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`；详细 apt 日志见 `install.log` / `*.apt.log`）  
-5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
+日志：`/var/dafthunk/install.log`、`/var/dafthunk/rebuild.log`。rebuild 约 **5–20 分钟**（视机器与缓存而定）。
 
-日志：`/var/dafthunk/install.log`（安装）、`setup.log`（域名配置摘要）、`rebuild.log`（构建）。rebuild 结束后才显示「完成」。
-
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。无控制台时用 `--non-interactive`（配合 `DAFTHUNK_HOSTNAME`）。打开打印的 URL 注册；**首个用户**为平台管理员。
+默认目录 `/var/dafthunk`。打开站点注册；**首个用户**为平台管理员。
 
 #### 更新
 
@@ -69,15 +65,12 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | 情况 | 命令 |
 |------|------|
 | 查看安装日志 | `less /var/dafthunk/install.log` |
-| 域名配置摘要 | `less /var/dafthunk/setup.log` |
 | 构建日志 | `less /var/dafthunk/rebuild.log` |
-| 安装中断 / SSH 断开 | `tmux attach -t dafthunk-install` |
-| 安装进程僵死 | `sudo pkill -f 'dafthunk-install|dafthunk-setup'; sudo bash /var/dafthunk/install-dafthunk --resume --force-setup --skip-docker 0</dev/tty` |
-| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
-| 尚未生成配置 / 卡在域名 | `cd /var/dafthunk/docker-host && sudo ./dafthunk-setup` |
-| 向导超时后重来 | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
-| 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 失败留下的备份目录 | `/var/dafthunk.backup.*` 确认无用后可删 |
+| SSH 断开 / rebuild 在跑 | `tmux attach -t dafthunk-install` |
+| 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 续装（保留数据） | `sudo bash /var/dafthunk/install-dafthunk --resume` |
+| 重写域名配置 | `sudo DAFTHUNK_HOSTNAME=新域名 DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup` |
+| 手动改配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 
 `shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。
 

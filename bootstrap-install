@@ -1,42 +1,18 @@
 #!/usr/bin/env bash
-# Dafthunk one-line bootstrap — download install-dafthunk, then run interactively.
-#
-# One-line install (auto tmux; set domain for unattended):
-#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive
-# Do NOT append 0</dev/tty to the curl|bash line — it steals stdin from the pipe and the script never runs.
+# Thin wrapper: download install-dafthunk to a file, then exec (works with curl | bash).
 set -euo pipefail
 
-# curl | bash -s with trailing 0</dev/tty: bash reads an empty tty instead of the piped script → silent exit.
-bootstrap_stdin_broken() {
-  [[ -t 0 ]] || return 1
-  [[ -p /dev/stdin ]] && return 1
-  [[ -f "${BASH_SOURCE[0]:-}" && "$0" == "${BASH_SOURCE[0]}" ]] && return 1
-  return 0
-}
-
-if bootstrap_stdin_broken; then
-  echo "Dafthunk: install script was not loaded (stdin is the terminal, not the curl pipe)." >&2
-  echo "Remove 0</dev/tty from the end of the one-liner. Example:" >&2
-  echo "  curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=你的域名 bash -s -- --lang zh --non-interactive" >&2
-  exit 1
-fi
-
-echo "Dafthunk: downloading installer…" >&2
-
-INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
+URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 TARGET="${DAFTHUNK_INSTALL_SCRIPT:-/tmp/dafthunk-install.sh}"
 
-# Re-use cached installer only when it matches current feature set.
-if [[ -f "$TARGET" ]] && grep -q 'ensure_install_tmux' "$TARGET" 2>/dev/null; then
-  :
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$URL" -o "$TARGET"
 elif command -v wget >/dev/null 2>&1; then
-  wget -qO "$TARGET" "$INSTALLER_URL"
-elif command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$INSTALLER_URL" -o "$TARGET"
+  wget -qO "$TARGET" "$URL"
 else
-  echo "Need wget or curl to download the installer." >&2
+  echo "Need curl or wget." >&2
   exit 1
 fi
 
 chmod +x "$TARGET"
-exec bash "$TARGET" --lang ask "$@" 0</dev/tty
+exec bash "$TARGET" "$@"
