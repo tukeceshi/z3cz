@@ -218,14 +218,25 @@ run_rebuild() {
   log "Building and starting stack (see ${rebuild_log})"
   prepull_node
   cd "$host_dir"
-  if need_cmd tmux && [[ -z "${TMUX:-}" ]] && [[ -r /dev/tty && -w /dev/tty ]]; then
-    info "Rebuild in tmux session 'dafthunk-install' (detach: Ctrl+b d)"
+  local rebuild_cmd="./launcher rebuild 2>&1 | tee -a '${rebuild_log}'"
+
+  if need_cmd tmux && [[ -z "${TMUX:-}" ]]; then
     tmux kill-session -t dafthunk-install 2>/dev/null || true
-    tmux new-session -s dafthunk-install \
-      "./launcher rebuild 2>&1 | tee -a '${rebuild_log}'"
-  else
-    ./launcher rebuild 2>&1 | tee -a "$rebuild_log"
+    tmux new-session -d -s dafthunk-install "$rebuild_cmd"
+    info "Rebuild running in tmux 'dafthunk-install' — log: ${rebuild_log}"
+    if tty -s >/dev/null 2>&1; then
+      info "Attaching to tmux (detach: Ctrl+b d)…"
+      tmux attach -t dafthunk-install || true
+    else
+      info "No TTY — waiting for rebuild in background…"
+      while tmux has-session -t dafthunk-install 2>/dev/null; do
+        sleep 10
+      done
+    fi
+    return 0
   fi
+
+  eval "$rebuild_cmd"
 }
 
 print_done() {
