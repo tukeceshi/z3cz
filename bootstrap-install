@@ -6,7 +6,10 @@ set -euo pipefail
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"
 TARGET="${DAFTHUNK_INSTALL_SCRIPT:-/tmp/dafthunk-install.sh}"
 
-if command -v wget >/dev/null 2>&1; then
+# Re-use already-deployed fixed script (GitHub raw may lag behind).
+if [[ -f "$TARGET" ]] && grep -q 'has_tty()' "$TARGET" 2>/dev/null; then
+  :
+elif command -v wget >/dev/null 2>&1; then
   wget -qO "$TARGET" "$INSTALLER_URL"
 elif command -v curl >/dev/null 2>&1; then
   curl -fsSL "$INSTALLER_URL" -o "$TARGET"
@@ -16,4 +19,4 @@ else
 fi
 
 chmod +x "$TARGET"
-exec bash "$TARGET" --lang ask "$@" </dev/tty
+exec bash "$TARGET" --lang ask "$@" 0</dev/tty

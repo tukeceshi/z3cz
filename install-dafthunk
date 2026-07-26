@@ -38,7 +38,6 @@ TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 APT_LOG="${TEMP_LOG}.apt.log"
 LOG_FILE="$TEMP_LOG"
 LOGGING_STARTED=0
-INTERACTIVE_FD=""
 
 RESUME=0
 SKIP_DOCKER=0
@@ -60,23 +59,25 @@ log_warn() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}${BOLD}==>${NC}${BOLD} $1${NC}"; }
 
-# True when we should ask a human (SSH console), even if stdin is a pipe (wget | bash).
-init_interactive_tty() {
-  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
+# Interactive I/O goes to /dev/tty only (never stdin — fd 0 may be closed or a dead pipe).
+has_tty() {
+  [[ -r /dev/tty && -w /dev/tty ]]
+}
+
+ensure_stdin_tty() {
+  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ -t 0 ]]; then
     return 0
   fi
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    exec 3>/dev/tty
-    INTERACTIVE_FD=3
-    stty -F /dev/tty sane 2>/dev/null || true
+  if has_tty; then
+    exec </dev/tty
   fi
 }
 
 write_prompt_tty() {
   local msg="$1"
-  init_interactive_tty
-  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
-    printf '%s\n' "$msg" >&${INTERACTIVE_FD}
+  if has_tty; then
+    stty -F /dev/tty sane 2>/dev/null || true
+    printf '%s\n' "$msg" >/dev/tty
   else
     printf '%s\n' "$msg" >&2
   fi
@@ -86,10 +87,7 @@ can_prompt() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then
     return 1
   fi
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    return 0
-  fi
-  [[ -t 0 ]]
+  has_tty
 }
 
 # Localized message: M <key> [args...]
@@ -374,50 +372,26 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  init_interactive_tty
-  if [[ -n "${INTERACTIVE_FD:-}" ]]; then
-    stty -F /dev/tty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value <&${INTERACTIVE_FD}; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value <&${INTERACTIVE_FD}; then
-      ask_read_failed_exit
-    fi
-  elif [[ -r /dev/tty && -w /dev/tty ]]; then
-    stty -F /dev/tty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value </dev/tty; then
-      ask_read_failed_exit
-    fi
-  elif [[ -t 0 ]]; then
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value; then
-      ask_read_failed_exit
-    fi
-  else
+  if ! has_tty; then
     ask_read_failed_exit
   fi
 
-  value="$(printf '%s' "${value:-}" | tr -d '\r' | awk 'NF { line=$0 } END { print line }')"
+  stty -F /dev/tty sane 2>/dev/null || true
+  if ((ASK_TIMEOUT_SEC > 0)); then
+    if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
+      rc=$?
+      if ((rc == 142 || rc == 143)); then
+        ask_timeout_exit
+      fi
+      ask_read_failed_exit
+    fi
+  elif ! read -r value </dev/tty; then
+    ask_read_failed_exit
+  fi
+
+  value="$(printf '%s' "${value:-}" | tr -d '\r')"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
   printf -v "$__var" '%s' "$value"
 }
 
@@ -905,6 +879,11 @@ setup_repo() {
 
   cd "$INSTALL_DIR"
   chmod +x docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
+  # Optional overlay (e.g. /tmp/deploy/dafthunk-setup) while GitHub raw is catching up.
+  if [[ -f "${DAFTHUNK_SETUP_OVERLAY:-/tmp/deploy/dafthunk-setup}" ]]; then
+    cp "${DAFTHUNK_SETUP_OVERLAY:-/tmp/deploy/dafthunk-setup}" docker-host/dafthunk-setup
+    chmod +x docker-host/dafthunk-setup
+  fi
   # Normalize CRLF if scripts were ever edited on Windows
   sed -i 's/\r$//' docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
   mkdir -p "$INSTALL_DIR/docker-host"
@@ -1034,10 +1013,10 @@ run_setup_and_rebuild() {
   ask_status "$(M interactive_next)"
   echo
   if [[ -r /dev/tty && -w /dev/tty ]]; then
-    DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
+    DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
       DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild </dev/tty
   else
-    DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
+    DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
       DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
   fi
   run_launcher_rebuild
@@ -1046,6 +1025,7 @@ run_setup_and_rebuild() {
 apply_lang_from_flag_or_env
 check_root
 reject_piped_stdin
+ensure_stdin_tty
 choose_ui_lang_interactive
 
 if [[ "$SKIP_DOCKER" != "1" ]]; then
