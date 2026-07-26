@@ -18,7 +18,9 @@ set -euo pipefail
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
-LOG_FILE="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
+# Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
+TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
+LOG_FILE="$TEMP_LOG"
 
 RESUME=0
 SKIP_DOCKER=0
@@ -55,7 +57,7 @@ If SSH drops during rebuild, reconnect and run:
 Or:
   sudo bash $INSTALL_DIR/install-dafthunk --resume
 
-Log file: $LOG_FILE
+Log: $INSTALL_DIR/install.log (and $TEMP_LOG during early steps)
 EOF
 }
 
@@ -95,11 +97,21 @@ check_root() {
 }
 
 setup_logging() {
-  mkdir -p "$INSTALL_DIR"
-  touch "$LOG_FILE"
-  # Duplicate stdout/stderr to log (keeps console output)
-  exec > >(tee -a "$LOG_FILE") 2>&1
-  log_info "Logging to $LOG_FILE"
+  touch "$TEMP_LOG"
+  # Duplicate stdout/stderr to temp log (do not create INSTALL_DIR yet)
+  exec > >(tee -a "$TEMP_LOG") 2>&1
+  log_info "Logging to $TEMP_LOG"
+}
+
+# After INSTALL_DIR exists, mirror the full temp log into the install tree.
+promote_log() {
+  local final="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
+  if [[ ! -d "$INSTALL_DIR" ]] || [[ ! -f "$TEMP_LOG" ]]; then
+    return 0
+  fi
+  cp "$TEMP_LOG" "$final"
+  LOG_FILE="$final"
+  log_info "Install log: $LOG_FILE"
 }
 
 fetch() {
@@ -154,23 +166,24 @@ setup_repo() {
     git fetch origin
     git reset --hard "origin/$BRANCH"
   else
-    if [[ -d "$INSTALL_DIR" ]] && [[ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]; then
-      log_warn "$INSTALL_DIR exists but is not a git checkout — backing up"
-      local backup="${INSTALL_DIR}.backup.$(date +%Y%m%d%H%M%S)"
-      log_info "Backing up to $backup"
-      mv "$INSTALL_DIR" "$backup"
-      mkdir -p "$INSTALL_DIR"
-      # Continue logging into the new tree
-      LOG_FILE="${DAFTHUNK_INSTALL_LOG:-$INSTALL_DIR/install.log}"
-      touch "$LOG_FILE"
+    if [[ -d "$INSTALL_DIR" ]]; then
+      if [[ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]; then
+        local backup="${INSTALL_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+        log_warn "$INSTALL_DIR exists but is not a git checkout — backing up to $backup"
+        mv "$INSTALL_DIR" "$backup"
+      else
+        rmdir "$INSTALL_DIR"
+      fi
     fi
 
     log_info "Cloning dafthunk to $INSTALL_DIR..."
+    # git clone creates INSTALL_DIR — do not mkdir/touch files there beforehand
     git clone --depth=1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
   fi
 
   cd "$INSTALL_DIR"
   chmod +x docker-host/dafthunk-setup docker-host/launcher install-dafthunk 2>/dev/null || true
+  promote_log
   log_info "Repository ready at $INSTALL_DIR"
 }
 
@@ -267,4 +280,6 @@ fi
 setup_repo
 run_setup_and_rebuild
 
+promote_log
 log_info "Done. Open the Public URL from setup output (or check docker-host/containers/app.yml)."
+log_info "Log: $LOG_FILE"

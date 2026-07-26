@@ -48,6 +48,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | 尚未生成配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 | 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
 | 查看安装日志 | `less /var/dafthunk/install.log` |
+| 失败留下的备份目录 | `/var/dafthunk.backup.*` 确认无用后可删 |
 
 `shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。
 

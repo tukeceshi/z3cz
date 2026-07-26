@@ -31,6 +31,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | 接着跑安装器 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
 | 重配 hostname | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
 | 日志 | `less /var/dafthunk/install.log` |
+| 失败备份 | `/var/dafthunk.backup.*` 确认无用后可删 |
 
 `--resume`：跳过装 Docker/Git；已有 `containers/app.yml` 则跳过向导直接 rebuild。`shared/` 默认保留。
 
