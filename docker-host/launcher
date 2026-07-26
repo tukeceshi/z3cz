@@ -115,7 +115,7 @@ case "$COMMAND" in
   bootstrap|rebuild)
     echo ""
     echo "Note: if SSH disconnects, reconnect and run: ./launcher rebuild"
-    echo "      (shared/ data is kept; log may be in ../install.log)"
+    echo "      (shared/ data is kept; logs: ../install.log, ../setup.log, ../rebuild.log)"
     echo ""
     run_render
     # Build one service at a time — parallel bake OOMs on 2GB VPS.

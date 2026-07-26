@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Dafthunk one-line bootstrap — download install-dafthunk, then run interactively.
-# Usage: curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
+#
+# Recommended:
+#   curl -fsSL …/bootstrap-install -o /tmp/bootstrap-install.sh
+#   sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
+#
+# One-liner (needs foreground TTY):
+#   curl -fsSL …/bootstrap-install | sudo bash
 set -euo pipefail
 
 INSTALLER_URL="${DAFTHUNK_INSTALLER_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk}"

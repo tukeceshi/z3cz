@@ -34,16 +34,24 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后一键安装：
+然后一键安装（**推荐**：先下载再执行，避免 pipe 丢交互）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install -o /tmp/bootstrap-install.sh
+sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
+```
+
+也可一行（需前台 TTY）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
 ```
 
-无 `curl` 时可用：
+无 `curl` 时：
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
+wget -qO /tmp/bootstrap-install.sh https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install
+sudo bash /tmp/bootstrap-install.sh --lang zh 0</dev/tty
 ```
 
 一键脚本会依次：
@@ -54,7 +62,9 @@ wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-in
 4. `apt update` 并安装 `docker.io`、Compose、`git`（**不含** `apt upgrade`；详细 apt 日志见 `install.log` / `*.apt.log`）  
 5. clone → 向导写配置 → `launcher rebuild`（串行构建，适合小内存机）
 
-默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。bootstrap 会下载脚本到 `/tmp/dafthunk-install.sh` 并从终端交互。勿用 `sudo bash <(wget …)` 或直接 `wget | sudo bash install-dafthunk`。无控制台时用 `--non-interactive`（CI）。有 `tmux`/`screen` 时 rebuild 在后台会话中启动（必要时 `tmux attach -t dafthunk-install`）。打开打印的 URL 注册；**首个用户**为平台管理员。
+日志：`/var/dafthunk/install.log`（安装）、`setup.log`（域名配置摘要）、`rebuild.log`（构建）。rebuild 结束后才显示「完成」。
+
+默认目录 `/var/dafthunk`（`DAFTHUNK_INSTALL_DIR` 可改）。无控制台时用 `--non-interactive`（配合 `DAFTHUNK_HOSTNAME`）。打开打印的 URL 注册；**首个用户**为平台管理员。
 
 #### 更新
 
@@ -66,11 +76,13 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 
 | 情况 | 命令 |
 |------|------|
-| 构建中断 / 断线 | `cd /var/dafthunk/docker-host && ./launcher rebuild` 或 `tmux attach -t dafthunk-install` |
-| 尚未生成配置 / 卡在域名问答 | `cd /var/dafthunk/docker-host && sudo ./dafthunk-setup` |
+| 查看安装日志 | `less /var/dafthunk/install.log` |
+| 域名配置摘要 | `less /var/dafthunk/setup.log` |
+| 构建日志 | `less /var/dafthunk/rebuild.log` |
+| 构建中断 / 断线 | `tmux attach -t dafthunk-install` 或 `cd /var/dafthunk/docker-host && ./launcher rebuild` |
+| 尚未生成配置 / 卡在域名 | `cd /var/dafthunk/docker-host && sudo ./dafthunk-setup` |
 | 向导超时后重来 | `sudo bash /var/dafthunk/install-dafthunk --resume --force-setup` |
 | 整段接着装 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 查看安装日志 | `less /var/dafthunk/install.log` |
 | 失败留下的备份目录 | `/var/dafthunk.backup.*` 确认无用后可删 |
 
 `shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。

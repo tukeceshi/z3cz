@@ -37,6 +37,8 @@ NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
 TEMP_LOG="${DAFTHUNK_INSTALL_LOG_TMP:-/tmp/dafthunk-install-$$.log}"
 APT_LOG="${TEMP_LOG}.apt.log"
 LOG_FILE="$TEMP_LOG"
+NODE_IMAGE="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
+REBUILD_EXIT_FILE=".rebuild.exit"
 LOGGING_STARTED=0
 
 RESUME=0
@@ -177,6 +179,22 @@ M() {
         compose_not_found) echo "docker compose / docker-compose not found." ;;
         git_not_found) echo "Git not found. Re-run without --resume/--skip-docker." ;;
         done) echo "Done. Open the Public URL from setup output (or check docker-host/containers/app.yml)." ;;
+        rebuild_running) echo "Waiting for rebuild to finish (log: $1)..." ;;
+        rebuild_failed) echo "Rebuild failed — see $1 and re-run: cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
+        rebuild_log_label) echo "Rebuild log: $1" ;;
+        setup_log_label) echo "Setup log: $1" ;;
+        setup_terminal_hint) echo "Domain setup runs in the terminal; summary → setup.log" ;;
+        prepull_image) echo "Pre-pulling $1 (speeds up first build)..." ;;
+        prepull_skip) echo "Pre-pull skipped for $1 (non-fatal)" ;;
+        summary_title) echo "========== Dafthunk Install Summary ==========" ;;
+        summary_domain) echo "Domain:  $1" ;;
+        summary_url) echo "URL:     $1" ;;
+        summary_logs) echo "Logs:    $1" ;;
+        summary_log_line) echo "         $1" ;;
+        summary_ready) echo "Status:  ready — register first user (platform admin)" ;;
+        summary_failed) echo "Status:  rebuild failed" ;;
+        summary_resume) echo "Resume:  cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
+        summary_end) echo "==============================================" ;;
         lang_using) echo "Prompt language: $1" ;;
         non_interactive_default) echo "(non-interactive) $1 → $2" ;;
         *) echo "[$key $*]"; ;;
@@ -260,6 +278,22 @@ M() {
         compose_not_found) echo "未找到 docker compose / docker-compose。" ;;
         git_not_found) echo "未找到 Git。请去掉 --resume/--skip-docker 后重跑。" ;;
         done) echo "完成。请打开 setup 输出的 Public URL（或查看 docker-host/containers/app.yml）。" ;;
+        rebuild_running) echo "等待 rebuild 结束（日志: $1）..." ;;
+        rebuild_failed) echo "Rebuild 失败 — 查看 $1，或执行: cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
+        rebuild_log_label) echo "Rebuild 日志: $1" ;;
+        setup_log_label) echo "Setup 日志: $1" ;;
+        setup_terminal_hint) echo "域名配置在终端进行，摘要写入 setup.log" ;;
+        prepull_image) echo "预拉取 $1（加快首次构建）..." ;;
+        prepull_skip) echo "预拉取 $1 跳过（不影响安装）" ;;
+        summary_title) echo "========== Dafthunk 安装摘要 ==========" ;;
+        summary_domain) echo "域名:  $1" ;;
+        summary_url) echo "地址:  $1" ;;
+        summary_logs) echo "日志:  $1" ;;
+        summary_log_line) echo "       $1" ;;
+        summary_ready) echo "状态:  就绪 — 打开地址注册首个用户（平台管理员）" ;;
+        summary_failed) echo "状态:  rebuild 失败" ;;
+        summary_resume) echo "续跑:  cd $INSTALL_DIR/docker-host && ./launcher rebuild" ;;
+        summary_end) echo "========================================" ;;
         lang_using) echo "提示语言: $1" ;;
         non_interactive_default) echo "（非交互）$1 → $2" ;;
         *) echo "[$key $*]"; ;;
@@ -614,9 +648,80 @@ promote_log() {
   if [[ ! -d "$INSTALL_DIR" ]] || [[ ! -f "$TEMP_LOG" ]]; then
     return 0
   fi
-  cp "$TEMP_LOG" "$final"
+  mkdir -p "$INSTALL_DIR"
+  cat "$TEMP_LOG" >>"$final"
   LOG_FILE="$final"
+  exec > >(tee -a "$final") 2>&1
   log_info "$(M install_log "$LOG_FILE")"
+}
+
+setup_log_path() {
+  printf '%s' "${DAFTHUNK_SETUP_LOG:-$INSTALL_DIR/setup.log}"
+}
+
+rebuild_log_path() {
+  printf '%s' "${DAFTHUNK_REBUILD_LOG:-$INSTALL_DIR/rebuild.log}"
+}
+
+read_rebuild_exit() {
+  local f="$INSTALL_DIR/$REBUILD_EXIT_FILE"
+  local c=""
+  [[ -f "$f" ]] || return 1
+  c="$(tr -d '[:space:]' <"$f")"
+  rm -f "$f"
+  [[ "$c" =~ ^[0-9]+$ ]] || return 1
+  return "$c"
+}
+
+wait_for_tmux_session() {
+  local session="$1"
+  while tmux has-session -t "$session" 2>/dev/null; do
+    sleep 3
+  done
+}
+
+wait_for_screen_session() {
+  local session="$1"
+  while screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; do
+    sleep 3
+  done
+}
+
+run_rebuild_logged() {
+  local log="$1"
+  mkdir -p "$(dirname "$log")"
+  : >"$log"
+  ./launcher rebuild 2>&1 | tee -a "$log"
+  return "${PIPESTATUS[0]}"
+}
+
+print_install_summary() {
+  local rc="$1"
+  local app_yml="$INSTALL_DIR/docker-host/containers/app.yml"
+  local setup_log rebuild_log hostname web_host
+  setup_log="$(setup_log_path)"
+  rebuild_log="$(rebuild_log_path)"
+  hostname=""
+  web_host=""
+  if [[ -f "$app_yml" ]]; then
+    hostname="$(grep -E '^hostname:' "$app_yml" | head -n1 | sed 's/^hostname:[[:space:]]*//')"
+    web_host="$(grep -E 'WEB_HOST:' "$app_yml" | head -n1 | sed 's/.*WEB_HOST:[[:space:]]*//' | tr -d '"')"
+  fi
+  echo ""
+  log_info "$(M summary_title)"
+  [[ -n "$hostname" ]] && log_info "$(M summary_domain "$hostname")"
+  [[ -n "$web_host" ]] && log_info "$(M summary_url "$web_host")"
+  log_info "$(M summary_logs "$LOG_FILE")"
+  log_info "$(M summary_log_line "$setup_log")"
+  log_info "$(M summary_log_line "$rebuild_log")"
+  [[ -f "$APT_LOG" ]] && log_info "$(M summary_log_line "$APT_LOG")"
+  if ((rc == 0)); then
+    log_info "$(M summary_ready)"
+  else
+    log_info "$(M summary_failed)"
+    log_info "$(M summary_resume)"
+  fi
+  log_info "$(M summary_end)"
 }
 
 mem_total_mib() {
@@ -815,6 +920,9 @@ install_packages_apt() {
   else
     pkgs+=(docker-compose)
   fi
+  if apt-cache show docker-buildx-plugin >/dev/null 2>&1; then
+    pkgs+=(docker-buildx-plugin)
+  fi
   if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 "${pkgs[@]}" >>"$APT_LOG" 2>&1; then
     log_error "$(M apt_failed "$APT_LOG")"
     tail -n 60 "$APT_LOG" >&2 || true
@@ -834,7 +942,10 @@ install_packages_apt() {
   announce "$(M docker_ready)"
   log_info "Docker $(docker --version 2>/dev/null | head -n1)"
   docker compose version 2>/dev/null || docker-compose version 2>/dev/null || true
-  ask_status "$(M interactive_next)"
+  log_info "$(M prepull_image "$NODE_IMAGE")"
+  if ! docker pull "$NODE_IMAGE" >>"$APT_LOG" 2>&1; then
+    log_warn "$(M prepull_skip "$NODE_IMAGE")"
+  fi
 }
 
 install_packages_get_docker() {
@@ -854,7 +965,10 @@ install_packages_get_docker() {
     yum -y install git || true
   fi
   announce "$(M docker_ready)"
-  ask_status "$(M interactive_next)"
+  if command -v docker >/dev/null 2>&1; then
+    log_info "$(M prepull_image "$NODE_IMAGE")"
+    docker pull "$NODE_IMAGE" >>"$APT_LOG" 2>&1 || log_warn "$(M prepull_skip "$NODE_IMAGE")"
+  fi
 }
 
 prepare_host_interactive() {
@@ -940,61 +1054,67 @@ try_attach_screen() {
 }
 
 run_launcher_rebuild() {
+  local rebuild_log exit_file rc=0 session
+  rebuild_log="$(rebuild_log_path)"
+  exit_file="$INSTALL_DIR/$REBUILD_EXIT_FILE"
+  mkdir -p "$INSTALL_DIR"
+  rm -f "$exit_file"
   print_resume_hint
   cd "$INSTALL_DIR/docker-host"
+  log_info "$(M rebuild_log_label "$rebuild_log")"
 
-  local done_msg
-  if [[ "$UI_LANG" == "en" ]]; then
-    done_msg="Rebuild finished. Detach: Ctrl+b d"
-  else
-    done_msg="Rebuild 已结束。脱离会话: Ctrl+b d"
-  fi
-
-  # Prefer detached tmux/screen so rebuild starts even when /dev/tty is unusable for attach.
   if command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX:-}" ]]; then
-    local session="dafthunk-install"
+    session="dafthunk-install"
     if tmux has-session -t "$session" 2>/dev/null; then
       log_warn "$(M tmux_exists "$session")"
     else
       log_info "$(M tmux_start "$session")"
-      if ! tmux new-session -d -s "$session" \
-        "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; bash"; then
+      if ! tmux new-session -d -s "$session" bash -c \
+        "cd '$INSTALL_DIR/docker-host' && { ./launcher rebuild 2>&1 | tee -a '$rebuild_log'; echo \${PIPESTATUS[0]} > '$exit_file'; exit \${PIPESTATUS[0]}; }"; then
         log_warn "$(M tmux_start_fail)"
-        ./launcher rebuild
-        return 0
+        run_rebuild_logged "$rebuild_log"
+        return $?
       fi
     fi
     if ! tmux has-session -t "$session" 2>/dev/null; then
       log_warn "$(M tmux_start_fail)"
-      ./launcher rebuild
-      return 0
+      run_rebuild_logged "$rebuild_log"
+      return $?
     fi
     log_info "$(M tmux_reattach "$session")"
     try_attach_tmux "$session"
-    return 0
+    log_info "$(M rebuild_running "$rebuild_log")"
+    wait_for_tmux_session "$session"
+    read_rebuild_exit
+    rc=$?
+    return "$rc"
   fi
 
   if command -v screen >/dev/null 2>&1 && [[ -z "${STY:-}" ]]; then
-    local session="dafthunk-install"
+    session="dafthunk-install"
     if screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
       log_warn "$(M screen_exists "$session")"
     else
       log_info "$(M screen_start "$session")"
       if ! screen -dmS "$session" bash -c \
-        "cd '$INSTALL_DIR/docker-host' && ./launcher rebuild; echo; echo '$done_msg'; exec bash"; then
+        "cd '$INSTALL_DIR/docker-host' && { ./launcher rebuild 2>&1 | tee -a '$rebuild_log'; echo \${PIPESTATUS[0]} > '$exit_file'; exit \${PIPESTATUS[0]}; }"; then
         log_warn "$(M screen_start_fail)"
-        ./launcher rebuild
-        return 0
+        run_rebuild_logged "$rebuild_log"
+        return $?
       fi
     fi
     if ! screen -list 2>/dev/null | grep -q "[.]${session}[[:space:]]"; then
       log_warn "$(M screen_start_fail)"
-      ./launcher rebuild
-      return 0
+      run_rebuild_logged "$rebuild_log"
+      return $?
     fi
     log_info "$(M screen_reattach "$session")"
     try_attach_screen "$session"
-    return 0
+    log_info "$(M rebuild_running "$rebuild_log")"
+    wait_for_screen_session "$session"
+    read_rebuild_exit
+    rc=$?
+    return "$rc"
   fi
 
   if ! can_prompt; then
@@ -1003,11 +1123,13 @@ run_launcher_rebuild() {
     log_warn "$(M no_tmux_screen)"
   fi
 
-  ./launcher rebuild
+  run_rebuild_logged "$rebuild_log"
+  return $?
 }
 
 run_setup_and_rebuild() {
   local app_yml="$INSTALL_DIR/docker-host/containers/app.yml"
+  local setup_log rebuild_rc=0
   cd "$INSTALL_DIR/docker-host"
 
   if [[ ! -f "./dafthunk-setup" ]] || [[ ! -f "./launcher" ]]; then
@@ -1019,21 +1141,26 @@ run_setup_and_rebuild() {
     log_step "$(M config_present)"
     log_info "$(M found_yml "$app_yml")"
     run_launcher_rebuild
-    return 0
+    return $?
   fi
 
   log_step "$(M step_setup_rebuild)"
-  ask_status "$(M interactive_next)"
+  setup_log="$(setup_log_path)"
+  : >"$setup_log"
+  log_info "$(M setup_log_label "$setup_log")"
+  log_info "$(M setup_terminal_hint)"
   echo
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild \
-      0</dev/tty >/dev/tty 2>&1
+      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
+      bash ./dafthunk-setup --no-rebuild 0</dev/tty >/dev/tty 2>&1
   else
     DAFTHUNK_FROM_INSTALL=1 DAFTHUNK_LANG="$UI_LANG" DAFTHUNK_ASK_TIMEOUT="$ASK_TIMEOUT_SEC" \
-      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" bash ./dafthunk-setup --no-rebuild
+      DAFTHUNK_NON_INTERACTIVE="$NON_INTERACTIVE" DAFTHUNK_SETUP_LOG="$setup_log" \
+      bash ./dafthunk-setup --no-rebuild
   fi
-  run_launcher_rebuild
+  run_launcher_rebuild || rebuild_rc=$?
+  return "$rebuild_rc"
 }
 
 apply_lang_from_flag_or_env
@@ -1042,6 +1169,11 @@ reject_piped_stdin
 ensure_stdin_tty
 choose_ui_lang_interactive
 
+ensure_logging
+lang_label="中文"
+[[ "$UI_LANG" == "en" ]] && lang_label="English"
+log_info "$(M lang_using "$lang_label")"
+
 if [[ "$SKIP_DOCKER" != "1" ]]; then
   prepare_host_interactive
 else
@@ -1049,11 +1181,6 @@ else
     ensure_swap
   fi
 fi
-
-ensure_logging
-lang_label="中文"
-[[ "$UI_LANG" == "en" ]] && lang_label="English"
-log_info "$(M lang_using "$lang_label")"
 
 if [[ "$RESUME" == "1" ]]; then
   log_step "$(M resume_mode)"
@@ -1082,8 +1209,13 @@ else
 fi
 
 setup_repo
-run_setup_and_rebuild
+rebuild_rc=0
+run_setup_and_rebuild || rebuild_rc=$?
 
-promote_log
-log_info "$(M done)"
-log_info "$(M log_label "$LOG_FILE")"
+print_install_summary "$rebuild_rc"
+if ((rebuild_rc == 0)); then
+  log_info "$(M done)"
+else
+  log_error "$(M rebuild_failed "$(rebuild_log_path)")"
+  exit "$rebuild_rc"
+fi
