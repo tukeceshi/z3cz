@@ -13,8 +13,7 @@
 #   DAFTHUNK_REPO_URL=...
 #   DAFTHUNK_BRANCH=main
 #   DAFTHUNK_TARGET_RAM_MIB=4096   # default total memory+swap target
-#   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack + ignore tiny deficit
-#   DAFTHUNK_LOW_RAM_WARN_MIB=1792 # warn only below this (2G VMs often report ~1900)
+#   DAFTHUNK_RAM_SLACK_MIB=256     # soft-meet slack for "memory check passed"
 #   DAFTHUNK_LANG=zh|en            # prompt language (default zh)
 #   DAFTHUNK_TZ_SUGGEST=Asia/Shanghai  # suggested timezone when changing
 #
@@ -25,7 +24,6 @@ REPO_URL="${DAFTHUNK_REPO_URL:-https://github.com/tukeceshi/dafthunk.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
 TARGET_TOTAL_MIB="${DAFTHUNK_TARGET_RAM_MIB:-4096}"
 RAM_SLACK_MIB="${DAFTHUNK_RAM_SLACK_MIB:-256}"
-LOW_RAM_WARN_MIB="${DAFTHUNK_LOW_RAM_WARN_MIB:-1792}"
 SWAPFILE="${DAFTHUNK_SWAPFILE:-/swapfile}"
 TZ_SUGGEST="${DAFTHUNK_TZ_SUGGEST:-Asia/Shanghai}"
 # Log to /tmp until clone finishes — writing into INSTALL_DIR first makes git clone fail.
@@ -76,20 +74,13 @@ M() {
         resume_mode) echo "Resume mode" ;;
         skip_swap) echo "Skipping swap setup (--skip-swap)" ;;
         step_memory) echo "Memory check" ;;
-        ram_swap_info) echo "RAM ≈ $1, swap ≈ $2 (target total ≈ $3)" ;;
-        ram_low) echo "RAM well under 2G (~${LOW_RAM_WARN_MIB}MiB threshold) — builds may be slow or fail; swap is strongly recommended." ;;
-        swap_file_present) echo "Swap file already present at $1" ;;
-        swap_meets_target) echo "Existing swap already meets the ~$1 target" ;;
-        swap_near_target) echo "RAM+swap ≈ $1 already near target ~$2 — no extra swap needed" ;;
-        swap_replace_anyway) echo "Configure/replace swap anyway? [y/N]: " ;;
-        swap_short) echo "Existing $1 but still short of target by ~$2" ;;
-        swap_replace_size) echo "Replace swap with $1? [Y/n]: " ;;
-        swap_suggest_total) echo "Suggested usable total ≈ $1 (RAM + swap)." ;;
-        swap_detect_suggest) echo "Detected RAM ≈ $1; suggested extra swap: $2 (enter 0 to skip)." ;;
-        swap_size_prompt) echo "Swap size [$1]: " ;;
-        swap_invalid) echo "Invalid size '$1' — using $2" ;;
+        mem_pass) echo "Memory check passed (required $1, usable ≈ $2)" ;;
+        mem_need_req) echo "Required memory: $1" ;;
+        mem_need_actual) echo "Detected RAM: $1" ;;
+        mem_need_swap_prompt) echo "Swap is needed. Enter for 2G, or type 2–4 (0 to skip): " ;;
+        swap_invalid) echo "Invalid size '$1' — using ${2}G" ;;
         swap_skip_create) echo "Skipping swap creation" ;;
-        swap_removing) echo "Removing existing $1" ;;
+        swap_replacing) echo "Replacing existing swap file $1" ;;
         step_swap_create) echo "Creating $1 swap at $2" ;;
         swap_fallocate_fail) echo "fallocate failed — falling back to dd (slower)" ;;
         swap_active) echo "Swap active. RAM+swap ≈ $1" ;;
@@ -149,20 +140,13 @@ M() {
         resume_mode) echo "续装模式" ;;
         skip_swap) echo "跳过 swap 设置 (--skip-swap)" ;;
         step_memory) echo "内存检查" ;;
-        ram_swap_info) echo "内存 ≈ $1，swap ≈ $2（目标合计 ≈ $3）" ;;
-        ram_low) echo "内存明显不足 2G（告警阈值约 ${LOW_RAM_WARN_MIB}MiB）— 构建可能很慢或失败；强烈建议添加 swap。" ;;
-        swap_file_present) echo "已存在 swap 文件: $1" ;;
-        swap_meets_target) echo "当前 swap 已达到约 $1 的目标" ;;
-        swap_near_target) echo "内存+swap ≈ $1 已接近目标 ~$2 — 无需再增加 swap" ;;
-        swap_replace_anyway) echo "仍要配置/替换 swap？ [y/N]: " ;;
-        swap_short) echo "已有 $1，但仍距目标约差 $2" ;;
-        swap_replace_size) echo "将 swap 替换为 $1？ [Y/n]: " ;;
-        swap_suggest_total) echo "建议总可用约 $1（内存 + swap）。" ;;
-        swap_detect_suggest) echo "检测到内存 ≈ $1；建议额外 swap: $2（填 0 跳过）。" ;;
-        swap_size_prompt) echo "Swap 大小 [$1]: " ;;
-        swap_invalid) echo "无效大小「$1」— 改用 $2" ;;
+        mem_pass) echo "内存检查通过（要求 $1，当前可用约 $2）" ;;
+        mem_need_req) echo "要求内存：$1" ;;
+        mem_need_actual) echo "实际内存：$1" ;;
+        mem_need_swap_prompt) echo "需要增加 swap。回车默认 2G，或输入 2~4（0 跳过）：" ;;
+        swap_invalid) echo "无效大小「$1」— 改用 ${2}G" ;;
         swap_skip_create) echo "跳过创建 swap" ;;
-        swap_removing) echo "正在移除已有 $1" ;;
+        swap_replacing) echo "将替换现有 swap 文件 $1" ;;
         step_swap_create) echo "正在创建 $1 swap：$2" ;;
         swap_fallocate_fail) echo "fallocate 失败 — 改用 dd（较慢）" ;;
         swap_active) echo "Swap 已启用。内存+swap ≈ $1" ;;
@@ -485,29 +469,6 @@ swap_total_mib() {
   echo $((kb / 1024))
 }
 
-# Parse 0 | 2G | 2g | 2048M | 2048 → MiB (0 allowed)
-parse_size_mib() {
-  local raw="$1"
-  raw="$(echo "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
-  if [[ "$raw" == "0" ]]; then
-    echo 0
-    return 0
-  fi
-  if [[ "$raw" =~ ^([0-9]+)g(ib)?$ ]]; then
-    echo $((BASH_REMATCH[1] * 1024))
-    return 0
-  fi
-  if [[ "$raw" =~ ^([0-9]+)m(ib)?$ ]]; then
-    echo "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "$raw" =~ ^[0-9]+$ ]]; then
-    echo "$raw"
-    return 0
-  fi
-  return 1
-}
-
 mib_to_display() {
   local mib="$1"
   if ((mib % 1024 == 0)); then
@@ -517,6 +478,40 @@ mib_to_display() {
   fi
 }
 
+# Round MiB to a whole-GiB tier for user-facing "实际内存：2G" (1935 → 2G).
+mib_to_gib_tier() {
+  local mib="$1"
+  local gib=$(((mib + 512) / 1024))
+  if ((gib < 1)); then
+    gib=1
+  fi
+  echo "${gib}G"
+}
+
+target_req_display() {
+  echo "$(((TARGET_TOTAL_MIB + 1023) / 1024))G+"
+}
+
+# Parse swap choice: 0 | 2–4 | 2g → MiB. Default GiB when invalid.
+parse_swap_gib_choice() {
+  local raw="$1"
+  local default_gib="${2:-2}"
+  raw="$(echo "$raw" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+  if [[ -z "$raw" ]]; then
+    echo $((default_gib * 1024))
+    return 0
+  fi
+  if [[ "$raw" == "0" ]]; then
+    echo 0
+    return 0
+  fi
+  if [[ "$raw" =~ ^([2-4])g(ib)?$ ]] || [[ "$raw" =~ ^([2-4])$ ]]; then
+    echo $((BASH_REMATCH[1] * 1024))
+    return 0
+  fi
+  return 1
+}
+
 ensure_swap() {
   if [[ "$SKIP_SWAP" == "1" ]]; then
     log_info "$(M skip_swap)"
@@ -524,63 +519,25 @@ ensure_swap() {
   fi
 
   log_step "$(M step_memory)"
-  local mem swap usable deficit default_swap answer size_mib
+  local mem swap usable answer size_mib req_label ram_label default_gib=2
   mem="$(mem_total_mib)"
   swap="$(swap_total_mib)"
   usable=$((mem + swap))
-  log_info "$(M ram_swap_info "$(mib_to_display "$mem")" "$(mib_to_display "$swap")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
+  req_label="$(target_req_display)"
+  ram_label="$(mib_to_gib_tier "$mem")"
 
-  # 2G cloud VMs often report MemTotal ~1900MiB — only warn when clearly smaller.
-  if ((mem < LOW_RAM_WARN_MIB)); then
-    log_warn "$(M ram_low)"
-  fi
-
-  # Soft-meet: within slack of target counts as enough (avoids +1G for a ~174MiB gap).
+  # Soft-meet: within slack of target → pass, no prompts.
   if ((usable + RAM_SLACK_MIB >= TARGET_TOTAL_MIB)); then
-    deficit=0
-    if ((usable < TARGET_TOTAL_MIB)); then
-      log_info "$(M swap_near_target "$(mib_to_display "$usable")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
-    fi
-  else
-    deficit=$((TARGET_TOTAL_MIB - usable))
+    log_info "$(M mem_pass "$req_label" "$(mib_to_gib_tier "$usable")")"
+    return 0
   fi
 
-  # Tiny leftover deficit → suggest 0; otherwise round up to whole GiB.
-  if ((deficit == 0)) || ((deficit < RAM_SLACK_MIB)); then
-    deficit=0
-    default_swap=0
-  else
-    default_swap=$((((deficit + 1023) / 1024) * 1024))
-  fi
-
-  if ((deficit == 0)); then
-    if [[ -f "$SWAPFILE" ]] || ((swap > 0)); then
-      if [[ -f "$SWAPFILE" ]]; then
-        log_info "$(M swap_file_present "$SWAPFILE")"
-      else
-        log_info "$(M swap_meets_target "$(mib_to_display "$TARGET_TOTAL_MIB")")"
-      fi
-      if ! ask_yes_no "$(M swap_replace_anyway)" "N"; then
-        return 0
-      fi
-      default_swap=2048
-    else
-      log_info "$(M swap_near_target "$(mib_to_display "$usable")" "$(mib_to_display "$TARGET_TOTAL_MIB")")"
-      return 0
-    fi
-  elif [[ -f "$SWAPFILE" ]]; then
-    log_warn "$(M swap_short "$SWAPFILE" "$(mib_to_display "$deficit")")"
-    if ! ask_yes_no "$(M swap_replace_size "$(mib_to_display "$default_swap")")" "Y"; then
-      return 0
-    fi
-  fi
-
-  echo "$(M swap_suggest_total "$(mib_to_display "$TARGET_TOTAL_MIB")")"
-  echo "$(M swap_detect_suggest "$(mib_to_display "$mem")" "$(mib_to_display "$default_swap")")"
-  answer="$(ask "$(M swap_size_prompt "$(mib_to_display "$default_swap")")" "$(mib_to_display "$default_swap")")"
-  if ! size_mib="$(parse_size_mib "$answer")"; then
-    log_warn "$(M swap_invalid "$answer" "$(mib_to_display "$default_swap")")"
-    size_mib="$default_swap"
+  echo "$(M mem_need_req "$req_label")"
+  echo "$(M mem_need_actual "$ram_label")"
+  answer="$(ask "$(M mem_need_swap_prompt)" "$default_gib")"
+  if ! size_mib="$(parse_swap_gib_choice "$answer" "$default_gib")"; then
+    log_warn "$(M swap_invalid "$answer" "$default_gib")"
+    size_mib=$((default_gib * 1024))
   fi
 
   if ((size_mib == 0)); then
@@ -589,7 +546,7 @@ ensure_swap() {
   fi
 
   if [[ -f "$SWAPFILE" ]]; then
-    log_warn "$(M swap_removing "$SWAPFILE")"
+    log_info "$(M swap_replacing "$SWAPFILE")"
     swapoff "$SWAPFILE" 2>/dev/null || true
     rm -f "$SWAPFILE"
   fi

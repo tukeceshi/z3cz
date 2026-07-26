@@ -20,7 +20,7 @@ wget -qO- https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-daft
 推荐 Ubuntu。一键脚本会：
 
 1. 选择提示语言（默认中文；`--lang en` / `DAFTHUNK_LANG=en`）  
-2. 检测内存，对话加 swap（默认目标约 4G 总可用）  
+2. 内存检查：达标直接通过；不足则询问 swap（默认 2G，可选 2～4 / `0` 跳过）  
 3. 显示当前时区，默认保持；可选修改  
 4. `apt update` 并安装 `docker.io` + Compose + `git`（不含 `apt upgrade`）  
 5. clone → setup → 串行 `launcher rebuild`
