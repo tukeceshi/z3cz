@@ -11,14 +11,16 @@
 ## 一键安装（Linux 服务器）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo DAFTHUNK_HOSTNAME=你的域名 bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
 或：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=你的域名 bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
 ```
+
+安装过程中会提示输入公网域名。无人值守时可设 `DAFTHUNK_HOSTNAME`（需通过已下载的脚本文件执行）。
 
 - 默认目录 `/var/dafthunk`；日志 `install.log`、`rebuild.log`
 - 断线：`tmux attach -t dafthunk-install`
@@ -37,7 +39,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` 或 `tmux attach -t dafthunk-install` |
 | 无 app.yml | `./dafthunk-setup` |
 | 续跑安装器 | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 重配 hostname | `sudo DAFTHUNK_HOSTNAME=域名 DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup` |
+| 重配 hostname | `sudo DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup` |
 | 日志 | `less /var/dafthunk/install.log` |
 
 `shared/` 默认保留。

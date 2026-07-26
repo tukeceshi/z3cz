@@ -34,19 +34,21 @@
 sudo apt-get update && sudo apt-get upgrade -y
 ```
 
-然后**一条命令**完成安装（将 `z3cz.com` 换成你的域名）：
+然后**一条命令**完成安装（安装过程中会提示输入公网域名）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo DAFTHUNK_HOSTNAME=z3cz.com bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 ```
 
-等价入口（先下载脚本再执行，适合需要传 `--resume` 等参数时）：
+等价入口（先下载脚本再执行）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo DAFTHUNK_HOSTNAME=z3cz.com bash
+curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install | sudo bash
 ```
 
-交互填域名时去掉 `DAFTHUNK_HOSTNAME=…`，在提示下输入即可。无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
+无人值守（CI 等）可设环境变量：`sudo DAFTHUNK_HOSTNAME=你的域名 bash …`（需先下载脚本到文件再执行，或配合 `bootstrap-install`）。
+
+无 `curl` 时把 `curl -fsSL URL` 换成 `wget -qO- URL`。
 
 脚本会：检查内存（不足则加 2G swap）→ 安装 Docker/Git → clone → 写 `containers/app.yml` → `launcher rebuild`（自动进 tmux，断线 `tmux attach -t dafthunk-install`）。
 
@@ -69,7 +71,7 @@ cd /var/dafthunk && git pull && docker-host/launcher rebuild
 | SSH 断开 / rebuild 在跑 | `tmux attach -t dafthunk-install` |
 | 构建中断 | `cd /var/dafthunk/docker-host && ./launcher rebuild` |
 | 续装（保留数据） | `sudo bash /var/dafthunk/install-dafthunk --resume` |
-| 重写域名配置 | `sudo DAFTHUNK_HOSTNAME=新域名 DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup` |
+| 重写域名配置 | `sudo DAFTHUNK_FORCE_SETUP=1 bash /var/dafthunk/install-dafthunk --resume --force-setup`（或重新运行安装并在提示下输入新域名） |
 | 手动改配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
 
 `shared/` 默认保留；勿轻易删除。卡住时可 `Ctrl+C`，再 `./launcher logs` 后重新 `rebuild`。

@@ -2,7 +2,7 @@
 # Dafthunk one-click install (minimal).
 #
 # One line:
-#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo DAFTHUNK_HOSTNAME=example.com bash
+#   curl -fsSL https://raw.githubusercontent.com/tukeceshi/dafthunk/main/install-dafthunk | sudo bash
 #
 # Resume:
 #   sudo bash /var/dafthunk/install-dafthunk --resume
@@ -28,13 +28,13 @@ usage() {
   cat <<EOF
 Dafthunk install
 
-  curl -fsSL ${SELF_URL} | sudo DAFTHUNK_HOSTNAME=your.domain bash
+  curl -fsSL ${SELF_URL} | sudo bash
 
   sudo bash ${INSTALL_DIR}/install-dafthunk --resume
   sudo bash ${INSTALL_DIR}/install-dafthunk --resume --force-setup
 
 Environment:
-  DAFTHUNK_HOSTNAME       Public domain (required if not interactive)
+  DAFTHUNK_HOSTNAME       Public domain (optional; prompted if unset)
   DAFTHUNK_INSTALL_DIR    Default: /var/dafthunk
   DAFTHUNK_FORCE_SETUP=1  Rewrite containers/app.yml
 EOF
@@ -152,7 +152,7 @@ read_hostname_interactive() {
   if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
     die "Set DAFTHUNK_HOSTNAME (no interactive terminal)"
   fi
-  printf '域名 (例 z3cz.com): ' >/dev/tty
+  printf '公网域名: ' >/dev/tty
   read -r HOSTNAME </dev/tty || die "Failed to read domain from /dev/tty"
   HOSTNAME="${HOSTNAME#"${HOSTNAME%%[![:space:]]*}"}"
   HOSTNAME="${HOSTNAME%"${HOSTNAME##*[![:space:]]}"}"
