@@ -75,7 +75,11 @@ export function useGenerativeCloudJobProgress(
 
   const resolveJobMedia = useCallback(
     async (jobId: string) => {
-      syncProgress({ jobId, phase: "generating" });
+      const resumedPhase = readGenerativeProgressPhase(options.metadata);
+      syncProgress({
+        jobId,
+        phase: resumedPhase ?? "generating",
+      });
       try {
         const media = await resolveCloudGenerationJobMedia({
           organizationId: options.orgId!,
@@ -130,11 +134,8 @@ export function useGenerativeCloudJobProgress(
 
   useEffect(() => {
     const jobId = readGenerativeProgressJobId(options.metadata);
-    const phase = readGenerativeProgressPhase(options.metadata);
-    const stagingIds = readGenerativeStagingMediaIds(options.metadata);
     if (
       !jobId ||
-      (!phase && stagingIds.length === 0) ||
       !options.orgId ||
       !options.cloudConfigured ||
       options.isGenerating ||

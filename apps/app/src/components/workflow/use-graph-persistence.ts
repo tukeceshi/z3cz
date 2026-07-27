@@ -4,6 +4,7 @@ import type {
 } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 
+import { snapshotGenerativeProgressForPersist } from "./generative-progress-utils";
 import { AI_TEXT_GENERATING_META_KEY } from "./ai-text-node-utils";
 import { stripWorkflowNodeCanvasUi } from "./workflow-node-canvas-ui";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
@@ -63,10 +64,29 @@ export function useGraphPersistence({
 }: UseGraphPersistenceProps): void {
   const lastPersistedNodesRef = useRef<string>("");
   const lastPersistedEdgesRef = useRef<string>("");
+  const lastPersistedProgressRef = useRef<string>("");
   const nodesPersistTimerRef = useRef<number | null>(null);
   const edgesPersistTimerRef = useRef<number | null>(null);
   const pendingNodesRef = useRef<ReactFlowNode<WorkflowNodeType>[]>(nodes);
   const pendingEdgesRef = useRef<ReactFlowEdge<WorkflowEdgeType>[]>(edges);
+
+  const persistNodesNow = () => {
+    const normalizedNodes = pendingNodesRef.current.map((node) => ({
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      data: stripExecutionFields(node.data),
+    }));
+
+    const serialized = JSON.stringify(normalizedNodes);
+    if (serialized !== lastPersistedNodesRef.current) {
+      lastPersistedNodesRef.current = serialized;
+      onNodesChangePersist?.(pendingNodesRef.current);
+    }
+    lastPersistedProgressRef.current = snapshotGenerativeProgressForPersist(
+      pendingNodesRef.current
+    );
+  };
 
   useEffect(() => {
     pendingNodesRef.current = nodes;
@@ -74,24 +94,23 @@ export function useGraphPersistence({
       return;
     }
 
+    const progressSnapshot = snapshotGenerativeProgressForPersist(nodes);
+
     if (nodesPersistTimerRef.current !== null) {
       window.clearTimeout(nodesPersistTimerRef.current);
+      nodesPersistTimerRef.current = null;
+    }
+
+    if (lastPersistedProgressRef.current === "") {
+      lastPersistedProgressRef.current = progressSnapshot;
+    } else if (progressSnapshot !== lastPersistedProgressRef.current) {
+      persistNodesNow();
+      return;
     }
 
     nodesPersistTimerRef.current = window.setTimeout(() => {
       nodesPersistTimerRef.current = null;
-      const normalizedNodes = pendingNodesRef.current.map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        data: stripExecutionFields(node.data),
-      }));
-
-      const serialized = JSON.stringify(normalizedNodes);
-      if (serialized !== lastPersistedNodesRef.current) {
-        lastPersistedNodesRef.current = serialized;
-        onNodesChangePersist?.(pendingNodesRef.current);
-      }
+      persistNodesNow();
     }, PERSIST_DEBOUNCE_MS);
 
     return () => {

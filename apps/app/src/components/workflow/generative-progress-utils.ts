@@ -107,6 +107,21 @@ export function isGenerativeProgressActive(
   return Boolean(readGenerativeProgressPhase(metadata));
 }
 
+/** Persist immediately when job id or staged blob ids change (refresh resume). */
+export function snapshotGenerativeProgressForPersist(
+  nodes: readonly { readonly id: string; readonly data: { readonly metadata?: Record<string, string> } }[]
+): string {
+  return JSON.stringify(
+    nodes.map((node) => ({
+      id: node.id,
+      jobId: node.data.metadata?.[GENERATIVE_JOB_ID_META_KEY] ?? null,
+      phase: node.data.metadata?.[GENERATIVE_PROGRESS_PHASE_META_KEY] ?? null,
+      stagingMediaIds:
+        node.data.metadata?.[GENERATIVE_STAGING_MEDIA_IDS_META_KEY] ?? null,
+    }))
+  );
+}
+
 /** Formats elapsed generation time for progress labels (e.g. `3m 20s`). */
 export function formatGenerativeProgressElapsed(
   startedAtMs: number,

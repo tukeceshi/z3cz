@@ -1,4 +1,6 @@
 import type {
+  GenerationJobPendingMedia,
+  GenerationJobRecord,
   LocalMediaReference,
   MediaReference,
   ObjectReference,
@@ -204,10 +206,6 @@ export async function runGenerationJobPersistWorker(params: {
   });
 
   if (ready.finalMedia && ready.finalMedia.length > 0) {
-    const existing = await resolveExistingLocalRefs(params.stagingMediaIds ?? []);
-    if (existing.length > 0) {
-      return existing;
-    }
     return ready.finalMedia;
   }
 
@@ -234,11 +232,11 @@ export async function runGenerationJobPersistWorker(params: {
     throwIfTerminal(response.job);
 
     if (response.job.status === "succeeded") {
-      if (allLocalRefsReady(localRefs, pendingMedia.length)) {
-        return localRefs;
-      }
       if (response.finalMedia && response.finalMedia.length > 0) {
         return response.finalMedia;
+      }
+      if (allLocalRefsReady(localRefs, pendingMedia.length)) {
+        return localRefs;
       }
       throw new Error("Generation succeeded without display media");
     }
@@ -253,10 +251,13 @@ export async function runGenerationJobPersistWorker(params: {
         jobId: params.jobId,
         onProgressPhase: notify,
       });
+      if (succeeded.finalMedia && succeeded.finalMedia.length > 0) {
+        return succeeded.finalMedia;
+      }
       if (allLocalRefsReady(localRefs, pendingMedia.length)) {
         return localRefs;
       }
-      return succeeded.finalMedia ?? [];
+      return [];
     }
 
     if (response.job.status === "ready_to_persist") {
@@ -269,6 +270,8 @@ export async function runGenerationJobPersistWorker(params: {
       if (localRefs[index]) {
         continue;
       }
+
+      notify?.("downloading");
 
       try {
         localRefs[index] = await downloadToAiStaging({
@@ -296,6 +299,8 @@ export async function runGenerationJobPersistWorker(params: {
       );
       continue;
     }
+
+    notify?.("uploading");
 
     const objectRefs: ObjectReference[] = [];
     let uploadFailed = false;
@@ -331,6 +336,6 @@ export async function runGenerationJobPersistWorker(params: {
       objectRefs
     );
 
-    return localRefs;
+    return objectRefs;
   }
 }
