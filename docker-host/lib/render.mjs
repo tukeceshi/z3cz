@@ -124,7 +124,9 @@ export function renderCaddyfile(config) {
     const global = renderCaddyGlobal(config);
     const tls = tlsDirective(config);
     return `${global}${config.hostname} {
-${tls}${siteHandler}
+${tls}\theader Alt-Svc "clear"
+
+${siteHandler}
 }
 `;
   }

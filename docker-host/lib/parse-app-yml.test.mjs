@@ -128,6 +128,38 @@ test("renderCaddyfile auto has no tls line", () => {
   assert.doesNotMatch(file, /^\ttls /m);
 });
 
+test("renderCaddyfile https disables http3 and clears alt-svc", () => {
+  const file = renderCaddyfile({
+    hostname: "ex.com",
+    https: true,
+    tls: "auto",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {},
+    origin: "https://ex.com",
+  });
+  assert.match(file, /protocols h1 h2/);
+  assert.match(file, /header Alt-Svc "clear"/);
+});
+
+test("renderCompose does not expose udp 443", () => {
+  const yaml = renderCompose({
+    hostname: "ex.com",
+    https: true,
+    tls: "auto",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {
+      JWT_SECRET: "a".repeat(64),
+      SECRET_MASTER_KEY: "b".repeat(64),
+    },
+    origin: "https://ex.com",
+  });
+  assert.doesNotMatch(yaml, /443\/udp/);
+});
+
 test("renderCompose file tls mounts unified cert dir", () => {
   const yaml = renderCompose({
     hostname: "ex.com",
