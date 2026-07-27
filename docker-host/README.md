@@ -43,6 +43,43 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 | `fallback` | 读 `shared/caddy/certs/<域名>/` |
 | `manual` | 上传 pem，`tls: manual`，`https-reload.sh` |
 
+## 大陆访问 / 静态资源加速
+
+首屏 JS 慢通常是**跨境传输**问题（301KB 不应需数分钟），与业务代码体积关系不大。当前链路：
+
+`浏览器 → Caddy (TLS/H2) → nginx (gzip) → Vite dist`
+
+已在 nginx / Caddy 默认开启：
+
+- `/assets/*` 长缓存（`immutable`，哈希文件名）
+- gzip 压缩等级 6 + `gzip_vary`
+- Caddy 边缘 `encode gzip zstd`，禁用 HTTP/3（大陆部分线路 UDP/QUIC 会拖慢后再回退 H2）
+
+**首次访问**要明显变快，需要把静态资源放到离用户更近的边缘：
+
+| 方案 | 适用 | 做法 |
+|------|------|------|
+| **Cloudflare 橙云** | 已有 CF DNS | A 记录开代理；Page Rule / Cache Rule 缓存 `/assets/*` |
+| **腾讯云 CDN** | 机器在腾讯云 | 源站填 `z3cz.com`，缓存 `/assets/`；大陆节点回源新加坡 |
+| **香港源站** | 自管 VPS | 比新加坡到大陆 RTT 更低，TCP 吞吐更好 |
+
+部署后更新 Caddy 配置：
+
+```bash
+cd /var/dafthunk/docker-host && ./launcher render && ./launcher recreate caddy
+# nginx 配置随 app 容器挂载，需 rebuild：
+sudo bash /var/dafthunk/scripts/host/deploy.sh
+```
+
+诊断（在**大陆客户端**执行，不要在 VPS 上）：
+
+```bash
+curl -w "ttfb:%{time_starttransfer} total:%{time_total} speed:%{speed_download}\n" \
+  -H "Accept-Encoding: gzip" -o NUL -sS "https://你的域名/assets/index-*.js"
+```
+
+若 VPS 上 curl 很快、大陆很慢，说明是传输路径问题，应上 CDN 或换更近区域，而非继续减 JS。
+
 ## 布局
 
 | 路径 | 说明 |

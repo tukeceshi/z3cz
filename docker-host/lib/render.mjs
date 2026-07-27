@@ -92,20 +92,36 @@ function caddyExtraVolumes(config) {
 }
 
 /**
+ * Global Caddy options. HTTP/3 (QUIC/UDP) is disabled by default: on some
+ * mainland routes UDP is throttled and browsers stall before falling back to H2.
+ *
+ * @param {ReturnType<typeof loadAppConfig>} config
+ */
+function renderCaddyGlobal(config) {
+  const lines = ["servers {", "\tprotocols h1 h2", "}"];
+  if (config.le_email) {
+    lines.unshift(`email ${config.le_email}`);
+  }
+  return `{\n\t${lines.join("\n\t")}\n}\n\n`;
+}
+
+/**
  * @param {ReturnType<typeof loadAppConfig>} config
  */
 export function renderCaddyfile(config) {
-  const siteHandler = `	handle_path /api/* {
+  const siteHandler = `	encode gzip zstd
+
+	handle_path /api/* {
 		reverse_proxy api:3102
 	}
 	handle {
-		reverse_proxy app:80
+		reverse_proxy app:80 {
+			flush_interval -1
+		}
 	}`;
 
   if (config.https) {
-    const global = config.le_email
-      ? `{\n\temail ${config.le_email}\n}\n\n`
-      : "";
+    const global = renderCaddyGlobal(config);
     const tls = tlsDirective(config);
     return `${global}${config.hostname} {
 ${tls}${siteHandler}
@@ -231,7 +247,6 @@ services:
     ports:
       - "\${HTTP_PORT:-${config.http_port}}:80"
       - "\${HTTPS_PORT:-${config.https_port}}:443"
-      - "\${HTTPS_PORT:-${config.https_port}}:443/udp"
     volumes:
       - ./Caddyfile.generated:/etc/caddy/Caddyfile:ro
       - ./shared/caddy:/data
