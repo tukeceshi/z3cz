@@ -447,7 +447,7 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
       />
 
       <ScrollArea className="min-h-0 flex-1">
-        {isEmpty ? (
+        {isEmpty && !perms.canEditWorkflows ? (
           <div className="py-12 text-center text-muted-foreground">
             <Wand className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p className="text-sm">{t("pages.workflows.emptyAll")}</p>
