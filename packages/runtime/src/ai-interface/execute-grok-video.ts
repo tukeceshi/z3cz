@@ -216,7 +216,7 @@ export async function pollGrokVideoTask(params: {
     return { status: "completed", videoUrl };
   }
 
-  return { status: "pending" };
+  return { status: "pending", upstreamPhase: "running" };
 }
 
 export async function awaitGrokVideoPoll(params: {

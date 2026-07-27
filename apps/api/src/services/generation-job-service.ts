@@ -59,7 +59,9 @@ export function resolveGenerationJobDisplayPhase(
   switch (job.status) {
     case "pending":
     case "generating":
-      return "generating";
+      return job.resultJson?.upstreamVideoStatus === "queued"
+        ? "queued"
+        : "generating";
     case "ready_to_persist":
       return "ready_to_persist";
     case "uploading":
@@ -296,12 +298,30 @@ async function pollVideoGenerationJob(
   }
 
   if (pollResult.status !== "completed" || !pollResult.videoUrl) {
-    return job;
+    const upstreamVideoStatus = pollResult.upstreamPhase ?? "running";
+    if (job.resultJson?.upstreamVideoStatus === upstreamVideoStatus) {
+      return job;
+    }
+    return (
+      (await updateGenerationJob(db, {
+        id: job.id,
+        organizationId: job.organizationId,
+        status: "generating",
+        expectedStatuses: ["generating"],
+        resultJson: {
+          ...(job.resultJson ?? {}),
+          upstreamVideoStatus,
+        },
+      })) ?? job
+    );
   }
 
   const readyAt = new Date().toISOString();
+  const previousResult = job.resultJson ?? {};
+  const { upstreamVideoStatus: _upstreamVideoStatus, ...restResult } =
+    previousResult;
   const resultJson: GenerationJobResultJson = {
-    ...(job.resultJson ?? {}),
+    ...restResult,
     pendingMedia: [
       {
         sourceUrl: pollResult.videoUrl,

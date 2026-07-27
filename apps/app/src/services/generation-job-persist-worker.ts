@@ -148,6 +148,8 @@ async function waitForJobReadyToPersist(params: {
       isServerPersistInProgress(response.job)
     ) {
       params.onProgressPhase?.("server_persisting");
+    } else if (response.displayPhase === "queued") {
+      params.onProgressPhase?.("queued");
     } else {
       params.onProgressPhase?.("generating");
     }

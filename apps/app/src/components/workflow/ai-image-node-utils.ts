@@ -251,6 +251,28 @@ export function withAiImageResult(
   return { inputs, outputs };
 }
 
+/**
+ * Card preview while cloud persist is uploading. Does not append history —
+ * final success path writes the single history entry.
+ */
+export function withAiImageStagingPreview(
+  current: WorkflowNodeType,
+  images: readonly MediaReference[]
+): Partial<WorkflowNodeType> {
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_RESULT_INPUT_ID,
+    [...images],
+    "json"
+  );
+  const outputs = current.outputs.map((output) =>
+    output.id === AI_IMAGE_OUTPUT_ID
+      ? ({ ...output, value: [...images] } as WorkflowParameter)
+      : output
+  );
+  return { inputs, outputs };
+}
+
 export function readAiImageCardImages(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],

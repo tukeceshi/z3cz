@@ -355,7 +355,13 @@ export function useModelCalls(
     : null;
 
   const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListAiModelInvocationsResponse>(`${key}`)
+    makeRequest<ListAiModelInvocationsResponse>(`${key}`),
+    {
+      refreshInterval: (latest) =>
+        latest?.invocations.some((entry) => entry.status === "pending")
+          ? 3000
+          : 0,
+    }
   );
 
   return {

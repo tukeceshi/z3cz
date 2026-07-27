@@ -1,11 +1,12 @@
 import type { ObjectReference, MediaReference } from "@dafthunk/types";
+import { isMediaReference } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 import ImageIcon from "lucide-react/icons/image";
 import PlusIcon from "lucide-react/icons/plus";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import XIcon from "lucide-react/icons/x";
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -25,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { cn } from "@/utils/utils";
 
 import {
@@ -46,6 +48,130 @@ interface ReferenceHoverPreviewState {
 
 const REFERENCE_HOVER_PREVIEW_GAP_PX = 8;
 const REFERENCE_HOVER_PREVIEW_MAX_PX = 150;
+
+function mediaNodeTypeForChip(
+  chip: AiTextReferenceChip
+): "ai-image" | "ai-video" | undefined {
+  if (chip.kind === "image") return "ai-image";
+  if (chip.kind === "video") return "ai-video";
+  return undefined;
+}
+
+function chipMedia(chip: AiTextReferenceChip): MediaReference | null {
+  return chip.media && isMediaReference(chip.media) ? chip.media : null;
+}
+
+function ReferenceChipMediaThumb({
+  chip,
+  fallbackIcon,
+}: {
+  readonly chip: AiTextReferenceChip;
+  readonly fallbackIcon: ReactNode;
+}) {
+  const media = chipMedia(chip);
+  const { displayUrl } = useMediaDisplayUrl({
+    media,
+    nodeType: mediaNodeTypeForChip(chip),
+    size: "thumb",
+  });
+  const url = displayUrl ?? chip.previewUrl;
+
+  if (url && chip.kind === "image") {
+    return (
+      <img
+        src={url}
+        alt={chip.label}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+
+  if (url && chip.kind === "video") {
+    return <video src={url} className="h-full w-full object-cover" muted />;
+  }
+
+  return <span className="text-muted-foreground">{fallbackIcon}</span>;
+}
+
+function ReferenceHoverPreview({
+  chip,
+  anchor,
+}: {
+  readonly chip: AiTextReferenceChip;
+  readonly anchor: DOMRect;
+}) {
+  const media = chipMedia(chip);
+  const { displayUrl } = useMediaDisplayUrl({
+    media,
+    nodeType: mediaNodeTypeForChip(chip),
+    size: "thumb",
+  });
+  const url = displayUrl ?? chip.previewUrl;
+
+  const style = {
+    left: anchor.left + anchor.width / 2,
+    top: anchor.top - REFERENCE_HOVER_PREVIEW_GAP_PX,
+    transform: "translate(-50%, -100%)",
+  } as const;
+
+  if (chip.kind === "image" && url) {
+    return createPortal(
+      <div
+        className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
+        style={style}
+      >
+        <img
+          src={url}
+          alt=""
+          className="max-h-[150px] max-w-[150px] object-contain"
+          style={{
+            maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
+            maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
+          }}
+        />
+      </div>,
+      document.body
+    );
+  }
+
+  if (chip.kind === "video" && url) {
+    return createPortal(
+      <div
+        className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
+        style={style}
+      >
+        <video
+          src={url}
+          className="max-h-[150px] max-w-[150px] object-contain"
+          style={{
+            maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
+            maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
+          }}
+          muted
+          autoPlay
+          loop
+        />
+      </div>,
+      document.body
+    );
+  }
+
+  if (chip.kind === "text" && chip.textExcerpt) {
+    return createPortal(
+      <div
+        className="pointer-events-none fixed z-[300] w-56 rounded-lg border border-border bg-popover p-2 shadow-lg"
+        style={style}
+      >
+        <p className="line-clamp-6 text-xs leading-relaxed text-muted-foreground">
+          {chip.textExcerpt}
+        </p>
+      </div>,
+      document.body
+    );
+  }
+
+  return null;
+}
 
 export function collectAiTextReferenceChips(params: {
   readonly nodeId: string;
@@ -123,77 +249,6 @@ export function AiTextReferenceBar({
     []
   );
 
-  const renderHoverPreviewPortal = () => {
-    if (!hoverPreview || typeof document === "undefined") {
-      return null;
-    }
-
-    const { chip, anchor } = hoverPreview;
-    const style = {
-      left: anchor.left + anchor.width / 2,
-      top: anchor.top - REFERENCE_HOVER_PREVIEW_GAP_PX,
-      transform: "translate(-50%, -100%)",
-    } as const;
-
-    if (chip.kind === "image" && chip.previewUrl) {
-      return createPortal(
-        <div
-          className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
-          style={style}
-        >
-          <img
-            src={chip.previewUrl}
-            alt=""
-            className="max-h-[150px] max-w-[150px] object-contain"
-            style={{
-              maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
-              maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
-            }}
-          />
-        </div>,
-        document.body
-      );
-    }
-
-    if (chip.kind === "video" && chip.previewUrl) {
-      return createPortal(
-        <div
-          className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
-          style={style}
-        >
-          <video
-            src={chip.previewUrl}
-            className="max-h-[150px] max-w-[150px] object-contain"
-            style={{
-              maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
-              maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
-            }}
-            muted
-            autoPlay
-            loop
-          />
-        </div>,
-        document.body
-      );
-    }
-
-    if (chip.kind === "text" && chip.textExcerpt) {
-      return createPortal(
-        <div
-          className="pointer-events-none fixed z-[300] w-56 rounded-lg border border-border bg-popover p-2 shadow-lg"
-          style={style}
-        >
-          <p className="line-clamp-6 text-xs leading-relaxed text-muted-foreground">
-            {chip.textExcerpt}
-          </p>
-        </div>,
-        document.body
-      );
-    }
-
-    return null;
-  };
-
   return (
     <div className="relative flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
@@ -211,46 +266,20 @@ export function AiTextReferenceBar({
               onClick={() => onInjectChip(chip)}
               title={chip.label}
             >
-              {chip.previewUrl && chip.kind === "image" ? (
-                <img
-                  src={chip.previewUrl}
-                  alt={chip.label}
-                  className="h-full w-full object-cover"
-                />
-              ) : chip.previewUrl && chip.kind === "video" ? (
-                <video
-                  src={chip.previewUrl}
-                  className="h-full w-full object-cover"
-                  muted
-                />
-              ) : (
-                <span className="text-muted-foreground">
-                  {iconForKind[chip.kind]}
-                </span>
-              )}
+              <ReferenceChipMediaThumb
+                chip={chip}
+                fallbackIcon={iconForKind[chip.kind]}
+              />
             </button>
           ) : (
             <div
               className="nodrag flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
               title={chip.label}
             >
-              {chip.previewUrl && chip.kind === "image" ? (
-                <img
-                  src={chip.previewUrl}
-                  alt={chip.label}
-                  className="h-full w-full object-cover"
-                />
-              ) : chip.previewUrl && chip.kind === "video" ? (
-                <video
-                  src={chip.previewUrl}
-                  className="h-full w-full object-cover"
-                  muted
-                />
-              ) : (
-                <span className="text-muted-foreground">
-                  {iconForKind[chip.kind]}
-                </span>
-              )}
+              <ReferenceChipMediaThumb
+                chip={chip}
+                fallbackIcon={iconForKind[chip.kind]}
+              />
             </div>
           )}
           {!disabled ? (
@@ -324,7 +353,12 @@ export function AiTextReferenceBar({
         />
       ) : null}
 
-      {renderHoverPreviewPortal()}
+      {hoverPreview ? (
+        <ReferenceHoverPreview
+          chip={hoverPreview.chip}
+          anchor={hoverPreview.anchor}
+        />
+      ) : null}
 
       <AlertDialog
         open={pendingDisconnectId !== null}

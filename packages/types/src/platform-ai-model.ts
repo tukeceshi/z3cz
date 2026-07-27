@@ -547,7 +547,7 @@ export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   maxReferenceVideos: 1,
   maxVideoReferenceBytes: 50 * 1024 * 1024,
   maxVideoReferenceSeconds: 60,
-  promptMaxChars: 600,
+  promptMaxChars: 1000,
   generationFields: DEFAULT_VIDEO_GENERATION_FIELDS,
 };
 

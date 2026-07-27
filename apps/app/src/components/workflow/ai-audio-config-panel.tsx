@@ -58,6 +58,7 @@ import {
   AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_AUDIO_PROMPT_HANDLE_ID,
   appendAiAudioGeneratedHistoryItems,
+  withAiAudioStagingPreview,
   canGenerateAiAudio,
   pickDefaultAudioModelCanonicalId,
   resolveAiAudioModelRules,
@@ -335,18 +336,14 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
 
   const handleStaged = useCallback(
     (localMedia: readonly import("@dafthunk/types").LocalMediaReference[]) => {
-      const audio = localMedia[0];
-      if (!audio || !updateNodeData) return;
+      if (!updateNodeData || localMedia.length === 0) return;
       updateNodeData(nodeId, (current) => {
-        const withResult = appendAiAudioGeneratedHistoryItems(current, [audio], {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
+        const withPreview = withAiAudioStagingPreview(current, localMedia);
         return {
-          ...withResult,
+          ...withPreview,
           metadata: withAiAudioGenerateError(
             withGenerativeProgress(
-              withAiAudioGeneratingFlag(withResult.metadata, true),
+              withAiAudioGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
                 stagingMediaIds: localMedia.map((entry) => entry.mediaId),
@@ -357,7 +354,7 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
         };
       });
     },
-    [generationParams, nodeId, promptForGenerate, updateNodeData]
+    [nodeId, updateNodeData]
   );
 
   const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =

@@ -42,6 +42,18 @@ describe("resolveGenerationJobDisplayPhase", () => {
     ).toBe("generating");
   });
 
+  it("maps queued upstream video status", () => {
+    expect(
+      resolveGenerationJobDisplayPhase(
+        makeJob({
+          modality: "video",
+          status: "generating",
+          resultJson: { upstreamVideoStatus: "queued" },
+        })
+      )
+    ).toBe("queued");
+  });
+
   it("maps client uploading separately from server persist", () => {
     expect(
       resolveGenerationJobDisplayPhase(

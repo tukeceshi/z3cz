@@ -8,6 +8,8 @@ import {
 
   type VolcanoTosServiceStatus,
 
+  type VolcanoSetupStatus,
+
 } from "@dafthunk/types";
 
 import Loader2 from "lucide-react/icons/loader-2";
@@ -50,15 +52,22 @@ import {
 
   createOrganizationAiInterface,
 
+  fetchOrganizationAiInterface,
+
   probeVolcanoCredentials,
 
   probeVolcanoTosBuckets,
 
-  updateVolcanoTosStorage,
+  retryVolcanoInterfaceSetup,
 
   AI_INTERFACE_NAME_CONFLICT_CODE,
+
   VOLCANO_ARK_NOT_OPENED_CODE,
+
+  VOLCANO_INTERFACE_EXISTS_CODE,
+
   VOLCANO_TOS_NOT_OPENED_CODE,
+
 } from "@/services/organization-ai-interface-service";
 
 import { ApiRequestError } from "@/services/utils";
@@ -328,6 +337,21 @@ export function VolcanoWizardFlow({
 
   const probeInFlightRef = useRef(false);
 
+  const saveInFlightRef = useRef(false);
+
+  const setupIdempotencyKeyRef = useRef(crypto.randomUUID());
+
+  const [setupWaitPhase, setSetupWaitPhase] = useState<
+    "idle" | "waiting" | "failed"
+  >("idle");
+
+  const [setupWaitError, setSetupWaitError] = useState<string | null>(null);
+
+  const [createdInterfaceId, setCreatedInterfaceId] = useState<string | null>(
+    null
+  );
+
+
 
 
   const selectedModelIds = useMemo(
@@ -386,11 +410,25 @@ export function VolcanoWizardFlow({
 
     setIsRetryingTos(false);
 
+    setSetupWaitPhase("idle");
+
+    setSetupWaitError(null);
+
+    setCreatedInterfaceId(null);
+
+    setupIdempotencyKeyRef.current = crypto.randomUUID();
+
   };
 
 
 
   const handleClose = (nextOpen: boolean) => {
+
+    if (!nextOpen && setupWaitPhase === "waiting") {
+
+      return;
+
+    }
 
     if (!nextOpen) reset();
 
@@ -730,146 +768,156 @@ export function VolcanoWizardFlow({
 
 
 
+  const waitForSetupReady = async (interfaceId: string): Promise<void> => {
+    const pollMs = 1500;
+    const maxAttempts = 80;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const iface = await fetchOrganizationAiInterface(
+        organizationId,
+        interfaceId
+      );
+      const status = iface.volcanoSetupStatus as VolcanoSetupStatus | null;
+      if (status === "ready") {
+        return;
+      }
+      if (status === "failed" || status === "enqueue_failed") {
+        const meta =
+          iface.metadata &&
+          typeof iface.metadata === "object" &&
+          "setupError" in iface.metadata
+            ? (iface.metadata as { setupError?: string | null }).setupError
+            : null;
+        throw new Error(
+          meta?.trim() || t("pages.aiInterfaces.volcano.setupFailed")
+        );
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, pollMs));
+    }
+    throw new Error(t("pages.aiInterfaces.volcano.setupTimeout"));
+  };
+
+  const handleRetrySetup = async () => {
+    if (!createdInterfaceId || saveInFlightRef.current) {
+      return;
+    }
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    setSetupWaitPhase("waiting");
+    setSetupWaitError(null);
+    try {
+      await retryVolcanoInterfaceSetup(organizationId, createdInterfaceId);
+      await waitForSetupReady(createdInterfaceId);
+      appToast.success("pages.aiInterfaces.created");
+      await finishWizard();
+    } catch (error) {
+      setSetupWaitPhase("failed");
+      setSetupWaitError(
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.volcano.setupFailed")
+      );
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (saveInFlightRef.current || isSaving || setupWaitPhase === "waiting") {
+      return;
+    }
 
     if (!name.trim()) {
-
       appToast.error("pages.aiInterfaces.nameTemplateRequired");
-
       return;
-
     }
 
     if (!accessKeyId.trim() || !secretAccessKey.trim()) {
-
       appToast.error("pages.aiInterfaces.volcano.credentialsRequired");
-
       return;
-
     }
 
-
-
+    saveInFlightRef.current = true;
     setIsSaving(true);
+    setSetupWaitError(null);
+    let createdId: string | null = null;
 
     try {
+      const includeTos =
+        tosConfig.enabled && tosServiceStatus !== "not_opened";
 
-      const created = await createOrganizationAiInterface(organizationId, {
-
-        provider: "doubao_volcano",
-
-        name: name.trim(),
-
-        accessKeyId: accessKeyId.trim(),
-
-        secretAccessKey: secretAccessKey.trim(),
-
-        enabledModels: selectedModelIds,
-
-        volcanoActivationResults: Object.values(activationResults),
-
-        enabled: true,
-
-        isDefault: true,
-
-      });
-
-
-
-      if (tosConfig.enabled) {
-
-        if (tosServiceStatus === "not_opened") {
-
-          appToast.success("pages.aiInterfaces.tosStorage.notOpened.saveSkipped");
-
-        } else {
-
-          try {
-
-            await updateVolcanoTosStorage(organizationId, created.id, {
-
-              enabled: true,
-
-              region: tosConfig.region,
-
-              bucket: tosConfig.resolvedBucketName,
-
-              createBucket: tosConfig.createBucket,
-
-            });
-
-            appToast.success("pages.aiInterfaces.tosStorage.saved");
-
-          } catch (tosError) {
-
-            if (
-
-              tosError instanceof ApiRequestError &&
-
-              tosError.code === VOLCANO_TOS_NOT_OPENED_CODE
-
-            ) {
-
-              appToast.success("pages.aiInterfaces.tosStorage.notOpened.saveSkipped");
-
-            } else {
-
-              appToast.errorRaw(
-
-                tosError instanceof Error
-
-                  ? tosError.message
-
-                  : t("pages.aiInterfaces.tosStorage.saveFailed")
-
-              );
-
-            }
-
-            appToast.success("pages.aiInterfaces.volcano.createdStorageFailed");
-
-          }
-
-        }
-
-      } else {
-
-        appToast.success("pages.aiInterfaces.created");
-
-      }
-
-
-
-      await finishWizard();
-
-    } catch (error) {
-
-      if (
-
-        error instanceof ApiRequestError &&
-
-        error.code === AI_INTERFACE_NAME_CONFLICT_CODE
-
-      ) {
-
-        appToast.error("pages.aiInterfaces.duplicateName");
-
-        return;
-
-      }
-
-      appToast.errorRaw(
-
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
-
+      const created = await createOrganizationAiInterface(
+        organizationId,
+        {
+          provider: "doubao_volcano",
+          name: name.trim(),
+          accessKeyId: accessKeyId.trim(),
+          secretAccessKey: secretAccessKey.trim(),
+          enabledModels: selectedModelIds,
+          volcanoActivationResults: Object.values(activationResults),
+          enabled: true,
+          isDefault: true,
+          ...(includeTos
+            ? {
+                tosStorage: {
+                  enabled: true,
+                  region: tosConfig.region,
+                  bucket: tosConfig.resolvedBucketName,
+                  createBucket: tosConfig.createBucket,
+                },
+              }
+            : {}),
+        },
+        { idempotencyKey: setupIdempotencyKeyRef.current }
       );
 
+      createdId = created.id;
+      setCreatedInterfaceId(created.id);
+      setSetupWaitPhase("waiting");
+
+      if (tosConfig.enabled && tosServiceStatus === "not_opened") {
+        appToast.success("pages.aiInterfaces.tosStorage.notOpened.saveSkipped");
+      }
+
+      await waitForSetupReady(created.id);
+      appToast.success("pages.aiInterfaces.created");
+      await finishWizard();
+    } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === AI_INTERFACE_NAME_CONFLICT_CODE
+      ) {
+        appToast.error("pages.aiInterfaces.duplicateName");
+        setSetupWaitPhase("idle");
+        return;
+      }
+      if (
+        error instanceof ApiRequestError &&
+        error.code === VOLCANO_INTERFACE_EXISTS_CODE
+      ) {
+        appToast.error("pages.aiInterfaces.volcano.alreadyExists");
+        setSetupWaitPhase("idle");
+        return;
+      }
+      if (createdId) {
+        setSetupWaitPhase("failed");
+        setSetupWaitError(
+          error instanceof Error
+            ? error.message
+            : t("pages.aiInterfaces.volcano.setupFailed")
+        );
+      } else {
+        setSetupWaitPhase("idle");
+        appToast.errorRaw(
+          error instanceof Error
+            ? error.message
+            : t("pages.aiInterfaces.saveFailed")
+        );
+      }
     } finally {
-
+      saveInFlightRef.current = false;
       setIsSaving(false);
-
     }
-
   };
 
 
@@ -1216,13 +1264,40 @@ export function VolcanoWizardFlow({
 
 
 
+        {setupWaitPhase === "waiting" ? (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border p-3 text-sm">
+            <Loader2 className="size-4 animate-spin" />
+            <span>{t("pages.aiInterfaces.volcano.setupWaiting")}</span>
+          </div>
+        ) : null}
+        {setupWaitPhase === "failed" ? (
+          <div className="mb-3 space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <p className="text-destructive">
+              {setupWaitError ?? t("pages.aiInterfaces.volcano.setupFailed")}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleRetrySetup()}
+              disabled={isSaving}
+            >
+              {t("pages.aiInterfaces.volcano.setupRetry")}
+            </Button>
+          </div>
+        ) : null}
+
         <DialogFooter className="gap-2 sm:justify-between">
 
           <div>
 
             {step > 1 ? (
 
-              <Button variant="outline" onClick={() => setStep((current) => current - 1)}>
+              <Button
+                variant="outline"
+                onClick={() => setStep((current) => current - 1)}
+                disabled={setupWaitPhase === "waiting"}
+              >
 
                 {t("common.back")}
 
@@ -1230,7 +1305,11 @@ export function VolcanoWizardFlow({
 
             ) : (
 
-              <Button variant="outline" onClick={onBackToChannel}>
+              <Button
+                variant="outline"
+                onClick={onBackToChannel}
+                disabled={setupWaitPhase === "waiting"}
+              >
 
                 {t("common.back")}
 
@@ -1242,7 +1321,11 @@ export function VolcanoWizardFlow({
 
           <div className="flex gap-2">
 
-            <Button variant="outline" onClick={() => handleClose(false)}>
+            <Button
+              variant="outline"
+              onClick={() => handleClose(false)}
+              disabled={setupWaitPhase === "waiting"}
+            >
 
               {t("common.cancel")}
 
@@ -1292,9 +1375,16 @@ export function VolcanoWizardFlow({
 
             ) : (
 
-              <Button onClick={handleSave} disabled={isSaving}>
+              <Button
+                onClick={() => void handleSave()}
+                disabled={isSaving || setupWaitPhase === "waiting"}
+              >
 
-                {isSaving ? t("common.saving") : t("common.save")}
+                {setupWaitPhase === "waiting"
+                  ? t("pages.aiInterfaces.volcano.setupWaitingShort")
+                  : isSaving
+                    ? t("common.saving")
+                    : t("common.save")}
 
               </Button>
 

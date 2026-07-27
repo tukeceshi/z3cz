@@ -350,6 +350,7 @@ export const organizationAiInterfaces = pgTable(
     selectedModel: text("selected_model"),
     apiKeyEncrypted: text("api_key_encrypted").notNull(),
     metadata: text("metadata"),
+    volcanoSetupStatus: text("volcano_setup_status"),
     enabled: boolean("enabled").notNull().default(true),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: createCreatedAt(),
@@ -361,6 +362,19 @@ export const organizationAiInterfaces = pgTable(
       table.provider
     ),
     index("organization_ai_interfaces_template_id_idx").on(table.templateId),
+  ]
+);
+
+export const aiInterfaceCreateIdempotency = pgTable(
+  "ai_interface_create_idempotency",
+  {
+    key: text("key").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    interfaceId: text("interface_id").notNull(),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [
+    index("ai_interface_create_idempotency_org_idx").on(table.organizationId),
   ]
 );
 

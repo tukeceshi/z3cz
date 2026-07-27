@@ -1,4 +1,4 @@
-import { VOLCANO_AI_MODEL_CATALOG } from "./ai-model-catalog";
+import { VOLCANO_AGGREGATE_MODEL_CATALOG } from "./ai-model-catalog";
 import type { OrganizationAiInterface } from "./ai-interface";
 import {
   VOLCANO_MODEL_PRICING_CATALOG,
@@ -51,10 +51,15 @@ function getVolcanoApiKeyStatus(
 }
 
 function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
+  const aggregateIds = new Set(
+    VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => entry.canonicalId)
+  );
   return {
     docUrl: VOLCANO_PRICING_DOC_URL,
     effectiveDate: VOLCANO_PRICING_EFFECTIVE_DATE,
-    rows: VOLCANO_MODEL_PRICING_CATALOG.map((row) => ({
+    rows: VOLCANO_MODEL_PRICING_CATALOG.filter((row) =>
+      aggregateIds.has(row.canonicalId)
+    ).map((row) => ({
       canonicalId: row.canonicalId,
       alias: row.alias,
       modality: row.modality,
@@ -115,11 +120,11 @@ export function buildVolcanoSnapshotFromMetadata(
   const packageListCachedAt = cache?.fetchedAt;
   const { usageByModel, packageByModel } = buildUsageMapsFromPackageRows(
     packageRows,
-    VOLCANO_AI_MODEL_CATALOG
+    VOLCANO_AGGREGATE_MODEL_CATALOG
   );
   const activationCache = metadata.modelActivationCache ?? {};
 
-  const models = VOLCANO_AI_MODEL_CATALOG.map((entry) => {
+  const models = VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => {
     const config = metadata.models[entry.canonicalId];
     const enabled = config?.enabled ?? false;
     const packageSnapshot = packageByModel.get(entry.canonicalId) ?? null;

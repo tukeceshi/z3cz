@@ -22,6 +22,7 @@ import { ApiContext } from "../context";
 import { createDatabase } from "../db";
 import {
   createAiModelInvocation,
+  finalizeAiModelInvocation,
   getAiModelInvocation,
   listAiModelInvocations,
   listPlatformAiModelGroups,
@@ -52,6 +53,7 @@ import {
   resolveAudioModelInterface,
 } from "../services/resolve-audio-model-interface";
 import { executeMinimaxSpeech } from "../integrations/minimax/execute-minimax-speech";
+import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
 import {
   downloadOrgVideo,
   pollOrgVideoTask,
@@ -477,6 +479,18 @@ platformAiRoutes.post(
         ? `${effectivePrompt.slice(0, 200)}…`
         : effectivePrompt;
 
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: modelOption.canonicalId,
+      displayName: modelOption.displayName,
+      promptExcerpt,
+      content: "",
+      source: "ai-text-node-generate",
+      status: "pending",
+    });
+
     const result = await executeTextModel({
       env: c.env,
       db,
@@ -487,35 +501,23 @@ platformAiRoutes.post(
     });
 
     if (!result.ok || !result.text || !result.interfaceId) {
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: modelOption.canonicalId,
-        displayName: modelOption.displayName,
-        interfaceId: null,
-        interfaceName: null,
-        promptExcerpt,
-        content: "",
-        source: "ai-text-node-generate",
         status: "failed",
         error: result.invocationError ?? result.error ?? "Generation failed",
       });
       return c.json({ error: result.error ?? "Generation failed" }, 502);
     }
 
-    await createAiModelInvocation(db, {
+    await finalizeAiModelInvocation(db, {
       id: invocationId,
       organizationId,
-      userId: jwtPayload?.sub,
-      canonicalId: modelOption.canonicalId,
-      displayName: modelOption.displayName,
+      status: "completed",
+      content: result.text,
       interfaceId: result.interfaceId,
       interfaceName: result.interfaceName ?? null,
-      promptExcerpt,
-      content: result.text,
-      source: "ai-text-node-generate",
-      status: "completed",
+      error: null,
     });
 
     return c.json({
@@ -663,6 +665,20 @@ platformAiRoutes.post(
     const deferCloudPersist = storageResolution.storageMode === "cloud";
     const jobId = deferCloudPersist ? crypto.randomUUID() : null;
 
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: resolvedModel.canonicalId,
+      displayName: resolvedModel.displayName,
+      interfaceId: resolvedModel.interfaceId,
+      interfaceName: resolvedModel.interfaceName,
+      promptExcerpt,
+      content: "",
+      source: "ai-image-node-generate",
+      status: "pending",
+    });
+
     const result = await executeVolcanoImageGeneration({
       apiKey: iface.apiKey,
       baseUrl: iface.baseUrl,
@@ -680,17 +696,9 @@ platformAiRoutes.post(
     });
 
     if (result.status === "failed") {
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-image-node-generate",
         status: "failed",
         error: result.error ?? "Generation failed",
       });
@@ -701,22 +709,21 @@ platformAiRoutes.post(
     if (deferCloudPersist && jobId) {
       const ephemeralImages = images.filter(isEphemeralMediaReference);
       if (ephemeralImages.length !== images.length) {
+        await finalizeAiModelInvocation(db, {
+          id: invocationId,
+          organizationId,
+          status: "failed",
+          error: "Expected ephemeral upstream image URLs",
+        });
         return c.json({ error: "Expected ephemeral upstream image URLs" }, 502);
       }
 
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-image-node-generate",
         status: "pending",
         generationJobId: jobId,
+        error: null,
       });
 
       await createReadyToPersistImageJob(db, {
@@ -742,18 +749,12 @@ platformAiRoutes.post(
       });
     }
 
-    await createAiModelInvocation(db, {
+    await finalizeAiModelInvocation(db, {
       id: invocationId,
       organizationId,
-      userId: jwtPayload?.sub,
-      canonicalId: resolvedModel.canonicalId,
-      displayName: resolvedModel.displayName,
-      interfaceId: resolvedModel.interfaceId,
-      interfaceName: resolvedModel.interfaceName,
-      promptExcerpt,
-      content: `${result.images?.length ?? 0} image(s)`,
-      source: "ai-image-node-generate",
       status: "completed",
+      content: `${result.images?.length ?? 0} image(s)`,
+      error: null,
     });
 
     return c.json({
@@ -869,6 +870,20 @@ platformAiRoutes.post(
     const promptExcerpt =
       prompt.length > 200 ? `${prompt.slice(0, 200)}…` : prompt;
 
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: resolvedModel.canonicalId,
+      displayName: resolvedModel.displayName,
+      interfaceId: resolvedModel.interfaceId,
+      interfaceName: resolvedModel.interfaceName,
+      promptExcerpt,
+      content: "",
+      source: "ai-audio-node-generate",
+      status: "pending",
+    });
+
     const result = await executeMinimaxSpeech({
       apiKey: iface.apiKey,
       baseUrl: iface.baseUrl,
@@ -879,17 +894,9 @@ platformAiRoutes.post(
     });
 
     if (result.status === "failed" || !result.audio || !result.mimeType) {
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-audio-node-generate",
         status: "failed",
         error: result.error ?? "Generation failed",
       });
@@ -917,19 +924,12 @@ platformAiRoutes.post(
         expiresAt: createEphemeralMediaExpiresAt(),
       };
 
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-audio-node-generate",
         status: "pending",
         generationJobId: jobId,
+        error: null,
       });
 
       await createReadyToPersistAudioJob(db, {
@@ -962,18 +962,12 @@ platformAiRoutes.post(
       await objectStore.writeObject(audioData, mimeType, organizationId),
     ];
 
-    await createAiModelInvocation(db, {
+    await finalizeAiModelInvocation(db, {
       id: invocationId,
       organizationId,
-      userId: jwtPayload?.sub,
-      canonicalId: resolvedModel.canonicalId,
-      displayName: resolvedModel.displayName,
-      interfaceId: resolvedModel.interfaceId,
-      interfaceName: resolvedModel.interfaceName,
-      promptExcerpt,
-      content: "1 audio file",
-      source: "ai-audio-node-generate",
       status: "completed",
+      content: "1 audio file",
+      error: null,
     });
 
     return c.json({
@@ -1113,6 +1107,20 @@ platformAiRoutes.post(
           : prompt
         : "(reference only)";
 
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: resolvedModel.canonicalId,
+      displayName: resolvedModel.displayName,
+      interfaceId: resolvedModel.interfaceId,
+      interfaceName: resolvedModel.interfaceName,
+      promptExcerpt,
+      content: "",
+      source: "ai-video-node-submit",
+      status: "pending",
+    });
+
     const submitResult = await submitOrgVideoTask({
       apiKey: iface.apiKey,
       baseUrl: iface.baseUrl,
@@ -1126,17 +1134,9 @@ platformAiRoutes.post(
     });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-video-node-submit",
         status: "failed",
         error: submitResult.error ?? "Submit failed",
       });
@@ -1149,19 +1149,12 @@ platformAiRoutes.post(
     });
     const jobId = crypto.randomUUID();
     if (storageResolution.storageMode === "cloud") {
-      await createAiModelInvocation(db, {
+      await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
-        userId: jwtPayload?.sub,
-        canonicalId: resolvedModel.canonicalId,
-        displayName: resolvedModel.displayName,
-        interfaceId: resolvedModel.interfaceId,
-        interfaceName: resolvedModel.interfaceName,
-        promptExcerpt,
-        content: "",
-        source: "ai-video-node-submit",
         status: "pending",
         generationJobId: jobId,
+        error: null,
       });
 
       await createGenerationJob(db, {
@@ -1192,18 +1185,12 @@ platformAiRoutes.post(
       });
     }
 
-    await createAiModelInvocation(db, {
+    await finalizeAiModelInvocation(db, {
       id: invocationId,
       organizationId,
-      userId: jwtPayload?.sub,
-      canonicalId: resolvedModel.canonicalId,
-      displayName: resolvedModel.displayName,
-      interfaceId: resolvedModel.interfaceId,
-      interfaceName: resolvedModel.interfaceName,
-      promptExcerpt,
-      content: `task:${submitResult.taskId}`,
-      source: "ai-video-node-submit",
       status: "completed",
+      content: `task:${submitResult.taskId}`,
+      error: null,
     });
 
     return c.json({
@@ -1447,7 +1434,12 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     });
   }
 
-  return c.json({ status: "running" as const });
+  return c.json({
+    status:
+      pollResult.upstreamPhase === "queued"
+        ? ("queued" as const)
+        : ("running" as const),
+  });
 });
 
 platformAiRoutes.get("/media/proxy", async (c) => {

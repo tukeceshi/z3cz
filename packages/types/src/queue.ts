@@ -71,6 +71,8 @@ export interface DeleteQueueTriggerResponse {
   workflowId: string;
 }
 
+import type { VolcanoInterfaceSetupQueueMessage } from "./volcano-setup";
+
 // Queue Message Type
 export interface QueueMessage {
   queueId: string;
@@ -78,3 +80,7 @@ export interface QueueMessage {
   payload: unknown;
   timestamp: number;
 }
+
+export type WorkerQueueMessage =
+  | QueueMessage
+  | VolcanoInterfaceSetupQueueMessage;

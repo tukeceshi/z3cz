@@ -240,6 +240,28 @@ export function withAiAudioResult(
   return { inputs, outputs };
 }
 
+/**
+ * Card preview while cloud persist is uploading. Does not append history —
+ * final success path writes the history entry.
+ */
+export function withAiAudioStagingPreview(
+  current: WorkflowNodeType,
+  audios: readonly MediaReference[]
+): Partial<WorkflowNodeType> {
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_AUDIO_RESULT_INPUT_ID,
+    [...audios],
+    "json"
+  );
+  const outputs = current.outputs.map((output) =>
+    output.id === AI_AUDIO_OUTPUT_ID
+      ? ({ ...output, value: [...audios] } as WorkflowParameter)
+      : output
+  );
+  return { inputs, outputs };
+}
+
 export function readAiAudioCardAudios(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],

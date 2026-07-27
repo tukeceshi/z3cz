@@ -28,7 +28,7 @@ import TrashIcon from "lucide-react/icons/trash-2";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import WrenchIcon from "lucide-react/icons/wrench";
-import { createElement, memo, useMemo, useState } from "react";
+import { createElement, memo, useEffect, useMemo, useState } from "react";
 
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { useTranslation } from "@/components/locale-provider";
@@ -61,6 +61,16 @@ import {
   GENERATIVE_NODE_CARD_CLASS,
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
+import {
+  formatGenerativeProgressElapsed,
+  readGenerativeProgressPhase,
+  readGenerativeProgressStartedAt,
+} from "./generative-progress-utils";
+import {
+  generativeAudioProgressButtonKey,
+  generativeProgressButtonKey,
+  generativeVideoProgressButtonKey,
+} from "@/hooks/use-generative-cloud-job";
 import {
   WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
   WORKFLOW_NODE_SELECTED_BORDER_CLASS,
@@ -554,10 +564,17 @@ export const WorkflowNode = memo(
     const isExecuting =
       data.executionState === "executing" ||
       data.executionState === "pending";
+    const progressPhase = readGenerativeProgressPhase(data.metadata);
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
-    const isAiImageBusy = isAiImageNode && isAiImageGenerating(data.metadata);
-    const isAiVideoBusy = isAiVideoNode && isAiVideoGenerating(data.metadata);
-    const isAiAudioBusy = isAiAudioNode && isAiAudioGenerating(data.metadata);
+    const isAiImageBusy =
+      isAiImageNode &&
+      (isAiImageGenerating(data.metadata) || progressPhase !== undefined);
+    const isAiVideoBusy =
+      isAiVideoNode &&
+      (isAiVideoGenerating(data.metadata) || progressPhase !== undefined);
+    const isAiAudioBusy =
+      isAiAudioNode &&
+      (isAiAudioGenerating(data.metadata) || progressPhase !== undefined);
     const generativeCardError =
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
         ? readGenerativeCardError(data.metadata)
@@ -566,6 +583,68 @@ export const WorkflowNode = memo(
     const isError =
       (data.executionState === "error" && !!data.error) ||
       Boolean(generativeCardError);
+
+    const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
+    useEffect(() => {
+      if (!showBusyOverlay || !progressPhase) {
+        return;
+      }
+      setProgressNowMs(Date.now());
+      const timerId = window.setInterval(() => {
+        setProgressNowMs(Date.now());
+      }, 1000);
+      return () => {
+        window.clearInterval(timerId);
+      };
+    }, [progressPhase, showBusyOverlay]);
+
+    const busyOverlayLabel = useMemo(() => {
+      if (isAiVideoNode && (isAiVideoBusy || progressPhase)) {
+        const phase = progressPhase ?? "generating";
+        const base = t(generativeVideoProgressButtonKey(phase));
+        const startedAt = readGenerativeProgressStartedAt(data.metadata);
+        if (!startedAt) {
+          return base;
+        }
+        const { minutes, seconds } = formatGenerativeProgressElapsed(
+          startedAt,
+          progressNowMs
+        );
+        const elapsed =
+          minutes > 0
+            ? t("workflow.aiVideoPanel.progressElapsedMinutes", {
+                minutes,
+                seconds: String(seconds).padStart(2, "0"),
+              })
+            : t("workflow.aiVideoPanel.progressElapsedSeconds", { seconds });
+        return t("workflow.aiVideoPanel.progressWithElapsed", {
+          label: base.replace(/[….]+$/u, "").trimEnd(),
+          elapsed,
+        });
+      }
+      if (isAiImageNode && (isAiImageBusy || progressPhase)) {
+        return t(
+          generativeProgressButtonKey(progressPhase ?? "generating")
+        );
+      }
+      if (isAiAudioNode && (isAiAudioBusy || progressPhase)) {
+        return t(
+          generativeAudioProgressButtonKey(progressPhase ?? "generating")
+        );
+      }
+      return null;
+    }, [
+      data.metadata,
+      isAiAudioBusy,
+      isAiAudioNode,
+      isAiImageBusy,
+      isAiImageNode,
+      isAiVideoBusy,
+      isAiVideoNode,
+      progressNowMs,
+      progressPhase,
+      t,
+    ]);
 
     const localizedGenerativeBaseName = isAiTextNode
       ? t("workflow.canvas.aiText")
@@ -684,13 +763,18 @@ export const WorkflowNode = memo(
           {showBusyOverlay && (
             <div
               className={cn(
-                "absolute inset-0 z-10 flex items-center justify-center bg-card/70 backdrop-blur-[1px]",
+                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
                 isGenerativeCanvasNode
                   ? GENERATIVE_NODE_CARD_RADIUS_CLASS
                   : "rounded-md"
               )}
             >
               <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
+              {busyOverlayLabel ? (
+                <p className="max-w-[90%] px-3 text-center text-[11px] leading-snug text-muted-foreground">
+                  {busyOverlayLabel}
+                </p>
+              ) : null}
             </div>
           )}
 

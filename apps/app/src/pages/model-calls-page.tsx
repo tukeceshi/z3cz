@@ -20,6 +20,10 @@ import {
   fetchModelCallDetail,
   useModelCalls,
 } from "@/services/platform-ai-model-service";
+import {
+  invocationStatusBadgeVariant,
+  invocationStatusLabelKey,
+} from "@/utils/model-invocation-status";
 
 export function ModelCallsPage() {
   const { t } = useTranslation();
@@ -85,12 +89,8 @@ function ModelCallsPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge
-                  variant={
-                    invocation.status === "completed" ? "default" : "destructive"
-                  }
-                >
-                  {invocation.status}
+                <Badge variant={invocationStatusBadgeVariant(invocation.status)}>
+                  {t(invocationStatusLabelKey(invocation.status))}
                 </Badge>
                 <Button
                   size="sm"

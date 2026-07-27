@@ -1,4 +1,5 @@
 import type { AiModelModality } from "./ai-model-catalog";
+import type { VolcanoSetupStatus } from "./volcano-setup";
 import type { VolcanoModelActivationCacheEntry } from "./volcano-activation";
 import type { VolcanoTosRegionPricingSnapshot } from "./volcano-tos-pricing";
 import type {
@@ -58,6 +59,10 @@ export interface VolcanoInterfaceMetadata {
   /** ISO timestamps of successful billing package fetches (server rate limit). */
   readonly packageListRefreshLog?: readonly string[];
   readonly tosStorage?: VolcanoTosStorageConfig;
+  /** Background provisioning after fast create. */
+  readonly setupStatus?: VolcanoSetupStatus;
+  readonly setupError?: string | null;
+  readonly setupIdempotencyKey?: string;
 }
 
 /** TOS resource package usage (storage capacity or traffic). */

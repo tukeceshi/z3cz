@@ -1,6 +1,8 @@
-import type { QueueMessage } from "@dafthunk/types";
+import type { WorkerQueueMessage } from "@dafthunk/types";
 
-function createQueueMessage(body: QueueMessage): Message<QueueMessage> {
+function createQueueMessage(
+  body: WorkerQueueMessage
+): Message<WorkerQueueMessage> {
   let acked = false;
 
   return {
@@ -16,10 +18,12 @@ function createQueueMessage(body: QueueMessage): Message<QueueMessage> {
         void dispatchQueueMessages([body]);
       }
     },
-  } as Message<QueueMessage>;
+  } as Message<WorkerQueueMessage>;
 }
 
-async function dispatchQueueMessages(messages: QueueMessage[]): Promise<void> {
+async function dispatchQueueMessages(
+  messages: WorkerQueueMessage[]
+): Promise<void> {
   const { getNodeBindings } = await import("../env/node-bindings-ref");
   const { handleQueueMessages } = await import("../queue");
 
@@ -31,7 +35,7 @@ async function dispatchQueueMessages(messages: QueueMessage[]): Promise<void> {
     retryAll: () => {
       void dispatchQueueMessages(messages);
     },
-  } as MessageBatch<QueueMessage>;
+  } as unknown as MessageBatch<WorkerQueueMessage>;
 
   await handleQueueMessages(batch, env, {} as ExecutionContext);
 }
@@ -42,12 +46,14 @@ async function dispatchQueueMessages(messages: QueueMessage[]): Promise<void> {
  */
 export function createNodeWorkflowQueue(): Queue {
   return {
-    send: async (body) => {
-      void dispatchQueueMessages([body as QueueMessage]);
+    send: async (body: unknown) => {
+      void dispatchQueueMessages([body as WorkerQueueMessage]);
     },
-    sendBatch: async (batch) => {
-      const messages = batch.map((item) => item.body as QueueMessage);
+    sendBatch: async (batch: Iterable<{ body: unknown }>) => {
+      const messages = [...batch].map(
+        (item) => item.body as WorkerQueueMessage
+      );
       void dispatchQueueMessages(messages);
     },
-  } as Queue;
+  } as unknown as Queue;
 }

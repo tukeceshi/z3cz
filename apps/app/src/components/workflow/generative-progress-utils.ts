@@ -1,4 +1,5 @@
 export type GenerativeProgressPhase =
+  | "queued"
   | "generating"
   | "downloading"
   | "uploading"
@@ -7,6 +8,15 @@ export type GenerativeProgressPhase =
 const GENERATIVE_JOB_ID_META_KEY = "genJobId";
 const GENERATIVE_PROGRESS_PHASE_META_KEY = "genProgressPhase";
 const GENERATIVE_STAGING_MEDIA_IDS_META_KEY = "genStagingMediaIds";
+const GENERATIVE_PROGRESS_STARTED_AT_META_KEY = "genProgressStartedAt";
+
+const PROGRESS_PHASES = new Set<string>([
+  "queued",
+  "generating",
+  "downloading",
+  "uploading",
+  "server_persisting",
+]);
 
 export function readGenerativeProgressJobId(
   metadata: Record<string, string> | undefined
@@ -19,15 +29,21 @@ export function readGenerativeProgressPhase(
   metadata: Record<string, string> | undefined
 ): GenerativeProgressPhase | undefined {
   const value = metadata?.[GENERATIVE_PROGRESS_PHASE_META_KEY];
-  if (
-    value === "generating" ||
-    value === "downloading" ||
-    value === "uploading" ||
-    value === "server_persisting"
-  ) {
-    return value;
+  if (value && PROGRESS_PHASES.has(value)) {
+    return value as GenerativeProgressPhase;
   }
   return undefined;
+}
+
+export function readGenerativeProgressStartedAt(
+  metadata: Record<string, string> | undefined
+): number | undefined {
+  const raw = metadata?.[GENERATIVE_PROGRESS_STARTED_AT_META_KEY]?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 export function readGenerativeStagingMediaIds(
@@ -58,8 +74,12 @@ export function withGenerativeProgress(
 
   if (params.phase === null) {
     delete next[GENERATIVE_PROGRESS_PHASE_META_KEY];
+    delete next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY];
   } else if (params.phase) {
     next[GENERATIVE_PROGRESS_PHASE_META_KEY] = params.phase;
+    if (!next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY]) {
+      next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY] = String(Date.now());
+    }
   }
 
   if (params.stagingMediaIds === null) {
@@ -85,4 +105,16 @@ export function isGenerativeProgressActive(
   metadata: Record<string, string> | undefined
 ): boolean {
   return Boolean(readGenerativeProgressPhase(metadata));
+}
+
+/** Formats elapsed generation time for progress labels (e.g. `3m 20s`). */
+export function formatGenerativeProgressElapsed(
+  startedAtMs: number,
+  nowMs: number = Date.now()
+): { readonly minutes: number; readonly seconds: number } {
+  const totalSec = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+  return {
+    minutes: Math.floor(totalSec / 60),
+    seconds: totalSec % 60,
+  };
 }

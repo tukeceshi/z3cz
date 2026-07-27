@@ -52,6 +52,7 @@ export function useGenerativeCloudJobProgress(
   readonly activeProgressPhase: GenerativeProgressPhase | null;
 } {
   const resumeAttemptedRef = useRef(false);
+  const resolvedJobIdsRef = useRef(new Set<string>());
 
   const syncProgress = useCallback(
     (params: {
@@ -75,22 +76,29 @@ export function useGenerativeCloudJobProgress(
   const resolveJobMedia = useCallback(
     async (jobId: string) => {
       syncProgress({ jobId, phase: "generating" });
-      return resolveCloudGenerationJobMedia({
-        organizationId: options.orgId!,
-        jobId,
-        workflowId: options.workflowId,
-        stagingMediaIds: readGenerativeStagingMediaIds(options.metadata),
-        onPhase: options.setPersistPhase,
-        onProgressPhase: (phase) => syncProgress({ jobId, phase }),
-        onStaged: (localMedia) => {
-          syncProgress({
-            jobId,
-            phase: "uploading",
-            stagingMediaIds: localMedia.map((entry) => entry.mediaId),
-          });
-          options.onStaged?.(localMedia);
-        },
-      });
+      try {
+        const media = await resolveCloudGenerationJobMedia({
+          organizationId: options.orgId!,
+          jobId,
+          workflowId: options.workflowId,
+          stagingMediaIds: readGenerativeStagingMediaIds(options.metadata),
+          onPhase: options.setPersistPhase,
+          onProgressPhase: (phase) => syncProgress({ jobId, phase }),
+          onStaged: (localMedia) => {
+            syncProgress({
+              jobId,
+              phase: "uploading",
+              stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+            });
+            options.onStaged?.(localMedia);
+          },
+        });
+        resolvedJobIdsRef.current.add(jobId);
+        return media;
+      } catch (error) {
+        resolvedJobIdsRef.current.add(jobId);
+        throw error;
+      }
     },
     [
       options.metadata,
@@ -130,7 +138,8 @@ export function useGenerativeCloudJobProgress(
       !options.orgId ||
       !options.cloudConfigured ||
       options.isGenerating ||
-      resumeAttemptedRef.current
+      resumeAttemptedRef.current ||
+      resolvedJobIdsRef.current.has(jobId)
     ) {
       return;
     }
@@ -181,6 +190,8 @@ export function generativeProgressButtonKey(
       return "workflow.aiImagePanel.persistUploading";
     case "server_persisting":
       return "workflow.aiImagePanel.serverPersisting";
+    case "queued":
+      return "workflow.aiImagePanel.queued";
     case "generating":
       return "workflow.aiImagePanel.generating";
     default:
@@ -198,6 +209,8 @@ export function generativeVideoProgressButtonKey(
       return "workflow.aiVideoPanel.persistUploading";
     case "server_persisting":
       return "workflow.aiVideoPanel.serverPersisting";
+    case "queued":
+      return "workflow.aiVideoPanel.queued";
     case "generating":
       return "workflow.aiVideoPanel.generating";
     default:
@@ -215,6 +228,8 @@ export function generativeAudioProgressButtonKey(
       return "workflow.aiAudioPanel.persistUploading";
     case "server_persisting":
       return "workflow.aiAudioPanel.serverPersisting";
+    case "queued":
+      return "workflow.aiAudioPanel.queued";
     case "generating":
       return "workflow.aiAudioPanel.generating";
     default:
@@ -240,6 +255,8 @@ export function generativeCardProgressKey(
       return `${prefix}.cardUploading`;
     case "server_persisting":
       return `${prefix}.cardServerPersisting`;
+    case "queued":
+      return `${prefix}.cardQueued`;
     case "generating":
       return `${prefix}.cardGenerating`;
     default:

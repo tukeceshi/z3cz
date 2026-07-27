@@ -16,6 +16,7 @@ export * from "./volcano-tos-regions";
 export * from "./volcano-tos-pricing";
 export * from "./volcano-tos-package-usage";
 export * from "./volcano-snapshot";
+export * from "./volcano-setup";
 export * from "./volcano-ark-access";
 export * from "./volcano-activation";
 export * from "./volcano-effective-activation";

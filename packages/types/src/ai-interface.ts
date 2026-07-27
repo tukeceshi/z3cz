@@ -1,5 +1,6 @@
 import type { NodeType } from "./workflow";
 import type { VolcanoActivationProbeResult } from "./volcano-activation";
+import type { VolcanoSetupStatus } from "./volcano-setup";
 import type { VolcanoInterfaceMetadata, VolcanoTosStorageConfig } from "./volcano-snapshot";
 
 export const AI_INTERFACE_NODE_TYPE = "ai-interface" as const;
@@ -193,6 +194,7 @@ export interface OrganizationAiInterface {
   readonly hasApiKey: boolean;
   readonly apiKeyHint?: string | null;
   readonly metadata?: VolcanoInterfaceMetadata | Readonly<Record<string, unknown>> | null;
+  readonly volcanoSetupStatus?: VolcanoSetupStatus | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -214,6 +216,12 @@ export interface CreateOrganizationAiInterfaceRequest {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly enabled?: boolean;
   readonly isDefault?: boolean;
+  readonly tosStorage?: {
+    readonly enabled: boolean;
+    readonly bucket: string;
+    readonly region: string;
+    readonly createBucket?: boolean;
+  };
 }
 
 export interface UpdateOrganizationAiInterfaceRequest {

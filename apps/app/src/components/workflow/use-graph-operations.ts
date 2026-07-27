@@ -58,7 +58,11 @@ import {
   AI_VIDEO_REFERENCE_HANDLE_ID,
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
-import { validateWorkflowConnection } from "./workflow-connection-validation";
+import {
+  edgeTouchesInputHandle,
+  resolveConnectionEndpoints,
+  validateWorkflowConnection,
+} from "./workflow-connection-validation";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
@@ -585,21 +589,16 @@ export function useGraphOperations({
             ? { ...connection, targetHandle: AI_VIDEO_PROMPT_HANDLE_ID }
             : connection;
 
-      const targetInput = targetNode.data.inputs.find(
-        (input) => input.id === normalizedConnection.targetHandle
+      const endpoints = resolveConnectionEndpoints(
+        normalizedConnection,
+        sourceNode,
+        targetNode
       );
-      const sourceInput = sourceNode.data.inputs.find(
-        (input) => input.id === normalizedConnection.sourceHandle
-      );
+      if (!endpoints) return;
 
-      const inputNodeId = targetInput
-        ? normalizedConnection.target
-        : normalizedConnection.source;
-      const inputHandleId = targetInput
-        ? normalizedConnection.targetHandle
-        : normalizedConnection.sourceHandle;
-      const acceptsMultipleConnections =
-        targetInput?.repeated || sourceInput?.repeated || false;
+      const { inputNodeId, inputHandleId, inputParam } = endpoints;
+      // Outputs may fan out; only non-repeated inputs replace prior edges.
+      const acceptsMultipleConnections = Boolean(inputParam.repeated);
 
       const newEdge: ReactFlowEdge<WorkflowEdgeType> = {
         ...normalizedConnection,
@@ -621,12 +620,7 @@ export function useGraphOperations({
         if (!acceptsMultipleConnections) {
           filteredEdges = eds.filter(
             (edge) =>
-              !(
-                (edge.target === inputNodeId &&
-                  edge.targetHandle === inputHandleId) ||
-                (edge.source === inputNodeId &&
-                  edge.sourceHandle === inputHandleId)
-              )
+              !edgeTouchesInputHandle(edge, inputNodeId, inputHandleId)
           );
         }
 

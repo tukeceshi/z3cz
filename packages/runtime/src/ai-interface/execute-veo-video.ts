@@ -203,7 +203,7 @@ export async function pollVeoVideoTask(params: {
   }
 
   if (!parsed.done) {
-    return { status: "pending" };
+    return { status: "pending", upstreamPhase: "running" };
   }
 
   if (parsed.error?.message) {

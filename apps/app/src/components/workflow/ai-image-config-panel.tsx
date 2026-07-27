@@ -75,6 +75,7 @@ import {
   pickDefaultImageModelCanonicalId,
   referencesFitImageModelLimits,
   withAiImageGeneratedResult,
+  withAiImageStagingPreview,
   withAiImageGeneratingFlag,
   withAiImageGenerateError,
 } from "./ai-image-node-utils";
@@ -427,15 +428,12 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     (localMedia: readonly LocalMediaReference[]) => {
       if (!updateNodeData) return;
       updateNodeData(nodeId, (current) => {
-        const withResult = withAiImageGeneratedResult(current, localMedia, {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
+        const withPreview = withAiImageStagingPreview(current, localMedia);
         return {
-          ...withResult,
+          ...withPreview,
           metadata: withAiImageGenerateError(
             withGenerativeProgress(
-              withAiImageGeneratingFlag(withResult.metadata, true),
+              withAiImageGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
                 stagingMediaIds: localMedia.map((entry) => entry.mediaId),
@@ -446,7 +444,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         };
       });
     },
-    [generationParams, nodeId, promptForGenerate, updateNodeData]
+    [nodeId, updateNodeData]
   );
 
   const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
@@ -813,7 +811,10 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           ...withResult,
           inputs,
           metadata: withAiImageGenerateError(
-            withAiImageGeneratingFlag(withResult.metadata, false),
+            withAiImageGeneratingFlag(
+              clearGenerativeProgress(withResult.metadata),
+              false
+            ),
             null
           ),
         };
@@ -847,7 +848,10 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
               return {
                 ...withResult,
                 metadata: withAiImageGenerateError(
-                  withAiImageGeneratingFlag(withResult.metadata, false),
+                  withAiImageGeneratingFlag(
+                    clearGenerativeProgress(withResult.metadata),
+                    false
+                  ),
                   null
                 ),
               };

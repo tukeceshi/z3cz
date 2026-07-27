@@ -2,6 +2,7 @@ import type {
   AiInterfaceProvider,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
+  VolcanoSetupStatus,
 } from "@dafthunk/types";
 import { and, desc, eq, ne } from "drizzle-orm";
 
@@ -28,6 +29,7 @@ function rowToOrgInterface(
     hasApiKey: row.apiKeyEncrypted.length > 0,
     apiKeyHint: readApiKeyHint(metadata),
     metadata,
+    volcanoSetupStatus: (row.volcanoSetupStatus as VolcanoSetupStatus | null) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -104,6 +106,24 @@ async function clearOrgDefault(
     .where(and(...conditions));
 }
 
+export async function getVolcanoInterfaceRowForOrganization(
+  db: Database,
+  organizationId: string
+) {
+  const [row] = await db
+    .select()
+    .from(organizationAiInterfaces)
+    .where(
+      and(
+        eq(organizationAiInterfaces.organizationId, organizationId),
+        eq(organizationAiInterfaces.provider, "doubao_volcano")
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
 export async function createOrganizationAiInterface(
   db: Database,
   organizationId: string,
@@ -115,6 +135,7 @@ export async function createOrganizationAiInterface(
     selectedModel?: string | null;
     apiKeyEncrypted: string;
     metadata?: string | null;
+    volcanoSetupStatus?: VolcanoSetupStatus | null;
     enabled?: boolean;
     isDefault?: boolean;
   }
@@ -137,6 +158,7 @@ export async function createOrganizationAiInterface(
       selectedModel: input.selectedModel ?? null,
       apiKeyEncrypted: input.apiKeyEncrypted,
       metadata: input.metadata ?? null,
+      volcanoSetupStatus: input.volcanoSetupStatus ?? null,
       enabled: input.enabled ?? true,
       isDefault: input.isDefault ?? false,
       createdAt: now,
@@ -151,9 +173,10 @@ export async function updateOrganizationAiInterface(
   db: Database,
   organizationId: string,
   id: string,
-  input: UpdateOrganizationAiInterfaceRequest & {
+  input: Omit<UpdateOrganizationAiInterfaceRequest, "metadata"> & {
     apiKeyEncrypted?: string;
     metadata?: string;
+    volcanoSetupStatus?: string | null;
   }
 ): Promise<OrganizationAiInterface> {
   const existing = await getOrganizationAiInterfaceRow(db, organizationId, id);
@@ -179,6 +202,9 @@ export async function updateOrganizationAiInterface(
         ? { selectedModel: input.selectedModel }
         : {}),
       ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+      ...(input.volcanoSetupStatus !== undefined
+        ? { volcanoSetupStatus: input.volcanoSetupStatus }
+        : {}),
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
       ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
       ...(input.apiKeyEncrypted !== undefined

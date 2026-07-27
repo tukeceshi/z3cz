@@ -164,11 +164,6 @@ export function AiImageHistoryOverlay({
                           </span>
                         )}
                       </div>
-                      {item.prompt ? (
-                        <span className="line-clamp-2 block text-[10px] text-muted-foreground">
-                          {item.prompt}
-                        </span>
-                      ) : null}
                       {isCurrent ? (
                         <span className="mt-1 block text-[10px] text-muted-foreground">
                           {t("workflow.aiImagePanel.historySelected")}

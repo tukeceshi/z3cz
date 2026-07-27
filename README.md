@@ -44,11 +44,13 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 #### 更新
 
 ```bash
-# 推荐：一条命令
+# 推荐：pull → 预检/按序迁移 → rebuild
 sudo bash /var/dafthunk/scripts/host/update.sh
 
-# 或分步
-cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
+# 仅迁移 / 跳过迁移 / 后台 rebuild
+# sudo bash /var/dafthunk/scripts/host/update.sh --migrate-only
+# sudo bash /var/dafthunk/scripts/host/update.sh --skip-migrate
+# sudo bash /var/dafthunk/scripts/host/update.sh --detach
 ```
 
 #### HTTPS 模式
@@ -289,7 +291,8 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 | `configure.sh`      | 写 `app.yml`（`--force` 覆盖；始终 HTTPS，`tls: auto`） |
 | `https-setup.sh`    | **第 3 步**：预申请证书（LE → ZeroSSL）                  |
 | `deploy.sh`         | 构建并启动（`--detach` 后台）                           |
-| `update.sh`         | `git pull` + deploy（需 sudo）                    |
+| `update.sh`         | `git pull` → 预检/迁移 → deploy（需 sudo；`--skip-migrate` / `--migrate-only`） |
+| `db-migrate.sh`     | 对 pending 迁移跑旁路 `.precheck.sql`，再按 journal 顺序 migrate |
 | `https-fallback.sh` | Caddy 失败后的备用申请（deploy 提示）                      |
 | `https-reload.sh`   | 换文件或改 `tls` 后重启 Caddy                          |
 | `https-try-auto.sh` | 自愿切回 Caddy 自动（用户自行）                            |

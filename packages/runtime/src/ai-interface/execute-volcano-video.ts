@@ -24,6 +24,8 @@ export interface VolcanoVideoSubmitResult {
 
 export interface VolcanoVideoPollResult {
   readonly status: "pending" | "completed" | "failed";
+  /** Present while status is pending — from upstream task status. */
+  readonly upstreamPhase?: "queued" | "running";
   readonly videoUrl?: string;
   readonly error?: string;
 }
@@ -223,7 +225,11 @@ export async function pollVolcanoVideoTask(params: {
     return { status: "completed", videoUrl };
   }
 
-  return { status: "pending" };
+  if (status === "queued" || status === "pending" || status === "created") {
+    return { status: "pending", upstreamPhase: "queued" };
+  }
+
+  return { status: "pending", upstreamPhase: "running" };
 }
 
 export async function downloadVolcanoVideo(params: {

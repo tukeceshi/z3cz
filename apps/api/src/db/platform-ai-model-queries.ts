@@ -394,6 +394,43 @@ export async function failAiModelInvocationForGenerationJob(
     );
 }
 
+export async function finalizeAiModelInvocation(
+  db: Database,
+  params: {
+    readonly id: string;
+    readonly organizationId: string;
+    readonly status: AiModelInvocation["status"];
+    readonly content?: string;
+    readonly error?: string | null;
+    readonly interfaceId?: string | null;
+    readonly interfaceName?: string | null;
+    readonly generationJobId?: string | null;
+  }
+): Promise<void> {
+  await db
+    .update(aiModelInvocations)
+    .set({
+      status: params.status,
+      ...(params.content !== undefined ? { content: params.content } : {}),
+      ...(params.error !== undefined ? { error: params.error } : {}),
+      ...(params.interfaceId !== undefined
+        ? { interfaceId: params.interfaceId }
+        : {}),
+      ...(params.interfaceName !== undefined
+        ? { interfaceName: params.interfaceName }
+        : {}),
+      ...(params.generationJobId !== undefined
+        ? { generationJobId: params.generationJobId }
+        : {}),
+    })
+    .where(
+      and(
+        eq(aiModelInvocations.id, params.id),
+        eq(aiModelInvocations.organizationId, params.organizationId)
+      )
+    );
+}
+
 export async function listAiModelInvocations(
   db: Database,
   organizationId: string,

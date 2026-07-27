@@ -48,6 +48,8 @@ import { readActiveGenerationJobId } from "@/services/read-active-generation-job
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
   clearGenerativeProgress,
+  formatGenerativeProgressElapsed,
+  readGenerativeProgressStartedAt,
   withGenerativeProgress,
 } from "./generative-progress-utils";
 import {
@@ -89,6 +91,7 @@ import {
   pickDefaultVideoModelCanonicalId,
   referencesFitVideoModelLimits,
   appendAiVideoGeneratedHistoryItems,
+  withAiVideoStagingPreview,
   withAiVideoGeneratingFlag,
   withAiVideoGenerateError,
 } from "./ai-video-node-utils";
@@ -146,7 +149,8 @@ async function pollUntilVideoReady(
   taskId: string,
   aiInterfaceId: string,
   modelCanonicalId: string,
-  workflowId?: string
+  workflowId: string | undefined,
+  onPhase?: (phase: "queued" | "generating") => void
 ): Promise<MediaReference> {
   for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
     const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId, {
@@ -165,6 +169,11 @@ async function pollUntilVideoReady(
     }
     if (result.status === "failed" || result.status === "expired" || result.status === "cancelled") {
       throw new Error(result.error ?? "Video generation failed");
+    }
+    if (result.status === "queued") {
+      onPhase?.("queued");
+    } else {
+      onPhase?.("generating");
     }
     await new Promise((resolve) => {
       setTimeout(resolve, VIDEO_POLL_INTERVAL_MS);
@@ -205,6 +214,7 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
     null
   );
+  const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const [generationParams, setGenerationParams] = useState<
@@ -489,18 +499,14 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
 
   const handleStaged = useCallback(
     (localMedia: readonly LocalMediaReference[]) => {
-      const video = localMedia[0];
-      if (!video || !updateNodeData) return;
+      if (!updateNodeData || localMedia.length === 0) return;
       updateNodeData(nodeId, (current) => {
-        const withResult = appendAiVideoGeneratedHistoryItems(current, [video], {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
+        const withPreview = withAiVideoStagingPreview(current, localMedia);
         return {
-          ...withResult,
+          ...withPreview,
           metadata: withAiVideoGenerateError(
             withGenerativeProgress(
-              withAiVideoGeneratingFlag(withResult.metadata, true),
+              withAiVideoGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
                 stagingMediaIds: localMedia.map((entry) => entry.mediaId),
@@ -511,7 +517,7 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
         };
       });
     },
-    [generationParams, nodeId, promptForGenerate, updateNodeData]
+    [nodeId, updateNodeData]
   );
 
   const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
@@ -530,6 +536,42 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
       onResumeSuccess: handleResumeSuccess,
       onResumeError: handleResumeError,
     });
+
+  useEffect(() => {
+    if (!activeProgressPhase) {
+      return;
+    }
+    setProgressNowMs(Date.now());
+    const timerId = window.setInterval(() => {
+      setProgressNowMs(Date.now());
+    }, 1000);
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [activeProgressPhase]);
+
+  const progressButtonLabel = useMemo(() => {
+    const base = t(generativeVideoProgressButtonKey(activeProgressPhase));
+    const startedAt = readGenerativeProgressStartedAt(data.metadata);
+    if (!activeProgressPhase || !startedAt) {
+      return base;
+    }
+    const { minutes, seconds } = formatGenerativeProgressElapsed(
+      startedAt,
+      progressNowMs
+    );
+    const elapsed =
+      minutes > 0
+        ? t("workflow.aiVideoPanel.progressElapsedMinutes", {
+            minutes,
+            seconds: String(seconds).padStart(2, "0"),
+          })
+        : t("workflow.aiVideoPanel.progressElapsedSeconds", { seconds });
+    return t("workflow.aiVideoPanel.progressWithElapsed", {
+      label: base.replace(/[….]+$/u, "").trimEnd(),
+      elapsed,
+    });
+  }, [activeProgressPhase, data.metadata, progressNowMs, t]);
 
   const promptReferenceSourceName = useMemo(() => {
     const edge = edges.find(
@@ -865,7 +907,8 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
             submitResponse.taskId,
             submitResponse.aiInterfaceId,
             submitPayload.modelCanonicalId,
-            workflowId
+            workflowId,
+            (phase) => syncProgress({ phase })
           );
         }
         return {
@@ -1209,7 +1252,7 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
             ) : (
               <SparklesIcon className="h-3.5 w-3.5" />
             )}
-            {t(generativeVideoProgressButtonKey(activeProgressPhase))}
+            {progressButtonLabel}
           </Button>
         </div>
       </GenerativeConfigPanelShell>

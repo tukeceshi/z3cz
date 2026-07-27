@@ -60,6 +60,7 @@ export function shouldDeferClientPersistToServer(job: {
 export type GenerationJobPersistOwner = "client" | "server";
 
 export type GenerationJobDisplayPhase =
+  | "queued"
   | "generating"
   | "ready_to_persist"
   | "downloading"
@@ -77,6 +78,8 @@ export interface GenerationJobPendingMedia {
 
 export type GenerationJobPersistDispatch = "api" | "worker";
 
+export type GenerationJobUpstreamVideoStatus = "queued" | "running";
+
 export interface GenerationJobResultJson {
   readonly pendingMedia?: readonly GenerationJobPendingMedia[];
   readonly finalMedia?: readonly MediaReference[];
@@ -90,6 +93,8 @@ export interface GenerationJobResultJson {
   readonly persistWorkerId?: string;
   readonly workerDispatchedAt?: string;
   readonly workerClaimedAt?: string;
+  /** Latest non-terminal upstream video poll phase (Volcengine queued/running). */
+  readonly upstreamVideoStatus?: GenerationJobUpstreamVideoStatus;
 }
 
 export interface GenerationJobRecord {

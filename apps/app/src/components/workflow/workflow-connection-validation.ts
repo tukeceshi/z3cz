@@ -21,6 +21,10 @@ import {
   isAiVideoPromptReferenceTarget,
 } from "./ai-video-prompt-reference";
 import {
+  AI_VIDEO_PROMPT_HANDLE_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+} from "./ai-video-node-utils";
+import {
   evaluateAiAudioPromptReferenceStructural,
   isAiAudioPromptReferenceTarget,
 } from "./ai-audio-prompt-reference";
@@ -60,6 +64,16 @@ const VIRTUAL_REFERENCE_INPUTS: Readonly<
     type: "any",
     repeated: false,
   },
+  [AI_VIDEO_REFERENCE_HANDLE_ID]: {
+    id: AI_VIDEO_REFERENCE_HANDLE_ID,
+    type: "any",
+    repeated: true,
+  },
+  [AI_VIDEO_PROMPT_HANDLE_ID]: {
+    id: AI_VIDEO_PROMPT_HANDLE_ID,
+    type: "any",
+    repeated: false,
+  },
   [AI_AUDIO_PROMPT_HANDLE_ID]: {
     id: AI_AUDIO_PROMPT_HANDLE_ID,
     type: "any",
@@ -79,7 +93,8 @@ function workflowParameterTypesConnect(
   return exactMatch || anyTypeMatch || blobCompatible;
 }
 
-function resolveInputParam(
+/** Resolve an input handle, including virtual generative reference handles. */
+export function resolveWorkflowInputParam(
   node: ReactFlowNode<WorkflowNodeType>,
   handleId: string | null | undefined
 ): WorkflowParameter | undefined {
@@ -92,6 +107,89 @@ function resolveInputParam(
     ...virtual,
     name: virtual.id,
   } as WorkflowParameter;
+}
+
+/** True when an edge is attached to the given input (either stored direction). */
+export function edgeTouchesInputHandle(
+  edge: {
+    readonly source: string;
+    readonly target: string;
+    readonly sourceHandle?: string | null;
+    readonly targetHandle?: string | null;
+  },
+  inputNodeId: string,
+  inputHandleId: string | null | undefined
+): boolean {
+  if (!inputHandleId) return false;
+  return (
+    (edge.target === inputNodeId && edge.targetHandle === inputHandleId) ||
+    (edge.source === inputNodeId && edge.sourceHandle === inputHandleId)
+  );
+}
+
+export interface ResolvedConnectionEndpoints {
+  readonly inputParam: WorkflowParameter;
+  readonly outputParam: WorkflowParameter;
+  readonly inputNodeId: string;
+  readonly inputHandleId: string;
+  readonly outputNodeId: string;
+  readonly outputHandleId: string;
+}
+
+/** Identify which side of a connection is the input (supports reverse drag). */
+export function resolveConnectionEndpoints(
+  connection: Connection,
+  sourceNode: ReactFlowNode<WorkflowNodeType>,
+  targetNode: ReactFlowNode<WorkflowNodeType>
+): ResolvedConnectionEndpoints | null {
+  const sourceOutput = sourceNode.data.outputs.find(
+    (output) => output.id === connection.sourceHandle
+  );
+  const sourceInput = resolveWorkflowInputParam(
+    sourceNode,
+    connection.sourceHandle
+  );
+  const targetInput = resolveWorkflowInputParam(
+    targetNode,
+    connection.targetHandle
+  );
+  const targetOutput = targetNode.data.outputs.find(
+    (output) => output.id === connection.targetHandle
+  );
+
+  if (
+    sourceOutput &&
+    targetInput &&
+    connection.target &&
+    connection.targetHandle
+  ) {
+    return {
+      outputParam: sourceOutput,
+      inputParam: targetInput,
+      inputNodeId: connection.target,
+      inputHandleId: connection.targetHandle,
+      outputNodeId: connection.source!,
+      outputHandleId: connection.sourceHandle!,
+    };
+  }
+
+  if (
+    sourceInput &&
+    targetOutput &&
+    connection.source &&
+    connection.sourceHandle
+  ) {
+    return {
+      outputParam: targetOutput,
+      inputParam: sourceInput,
+      inputNodeId: connection.source,
+      inputHandleId: connection.sourceHandle,
+      outputNodeId: connection.target!,
+      outputHandleId: connection.targetHandle!,
+    };
+  }
+
+  return null;
 }
 
 export interface ValidateWorkflowConnectionParams {
@@ -115,33 +213,15 @@ export function validateWorkflowConnection(
   const targetNode = nodes.find((node) => node.id === conn.target);
   if (!sourceNode || !targetNode) return false;
 
-  const sourceOutput = sourceNode.data.outputs.find(
-    (output) => output.id === conn.sourceHandle
-  );
-  const sourceInput = resolveInputParam(sourceNode, conn.sourceHandle);
-  const targetInput = resolveInputParam(targetNode, conn.targetHandle);
-  const targetOutput = targetNode.data.outputs.find(
-    (output) => output.id === conn.targetHandle
-  );
+  const endpoints = resolveConnectionEndpoints(conn, sourceNode, targetNode);
+  if (!endpoints) return false;
 
-  let inputParam: WorkflowParameter | undefined;
-  let outputParam: WorkflowParameter | undefined;
-  let inputNodeId: string | undefined;
-  let inputHandleId: string | null | undefined;
-
-  if (sourceOutput && targetInput) {
-    outputParam = sourceOutput;
-    inputParam = targetInput;
-    inputNodeId = conn.target;
-    inputHandleId = conn.targetHandle;
-  } else if (sourceInput && targetOutput) {
-    outputParam = targetOutput;
-    inputParam = sourceInput;
-    inputNodeId = conn.source;
-    inputHandleId = conn.sourceHandle;
-  } else {
-    return false;
-  }
+  const {
+    inputParam,
+    outputParam,
+    inputNodeId,
+    inputHandleId,
+  } = endpoints;
 
   if (
     !workflowParameterTypesConnect(outputParam.type, inputParam.type)
@@ -292,12 +372,10 @@ export function validateWorkflowConnection(
     if (!verdict.ok) return false;
   }
 
+  // Non-repeated inputs are exclusive; outputs may fan out to many targets.
   if (!inputParam.repeated) {
-    const hasExistingConnection = edges.some(
-      (edge) =>
-        (edge.target === inputNodeId &&
-          edge.targetHandle === inputHandleId) ||
-        (edge.source === inputNodeId && edge.sourceHandle === inputHandleId)
+    const hasExistingConnection = edges.some((edge) =>
+      edgeTouchesInputHandle(edge, inputNodeId, inputHandleId)
     );
     if (hasExistingConnection) return false;
   }

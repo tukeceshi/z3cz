@@ -252,6 +252,28 @@ export function withAiVideoResult(
   return { inputs, outputs };
 }
 
+/**
+ * Card preview while cloud persist is uploading. Does not append history —
+ * final success path writes the history entry.
+ */
+export function withAiVideoStagingPreview(
+  current: WorkflowNodeType,
+  videos: readonly MediaReference[]
+): Partial<WorkflowNodeType> {
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_VIDEO_RESULT_INPUT_ID,
+    [...videos],
+    "json"
+  );
+  const outputs = current.outputs.map((output) =>
+    output.id === AI_VIDEO_OUTPUT_ID
+      ? ({ ...output, value: [...videos] } as WorkflowParameter)
+      : output
+  );
+  return { inputs, outputs };
+}
+
 export function readAiVideoCardVideos(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],

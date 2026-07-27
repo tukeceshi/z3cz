@@ -28,9 +28,14 @@ import {
   createOrganizationAiInterface,
   deleteOrganizationAiInterface,
   getOrganizationAiInterfaceRow,
+  getVolcanoInterfaceRowForOrganization,
   listOrganizationAiInterfaces,
   updateOrganizationAiInterface,
 } from "../db/ai-interface-queries";
+import {
+  getCreateIdempotencyRecord,
+  insertCreateIdempotencyRecord,
+} from "../db/ai-interface-idempotency-queries";
 import { listPlatformAiModels } from "../db/platform-ai-model-queries";
 import { encryptSecret } from "../utils/encryption";
 import {
@@ -39,12 +44,13 @@ import {
 } from "../utils/encryption-errors";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { getVolcanoArkApiKey } from "../integrations/volcengine/get-api-key";
-import { issueVolcanoArkApiKeyForInterface } from "../integrations/volcengine/issue-volcano-api-key";
 import {
   isVolcanoArkNotOpenedError,
   isAiInterfaceNameConflictError,
+  isVolcanoInterfaceExistsError,
   VOLCANO_ARK_NOT_OPENED_CODE,
   AI_INTERFACE_NAME_CONFLICT_CODE,
+  VOLCANO_INTERFACE_EXISTS_CODE,
 } from "../integrations/volcengine/errors";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
 import { encryptDeferredVolcanoArkApiKey } from "../integrations/volcengine/deferred-api-key";
@@ -74,7 +80,6 @@ import {
   normalizeVolcanoWizardProbeResults,
 } from "../integrations/volcengine/resolve-volcano-activation";
 import { buildVolcanoSnapshot } from "../integrations/volcengine/snapshot";
-import { seedVolcanoPackageListCache } from "../integrations/volcengine/seed-volcano-package-list-cache";
 import { VOLCANO_ARK_INFERENCE_BASE_URL } from "../integrations/volcengine/constants";
 import { defaultBaseUrlForProvider } from "@dafthunk/runtime/ai-interface/builtin-artifact";
 import { mergeVolcanoTosStorage } from "../services/resolve-org-cloud-storage";
@@ -94,6 +99,7 @@ import {
 import { getVolcanoCredentials } from "../integrations/volcengine/ensure-api-key";
 import { ensureVolcanoTosBucketCreated } from "../integrations/volcengine/create-volcano-tos-bucket";
 import { VOLCANO_TOS_DEFAULT_PREFIX } from "@dafthunk/types";
+import type { VolcanoInterfaceSetupQueueMessage } from "@dafthunk/types";
 import {
   mergeApiKeyHintIntoMetadata,
   readApiKeyHint,
@@ -168,6 +174,14 @@ const createSchema = z
     metadata: z.record(z.string(), z.unknown()).optional(),
     enabled: z.boolean().optional(),
     isDefault: z.boolean().optional(),
+    tosStorage: z
+      .object({
+        enabled: z.boolean(),
+        bucket: z.string().trim().min(1),
+        region: z.string().trim().min(1),
+        createBucket: z.boolean().optional(),
+      })
+      .optional(),
   })
   .superRefine((value, ctx) => {
     if (isVolcanoAiInterfaceProvider(value.provider)) {
@@ -615,6 +629,9 @@ aiInterfaceRoutes.get("/:id", async (c) => {
       hasApiKey: row.apiKeyEncrypted.length > 0,
       apiKeyHint: readApiKeyHint(metadata),
       metadata,
+      volcanoSetupStatus:
+        (row.volcanoSetupStatus as OrganizationAiInterface["volcanoSetupStatus"]) ??
+        null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -626,19 +643,176 @@ aiInterfaceRoutes.get("/:id", async (c) => {
   }
 });
 
+aiInterfaceRoutes.post("/:id/volcano-setup/retry", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const id = c.req.param("id");
+  const db = createDatabase(c.env);
+
+  try {
+    const row = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    if (!row) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+    if (!isVolcanoAiInterfaceProvider(row.provider)) {
+      return c.json({ error: "Not a Volcano interface" }, 400);
+    }
+
+    const status = row.volcanoSetupStatus;
+    if (status !== "failed" && status !== "enqueue_failed") {
+      return c.json(
+        { error: "Setup is not in a failed state", status },
+        409
+      );
+    }
+
+    const metadata = parseInterfaceMetadata(row.metadata);
+    if (!isVolcanoMetadata(metadata)) {
+      return c.json({ error: "Volcano metadata not configured" }, 400);
+    }
+
+    const nextMetadata = {
+      ...metadata,
+      setupStatus: "pending" as const,
+      setupError: null,
+    };
+    await updateOrganizationAiInterface(db, organizationId, id, {
+      volcanoSetupStatus: "pending",
+      metadata: serializeInterfaceMetadata(nextMetadata),
+    });
+
+    const setupMessage: VolcanoInterfaceSetupQueueMessage = {
+      kind: "volcano_interface_setup",
+      organizationId,
+      interfaceId: id,
+      idempotencyKey: metadata.setupIdempotencyKey ?? id,
+    };
+
+    try {
+      await c.env.WORKFLOW_QUEUE.send(setupMessage);
+    } catch (enqueueError) {
+      console.error("Failed to re-enqueue volcano setup:", enqueueError);
+      await updateOrganizationAiInterface(db, organizationId, id, {
+        volcanoSetupStatus: "enqueue_failed",
+        metadata: serializeInterfaceMetadata({
+          ...nextMetadata,
+          setupStatus: "enqueue_failed",
+          setupError:
+            enqueueError instanceof Error
+              ? enqueueError.message
+              : "Failed to enqueue setup",
+        }),
+      });
+      return c.json({ error: "Failed to enqueue setup" }, 500);
+    }
+
+    const refreshed = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    if (!refreshed) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+    const refreshedMetadata = refreshed.metadata
+      ? parseInterfaceMetadata(refreshed.metadata)
+      : null;
+    return c.json({
+      interface: {
+        id: refreshed.id,
+        organizationId: refreshed.organizationId,
+        templateId: refreshed.templateId,
+        templateVersion: refreshed.templateVersion,
+        name: refreshed.name,
+        provider: refreshed.provider as OrganizationAiInterface["provider"],
+        baseUrl: refreshed.baseUrl,
+        selectedModel: refreshed.selectedModel,
+        enabled: refreshed.enabled,
+        isDefault: refreshed.isDefault,
+        hasApiKey: refreshed.apiKeyEncrypted.length > 0,
+        apiKeyHint: readApiKeyHint(refreshedMetadata),
+        metadata: refreshedMetadata,
+        volcanoSetupStatus:
+          (refreshed.volcanoSetupStatus as OrganizationAiInterface["volcanoSetupStatus"]) ??
+          null,
+        createdAt: refreshed.createdAt.toISOString(),
+        updatedAt: refreshed.updatedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error retrying volcano setup:", error);
+    return mapAiInterfaceError(c, error, "Failed to retry volcano setup");
+  }
+});
+
 aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
   const organizationId = c.get("organizationId")!;
   const body = c.req.valid("json");
   const db = createDatabase(c.env);
   const provider = body.provider as AiInterfaceProvider;
+  const idempotencyKey =
+    c.req.header("Idempotency-Key")?.trim() ||
+    c.req.header("idempotency-key")?.trim() ||
+    "";
 
   try {
-    let apiKeyEncrypted = "";
-    let metadataRaw: string | null = null;
-    let baseUrl =
-      body.baseUrl ?? defaultBaseUrlForProvider(provider) ?? null;
-
     if (isVolcanoAiInterfaceProvider(provider)) {
+      if (idempotencyKey) {
+        const existingIdempotency = await getCreateIdempotencyRecord(
+          db,
+          idempotencyKey
+        );
+        if (existingIdempotency) {
+          if (existingIdempotency.organizationId !== organizationId) {
+            return c.json({ error: "Idempotency key conflict" }, 409);
+          }
+          const existingIface = await getOrganizationAiInterfaceRow(
+            db,
+            organizationId,
+            existingIdempotency.interfaceId
+          );
+          if (existingIface) {
+            const metadata = existingIface.metadata
+              ? parseInterfaceMetadata(existingIface.metadata)
+              : null;
+            return c.json(
+              {
+                interface: {
+                  id: existingIface.id,
+                  organizationId: existingIface.organizationId,
+                  templateId: existingIface.templateId,
+                  templateVersion: existingIface.templateVersion,
+                  name: existingIface.name,
+                  provider: existingIface.provider as OrganizationAiInterface["provider"],
+                  baseUrl: existingIface.baseUrl,
+                  selectedModel: existingIface.selectedModel,
+                  enabled: existingIface.enabled,
+                  isDefault: existingIface.isDefault,
+                  hasApiKey: existingIface.apiKeyEncrypted.length > 0,
+                  apiKeyHint: readApiKeyHint(metadata),
+                  metadata,
+                  volcanoSetupStatus:
+                    (existingIface.volcanoSetupStatus as OrganizationAiInterface["volcanoSetupStatus"]) ??
+                    null,
+                  createdAt: existingIface.createdAt.toISOString(),
+                  updatedAt: existingIface.updatedAt.toISOString(),
+                },
+              },
+              201
+            );
+          }
+        }
+      }
+
+      const existingVolcano = await getVolcanoInterfaceRowForOrganization(
+        db,
+        organizationId
+      );
+      if (existingVolcano) {
+        return c.json(
+          {
+            error: "A Volcano interface already exists in this organization",
+            code: VOLCANO_INTERFACE_EXISTS_CODE,
+          },
+          409
+        );
+      }
+
       const secretAccessKeyEncrypted = await encryptSecret(
         body.secretAccessKey!,
         c.env,
@@ -659,59 +833,136 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
             catalogEntries
           )
         : metadata;
-      const credentials = {
-        accessKeyId: body.accessKeyId!,
-        secretAccessKey: body.secretAccessKey!,
-        region: metadataWithActivation.region,
+
+      const interfaceId = crypto.randomUUID();
+      const metadataPending = {
+        ...metadataWithActivation,
+        arkApiKeyPending: true,
+        setupStatus: "pending" as const,
+        setupError: null,
+        ...(idempotencyKey ? { setupIdempotencyKey: idempotencyKey } : {}),
       };
-      const issued = await issueVolcanoArkApiKeyForInterface({
-        credentials,
-        catalogEntries,
-      });
-      if (issued) {
-        metadataRaw = serializeInterfaceMetadata(
-          withApiKeyHint(
-            {
-              ...metadataWithActivation,
-              arkApiKeyExpiresAt: issued.expiresAt,
-            },
-            issued.apiKey
-          )
-        );
-        apiKeyEncrypted = await encryptSecret(
-          issued.apiKey,
-          c.env,
-          organizationId
-        );
-      } else {
-        metadataRaw = serializeInterfaceMetadata({
-          ...metadataWithActivation,
-          arkApiKeyPending: true,
-        });
-        apiKeyEncrypted = await encryptDeferredVolcanoArkApiKey(
-          c.env,
-          organizationId
-        );
-      }
-      baseUrl = body.baseUrl ?? VOLCANO_ARK_INFERENCE_BASE_URL;
-    } else {
-      apiKeyEncrypted = await encryptSecret(
-        body.apiKey!,
+
+      const apiKeyEncrypted = await encryptDeferredVolcanoArkApiKey(
         c.env,
         organizationId
       );
-      metadataRaw = serializeInterfaceMetadata(
-        mergeApiKeyHintIntoMetadata(
-          (body.metadata as Record<string, unknown> | undefined) ?? undefined,
-          body.apiKey!
-        )
-      );
+
+      const iface = await createOrganizationAiInterface(db, organizationId, {
+        name: body.name,
+        provider,
+        baseUrl: body.baseUrl ?? VOLCANO_ARK_INFERENCE_BASE_URL,
+        selectedModel: body.selectedModel ?? null,
+        enabled: body.enabled,
+        isDefault: body.isDefault,
+        id: interfaceId,
+        apiKeyEncrypted,
+        metadata: serializeInterfaceMetadata(metadataPending),
+        volcanoSetupStatus: "pending",
+      });
+
+      if (idempotencyKey) {
+        const inserted = await insertCreateIdempotencyRecord(db, {
+          key: idempotencyKey,
+          organizationId,
+          interfaceId,
+        });
+        if (!inserted) {
+          const raced = await getCreateIdempotencyRecord(db, idempotencyKey);
+          if (raced && raced.interfaceId !== interfaceId) {
+            await deleteOrganizationAiInterface(db, organizationId, interfaceId);
+            const winner = await getOrganizationAiInterfaceRow(
+              db,
+              organizationId,
+              raced.interfaceId
+            );
+            if (winner) {
+              const metadata = winner.metadata
+                ? parseInterfaceMetadata(winner.metadata)
+                : null;
+              return c.json(
+                {
+                  interface: {
+                    id: winner.id,
+                    organizationId: winner.organizationId,
+                    templateId: winner.templateId,
+                    templateVersion: winner.templateVersion,
+                    name: winner.name,
+                    provider: winner.provider as OrganizationAiInterface["provider"],
+                    baseUrl: winner.baseUrl,
+                    selectedModel: winner.selectedModel,
+                    enabled: winner.enabled,
+                    isDefault: winner.isDefault,
+                    hasApiKey: winner.apiKeyEncrypted.length > 0,
+                    apiKeyHint: readApiKeyHint(metadata),
+                    metadata,
+                    volcanoSetupStatus:
+                      (winner.volcanoSetupStatus as OrganizationAiInterface["volcanoSetupStatus"]) ??
+                      null,
+                    createdAt: winner.createdAt.toISOString(),
+                    updatedAt: winner.updatedAt.toISOString(),
+                  },
+                },
+                201
+              );
+            }
+          }
+        }
+      }
+
+      const setupMessage: VolcanoInterfaceSetupQueueMessage = {
+        kind: "volcano_interface_setup",
+        organizationId,
+        interfaceId,
+        idempotencyKey: idempotencyKey || interfaceId,
+        ...(body.tosStorage?.enabled
+          ? {
+              tosSetup: {
+                enabled: true,
+                region: body.tosStorage.region,
+                bucket: body.tosStorage.bucket,
+                createBucket: body.tosStorage.createBucket,
+              },
+            }
+          : {}),
+      };
+
+      try {
+        await c.env.WORKFLOW_QUEUE.send(setupMessage);
+      } catch (enqueueError) {
+        console.error("Failed to enqueue volcano setup:", enqueueError);
+        await updateOrganizationAiInterface(db, organizationId, interfaceId, {
+          volcanoSetupStatus: "enqueue_failed",
+          metadata: serializeInterfaceMetadata({
+            ...metadataPending,
+            setupStatus: "enqueue_failed",
+            setupError:
+              enqueueError instanceof Error
+                ? enqueueError.message
+                : "Failed to enqueue setup",
+          }),
+        });
+      }
+
+      return c.json({ interface: iface }, 201);
     }
+
+    const apiKeyEncrypted = await encryptSecret(
+      body.apiKey!,
+      c.env,
+      organizationId
+    );
+    const metadataRaw = serializeInterfaceMetadata(
+      mergeApiKeyHintIntoMetadata(
+        (body.metadata as Record<string, unknown> | undefined) ?? undefined,
+        body.apiKey!
+      )
+    );
 
     const iface = await createOrganizationAiInterface(db, organizationId, {
       name: body.name,
       provider,
-      baseUrl,
+      baseUrl: body.baseUrl ?? defaultBaseUrlForProvider(provider) ?? null,
       selectedModel: body.selectedModel ?? null,
       enabled: body.enabled,
       isDefault: body.isDefault,
@@ -720,43 +971,21 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
       metadata: metadataRaw,
     });
 
-    if (isVolcanoAiInterfaceProvider(provider)) {
-      try {
-        await seedVolcanoPackageListCache({
-          env: c.env,
-          organizationId,
-          interfaceId: iface.id,
-        });
-        const refreshed = await getOrganizationAiInterfaceRow(
-          db,
-          organizationId,
-          iface.id
-        );
-        if (refreshed) {
-          return c.json(
-            {
-              interface: {
-                ...iface,
-                metadata: refreshed.metadata
-                  ? parseInterfaceMetadata(refreshed.metadata)
-                  : iface.metadata,
-                updatedAt: refreshed.updatedAt.toISOString(),
-              },
-            },
-            201
-          );
-        }
-      } catch (error) {
-        console.error("Failed to seed volcano package list cache:", error);
-      }
-    }
-
     return c.json({ interface: iface }, 201);
   } catch (error) {
     if (isVolcanoArkNotOpenedError(error)) {
       return c.json(
         { error: error.message, code: VOLCANO_ARK_NOT_OPENED_CODE },
         400
+      );
+    }
+    if (isVolcanoInterfaceExistsError(error)) {
+      return c.json(
+        {
+          error: "A Volcano interface already exists in this organization",
+          code: VOLCANO_INTERFACE_EXISTS_CODE,
+        },
+        409
       );
     }
     if (isAiInterfaceNameConflictError(error)) {

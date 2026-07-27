@@ -14,6 +14,8 @@ import { makeRequest } from "./utils";
 export const VOLCANO_ARK_NOT_OPENED_CODE = "volcano_ark_not_opened" as const;
 export const AI_INTERFACE_NAME_CONFLICT_CODE =
   "ai_interface_name_conflict" as const;
+export const VOLCANO_INTERFACE_EXISTS_CODE =
+  "volcano_interface_exists" as const;
 export const VOLCANO_TOS_NOT_OPENED_CODE = "volcano_tos_not_opened" as const;
 
 function orgEndpoint(organizationId: string): string {
@@ -39,14 +41,41 @@ export function useOrganizationAiInterfaces(organizationId: string | undefined) 
 
 export async function createOrganizationAiInterface(
   organizationId: string,
-  input: CreateOrganizationAiInterfaceRequest
+  input: CreateOrganizationAiInterfaceRequest,
+  options?: { readonly idempotencyKey?: string }
 ): Promise<OrganizationAiInterface> {
+  const headers: HeadersInit = {};
+  if (options?.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
+  }
   const response = await makeRequest<{ interface: OrganizationAiInterface }>(
     orgEndpoint(organizationId),
     {
       method: "POST",
       body: JSON.stringify(input),
+      headers,
     }
+  );
+  return response.interface;
+}
+
+export async function fetchOrganizationAiInterface(
+  organizationId: string,
+  interfaceId: string
+): Promise<OrganizationAiInterface> {
+  const response = await makeRequest<{ interface: OrganizationAiInterface }>(
+    `${orgEndpoint(organizationId)}/${interfaceId}`
+  );
+  return response.interface;
+}
+
+export async function retryVolcanoInterfaceSetup(
+  organizationId: string,
+  interfaceId: string
+): Promise<OrganizationAiInterface> {
+  const response = await makeRequest<{ interface: OrganizationAiInterface }>(
+    `${orgEndpoint(organizationId)}/${interfaceId}/volcano-setup/retry`,
+    { method: "POST" }
   );
   return response.interface;
 }
