@@ -24,3 +24,6 @@ data/ai-interface-templates/
 
 # Docker bind-mounted API logs (docker-compose.dev.yml)
 logs/
+
+# Local agent / SSH diagnostics (not committed)
+.local/

@@ -82,13 +82,18 @@ sync_host_scripts() {
   local dir="${INSTALL_DIR}/scripts/host"
   mkdir -p "$dir"
   log "Syncing scripts/host from GitHub"
-  for name in bootstrap configure deploy use-http renew-https update; do
+  for name in bootstrap configure deploy update https-fallback https-reload https-try-auto https-renew-hook; do
     if curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"; then
       chmod +x "${dir}/${name}.sh"
     else
       info "Skip ${name}.sh (not on ${RAW_BASE} yet — use git pull after clone)"
     fi
   done
+  if curl -fsSL "${RAW_BASE}/https-common.sh" -o "${dir}/https-common.sh"; then
+    :
+  else
+    info "Skip https-common.sh (use git pull after clone)"
+  fi
 }
 
 log "Bootstrap"

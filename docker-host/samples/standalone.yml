@@ -9,6 +9,9 @@ hostname: workflow.example.com
 # localhost / 私网 IP 请设为 false
 https: true
 
+# auto = Caddy 自动申请 | fallback = 备用申请（文件） | manual = 手动上传（文件，不自动续期）
+tls: auto
+
 # Let's Encrypt 通知邮箱（可选，与平台 admin 无关）
 # le_email: admin@example.com
 

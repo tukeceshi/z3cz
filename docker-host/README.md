@@ -4,6 +4,8 @@
 
 宿主机只需 **Docker + Git + bash**。`./launcher` 在无 Node 时用临时 Node 容器生成 compose。
 
+**须通过 `https://你的域名` 访问**（HTTP 不支持登录与 AI 上传）。
+
 ## 安装（三步）
 
 ```bash
@@ -11,80 +13,73 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-
 
 sudo bash /var/dafthunk/scripts/host/configure.sh
 
-# 仅 HTTP（可选）
-sudo bash /var/dafthunk/scripts/host/configure.sh --http
-
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 # 后台：sudo /var/dafthunk/scripts/host/deploy.sh --detach
 ```
 
-默认 `/var/dafthunk`。日志：`rebuild.log`。后台：`tmux attach -t dafthunk-deploy`。
+默认 `/var/dafthunk`，`tls: auto`。日志：`rebuild.log`。
 
 ## 更新
-
-仓库由 bootstrap 以 root 克隆，更新时必须 **sudo git pull**（勿改 `git config safe.directory`）：
 
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
 ```
 
-或：
-
-```bash
-cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
-```
-
-仅切换 HTTP/HTTPS 时：`sudo git pull` 后运行 `use-http.sh` 或 `renew-https.sh`，不必全量 deploy。
-
-## 应急
+## 应急（deploy 引导范围）
 
 | 情况 | 命令 |
 |------|------|
-| 构建中断 | `sudo scripts/host/deploy.sh` 或 `tmux attach -t dafthunk-deploy` |
-| HTTPS 失败 / LE 限流 | `sudo bash scripts/host/use-http.sh` |
-| 重新申请 HTTPS 证书 | `sudo bash scripts/host/renew-https.sh` |
-| 改域名 | `sudo scripts/host/configure.sh --force` 再 deploy |
-| 无 app.yml | `./dafthunk-setup` |
-| 日志 | `less /var/dafthunk/rebuild.log` |
+| HTTPS 未就绪 | `sudo bash scripts/host/https-fallback.sh` |
+| 构建中断 | `sudo scripts/host/deploy.sh` |
 
-## HTTP / HTTPS
+备用仍失败 → **手动模式**（见下），不在 deploy 脚本里自动切换。
 
-| 目的 | 命令 |
-|------|------|
-| 首次安装即 HTTP | `sudo bash scripts/host/configure.sh --http` |
-| 运行中切 HTTP | `sudo bash scripts/host/use-http.sh` |
-| 删旧证、重开 HTTPS | `sudo bash scripts/host/renew-https.sh` |
+## HTTPS 模式
 
-`use-http.sh` / `renew-https.sh` 会改 `containers/app.yml`、执行 `launcher render`、重建 www/app，并 `--force-recreate` caddy（及 api）。`renew-https.sh` 还会删除 `shared/caddy/caddy/certificates/`。
+| 模式 | `tls` | 续期 |
+|------|-------|------|
+| 自动 | `auto` | Caddy |
+| 备用 | `fallback` | 先试回 Caddy，否则 acme.sh |
+| 手动 | `manual` | 无（用户换文件 + reload） |
 
-Let's Encrypt 7 天内同一域名申请次数有限；反复重装易触发限流。限流期间用 HTTP，解除后再 `renew-https.sh`。
+### 证书文件（fallback / manual 共用）
 
-## 已有仓库（手动）
-
-```bash
-cd docker-host && ./dafthunk-setup
 ```
+shared/caddy/certs/<域名>/fullchain.pem
+shared/caddy/certs/<域名>/privkey.pem
+```
+
+Caddy 自动模式证书在 `shared/caddy/` 内部，不在上述路径。
+
+### 手动模式
+
+1. 上传两个 pem 到上路径
+2. `containers/app.yml` 设 `tls: manual`
+3. `sudo bash scripts/host/https-reload.sh`
+
+换证：覆盖 pem → `https-reload.sh`。
+
+### 用户自行（不进 deploy）
+
+| 操作 | 命令 |
+|------|------|
+| 切回 Caddy 自动 | `sudo bash scripts/host/https-try-auto.sh` |
+| 换证 / 改 tls 后生效 | `sudo bash scripts/host/https-reload.sh` |
 
 ## 常用命令
 
 ```bash
 ./launcher status
-./launcher logs -f api
+./launcher logs -f caddy
 ./launcher rebuild
-./launcher destroy
 ```
 
 ## 布局
 
 | 路径 | 说明 |
 |------|------|
-| `containers/app.yml` | configure / setup 生成 |
-| `shared/` | Postgres / 存储 / Caddy（证书在 `shared/caddy/caddy/certificates/`） |
-| `../scripts/host/` | bootstrap / configure / deploy / update / use-http / renew-https |
+| `containers/app.yml` | `tls: auto \| fallback \| manual` |
+| `shared/caddy/certs/` | fallback / manual 证书文件 |
+| `../scripts/host/` | bootstrap / configure / deploy / https-* |
 
-## 与开发栈
-
-- 开发：根目录 `docker compose up` → `:3100` / `:3101` / `:3102`
-- 自托管：launcher → `:80` / `:443`
-
-两套 compose 数据不共享。
+两套 compose（开发 / 自托管）数据不共享。

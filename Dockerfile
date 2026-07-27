@@ -169,6 +169,9 @@ CMD ["pnpm", "start"]
 # --- Node API 生产运行（tsx 直跑源码，无需 pnpm build）---
 FROM deps AS prod-api
 
+# Workflow create/validate reads apps/www/data/nodes.json at runtime.
+RUN pnpm --filter '@dafthunk/www' extract-nodes
+
 COPY docker/prod-api-entrypoint.sh /usr/local/bin/prod-api-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/prod-api-entrypoint.sh \
   && chmod +x /usr/local/bin/prod-api-entrypoint.sh

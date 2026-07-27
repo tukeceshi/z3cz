@@ -66,6 +66,34 @@ export function loadAppConfig() {
 /**
  * @param {ReturnType<typeof loadAppConfig>} config
  */
+function usesFileTls(config) {
+  return config.tls === "fallback" || config.tls === "manual";
+}
+
+/**
+ * @param {ReturnType<typeof loadAppConfig>} config
+ */
+function tlsDirective(config) {
+  if (!usesFileTls(config)) {
+    return "";
+  }
+  const base = `/etc/caddy/certs/${config.hostname}`;
+  return `\ttls ${base}/fullchain.pem ${base}/privkey.pem\n`;
+}
+
+/**
+ * @param {ReturnType<typeof loadAppConfig>} config
+ */
+function caddyExtraVolumes(config) {
+  if (!usesFileTls(config)) {
+    return "";
+  }
+  return "      - ./shared/caddy/certs:/etc/caddy/certs:ro\n";
+}
+
+/**
+ * @param {ReturnType<typeof loadAppConfig>} config
+ */
 export function renderCaddyfile(config) {
   const siteHandler = `	handle_path /api/* {
 		reverse_proxy api:3102
@@ -78,8 +106,9 @@ export function renderCaddyfile(config) {
     const global = config.le_email
       ? `{\n\temail ${config.le_email}\n}\n\n`
       : "";
+    const tls = tlsDirective(config);
     return `${global}${config.hostname} {
-${siteHandler}
+${tls}${siteHandler}
 }
 `;
   }
@@ -207,7 +236,7 @@ services:
       - ./Caddyfile.generated:/etc/caddy/Caddyfile:ro
       - ./shared/caddy:/data
       - ./shared/caddy-config:/config
-    restart: unless-stopped
+${caddyExtraVolumes(config)}    restart: unless-stopped
 `;
 }
 

@@ -122,6 +122,7 @@ async function main() {
   const yaml = stringifyAppYml({
     hostname,
     https,
+    tls: "auto",
     le_email: leEmail,
     http_port: httpPort,
     https_port: httpsPort,

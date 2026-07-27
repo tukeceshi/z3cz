@@ -32,6 +32,7 @@ export function ensureHostDirs() {
     path.join(sharedDir, "postgres"),
     path.join(sharedDir, "storage"),
     path.join(sharedDir, "caddy"),
+    path.join(sharedDir, "caddy", "certs"),
     path.join(sharedDir, "backups"),
   ]) {
     fs.mkdirSync(dir, { recursive: true });

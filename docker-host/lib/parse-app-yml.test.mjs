@@ -28,6 +28,7 @@ test("stringifyAppYml round-trip", () => {
   const yaml = stringifyAppYml({
     hostname: "localhost",
     https: false,
+    tls: "auto",
     http_port: 8080,
     https_port: 443,
     env: {
@@ -48,10 +49,107 @@ test("publicOrigin includes non-default ports", () => {
   assert.equal(publicOrigin("ex.com", true, 80, 443), "https://ex.com");
 });
 
+test("parseAppYml reads tls field", () => {
+  const config = parseAppYml(`
+hostname: example.com
+https: true
+tls: manual
+http_port: 80
+https_port: 443
+env:
+  JWT_SECRET: abc
+  SECRET_MASTER_KEY: def
+`);
+  assert.equal(config.tls, "manual");
+});
+
+test("parseAppYml defaults tls to auto", () => {
+  const config = parseAppYml(`
+hostname: example.com
+https: true
+env:
+  JWT_SECRET: abc
+  SECRET_MASTER_KEY: def
+`);
+  assert.equal(config.tls, "auto");
+});
+
+test("parseAppYml maps legacy acme to fallback", () => {
+  const config = parseAppYml(`
+hostname: example.com
+https: true
+tls: acme
+env:
+  JWT_SECRET: abc
+  SECRET_MASTER_KEY: def
+`);
+  assert.equal(config.tls, "fallback");
+});
+
+test("renderCaddyfile manual tls uses unified cert paths", () => {
+  const file = renderCaddyfile({
+    hostname: "ex.com",
+    https: true,
+    tls: "manual",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {},
+    origin: "https://ex.com",
+  });
+  assert.match(file, /tls \/etc\/caddy\/certs\/ex\.com\/fullchain\.pem/);
+});
+
+test("renderCaddyfile fallback uses same cert paths as manual", () => {
+  const file = renderCaddyfile({
+    hostname: "ex.com",
+    https: true,
+    tls: "fallback",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {},
+    origin: "https://ex.com",
+  });
+  assert.match(file, /tls \/etc\/caddy\/certs\/ex\.com\/fullchain\.pem/);
+});
+
+test("renderCaddyfile auto has no tls line", () => {
+  const file = renderCaddyfile({
+    hostname: "ex.com",
+    https: true,
+    tls: "auto",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {},
+    origin: "https://ex.com",
+  });
+  assert.doesNotMatch(file, /^\ttls /m);
+});
+
+test("renderCompose file tls mounts unified cert dir", () => {
+  const yaml = renderCompose({
+    hostname: "ex.com",
+    https: true,
+    tls: "manual",
+    le_email: "",
+    http_port: 80,
+    https_port: 443,
+    env: {
+      JWT_SECRET: "a".repeat(64),
+      SECRET_MASTER_KEY: "b".repeat(64),
+    },
+    origin: "https://ex.com",
+  });
+  assert.match(yaml, /shared\/caddy\/certs:\/etc\/caddy\/certs:ro/);
+});
+
 test("renderCaddyfile http-only listens on :80", () => {
   const file = renderCaddyfile({
     hostname: "localhost",
     https: false,
+    tls: "auto",
     le_email: "",
     http_port: 8080,
     https_port: 443,
@@ -68,6 +166,7 @@ test("renderCompose is host project without smtp", () => {
   const yaml = renderCompose({
     hostname: "localhost",
     https: false,
+    tls: "auto",
     le_email: "",
     http_port: 8080,
     https_port: 443,
