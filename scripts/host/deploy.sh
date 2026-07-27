@@ -55,10 +55,9 @@ if [[ -n "$hostname" ]] && command -v curl >/dev/null 2>&1; then
     info "HTTPS https://${hostname} → $code"
   else
     info "HTTPS not ready for https://${hostname} — check: sudo docker logs dafthunk-host-caddy-1 2>&1 | tail -30"
-    info "Try: sudo bash ${INSTALL_DIR}/scripts/host/https-fallback.sh"
-    info "If fallback fails too — manual mode (see README / docker-host/README):"
-    info "  ${HOST_DIR}/shared/caddy/certs/${hostname}/fullchain.pem + privkey.pem"
-    info "  set tls: manual in app.yml, then: sudo bash ${INSTALL_DIR}/scripts/host/https-reload.sh"
+    info "Re-run: sudo bash ${INSTALL_DIR}/scripts/host/https-setup.sh"
+    info "Or ZeroSSL only: sudo bash ${INSTALL_DIR}/scripts/host/https-fallback.sh"
+    info "Manual: upload to ${HOST_DIR}/shared/caddy/certs/${hostname}/, tls: manual, then https-reload.sh"
   fi
 fi
 

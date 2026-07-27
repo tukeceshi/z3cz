@@ -82,7 +82,7 @@ sync_host_scripts() {
   local dir="${INSTALL_DIR}/scripts/host"
   mkdir -p "$dir"
   log "Syncing scripts/host from GitHub"
-  for name in bootstrap configure deploy update https-fallback https-reload https-try-auto https-renew-hook; do
+  for name in bootstrap configure https-setup deploy update https-fallback https-reload https-try-auto https-renew-hook; do
     if curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"; then
       chmod +x "${dir}/${name}.sh"
     else
@@ -102,3 +102,4 @@ ensure_swap
 ensure_repo
 sync_host_scripts
 info "Done. Next: sudo bash ${INSTALL_DIR}/scripts/host/configure.sh"
+info "Then: sudo bash ${INSTALL_DIR}/scripts/host/https-setup.sh"

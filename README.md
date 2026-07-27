@@ -25,7 +25,7 @@
 - Linux（推荐 Ubuntu）、sudo、可访问外网
 - 建议内存 + swap 合计约 4G
 
-#### 安装（三步）
+#### 安装（四步）
 
 ```bash
 # 1. 环境 + 拉代码（整行复制）
@@ -34,9 +34,14 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-
 # 2. 写域名配置（交互时可省略 DAFTHUNK_HOSTNAME；始终启用 HTTPS）
 sudo bash /var/dafthunk/scripts/host/configure.sh
 
-# 3. 构建并启动（较慢；后台：加 --detach）
+# 3. 申请 HTTPS 证书（LE → ZeroSSL；成功写入统一目录，tls: fallback）
+sudo bash /var/dafthunk/scripts/host/https-setup.sh
+
+# 4. 构建并启动（较慢；后台：加 --detach）
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
+
+跳过预申请、交给 Caddy 自动办证：`sudo bash .../https-setup.sh --caddy-only`（LE 限流时 HTTPS 可能仍不可用）。
 
 若第 2 步报 `command not found`，先下载再执行：
 
@@ -78,7 +83,7 @@ cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
 | 后台构建 | `tmux attach -t dafthunk-deploy` |
 | 只重构建 | `sudo bash /var/dafthunk/scripts/host/deploy.sh` |
 | 改域名 | `sudo bash /var/dafthunk/scripts/host/configure.sh --force`，再 deploy |
-| HTTPS 未就绪 | `sudo bash /var/dafthunk/scripts/host/https-fallback.sh` |
+| HTTPS 未就绪 | `sudo bash /var/dafthunk/scripts/host/https-setup.sh` 或 `https-fallback.sh` |
 | 换证后生效 | `sudo bash /var/dafthunk/scripts/host/https-reload.sh` |
 | 查看 Caddy 日志 | `sudo docker logs dafthunk-host-caddy-1 2>&1 \| tail -30` |
 | 手动配置 | `cd /var/dafthunk/docker-host && ./dafthunk-setup` |
@@ -89,9 +94,11 @@ cd /var/dafthunk && sudo git pull && sudo bash scripts/host/deploy.sh
 
 | 模式 | `tls` | 说明 |
 |------|-------|------|
-| 自动 | `auto` | Caddy 申请与续期（默认） |
-| 备用 | `fallback` | deploy 提示时跑 `https-fallback.sh`；续期先试回 Caddy |
+| 自动 | `auto` | configure 默认；**https-setup** 会预申请并改为 `fallback`（推荐） |
+| 备用 | `fallback` | acme.sh 证书文件；续期先试回 Caddy |
 | 手动 | `manual` | 自行上传文件，不自动续期 |
+
+**安装顺序**：`configure` → **`https-setup`** → `deploy`。第三步失败时不要 deploy，按提示上传证书或重试。
 
 **文件路径**（`fallback` / `manual` 相同）：
 
@@ -296,12 +303,13 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 ## 部署
 
-三步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下脚本：
+四步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下脚本：
 
 | 脚本 | 作用 |
 |------|------|
 | `bootstrap.sh` | Docker / Git / 拉代码 |
 | `configure.sh` | 写 `app.yml`（`--force` 覆盖；始终 HTTPS，`tls: auto`） |
+| `https-setup.sh` | **第 3 步**：预申请证书（LE → ZeroSSL） |
 | `deploy.sh` | 构建并启动（`--detach` 后台） |
 | `update.sh` | `git pull` + deploy（需 sudo） |
 | `https-fallback.sh` | Caddy 失败后的备用申请（deploy 提示） |

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deprecated wrapper — runs bootstrap → configure → deploy when scripts exist.
+# Deprecated wrapper — runs bootstrap → configure → https-setup → deploy when scripts exist.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,11 +13,13 @@ run() {
     cat >&2 <<EOF
 install-dafthunk is deprecated.
 
-Use three steps (download each script, then run):
+Use four steps (download each script, then run):
 
   curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
 
   sudo DAFTHUNK_HOSTNAME=your.domain ${INSTALL_DIR}/scripts/host/configure.sh
+
+  sudo ${INSTALL_DIR}/scripts/host/https-setup.sh
 
   sudo ${INSTALL_DIR}/scripts/host/deploy.sh
 
@@ -30,4 +32,5 @@ EOF
 
 run "${BASE}/bootstrap.sh"
 run "${BASE}/configure.sh" "$@"
+run "${BASE}/https-setup.sh"
 run "${BASE}/deploy.sh" "$@"
