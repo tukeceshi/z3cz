@@ -63,7 +63,6 @@ adminWorkflowsRoutes.get(
           runtime: workflows.runtime,
           organizationId: workflows.organizationId,
           organizationName: organizations.name,
-          enabled: workflows.enabled,
           createdAt: workflows.createdAt,
           updatedAt: workflows.updatedAt,
         })
@@ -97,7 +96,7 @@ adminWorkflowsRoutes.get(
  * GET /admin/workflows/:id
  *
  * Get full details for a specific workflow including nodes/edges so the
- * admin detail page can render with a single round-trip. No org filter â€?
+ * admin detail page can render with a single round-trip. No org filter ?
  * the admin auth middleware on this router is the safety net, matching how
  * every other /admin/* endpoint exposes cross-org data.
  */
@@ -116,7 +115,6 @@ adminWorkflowsRoutes.get("/:id", async (c) => {
         runtime: workflows.runtime,
         organizationId: workflows.organizationId,
         organizationName: organizations.name,
-        enabled: workflows.enabled,
         createdAt: workflows.createdAt,
         updatedAt: workflows.updatedAt,
       })

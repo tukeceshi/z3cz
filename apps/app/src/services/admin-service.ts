@@ -212,7 +212,6 @@ export interface AdminWorkflow {
   runtime: string;
   organizationId: string;
   organizationName: string;
-  enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
