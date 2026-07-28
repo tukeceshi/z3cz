@@ -29,8 +29,6 @@ import {
 } from "../../ai-image-history-overlay";
 import { readGenerativeProgressPhase } from "../../generative-progress-utils";
 import {
-  AI_VIDEO_CARD_HEIGHT_PX,
-  AI_VIDEO_CARD_WIDTH_PX,
   isAiVideoGenerating,
   readAiVideoCardVideos,
   readAiVideoResultHistory,
@@ -38,6 +36,7 @@ import {
   withAiVideoGenerateError,
   withAiVideoManualUpload,
 } from "../../ai-video-node-utils";
+import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -193,6 +192,11 @@ function AiVideoWidget({
     Boolean(activeVideoUrl) &&
     !activeVideoStale &&
     !activeVideoExpired;
+  const cardSize = useAdaptiveMediaCardSize({
+    displayUrl: activeVideoUrl,
+    hasMedia: Boolean(activeVideo) && !activeVideoExpired && !activeVideoStale,
+    kind: "video",
+  });
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -346,8 +350,8 @@ function AiVideoWidget({
           className
         )}
         style={{
-          width: AI_VIDEO_CARD_WIDTH_PX,
-          height: AI_VIDEO_CARD_HEIGHT_PX,
+          width: cardSize.width,
+          height: cardSize.height,
         }}
         onDoubleClick={(event) => {
           if (generateError) {

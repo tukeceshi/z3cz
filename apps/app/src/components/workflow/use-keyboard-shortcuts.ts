@@ -16,13 +16,14 @@ interface UseKeyboardShortcutsProps {
   cutSelected: () => void;
   pasteFromClipboard: () => void;
   duplicateSelected: () => void;
+  requestDeleteSelected?: () => void;
   onAction?: (e: React.MouseEvent) => void;
   nodeCount: number;
 }
 
 /**
  * Side-effect-only hook that registers global keyboard shortcuts
- * for clipboard operations (Cmd+C/X/V/D) and workflow execution (Cmd+Enter).
+ * for clipboard (Cmd+C/X/V/D), delete (Delete/Backspace), and run (Cmd+Enter).
  */
 export function useKeyboardShortcuts({
   disabled,
@@ -34,6 +35,7 @@ export function useKeyboardShortcuts({
   cutSelected,
   pasteFromClipboard,
   duplicateSelected,
+  requestDeleteSelected,
   onAction,
   nodeCount,
 }: UseKeyboardShortcutsProps): void {
@@ -44,12 +46,25 @@ export function useKeyboardShortcuts({
       const isInputField =
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
-        target.contentEditable === "true";
+        target.isContentEditable;
 
       if (isInputField) return;
 
+      const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
       const isMac = /mac/i.test(navigator.userAgent);
       const isCtrlOrCmd = isMac ? event.metaKey : event.ctrlKey;
+
+      if (
+        !isCtrlOrCmd &&
+        !disabled &&
+        requestDeleteSelected &&
+        hasSelection &&
+        (event.key === "Delete" || event.key === "Backspace")
+      ) {
+        event.preventDefault();
+        requestDeleteSelected();
+        return;
+      }
 
       if (!isCtrlOrCmd) return;
 
@@ -65,8 +80,6 @@ export function useKeyboardShortcuts({
         }
         return;
       }
-
-      const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
 
       switch (event.key.toLowerCase()) {
         case "c":
@@ -108,6 +121,7 @@ export function useKeyboardShortcuts({
     cutSelected,
     pasteFromClipboard,
     duplicateSelected,
+    requestDeleteSelected,
     onAction,
     nodeCount,
   ]);

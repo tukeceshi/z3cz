@@ -40,7 +40,9 @@ export const authService = {
 
   // Get the current user information
   async getCurrentUser(): Promise<JWTTokenPayload | null> {
-    try {
+    const fetchUser = async (): Promise<JWTTokenPayload> => {
+      // skipRefresh: avoid hard session-expired redirect on public pages;
+      // expired access tokens are handled below via an explicit refresh.
       const response = await makeRequest<{ user: JWTTokenPayload }>(
         "/auth/user",
         {
@@ -53,14 +55,41 @@ export const authService = {
         throw new AuthError("Invalid user response format");
       }
 
-      // Basic validation of user data
       if (!response.user.sub || !response.user.name) {
         throw new AuthError("Invalid user data received");
       }
 
       return response.user;
+    };
+
+    try {
+      return await fetchUser();
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
+        try {
+          const refreshResponse = await makeRequest<{
+            success: boolean;
+            user?: JWTTokenPayload;
+          }>(
+            "/auth/refresh",
+            {
+              method: "POST",
+            },
+            true
+          );
+
+          if (
+            refreshResponse.success &&
+            refreshResponse.user?.sub &&
+            refreshResponse.user.name
+          ) {
+            mutate(AUTH_USER_KEY, refreshResponse.user, { revalidate: false });
+            return refreshResponse.user;
+          }
+        } catch {
+          // Refresh failed — treat as logged out below.
+        }
+
         throw new AuthError("Unauthorized", "UNAUTHORIZED");
       }
 

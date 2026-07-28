@@ -289,51 +289,6 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;
 
-  const handleResumeSuccess = useCallback(
-    (audios: readonly import("@dafthunk/types").MediaReference[]) => {
-      const audio = audios[0];
-      if (!audio || !updateNodeData) return;
-      updateNodeData(nodeId, (current) => {
-        const withResult = appendAiAudioGeneratedHistoryItems(current, [audio], {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
-        return {
-          ...withResult,
-          metadata: withAiAudioGenerateError(
-            withAiAudioGeneratingFlag(
-              clearGenerativeProgress(withResult.metadata),
-              false
-            ),
-            null
-          ),
-        };
-      });
-      toast.success("workflow.aiAudioPanel.generated");
-    },
-    [generationParams, nodeId, promptForGenerate, toast, updateNodeData]
-  );
-
-  const handleResumeError = useCallback(
-    (error: unknown) => {
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
-      updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiAudioGenerateError(
-          withAiAudioGeneratingFlag(
-            clearGenerativeProgress(current.metadata),
-            false
-          ),
-          prepareGenerativeCardError(formatted, t)
-        ),
-      }));
-      toast.errorRaw(formatted);
-    },
-    [nodeId, t, toast, updateNodeData]
-  );
-
   const handleStaged = useCallback(
     (localMedia: readonly import("@dafthunk/types").LocalMediaReference[]) => {
       if (!updateNodeData || localMedia.length === 0) return;
@@ -366,12 +321,13 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
       metadata: data.metadata,
       isGenerating,
       persistPhase,
+      autoResume: false,
       updateNodeData,
       setPersistPhase,
       setIsGenerating,
+      applyBusyMetadata: (metadata, busy) =>
+        withAiAudioGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
-      onResumeSuccess: handleResumeSuccess,
-      onResumeError: handleResumeError,
     });
 
   const promptReferenceSourceName = useMemo(() => {

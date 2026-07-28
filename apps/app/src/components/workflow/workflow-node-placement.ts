@@ -110,7 +110,7 @@ export function resolveWorkflowNodeDimensions(
   return { width: 200, height: isOutputNode ? 250 : 100 };
 }
 
-/** Card size for add-node placement; generative nodes ignore measured DOM size. */
+/** Card size for add-node placement; image/video prefer measured adaptive size. */
 export function resolveWorkflowNodeCardSizeForPlacement(
   nodeType: string | undefined,
   node?: Pick<ReactFlowNode, "measured" | "width" | "height">
@@ -122,12 +122,24 @@ export function resolveWorkflowNodeCardSizeForPlacement(
     };
   }
   if (nodeType === AI_IMAGE_NODE_TYPE) {
+    if (node?.measured?.width && node?.measured?.height) {
+      return { width: node.measured.width, height: node.measured.height };
+    }
+    if (node?.width && node?.height) {
+      return { width: node.width, height: node.height };
+    }
     return {
       width: AI_IMAGE_CARD_WIDTH_PX,
       height: AI_IMAGE_CARD_HEIGHT_PX,
     };
   }
   if (nodeType === AI_VIDEO_NODE_TYPE) {
+    if (node?.measured?.width && node?.measured?.height) {
+      return { width: node.measured.width, height: node.measured.height };
+    }
+    if (node?.width && node?.height) {
+      return { width: node.width, height: node.height };
+    }
     return {
       width: AI_VIDEO_CARD_WIDTH_PX,
       height: AI_VIDEO_CARD_HEIGHT_PX,

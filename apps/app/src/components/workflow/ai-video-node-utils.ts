@@ -21,15 +21,19 @@ import {
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
 
+import {
+  AI_VIDEO_EMPTY_CARD_SIZE,
+} from "./media-card-size";
+
 export const AI_VIDEO_REFERENCE_HANDLE_ID = "reference_images" as const;
 export const AI_VIDEO_PROMPT_HANDLE_ID = "prompt_reference" as const;
 export const AI_VIDEO_OUTPUT_ID = "videos" as const;
 export const AI_VIDEO_RESULT_INPUT_ID = "videos_result" as const;
 export const AI_VIDEO_HISTORY_INPUT_ID = "videos_history" as const;
 
-/** Canvas card size — 16:9 (480×270). */
-export const AI_VIDEO_CARD_WIDTH_PX = 480;
-export const AI_VIDEO_CARD_HEIGHT_PX = 270;
+/** Empty / placement default — adaptive size used once media loads. */
+export const AI_VIDEO_CARD_WIDTH_PX = AI_VIDEO_EMPTY_CARD_SIZE.width;
+export const AI_VIDEO_CARD_HEIGHT_PX = AI_VIDEO_EMPTY_CARD_SIZE.height;
 
 /** Bottom editor panel — same visual size as AI text / AI image. */
 export const AI_VIDEO_PANEL_WIDTH_PX = AI_GENERATIVE_PANEL_WIDTH_PX;

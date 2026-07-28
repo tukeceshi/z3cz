@@ -380,50 +380,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;
 
-  const handleResumeSuccess = useCallback(
-    (finalImages: readonly MediaReference[]) => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => {
-        const withResult = withAiImageGeneratedResult(current, finalImages, {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
-        return {
-          ...withResult,
-          metadata: withAiImageGenerateError(
-            withAiImageGeneratingFlag(
-              clearGenerativeProgress(withResult.metadata),
-              false
-            ),
-            null
-          ),
-        };
-      });
-      toast.success("workflow.aiImagePanel.generated");
-    },
-    [generationParams, nodeId, promptForGenerate, toast, updateNodeData]
-  );
-
-  const handleResumeError = useCallback(
-    (error: unknown) => {
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
-      updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiImageGenerateError(
-          withAiImageGeneratingFlag(
-            clearGenerativeProgress(current.metadata),
-            false
-          ),
-          prepareGenerativeCardError(formatted, t)
-        ),
-      }));
-      toast.errorRaw(formatted);
-    },
-    [nodeId, t, toast, updateNodeData]
-  );
-
   const handleStaged = useCallback(
     (localMedia: readonly LocalMediaReference[]) => {
       if (!updateNodeData) return;
@@ -456,12 +412,13 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       metadata: data.metadata,
       isGenerating,
       persistPhase,
+      autoResume: false,
       updateNodeData,
       setPersistPhase,
       setIsGenerating,
+      applyBusyMetadata: (metadata, busy) =>
+        withAiImageGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
-      onResumeSuccess: handleResumeSuccess,
-      onResumeError: handleResumeError,
     });
 
   const promptReferenceSourceName = useMemo(() => {

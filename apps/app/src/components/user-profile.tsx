@@ -17,8 +17,17 @@ import {
 import { getInitials } from "@/utils/user-utils";
 
 export function UserProfile() {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   const { t } = useTranslation();
+
+  if (isLoading) {
+    return (
+      <div
+        className="h-8 w-8 rounded-full bg-neutral-200/70 dark:bg-neutral-700/70"
+        aria-hidden
+      />
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return null;

@@ -1,4 +1,3 @@
-import BookOpen from "lucide-react/icons/book-open";
 import Bot from "lucide-react/icons/bot";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
 import Github from "lucide-react/icons/github";
@@ -15,7 +14,7 @@ import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme-toggle";
 
 export function AppHeader() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { t, siteSettings } = useTranslation();
   const location = useLocation();
   const isAdminSection = location.pathname.startsWith("/admin");
@@ -35,7 +34,8 @@ export function AppHeader() {
             {siteSettings.siteName}
           </span>
         </Link>
-        {isAuthenticated &&
+        {!isLoading &&
+          isAuthenticated &&
           (isAdminSection ? (
             <span className="h-8 px-2 text-sm font-semibold flex items-center rounded-md bg-neutral-300/50 dark:bg-neutral-600/50 shrink-0">
               {t("nav.administration")}
@@ -49,7 +49,7 @@ export function AppHeader() {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <nav className="flex items-center gap-2">
-          {isAuthenticated ? (
+          {isLoading ? null : isAuthenticated ? (
             <>
               <NavLink
                 to={"/org"}
@@ -80,16 +80,6 @@ export function AppHeader() {
               {t("nav.login")}
             </NavLink>
           )}
-          <a
-            href={`${import.meta.env.VITE_WEBSITE_URL}/docs`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={navLinkClasses}
-            data-tour="documentation-link"
-          >
-            <BookOpen className="h-4 w-4 mr-1.5" />
-            <span>{t("nav.documentation")}</span>
-          </a>
           <a
             href="https://github.com/tukeceshi/dafthunk"
             target="_blank"

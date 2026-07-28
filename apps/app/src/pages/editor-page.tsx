@@ -16,6 +16,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
+import { CanvasThemeTip } from "@/components/workflow/canvas-theme-tip";
 import { readInitialViewportOneToOne } from "@/components/workflow/workflow-editor-navigation";
 import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-editor-sidebar-effect";
 import { WorkflowError } from "@/components/workflow/workflow-error";
@@ -300,6 +301,7 @@ function EditorPageContent() {
           onEditorViewportChange={handleEditorViewportChange}
         />
       </div>
+      {!workflowReadOnly ? <CanvasThemeTip /> : null}
     </ReactFlowProvider>
   );
 }

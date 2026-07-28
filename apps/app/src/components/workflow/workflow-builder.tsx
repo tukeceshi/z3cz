@@ -32,6 +32,7 @@ import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
 import { HttpRequestConfigDialog } from "./http-request-config-dialog";
+import { DeleteSelectionConfirmDialog } from "./delete-selection-confirm-dialog";
 import { UpgradeRequiredDialog } from "./upgrade-required-dialog";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
@@ -304,11 +305,24 @@ export function WorkflowBuilder({
     [appToast, handleNodeSelect, nodeTypes]
   );
 
-  // Keyboard shortcuts (Cmd+C/X/V/D + Cmd+Enter)
+  // Keyboard shortcuts (Cmd+C/X/V/D, Delete/Backspace, Cmd+Enter)
   const handleActionButtonClick =
     !readOnly && executeWorkflow
       ? execution.handleActionButtonClick
       : undefined;
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const requestDeleteSelected = useCallback(() => {
+    if (readOnly) return;
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+    setDeleteConfirmOpen(true);
+  }, [readOnly, selectedEdges.length, selectedNodes.length]);
+
+  const handleConfirmDeleteSelected = useCallback(() => {
+    deleteSelected();
+    setDeleteConfirmOpen(false);
+  }, [deleteSelected]);
 
   useKeyboardShortcuts({
     disabled: readOnly,
@@ -320,6 +334,7 @@ export function WorkflowBuilder({
     cutSelected,
     pasteFromClipboard,
     duplicateSelected,
+    requestDeleteSelected,
     onAction: handleActionButtonClick,
     nodeCount: nodes.length,
   });
@@ -565,7 +580,7 @@ export function WorkflowBuilder({
                   onZoomOneToOne={handleZoomOneToOne}
                   selectedNodes={selectedNodes}
                   selectedEdges={selectedEdges}
-                  onDeleteSelected={readOnly ? undefined : deleteSelected}
+                  onDeleteSelected={readOnly ? undefined : requestDeleteSelected}
                   onDuplicateSelected={readOnly ? undefined : duplicateSelected}
                   onApplyLayout={readOnly ? undefined : applyLayout}
                   onCopySelected={readOnly ? undefined : copySelected}
@@ -633,6 +648,14 @@ export function WorkflowBuilder({
             workflowErrorMessage={execution.workflowErrorMessage}
           />
         </div>
+
+        <DeleteSelectionConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          nodeCount={selectedNodes.length}
+          edgeCount={selectedEdges.length}
+          onConfirm={handleConfirmDeleteSelected}
+        />
 
         <WorkflowRunConfigDialog
           open={execution.isRunConfigDialogVisible}

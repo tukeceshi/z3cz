@@ -19,6 +19,7 @@ import {
   buildGenerativeDragPreviewState,
 } from "./generative-connection-preview";
 import {
+  AI_TEXT_PLUS_BORDER_GAP_PX,
   getAiTextEdgePathOffset,
   resolveAiTextEdgeAnchors,
   resolveWorkflowEdgeHandles,
@@ -56,7 +57,7 @@ function buildSmoothStepPath(params: SmoothStepPathParams): string {
     targetY: params.targetY,
     sourcePosition: params.sourcePosition,
     targetPosition: params.targetPosition,
-    borderRadius: offset === 0 ? 0 : 8,
+    borderRadius: 8,
     offset,
   });
   return edgePath;
@@ -289,7 +290,7 @@ export const WorkflowConnectionLine = memo(
         outboundFromOutput ||
         outboundFromImageOutput
       ) {
-        return 0;
+        return AI_TEXT_PLUS_BORDER_GAP_PX;
       }
       const fromType = (
         connection.fromNode?.data as { nodeType?: string } | undefined

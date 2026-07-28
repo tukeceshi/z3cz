@@ -20,6 +20,7 @@ import {
   AI_TEXT_PLUS_BORDER_GAP_PX,
   AI_TEXT_HANDLE_PLUS_PX,
 } from "./ai-text-connection-utils";
+import { snapGenerativeContentBorderPoint } from "./generative-node-content-geometry";
 
 const AI_AUDIO_HANDLE_RF_Y_OFFSET_PX = AI_TEXT_HANDLE_HIT_PX / 2;
 
@@ -246,7 +247,13 @@ export function AiAudioConnectionSides({
 
 export function snapAiAudioPromptBorderPoint(node: {
   readonly internals: { readonly positionAbsolute: { readonly x: number; readonly y: number } };
+  readonly measured?: { readonly width?: number; readonly height?: number };
+  readonly width?: number;
+  readonly height?: number;
+  readonly data?: { readonly nodeType?: string };
 }): { x: number; y: number } {
-  const pos = node.internals.positionAbsolute;
-  return { x: pos.x, y: pos.y + AI_AUDIO_CARD_HEIGHT_PX / 2 };
+  return snapGenerativeContentBorderPoint(
+    node as Parameters<typeof snapGenerativeContentBorderPoint>[0],
+    "left"
+  );
 }

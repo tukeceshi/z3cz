@@ -28,8 +28,6 @@ import {
 } from "../../ai-image-history-overlay";
 import { readGenerativeProgressPhase } from "../../generative-progress-utils";
 import {
-  AI_IMAGE_CARD_HEIGHT_PX,
-  AI_IMAGE_CARD_WIDTH_PX,
   isAiImageGenerating,
   readAiImageCardImages,
   readAiImageResultHistory,
@@ -37,6 +35,7 @@ import {
   withAiImageGenerateError,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
+import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -114,6 +113,11 @@ function AiImageWidget({
     Boolean(primaryImageUrl) &&
     !primaryImageStale &&
     !primaryImageExpired;
+  const cardSize = useAdaptiveMediaCardSize({
+    displayUrl: primaryImageUrl,
+    hasMedia: hasImages && !primaryImageExpired && !primaryImageStale,
+    kind: "image",
+  });
   const cardPlaceholder = t(
     generativeCardProgressKey(
       progressPhase ??
@@ -270,8 +274,8 @@ function AiImageWidget({
           className
         )}
         style={{
-          width: AI_IMAGE_CARD_WIDTH_PX,
-          height: AI_IMAGE_CARD_HEIGHT_PX,
+          width: cardSize.width,
+          height: cardSize.height,
         }}
         onDoubleClick={(event) => {
           if (generateError) {

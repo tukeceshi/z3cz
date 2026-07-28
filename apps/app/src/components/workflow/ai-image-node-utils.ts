@@ -20,15 +20,21 @@ import {
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
 
+import {
+  AI_IMAGE_EMPTY_CARD_SIZE,
+  MEDIA_CARD_SHORT_SIDE_PX,
+} from "./media-card-size";
+
 export const AI_IMAGE_REFERENCE_HANDLE_ID = "reference_images" as const;
 export const AI_IMAGE_PROMPT_HANDLE_ID = "prompt_reference" as const;
 export const AI_IMAGE_OUTPUT_ID = "images" as const;
 export const AI_IMAGE_RESULT_INPUT_ID = "images_result" as const;
 export const AI_IMAGE_HISTORY_INPUT_ID = "images_history" as const;
 
-/** Canvas card size — PixVerse-aligned square. */
-export const AI_IMAGE_CARD_WIDTH_PX = 360;
-export const AI_IMAGE_CARD_HEIGHT_PX = 360;
+/** Empty / placement default — adaptive size used once media loads. */
+export const AI_IMAGE_CARD_WIDTH_PX = AI_IMAGE_EMPTY_CARD_SIZE.width;
+export const AI_IMAGE_CARD_HEIGHT_PX = AI_IMAGE_EMPTY_CARD_SIZE.height;
+export { MEDIA_CARD_SHORT_SIDE_PX };
 
 /** Bottom editor panel — same visual size as AI text. */
 export const AI_IMAGE_PANEL_WIDTH_PX = AI_GENERATIVE_PANEL_WIDTH_PX;

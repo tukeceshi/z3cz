@@ -10,7 +10,7 @@ import {
   WORKFLOW_NODE_ADD_GAP_PX,
 } from "./workflow-node-placement";
 
-const AI_IMAGE_SIZE = { width: 360, height: 360 } as const;
+const AI_IMAGE_SIZE = { width: 270, height: 270 } as const;
 
 const WIDE_BOUNDS = { minX: 0, minY: 0, maxX: 2000, maxY: 1200 } as const;
 
@@ -44,9 +44,9 @@ describe("findOpenNodePositionFromCenter", () => {
     const bounds = { minX: 0, minY: 0, maxX: 2000, maxY: 1200 };
     const center = getViewportCenterFromBounds(bounds);
     const occupied = [
-      { x: 0, y: 0, width: 360, height: 360 },
-      { x: 0, y: 430, width: 360, height: 360 },
-      { x: 390, y: 0, width: 360, height: 360 },
+      { x: 0, y: 0, width: 270, height: 270 },
+      { x: 0, y: 340, width: 270, height: 270 },
+      { x: 340, y: 0, width: 270, height: 270 },
     ];
     const result = findOpenNodePositionFromCenter(
       bounds,
@@ -75,7 +75,7 @@ describe("findOpenNodePositionFromCenter", () => {
 
 describe("findSnugAdjacencyPositionInBounds", () => {
   it("places to the right with exact add gap (not ~400px grid gap)", () => {
-    const occupied = [{ x: 100, y: 0, width: 360, height: 360 }];
+    const occupied = [{ x: 100, y: 0, width: 270, height: 270 }];
     const center = getViewportCenterFromBounds(WIDE_BOUNDS);
     const result = findSnugAdjacencyPositionInBounds(
       WIDE_BOUNDS,
@@ -85,15 +85,15 @@ describe("findSnugAdjacencyPositionInBounds", () => {
       WORKFLOW_NODE_ADD_GAP_PX
     );
     expect(result?.position).toEqual({
-      x: 100 + 360 + WORKFLOW_NODE_ADD_GAP_PX,
+      x: 100 + 270 + WORKFLOW_NODE_ADD_GAP_PX,
       y: 0,
     });
   });
 
   it("prefers adjacency candidates closer to the viewport center", () => {
     const occupied = [
-      { x: 0, y: 0, width: 360, height: 360 },
-      { x: 900, y: 0, width: 360, height: 360 },
+      { x: 0, y: 0, width: 270, height: 270 },
+      { x: 900, y: 0, width: 270, height: 270 },
     ];
     const bounds = { minX: 0, minY: 0, maxX: 1400, maxY: 800 };
     const center = getViewportCenterFromBounds(bounds);
@@ -103,7 +103,7 @@ describe("findSnugAdjacencyPositionInBounds", () => {
       AI_IMAGE_SIZE,
       occupied
     );
-    expect(result?.position.x).toBe(360 + WORKFLOW_NODE_ADD_GAP_PX);
+    expect(result?.position.x).toBe(270 + WORKFLOW_NODE_ADD_GAP_PX);
   });
 });
 
@@ -115,7 +115,7 @@ describe("findOpenNodePositionInBounds", () => {
   });
 
   it("does not use the old top-left grid that produced ~400px gaps", () => {
-    const occupied = [{ x: 100, y: 0, width: 360, height: 360 }];
+    const occupied = [{ x: 100, y: 0, width: 270, height: 270 }];
     const result = findOpenNodePositionInBounds(
       WIDE_BOUNDS,
       AI_IMAGE_SIZE,
@@ -128,14 +128,14 @@ describe("findOpenNodePositionInBounds", () => {
 
 describe("findFallbackNodePosition", () => {
   it("prefers placing to the right of existing nodes on the same row", () => {
-    const occupied = [{ x: 100, y: 50, width: 360, height: 360 }];
+    const occupied = [{ x: 100, y: 50, width: 270, height: 270 }];
     const result = findFallbackNodePosition(
       occupied,
       AI_IMAGE_SIZE,
       WORKFLOW_NODE_ADD_GAP_PX
     );
     expect(result).toEqual({
-      x: 100 + 360 + WORKFLOW_NODE_ADD_GAP_PX,
+      x: 100 + 270 + WORKFLOW_NODE_ADD_GAP_PX,
       y: 50,
     });
   });
@@ -150,10 +150,22 @@ describe("collectOccupiedRects", () => {
         data: { nodeType: "ai-image" } as never,
       },
     ]);
-    expect(rects[0]).toEqual({ x: 10, y: 20, width: 360, height: 360 });
+    expect(rects[0]).toEqual({ x: 10, y: 20, width: 270, height: 270 });
   });
 
-  it("ignores measured size for generative nodes", () => {
+  it("prefers measured size for adaptive image nodes", () => {
+    const rects = collectOccupiedRects([
+      {
+        id: "n1",
+        position: { x: 0, y: 0 },
+        measured: { width: 480, height: 270 },
+        data: { nodeType: "ai-image" } as never,
+      },
+    ]);
+    expect(rects[0]).toEqual({ x: 0, y: 0, width: 480, height: 270 });
+  });
+
+  it("ignores measured size for ai-text nodes", () => {
     const rects = collectOccupiedRects([
       {
         id: "n1",

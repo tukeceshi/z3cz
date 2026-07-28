@@ -19,6 +19,7 @@ export function ThemeToggle() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-tour="theme-toggle"
           className="inline-flex p-1.5 relative rounded-full overflow-hidden"
           aria-label={t("theme.toggle")}
         >

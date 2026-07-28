@@ -6,13 +6,14 @@ import {
   type Transform,
 } from "@xyflow/react";
 import {
-  AI_IMAGE_CARD_HEIGHT_PX,
-  AI_IMAGE_CARD_WIDTH_PX,
   AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
   isAiImageAllowedReferenceNodeType,
 } from "./ai-image-node-utils";
+import {
+  snapGenerativeContentBorderPoint,
+} from "./generative-node-content-geometry";
 import type { WorkflowEdgeType } from "./workflow-types";
 
 type AiImageReferenceEdge = Pick<
@@ -38,23 +39,6 @@ interface FlowConnection {
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
-}
-
-function nodeFlowSize(node: InternalNode<Node>): {
-  width: number;
-  height: number;
-} {
-  const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType;
-  if (nodeType === AI_IMAGE_NODE_TYPE) {
-    return {
-      width: AI_IMAGE_CARD_WIDTH_PX,
-      height: AI_IMAGE_CARD_HEIGHT_PX,
-    };
-  }
-  return {
-    width: node.measured?.width ?? node.width ?? AI_IMAGE_CARD_WIDTH_PX,
-    height: node.measured?.height ?? node.height ?? AI_IMAGE_CARD_HEIGHT_PX,
-  };
 }
 
 function connectionPointer(
@@ -143,12 +127,11 @@ function isAiImageValidHighlightTarget(
 }
 
 function aiImageSnapFromNode(node: InternalNode<Node>): AiImageSnapTarget {
-  const pos = node.internals.positionAbsolute;
-  const { height } = nodeFlowSize(node);
+  const point = snapGenerativeContentBorderPoint(node, "left");
   return {
     nodeId: node.id,
-    x: pos.x,
-    y: pos.y + height / 2,
+    x: point.x,
+    y: point.y,
   };
 }
 
@@ -203,17 +186,13 @@ export function findAiImageConnectionSnap(
 export function snapAiImageReferenceBorderPoint(
   node: InternalNode<Node>
 ): { x: number; y: number } {
-  const pos = node.internals.positionAbsolute;
-  const { height } = nodeFlowSize(node);
-  return { x: pos.x, y: pos.y + height / 2 };
+  return snapGenerativeContentBorderPoint(node, "left");
 }
 
 export function snapAiImageOutputBorderPoint(
   node: InternalNode<Node>
 ): { x: number; y: number } {
-  const pos = node.internals.positionAbsolute;
-  const { width, height } = nodeFlowSize(node);
-  return { x: pos.x + width, y: pos.y + height / 2 };
+  return snapGenerativeContentBorderPoint(node, "right");
 }
 
 export function isAiImageInboundReferenceEdge(params: {

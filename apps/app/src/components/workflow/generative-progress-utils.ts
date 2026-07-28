@@ -123,6 +123,43 @@ export function snapshotGenerativeProgressForPersist(
 }
 
 /** Formats elapsed generation time for progress labels (e.g. `3m 20s`). */
+export function formatGenerativeBusyOverlayLabel(params: {
+  readonly phase: GenerativeProgressPhase;
+  readonly progressButtonKey: (phase: GenerativeProgressPhase | null) => string;
+  readonly i18nPrefix:
+    | "workflow.aiImagePanel"
+    | "workflow.aiVideoPanel"
+    | "workflow.aiAudioPanel";
+  readonly metadata: Record<string, string> | undefined;
+  readonly progressNowMs: number;
+  readonly t: (
+    key: string,
+    values?: Record<string, string | number>
+  ) => string;
+}): string {
+  const base = params.t(params.progressButtonKey(params.phase));
+  const startedAt = readGenerativeProgressStartedAt(params.metadata);
+  if (!startedAt) {
+    return base;
+  }
+  const { minutes, seconds } = formatGenerativeProgressElapsed(
+    startedAt,
+    params.progressNowMs
+  );
+  const elapsed =
+    minutes > 0
+      ? params.t(`${params.i18nPrefix}.progressElapsedMinutes`, {
+          minutes,
+          seconds: String(seconds).padStart(2, "0"),
+        })
+      : params.t(`${params.i18nPrefix}.progressElapsedSeconds`, { seconds });
+  return params.t(`${params.i18nPrefix}.progressWithElapsed`, {
+    label: base.replace(/[….]+$/u, "").trimEnd(),
+    elapsed,
+  });
+}
+
+/** Formats elapsed generation time for progress labels (e.g. `3m 20s`). */
 export function formatGenerativeProgressElapsed(
   startedAtMs: number,
   nowMs: number = Date.now()

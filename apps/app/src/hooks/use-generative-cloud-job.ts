@@ -11,10 +11,44 @@ import {
 } from "@/components/workflow/generative-progress-utils";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import {
+  releaseGenerativeJobResume,
+  tryClaimGenerativeJobResume,
+} from "@/services/generative-cloud-job-resume-registry";
+import { getGenerationJob } from "@/services/platform-ai-model-service";
+import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
 import type { LocalMediaReference, MediaReference } from "@dafthunk/types";
+
+const JOB_POLL_INTERVAL_MS = 3_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function waitForJobFinalMedia(
+  organizationId: string,
+  jobId: string
+): Promise<readonly MediaReference[]> {
+  while (true) {
+    const response = await getGenerationJob(organizationId, jobId);
+    if (response.job.status === "succeeded") {
+      return response.finalMedia ?? [];
+    }
+    if (
+      response.job.status === "failed" ||
+      response.job.status === "cancelled"
+    ) {
+      throw new Error(
+        response.job.failureReason ?? "Generation failed"
+      );
+    }
+    await sleep(JOB_POLL_INTERVAL_MS);
+  }
+}
 
 interface UseGenerativeCloudJobOptions {
   readonly nodeId: string;
@@ -24,6 +58,7 @@ interface UseGenerativeCloudJobOptions {
   readonly metadata: Record<string, string> | undefined;
   readonly isGenerating: boolean;
   readonly persistPhase: PersistGenerativeMediaPhase | null;
+  readonly autoResume?: boolean;
   readonly updateNodeData?: (
     nodeId: string,
     updater: (current: {
@@ -32,9 +67,13 @@ interface UseGenerativeCloudJobOptions {
   ) => void;
   readonly setPersistPhase: (phase: PersistGenerativeMediaPhase | null) => void;
   readonly setIsGenerating: (generating: boolean) => void;
+  readonly applyBusyMetadata?: (
+    metadata: Record<string, string> | undefined,
+    busy: boolean
+  ) => Record<string, string> | undefined;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
-  readonly onResumeSuccess: (media: readonly MediaReference[]) => void;
-  readonly onResumeError: (error: unknown) => void;
+  readonly onResumeSuccess?: (media: readonly MediaReference[]) => void;
+  readonly onResumeError?: (error: unknown) => void;
 }
 
 export function useGenerativeCloudJobProgress(
@@ -52,7 +91,6 @@ export function useGenerativeCloudJobProgress(
   readonly activeProgressPhase: GenerativeProgressPhase | null;
 } {
   const resumeAttemptedRef = useRef(false);
-  const resolvedJobIdsRef = useRef(new Set<string>());
 
   const syncProgress = useCallback(
     (params: {
@@ -60,18 +98,30 @@ export function useGenerativeCloudJobProgress(
       readonly phase?: GenerativeProgressPhase | null;
       readonly stagingMediaIds?: readonly string[] | null;
     }) => {
-      options.updateNodeData?.(options.nodeId, (current) => ({
-        metadata: withGenerativeProgress(current.metadata, params),
-      }));
+      options.updateNodeData?.(options.nodeId, (current) => {
+        let metadata = withGenerativeProgress(current.metadata, params);
+        if (options.applyBusyMetadata) {
+          if (params.phase === null) {
+            metadata = options.applyBusyMetadata(metadata, false);
+          } else if (params.phase) {
+            metadata = options.applyBusyMetadata(metadata, true);
+          }
+        }
+        return { metadata };
+      });
     },
-    [options.nodeId, options.updateNodeData]
+    [options.applyBusyMetadata, options.nodeId, options.updateNodeData]
   );
 
   const clearProgress = useCallback(() => {
-    options.updateNodeData?.(options.nodeId, (current) => ({
-      metadata: clearGenerativeProgress(current.metadata),
-    }));
-  }, [options.nodeId, options.updateNodeData]);
+    options.updateNodeData?.(options.nodeId, (current) => {
+      let metadata = clearGenerativeProgress(current.metadata);
+      if (options.applyBusyMetadata) {
+        metadata = options.applyBusyMetadata(metadata, false);
+      }
+      return { metadata };
+    });
+  }, [options.applyBusyMetadata, options.nodeId, options.updateNodeData]);
 
   const resolveJobMedia = useCallback(
     async (jobId: string) => {
@@ -80,6 +130,12 @@ export function useGenerativeCloudJobProgress(
         jobId,
         phase: resumedPhase ?? "generating",
       });
+
+      const claimed = tryClaimGenerativeJobResume(jobId);
+      if (!claimed) {
+        return waitForJobFinalMedia(options.orgId!, jobId);
+      }
+
       try {
         const media = await resolveCloudGenerationJobMedia({
           organizationId: options.orgId!,
@@ -97,11 +153,9 @@ export function useGenerativeCloudJobProgress(
             options.onStaged?.(localMedia);
           },
         });
-        resolvedJobIdsRef.current.add(jobId);
         return media;
-      } catch (error) {
-        resolvedJobIdsRef.current.add(jobId);
-        throw error;
+      } finally {
+        releaseGenerativeJobResume(jobId);
       }
     },
     [
@@ -133,6 +187,10 @@ export function useGenerativeCloudJobProgress(
   );
 
   useEffect(() => {
+    if (!options.autoResume) {
+      return;
+    }
+
     const jobId = readGenerativeProgressJobId(options.metadata);
     if (
       !jobId ||
@@ -140,7 +198,8 @@ export function useGenerativeCloudJobProgress(
       !options.cloudConfigured ||
       options.isGenerating ||
       resumeAttemptedRef.current ||
-      resolvedJobIdsRef.current.has(jobId)
+      !options.onResumeSuccess ||
+      !options.onResumeError
     ) {
       return;
     }
@@ -150,10 +209,10 @@ export function useGenerativeCloudJobProgress(
 
     void resolveJobMedia(jobId)
       .then((media) => {
-        options.onResumeSuccess(media);
+        options.onResumeSuccess?.(media);
       })
       .catch((error) => {
-        options.onResumeError(error);
+        options.onResumeError?.(error);
       })
       .finally(() => {
         options.setPersistPhase(null);
@@ -162,12 +221,13 @@ export function useGenerativeCloudJobProgress(
       });
   }, [
     clearProgress,
+    options.autoResume,
     options.cloudConfigured,
     options.isGenerating,
     options.metadata,
-    options.orgId,
     options.onResumeError,
     options.onResumeSuccess,
+    options.orgId,
     options.setIsGenerating,
     options.setPersistPhase,
     resolveJobMedia,

@@ -42,17 +42,15 @@ import {
   withAiTextManualResult,
 } from "./ai-text-node-utils";
 import {
-  AI_IMAGE_CARD_WIDTH_PX,
-  isAiImageGenerating,
-} from "./ai-image-node-utils";
-import {
   AI_AUDIO_CARD_WIDTH_PX,
   isAiAudioGenerating,
 } from "./ai-audio-node-utils";
 import {
-  AI_VIDEO_CARD_WIDTH_PX,
   isAiVideoGenerating,
 } from "./ai-video-node-utils";
+import {
+  isAiImageGenerating,
+} from "./ai-image-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { formatLocalizedGenerativeNodeDisplayName } from "./generative-node-naming";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
@@ -62,10 +60,10 @@ import {
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
 import {
-  formatGenerativeProgressElapsed,
+  formatGenerativeBusyOverlayLabel,
   readGenerativeProgressPhase,
-  readGenerativeProgressStartedAt,
 } from "./generative-progress-utils";
+import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
 import {
   generativeAudioProgressButtonKey,
   generativeProgressButtonKey,
@@ -599,40 +597,46 @@ export const WorkflowNode = memo(
     }, [progressPhase, showBusyOverlay]);
 
     const busyOverlayLabel = useMemo(() => {
-      if (isAiVideoNode && (isAiVideoBusy || progressPhase)) {
-        const phase = progressPhase ?? "generating";
-        const base = t(generativeVideoProgressButtonKey(phase));
-        const startedAt = readGenerativeProgressStartedAt(data.metadata);
-        if (!startedAt) {
-          return base;
-        }
-        const { minutes, seconds } = formatGenerativeProgressElapsed(
-          startedAt,
-          progressNowMs
-        );
-        const elapsed =
-          minutes > 0
-            ? t("workflow.aiVideoPanel.progressElapsedMinutes", {
-                minutes,
-                seconds: String(seconds).padStart(2, "0"),
-              })
-            : t("workflow.aiVideoPanel.progressElapsedSeconds", { seconds });
-        return t("workflow.aiVideoPanel.progressWithElapsed", {
-          label: base.replace(/[….]+$/u, "").trimEnd(),
-          elapsed,
+      if (
+        !isAiImageNode &&
+        !isAiVideoNode &&
+        !isAiAudioNode
+      ) {
+        return null;
+      }
+      if (!isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy && !progressPhase) {
+        return null;
+      }
+
+      const phase = progressPhase ?? "generating";
+      if (isAiImageNode) {
+        return formatGenerativeBusyOverlayLabel({
+          phase,
+          progressButtonKey: generativeProgressButtonKey,
+          i18nPrefix: "workflow.aiImagePanel",
+          metadata: data.metadata,
+          progressNowMs,
+          t,
         });
       }
-      if (isAiImageNode && (isAiImageBusy || progressPhase)) {
-        return t(
-          generativeProgressButtonKey(progressPhase ?? "generating")
-        );
+      if (isAiVideoNode) {
+        return formatGenerativeBusyOverlayLabel({
+          phase,
+          progressButtonKey: generativeVideoProgressButtonKey,
+          i18nPrefix: "workflow.aiVideoPanel",
+          metadata: data.metadata,
+          progressNowMs,
+          t,
+        });
       }
-      if (isAiAudioNode && (isAiAudioBusy || progressPhase)) {
-        return t(
-          generativeAudioProgressButtonKey(progressPhase ?? "generating")
-        );
-      }
-      return null;
+      return formatGenerativeBusyOverlayLabel({
+        phase,
+        progressButtonKey: generativeAudioProgressButtonKey,
+        i18nPrefix: "workflow.aiAudioPanel",
+        metadata: data.metadata,
+        progressNowMs,
+        t,
+      });
     }, [
       data.metadata,
       isAiAudioBusy,
@@ -750,13 +754,9 @@ export const WorkflowNode = memo(
           style={
             isAiTextNode
               ? { width: AI_TEXT_CARD_WIDTH_PX }
-              : isAiImageNode
-                ? { width: AI_IMAGE_CARD_WIDTH_PX }
-                : isAiVideoNode
-                  ? { width: AI_VIDEO_CARD_WIDTH_PX }
-                  : isAiAudioNode
-                    ? { width: AI_AUDIO_CARD_WIDTH_PX }
-                    : undefined
+              : isAiAudioNode
+                ? { width: AI_AUDIO_CARD_WIDTH_PX }
+                : undefined
           }
         >
           {/* Execution / generate overlay */}
@@ -777,6 +777,16 @@ export const WorkflowNode = memo(
               ) : null}
             </div>
           )}
+
+          {(isAiImageNode || isAiVideoNode || isAiAudioNode) && !disabled ? (
+            <GenerativeCloudJobResumeHost
+              nodeId={id}
+              modality={
+                isAiImageNode ? "image" : isAiVideoNode ? "video" : "audio"
+              }
+              data={data as unknown as CanvasWorkflowNodeType}
+            />
+          ) : null}
 
           {/* Error overlay — generative nodes render errors inside their widgets */}
           {isError && data.error && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode ? (

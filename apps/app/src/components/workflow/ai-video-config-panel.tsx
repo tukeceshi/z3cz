@@ -452,51 +452,6 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;
 
-  const handleResumeSuccess = useCallback(
-    (videos: readonly MediaReference[]) => {
-      const video = videos[0];
-      if (!video || !updateNodeData) return;
-      updateNodeData(nodeId, (current) => {
-        const withResult = appendAiVideoGeneratedHistoryItems(current, [video], {
-          prompt: promptForGenerate.trim(),
-          params: generationParams,
-        });
-        return {
-          ...withResult,
-          metadata: withAiVideoGenerateError(
-            withAiVideoGeneratingFlag(
-              clearGenerativeProgress(withResult.metadata),
-              false
-            ),
-            null
-          ),
-        };
-      });
-      toast.success("workflow.aiVideoPanel.generated");
-    },
-    [generationParams, nodeId, promptForGenerate, toast, updateNodeData]
-  );
-
-  const handleResumeError = useCallback(
-    (error: unknown) => {
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
-      updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiVideoGenerateError(
-          withAiVideoGeneratingFlag(
-            clearGenerativeProgress(current.metadata),
-            false
-          ),
-          prepareGenerativeCardError(formatted, t)
-        ),
-      }));
-      toast.errorRaw(formatted);
-    },
-    [nodeId, t, toast, updateNodeData]
-  );
-
   const handleStaged = useCallback(
     (localMedia: readonly LocalMediaReference[]) => {
       if (!updateNodeData || localMedia.length === 0) return;
@@ -529,12 +484,13 @@ export function AiVideoConfigPanel({ nodeId, data }: AiVideoConfigPanelProps) {
       metadata: data.metadata,
       isGenerating,
       persistPhase,
+      autoResume: false,
       updateNodeData,
       setPersistPhase,
       setIsGenerating,
+      applyBusyMetadata: (metadata, busy) =>
+        withAiVideoGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
-      onResumeSuccess: handleResumeSuccess,
-      onResumeError: handleResumeError,
     });
 
   useEffect(() => {

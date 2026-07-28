@@ -1,4 +1,4 @@
-import { AI_TEXT_NODE_TYPE, AI_IMAGE_NODE_TYPE } from "@dafthunk/types";
+import { AI_TEXT_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import {
   type Edge as ReactFlowEdge,
   type InternalNode,
@@ -7,15 +7,15 @@ import {
 } from "@xyflow/react";
 
 import {
-  AI_TEXT_CARD_HEIGHT_PX,
-  AI_TEXT_CARD_WIDTH_PX,
+  AI_AUDIO_OUTPUT_ID,
+  AI_AUDIO_PROMPT_HANDLE_ID,
+} from "./ai-audio-node-utils";
+import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_OUTPUT_ID,
   isAiTextAllowedReferenceNodeType,
 } from "./ai-text-node-utils";
 import {
-  AI_IMAGE_CARD_HEIGHT_PX,
-  AI_IMAGE_CARD_WIDTH_PX,
   AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
@@ -28,6 +28,18 @@ import {
   isIncomingAiTextReferenceAllowed,
   isIncomingAiTextReferenceConnection,
 } from "./ai-text-reference-policy";
+import {
+  snapGenerativeContentBorderPoint,
+} from "./generative-node-content-geometry";
+import {
+  snapAiVideoOutputBorderPoint,
+  snapAiVideoReferenceBorderPoint,
+} from "./ai-video-connection-utils";
+import {
+  AI_VIDEO_OUTPUT_ID,
+  AI_VIDEO_PROMPT_HANDLE_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+} from "./ai-video-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 /** LibTV-style circular hit zone (px). */
@@ -63,29 +75,6 @@ interface FlowConnection {
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
-}
-
-function nodeFlowSize(node: InternalNode<Node>): {
-  width: number;
-  height: number;
-} {
-  const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType;
-  if (nodeType === AI_TEXT_NODE_TYPE) {
-    return {
-      width: AI_TEXT_CARD_WIDTH_PX,
-      height: AI_TEXT_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_IMAGE_NODE_TYPE) {
-    return {
-      width: AI_IMAGE_CARD_WIDTH_PX,
-      height: AI_IMAGE_CARD_HEIGHT_PX,
-    };
-  }
-  return {
-    width: node.measured?.width ?? node.width ?? AI_TEXT_CARD_WIDTH_PX,
-    height: node.measured?.height ?? node.height ?? AI_TEXT_CARD_HEIGHT_PX,
-  };
 }
 
 type AiTextReferenceEdge = Pick<
@@ -233,12 +222,11 @@ function nodeIdUnderFlowPointer(
 }
 
 function aiTextSnapFromNode(node: InternalNode<Node>): AiTextSnapTarget {
-  const pos = node.internals.positionAbsolute;
-  const { height } = nodeFlowSize(node);
+  const point = snapGenerativeContentBorderPoint(node, "left");
   return {
     nodeId: node.id,
-    x: pos.x,
-    y: pos.y + height / 2,
+    x: point.x,
+    y: point.y,
   };
 }
 
@@ -307,7 +295,11 @@ export function findAiTextConnectionSnap(
   return aiTextSnapFromNode(node);
 }
 
-/** Step-path corner offset — 0 for flush AI-text edges. */
+/**
+ * Step-path lead-out before the bend.
+ * Generative edges use the plus-border gap so the stub sits in the
+ * card↔plus band (endpoints stay on the border).
+ */
 export function getAiTextEdgePathOffset(
   sourceNodeType: string | undefined,
   targetNodeType: string | undefined,
@@ -316,19 +308,25 @@ export function getAiTextEdgePathOffset(
 ): number {
   if (
     sourceHandle === AI_TEXT_OUTPUT_ID ||
+    sourceHandle === AI_IMAGE_OUTPUT_ID ||
+    sourceHandle === AI_VIDEO_OUTPUT_ID ||
+    sourceHandle === AI_AUDIO_OUTPUT_ID ||
     targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID ||
     targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
     targetHandle === AI_IMAGE_PROMPT_HANDLE_ID ||
+    targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID ||
+    targetHandle === AI_VIDEO_PROMPT_HANDLE_ID ||
+    targetHandle === AI_AUDIO_PROMPT_HANDLE_ID ||
     (targetNodeType === AI_TEXT_NODE_TYPE &&
       isAiTextAllowedReferenceNodeType(sourceNodeType))
   ) {
-    return 0;
+    return AI_TEXT_PLUS_BORDER_GAP_PX;
   }
   if (
     sourceNodeType === AI_TEXT_NODE_TYPE ||
     targetNodeType === AI_TEXT_NODE_TYPE
   ) {
-    return 0;
+    return AI_TEXT_PLUS_BORDER_GAP_PX;
   }
   return 20;
 }
@@ -403,6 +401,13 @@ export function resolveAiTextEdgeAnchors(params: {
       sourceX = snap.x;
       sourceY = snap.y;
     }
+  } else if (resolved.sourceHandle === AI_VIDEO_OUTPUT_ID) {
+    const node = params.nodeLookup.get(params.source);
+    if (node) {
+      const snap = snapAiVideoOutputBorderPoint(node);
+      sourceX = snap.x;
+      sourceY = snap.y;
+    }
   }
 
   if (inboundReference) {
@@ -415,7 +420,10 @@ export function resolveAiTextEdgeAnchors(params: {
   } else if (
     resolved.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID ||
     resolved.targetHandle === AI_IMAGE_PROMPT_HANDLE_ID ||
-    resolved.targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID
+    resolved.targetHandle === AI_TEXT_KEYWORDS_HANDLE_ID ||
+    resolved.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID ||
+    resolved.targetHandle === AI_VIDEO_PROMPT_HANDLE_ID ||
+    resolved.targetHandle === AI_AUDIO_PROMPT_HANDLE_ID
   ) {
     const node = params.nodeLookup.get(params.target);
     if (node) {
@@ -423,13 +431,18 @@ export function resolveAiTextEdgeAnchors(params: {
       const snapPoint =
         nodeType === AI_IMAGE_NODE_TYPE
           ? snapAiImageReferenceBorderPoint(node)
-          : snapAiTextKeywordsBorderPoint(node);
+          : nodeType === AI_VIDEO_NODE_TYPE
+            ? snapAiVideoReferenceBorderPoint(node)
+            : resolved.targetHandle === AI_AUDIO_PROMPT_HANDLE_ID
+              ? snapGenerativeContentBorderPoint(node, "left")
+              : snapAiTextKeywordsBorderPoint(node);
       targetX = snapPoint.x;
       targetY = snapPoint.y;
     }
   } else if (
     resolved.targetHandle === AI_TEXT_OUTPUT_ID ||
-    resolved.targetHandle === AI_IMAGE_OUTPUT_ID
+    resolved.targetHandle === AI_IMAGE_OUTPUT_ID ||
+    resolved.targetHandle === AI_VIDEO_OUTPUT_ID
   ) {
     const node = params.nodeLookup.get(params.target);
     if (node) {
@@ -437,7 +450,9 @@ export function resolveAiTextEdgeAnchors(params: {
       const snapPoint =
         nodeType === AI_IMAGE_NODE_TYPE
           ? snapAiImageOutputBorderPoint(node)
-          : snapAiTextOutputBorderPoint(node);
+          : nodeType === AI_VIDEO_NODE_TYPE
+            ? snapAiVideoOutputBorderPoint(node)
+            : snapAiTextOutputBorderPoint(node);
       targetX = snapPoint.x;
       targetY = snapPoint.y;
     }
@@ -492,15 +507,11 @@ export function isAiTextInboundReferenceEdge(params: {
 export function snapAiTextKeywordsBorderPoint(
   node: InternalNode<Node>
 ): { x: number; y: number } {
-  const pos = node.internals.positionAbsolute;
-  const { height } = nodeFlowSize(node);
-  return { x: pos.x, y: pos.y + height / 2 };
+  return snapGenerativeContentBorderPoint(node, "left");
 }
 
 export function snapAiTextOutputBorderPoint(
   node: InternalNode<Node>
 ): { x: number; y: number } {
-  const pos = node.internals.positionAbsolute;
-  const { width, height } = nodeFlowSize(node);
-  return { x: pos.x + width, y: pos.y + height / 2 };
+  return snapGenerativeContentBorderPoint(node, "right");
 }

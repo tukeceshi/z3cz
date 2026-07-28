@@ -9,7 +9,6 @@ import {
 import { cn } from "@/utils/utils";
 
 import {
-  AI_IMAGE_CARD_HEIGHT_PX,
   AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PROMPT_HANDLE_ID,
   AI_IMAGE_REFERENCE_HANDLE_ID,
@@ -167,7 +166,7 @@ function AiImageEdgeSide({ side, disabled = false }: AiImageEdgeSideProps) {
       )}
       style={{
         width: AI_TEXT_EDGE_SHELL_W_PX,
-        height: AI_IMAGE_CARD_HEIGHT_PX,
+        height: "100%",
         ...columnPositionStyle,
       }}
     >

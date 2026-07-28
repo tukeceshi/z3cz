@@ -9,7 +9,6 @@ import {
 import { cn } from "@/utils/utils";
 
 import {
-  AI_VIDEO_CARD_HEIGHT_PX,
   AI_VIDEO_OUTPUT_ID,
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -167,7 +166,7 @@ function AiVideoEdgeSide({ side, disabled = false }: AiVideoEdgeSideProps) {
       )}
       style={{
         width: AI_TEXT_EDGE_SHELL_W_PX,
-        height: AI_VIDEO_CARD_HEIGHT_PX,
+        height: "100%",
         ...columnPositionStyle,
       }}
     >

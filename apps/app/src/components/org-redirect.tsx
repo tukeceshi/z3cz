@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { InsetLoading } from "@/components/inset-loading";
 
 interface OrgRedirectProps {
   to: string;
@@ -12,9 +13,13 @@ export const OrgRedirect: React.FC<OrgRedirectProps> = ({
   to,
   replace = true,
 }) => {
-  const { organization } = useAuth();
+  const { organization, isLoading } = useAuth();
   const params = useParams();
   const location = useLocation();
+
+  if (isLoading) {
+    return <InsetLoading />;
+  }
 
   const orgId = params.organizationId || organization?.id;
 
@@ -23,7 +28,6 @@ export const OrgRedirect: React.FC<OrgRedirectProps> = ({
     return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
-  // Replace all :param placeholders with actual route params
   let redirectTo = to.replace(":organizationId", orgId);
   for (const [key, value] of Object.entries(params)) {
     if (key !== "organizationId" && value) {

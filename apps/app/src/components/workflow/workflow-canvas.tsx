@@ -396,7 +396,7 @@ function DeleteButton({
           <span>{t("workflow.canvas.delete")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
-              ⌫
+              Del
             </kbd>
           </div>
         </div>
@@ -804,6 +804,7 @@ export function WorkflowCanvas({
         elementsSelectable={showControls}
         selectNodesOnDrag={!disabled && showControls}
         multiSelectionKeyCode={showControls ? "Shift" : undefined}
+        deleteKeyCode={null}
         panOnDrag={showControls}
         zoomOnScroll={showControls}
         zoomOnPinch={showControls}

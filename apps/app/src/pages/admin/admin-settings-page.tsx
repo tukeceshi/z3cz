@@ -40,7 +40,7 @@ export function AdminSettingsPage() {
   const [siteName, setSiteName] = useState("");
   const [siteTagline, setSiteTagline] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
-  const [newUserTourEnabled, setNewUserTourEnabled] = useState(true);
+  const [newUserTourEnabled, setNewUserTourEnabled] = useState(false);
   const [homepageMode, setHomepageMode] = useState<HomepageMode>("console");
   const [isSaving, setIsSaving] = useState(false);
 

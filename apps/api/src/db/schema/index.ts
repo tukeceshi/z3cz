@@ -245,7 +245,7 @@ export const platformSettings = pgTable("platform_settings", {
   supportEmail: text("support_email"),
   featureConfig: text("feature_config"),
   authConfig: text("auth_config"),
-  newUserTourEnabled: boolean("new_user_tour_enabled").notNull().default(true),
+  newUserTourEnabled: boolean("new_user_tour_enabled").notNull().default(false),
   homepageMode: text("homepage_mode")
     .$type<"console" | "marketing">()
     .notNull()
