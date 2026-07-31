@@ -16,7 +16,7 @@ export function volcanoPackageMatchKeyForCanonicalId(
   if (exception) {
     return exception.toLowerCase();
   }
-  return canonicalId.trim().toLowerCase().replaceAll("-", "_");
+  return canonicalId.trim().toLowerCase().replace(/-/g, "_");
 }
 
 export function volcanoPackageCodeMatchesKey(
