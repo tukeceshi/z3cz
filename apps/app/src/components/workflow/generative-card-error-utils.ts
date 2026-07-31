@@ -105,3 +105,35 @@ export function withGenerativeCardGenerateError(
   );
   return next;
 }
+
+/**
+ * Session-only generative UI keys. Must not be saved or rehydrated — otherwise
+ * a stale card error can overwrite a successful generate after remote sync.
+ */
+export const TRANSIENT_GENERATIVE_METADATA_KEYS = [
+  GENERATIVE_CARD_GENERATE_ERROR_META_KEY,
+  AI_IMAGE_GENERATE_ERROR_META_KEY,
+  AI_VIDEO_GENERATE_ERROR_META_KEY,
+  "aiTextGenerating",
+  "aiImageGenerating",
+  "aiVideoGenerating",
+  "aiAudioGenerating",
+] as const;
+
+export function stripTransientGenerativeMetadata(
+  metadata: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!metadata) return undefined;
+
+  let changed = false;
+  const next = { ...metadata };
+  for (const key of TRANSIENT_GENERATIVE_METADATA_KEYS) {
+    if (key in next) {
+      delete next[key];
+      changed = true;
+    }
+  }
+
+  if (!changed) return metadata;
+  return Object.keys(next).length > 0 ? next : undefined;
+}

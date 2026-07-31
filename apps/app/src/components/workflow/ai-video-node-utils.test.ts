@@ -28,6 +28,8 @@ describe("appendAiVideoGeneratedHistoryItems", () => {
 
     const update = appendAiVideoGeneratedHistoryItems(current, videos, {
       prompt: "batch prompt",
+      platformModelId: "seed-1.6",
+      providerModelId: "doubao-seed-1-6-250615",
     });
 
     const inputs = update.inputs ?? current.inputs;
@@ -36,6 +38,8 @@ describe("appendAiVideoGeneratedHistoryItems", () => {
     expect(history.items).toHaveLength(1);
     expect(history.items[0]?.videos).toHaveLength(3);
     expect(history.items[0]?.prompt).toBe("batch prompt");
+    expect(history.items[0]?.platformModelId).toBe("seed-1.6");
+    expect(history.items[0]?.providerModelId).toBe("doubao-seed-1-6-250615");
     expect(history.selectedId).toBe(history.items[0]?.id);
 
     const resultInput = inputs.find((input) => input.id === "videos_result");

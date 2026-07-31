@@ -26,6 +26,7 @@ const CATALOG_CONFIG_MAP: Readonly<Record<string, string>> = {
   "doubao-seedance-2-mini": "Doubao_Seedance_2.0_mini_pack_free_infer",
   "doubao-seedream-5-pro": "Doubao_Seedream_5.0_pro_pack_free_infer",
   "doubao-seedream-5": "Doubao_Seedream_5.0_pack_free_infer",
+  "doubao-seed-evolving": "Doubao_Seed_Evolving_free_infer_res_pack",
 };
 
 async function fetchPage(nextToken?: string): Promise<{

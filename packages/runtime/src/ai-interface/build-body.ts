@@ -1,7 +1,35 @@
 import type {
   AiInterfaceBodySlot,
   AiInterfaceFieldSpec,
+  ReferenceImageInline,
 } from "@dafthunk/types";
+import { buildOpenAiMultimodalUserContent } from "@dafthunk/types";
+
+function readStringArray(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const items = value.filter((entry): entry is string => typeof entry === "string");
+  return items.length > 0 ? items : undefined;
+}
+
+function readReferenceImageInline(
+  value: unknown
+): readonly ReferenceImageInline[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const items = value.filter((entry): entry is ReferenceImageInline => {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+    const record = entry as Record<string, unknown>;
+    return (
+      typeof record.mimeType === "string" && typeof record.data === "string"
+    );
+  });
+  return items.length > 0 ? items : undefined;
+}
 
 export function buildBodyFromSlots(params: {
   slots: readonly AiInterfaceBodySlot[];
@@ -31,14 +59,23 @@ export function buildBodyFromSlots(params: {
         return { error: `${promptField} is required` };
       }
 
-      const messages: Array<{ role: string; content: string }> = [];
+      const content = buildOpenAiMultimodalUserContent({
+        prompt,
+        referenceImageUrls: readStringArray(inputs.referenceImageUrls),
+        referenceImageInline: readReferenceImageInline(
+          inputs.referenceImageInline
+        ),
+        referenceVideoUrls: readStringArray(inputs.referenceVideoUrls),
+      });
+
+      const messages: Array<{ role: string; content: unknown }> = [];
       if (slot.systemField) {
         const system = inputs[slot.systemField];
         if (typeof system === "string" && system.trim().length > 0) {
           messages.push({ role: "system", content: system });
         }
       }
-      messages.push({ role: "user", content: prompt });
+      messages.push({ role: "user", content });
       body[slot.to] = messages;
       continue;
     }

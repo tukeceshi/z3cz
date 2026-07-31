@@ -4,6 +4,9 @@ import {
   computeUsageBarSegments,
   mergeVolcanoResourcePackagesByInstance,
   parseVolcanoPackageAmount,
+  pickVolcanoPackageOwnerCanonicalId,
+  volcanoPackageMatchKeyForCanonicalId,
+  volcanoPackageProvisionModeForCanonicalId,
 } from "@dafthunk/types";
 
 import {
@@ -41,6 +44,97 @@ describe("parseResourcePackages", () => {
     expect(parseVolcanoPackageAmount("499940")).toBe(499940);
     expect(parseVolcanoPackageAmount(undefined)).toBe(0);
     expect(parseVolcanoPackageAmount("invalid")).toBe(0);
+  });
+
+  it("maps package match keys from model ids with three exceptions", () => {
+    expect(volcanoPackageMatchKeyForCanonicalId("doubao-seed-evolving")).toBe(
+      "doubao_seed_evolving"
+    );
+    expect(volcanoPackageMatchKeyForCanonicalId("deepseek-v4-pro")).toBe(
+      "deepseek_v4_pro"
+    );
+    expect(volcanoPackageMatchKeyForCanonicalId("glm-5-2")).toBe("glm_5.2");
+    expect(
+      volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-fast")
+    ).toBe("doubao_seedance_2.0_fast");
+    expect(
+      volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-mini")
+    ).toBe("doubao_seedance_2.0_mini");
+    expect(
+      volcanoPackageProvisionModeForCanonicalId("doubao-seed-evolving")
+    ).toBe("required");
+  });
+
+  it("gives fast Seedance packages to the fast model via longest key", () => {
+    expect(
+      pickVolcanoPackageOwnerCanonicalId(
+        "Doubao_Seedance_2.0_fast_pack_free_infer",
+        [
+          "doubao-seedance-2",
+          "doubao-seedance-2-fast",
+          "doubao-seedance-2-mini",
+        ]
+      )
+    ).toBe("doubao-seedance-2-fast");
+    expect(
+      pickVolcanoPackageOwnerCanonicalId("Doubao_Seedance_2.0_pack_free_infer", [
+        "doubao-seedance-2",
+        "doubao-seedance-2-fast",
+        "doubao-seedance-2-mini",
+      ])
+    ).toBe("doubao-seedance-2");
+  });
+
+  it("aggregates Seed Evolving free and collaboration packages", () => {
+    const packagesByCode = indexResourcePackagesByConfigurationCode([
+      {
+        ConfigurationCode: "Doubao_Seed_Evolving_free_infer_res_pack",
+        ConfigurationName: "Doubao-Seed-Evolving免费在线推理资源包",
+        TotalAmount: "500000",
+        AvailableAmount: "498274",
+        Unit: "token",
+        Status: "Effective",
+        InstanceNo: "rpi-free",
+      },
+      {
+        ConfigurationCode: "Doubao_Seed_Evolving_pack_data_collaboration",
+        ConfigurationName: "Doubao-Seed-Evolving协作奖励计划资源包",
+        TotalAmount: "5000000",
+        AvailableAmount: "5000000",
+        Unit: "token",
+        Status: "Effective",
+        InstanceNo: "rpi-collab",
+      },
+    ]);
+
+    const snapshot = buildVolcanoPackageSnapshotForModel({
+      canonicalId: "doubao-seed-evolving",
+      packagesByCode,
+    });
+    expect(snapshot.provisioned).toBe(true);
+    expect(snapshot.matchedCodes).toEqual([
+      "Doubao_Seed_Evolving_free_infer_res_pack",
+      "Doubao_Seed_Evolving_pack_data_collaboration",
+    ]);
+
+    const { usageByCanonicalId } = buildVolcanoPackageUsageMap({
+      catalog: [
+        {
+          canonicalId: "doubao-seed-evolving",
+          alias: "Doubao Seed Evolving",
+          modality: "text",
+          providerModelId: "doubao-seed-evolving",
+        },
+      ],
+      packagesByCode,
+    });
+    expect(usageByCanonicalId.get("doubao-seed-evolving")).toMatchObject({
+      period: "package",
+      quota: 5_500_000,
+      remaining: 5_498_274,
+      used: 1_726,
+      unit: "tokens",
+    });
   });
 
   it("indexes rows by configuration code", () => {
@@ -506,7 +600,7 @@ describe("resolveVolcanoActivation", () => {
     ).toBe("not_open");
   });
 
-  it("does not infer not_open for models without package mapping", () => {
+  it("infers not_open for Seed when required package mapping is empty", () => {
     expect(
       resolveVolcanoEffectiveActivationStatus({
         canonicalId: "doubao-seed-evolving",
@@ -518,7 +612,22 @@ describe("resolveVolcanoActivation", () => {
           configurationNames: [],
         },
       })
-    ).toBeNull();
+    ).toBe("not_open");
+  });
+
+  it("opens Seed when Evolving free inference package is provisioned", () => {
+    expect(
+      resolveVolcanoEffectiveActivationStatus({
+        canonicalId: "doubao-seed-evolving",
+        probe: null,
+        packageSnapshot: {
+          provisioned: true,
+          matchedCodes: ["Doubao_Seed_Evolving_free_infer_res_pack"],
+          instanceNos: ["rpi-seed"],
+          configurationNames: ["Doubao-Seed-Evolving免费在线推理资源包"],
+        },
+      })
+    ).toBe("open");
   });
 
   it("returns open for required models with provisioned package but stale probe", () => {

@@ -1,4 +1,8 @@
-import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_IMAGE_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
@@ -31,28 +35,28 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
   const [degradedDismissed, setDegradedDismissed] = useState(false);
   const [unhealthyDismissed, setUnhealthyDismissed] = useState(false);
 
-  const hasGenerativeNodes = useMemo(
-    () =>
-      nodes.some((node) =>
-        AI_GENERATIVE_NODE_TYPES.includes(
-          node.data.nodeType as (typeof AI_GENERATIVE_NODE_TYPES)[number]
-        )
-      ),
-    [nodes]
-  );
-
-  const showAutoFixingBanner =
-    hasGenerativeNodes && autoFixState === "fixing_cors";
+  const hasGenerativeMediaNodes = useMemo(() => {
+    const mediaNodeTypes: readonly string[] = [
+      AI_AUDIO_NODE_TYPE,
+      AI_IMAGE_NODE_TYPE,
+      AI_VIDEO_NODE_TYPE,
+    ];
+    return nodes.some((node) =>
+      mediaNodeTypes.includes(node.data.nodeType ?? "")
+    );
+  }, [nodes]);
 
   const showNotConfiguredBanner =
-    hasGenerativeNodes &&
+    hasGenerativeMediaNodes &&
     !isLoading &&
     !configured &&
-    !notConfiguredDismissed &&
-    !showAutoFixingBanner;
+    !notConfiguredDismissed;
+
+  const showAutoFixingBanner =
+    hasGenerativeMediaNodes && autoFixState === "fixing_cors";
 
   const showDegradedBanner =
-    hasGenerativeNodes &&
+    hasGenerativeMediaNodes &&
     !isLoading &&
     configured &&
     health?.status === "degraded" &&
@@ -61,7 +65,7 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
     !showAutoFixingBanner;
 
   const showUnhealthyBanner =
-    hasGenerativeNodes &&
+    hasGenerativeMediaNodes &&
     !isLoading &&
     configured &&
     blocksGenerativeMedia &&
@@ -73,14 +77,14 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
   return (
     <>
       <AiCloudStorageBanner
-        visible={showAutoFixingBanner}
-        variant="auto_fixing"
-        showConfigureAction={false}
-      />
-      <AiCloudStorageBanner
         visible={showNotConfiguredBanner}
         variant="not_configured"
         onDismiss={() => setNotConfiguredDismissed(true)}
+      />
+      <AiCloudStorageBanner
+        visible={showAutoFixingBanner}
+        variant="auto_fixing"
+        showConfigureAction={false}
       />
       <AiCloudStorageBanner
         visible={showDegradedBanner}

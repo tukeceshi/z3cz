@@ -13,7 +13,7 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 |------|------|------|
 | 类型目录 | `packages/types/src/ai-model-catalog.ts` | `VOLCANO_AI_MODEL_CATALOG` |
 | 定价 | `packages/types/src/volcano-pricing-catalog.ts` | `VOLCANO_MODEL_PRICING_CATALOG` |
-| 资源包 | `packages/types/src/volcano-package-catalog.ts` | `VOLCANO_PACKAGE_CONFIG_BY_CANONICAL_ID` + `VOLCANO_PACKAGE_PROVISION_MODE_BY_CANONICAL_ID` |
+| 资源包 | `packages/types/src/volcano-package-catalog.ts` | 模型 ID 匹配键 + `VOLCANO_PACKAGE_PROVISION_MODE_BY_CANONICAL_ID` |
 | 数据库 | `apps/api/src/db/migrations/00NN_*.sql` | `platform_ai_models`；可选 `platform_ai_model_groups` |
 | 迁移注册 | `apps/api/src/db/migrations/meta/_journal.json` | 与 SQL 同步登记 |
 
@@ -23,7 +23,7 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 
 - `canonicalId`、`displayName`、模态（text / image / video）
 - **`providerModelId`**：在线推理 ModelId（见下），不是控制台展示名或 Coding Plan 名
-- 资源包 `ConfigurationCode`（无包则 `[]` + provision mode `none`）
+- 资源包：按模型 ID 匹配账单包 Code（见 `volcano-package-catalog`；特殊匹配键另列）
 - 定价与 `monthlyFreeQuota`
 - 文字模型 `parameter_rules`（可复制已有同模态条目）
 
@@ -78,11 +78,14 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 
 ## 已知资源包对照
 
-| canonicalId | ConfigurationCode | providerModelId |
-|-------------|-------------------|-----------------|
-| `deepseek-v4-pro` | `DeepSeek_V4_pro_free_inference_resource_pack` | `deepseek-v4-pro-260425` |
-| `deepseek-v4-flash` | `DeepSeek_V4_flash_free_inference_resource_pack` | `deepseek-v4-flash-260425` |
-| `glm-5-2` | `GLM_5.2_free_inference_resource_pack` | `glm-5-2-260617` |
+按模型 ID 匹配账单 `ConfigurationCode`（`-`→`_`，不区分大小写；例外：`glm-5-2`→`glm_5.2`，`doubao-seedance-2-fast`→`doubao_seedance_2.0_fast`，`doubao-seedance-2-mini`→`doubao_seedance_2.0_mini`）。一对多时取更长匹配键。
+
+| canonicalId | providerModelId |
+|-------------|-----------------|
+| `deepseek-v4-pro` | `deepseek-v4-pro-260425` |
+| `deepseek-v4-flash` | `deepseek-v4-flash-260425` |
+| `glm-5-2` | `glm-5-2-260617` |
+| `doubao-seed-evolving` | `doubao-seed-evolving` |
 
 ## 参考文件
 

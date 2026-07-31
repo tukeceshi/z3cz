@@ -50,6 +50,12 @@ async function waitForJobFinalMedia(
   }
 }
 
+export interface ResolveGenerativeJobMediaResult {
+  readonly media: readonly MediaReference[];
+  /** True only for the caller that claimed resume and ran local persist. */
+  readonly owned: boolean;
+}
+
 interface UseGenerativeCloudJobOptions {
   readonly nodeId: string;
   readonly orgId: string | undefined;
@@ -87,7 +93,7 @@ export function useGenerativeCloudJobProgress(
   readonly clearProgress: () => void;
   readonly resolveJobMedia: (
     jobId: string
-  ) => Promise<readonly MediaReference[]>;
+  ) => Promise<ResolveGenerativeJobMediaResult>;
   readonly activeProgressPhase: GenerativeProgressPhase | null;
 } {
   const resumeAttemptedRef = useRef(false);
@@ -124,19 +130,25 @@ export function useGenerativeCloudJobProgress(
   }, [options.applyBusyMetadata, options.nodeId, options.updateNodeData]);
 
   const resolveJobMedia = useCallback(
-    async (jobId: string) => {
-      const resumedPhase = readGenerativeProgressPhase(options.metadata);
-      syncProgress({
-        jobId,
-        phase: resumedPhase ?? "generating",
-      });
-
+    async (jobId: string): Promise<ResolveGenerativeJobMediaResult> => {
       const claimed = tryClaimGenerativeJobResume(jobId);
       if (!claimed) {
-        return waitForJobFinalMedia(options.orgId!, jobId);
+        try {
+          const media = await waitForJobFinalMedia(options.orgId!, jobId);
+          return { media, owned: false };
+        } catch {
+          // Owner (or another waiter) surfaces job failure; do not fight over UI.
+          return { media: [], owned: false };
+        }
       }
 
       try {
+        const resumedPhase = readGenerativeProgressPhase(options.metadata);
+        syncProgress({
+          jobId,
+          phase: resumedPhase ?? "generating",
+        });
+
         const media = await resolveCloudGenerationJobMedia({
           organizationId: options.orgId!,
           jobId,
@@ -153,7 +165,7 @@ export function useGenerativeCloudJobProgress(
             options.onStaged?.(localMedia);
           },
         });
-        return media;
+        return { media, owned: true };
       } finally {
         releaseGenerativeJobResume(jobId);
       }
@@ -208,16 +220,20 @@ export function useGenerativeCloudJobProgress(
     options.setIsGenerating(true);
 
     void resolveJobMedia(jobId)
-      .then((media) => {
-        options.onResumeSuccess?.(media);
+      .then((result) => {
+        if (!result.owned) {
+          return;
+        }
+        options.onResumeSuccess?.(result.media);
+        clearProgress();
       })
       .catch((error) => {
         options.onResumeError?.(error);
+        clearProgress();
       })
       .finally(() => {
         options.setPersistPhase(null);
         options.setIsGenerating(false);
-        clearProgress();
       });
   }, [
     clearProgress,

@@ -4,6 +4,7 @@ import {
   AI_IMAGE_GENERATE_ERROR_META_KEY,
   GENERATIVE_CARD_GENERATE_ERROR_META_KEY,
   readGenerativeCardError,
+  stripTransientGenerativeMetadata,
   withGenerativeCardGenerateError,
 } from "./generative-card-error-utils";
 
@@ -59,5 +60,22 @@ describe("generative-card-error-utils", () => {
         detail: "upstream unavailable",
       }),
     });
+  });
+
+  it("strips card errors and generating flags for persist/rehydrate", () => {
+    expect(
+      stripTransientGenerativeMetadata({
+        [GENERATIVE_CARD_GENERATE_ERROR_META_KEY]: "403",
+        [AI_IMAGE_GENERATE_ERROR_META_KEY]: "legacy",
+        aiTextGenerating: "1",
+        keepMe: "yes",
+      })
+    ).toEqual({ keepMe: "yes" });
+
+    expect(
+      stripTransientGenerativeMetadata({
+        [GENERATIVE_CARD_GENERATE_ERROR_META_KEY]: "only-error",
+      })
+    ).toBeUndefined();
   });
 });

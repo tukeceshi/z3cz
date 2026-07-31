@@ -20,6 +20,8 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useTranslation } from "@/components/locale-provider";
+
 import {
   ALL_TRIGGER_NODE_TYPE_IDS,
   getTriggerNodeTypes,
@@ -65,7 +67,7 @@ import {
 } from "./workflow-connection-validation";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
-import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import type {
   ConnectionValidationState,
@@ -182,6 +184,7 @@ function createReactFlowNode(
   position: { x: number; y: number },
   createObjectUrl: (objectReference: ObjectReference) => string,
   existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>,
+  t: (key: string) => string,
   id?: string
 ): ReactFlowNode<WorkflowNodeType> {
   const inputs = mergeGenerativeNodeCatalogInputs(
@@ -198,7 +201,11 @@ function createReactFlowNode(
     data: {
       name: resolveGenerativeNodeDisplayName({
         nodeType: nodeType.type,
-        baseName: nodeType.name,
+        baseName: resolveGenerativeNodeDefaultBaseName(
+          nodeType.type,
+          nodeType.name,
+          t
+        ),
         existingNodes,
       }),
       inputs,
@@ -289,6 +296,7 @@ export interface UseGraphOperationsReturn {
   deleteEdge: (edgeId: string) => void;
   deleteSelected: () => void;
   deselectAll: () => void;
+  selectNode: (nodeId: string) => void;
   addTriggerNodes: (trigger: WorkflowTrigger) => void;
   removeTriggerNodes: () => void;
 }
@@ -304,6 +312,7 @@ export function useGraphOperations({
   allowedNodeTypes,
   nodeTypes = [],
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
+  const { t } = useTranslation();
   // Core state
   const [nodes, setNodes, onNodesChange] =
     useNodesState<ReactFlowNode<WorkflowNodeType>>(initialNodes);
@@ -727,7 +736,8 @@ export function useGraphOperations({
         nodeType,
         placement.position,
         createObjectUrl,
-        nodesRef.current
+        nodesRef.current,
+        t
       );
       newNode.selected = true;
 
@@ -746,7 +756,7 @@ export function useGraphOperations({
         );
       }
     },
-    [reactFlowInstance, setNodes, createObjectUrl, nodesRef]
+    [reactFlowInstance, setNodes, createObjectUrl, nodesRef, t]
   );
 
   // Update node execution data (batched for multi-node execution ticks)
@@ -942,6 +952,19 @@ export function useGraphOperations({
     setEdges((eds) => eds.map((edge) => ({ ...edge, selected: false })));
   }, [setNodes, setEdges]);
 
+  const selectNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        }))
+      );
+      setEdges((eds) => eds.map((edge) => ({ ...edge, selected: false })));
+    },
+    [setNodes, setEdges]
+  );
+
   const removeTriggerNodes = useCallback(() => {
     const triggerNodes = nodesRef.current.filter(
       (n) => n.data.nodeType && ALL_TRIGGER_NODE_TYPE_IDS.has(n.data.nodeType)
@@ -973,6 +996,7 @@ export function useGraphOperations({
           { x: i * 400, y: 0 },
           createObjectUrl,
           nodesRef.current,
+          t,
           `${nodeType.type}-${Date.now()}-${i}`
         );
       });
@@ -981,7 +1005,7 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl]
+    [nodeTypes, setNodes, createObjectUrl, t]
   );
 
   return {
@@ -1035,6 +1059,7 @@ export function useGraphOperations({
     deleteEdge: graphEditBlocked ? NOOP : deleteEdge,
     deleteSelected: readOnlyDisabled ? NOOP : deleteSelected,
     deselectAll,
+    selectNode,
     addTriggerNodes: graphEditBlocked ? NOOP : addTriggerNodes,
     removeTriggerNodes: graphEditBlocked ? NOOP : removeTriggerNodes,
   };

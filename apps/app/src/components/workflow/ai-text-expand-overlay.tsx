@@ -148,7 +148,7 @@ export function AiTextExpandButton({
         event.stopPropagation();
         onClick();
       }}
-      title={t("workflow.aiTextPanel.expand")}
+      title={t("workflow.studio.enter")}
     >
       <Maximize2Icon className="h-2.5 w-2.5" strokeWidth={2} />
     </button>

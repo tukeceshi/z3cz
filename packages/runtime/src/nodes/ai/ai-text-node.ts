@@ -1,7 +1,11 @@
 import type { NodeExecution, NodeType } from "@dafthunk/types";
 import {
   buildAiTextUserPrompt,
+  collectAiTextMediaReferences,
+  isEphemeralMediaReference,
+  isLocalMediaReference,
   normalizeAiTextReferences,
+  type MediaReference,
 } from "@dafthunk/types";
 
 import type { NodeContext } from "../../node-types";
@@ -23,7 +27,7 @@ export class AiTextNode extends ExecutableNode {
     documentation: `Generates text using the organization's configured AI interface.
 
 ### Inputs
-- **keywords**: Optional upstream text reference (wired on the canvas).
+- **keywords**: Optional upstream references (text / image / video per model limits).
 - **prompt**: Manual prompt when keywords is not connected.
 - **model**: Platform model canonical id (e.g. deepseek-v4-flash).
 
@@ -83,14 +87,18 @@ export class AiTextNode extends ExecutableNode {
   };
 
   public async execute(context: NodeContext): Promise<NodeExecution> {
-    const references = normalizeAiTextReferences(
-      context.inputs[AI_TEXT_KEYWORDS_INPUT]
-    );
+    const keywords = context.inputs[AI_TEXT_KEYWORDS_INPUT];
+    const references = normalizeAiTextReferences(keywords);
+    const media = collectAiTextMediaReferences(keywords);
     const question =
       typeof context.inputs.prompt === "string"
         ? context.inputs.prompt.trim()
         : "";
-    const effectivePrompt = buildAiTextUserPrompt({ references, question });
+    const effectivePrompt = buildAiTextUserPrompt({
+      references,
+      question,
+      hasMediaReferences: media.images.length > 0 || media.videos.length > 0,
+    });
 
     if (!effectivePrompt) {
       return this.createErrorResult(
@@ -114,9 +122,30 @@ export class AiTextNode extends ExecutableNode {
       );
     }
 
+    let referenceImageUrls: string[] = [];
+    let referenceVideoUrls: string[] = [];
+    try {
+      referenceImageUrls = await resolveMediaUrlsForTextModel(
+        context,
+        media.images
+      );
+      referenceVideoUrls = await resolveMediaUrlsForTextModel(
+        context,
+        media.videos
+      );
+    } catch (error) {
+      return this.createErrorResult(
+        error instanceof Error ? error.message : "Failed to resolve media references"
+      );
+    }
+
     const result = await context.executeTextModel({
       canonicalId: modelCanonicalId,
       effectivePrompt,
+      referenceImageUrls:
+        referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
+      referenceVideoUrls:
+        referenceVideoUrls.length > 0 ? referenceVideoUrls : undefined,
     });
 
     if (!result.ok || !result.text) {
@@ -125,4 +154,29 @@ export class AiTextNode extends ExecutableNode {
 
     return this.createSuccessResult({ text: result.text }, 1);
   }
+}
+
+async function resolveMediaUrlsForTextModel(
+  context: NodeContext,
+  refs: readonly MediaReference[]
+): Promise<string[]> {
+  const urls: string[] = [];
+
+  for (const ref of refs) {
+    if (isLocalMediaReference(ref)) {
+      throw new Error(
+        "Local browser-only media cannot be used in server workflow runs. Generate from the canvas panel instead."
+      );
+    }
+    if (isEphemeralMediaReference(ref)) {
+      urls.push(ref.url);
+      continue;
+    }
+    if (!context.objectStore) {
+      throw new Error("Object store is not available for media references.");
+    }
+    urls.push(await context.objectStore.getPresignedUrl(ref, 3600));
+  }
+
+  return urls;
 }

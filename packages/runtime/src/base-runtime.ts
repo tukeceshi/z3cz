@@ -1247,6 +1247,9 @@ export abstract class Runtime<Env = unknown> {
                 organizationId: context.organizationId,
                 canonicalId: params.canonicalId,
                 effectivePrompt: params.effectivePrompt,
+                referenceImageUrls: params.referenceImageUrls,
+                referenceImageInline: params.referenceImageInline,
+                referenceVideoUrls: params.referenceVideoUrls,
               })
           : undefined,
         resolveTextModel: this.textModelService

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { AI_TEXT_GENERATING_META_KEY } from "@/components/workflow/ai-text-node-utils";
+import { stripTransientGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -40,15 +40,6 @@ interface UseEditableWorkflowProps {
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
 }
 
-function persistableNodeMetadata(
-  metadata: Record<string, string> | undefined
-): Record<string, string> | undefined {
-  if (!metadata) return undefined;
-  const next = { ...metadata };
-  delete next[AI_TEXT_GENERATING_META_KEY];
-  return Object.keys(next).length > 0 ? next : undefined;
-}
-
 /**
  * Convert the editor's ReactFlow graph into the backend wire format.
  *
@@ -72,7 +63,7 @@ function buildWorkflowPayload(
       icon: node.data.icon,
       functionCalling: node.data.functionCalling,
       ...(() => {
-        const metadata = persistableNodeMetadata(node.data.metadata);
+        const metadata = stripTransientGenerativeMetadata(node.data.metadata);
         return metadata ? { metadata } : {};
       })(),
       inputs: node.data.inputs.map((input) => {

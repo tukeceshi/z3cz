@@ -20,8 +20,8 @@ import { cn } from "@/utils/utils";
 
 import {
   AiImageExpandButton,
-  AiImageExpandOverlay,
 } from "../../ai-image-expand-overlay";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
 import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
@@ -46,6 +46,7 @@ import {
   withGenerativeCardEditing,
 } from "../../generative-card-mode-utils";
 import {
+  GENERATIVE_IMAGE_UPLOAD_ACCEPT,
   normalizeGenerativeCardUploadFile,
   readGenerativePrompt,
   resolveGenerativeCardUploadError,
@@ -87,7 +88,7 @@ function AiImageWidget({
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [expandOpen, setExpandOpen] = useState(false);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
@@ -260,7 +261,7 @@ function AiImageWidget({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={GENERATIVE_IMAGE_UPLOAD_ACCEPT}
         className="hidden"
         onChange={(event) => {
           void handleUploadFiles(event.target.files);
@@ -285,7 +286,7 @@ function AiImageWidget({
           }
           if (hasImages && !isGenerating) {
             event.stopPropagation();
-            setExpandOpen(true);
+            openCreativeStudio();
             return;
           }
           if (!isGenerating) {
@@ -330,7 +331,7 @@ function AiImageWidget({
               />
             ) : null}
             {hasImages ? (
-              <AiImageExpandButton onClick={() => setExpandOpen(true)} />
+              <AiImageExpandButton onClick={openCreativeStudio} />
             ) : null}
           </div>
         ) : null}
@@ -341,16 +342,6 @@ function AiImageWidget({
           error={generateError}
           open={errorDetailOpen}
           onOpenChange={setErrorDetailOpen}
-        />
-      ) : null}
-
-      {images.length > 0 ? (
-        <AiImageExpandOverlay
-          open={expandOpen}
-          title={t("workflow.aiImagePanel.outputTitle")}
-          images={images}
-          createObjectUrl={createObjectUrl}
-          onClose={() => setExpandOpen(false)}
         />
       ) : null}
 

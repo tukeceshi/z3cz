@@ -9,6 +9,7 @@ import {
   buildTextModelInvocationError,
   extractUpstreamErrorMessage,
   interpretUpstreamTextModelError,
+  isTransientTextModelUpstreamError,
 } from "./interpret-upstream-text-model-error";
 
 describe("extractUpstreamErrorMessage", () => {
@@ -30,6 +31,19 @@ describe("interpretUpstreamTextModelError", () => {
     expect(interpretUpstreamTextModelError("Invalid API key")).toContain(
       "API Key"
     );
+  });
+});
+
+describe("isTransientTextModelUpstreamError", () => {
+  it("treats abort/timeout as transient", () => {
+    expect(isTransientTextModelUpstreamError("This operation was aborted")).toBe(
+      true
+    );
+    expect(isTransientTextModelUpstreamError("请求超时")).toBe(true);
+  });
+
+  it("treats auth errors as permanent", () => {
+    expect(isTransientTextModelUpstreamError("Invalid API key")).toBe(false);
   });
 });
 

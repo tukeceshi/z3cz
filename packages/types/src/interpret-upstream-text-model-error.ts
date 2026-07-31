@@ -111,6 +111,23 @@ export function interpretUpstreamTextModelError(
   return undefined;
 }
 
+/** Transient upstream failures must not auto-disable the org model/interface. */
+export function isTransientTextModelUpstreamError(raw: string): boolean {
+  const extracted = extractUpstreamErrorMessage(raw);
+  const haystack = `${raw}\n${extracted}`.trim();
+  if (!haystack) {
+    return false;
+  }
+
+  return (
+    /timeout|timed\s+out|aborted|etimedout|请求超时/iu.test(haystack) ||
+    /429|rate\s+limit|too\s+many\s+requests|请求过于频繁/iu.test(haystack) ||
+    /5\d\d|bad\s+gateway|service\s+unavailable|gateway\s+timeout|暂时不可用/iu.test(
+      haystack
+    )
+  );
+}
+
 export function buildTextModelInvocationErrorParts(params: {
   readonly upstreamError?: string;
   readonly locale?: "zh" | "en";

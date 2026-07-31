@@ -1,4 +1,5 @@
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -7,8 +8,8 @@ import { cn } from "@/utils/utils";
 
 import {
   AiTextExpandButton,
-  AiTextExpandOverlay,
 } from "../../ai-text-expand-overlay";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
 import {
   AiTextHistoryButton,
   AiTextHistoryOverlay,
@@ -16,6 +17,7 @@ import {
 import {
   AI_TEXT_CARD_HEIGHT_PX,
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
+  isAiTextGenerating,
   readAiTextResult,
   readAiTextResultHistory,
   withAiTextHistorySelection,
@@ -54,33 +56,41 @@ function AiTextWidget({
 }: AiTextWidgetProps) {
   const { t } = useTranslation();
   const { updateNodeData } = useWorkflow();
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [editing, setEditing] = useState(false);
-  const [expandOpen, setExpandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const displayValue = text ?? "";
+  const isGenerating = isAiTextGenerating(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
   );
   const generateError = readGenerativeCardError(metadata);
   const cardPlaceholder = t("workflow.aiTextPanel.cardInputPlaceholder");
+  const editLocked = disabled || isGenerating;
 
   const commitText = useCallback(
     (value: string) => {
-      if (disabled) return;
+      if (editLocked) return;
       onChange(value);
     },
-    [disabled, onChange]
+    [editLocked, onChange]
   );
 
   const textBuffer = useBufferedTextValue(displayValue, commitText);
 
   useEffect(() => {
-    if (generateError && editing) {
+    if ((generateError || isGenerating) && editing) {
       setEditing(false);
     }
-  }, [generateError, editing]);
+  }, [generateError, isGenerating, editing]);
+
+  useEffect(() => {
+    if (isGenerating && historyOpen) {
+      setHistoryOpen(false);
+    }
+  }, [isGenerating, historyOpen]);
 
   useEffect(() => {
     if (!updateNodeData) return;
@@ -104,7 +114,7 @@ function AiTextWidget({
   };
 
   const handleHistorySelect = (id: string) => {
-    if (disabled || !updateNodeData) return;
+    if (editLocked || !updateNodeData) return;
     const item = historyItems.items.find((entry) => entry.id === id);
     if (!item) return;
 
@@ -121,8 +131,13 @@ function AiTextWidget({
       setErrorDetailOpen(true);
       return;
     }
-    if (disabled || editing) return;
+    if (editLocked) return;
     event.stopPropagation();
+    if (textBuffer.value.trim()) {
+      openCreativeStudio();
+      return;
+    }
+    if (editing) return;
     setEditing(true);
   };
 
@@ -137,7 +152,7 @@ function AiTextWidget({
         style={{ height: AI_TEXT_CARD_HEIGHT_PX }}
         onDoubleClick={handleDoubleClick}
       >
-        {editing && !generateError ? (
+        {editing && !generateError && !isGenerating ? (
           <Textarea
             autoFocus
             value={textBuffer.value}
@@ -146,7 +161,7 @@ function AiTextWidget({
             onBlur={stopEditing}
             onCompositionStart={textBuffer.onCompositionStart}
             onCompositionEnd={textBuffer.onCompositionEnd}
-            readOnly={disabled}
+            readOnly={editLocked}
             maxLength={outputMaxChars}
             placeholder={cardPlaceholder}
             className="nodrag h-full min-h-0 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
@@ -167,13 +182,18 @@ function AiTextWidget({
 
         {!generateError ? (
           <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
-            {showHistoryIcon ? (
+            {isGenerating ? (
+              <LoaderIcon className="h-3.5 w-3.5 animate-spin text-yellow-500" />
+            ) : null}
+            {showHistoryIcon && !isGenerating ? (
               <AiTextHistoryButton
                 count={historyItems.items.length}
                 onClick={() => setHistoryOpen(true)}
               />
             ) : null}
-            <AiTextExpandButton onClick={() => setExpandOpen(true)} />
+            {!isGenerating ? (
+              <AiTextExpandButton onClick={openCreativeStudio} />
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -185,17 +205,6 @@ function AiTextWidget({
           onOpenChange={setErrorDetailOpen}
         />
       ) : null}
-
-      <AiTextExpandOverlay
-        open={expandOpen}
-        title={t("workflow.aiTextPanel.outputTitle")}
-        value={textBuffer.value}
-        onChange={textBuffer.commit}
-        onClose={() => setExpandOpen(false)}
-        readOnly={disabled}
-        maxLength={outputMaxChars}
-        placeholder={t("workflow.aiTextPanel.outputPlaceholder")}
-      />
 
       {showHistoryIcon ? (
         <AiTextHistoryOverlay

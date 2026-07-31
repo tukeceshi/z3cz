@@ -50,6 +50,8 @@ export interface TextModelFailureMessageParams {
   readonly nextInterfaceName?: string;
   readonly nextChannelKind?: TextModelChannelKind;
   readonly locale?: "zh" | "en";
+  /** When false, do not claim the interface was auto-disabled. Default true. */
+  readonly disabledInterface?: boolean;
 }
 
 function buildTextModelFailureCardLines(
@@ -57,34 +59,51 @@ function buildTextModelFailureCardLines(
 ): readonly string[] {
   const locale = params.locale ?? "zh";
   const failedTag = channelTag(params.channelKind, locale);
+  const disabledInterface = params.disabledInterface !== false;
 
   if (locale === "zh") {
-    const lines = [
-      `${params.modelDisplayLabel}调用失败`,
-      `已自动关闭错误接口 「${failedTag}」${params.failedInterfaceName}。`,
-      "请检查配置，可在「AI/资源 接口」重新启用接口。",
-    ];
+    const lines = [`${params.modelDisplayLabel}调用失败`];
+    if (disabledInterface) {
+      lines.push(
+        `已自动关闭错误接口 「${failedTag}」${params.failedInterfaceName}。`,
+        "请检查配置，可在「AI/资源 接口」重新启用接口。"
+      );
+    } else {
+      lines.push(
+        `接口 「${failedTag}」${params.failedInterfaceName} 暂时失败，模型未关闭。`
+      );
+    }
     if (params.nextInterfaceName && params.nextChannelKind) {
       const nextTag = channelTag(params.nextChannelKind, locale);
       lines.push(
         `重试将使用接口「${nextTag}」${params.nextInterfaceName}。`
       );
-    } else {
+    } else if (disabledInterface) {
       lines.push("已无其他可用接口。");
+    } else {
+      lines.push("请稍后重试。");
     }
     return lines;
   }
 
-  const lines = [
-    `${params.modelDisplayLabel} request failed`,
-    `Disabled interface "${failedTag}" ${params.failedInterfaceName}.`,
-    "Check settings and re-enable the interface under AI / Resource Interfaces.",
-  ];
+  const lines = [`${params.modelDisplayLabel} request failed`];
+  if (disabledInterface) {
+    lines.push(
+      `Disabled interface "${failedTag}" ${params.failedInterfaceName}.`,
+      "Check settings and re-enable the interface under AI / Resource Interfaces."
+    );
+  } else {
+    lines.push(
+      `Interface "${failedTag}" ${params.failedInterfaceName} failed temporarily; the model was not disabled.`
+    );
+  }
   if (params.nextInterfaceName && params.nextChannelKind) {
     const nextTag = channelTag(params.nextChannelKind, locale);
     lines.push(`Retry will use interface "${nextTag}" ${params.nextInterfaceName}.`);
-  } else {
+  } else if (disabledInterface) {
     lines.push("No other interfaces are available.");
+  } else {
+    lines.push("Please try again later.");
   }
   return lines;
 }

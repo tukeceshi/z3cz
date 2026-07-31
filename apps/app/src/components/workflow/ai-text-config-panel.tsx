@@ -1,7 +1,5 @@
 import {
-  AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
-  AI_VIDEO_NODE_TYPE,
   normalizeTextModelParameterRules,
   validateAiTextPromptAssembly,
   type AiTextReferenceInput,
@@ -19,8 +17,8 @@ import {
 } from "@xyflow/react";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import SparklesIcon from "lucide-react/icons/sparkles";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -29,18 +27,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import {
-  generateAiText,
+  generateAiTextStream,
   resolveOrgTextModel,
   useOrgTextModels,
 } from "@/services/platform-ai-model-service";
-import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
-import { uploadGenerativeMedia } from "@/services/upload-generative-media";
+import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
 import {
   AiTextExpandButton,
-  AiTextExpandOverlay,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker, rememberAiTextRecentModel } from "./ai-text-model-picker";
 import {
@@ -48,7 +44,6 @@ import {
   collectAiTextReferenceChips,
 } from "./ai-text-reference-bar";
 import {
-  canAcceptAiTextReference,
   countAiTextReferences,
   evaluateAiTextReferenceStructural,
   listPickableReferenceSources,
@@ -59,17 +54,18 @@ import {
   AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX,
   classifyReferenceFromNodeType,
   pickDefaultTextModelCanonicalId,
-  probeVideoFileDurationSeconds,
   probeVideoUrlDurationSeconds,
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
   withAiTextGeneratedResult,
+  withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
-import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { formatGenerativeApiError, extractGenerativeApiErrorMessage } from "./format-generative-api-error";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
+import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
@@ -82,28 +78,29 @@ import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 export interface AiTextConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
+  readonly layout?: GenerativeConfigPanelLayout;
 }
 
-export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
+export function AiTextConfigPanel({
+  nodeId,
+  data,
+  layout = "attached",
+}: AiTextConfigPanelProps) {
   const {
     updateNodeData,
     disabled,
     edges = [],
     deleteEdge,
-    nodeTypes = [],
   } = useWorkflow();
   const nodes = useNodes();
-  const { setNodes, setEdges, getNode } = useReactFlow();
+  const { setEdges } = useReactFlow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
   const toast = useAppToast();
   const { getOrgUrl } = useOrgUrl();
-  const { id: workflowId } = useParams<{ id: string }>();
-  const { uploadBinaryData, createObjectUrl, getObjectMetadata } =
-    useObjectService();
+  const { createObjectUrl, getObjectMetadata } = useObjectService();
   const orgId = organization?.id;
-  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   const resolveMediaPreviewUrl = useCallback(
     (media: MediaReference) =>
@@ -111,10 +108,15 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     [createObjectUrl, orgId]
   );
 
-  const { models, groups, isLoading } = useOrgTextModels(orgId);
+  const { models, groups, modelsError, isLoading, refreshModels } =
+    useOrgTextModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [expandOpen, setExpandOpen] = useState(false);
+  const generateInFlightRef = useRef(false);
+  const generateAbortRef = useRef<AbortController | null>(null);
+  const streamPreviewRafRef = useRef<number | null>(null);
+  const streamPreviewPendingRef = useRef<string | null>(null);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
 
   const textModelCatalog = useMemo(
     () =>
@@ -184,15 +186,30 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       }));
   }, [referenceChips]);
 
+  const imageMediaReferences = useMemo((): readonly MediaReference[] => {
+    return referenceChips
+      .filter((chip) => chip.kind === "image" && chip.media != null)
+      .map((chip) => chip.media!);
+  }, [referenceChips]);
+
+  const videoMediaReferences = useMemo((): readonly MediaReference[] => {
+    return referenceChips
+      .filter((chip) => chip.kind === "video" && chip.media != null)
+      .map((chip) => chip.media!);
+  }, [referenceChips]);
+
+  const mediaReferenceCount =
+    imageMediaReferences.length + videoMediaReferences.length;
+
   const hasNonTextReferences = useMemo(
     () => referenceChips.some((chip) => chip.kind !== "text"),
     [referenceChips]
   );
 
-  const promptMaxLength = modelRules.promptMaxChars;
-  const allowUpload =
+  const modelSupportsMedia =
     modelRules.maxImageReferences > 0 || modelRules.maxVideoReferences > 0;
 
+  const promptMaxLength = modelRules.promptMaxChars;
   const selectableModels = useMemo(
     () => models.filter((entry) => entry.selectable),
     [models]
@@ -202,19 +219,6 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     () => selectableModels.filter((entry) => modelFitsCurrentRefs(entry)),
     [modelFitsCurrentRefs, selectableModels]
   );
-
-  const clearModelSelection = useCallback(() => {
-    if (!updateNodeData) return;
-    updateNodeData(nodeId, (current) => {
-      const inputs = current.inputs.map((input) => {
-        if (input.id === "model" || input.id === "ai_interface_id") {
-          return { ...input, value: "" } as WorkflowParameter;
-        }
-        return input;
-      });
-      return { inputs };
-    });
-  }, [nodeId, updateNodeData]);
 
   const applyModelSelection = async (canonicalId: string) => {
     if (disabled || !updateNodeData || !orgId) return;
@@ -269,20 +273,6 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-pick when empty
   }, [disabled, isLoading, selectedModelId, modelsFittingRefs, orgId, updateNodeData, nodeId]);
 
-  // Clear model when current references exceed its limits.
-  useEffect(() => {
-    if (disabled || !selectedModelId || !selectedModel) return;
-    if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
-      clearModelSelection();
-    }
-  }, [
-    clearModelSelection,
-    disabled,
-    modelFitsCurrentRefs,
-    selectedModel,
-    selectedModelId,
-  ]);
-
   useEffect(() => {
     if (disabled || !updateNodeData || !selectedModel) return;
     const rules = normalizeTextModelParameterRules(selectedModel.parameterRules);
@@ -334,7 +324,6 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     readonly rules: TextModelParameterRules;
     readonly textValue?: string;
     readonly objectRef?: ObjectReference;
-    readonly file?: File;
   }): Promise<boolean> => {
     const rules = normalizeTextModelParameterRules(params.rules);
 
@@ -343,36 +332,6 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       if (text.length > rules.maxTextReferenceChars) {
         toast.error("workflow.aiTextPanel.referenceTooLarge");
         return false;
-      }
-      return true;
-    }
-
-    if (params.file) {
-      if (
-        params.kind === "image" &&
-        params.file.size > rules.maxImageReferenceBytes
-      ) {
-        toast.error("workflow.aiTextPanel.referenceTooLarge");
-        return false;
-      }
-      if (
-        params.kind === "video" &&
-        params.file.size > rules.maxVideoReferenceBytes
-      ) {
-        toast.error("workflow.aiTextPanel.referenceTooLarge");
-        return false;
-      }
-      if (params.kind === "video") {
-        try {
-          const seconds = await probeVideoFileDurationSeconds(params.file);
-          if (seconds > rules.maxVideoReferenceSeconds) {
-            toast.error("workflow.aiTextPanel.referenceTooLong");
-            return false;
-          }
-        } catch {
-          toast.error("workflow.aiTextPanel.referenceProbeFailed");
-          return false;
-        }
       }
       return true;
     }
@@ -477,134 +436,9 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     setPickNodeOpen(false);
   };
 
-  const handleUploadFiles = async (files: FileList) => {
-    if (disabled) return;
-    const host = getNode(nodeId);
-    if (!host) return;
-
-    let offset = 0;
-    let addedImage = 0;
-    let addedVideo = 0;
-
-    for (const file of Array.from(files)) {
-      const kind = file.type.startsWith("image/")
-        ? "image"
-        : file.type.startsWith("video/")
-          ? "video"
-          : null;
-      if (!kind) {
-        toast.error("workflow.aiTextPanel.referenceRejected");
-        continue;
-      }
-
-      const catalogType =
-        kind === "image" ? AI_IMAGE_NODE_TYPE : AI_VIDEO_NODE_TYPE;
-      const check = canAcceptAiTextReference({
-        rules: modelRules,
-        sourceNodeType: catalogType,
-        currentCounts: {
-          text: currentReferenceCounts.text,
-          image: currentReferenceCounts.image + addedImage,
-          video: currentReferenceCounts.video + addedVideo,
-        },
-      });
-      if (!check.ok) {
-        toast.error("workflow.aiTextPanel.referenceRejected");
-        continue;
-      }
-
-      const sizeOk = await validateReferenceContent({
-        kind,
-        rules: modelRules,
-        file,
-      });
-      if (!sizeOk) continue;
-
-      const catalog = nodeTypes.find((entry) => entry.type === catalogType);
-      if (!catalog) {
-        toast.error("workflow.aiTextPanel.createNodeFailed");
-        continue;
-      }
-
-      try {
-        let value: MediaReference;
-        if (kind === "video" && orgId) {
-          value = await uploadGenerativeMedia({
-            organizationId: orgId,
-            workflowId,
-            file,
-            cloudConfigured,
-            mediaKind: "ai-video",
-          });
-        } else {
-          const arrayBuffer = await file.arrayBuffer();
-          const mimeType = file.type || "application/octet-stream";
-          value = (await uploadBinaryData(
-            arrayBuffer,
-            mimeType
-          )) as ObjectReference;
-        }
-
-        const outputId = kind === "image" ? "images" : "videos";
-        const manualField = kind === "image" ? "manual_images" : "manual_videos";
-        const newId = `${catalogType}-${Date.now()}-${offset}`;
-        const position = {
-          x: host.position.x - 280,
-          y: host.position.y + offset * 100,
-        };
-
-        setNodes((current) => [
-          ...current,
-          {
-            id: newId,
-            type: "workflowNode",
-            position,
-            data: {
-              name: resolveGenerativeNodeDisplayName({
-                nodeType: catalog.type,
-                baseName: catalog.name,
-                existingNodes: typedNodes,
-                additionalSameTypeCount:
-                  kind === "image" ? addedImage : addedVideo,
-              }),
-              nodeType: catalog.type,
-              icon: catalog.icon,
-              inputs: catalog.inputs.map((param) => ({
-                ...param,
-                id: param.name,
-                value:
-                  param.name === manualField
-                    ? [value]
-                    : param.value,
-              })),
-              outputs: catalog.outputs.map((param) => ({
-                ...param,
-                id: param.name,
-                value: param.name === outputId ? [value] : undefined,
-              })),
-              executionState: "idle" as const,
-              createObjectUrl,
-            },
-          },
-        ]);
-
-        connectReferenceEdge({
-          source: newId,
-          sourceHandle: outputId,
-          target: nodeId,
-          targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
-        });
-        if (kind === "image") addedImage += 1;
-        if (kind === "video") addedVideo += 1;
-        offset += 1;
-      } catch {
-        toast.error("workflow.aiTextPanel.uploadFailed");
-      }
-    }
-  };
-
   const handleGenerate = async () => {
     if (!orgId || !selectedModel || disabled) return;
+    if (generateInFlightRef.current) return;
     if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
       return;
     }
@@ -612,11 +446,7 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     promptBuffer.flush();
     const question = promptBuffer.value.trim() || undefined;
 
-    if (
-      hasNonTextReferences &&
-      textReferences.length === 0 &&
-      !question
-    ) {
+    if (hasNonTextReferences && !modelSupportsMedia) {
       toast.error("workflow.aiTextPanel.mediaReferenceUnsupported");
       return;
     }
@@ -625,12 +455,13 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       references: textReferences,
       question,
       parameterRules: modelRules,
+      mediaReferenceCount,
     });
 
     if (!assembly.ok) {
       if (textReferences.length === 0 && referenceChips.length > 0) {
         toast.error("workflow.aiTextPanel.keywordsEmpty");
-      } else if (!question) {
+      } else if (!question && mediaReferenceCount === 0) {
         toast.error("workflow.aiTextPanel.promptRequired");
       } else {
         toast.errorRaw(assembly.error);
@@ -638,6 +469,9 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       return;
     }
 
+    generateInFlightRef.current = true;
+    const abortController = new AbortController();
+    generateAbortRef.current = abortController;
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
       metadata: withGenerativeCardGenerateError(
@@ -646,20 +480,78 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       ),
     }));
     try {
-      const response: GenerateAiTextResponse = await generateAiText(orgId, {
-        modelCanonicalId: selectedModel.canonicalId,
-        prompt: question,
-        references:
-          textReferences.length > 0 ? textReferences : undefined,
-        nodeId,
-      });
+      let referenceImageUrls: readonly string[] | undefined;
+      let referenceImageInline:
+        | readonly { readonly mimeType: string; readonly data: string }[]
+        | undefined;
+      let referenceVideoUrls: readonly string[] | undefined;
+
+      if (mediaReferenceCount > 0) {
+        const resolved = await resolveMediaReferencesForTextGenerate({
+          organizationId: orgId,
+          references: [...imageMediaReferences, ...videoMediaReferences],
+        });
+        referenceImageUrls =
+          resolved.referenceImageUrls.length > 0
+            ? resolved.referenceImageUrls
+            : undefined;
+        referenceImageInline =
+          resolved.referenceImageInline.length > 0
+            ? resolved.referenceImageInline
+            : undefined;
+        referenceVideoUrls =
+          resolved.referenceVideoUrls.length > 0
+            ? resolved.referenceVideoUrls
+            : undefined;
+      }
+
+      const response: GenerateAiTextResponse = await generateAiTextStream(
+        orgId,
+        {
+          modelCanonicalId: selectedModel.canonicalId,
+          prompt: question,
+          references:
+            textReferences.length > 0 ? textReferences : undefined,
+          referenceImageUrls,
+          referenceImageInline,
+          referenceVideoUrls,
+          nodeId,
+        },
+        {
+          signal: abortController.signal,
+          onDelta: (_delta, fullText) => {
+            streamPreviewPendingRef.current = fullText;
+            if (streamPreviewRafRef.current !== null) {
+              return;
+            }
+            streamPreviewRafRef.current = window.requestAnimationFrame(() => {
+              streamPreviewRafRef.current = null;
+              const pending = streamPreviewPendingRef.current;
+              if (pending == null) return;
+              updateNodeData?.(nodeId, (current) => ({
+                ...withAiTextStreamingPreview(current, pending),
+                metadata: withAiTextGeneratingFlag(current.metadata, true),
+              }));
+            });
+          },
+        }
+      );
+
+      if (streamPreviewRafRef.current !== null) {
+        window.cancelAnimationFrame(streamPreviewRafRef.current);
+        streamPreviewRafRef.current = null;
+      }
+      streamPreviewPendingRef.current = null;
 
       rememberAiTextRecentModel(orgId, selectedModel.canonicalId);
 
       if (!updateNodeData) return;
 
       updateNodeData(nodeId, (current) => {
-        const withResult = withAiTextGeneratedResult(current, response.text);
+        const withResult = withAiTextGeneratedResult(current, response.text, {
+          platformModelId: selectedModel.canonicalId,
+          providerModelId: selectedModel.providerModelId,
+        });
         const inputs = (withResult.inputs ?? current.inputs).map((input) =>
           input.id === "ai_interface_id"
             ? ({ ...input, value: response.aiInterfaceId } as WorkflowParameter)
@@ -677,6 +569,9 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
       toast.success("workflow.aiTextPanel.generated");
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       const raw = error instanceof Error ? error.message : String(error);
       const extracted = extractGenerativeApiErrorMessage(raw);
       const formatted = extracted.includes("\n")
@@ -690,6 +585,15 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
       }));
       toast.errorRaw(formatted);
     } finally {
+      if (streamPreviewRafRef.current !== null) {
+        window.cancelAnimationFrame(streamPreviewRafRef.current);
+        streamPreviewRafRef.current = null;
+      }
+      streamPreviewPendingRef.current = null;
+      if (generateAbortRef.current === abortController) {
+        generateAbortRef.current = null;
+      }
+      generateInFlightRef.current = false;
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiTextGeneratingFlag(current.metadata, false),
       }));
@@ -705,10 +609,12 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
     selectedModelOk &&
     !disabled &&
     !isGenerating &&
+    !(hasNonTextReferences && !modelSupportsMedia) &&
     validateAiTextPromptAssembly({
       references: textReferences,
       question: promptBuffer.value,
       parameterRules: modelRules,
+      mediaReferenceCount,
     }).ok;
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
@@ -730,21 +636,21 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
 
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom}>
+      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom} layout={layout}>
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
-          allowUpload={allowUpload && !disabled}
           onDisconnect={(edgeId) => deleteEdge?.(edgeId)}
           onPickCanvasNode={() => setPickNodeOpen(true)}
-          onUploadFiles={(files) => {
-            void handleUploadFiles(files);
-          }}
         />
 
         <div
           className="relative mt-2 min-h-0 flex-1"
-          style={{ minHeight: AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX }}
+          style={
+            layout === "studio-dock"
+              ? undefined
+              : { minHeight: AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX }
+          }
         >
           <Textarea
             value={promptBuffer.value}
@@ -761,10 +667,12 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
             }
             className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0"
           />
-          <AiTextExpandButton
-            className="absolute right-1 top-1"
-            onClick={() => setExpandOpen(true)}
-          />
+          {layout === "attached" ? (
+            <AiTextExpandButton
+              className="absolute right-1 top-1"
+              onClick={openCreativeStudio}
+            />
+          ) : null}
         </div>
 
         <div className="mt-2 flex items-end justify-between gap-2">
@@ -774,7 +682,11 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
               models={models}
               groups={groups}
               selectedModelId={selectedModelId}
-              disabled={disabled || isLoading || models.length === 0}
+              disabled={disabled || isLoading}
+              loadError={Boolean(modelsError)}
+              onRetryLoad={() => {
+                void refreshModels();
+              }}
               modelFitsCurrentRefs={modelFitsCurrentRefs}
               onSelect={(canonicalId) => {
                 void applyModelSelection(canonicalId);
@@ -815,16 +727,6 @@ export function AiTextConfigPanel({ nodeId, data }: AiTextConfigPanelProps) {
           </Button>
         </div>
       </GenerativeConfigPanelShell>
-
-      <AiTextExpandOverlay
-        open={expandOpen}
-        title={t("workflow.aiTextPanel.promptTitle")}
-        value={promptBuffer.value}
-        onChange={promptBuffer.commit}
-        onClose={() => setExpandOpen(false)}
-        maxLength={promptMaxLength}
-        placeholder={t("workflow.aiTextPanel.promptPlaceholder")}
-      />
 
       <GenerativePickNodeDialog
         open={pickNodeOpen}

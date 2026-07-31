@@ -328,6 +328,8 @@ export function withAiImageGeneratedResult(
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly providerModelId?: string;
   }
 ): Partial<WorkflowNodeType> {
   const history = readAiImageResultHistory(current.inputs);
@@ -336,6 +338,8 @@ export function withAiImageGeneratedResult(
     images: [...images],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
+    platformModelId: meta?.platformModelId,
+    providerModelId: meta?.providerModelId,
     createdAt: new Date().toISOString(),
   };
   const nextHistory: AiImageResultHistory = {

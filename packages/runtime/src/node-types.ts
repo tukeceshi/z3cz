@@ -300,6 +300,12 @@ export interface NodeContext {
   executeTextModel?: (params: {
     readonly canonicalId: string;
     readonly effectivePrompt: string;
+    readonly referenceImageUrls?: readonly string[];
+    readonly referenceImageInline?: readonly {
+      readonly mimeType: string;
+      readonly data: string;
+    }[];
+    readonly referenceVideoUrls?: readonly string[];
   }) => Promise<{
     readonly ok: boolean;
     readonly text?: string;

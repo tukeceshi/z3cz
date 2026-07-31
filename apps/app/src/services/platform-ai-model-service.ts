@@ -318,6 +318,130 @@ export async function generateAiText(
   );
 }
 
+export interface GenerateAiTextStreamHandlers {
+  readonly onDelta?: (delta: string, fullText: string) => void;
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Browser → Dafthunk SSE proxy → upstream chat stream.
+ * Server finalizes the invocation once; client must only persist node state on `done`.
+ */
+export async function generateAiTextStream(
+  orgId: string,
+  body: GenerateAiTextRequest,
+  handlers: GenerateAiTextStreamHandlers = {}
+): Promise<GenerateAiTextResponse> {
+  const { buildApiUrl } = await import("@/config/api");
+  const fullUrl = buildApiUrl(
+    `${platformAiEndpoint(orgId)}/ai-text/generate-stream`
+  );
+
+  const response = await fetch(fullUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+    signal: handlers.signal,
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status: ${response.status}`;
+    try {
+      const errorData = (await response.json()) as { error?: string };
+      if (errorData.error) {
+        message = errorData.error;
+      }
+    } catch {
+      // keep status message
+    }
+    throw new Error(message);
+  }
+
+  if (!response.body) {
+    throw new Error("No stream body from server");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+  let donePayload: GenerateAiTextResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+
+    for (const chunk of chunks) {
+      const lines = chunk.split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) {
+          continue;
+        }
+        const data = trimmed.slice(5).trim();
+        if (!data) {
+          continue;
+        }
+
+        let event: {
+          type?: string;
+          text?: string;
+          error?: string;
+          invocationId?: string;
+          aiInterfaceId?: string;
+        };
+        try {
+          event = JSON.parse(data) as typeof event;
+        } catch {
+          continue;
+        }
+
+        if (event.type === "delta" && typeof event.text === "string") {
+          fullText += event.text;
+          handlers.onDelta?.(event.text, fullText);
+          continue;
+        }
+
+        if (event.type === "done" && typeof event.text === "string") {
+          fullText = event.text;
+          if (
+            typeof event.invocationId === "string" &&
+            typeof event.aiInterfaceId === "string"
+          ) {
+            donePayload = {
+              text: event.text,
+              invocationId: event.invocationId,
+              aiInterfaceId: event.aiInterfaceId,
+            };
+          }
+          continue;
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.error || "Generation failed");
+        }
+      }
+    }
+  }
+
+  if (!donePayload) {
+    throw new Error(
+      fullText.trim()
+        ? "Stream ended without completion event"
+        : "Stream returned no text"
+    );
+  }
+
+  return donePayload;
+}
+
 export function useModelInterfacePriorities(orgId: string | undefined) {
   const key = orgId
     ? `${platformAiEndpoint(orgId)}/model-interface-priorities`

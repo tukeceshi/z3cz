@@ -29,6 +29,12 @@ export interface TextModelService {
     organizationId: string;
     canonicalId: string;
     effectivePrompt: string;
+    referenceImageUrls?: readonly string[];
+    referenceImageInline?: readonly {
+      readonly mimeType: string;
+      readonly data: string;
+    }[];
+    referenceVideoUrls?: readonly string[];
   }): Promise<ExecuteRuntimeTextModelResult>;
   listTextModelCandidates(params: {
     organizationId: string;

@@ -167,6 +167,8 @@ export interface AiTextModelPickerProps {
   readonly groups: readonly PlatformAiModelGroup[];
   readonly selectedModelId: string;
   readonly disabled?: boolean;
+  readonly loadError?: boolean;
+  readonly onRetryLoad?: () => void;
   readonly modelFitsCurrentRefs: (model: OrgTextModelOption) => boolean;
   readonly onSelect: (canonicalId: string) => void;
 }
@@ -177,6 +179,8 @@ export function AiTextModelPicker({
   groups,
   selectedModelId,
   disabled = false,
+  loadError = false,
+  onRetryLoad,
   modelFitsCurrentRefs,
   onSelect,
 }: AiTextModelPickerProps) {
@@ -244,6 +248,28 @@ export function AiTextModelPicker({
       current === section.id ? null : section.id
     );
   };
+
+  if (loadError && models.length === 0) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onRetryLoad?.()}
+        className={cn(
+          "nodrag inline-flex h-8 max-w-[240px] items-center gap-1.5 rounded-full px-3 text-left text-xs transition",
+          "bg-muted/45 text-amber-700 hover:bg-muted/65 dark:text-amber-400",
+          "disabled:pointer-events-none disabled:opacity-50"
+        )}
+      >
+        <span className="truncate">
+          {t("workflow.aiTextPanel.modelsLoadFailed")}
+        </span>
+        <span className="shrink-0 underline underline-offset-2">
+          {t("workflow.aiTextPanel.retryLoadModels")}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <Popover

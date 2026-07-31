@@ -195,7 +195,7 @@ export function AiImageExpandButton({
         event.stopPropagation();
         onClick();
       }}
-      title={t("workflow.aiImagePanel.expand")}
+      title={t("workflow.studio.enter")}
     >
       <Maximize2Icon className="h-3 w-3 opacity-80" strokeWidth={2} />
     </button>

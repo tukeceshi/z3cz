@@ -28,6 +28,7 @@ import {
   isIncomingAiTextReferenceAllowed,
   isIncomingAiTextReferenceConnection,
 } from "./ai-text-reference-policy";
+import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
 import {
   snapGenerativeContentBorderPoint,
 } from "./generative-node-content-geometry";
@@ -181,44 +182,22 @@ function connectionPointer(
   return connection.pointer ?? connection.to;
 }
 
-/** Flow coords → viewport client coords (inverse of screenToFlowPosition). */
-function flowPointerToClient(
-  flowPointer: { x: number; y: number },
-  domNode: HTMLDivElement | null,
-  transform: Transform
-): { x: number; y: number } | null {
-  if (!domNode) return null;
-  const [tx, ty, zoom] = transform;
-  const rect = domNode.getBoundingClientRect();
-  return {
-    x: flowPointer.x * zoom + tx + rect.left,
-    y: flowPointer.y * zoom + ty + rect.top,
-  };
-}
-
-/** Same whole-card hit test as onConnectEnd — pointer over .react-flow__node. */
+/**
+ * Whole-card hit test from React Flow connection pointer.
+ * `connection.pointer` is pane-local (not flow coords).
+ */
 export function nodeIdUnderFlowPointerForPreview(
-  flowPointer: { x: number; y: number },
+  panePointer: { x: number; y: number },
   context: AiTextConnectionContext
 ): string | null {
-  if (typeof document === "undefined") return null;
-  const client = flowPointerToClient(flowPointer, context.domNode, context.transform);
-  if (!client) return null;
-
-  const stack = document.elementsFromPoint(client.x, client.y);
-  for (const el of stack) {
-    const nodeEl = el.closest(".react-flow__node") as HTMLElement | null;
-    const nodeId = nodeEl?.getAttribute("data-id");
-    if (nodeId) return nodeId;
-  }
-  return null;
+  return nodeIdUnderPanePointer(panePointer, { domNode: context.domNode });
 }
 
 function nodeIdUnderFlowPointer(
-  flowPointer: { x: number; y: number },
+  panePointer: { x: number; y: number },
   context: AiTextConnectionContext
 ): string | null {
-  return nodeIdUnderFlowPointerForPreview(flowPointer, context);
+  return nodeIdUnderFlowPointerForPreview(panePointer, context);
 }
 
 function aiTextSnapFromNode(node: InternalNode<Node>): AiTextSnapTarget {
@@ -264,11 +243,9 @@ export function findAiTextConnectionTargetNodeId(
     return targetId;
   };
 
-  const nodeIdUnderPointer = nodeIdUnderFlowPointer(pointer, context);
-  const fromPointer = resolveTarget(nodeIdUnderPointer);
-  if (fromPointer) return fromPointer;
-
-  return resolveTarget(connection.toNode?.id);
+  // Prefer the card under the pointer; do not fall back to RF `toNode`
+  // (handle proximity often snaps to a distant neighbor).
+  return resolveTarget(nodeIdUnderFlowPointer(pointer, context));
 }
 
 export function findAiTextConnectionSnap(

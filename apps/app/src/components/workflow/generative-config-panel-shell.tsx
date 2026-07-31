@@ -8,10 +8,20 @@ import {
 } from "./ai-generative-panel-utils";
 import { GENERATIVE_NODE_PANEL_CLASS } from "./generative-card-styles";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
+import {
+  STUDIO_DOCK_PROMPT_BOX,
+  STUDIO_DOCK_PROMPT_BOX_EXPANDED,
+  STUDIO_SCROLL,
+} from "./creative-studio-surface";
+import type { StudioDockSize } from "./generative-studio-dock-layout";
+
+export type GenerativeConfigPanelLayout = "attached" | "studio" | "studio-dock";
 
 export interface GenerativeConfigPanelShellProps {
   readonly nodeId: string;
   readonly zoom: number;
+  readonly layout?: GenerativeConfigPanelLayout;
+  readonly studioDockSize?: StudioDockSize;
   readonly children: ReactNode;
 }
 
@@ -19,8 +29,49 @@ export interface GenerativeConfigPanelShellProps {
 export function GenerativeConfigPanelShell({
   nodeId,
   zoom,
+  layout = "attached",
+  studioDockSize = "compact",
   children,
 }: GenerativeConfigPanelShellProps) {
+  if (layout === "studio-dock") {
+    const boxClass =
+      studioDockSize === "expanded"
+        ? STUDIO_DOCK_PROMPT_BOX_EXPANDED
+        : cn(STUDIO_DOCK_PROMPT_BOX, "h-[270px]");
+
+    return (
+      <div
+        className={cn("nodrag nopan nowheel", boxClass, STUDIO_SCROLL)}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDownCapture={(event) => {
+          event.stopPropagation();
+          armGenerativePanelPointerGuard(nodeId);
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  if (layout === "studio") {
+    return (
+      <div
+        className="nodrag nopan nowheel flex h-full min-h-0 flex-col overflow-hidden px-4 py-3"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDownCapture={(event) => {
+          event.stopPropagation();
+          armGenerativePanelPointerGuard(nodeId);
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    );
+  }
+
   const panelZoom = zoom > 0 ? zoom : 1;
 
   return (

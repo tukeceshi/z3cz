@@ -199,7 +199,7 @@ export interface AiTextReferenceBarProps {
   readonly canPickCanvasNode?: boolean;
   readonly onDisconnect: (edgeId: string) => void;
   readonly onPickCanvasNode: () => void;
-  readonly onUploadFiles: (files: FileList) => void;
+  readonly onUploadFiles?: (files: FileList) => void;
   /** When omitted, chips are preview-only (AI Text). */
   readonly onInjectChip?: (chip: AiTextReferenceChip) => void;
 }
@@ -346,7 +346,7 @@ export function AiTextReferenceBar({
           multiple
           onChange={(event) => {
             if (event.target.files && event.target.files.length > 0) {
-              onUploadFiles(event.target.files);
+              onUploadFiles?.(event.target.files);
             }
             event.target.value = "";
           }}

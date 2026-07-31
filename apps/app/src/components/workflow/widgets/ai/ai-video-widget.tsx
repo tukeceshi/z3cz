@@ -21,8 +21,8 @@ import { cn } from "@/utils/utils";
 
 import {
   AiImageExpandButton,
-  AiImageExpandOverlay,
 } from "../../ai-image-expand-overlay";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
 import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
@@ -160,7 +160,7 @@ function AiVideoWidget({
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [expandOpen, setExpandOpen] = useState(false);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
@@ -359,6 +359,11 @@ function AiVideoWidget({
             setErrorDetailOpen(true);
             return;
           }
+          if (activeVideo && !isGenerating) {
+            event.stopPropagation();
+            openCreativeStudio();
+            return;
+          }
           if (!isGenerating) {
             handleCardDoubleClick(event);
           }
@@ -398,7 +403,7 @@ function AiVideoWidget({
               />
             ) : null}
             {activeVideo ? (
-              <AiImageExpandButton onClick={() => setExpandOpen(true)} />
+              <AiImageExpandButton onClick={openCreativeStudio} />
             ) : null}
           </div>
         ) : null}
@@ -409,16 +414,6 @@ function AiVideoWidget({
           error={generateError}
           open={errorDetailOpen}
           onOpenChange={setErrorDetailOpen}
-        />
-      ) : null}
-
-      {activeVideo ? (
-        <AiImageExpandOverlay
-          open={expandOpen}
-          title={t("workflow.aiVideoPanel.outputTitle")}
-          media={[activeVideo]}
-          createObjectUrl={createObjectUrl}
-          onClose={() => setExpandOpen(false)}
         />
       ) : null}
 

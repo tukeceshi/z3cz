@@ -42,6 +42,12 @@ export class CloudflareTextModelService {
     organizationId: string;
     canonicalId: string;
     effectivePrompt: string;
+    referenceImageUrls?: readonly string[];
+    referenceImageInline?: readonly {
+      readonly mimeType: string;
+      readonly data: string;
+    }[];
+    referenceVideoUrls?: readonly string[];
   }): Promise<ExecuteRuntimeTextModelResult> {
     const db = createDatabase(this.env);
     return executeTextModel({
@@ -50,6 +56,9 @@ export class CloudflareTextModelService {
       organizationId: params.organizationId,
       canonicalId: params.canonicalId,
       effectivePrompt: params.effectivePrompt,
+      referenceImageUrls: params.referenceImageUrls,
+      referenceImageInline: params.referenceImageInline,
+      referenceVideoUrls: params.referenceVideoUrls,
     });
   }
 

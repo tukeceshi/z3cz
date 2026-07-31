@@ -4,7 +4,9 @@ import type {
   VolcanoModelUsage,
 } from "./volcano-snapshot";
 import type { VolcanoResourcePackageRow } from "./volcano-resource-package-usage";
-import { volcanoPackageCodesForCanonicalId } from "./volcano-package-catalog";
+import {
+  pickVolcanoPackageOwnerCanonicalId,
+} from "./volcano-package-catalog";
 import {
   aggregateResourcePackageRows,
   isUsageCountableResourcePackage,
@@ -27,26 +29,46 @@ function indexResourcePackagesByConfigurationCode(
   return index;
 }
 
-export function buildVolcanoPackageSnapshotForModel(params: {
+function collectRowsForCanonicalId(params: {
   readonly canonicalId: string;
-  readonly packagesByCode: ReadonlyMap<string, readonly VolcanoResourcePackageRow[]>;
-}): VolcanoModelPackageSnapshot {
-  const codes = volcanoPackageCodesForCanonicalId(params.canonicalId);
+  readonly catalogCanonicalIds: readonly string[];
+  readonly packagesByCode: ReadonlyMap<
+    string,
+    readonly VolcanoResourcePackageRow[]
+  >;
+}): VolcanoResourcePackageRow[] {
+  const matchedRows: VolcanoResourcePackageRow[] = [];
+
+  for (const [code, rows] of params.packagesByCode) {
+    const owner = pickVolcanoPackageOwnerCanonicalId(
+      code,
+      params.catalogCanonicalIds
+    );
+    if (owner !== params.canonicalId) {
+      continue;
+    }
+    matchedRows.push(...rows);
+  }
+
+  return matchedRows;
+}
+
+function snapshotFromRows(
+  matchedRows: readonly VolcanoResourcePackageRow[]
+): VolcanoModelPackageSnapshot {
   const matchedCodes: string[] = [];
   const instanceNos: string[] = [];
   const configurationNames: string[] = [];
-  const matchedRows: VolcanoResourcePackageRow[] = [];
+  const seenCodes = new Set<string>();
 
-  for (const code of codes) {
-    const rows = params.packagesByCode.get(code) ?? [];
-    if (rows.length === 0) continue;
-
-    matchedCodes.push(code);
-    for (const row of rows) {
-      matchedRows.push(row);
-      if (row.InstanceNo) instanceNos.push(row.InstanceNo);
-      if (row.ConfigurationName) configurationNames.push(row.ConfigurationName);
+  for (const row of matchedRows) {
+    const code = row.ConfigurationCode?.trim();
+    if (code && !seenCodes.has(code)) {
+      seenCodes.add(code);
+      matchedCodes.push(code);
     }
+    if (row.InstanceNo) instanceNos.push(row.InstanceNo);
+    if (row.ConfigurationName) configurationNames.push(row.ConfigurationName);
   }
 
   return {
@@ -57,9 +79,32 @@ export function buildVolcanoPackageSnapshotForModel(params: {
   };
 }
 
+export function buildVolcanoPackageSnapshotForModel(params: {
+  readonly canonicalId: string;
+  readonly packagesByCode: ReadonlyMap<
+    string,
+    readonly VolcanoResourcePackageRow[]
+  >;
+  /** Defaults to `[canonicalId]` when omitted (single-model lookup). */
+  readonly catalogCanonicalIds?: readonly string[];
+}): VolcanoModelPackageSnapshot {
+  const catalogCanonicalIds =
+    params.catalogCanonicalIds ?? [params.canonicalId];
+  return snapshotFromRows(
+    collectRowsForCanonicalId({
+      canonicalId: params.canonicalId,
+      catalogCanonicalIds,
+      packagesByCode: params.packagesByCode,
+    })
+  );
+}
+
 export function buildVolcanoPackageUsageMap(params: {
   readonly catalog: readonly AiModelCatalogEntry[];
-  readonly packagesByCode: ReadonlyMap<string, readonly VolcanoResourcePackageRow[]>;
+  readonly packagesByCode: ReadonlyMap<
+    string,
+    readonly VolcanoResourcePackageRow[]
+  >;
 }): {
   usageByCanonicalId: Map<string, VolcanoModelUsage | null>;
   packageByCanonicalId: Map<string, VolcanoModelPackageSnapshot>;
@@ -68,24 +113,16 @@ export function buildVolcanoPackageUsageMap(params: {
   const usageByCanonicalId = new Map<string, VolcanoModelUsage | null>();
   const packageByCanonicalId = new Map<string, VolcanoModelPackageSnapshot>();
   const usageErrorsByCanonicalId = new Map<string, string>();
+  const catalogCanonicalIds = params.catalog.map((entry) => entry.canonicalId);
 
   for (const entry of params.catalog) {
-    const packageSnapshot = buildVolcanoPackageSnapshotForModel({
+    const matchedRows = collectRowsForCanonicalId({
       canonicalId: entry.canonicalId,
+      catalogCanonicalIds,
       packagesByCode: params.packagesByCode,
     });
+    const packageSnapshot = snapshotFromRows(matchedRows);
     packageByCanonicalId.set(entry.canonicalId, packageSnapshot);
-
-    const codes = volcanoPackageCodesForCanonicalId(entry.canonicalId);
-    if (codes.length === 0) {
-      usageByCanonicalId.set(entry.canonicalId, null);
-      continue;
-    }
-
-    const matchedRows: VolcanoResourcePackageRow[] = [];
-    for (const code of codes) {
-      matchedRows.push(...(params.packagesByCode.get(code) ?? []));
-    }
 
     const { usage, error } = aggregateResourcePackageRows(matchedRows);
     usageByCanonicalId.set(

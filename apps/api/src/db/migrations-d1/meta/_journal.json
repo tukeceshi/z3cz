@@ -288,6 +288,13 @@
       "when": 1736800000000,
       "tag": "0066_video_prompt_max_chars_1000",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1736900000000,
+      "tag": "0067_seed_text_media_references",
+      "breakpoints": true
     }
   ]
 }

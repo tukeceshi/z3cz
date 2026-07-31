@@ -4,6 +4,7 @@ import {
   canGenerativeCardDoubleClickUpload,
   generativePromptWithinModelLimit,
   hasGenerativePrompt,
+  normalizeGenerativeCardUploadFile,
   readGenerativePrompt,
   withGenerativePromptCleared,
 } from "./generative-card-upload-utils";
@@ -49,5 +50,34 @@ describe("generativePromptWithinModelLimit", () => {
     expect(generativePromptWithinModelLimit("  abc  ", 3)).toBe(true);
     expect(generativePromptWithinModelLimit("  abcd  ", 3)).toBe(false);
     expect(generativePromptWithinModelLimit("", 600)).toBe(true);
+  });
+});
+
+describe("normalizeGenerativeCardUploadFile image formats", () => {
+  it("accepts png and jpeg only", () => {
+    expect(
+      normalizeGenerativeCardUploadFile(
+        new File([""], "a.png", { type: "image/png" }),
+        "image"
+      )
+    ).not.toBeNull();
+    expect(
+      normalizeGenerativeCardUploadFile(
+        new File([""], "a.jpg", { type: "image/jpeg" }),
+        "image"
+      )
+    ).not.toBeNull();
+    expect(
+      normalizeGenerativeCardUploadFile(
+        new File([""], "a.webp", { type: "image/webp" }),
+        "image"
+      )
+    ).toBeNull();
+    expect(
+      normalizeGenerativeCardUploadFile(
+        new File([""], "a.gif", { type: "image/gif" }),
+        "image"
+      )
+    ).toBeNull();
   });
 });

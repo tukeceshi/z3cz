@@ -267,6 +267,13 @@
       "when": 1786440000000,
       "tag": "0039_video_prompt_max_chars_1000",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786520000000,
+      "tag": "0040_seed_text_media_references",
+      "breakpoints": true
     }
   ]
 }

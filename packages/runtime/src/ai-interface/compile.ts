@@ -170,7 +170,7 @@ export function compileAiInterfaceSourceSpec(params: {
         source.connection.authPrefix ??
         (source.connection.authType === "bearer" ? "Bearer " : ""),
       defaultHeaders: source.connection.defaultHeaders ?? {},
-      timeoutMs: source.connection.timeoutMs ?? 60_000,
+      timeoutMs: source.connection.timeoutMs ?? 180_000,
     },
     execution: {
       mode: "sync",
@@ -249,7 +249,7 @@ export function createOpenAiCompatibleChatSourceSpec(params: {
       baseUrl: params.baseUrl,
       authType: "bearer",
       authPrefix: "Bearer ",
-      timeoutMs: 60_000,
+      timeoutMs: 180_000,
     },
     execution: {
       mode: "sync",
@@ -329,7 +329,7 @@ export function createAnthropicMessagesSourceSpec(params: {
       defaultHeaders: {
         "anthropic-version": ANTHROPIC_MESSAGES_API_VERSION,
       },
-      timeoutMs: 60_000,
+      timeoutMs: 180_000,
     },
     execution: {
       mode: "sync",

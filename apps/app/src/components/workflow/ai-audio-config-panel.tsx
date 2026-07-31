@@ -11,7 +11,7 @@ import {
 } from "@xyflow/react";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import SparklesIcon from "lucide-react/icons/sparkles";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -29,11 +29,14 @@ import {
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
 import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
+import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import {
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
+import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
   withGenerativeProgress,
@@ -45,7 +48,6 @@ import {
 import { connectGenerativeReferenceEdge } from "./generative-reference-utils";
 import {
   AiTextExpandButton,
-  AiTextExpandOverlay,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import { AiTextReferenceBar } from "./ai-text-reference-bar";
@@ -86,6 +88,7 @@ import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 export interface AiAudioConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
+  readonly layout?: GenerativeConfigPanelLayout;
 }
 
 function getInputString(data: WorkflowNodeType, id: string): string {
@@ -93,7 +96,11 @@ function getInputString(data: WorkflowNodeType, id: string): string {
   return typeof value === "string" ? value : "";
 }
 
-export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
+export function AiAudioConfigPanel({
+  nodeId,
+  data,
+  layout = "attached",
+}: AiAudioConfigPanelProps) {
   const {
     updateNodeData,
     disabled,
@@ -112,13 +119,15 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
 
-  const { models, groups, isLoading } = useOrgAudioModels(orgId);
+  const { models, groups, modelsError, isLoading, refreshModels } =
+    useOrgAudioModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
+  const generateInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
     null
   );
-  const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [generationParams, setGenerationParams] = useState<
     Record<string, unknown>
   >(() => readAiAudioGenerationParams(data.inputs));
@@ -405,6 +414,7 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
 
   const handleGenerate = async () => {
     if (disabled || !orgId || !selectedModel?.selectable) return;
+    if (generateInFlightRef.current) return;
 
     const prompt = promptForGenerate.trim();
 
@@ -433,7 +443,10 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
       return;
     }
 
+    generateInFlightRef.current = true;
     setIsGenerating(true);
+    /** False when another caller owns persist/progress for this job. */
+    let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
       metadata: withAiAudioGenerateError(
@@ -456,9 +469,15 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
       });
 
       let finalAudios = response.audios;
+      let finalizeJobId: string | null = null;
       if (response.jobId && response.phase === "ready_to_persist") {
-        syncProgress({ jobId: response.jobId, phase: "generating" });
-        finalAudios = await resolveJobMedia(response.jobId);
+        finalizeJobId = response.jobId;
+        const resolvedJob = await resolveJobMedia(response.jobId);
+        finalAudios = resolvedJob.media;
+        ownsJobProgress = resolvedJob.owned;
+        if (!ownsJobProgress) {
+          return;
+        }
       }
       setPersistPhase(null);
       clearProgress();
@@ -479,10 +498,25 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
 
       if (!updateNodeData) return;
 
+      const canWriteHistory = tryClaimGenerativeJobFinalize(finalizeJobId ?? "");
+
       updateNodeData(nodeId, (current) => {
+        if (!canWriteHistory) {
+          return {
+            metadata: withAiAudioGenerateError(
+              withAiAudioGeneratingFlag(
+                clearGenerativeProgress(current.metadata),
+                false
+              ),
+              null
+            ),
+          };
+        }
         const withResult = appendAiAudioGeneratedHistoryItems(current, [audio], {
           prompt,
           params: generationParams,
+          platformModelId: selectedModel.canonicalId,
+          providerModelId: selectedModel.providerModelId,
         });
         const inputs = (withResult.inputs ?? current.inputs).map((input) =>
           input.id === "ai_interface_id"
@@ -505,13 +539,19 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
         };
       });
 
-      toast.success("workflow.aiAudioPanel.generated");
+      if (canWriteHistory) {
+        toast.success("workflow.aiAudioPanel.generated");
+      }
     } catch (error) {
       const activeJobId = readActiveGenerationJobId(error);
       if (activeJobId && orgId && updateNodeData) {
         try {
-          syncProgress({ jobId: activeJobId, phase: "generating" });
-          const audios = await resolveJobMedia(activeJobId);
+          const resolvedJob = await resolveJobMedia(activeJobId);
+          ownsJobProgress = resolvedJob.owned;
+          if (!ownsJobProgress) {
+            return;
+          }
+          const audios = resolvedJob.media;
           setPersistPhase(null);
           clearProgress();
           const audio = audios[0];
@@ -524,11 +564,28 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
                 nodeType: "ai-audio",
               });
             }
+            const canWriteHistory = tryClaimGenerativeJobFinalize(activeJobId);
             updateNodeData(nodeId, (current) => {
+              if (!canWriteHistory) {
+                return {
+                  metadata: withAiAudioGenerateError(
+                    withAiAudioGeneratingFlag(
+                      clearGenerativeProgress(current.metadata),
+                      false
+                    ),
+                    null
+                  ),
+                };
+              }
               const withResult = appendAiAudioGeneratedHistoryItems(
                 current,
                 [audio],
-                { prompt, params: generationParams }
+                {
+                  prompt,
+                  params: generationParams,
+                  platformModelId: selectedModel.canonicalId,
+                  providerModelId: selectedModel.providerModelId,
+                }
               );
               return {
                 ...withResult,
@@ -541,7 +598,9 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
                 ),
               };
             });
-            toast.success("workflow.aiAudioPanel.generated");
+            if (canWriteHistory) {
+              toast.success("workflow.aiAudioPanel.generated");
+            }
             return;
           }
         } catch {
@@ -564,12 +623,15 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
       }));
       toast.errorRaw(formatted);
     } finally {
-      updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiAudioGeneratingFlag(
-          clearGenerativeProgress(current.metadata),
-          false
-        ),
-      }));
+      generateInFlightRef.current = false;
+      if (ownsJobProgress) {
+        updateNodeData?.(nodeId, (current) => ({
+          metadata: withAiAudioGeneratingFlag(
+            clearGenerativeProgress(current.metadata),
+            false
+          ),
+        }));
+      }
       setPersistPhase(null);
       setIsGenerating(false);
     }
@@ -607,7 +669,7 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
 
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom}>
+      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom} layout={layout}>
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
@@ -623,7 +685,11 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
 
         <div
           className="relative mt-2 min-h-0 flex-1"
-          style={{ minHeight: AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX }}
+          style={
+            layout === "studio-dock"
+              ? undefined
+              : { minHeight: AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX }
+          }
         >
           <Textarea
             value={displayPrompt}
@@ -663,21 +729,27 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
               </div>
             </div>
           ) : null}
-          <AiTextExpandButton
-            className="absolute right-1 top-1"
-            onClick={() => setExpandOpen(true)}
-          />
+          {layout === "attached" ? (
+            <AiTextExpandButton
+              className="absolute right-1 top-1"
+              onClick={openCreativeStudio}
+            />
+          ) : null}
         </div>
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-end gap-2">
-            {models.length > 0 ? (
+            {models.length > 0 || modelsError ? (
               <AiTextModelPicker
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
                 groups={groups}
                 selectedModelId={selectedModelId}
                 disabled={disabled || isLoading}
+                loadError={Boolean(modelsError)}
+                onRetryLoad={() => {
+                  void refreshModels();
+                }}
                 modelFitsCurrentRefs={modelFitsCurrentRefs}
                 onSelect={(canonicalId) => {
                   void applyModelSelection(canonicalId);
@@ -727,21 +799,6 @@ export function AiAudioConfigPanel({ nodeId, data }: AiAudioConfigPanelProps) {
           </Button>
         </div>
       </GenerativeConfigPanelShell>
-
-      <AiTextExpandOverlay
-        open={expandOpen}
-        title={t("workflow.aiAudioPanel.promptTitle")}
-        value={displayPrompt}
-        onChange={promptBuffer.commit}
-        onClose={() => setExpandOpen(false)}
-        readOnly={hasPromptReference || disabled}
-        maxLength={promptMaxLength}
-        placeholder={
-          hasPromptReference
-            ? promptReferenceEditHint
-            : t("workflow.aiAudioPanel.promptPlaceholder")
-        }
-      />
 
       <GenerativePickNodeDialog
         open={pickNodeOpen}

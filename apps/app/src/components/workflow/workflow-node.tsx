@@ -38,7 +38,9 @@ import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
+  hasAiTextGeneratedHistory,
   isAiTextGenerating,
+  withAiTextEditedResult,
   withAiTextManualResult,
 } from "./ai-text-node-utils";
 import {
@@ -52,7 +54,6 @@ import {
   isAiImageGenerating,
 } from "./ai-image-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
-import { formatLocalizedGenerativeNodeDisplayName } from "./generative-node-naming";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
@@ -404,7 +405,11 @@ export const WorkflowNode = memo(
       if (disabled || !updateNodeData || !widget) return;
 
       if (nodeType === AI_TEXT_NODE_TYPE) {
-        updateNodeData(id, (current) => withAiTextManualResult(current, value));
+        updateNodeData(id, (current) =>
+          hasAiTextGeneratedHistory(current.inputs)
+            ? withAiTextEditedResult(current, value)
+            : withAiTextManualResult(current, value)
+        );
         return;
       }
 
@@ -577,7 +582,8 @@ export const WorkflowNode = memo(
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
         ? readGenerativeCardError(data.metadata)
         : undefined;
-    const showBusyOverlay = isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
+    const showBusyOverlay =
+      isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
     const isError =
       (data.executionState === "error" && !!data.error) ||
       Boolean(generativeCardError);
@@ -650,24 +656,7 @@ export const WorkflowNode = memo(
       t,
     ]);
 
-    const localizedGenerativeBaseName = isAiTextNode
-      ? t("workflow.canvas.aiText")
-      : isAiImageNode
-        ? t("workflow.canvas.aiImage")
-        : isAiVideoNode
-          ? t("workflow.canvas.aiVideo")
-          : isAiAudioNode
-            ? t("workflow.canvas.aiAudio")
-            : null;
-
-    const nodeDisplayName =
-      localizedGenerativeBaseName !== null
-        ? formatLocalizedGenerativeNodeDisplayName({
-            nodeType,
-            storedName: data.name,
-            localizedBaseName: localizedGenerativeBaseName,
-          })
-        : data.name;
+    const nodeDisplayName = data.name;
 
     const headerIconName =
       isAiAudioNode && data.icon === "audio" ? "music" : data.icon;

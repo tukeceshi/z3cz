@@ -4,8 +4,7 @@
   WorkflowWithMetadata,
 } from "@dafthunk/types";
 import { ReactFlowProvider } from "@xyflow/react";
-import Settings from "lucide-react/icons/settings";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -13,7 +12,6 @@ import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { canEditWorkflows } from "@/utils/sub-account-permissions";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
-import { Button } from "@/components/ui/button";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { CanvasThemeTip } from "@/components/workflow/canvas-theme-tip";
@@ -24,7 +22,6 @@ import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
-import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useObjectService } from "@/services/object-service";
 import { useNodeTypes } from "@/services/type-service";
 import { getWorkflow } from "@/services/workflow-service";
@@ -157,43 +154,9 @@ function EditorPageContent() {
     );
   }, [location.pathname, location.search, location.state, navigate]);
 
-  const workflowSettingsButton = useMemo(
-    () =>
-      workflowReadOnly ? null : (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-        aria-label={t("pages.editor.workflowSettings")}
-        title={t("pages.editor.workflowSettings")}
-        onClick={() => setWorkflowSettingsOpen(true)}
-      >
-        <Settings className="h-3.5 w-3.5" />
-      </Button>
-      ),
-    [t, workflowReadOnly]
-  );
-
-  usePageBreadcrumbs(
-    [
-      { label: t("pages.workflows.title"), to: getOrgUrl("workflows") },
-      {
-        label:
-          httpWorkflowMetadata?.name ||
-          workflowMetadata?.name ||
-          t("pages.editor.defaultName"),
-        trailing: workflowSettingsButton,
-      },
-    ],
-    [
-      httpWorkflowMetadata?.name,
-      workflowMetadata?.name,
-      workflowSettingsButton,
-      getOrgUrl,
-      t,
-    ]
-  );
+  const handleOpenWorkflowSettings = useCallback(() => {
+    setWorkflowSettingsOpen(true);
+  }, []);
 
   const handleWorkflowUpdate = useCallback(
     (name: string, description?: string) => {
@@ -296,6 +259,8 @@ function EditorPageContent() {
           wsExecuteWorkflow={wsExecuteWorkflow}
           workflowSettingsOpen={workflowSettingsOpen}
           onWorkflowSettingsOpenChange={setWorkflowSettingsOpen}
+          workflowsListUrl={getOrgUrl("workflows")}
+          onOpenWorkflowSettings={handleOpenWorkflowSettings}
           initialViewportOneToOne={initialViewportOneToOneRef.current}
           savedEditorViewport={editorViewport ?? null}
           onEditorViewportChange={handleEditorViewportChange}

@@ -11,7 +11,11 @@ import { mutate } from "swr";
 import { AUTH_USER_KEY } from "@/components/auth-context";
 import { buildApiUrl } from "@/config/api";
 
-import { makeRequest, ApiRequestError } from "./utils";
+import {
+  ApiRequestError,
+  makeRequest,
+  refreshAccessToken,
+} from "./utils";
 
 // Error types for better error handling
 export class AuthError extends Error {
@@ -66,28 +70,12 @@ export const authService = {
       return await fetchUser();
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
-        try {
-          const refreshResponse = await makeRequest<{
-            success: boolean;
-            user?: JWTTokenPayload;
-          }>(
-            "/auth/refresh",
-            {
-              method: "POST",
-            },
-            true
-          );
-
-          if (
-            refreshResponse.success &&
-            refreshResponse.user?.sub &&
-            refreshResponse.user.name
-          ) {
-            mutate(AUTH_USER_KEY, refreshResponse.user, { revalidate: false });
-            return refreshResponse.user;
-          }
-        } catch {
-          // Refresh failed — treat as logged out below.
+        const refreshResult = await refreshAccessToken();
+        if (refreshResult.status === "success" && refreshResult.user) {
+          return refreshResult.user;
+        }
+        if (refreshResult.status === "error") {
+          throw refreshResult.error ?? new Error("Token refresh failed");
         }
 
         throw new AuthError("Unauthorized", "UNAUTHORIZED");
@@ -108,32 +96,19 @@ export const authService = {
     user?: JWTTokenPayload;
     error?: string;
   }> {
-    try {
-      const response = await makeRequest<{
-        success: boolean;
-        user: JWTTokenPayload;
-      }>("/auth/refresh", {
-        method: "POST",
-      });
-
-      if (response.success && response.user) {
-        // Validate user data before updating cache
-        if (!response.user.sub || !response.user.name) {
-          throw new AuthError("Invalid user data in refresh response");
-        }
-
-        // Update the SWR cache with the fresh user data
-        mutate(AUTH_USER_KEY, response.user, { revalidate: false });
-        return { success: true, user: response.user };
-      }
-
-      return { success: false, error: "Token refresh failed" };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      console.error("Token refresh failed:", errorMessage);
-      return { success: false, error: errorMessage };
+    const refreshResult = await refreshAccessToken();
+    if (refreshResult.status === "success" && refreshResult.user) {
+      return { success: true, user: refreshResult.user };
     }
+
+    return {
+      success: false,
+      error:
+        refreshResult.error?.message ??
+        (refreshResult.status === "unauthorized"
+          ? "Authentication required"
+          : "Token refresh failed"),
+    };
   },
 
   // Login with a provider

@@ -185,7 +185,8 @@ function resolveHoveredGenerativeNodeId(
 
   const hoveredNodeId = nodeIdUnderFlowPointerForPreview(pointer, context);
   if (!hoveredNodeId || hoveredNodeId === connection.fromNode.id) {
-    return connection.toNode?.id ?? null;
+    // Pointer is not over another card — ignore RF `toNode` snap.
+    return null;
   }
   return hoveredNodeId;
 }

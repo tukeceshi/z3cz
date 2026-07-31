@@ -8,62 +8,63 @@ import {
   reportCloudStorageError,
 } from "./cloud-storage-error-reporter";
 
-// Track if we're currently refreshing to avoid multiple simultaneous refresh attempts
-let isRefreshing = false;
-let refreshPromise: Promise<boolean> | null = null;
+export interface RefreshAccessTokenResult {
+  readonly status: "success" | "unauthorized" | "error";
+  readonly user?: JWTTokenPayload;
+  readonly error?: Error;
+}
+
+let refreshPromise: Promise<RefreshAccessTokenResult> | null = null;
 
 /**
  * Refresh the access token using the refresh token
  * This is a shared function that updates both cookies and SWR cache
  */
-const refreshAccessToken = async (): Promise<boolean> => {
-  if (isRefreshing && refreshPromise) {
-    // If already refreshing, wait for the existing refresh to complete
-    return refreshPromise;
-  }
+export const refreshAccessToken =
+  async (): Promise<RefreshAccessTokenResult> => {
+    if (refreshPromise) {
+      // All callers in this tab share one refresh request.
+      return refreshPromise;
+    }
 
-  isRefreshing = true;
-  refreshPromise = (async () => {
-    try {
-      const response = await makeRequest<{
-        success: boolean;
-        user?: JWTTokenPayload;
-      }>(
-        "/auth/refresh",
-        {
-          method: "POST",
-        },
-        true
-      ); // Skip refresh to avoid infinite loops
+    refreshPromise = (async () => {
+      try {
+        const response = await makeRequest<{
+          success: boolean;
+          user?: JWTTokenPayload;
+        }>(
+          "/auth/refresh",
+          {
+            method: "POST",
+          },
+          true
+        );
 
-      if (response.success && response.user) {
-        // Update the SWR cache with the fresh user data to keep auth context in sync
-        // We need to import mutate dynamically to avoid circular dependencies
-        const { mutate } = await import("swr");
-        const { AUTH_USER_KEY } = await import("@/components/auth-context");
-
-        // Validate user data before updating cache
-        if (!response.user.sub || !response.user.name) {
-          console.error("Invalid user data in refresh response");
-          return false;
+        if (!response.success || !response.user?.sub || !response.user.name) {
+          return { status: "unauthorized" };
         }
 
+        const { mutate } = await import("swr");
+        const { AUTH_USER_KEY } = await import("@/components/auth-context");
         mutate(AUTH_USER_KEY, response.user, { revalidate: false });
-        return true;
+
+        return { status: "success", user: response.user };
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 401) {
+          return { status: "unauthorized" };
+        }
+
+        const refreshError =
+          error instanceof Error ? error : new Error(String(error));
+        console.error("Token refresh failed:", refreshError);
+        return { status: "error", error: refreshError };
+      } finally {
+        refreshPromise = null;
       }
+    })();
 
-      return false;
-    } catch (error) {
-      console.error("Token refresh failed:", error);
-      return false;
-    } finally {
-      isRefreshing = false;
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
-};
+    return refreshPromise;
+  };
 
 interface ApiErrorBody {
   error?: string;
@@ -144,16 +145,13 @@ export const makeRequest = async <T>(
     response.ok &&
     response.headers.get("X-Token-Refresh-Needed") === "true"
   ) {
-    // Trigger refresh in the background, don't wait for it
-    refreshAccessToken().catch((error) => {
-      console.error("Background token refresh failed:", error);
-    });
+    void refreshAccessToken();
   }
 
   if (!response.ok) {
     if (response.status === 401 && !skipRefresh) {
-      const refreshSuccess = await refreshAccessToken();
-      if (refreshSuccess) {
+      const refreshResult = await refreshAccessToken();
+      if (refreshResult.status === "success") {
         const retryResponse = await fetch(fullUrl, requestOptions);
         if (retryResponse.ok) {
           if (retryResponse.status === 204) {
@@ -166,13 +164,18 @@ export const makeRequest = async <T>(
           return retryResponse.json();
         }
 
-        if (retryResponse.status === 401) {
-          await handleSessionExpired();
-          throw new ApiRequestError("Session expired", 401, "UNAUTHORIZED");
+        let retryErrorData: ApiErrorBody | null = null;
+        try {
+          retryErrorData = (await retryResponse.json()) as ApiErrorBody;
+        } catch {
+          retryErrorData = null;
         }
-      } else {
+        throwApiRequestError(retryResponse.status, retryErrorData);
+      } else if (refreshResult.status === "unauthorized") {
         await handleSessionExpired();
         throw new ApiRequestError("Session expired", 401, "UNAUTHORIZED");
+      } else {
+        throw refreshResult.error ?? new Error("Token refresh failed");
       }
     }
 

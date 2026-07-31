@@ -11,6 +11,7 @@ import {
   AI_IMAGE_REFERENCE_HANDLE_ID,
   isAiImageAllowedReferenceNodeType,
 } from "./ai-image-node-utils";
+import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
 import {
   snapGenerativeContentBorderPoint,
 } from "./generative-node-content-geometry";
@@ -50,24 +51,10 @@ function connectionPointer(
 }
 
 function nodeIdUnderFlowPointer(
-  client: { x: number; y: number },
+  panePointer: { x: number; y: number },
   context: AiImageConnectionContext
 ): string | null {
-  if (!context.domNode) return null;
-  const bounds = context.domNode.getBoundingClientRect();
-  const x = (client.x - bounds.left - context.transform[0]) / context.transform[2];
-  const y = (client.y - bounds.top - context.transform[1]) / context.transform[2];
-
-  const stack = document.elementsFromPoint(client.x, client.y);
-  for (const el of stack) {
-    const nodeEl = el.closest(".react-flow__node") as HTMLElement | null;
-    const nodeId = nodeEl?.getAttribute("data-id");
-    if (nodeId) return nodeId;
-  }
-
-  void x;
-  void y;
-  return null;
+  return nodeIdUnderPanePointer(panePointer, { domNode: context.domNode });
 }
 
 function isAiImageTargetNode(node: InternalNode<Node>): boolean {
@@ -154,11 +141,7 @@ export function findAiImageConnectionTargetNodeId(
     return targetId;
   };
 
-  const nodeIdUnderPointer = nodeIdUnderFlowPointer(pointer, context);
-  const fromPointer = resolveTarget(nodeIdUnderPointer);
-  if (fromPointer) return fromPointer;
-
-  return resolveTarget(connection.toNode?.id);
+  return resolveTarget(nodeIdUnderFlowPointer(pointer, context));
 }
 
 export function findAiImageConnectionSnap(

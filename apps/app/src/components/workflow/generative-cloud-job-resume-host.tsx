@@ -32,6 +32,7 @@ import { prepareGenerativeCardError } from "@/components/workflow/prepare-genera
 import { readGenerativePrompt } from "@/components/workflow/generative-card-upload-utils";
 import {
   clearGenerativeProgress,
+  readGenerativeProgressJobId,
   withGenerativeProgress,
 } from "@/components/workflow/generative-progress-utils";
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
@@ -39,6 +40,7 @@ import { useWorkflow } from "@/components/workflow/workflow-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeCloudJobProgress } from "@/hooks/use-generative-cloud-job";
+import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 
 export type GenerativeCloudJobResumeModality = "image" | "video" | "audio";
 
@@ -114,6 +116,25 @@ export function GenerativeCloudJobResumeHost({
       if (!updateNodeData || media.length === 0) {
         return;
       }
+
+      const jobId = readGenerativeProgressJobId(data.metadata);
+      const canWriteHistory = !jobId || tryClaimGenerativeJobFinalize(jobId);
+
+      if (!canWriteHistory) {
+        updateNodeData(nodeId, (current) => {
+          const cleared = clearGenerativeProgress(current.metadata);
+          const withBusy = applyBusyMetadata(cleared, false);
+          const withError =
+            modality === "image"
+              ? withAiImageGenerateError(withBusy, null)
+              : modality === "video"
+                ? withAiVideoGenerateError(withBusy, null)
+                : withAiAudioGenerateError(withBusy, null);
+          return { metadata: withError };
+        });
+        return;
+      }
+
       updateNodeData(nodeId, (current) => {
         const prompt = readGenerativePrompt(current.inputs).trim();
         const params =
@@ -156,7 +177,14 @@ export function GenerativeCloudJobResumeHost({
         toast.success("workflow.aiAudioPanel.generated");
       }
     },
-    [applyBusyMetadata, modality, nodeId, toast, updateNodeData]
+    [
+      applyBusyMetadata,
+      data.metadata,
+      modality,
+      nodeId,
+      toast,
+      updateNodeData,
+    ]
   );
 
   const handleResumeError = useCallback(

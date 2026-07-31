@@ -41,6 +41,8 @@ sudo bash /var/dafthunk/scripts/host/https-setup.sh
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
 
+
+
 #### 更新
 
 ```bash
@@ -52,6 +54,8 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 # sudo bash /var/dafthunk/scripts/host/update.sh --skip-migrate
 # sudo bash /var/dafthunk/scripts/host/update.sh --detach
 ```
+
+
 
 #### HTTPS 模式
 
@@ -71,6 +75,8 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 /var/dafthunk/docker-host/shared/caddy/certs/<域名>/fullchain.pem
 /var/dafthunk/docker-host/shared/caddy/certs/<域名>/privkey.pem
 ```
+
+
 
 #### 手动上传证书（按需，不是必要步骤）
 
@@ -285,17 +291,17 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 四步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下脚本：
 
 
-| 脚本                  | 作用                                             |
-| ------------------- | ---------------------------------------------- |
-| `bootstrap.sh`      | Docker / Git / 拉代码                             |
-| `configure.sh`      | 写 `app.yml`（`--force` 覆盖；始终 HTTPS，`tls: auto`） |
-| `https-setup.sh`    | **第 3 步**：预申请证书（LE → ZeroSSL）                  |
-| `deploy.sh`         | 构建并启动（`--detach` 后台）                           |
+| 脚本                  | 作用                                                                      |
+| ------------------- | ----------------------------------------------------------------------- |
+| `bootstrap.sh`      | Docker / Git / 拉代码                                                      |
+| `configure.sh`      | 写 `app.yml`（`--force` 覆盖；始终 HTTPS，`tls: auto`）                          |
+| `https-setup.sh`    | **第 3 步**：预申请证书（LE → ZeroSSL）                                           |
+| `deploy.sh`         | 构建并启动（`--detach` 后台）                                                    |
 | `update.sh`         | `git pull` → 预检/迁移 → deploy（需 sudo；`--skip-migrate` / `--migrate-only`） |
-| `db-migrate.sh`     | 对 pending 迁移跑旁路 `.precheck.sql`，再按 journal 顺序 migrate |
-| `https-fallback.sh` | Caddy 失败后的备用申请（deploy 提示）                      |
-| `https-reload.sh`   | 换文件或改 `tls` 后重启 Caddy                          |
-| `https-try-auto.sh` | 自愿切回 Caddy 自动（用户自行）                            |
+| `db-migrate.sh`     | 对 pending 迁移跑旁路 `.precheck.sql`，再按 journal 顺序 migrate                   |
+| `https-fallback.sh` | Caddy 失败后的备用申请（deploy 提示）                                               |
+| `https-reload.sh`   | 换文件或改 `tls` 后重启 Caddy                                                   |
+| `https-try-auto.sh` | 自愿切回 Caddy 自动（用户自行）                                                     |
 
 
 单域名 + Caddy，与开发栈隔离。详见 [docker-host/README.md](./docker-host/README.md)。
@@ -305,7 +311,7 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 | 操作                | 命令                                   |
 | ----------------- | ------------------------------------ |
-| 状态 / 日志 / 停止 / 再起 | `./launcher status|logs|stop|start`  |
+| 状态 / 日志 / 停止 / 再起 | `./launcher status                   |
 | pnpm 别名（可选）       | `pnpm host:setup` / `host:rebuild` 等 |
 
 
@@ -347,7 +353,5 @@ DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 ## 关于本仓库
 
 本仓库的代码修改主要借助 [Cursor](https://cursor.com) 完成。
-
-邀请注册：[https://cursor.com/referral?code=YEZHVO8BJCNH](https://cursor.com/referral?code=YEZHVO8BJCNH)
 
 欢迎基于上文 Docker 本地开发流程提交 PR。

@@ -1,28 +1,33 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  formatLocalizedGenerativeNodeDisplayName,
+  resolveGenerativeNodeDefaultBaseName,
   resolveGenerativeNodeDisplayName,
 } from "./generative-node-naming";
 
-describe("formatLocalizedGenerativeNodeDisplayName", () => {
-  it("replaces stored base name with localized label while keeping suffix", () => {
-    expect(
-      formatLocalizedGenerativeNodeDisplayName({
-        nodeType: "ai-audio",
-        storedName: "Audio 2",
-        localizedBaseName: "音频",
-      })
-    ).toBe("音频 2");
+describe("resolveGenerativeNodeDefaultBaseName", () => {
+  const t = (key: string) => {
+    const map: Record<string, string> = {
+      "workflow.canvas.aiText": "文字",
+      "workflow.canvas.aiImage": "图片",
+      "workflow.canvas.aiVideo": "视频",
+      "workflow.canvas.aiAudio": "音频",
+    };
+    return map[key] ?? key;
+  };
+
+  it("returns localized labels for generative types", () => {
+    expect(resolveGenerativeNodeDefaultBaseName("ai-text", "Text", t)).toBe(
+      "文字"
+    );
+    expect(resolveGenerativeNodeDefaultBaseName("ai-image", "Image", t)).toBe(
+      "图片"
+    );
   });
 
-  it("returns stored name for non-generative nodes", () => {
+  it("returns catalog name for non-generative types", () => {
     expect(
-      formatLocalizedGenerativeNodeDisplayName({
-        nodeType: "http-request",
-        storedName: "HTTP Request",
-        localizedBaseName: "请求",
-      })
+      resolveGenerativeNodeDefaultBaseName("http-request", "HTTP Request", t)
     ).toBe("HTTP Request");
   });
 });

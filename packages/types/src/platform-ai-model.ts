@@ -6,6 +6,7 @@ import {
   type ReferenceImageInline,
 } from "./reference-image-input";
 import type { MediaReference } from "./media-reference";
+import { isMediaReference } from "./media-reference";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 
@@ -205,8 +206,58 @@ export interface GenerateAiTextRequest {
   readonly modelCanonicalId: string;
   readonly prompt?: string;
   readonly references?: readonly AiTextReferenceInput[];
+  /** Public or ephemeral image URLs for multimodal text models (e.g. Seed). */
+  readonly referenceImageUrls?: readonly string[];
+  /** Browser-local image payloads when no public URL exists. */
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  /** Public or ephemeral video URLs for multimodal text models (e.g. Seed). */
+  readonly referenceVideoUrls?: readonly string[];
   readonly workflowId?: string;
   readonly nodeId?: string;
+}
+
+export type OpenAiChatContentPart =
+  | { readonly type: "text"; readonly text: string }
+  | {
+      readonly type: "image_url";
+      readonly image_url: { readonly url: string };
+    }
+  | {
+      readonly type: "video_url";
+      readonly video_url: { readonly url: string };
+    };
+
+/** Build OpenAI/Ark chat `content`: string when text-only, parts when media present. */
+export function buildOpenAiMultimodalUserContent(params: {
+  readonly prompt: string;
+  readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+}): string | OpenAiChatContentPart[] {
+  const imageUrls = mergeReferenceImageValues({
+    referenceImageUrls: params.referenceImageUrls,
+    referenceImageInline: params.referenceImageInline,
+  });
+  const videoUrls = (params.referenceVideoUrls ?? [])
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+
+  if (imageUrls.length === 0 && videoUrls.length === 0) {
+    return params.prompt;
+  }
+
+  const parts: OpenAiChatContentPart[] = [];
+  for (const url of videoUrls) {
+    parts.push({ type: "video_url", video_url: { url } });
+  }
+  for (const url of imageUrls) {
+    parts.push({ type: "image_url", image_url: { url } });
+  }
+  const text = params.prompt.trim();
+  if (text.length > 0) {
+    parts.push({ type: "text", text });
+  }
+  return parts;
 }
 
 export interface GenerateAiTextResponse {
@@ -215,9 +266,22 @@ export interface GenerateAiTextResponse {
   readonly aiInterfaceId: string;
 }
 
+/** SSE payload for `/ai-text/generate-stream`. */
+export type GenerateAiTextStreamEvent =
+  | { readonly type: "delta"; readonly text: string }
+  | {
+      readonly type: "done";
+      readonly text: string;
+      readonly invocationId: string;
+      readonly aiInterfaceId: string;
+    }
+  | { readonly type: "error"; readonly error: string };
+
 export interface AiTextResultHistoryItem {
   readonly id: string;
   readonly text: string;
+  readonly platformModelId?: string;
+  readonly providerModelId?: string;
   readonly createdAt: string;
 }
 
@@ -367,6 +431,8 @@ export interface AiImageResultHistoryItem {
   readonly images: readonly MediaReference[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
+  readonly platformModelId?: string;
+  readonly providerModelId?: string;
   readonly createdAt: string;
 }
 
@@ -380,6 +446,8 @@ export interface AiVideoResultHistoryItem {
   readonly videos: readonly MediaReference[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
+  readonly platformModelId?: string;
+  readonly providerModelId?: string;
   readonly createdAt: string;
 }
 
@@ -906,6 +974,8 @@ export function buildAiTextUserPrompt(params: {
   readonly references?: readonly AiTextReferenceInput[];
   readonly question?: string;
   readonly defaultQuestion?: string;
+  /** When true and there is no text, fall back to defaultQuestion for multimodal. */
+  readonly hasMediaReferences?: boolean;
 }): string {
   const references = (params.references ?? [])
     .map((entry) => ({
@@ -918,7 +988,13 @@ export function buildAiTextUserPrompt(params: {
     typeof params.question === "string" ? params.question.trim() : "";
 
   if (references.length === 0) {
-    return question;
+    if (question) {
+      return question;
+    }
+    if (params.hasMediaReferences) {
+      return params.defaultQuestion || AI_TEXT_DEFAULT_QUESTION;
+    }
+    return "";
   }
 
   const blocks = references.map((entry) =>
@@ -949,6 +1025,42 @@ export function normalizeAiTextReferences(
   return [];
 }
 
+function flattenAiTextKeywordValues(keywords: unknown): unknown[] {
+  if (keywords == null) {
+    return [];
+  }
+  if (Array.isArray(keywords)) {
+    return keywords.flatMap((entry) => flattenAiTextKeywordValues(entry));
+  }
+  return [keywords];
+}
+
+function isVideoMimeType(mimeType: string): boolean {
+  return mimeType.toLowerCase().startsWith("video/");
+}
+
+/** Collect image/video MediaReferences from AI text keywords input. */
+export function collectAiTextMediaReferences(keywords: unknown): {
+  readonly images: readonly MediaReference[];
+  readonly videos: readonly MediaReference[];
+} {
+  const images: MediaReference[] = [];
+  const videos: MediaReference[] = [];
+
+  for (const entry of flattenAiTextKeywordValues(keywords)) {
+    if (!isMediaReference(entry)) {
+      continue;
+    }
+    if (isVideoMimeType(entry.mimeType)) {
+      videos.push(entry);
+    } else {
+      images.push(entry);
+    }
+  }
+
+  return { images, videos };
+}
+
 export type AiTextPromptAssemblyResult =
   | { readonly ok: true; readonly prompt: string }
   | { readonly ok: false; readonly error: string };
@@ -960,10 +1072,12 @@ export function validateAiTextPromptAssembly(params: {
     TextModelParameterRules,
     "keywordsMaxChars" | "promptMaxChars"
   >;
+  readonly mediaReferenceCount?: number;
 }): AiTextPromptAssemblyResult {
   const references = params.references ?? [];
   const question =
     typeof params.question === "string" ? params.question.trim() : "";
+  const hasMediaReferences = (params.mediaReferenceCount ?? 0) > 0;
 
   const referencesContentLength = references.reduce(
     (sum, entry) => sum + entry.content.trim().length,
@@ -984,7 +1098,11 @@ export function validateAiTextPromptAssembly(params: {
     };
   }
 
-  const prompt = buildAiTextUserPrompt({ references, question });
+  const prompt = buildAiTextUserPrompt({
+    references,
+    question,
+    hasMediaReferences,
+  });
   if (!prompt) {
     return { ok: false, error: "Prompt or references are required" };
   }
@@ -997,4 +1115,18 @@ export function validateAiTextPromptAssembly(params: {
   }
 
   return { ok: true, prompt };
+}
+
+export function countGenerateAiTextMediaReferences(
+  body: Pick<
+    GenerateAiTextRequest,
+    "referenceImageUrls" | "referenceImageInline" | "referenceVideoUrls"
+  >
+): { readonly imageCount: number; readonly videoCount: number } {
+  return {
+    imageCount:
+      (body.referenceImageUrls?.length ?? 0) +
+      (body.referenceImageInline?.length ?? 0),
+    videoCount: body.referenceVideoUrls?.length ?? 0,
+  };
 }

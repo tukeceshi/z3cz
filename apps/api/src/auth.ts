@@ -60,8 +60,9 @@ import { buildOrganizationInfo } from "./utils/sub-account-permissions";
 // Constants
 export const JWT_ACCESS_TOKEN_NAME = "access_token";
 const JWT_REFRESH_TOKEN_NAME = "refresh_token";
-const JWT_ACCESS_TOKEN_DURATION = 300; // 5 minutes
+const JWT_ACCESS_TOKEN_DURATION = 900; // 15 minutes
 const JWT_REFRESH_TOKEN_DURATION = 86400; // 1 days
+const JWT_REFRESH_THRESHOLD = 60; // Refresh during the final minute
 const OAUTH_RETURN_TO_COOKIE = "oauth_return_to";
 const OAUTH_RETURN_TO_MAX_AGE = 300; // 5 minutes
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
@@ -334,12 +335,11 @@ export const jwtMiddleware = async (
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // Check if token is about to expire (less than 5 minutes left)
+  // Give the client time to refresh without refreshing every request.
   const now = Math.floor(Date.now() / 1000);
   const exp = payload.exp as number;
 
-  if (exp - now < 300) {
-    // 5 minutes
+  if (exp - now < JWT_REFRESH_THRESHOLD) {
     c.header("X-Token-Refresh-Needed", "true");
   }
 
@@ -436,12 +436,11 @@ export const optionalJwtMiddleware = async (
     )) as JWTTokenPayload | null;
 
     if (payload && payload.organization?.id) {
-      // Check if token is about to expire (less than 5 minutes left)
+      // Give the client time to refresh without refreshing every request.
       const now = Math.floor(Date.now() / 1000);
       const exp = payload.exp as number;
 
-      if (exp - now < 300) {
-        // 5 minutes
+      if (exp - now < JWT_REFRESH_THRESHOLD) {
         c.header("X-Token-Refresh-Needed", "true");
       }
 

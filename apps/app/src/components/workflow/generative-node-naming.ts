@@ -1,5 +1,9 @@
 import {
+  AI_AUDIO_NODE_TYPE,
   AI_GENERATIVE_NODE_TYPES,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
   type AiGenerativeNodeType,
 } from "@dafthunk/types";
 
@@ -15,6 +19,31 @@ export function isGenerativeNodeType(
   return (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType);
 }
 
+/** Localized type label used only when creating a default node name. */
+export function resolveGenerativeNodeDefaultBaseName(
+  nodeType: string,
+  catalogName: string,
+  t: (key: string) => string
+): string {
+  if (nodeType === AI_TEXT_NODE_TYPE) {
+    return t("workflow.canvas.aiText");
+  }
+  if (nodeType === AI_IMAGE_NODE_TYPE) {
+    return t("workflow.canvas.aiImage");
+  }
+  if (nodeType === AI_VIDEO_NODE_TYPE) {
+    return t("workflow.canvas.aiVideo");
+  }
+  if (nodeType === AI_AUDIO_NODE_TYPE) {
+    return t("workflow.canvas.aiAudio");
+  }
+  return catalogName;
+}
+
+/**
+ * Build a default node name at create time only (type label + sequence).
+ * After creation, `data.name` is the single source of truth.
+ */
 export function resolveGenerativeNodeDisplayName(params: {
   readonly nodeType: string;
   readonly baseName: string;
@@ -33,21 +62,4 @@ export function resolveGenerativeNodeDisplayName(params: {
   ).length;
 
   return `${baseName} ${existingCount + additionalSameTypeCount + 1}`;
-}
-
-export function formatLocalizedGenerativeNodeDisplayName(params: {
-  readonly nodeType: string;
-  readonly storedName: string;
-  readonly localizedBaseName: string;
-}): string {
-  if (!isGenerativeNodeType(params.nodeType)) {
-    return params.storedName;
-  }
-
-  const suffixMatch = params.storedName.match(/\s(\d+)$/);
-  if (!suffixMatch) {
-    return params.localizedBaseName;
-  }
-
-  return `${params.localizedBaseName} ${suffixMatch[1]}`;
 }

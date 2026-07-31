@@ -4,21 +4,12 @@ import type {
 } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 
+import { stripTransientGenerativeMetadata } from "./generative-card-error-utils";
 import { snapshotGenerativeProgressForPersist } from "./generative-progress-utils";
-import { AI_TEXT_GENERATING_META_KEY } from "./ai-text-node-utils";
 import { stripWorkflowNodeCanvasUi } from "./workflow-node-canvas-ui";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 const PERSIST_DEBOUNCE_MS = 250;
-
-function stripTransientMetadata(
-  metadata: Record<string, string> | undefined
-): Record<string, string> | undefined {
-  if (!metadata) return undefined;
-  const next = { ...metadata };
-  delete next[AI_TEXT_GENERATING_META_KEY];
-  return Object.keys(next).length > 0 ? next : undefined;
-}
 
 const stripExecutionFields = (
   data: WorkflowNodeType
@@ -27,7 +18,7 @@ const stripExecutionFields = (
   inputs: WorkflowNodeType["inputs"];
 } => {
   const { executionState, error, metadata: _metadata, ...rest } = data;
-  const metadata = stripTransientMetadata(data.metadata);
+  const metadata = stripTransientGenerativeMetadata(data.metadata);
   const persistable = stripWorkflowNodeCanvasUi(rest);
 
   return {

@@ -15,7 +15,7 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
@@ -38,11 +38,18 @@ import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
+import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import { WorkflowCanvas } from "./workflow-canvas";
 import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
+import {
+  CreativeStudioProvider,
+  useCreativeStudio,
+} from "./creative-studio-context";
+import { CreativeStudioView } from "./creative-studio-view";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowNodeSelector } from "./workflow-node-selector";
 import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
+import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
 import { isValidWorkflowEditorViewport } from "./workflow-viewport-utils";
@@ -182,6 +189,8 @@ export interface WorkflowBuilderProps {
   onEditorViewportChange?: (viewport: WorkflowEditorViewport) => void;
   workflowSettingsOpen?: boolean;
   onWorkflowSettingsOpenChange?: (open: boolean) => void;
+  workflowsListUrl?: string;
+  onOpenWorkflowSettings?: () => void;
 }
 
 export function WorkflowBuilder({
@@ -213,6 +222,8 @@ export function WorkflowBuilder({
   onEditorViewportChange,
   workflowSettingsOpen = false,
   onWorkflowSettingsOpenChange,
+  workflowsListUrl,
+  onOpenWorkflowSettings,
 }: WorkflowBuilderProps) {
   const { t } = useTranslation();
   const appToast = useAppToast();
@@ -252,6 +263,7 @@ export function WorkflowBuilder({
     deleteEdge,
     deleteSelected,
     deselectAll,
+    selectNode,
     duplicateSelected,
     applyLayout,
     copySelected,
@@ -521,6 +533,38 @@ export function WorkflowBuilder({
     [nodes, edges, workflowId, orgId, updateNodeExecution, appToast, t]
   );
 
+  const handleReturnToCanvas = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId) return;
+      selectNode(nodeId);
+    },
+    [selectNode]
+  );
+
+  const handleReturnToCanvasFromDetail = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId || !reactFlowInstance) return;
+
+      selectNode(nodeId);
+      suppressViewportPersistEndRef.current = true;
+
+      const node = reactFlowInstance.getNode(nodeId);
+      if (!node) return;
+
+      const { width, height } = resolveWorkflowNodeDimensions(
+        node.data.nodeType,
+        node
+      );
+      const { zoom } = reactFlowInstance.getViewport();
+      void reactFlowInstance.setCenter(
+        node.position.x + width / 2,
+        node.position.y + height / 2,
+        { zoom, duration: 300 }
+      );
+    },
+    [reactFlowInstance, selectNode]
+  );
+
   return (
     <ReactFlowProvider>
       <WorkflowProvider
@@ -537,7 +581,22 @@ export function WorkflowBuilder({
         workflowTrigger={workflowTrigger}
         onRunNode={readOnly ? undefined : handleRunNode}
       >
-        <div className="w-full h-full min-h-0 flex flex-col">
+        <CreativeStudioProvider
+          workflowId={workflowId}
+          onReturnToCanvas={handleReturnToCanvas}
+          onReturnToCanvasFromDetail={handleReturnToCanvasFromDetail}
+        >
+          <CreativeStudioCanvasSync selectNode={selectNode} />
+          {workflowsListUrl ? (
+            <WorkflowEditorBreadcrumbEffect
+              workflowName={workflowName ?? ""}
+              workflowsListUrl={workflowsListUrl}
+              readOnly={readOnly}
+              onOpenWorkflowSettings={onOpenWorkflowSettings}
+              soleSelectedNodeId={soleSelectedNodeId}
+            />
+          ) : null}
+          <div className="w-full h-full min-h-0 flex flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly}>
             <div className="flex min-h-0 flex-1">
               <div
@@ -548,7 +607,7 @@ export function WorkflowBuilder({
                     : "100%",
                 }}
               >
-                <WorkflowCanvas
+                <WorkflowEditorMainArea
                   nodes={nodes}
                   edges={edges}
                   connectionValidationState={connectionValidationState}
@@ -695,7 +754,47 @@ export function WorkflowBuilder({
           gatedNodeTypes={execution.upgradeDialogGatedNodeTypes}
           variant={execution.upgradeDialogVariant}
         />
+        </CreativeStudioProvider>
       </WorkflowProvider>
     </ReactFlowProvider>
+  );
+}
+
+function CreativeStudioCanvasSync({
+  selectNode,
+}: {
+  readonly selectNode: (nodeId: string) => void;
+}) {
+  const { viewMode, studioNodeId } = useCreativeStudio();
+
+  useEffect(() => {
+    if (viewMode !== "studio" || !studioNodeId) return;
+    selectNode(studioNodeId);
+  }, [selectNode, studioNodeId, viewMode]);
+
+  return null;
+}
+
+type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas>;
+
+function WorkflowEditorMainArea(props: WorkflowEditorMainAreaProps) {
+  const { viewMode } = useCreativeStudio();
+
+  const isStudio = viewMode === "studio";
+
+  return (
+    <div className="relative h-full w-full min-h-0">
+      <WorkflowCanvas
+        {...props}
+        disabled={Boolean(props.disabled) || isStudio}
+        showControls={isStudio ? false : props.showControls}
+      />
+
+      {isStudio ? (
+        <div className="absolute inset-0 z-50">
+          <CreativeStudioView />
+        </div>
+      ) : null}
+    </div>
   );
 }

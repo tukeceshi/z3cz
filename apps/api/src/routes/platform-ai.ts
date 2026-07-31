@@ -1,4 +1,5 @@
 import {
+  countGenerateAiTextMediaReferences,
   validateAiTextPromptAssembly,
   type CompleteGenerationJobUploadRequest,
   type GenerateAiAudioRequest,
@@ -40,6 +41,11 @@ import {
   resolveTextModelInterface,
 } from "../services/resolve-text-model-interface";
 import { executeTextModel } from "../services/execute-text-model";
+import {
+  handleTextModelStreamFailure,
+  prepareTextModelStream,
+  streamPreparedTextModel,
+} from "../services/stream-text-model";
 import {
   listOrgImageModelOptions,
   resolveImageModelInterface,
@@ -436,10 +442,18 @@ const aiTextReferenceSchema = z.object({
   content: z.string().min(1),
 });
 
+const referenceImageInlineSchema = z.object({
+  mimeType: z.string().min(1),
+  data: z.string().min(1),
+});
+
 const generateSchema = z.object({
   modelCanonicalId: z.string().min(1),
   prompt: z.string().optional(),
   references: z.array(aiTextReferenceSchema).optional(),
+  referenceImageUrls: z.array(z.string().min(1)).optional(),
+  referenceImageInline: z.array(referenceImageInlineSchema).optional(),
+  referenceVideoUrls: z.array(z.string().min(1)).optional(),
   workflowId: z.string().optional(),
   nodeId: z.string().optional(),
 });
@@ -462,10 +476,29 @@ platformAiRoutes.post(
       return c.json({ error: "Model is not available for this organization" }, 400);
     }
 
+    const mediaCounts = countGenerateAiTextMediaReferences(body);
+    if (mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences) {
+      return c.json(
+        {
+          error: `Model allows at most ${modelOption.parameterRules.maxImageReferences} image references`,
+        },
+        400
+      );
+    }
+    if (mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences) {
+      return c.json(
+        {
+          error: `Model allows at most ${modelOption.parameterRules.maxVideoReferences} video references`,
+        },
+        400
+      );
+    }
+
     const assembly = validateAiTextPromptAssembly({
       references: body.references,
       question: body.prompt,
       parameterRules: modelOption.parameterRules,
+      mediaReferenceCount: mediaCounts.imageCount + mediaCounts.videoCount,
     });
 
     if (!assembly.ok) {
@@ -498,6 +531,9 @@ platformAiRoutes.post(
       canonicalId: body.modelCanonicalId,
       effectivePrompt,
       outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
+      referenceImageUrls: body.referenceImageUrls,
+      referenceImageInline: body.referenceImageInline,
+      referenceVideoUrls: body.referenceVideoUrls,
     });
 
     if (!result.ok || !result.text || !result.interfaceId) {
@@ -528,10 +564,217 @@ platformAiRoutes.post(
   }
 );
 
-const referenceImageInlineSchema = z.object({
-  mimeType: z.string().min(1),
-  data: z.string().min(1),
-});
+platformAiRoutes.post(
+  "/ai-text/generate-stream",
+  zValidator("json", generateSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json") as GenerateAiTextRequest;
+    const db = createDatabase(c.env);
+
+    const options = await listOrgTextModelOptions(db, organizationId);
+    const modelOption = options.find(
+      (entry) => entry.canonicalId === body.modelCanonicalId
+    );
+
+    if (!modelOption?.selectable) {
+      return c.json({ error: "Model is not available for this organization" }, 400);
+    }
+
+    const mediaCounts = countGenerateAiTextMediaReferences(body);
+    if (mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences) {
+      return c.json(
+        {
+          error: `Model allows at most ${modelOption.parameterRules.maxImageReferences} image references`,
+        },
+        400
+      );
+    }
+    if (mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences) {
+      return c.json(
+        {
+          error: `Model allows at most ${modelOption.parameterRules.maxVideoReferences} video references`,
+        },
+        400
+      );
+    }
+
+    const assembly = validateAiTextPromptAssembly({
+      references: body.references,
+      question: body.prompt,
+      parameterRules: modelOption.parameterRules,
+      mediaReferenceCount: mediaCounts.imageCount + mediaCounts.videoCount,
+    });
+
+    if (!assembly.ok) {
+      return c.json({ error: assembly.error }, 400);
+    }
+
+    const effectivePrompt = assembly.prompt;
+    const invocationId = crypto.randomUUID();
+    const promptExcerpt =
+      effectivePrompt.length > 200
+        ? `${effectivePrompt.slice(0, 200)}…`
+        : effectivePrompt;
+
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: modelOption.canonicalId,
+      displayName: modelOption.displayName,
+      promptExcerpt,
+      content: "",
+      source: "ai-text-node-generate",
+      status: "pending",
+    });
+
+    const prepared = await prepareTextModelStream({
+      env: c.env,
+      db,
+      organizationId,
+      canonicalId: body.modelCanonicalId,
+      effectivePrompt,
+      outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
+      referenceImageUrls: body.referenceImageUrls,
+      referenceImageInline: body.referenceImageInline,
+      referenceVideoUrls: body.referenceVideoUrls,
+    });
+
+    if (!prepared.ok) {
+      await finalizeAiModelInvocation(db, {
+        id: invocationId,
+        organizationId,
+        status: "failed",
+        error: prepared.invocationError ?? prepared.error,
+      });
+      return c.json({ error: prepared.error }, 502);
+    }
+
+    const encoder = new TextEncoder();
+    const clientSignal = c.req.raw.signal;
+    let finalized = false;
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (payload: unknown): void => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
+          );
+        };
+
+        try {
+          for await (const event of streamPreparedTextModel({
+            prepared: prepared.prepared,
+            signal: clientSignal,
+          })) {
+            if (clientSignal.aborted) {
+              break;
+            }
+
+            if (event.type === "delta") {
+              send({ type: "delta", text: event.text });
+              continue;
+            }
+
+            if (event.type === "done") {
+              if (!finalized) {
+                finalized = true;
+                await finalizeAiModelInvocation(db, {
+                  id: invocationId,
+                  organizationId,
+                  status: "completed",
+                  content: event.text,
+                  interfaceId: prepared.prepared.candidate.interfaceId,
+                  interfaceName: prepared.prepared.candidate.interfaceName,
+                  error: null,
+                });
+              }
+              send({
+                type: "done",
+                text: event.text,
+                invocationId,
+                aiInterfaceId: prepared.prepared.candidate.interfaceId,
+              });
+              continue;
+            }
+
+            const failure = await handleTextModelStreamFailure({
+              db,
+              organizationId,
+              canonicalId: body.modelCanonicalId,
+              candidate: prepared.prepared.candidate,
+              upstreamError: event.error,
+              displayName: modelOption.displayName,
+              modality: modelOption.modality,
+            });
+            if (!finalized) {
+              finalized = true;
+              await finalizeAiModelInvocation(db, {
+                id: invocationId,
+                organizationId,
+                status: "failed",
+                error: failure.invocationError || failure.error,
+              });
+            }
+            send({ type: "error", error: failure.error });
+          }
+
+          if (clientSignal.aborted && !finalized) {
+            finalized = true;
+            await finalizeAiModelInvocation(db, {
+              id: invocationId,
+              organizationId,
+              status: "failed",
+              error: "Generation cancelled",
+            });
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Stream failed";
+          if (!finalized) {
+            finalized = true;
+            const failure = await handleTextModelStreamFailure({
+              db,
+              organizationId,
+              canonicalId: body.modelCanonicalId,
+              candidate: prepared.prepared.candidate,
+              upstreamError: message,
+              displayName: modelOption.displayName,
+              modality: modelOption.modality,
+            });
+            await finalizeAiModelInvocation(db, {
+              id: invocationId,
+              organizationId,
+              status: "failed",
+              error: failure.invocationError || failure.error,
+            });
+            try {
+              send({ type: "error", error: failure.error });
+            } catch {
+              // stream already closed
+            }
+          }
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  }
+);
 
 const generateImageSchema = z.object({
   modelCanonicalId: z.string().min(1),

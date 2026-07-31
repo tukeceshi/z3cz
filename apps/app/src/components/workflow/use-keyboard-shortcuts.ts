@@ -21,6 +21,18 @@ interface UseKeyboardShortcutsProps {
   nodeCount: number;
 }
 
+/** True when the user has a non-empty DOM text selection (browser copy/cut should win). */
+export function hasDomTextSelection(
+  selection: Selection | null = typeof window !== "undefined"
+    ? window.getSelection()
+    : null
+): boolean {
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return false;
+  }
+  return selection.toString().length > 0;
+}
+
 /**
  * Side-effect-only hook that registers global keyboard shortcuts
  * for clipboard (Cmd+C/X/V/D), delete (Delete/Backspace), and run (Cmd+Enter).
@@ -78,6 +90,15 @@ export function useKeyboardShortcuts({
           }) as unknown as React.MouseEvent;
           onAction(syntheticEvent);
         }
+        return;
+      }
+
+      // Prefer native copy/cut when the user selected text in browse mode.
+      const preferNativeTextClipboard =
+        (event.key.toLowerCase() === "c" || event.key.toLowerCase() === "x") &&
+        hasDomTextSelection();
+
+      if (preferNativeTextClipboard) {
         return;
       }
 

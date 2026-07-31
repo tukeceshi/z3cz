@@ -29,10 +29,22 @@ export function AppHeaderBreadcrumb() {
             <React.Fragment key={`${item.label}-${index}`}>
               <BreadcrumbItem className="min-w-0">
                 {isLast || !item.to ? (
-                  <span className="inline-flex items-center gap-1.5 min-w-0">
-                    <BreadcrumbPage className="truncate max-w-[10rem] sm:max-w-[16rem]">
-                      {item.label}
-                    </BreadcrumbPage>
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    {item.onClick ? (
+                      <button
+                        type="button"
+                        className="truncate max-w-[10rem] cursor-pointer rounded-sm text-foreground transition-colors hover:text-foreground/80 sm:max-w-[16rem]"
+                        onClick={item.onClick}
+                        title={item.onClickTitle}
+                        aria-label={item.onClickTitle ?? item.label}
+                      >
+                        {item.label}
+                      </button>
+                    ) : (
+                      <BreadcrumbPage className="truncate max-w-[10rem] sm:max-w-[16rem]">
+                        {item.label}
+                      </BreadcrumbPage>
+                    )}
                     {item.trailing}
                   </span>
                 ) : (

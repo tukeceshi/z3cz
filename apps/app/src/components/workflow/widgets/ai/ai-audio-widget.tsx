@@ -25,6 +25,8 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
+import { AiTextExpandButton } from "../../ai-text-expand-overlay";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
 import { readGenerativeProgressPhase } from "../../generative-progress-utils";
 import {
   AI_AUDIO_CARD_HEIGHT_PX,
@@ -139,6 +141,7 @@ function AiAudioWidget({
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
@@ -398,6 +401,11 @@ function AiAudioWidget({
             setErrorDetailOpen(true);
             return;
           }
+          if (activeAudio && !isGenerating) {
+            event.stopPropagation();
+            openCreativeStudio();
+            return;
+          }
           if (!isGenerating) {
             handleCardDoubleClick(event);
           }
@@ -437,6 +445,7 @@ function AiAudioWidget({
                 onClick={() => setHistoryOpen(true)}
               />
             ) : null}
+            <AiTextExpandButton onClick={openCreativeStudio} />
           </div>
         ) : null}
 

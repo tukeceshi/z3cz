@@ -318,6 +318,26 @@ async function getTemporaryVolcanoApiKey(
 }
 
 /** Issue one interface-level Ark API key (endpoint-scoped or console raw). */
+export function volcanoNeedsModelScopedArkKey(
+  metadata: VolcanoInterfaceMetadata | undefined
+): boolean {
+  if (!metadata?.models) {
+    return false;
+  }
+
+  const endpoints = metadata.arkEndpoints ?? {};
+  for (const [canonicalId, config] of Object.entries(metadata.models)) {
+    if (!config.enabled) {
+      continue;
+    }
+    if (!endpoints[canonicalId]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export async function getVolcanoArkApiKey(
   credentials: VolcengineCredentials,
   options?: {
@@ -325,16 +345,20 @@ export async function getVolcanoArkApiKey(
     readonly metadata?: VolcanoInterfaceMetadata;
   }
 ): Promise<GetApiKeyResult> {
-  const resourceIds =
-    options?.resourceIds && options.resourceIds.length > 0
-      ? options.resourceIds
-      : await resolveVolcanoEndpointIds({
-          credentials,
-          metadata: options?.metadata,
-        });
+  const preferModelScope = volcanoNeedsModelScopedArkKey(options?.metadata);
 
-  if (resourceIds.length > 0) {
-    return getTemporaryVolcanoApiKey(credentials, resourceIds);
+  if (!preferModelScope) {
+    const resourceIds =
+      options?.resourceIds && options.resourceIds.length > 0
+        ? options.resourceIds
+        : await resolveVolcanoEndpointIds({
+            credentials,
+            metadata: options?.metadata,
+          });
+
+    if (resourceIds.length > 0) {
+      return getTemporaryVolcanoApiKey(credentials, resourceIds);
+    }
   }
 
   try {

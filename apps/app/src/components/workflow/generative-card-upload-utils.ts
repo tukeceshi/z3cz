@@ -10,15 +10,8 @@ import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import type { WorkflowParameter } from "./workflow-types";
 
-const IMAGE_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".webp",
-  ".bmp",
-  ".svg",
-]);
+const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png"]);
+const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
 const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v"]);
 const AUDIO_EXTENSIONS = new Set([
   ".mp3",
@@ -70,6 +63,17 @@ export function normalizeGenerativeCardUploadFile(
         : AUDIO_EXTENSIONS;
   const prefix = `${kind}/`;
 
+  if (kind === "image") {
+    if (IMAGE_MIME_TYPES.has(mime)) {
+      return file;
+    }
+    if (!extensions.has(ext)) {
+      return null;
+    }
+    const resolvedMime = EXTENSION_MIME[ext] ?? "image/jpeg";
+    return new File([file], file.name, { type: resolvedMime });
+  }
+
   if (mime.startsWith(prefix)) {
     return file;
   }
@@ -85,6 +89,9 @@ export function normalizeGenerativeCardUploadFile(
 
   return new File([file], file.name, { type: resolvedMime });
 }
+
+/** File picker accept list for generative image card / studio uploads. */
+export const GENERATIVE_IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,.png,.jpg,.jpeg";
 
 export function warmGenerativeCardUploadCache(params: {
   readonly organizationId: string;

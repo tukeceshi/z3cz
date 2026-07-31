@@ -48,6 +48,8 @@ export interface AiAudioResultHistoryItem {
   readonly audios: readonly MediaReference[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
+  readonly platformModelId?: string;
+  readonly providerModelId?: string;
   readonly createdAt: string;
 }
 
@@ -309,6 +311,8 @@ export function appendAiAudioGeneratedHistoryItems(
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly providerModelId?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (audios.length === 0) return {};
@@ -319,6 +323,8 @@ export function appendAiAudioGeneratedHistoryItems(
     audios: [...audios],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
+    platformModelId: meta?.platformModelId,
+    providerModelId: meta?.providerModelId,
     createdAt: new Date().toISOString(),
   };
 

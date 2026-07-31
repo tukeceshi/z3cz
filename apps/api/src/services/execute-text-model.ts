@@ -2,7 +2,9 @@ import {
   buildTextModelDisplayLabel,
   buildTextModelFailureCardParts,
   buildTextModelInvocationErrorFromFailure,
+  isTransientTextModelUpstreamError,
   withSelectedModel,
+  type ReferenceImageInline,
 } from "@dafthunk/types";
 import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
 
@@ -36,6 +38,9 @@ async function executeTextModelCandidate(params: {
   readonly candidate: TextModelInterfaceCandidate;
   readonly effectivePrompt: string;
   readonly outputMaxTokens?: number;
+  readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
 }): Promise<
   { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }
 > {
@@ -69,6 +74,15 @@ async function executeTextModelCandidate(params: {
     resolved: withSelectedModel(iface, inferenceModelId),
     inputs: {
       prompt: params.effectivePrompt,
+      ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
+        ? { referenceImageUrls: params.referenceImageUrls }
+        : {}),
+      ...(params.referenceImageInline && params.referenceImageInline.length > 0
+        ? { referenceImageInline: params.referenceImageInline }
+        : {}),
+      ...(params.referenceVideoUrls && params.referenceVideoUrls.length > 0
+        ? { referenceVideoUrls: params.referenceVideoUrls }
+        : {}),
     },
     bodyExtensions: params.outputMaxTokens
       ? { max_tokens: params.outputMaxTokens }
@@ -95,6 +109,9 @@ export async function executeTextModel(params: {
   readonly canonicalId: string;
   readonly effectivePrompt: string;
   readonly outputMaxTokens?: number;
+  readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
 }): Promise<ExecuteTextModelResult> {
   const [candidates, options] = await Promise.all([
     listTextModelInterfaceCandidates(
@@ -125,6 +142,9 @@ export async function executeTextModel(params: {
     candidate,
     effectivePrompt: params.effectivePrompt,
     outputMaxTokens: params.outputMaxTokens,
+    referenceImageUrls: params.referenceImageUrls,
+    referenceImageInline: params.referenceImageInline,
+    referenceVideoUrls: params.referenceVideoUrls,
   });
 
   if (result.ok) {
@@ -136,14 +156,17 @@ export async function executeTextModel(params: {
     };
   }
 
-  await disableTextModelOnInterface(
-    params.db,
-    params.organizationId,
-    candidate.interfaceId,
-    params.canonicalId
-  );
+  const transient = isTransientTextModelUpstreamError(result.error);
+  if (!transient) {
+    await disableTextModelOnInterface(
+      params.db,
+      params.organizationId,
+      candidate.interfaceId,
+      params.canonicalId
+    );
+  }
 
-  const next = candidates[1];
+  const next = transient ? undefined : candidates[1];
   const modelDisplayLabel = modelOption
     ? buildTextModelDisplayLabel({
         displayName: modelOption.displayName,
@@ -152,13 +175,14 @@ export async function executeTextModel(params: {
     : params.canonicalId;
 
   const failure = buildTextModelFailureCardParts({
-      failedInterfaceName: candidate.interfaceName,
-      channelKind: candidate.channelKind,
-      modelDisplayLabel,
-      upstreamError: result.error,
-      nextInterfaceName: next?.interfaceName,
-      nextChannelKind: next?.channelKind,
-    });
+    failedInterfaceName: candidate.interfaceName,
+    channelKind: candidate.channelKind,
+    modelDisplayLabel,
+    upstreamError: result.error,
+    nextInterfaceName: next?.interfaceName,
+    nextChannelKind: next?.channelKind,
+    disabledInterface: !transient,
+  });
 
   const invocationError = buildTextModelInvocationErrorFromFailure({
     upstreamError: result.error,

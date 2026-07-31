@@ -132,6 +132,20 @@ export function withAiTextResult(
   return { inputs, outputs };
 }
 
+/** Live stream preview: update card text without rewriting history entries. */
+export function withAiTextStreamingPreview(
+  current: WorkflowNodeType,
+  text: string
+): Partial<WorkflowNodeType> {
+  const inputs = upsertInputValue(current.inputs, AI_TEXT_RESULT_INPUT_ID, text);
+  const outputs = current.outputs.map((output) =>
+    output.id === AI_TEXT_OUTPUT_ID
+      ? ({ ...output, value: text } as WorkflowParameter)
+      : output
+  );
+  return { inputs, outputs };
+}
+
 function upsertInputValue(
   inputs: readonly WorkflowParameter[],
   id: string,
@@ -235,14 +249,34 @@ export function withAiTextManualResult(
   return { ...withResult, metadata };
 }
 
-export function withAiTextGeneratedResult(
+/** Edit current text while keeping existing AI history / content mode intact. */
+export function withAiTextEditedResult(
   current: WorkflowNodeType,
   text: string
+): Partial<WorkflowNodeType> {
+  return withAiTextResult(current, text);
+}
+
+export function hasAiTextGeneratedHistory(
+  inputs: readonly WorkflowParameter[]
+): boolean {
+  return readAiTextResultHistory(inputs).items.length > 0;
+}
+
+export function withAiTextGeneratedResult(
+  current: WorkflowNodeType,
+  text: string,
+  meta?: {
+    readonly platformModelId?: string;
+    readonly providerModelId?: string;
+  }
 ): Partial<WorkflowNodeType> {
   const history = readAiTextResultHistory(current.inputs);
   const item: AiTextResultHistoryItem = {
     id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     text,
+    platformModelId: meta?.platformModelId,
+    providerModelId: meta?.providerModelId,
     createdAt: new Date().toISOString(),
   };
   const nextHistory: AiTextResultHistory = {

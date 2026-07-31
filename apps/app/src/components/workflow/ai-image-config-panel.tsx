@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import SparklesIcon from "lucide-react/icons/sparkles";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -41,6 +41,12 @@ import {
   withGenerativeProgress,
 } from "./generative-progress-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
+import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import {
+  shouldShowStudioPromptBox,
+  studioDockSizeForPanel,
+} from "./generative-studio-dock-layout";
+import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
@@ -52,7 +58,6 @@ import {
 } from "./generative-reference-utils";
 import {
   AiTextExpandButton,
-  AiTextExpandOverlay,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import {
@@ -82,7 +87,10 @@ import {
 import { formatGenerativeApiError } from "./format-generative-api-error";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
-import { resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import {
+  resolveGenerativeNodeDefaultBaseName,
+  resolveGenerativeNodeDisplayName,
+} from "./generative-node-naming";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
 import {
   canAcceptAiImageReference,
@@ -100,11 +108,13 @@ import {
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import { useGenerativeCloudJobProgress, generativeProgressButtonKey } from "@/hooks/use-generative-cloud-job";
+import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export interface AiImageConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
+  readonly layout?: GenerativeConfigPanelLayout;
 }
 
 function getInputString(data: WorkflowNodeType, id: string): string {
@@ -112,7 +122,11 @@ function getInputString(data: WorkflowNodeType, id: string): string {
   return typeof value === "string" ? value : "";
 }
 
-export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
+export function AiImageConfigPanel({
+  nodeId,
+  data,
+  layout = "attached",
+}: AiImageConfigPanelProps) {
   const {
     updateNodeData,
     disabled,
@@ -139,13 +153,15 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
     [createObjectUrl, orgId]
   );
 
-  const { models, groups, isLoading } = useOrgImageModels(orgId);
+  const { models, groups, modelsError, isLoading, refreshModels } =
+    useOrgImageModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
+  const generateInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
     null
   );
-  const [expandOpen, setExpandOpen] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
+  const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [generationParams, setGenerationParams] = useState<
     Record<string, unknown>
   >(() => readAiImageGenerationParams(data.inputs));
@@ -604,7 +620,11 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
             data: {
               name: resolveGenerativeNodeDisplayName({
                 nodeType: catalog.type,
-                baseName: catalog.name,
+                baseName: resolveGenerativeNodeDefaultBaseName(
+                  catalog.type,
+                  catalog.name,
+                  t
+                ),
                 existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
                 additionalSameTypeCount: offset,
               }),
@@ -643,6 +663,7 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
   const handleGenerate = async () => {
     if (disabled || !orgId || !selectedModel) return;
+    if (generateInFlightRef.current) return;
 
     if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
       return;
@@ -677,7 +698,10 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       return;
     }
 
+    generateInFlightRef.current = true;
     setIsGenerating(true);
+    /** False when another caller owns persist/progress for this job. */
+    let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
       metadata: withAiImageGenerateError(
@@ -731,9 +755,15 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       });
 
       let finalImages = response.images;
+      let finalizeJobId: string | null = null;
       if (response.jobId && response.phase === "ready_to_persist") {
-        syncProgress({ jobId: response.jobId, phase: "generating" });
-        finalImages = await resolveJobMedia(response.jobId);
+        finalizeJobId = response.jobId;
+        const resolvedJob = await resolveJobMedia(response.jobId);
+        finalImages = resolvedJob.media;
+        ownsJobProgress = resolvedJob.owned;
+        if (!ownsJobProgress) {
+          return;
+        }
       }
       setPersistPhase(null);
       clearProgress();
@@ -751,10 +781,26 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
 
       if (!updateNodeData) return;
 
+      const canWriteHistory = tryClaimGenerativeJobFinalize(finalizeJobId ?? "");
+
       updateNodeData(nodeId, (current) => {
+        if (!canWriteHistory) {
+          return {
+            metadata: withAiImageGenerateError(
+              withAiImageGeneratingFlag(
+                clearGenerativeProgress(current.metadata),
+                false
+              ),
+              null
+            ),
+          };
+        }
+
         const withResult = withAiImageGeneratedResult(current, finalImages, {
           prompt,
           params: generationParams,
+          platformModelId: selectedModel.canonicalId,
+          providerModelId: selectedModel.providerModelId,
         });
         const inputs = (withResult.inputs ?? current.inputs).map((input) =>
           input.id === "ai_interface_id"
@@ -777,13 +823,19 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         };
       });
 
-      toast.success("workflow.aiImagePanel.generated");
+      if (canWriteHistory) {
+        toast.success("workflow.aiImagePanel.generated");
+      }
     } catch (error) {
       const activeJobId = readActiveGenerationJobId(error);
       if (activeJobId && orgId) {
         try {
-          syncProgress({ jobId: activeJobId, phase: "generating" });
-          const finalImages = await resolveJobMedia(activeJobId);
+          const resolvedJob = await resolveJobMedia(activeJobId);
+          ownsJobProgress = resolvedJob.owned;
+          if (!ownsJobProgress) {
+            return;
+          }
+          const finalImages = resolvedJob.media;
           setPersistPhase(null);
           clearProgress();
           if (workflowId) {
@@ -796,11 +848,25 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
               });
             }
           }
+          const canWriteHistory = tryClaimGenerativeJobFinalize(activeJobId);
           if (updateNodeData) {
             updateNodeData(nodeId, (current) => {
+              if (!canWriteHistory) {
+                return {
+                  metadata: withAiImageGenerateError(
+                    withAiImageGeneratingFlag(
+                      clearGenerativeProgress(current.metadata),
+                      false
+                    ),
+                    null
+                  ),
+                };
+              }
               const withResult = withAiImageGeneratedResult(current, finalImages, {
                 prompt,
                 params: generationParams,
+                platformModelId: selectedModel.canonicalId,
+                providerModelId: selectedModel.providerModelId,
               });
               return {
                 ...withResult,
@@ -814,7 +880,9 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
               };
             });
           }
-          toast.success("workflow.aiImagePanel.generated");
+          if (canWriteHistory) {
+            toast.success("workflow.aiImagePanel.generated");
+          }
           return;
         } catch {
           // fall through to generic error handling
@@ -833,12 +901,15 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
       }));
       toast.errorRaw(formatted);
     } finally {
-      updateNodeData?.(nodeId, (current) => ({
-        metadata: withAiImageGeneratingFlag(
-          clearGenerativeProgress(current.metadata),
-          false
-        ),
-      }));
+      generateInFlightRef.current = false;
+      if (ownsJobProgress) {
+        updateNodeData?.(nodeId, (current) => ({
+          metadata: withAiImageGeneratingFlag(
+            clearGenerativeProgress(current.metadata),
+            false
+          ),
+        }));
+      }
       setPersistPhase(null);
       setIsGenerating(false);
     }
@@ -905,10 +976,33 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
         currentCount: referenceCount,
       }).ok);
 
+  const showStudioPromptBox = shouldShowStudioPromptBox({
+    layout,
+    hasPromptReference,
+    allowUpload,
+    referenceChips,
+  });
+  const studioDockSize = studioDockSizeForPanel({
+    layout,
+    hasPromptReference,
+    allowUpload,
+    referenceChips,
+  });
+
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom}>
-        <AiTextReferenceBar
+      <GenerativeConfigPanelShell
+        nodeId={nodeId}
+        zoom={zoom}
+        layout={layout}
+        studioDockSize={studioDockSize}
+      >
+        <div
+          className={cn(
+            layout === "studio-dock" && !showStudioPromptBox && "min-h-0 flex-1"
+          )}
+        >
+          <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
           allowUpload={allowUpload && !disabled}
@@ -923,10 +1017,19 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           }}
           onInjectChip={handleInjectChip}
         />
+        </div>
 
+        {showStudioPromptBox ? (
         <div
-          className="relative mt-2 min-h-0 flex-1"
-          style={{ minHeight: AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX }}
+          className={cn(
+            "relative mt-2 min-h-0",
+            layout === "studio-dock" ? "flex-1" : undefined
+          )}
+          style={
+            layout === "studio-dock"
+              ? undefined
+              : { minHeight: AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX }
+          }
         >
           <Textarea
             value={displayPrompt}
@@ -966,21 +1069,28 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
               </div>
             </div>
           ) : null}
-          <AiTextExpandButton
-            className="absolute right-1 top-1"
-            onClick={() => setExpandOpen(true)}
-          />
+          {layout === "attached" ? (
+            <AiTextExpandButton
+              className="absolute right-1 top-1"
+              onClick={openCreativeStudio}
+            />
+          ) : null}
         </div>
+        ) : null}
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-end gap-2">
-            {models.length > 0 ? (
+            {models.length > 0 || modelsError ? (
               <AiTextModelPicker
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
                 groups={groups}
                 selectedModelId={selectedModelId}
                 disabled={disabled || isLoading}
+                loadError={Boolean(modelsError)}
+                onRetryLoad={() => {
+                  void refreshModels();
+                }}
                 modelFitsCurrentRefs={(model) =>
                   modelFitsCurrentRefs(model as unknown as OrgImageModelOption)
                 }
@@ -1037,21 +1147,6 @@ export function AiImageConfigPanel({ nodeId, data }: AiImageConfigPanelProps) {
           </Button>
         </div>
       </GenerativeConfigPanelShell>
-
-      <AiTextExpandOverlay
-        open={expandOpen}
-        title={t("workflow.aiImagePanel.promptTitle")}
-        value={displayPrompt}
-        onChange={promptBuffer.commit}
-        onClose={() => setExpandOpen(false)}
-        readOnly={hasPromptReference || disabled}
-        maxLength={promptMaxLength}
-        placeholder={
-          hasPromptReference
-            ? promptReferenceEditHint
-            : t("workflow.aiImagePanel.promptPlaceholder")
-        }
-      />
 
       <GenerativePickNodeDialog
         open={pickNodeOpen}

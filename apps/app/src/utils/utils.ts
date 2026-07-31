@@ -12,6 +12,7 @@ import type {
   WorkflowNodeType,
   WorkflowParameter,
 } from "@/components/workflow/workflow-types";
+import { stripTransientGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -124,7 +125,9 @@ export function adaptBackendNodesToReactFlowNodes(
         outputs: adaptedOutputs,
         executionState: "idle",
         nodeTypes,
-        metadata: depNode.metadata ? { ...depNode.metadata } : undefined,
+        metadata: stripTransientGenerativeMetadata(
+          depNode.metadata ? { ...depNode.metadata } : undefined
+        ),
       },
     } as Node<WorkflowNodeType>;
   });

@@ -13,7 +13,7 @@ import {
   ensureVolcanoModelEndpoints,
 } from "./ensure-volcano-endpoints";
 import { isVolcanoArkNotOpenedError } from "./errors";
-import { getVolcanoArkApiKey } from "./get-api-key";
+import { getVolcanoArkApiKey, volcanoNeedsModelScopedArkKey } from "./get-api-key";
 import {
   isVolcanoMetadata,
   normalizeVolcanoInterfaceMetadata,
@@ -121,8 +121,15 @@ export async function ensureVolcanoApiKey(params: {
     params.organizationId
   );
   const keyPending = isVolcanoArkApiKeyPending(metadata, decryptedExisting);
+  const mustSwitchToModelScope =
+    volcanoNeedsModelScopedArkKey(metadata) &&
+    metadata.arkApiKeyScope !== "model";
 
-  if (keyPending || shouldRenewVolcanoApiKey(expiresAt)) {
+  if (
+    keyPending ||
+    shouldRenewVolcanoApiKey(expiresAt) ||
+    mustSwitchToModelScope
+  ) {
     try {
       const issued = await getVolcanoArkApiKey(credentials, { metadata });
       apiKey = issued.apiKey;

@@ -327,6 +327,8 @@ export function withAiVideoGeneratedResult(
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly providerModelId?: string;
   }
 ): Partial<WorkflowNodeType> {
   const primary = videos[0];
@@ -342,6 +344,8 @@ export function appendAiVideoGeneratedHistoryItems(
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly providerModelId?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (videos.length === 0) return {};
@@ -352,6 +356,8 @@ export function appendAiVideoGeneratedHistoryItems(
     videos: [...videos],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
+    platformModelId: meta?.platformModelId,
+    providerModelId: meta?.providerModelId,
     createdAt: new Date().toISOString(),
   };
 

@@ -8,8 +8,12 @@ import {
 export type BreadcrumbItem = {
   label: string;
   to?: string;
-  /** Optional control rendered after the label (e.g. settings button). */
+  /** Optional control rendered after the label (e.g. view-mode toggle). */
   trailing?: ReactNode;
+  /** When set on the current page item, the label becomes clickable. */
+  onClick?: () => void;
+  /** Accessible label for onClick (e.g. settings dialog title). */
+  onClickTitle?: string;
 };
 
 type PageContextType = {

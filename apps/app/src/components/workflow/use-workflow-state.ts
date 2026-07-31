@@ -84,6 +84,7 @@ interface UseWorkflowStateReturn {
   deleteEdge: (edgeId: string) => void;
   deleteSelected: () => void;
   deselectAll: () => void;
+  selectNode: (nodeId: string) => void;
   addTriggerNodes: (trigger: WorkflowTrigger) => void;
   removeTriggerNodes: () => void;
   duplicateNode: (nodeId: string) => void;
