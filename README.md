@@ -1,16 +1,38 @@
-# Dafthunk
+# z3cz
 
-> Break it, fix it, prompt it, automatic, automatic, ...
+**开源可视化工作流与 AI 创作工作台**
 
-可视化工作流自动化平台：浏览器内编排与执行工作流（[React Flow](https://reactflow.dev/)）。自托管与本地开发用 **Docker + Node API + Postgres**；也可部署到 Cloudflare Workers。
+（工程与安装路径仍使用 `dafthunk` 技术名，不影响使用。）
 
-Workflow
+[快速开始](#快速开始) · [核心功能](#核心功能) · [效果展示](#效果展示) · [项目结构](#项目结构) 
 
-## 概览
+## 核心功能
 
-**功能**：可视化编排、AI 节点、HTTP / 邮件 / 队列等触发、组织级多租户。
+- **无限画布**：节点拖拽、连线，画布 / 创作工作室双视图
+- **AI 创作**：文本、图片、视频、音频
+- **实时协同编辑**：WebSocket 多端同步画布，编辑防抖落库（Postgres）
+- **创作视图**：编辑节点拥有更宽阔的操作空间与更便捷的交互体验
+- **AI模型接口**：原生支持主流模型，可更换url和模型ID用于兼容中转
+- **火山引擎深度接入**：使用AK/SK用户凭证，自动导入AI接口、资源包消耗情况
+- **生成媒体落库**：结果上传云存储；画布暂存管理，减少资源重复加载
+- **生成任务守护**：Generation Job（生成任务）持久化，刷新或离开后可继续跟进
 
-**技术栈**：pnpm monorepo · TypeScript · Hono · React 19 · React Router v7 · Vite · Drizzle · Vitest · Docker ·（可选）Cloudflare Workers / R2 / Hyperdrive。
+## 效果展示
+
+<table width="100%">
+  <tr>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192540_619.png" alt="画布：文本与图片节点连线"></td>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192552_354.png" alt="创作视图：图片详情与生成"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192744_715.png" alt="画布暗色主题"></td>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192639_979.png" alt="AI/资源接口与用量"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192705_744.png" alt="选择接入渠道"></td>
+    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192714_807.png" alt="选择模型与功能"></td>
+  </tr>
+</table>
 
 ---
 
@@ -24,6 +46,8 @@ Workflow
 
 - Linux（推荐 Ubuntu）
 - 内存 4G + （不足时自动 swap 增加虚拟内存）
+
+
 
 #### 安装（四步）
 
@@ -46,13 +70,8 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 #### 更新
 
 ```bash
-# 推荐：pull → 预检/按序迁移 → rebuild
+# pull → 预检/按序迁移 → rebuild
 sudo bash /var/dafthunk/scripts/host/update.sh
-
-# 仅迁移 / 跳过迁移 / 后台 rebuild
-# sudo bash /var/dafthunk/scripts/host/update.sh --migrate-only
-# sudo bash /var/dafthunk/scripts/host/update.sh --skip-migrate
-# sudo bash /var/dafthunk/scripts/host/update.sh --detach
 ```
 
 
@@ -92,13 +111,10 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 
 ### 本地开发
 
-多端口开发栈（`:3100` / `:3101` / `:3102`），与自托管 compose 项目隔离。
-
 #### 前置要求
 
 - [Docker](https://docs.docker.com/get-docker/) 24+
 - [Docker Compose](https://docs.docker.com/compose/) v2.1+（需支持 `up --wait`）
-- Git
 
 
 
@@ -148,119 +164,20 @@ docker compose up -d --build --wait   # 或 pnpm dev
 2. 邮箱 + 密码「登录 / 注册」
 3. **首个注册用户**为超级管理员
 
-可选 GitHub / Google：在 **Admin → 登录方式** 配置；开发回调须同源，如 `http://localhost:3101/api/auth/login/github`。
-
 ---
 
 
 
-## Docker 日常命令（本地开发）
-
-默认栈：`docker-compose.yml` + `docker-compose.dev.yml`。
-
-
-| 服务       | 容器名                | 端口   |
-| -------- | ------------------ | ---- |
-| Postgres | `dafthunk-pg-dev`  | 仅容器内 |
-| API      | `dafthunk-api-dev` | 3102 |
-| www      | `dafthunk-www-dev` | 3100 |
-| app      | `dafthunk-app-dev` | 3101 |
-
-
-别名：`pnpm dev` / `dev:down` / `dev:logs`。
-
-### 启动与停止
+## Docker 日常命令
 
 ```bash
 docker compose up -d --build --wait    # 构建并启动
 docker compose up -d --wait            # 已构建过
-docker compose ps
-docker compose logs -f api www app
-
-docker compose down                    # 停容器，保留卷
-docker compose down -v                 # 删命名卷（DB、密钥、node_modules…）
-```
-
-依赖或 HMR 异常时，可 `down -v` 后重新启动。
-
-### 有序重启
-
-源码挂载：**前端** Vite HMR；**API** 为 `tsx watch` 整进程重启。Windows bind mount 下 API 已开文件轮询（`CHOKIDAR_USEPOLLING`）。进程重启默认可跳过 migrate（boot stamp 有效时）；`FORCE_DB_MIGRATE=1` 可强制迁移。
-
-容器级重启请按序操作，避免对整栈直接 `docker compose restart`：
-
-```bash
-docker compose exec api sh -c 'rm -f /app/data/storage/cache/restart-mode.* && touch /app/data/storage/cache/restart-mode.fast'
-docker compose restart api
-docker compose up -d --wait api
-docker compose restart www app
+docker compose logs -f api www appt    # 查看日志，可以只带对应的桶
+docker compose down                    # 停止容器
 ```
 
 
-| 模式     | 何时                      |
-| ------ | ----------------------- |
-| `fast` | 日常改 API 业务代码            |
-| `warm` | 改了 `packages/runtime`   |
-| `full` | lockfile、migration、种子变更 |
-
-
-
-| 场景                         | 命令                                 |
-| -------------------------- | ---------------------------------- |
-| 仅 www                      | `docker compose restart www`       |
-| 仅 app                      | `up -d --wait api` 后 `restart app` |
-| 改了 Dockerfile / entrypoint | `up -d --build` 后再有序重启             |
-
-
-启动阶段：`GET /health` 的 `phase`，或 `docker compose exec api cat /app/data/storage/cache/boot-phase.txt`。
-
-### 数据库
-
-迁移在 API 启动时自动执行。手动：
-
-```bash
-docker compose exec api sh -c 'cd /app/apps/api && pnpm db:migrate && node scripts/write-boot-stamp.mjs'
-docker compose exec api sh -c 'cd /app/apps/api && pnpm db:generate'
-docker compose exec api sh -c 'cd /app/apps/api && pnpm db:studio'
-docker compose exec api sh -c 'cd /app/apps/api && pnpm db:reset'   # 清业务数据，保留表结构
-```
-
-容器内：`postgresql://postgres:postgres@supabase-db:5432/postgres`。
-
-### 可选编排
-
-```bash
-# 宿主机暴露 Postgres 5432
-docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --wait
-
-# 向 api 注入 Cloudflare 凭证（在 .env.docker 中填写）
-docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --wait
-```
-
-
-
-### 故障排查
-
-
-| 现象                | 处理                                                                     |
-| ----------------- | ---------------------------------------------------------------------- |
-| 端口占用              | 改 `.env.docker`；自托管用 `dafthunk-host`（可与 310x 并存）                       |
-| API 长时间无响应        | 首次约 1–2 分钟；`docker compose logs -f api`                                |
-| www/app 异常        | `docker compose ps`                                                    |
-| 配置/镜像不生效          | `up -d --build` 后有序重启                                                  |
-| 登录 401            | 用 [http://localhost:3101；清库后刷新再注册](http://localhost:3101；清库后刷新再注册)     |
-| Gateway Cookie 错乱 | 只用 [http://localhost:8080](http://localhost:8080)                      |
-| 登录/API 500、503    | API 可能仍在启动                                                             |
-| OAuth 失败          | Admin → 登录方式；回调 `http://localhost:3101/api/auth/login/{provider}`      |
-| JWT 500           | `docker compose exec api cat /data/secrets/.dev.vars`                  |
-| Secrets 解密失败      | 面板重配，或 `down -v` 后重建                                                   |
-| 勿双写密钥             | Docker 开发勿把 `JWT_SECRET` / `SECRET_MASTER_KEY` 写入 `apps/api/.dev.vars` |
-
-
-```bash
-docker compose exec api node -e "fetch('http://127.0.0.1:3102/health').then(r=>console.log('api',r.status))"
-docker compose exec app node -e "fetch('http://127.0.0.1:3101/api/health').then(r=>console.log('proxy',r.status))"
-```
 
 ---
 
@@ -272,7 +189,6 @@ docker compose exec app node -e "fetch('http://127.0.0.1:3101/api/health').then(
 apps/api/            Hono API（本地 Node / 可选 Workers）
 apps/app/            产品 UI（React + Vite）
 apps/www/            营销站（React Router SSR）
-apps/smtp-gateway/   入站 SMTP（可选；host 栈默认不起）
 packages/types/      共享类型
 packages/utils/      共享工具
 packages/runtime/    工作流节点运行时
@@ -280,44 +196,13 @@ docker-host/         自托管 launcher / setup（Caddy 单域名）
 docker/              开发 entrypoint、Nginx、Caddyfile.dev
 ```
 
-本地 Docker 与 Cloudflare 能力大致对应：Workers → Node Hono；D1 → Postgres；R2 → 本地对象存储；Email Routing → SMTP 网关等。细节见下方 Cloudflare。
+
 
 ---
 
 
 
-## 部署
-
-四步安装与更新见上文「快速开始 → 自托管部署」。`scripts/host/` 下脚本：
-
-
-| 脚本                  | 作用                                                                      |
-| ------------------- | ----------------------------------------------------------------------- |
-| `bootstrap.sh`      | Docker / Git / 拉代码                                                      |
-| `configure.sh`      | 写 `app.yml`（`--force` 覆盖；始终 HTTPS，`tls: auto`）                          |
-| `https-setup.sh`    | **第 3 步**：预申请证书（LE → ZeroSSL）                                           |
-| `deploy.sh`         | 构建并启动（`--detach` 后台）                                                    |
-| `update.sh`         | `git pull` → 预检/迁移 → deploy（需 sudo；`--skip-migrate` / `--migrate-only`） |
-| `db-migrate.sh`     | 对 pending 迁移跑旁路 `.precheck.sql`，再按 journal 顺序 migrate                   |
-| `https-fallback.sh` | Caddy 失败后的备用申请（deploy 提示）                                               |
-| `https-reload.sh`   | 换文件或改 `tls` 后重启 Caddy                                                   |
-| `https-try-auto.sh` | 自愿切回 Caddy 自动（用户自行）                                                     |
-
-
-单域名 + Caddy，与开发栈隔离。详见 [docker-host/README.md](./docker-host/README.md)。
-
-**手动配置（非 scripts/host）：** `cd docker-host && ./dafthunk-setup`（写配置后自动 rebuild）。
-
-
-| 操作                | 命令                                   |
-| ----------------- | ------------------------------------ |
-| 状态 / 日志 / 停止 / 再起 | `./launcher status                   |
-| pnpm 别名（可选）       | `pnpm host:setup` / `host:rebuild` 等 |
-
-
-旧版多端口 `pnpm prod:up` 已弃用，请用 `docker-host/launcher`。
-
-### Cloudflare
+## Cloudflare部署（未验证，本地化改动太大了）
 
 可用 GitHub Actions 将主分支部署为 Workers（API / app / www），库用 Supabase + Hyperdrive，对象用 R2。
 
@@ -351,6 +236,8 @@ DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 
 
 ## 关于本仓库
+
+本仓库对外品牌为 **z3cz**；代码包名与自托管路径仍为 dafthunk / @dafthunk/*（刻意保留，避免破坏已有部署）。
 
 本仓库的代码修改主要借助 [Cursor](https://cursor.com) 完成。
 

@@ -2567,7 +2567,7 @@ export const en = {
     execution: {
       errorTitle: "Workflow Execution Error",
       errorDescription:
-        "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/dafthunk-com/dafthunk.",
+        "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/tukeceshi/dafthunk.",
       close: "Close",
     },
     generativeErrors: {

@@ -1,6 +1,6 @@
-# Docker self-host (Discourse-style)
+# z3cz · Docker 自托管
 
-单域名 · Caddy · monorepo 旁路栈（`name: dafthunk-host`）。
+单域名 · Caddy · monorepo 旁路栈（Compose 项目名仍为 `dafthunk-host`）。
 
 **须通过 `https://你的域名` 访问**（HTTP 不支持登录与 AI 上传）。
 
