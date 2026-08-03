@@ -598,30 +598,36 @@ html.dark .workflow-canvas .react-flow__background pattern circle {
   }
 }
 
-/* Creative studio: thin scrollbars (light + dark) */
+/* Shared thin scrollbars (light + dark) — lists, panels, studio */
+.thin-scrollbar,
 .studio-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
 }
 
+.thin-scrollbar::-webkit-scrollbar,
 .studio-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
+.thin-scrollbar::-webkit-scrollbar-track,
 .studio-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
+.thin-scrollbar::-webkit-scrollbar-thumb,
 .studio-scrollbar::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground) / 0.25);
   border-radius: 9999px;
 }
 
+.thin-scrollbar::-webkit-scrollbar-thumb:hover,
 .studio-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.45);
 }
 
+.thin-scrollbar::-webkit-scrollbar-corner,
 .studio-scrollbar::-webkit-scrollbar-corner {
   background: transparent;
 }

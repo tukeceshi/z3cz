@@ -383,6 +383,7 @@ export const platformAiModelGroups = pgTable("platform_ai_model_groups", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   icon: text("icon").notNull().default("sparkles"),
+  modality: text("modality").notNull().default("text"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: createCreatedAt(),
   updatedAt: createUpdatedAt(),
@@ -393,7 +394,6 @@ export const platformAiModels = pgTable("platform_ai_models", {
   displayName: text("display_name").notNull(),
   modality: text("modality").notNull(),
   platformEnabled: boolean("platform_enabled").notNull().default(true),
-  providerModelId: text("provider_model_id").notNull(),
   parameterRules: jsonb("parameter_rules")
     .$type<PlatformAiModelParameterRules>()
     .notNull(),
@@ -521,23 +521,6 @@ export const generationJobs = pgTable(
       table.organizationId,
       table.upstreamTaskId
     ),
-  ]
-);
-
-export const organizationModelInterfacePriorities = pgTable(
-  "organization_model_interface_priorities",
-  {
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    canonicalId: text("canonical_id").notNull(),
-    interfaceIds: jsonb("interface_ids").$type<string[]>().notNull().default([]),
-    updatedAt: createUpdatedAt(),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.organizationId, table.canonicalId],
-    }),
   ]
 );
 

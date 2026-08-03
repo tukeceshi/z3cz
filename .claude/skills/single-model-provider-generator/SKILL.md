@@ -31,11 +31,11 @@ create 时为该品牌**全部** canonical 写一条（未勾选 `enabled: false
 
 ## 新增步骤
 
-1. **Migration** — Admin 只读 DB、不能新建模型。插入 `platform_ai_model_groups` + `platform_ai_models`；同步 `VOLCANO_AI_MODEL_CATALOG` alias。
+1. **Migration** — Admin 只读 DB、不能新建模型。插入 `platform_ai_models`（身份字段 + rules，**无** `provider_model_id`）+ 可选分组；静态 catalog 的 `providerModelId` 仅作接口 metadata / 品牌 upstream 种子。
 2. **Types** — `XXX_PROVIDER_CARD_ID`、`XXX_CANONICAL_IDS`、`XXX_DEFAULT_ENDPOINT_URL`；`single-model-preset-catalog.ts` 排除 canonical，避免重复 preset。
 3. **向导** — `single-model-picker-step` 品牌卡 → `single-model-wizard-content` 的 `multiModelProviderConfig` → 复用 `DeepSeekModelConfigList` → i18n `presets.xxxProvider`。
 4. **列表/配置** — `single-model-config-dialog` 加入 `isMultiModelProvider`；`model-brand-icon` 用本地 `assets/model-brand-icons/`。
-5. **解析** — 文字一般不用改 execute；新模态才补 `resolve-*-model-interface`。
+5. **解析** — 推理只用接口 `upstreamModelId` / 火山 metadata；**无平台默认上游回退**。
 
 ## 两种例外
 

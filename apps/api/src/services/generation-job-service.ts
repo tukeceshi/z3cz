@@ -714,6 +714,7 @@ export function buildReadyToPersistJobPayload(params: {
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
   readonly aiInterfaceId: string;
   readonly invocationId?: string;
+  readonly requestSnapshot?: GenerationJobResultJson["requestSnapshot"];
 }): {
   readonly readyAt: string;
   readonly resultJson: GenerationJobResultJson;
@@ -728,6 +729,9 @@ export function buildReadyToPersistJobPayload(params: {
       ),
       aiInterfaceId: params.aiInterfaceId,
       invocationId: params.invocationId,
+      ...(params.requestSnapshot
+        ? { requestSnapshot: params.requestSnapshot }
+        : {}),
     },
   };
 }
@@ -745,6 +749,7 @@ export async function createReadyToPersistImageJob(
     readonly images: readonly EphemeralMediaReference[];
     readonly clientRequestId?: string | null;
     readonly invocationId?: string;
+    readonly requestSnapshot?: GenerationJobResultJson["requestSnapshot"];
   }
 ): Promise<GenerationJobRecord> {
   const { readyAt, resultJson } = buildReadyToPersistJobPayload({
@@ -752,6 +757,7 @@ export async function createReadyToPersistImageJob(
     mediaKind: "ai-image",
     aiInterfaceId: params.interfaceId,
     invocationId: params.invocationId,
+    requestSnapshot: params.requestSnapshot,
   });
 
   return createGenerationJob(db, {

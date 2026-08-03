@@ -72,7 +72,7 @@ function ChannelCard({
         "hover:border-primary/50 hover:bg-muted/40",
         selected
           ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-          : "border-border bg-card"
+          : "border-border bg-card dark:bg-neutral-800"
       )}
     >
       {channel.recommended ? (

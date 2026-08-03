@@ -40,7 +40,6 @@ import {
 } from "@/services/organization-ai-interface-service";
 
 import { DeleteAiInterfaceDialog } from "./organization-ai-interfaces/delete-ai-interface-dialog";
-import { ModelInterfacePriorityDialog } from "./organization-ai-interfaces/model-interface-priority-dialog";
 import { AddInterfaceWizardDialog } from "./organization-ai-interfaces/add-interface-wizard-dialog";
 import { SingleModelProviderPanel } from "./organization-ai-interfaces/single-model-provider-panel";
 import { VolcanoInterfacePanel } from "./organization-ai-interfaces/volcano-interface-panel";
@@ -194,12 +193,9 @@ function OrganizationAiInterfacesPageContent() {
     <InsetLayout
       title={t("pages.aiInterfaces.title")}
       titleRight={
-        <div className="flex items-center gap-2">
-          <ModelInterfacePriorityDialog orgId={organizationId!} />
-          <Button onClick={handleOpenCreate}>
-            {t("pages.aiInterfaces.addButton")}
-          </Button>
-        </div>
+        <Button onClick={handleOpenCreate}>
+          {t("pages.aiInterfaces.addButton")}
+        </Button>
       }
     >
       <p className="text-muted-foreground mb-4 text-sm">

@@ -122,24 +122,31 @@ export class AiAudioNode extends ExecutableNode {
       return this.createErrorResult("A model selection is required.");
     }
 
+    const interfaceId =
+      typeof context.inputs.ai_interface_id === "string" &&
+      context.inputs.ai_interface_id.trim().length > 0
+        ? context.inputs.ai_interface_id.trim()
+        : undefined;
+
+    if (!interfaceId) {
+      return this.createErrorResult("An AI interface must be selected.");
+    }
+
     if (!context.resolveAudioModel) {
       return this.createErrorResult(
         "Audio model resolution is unavailable in this runtime."
       );
     }
 
-    const resolvedModel = await context.resolveAudioModel(modelCanonicalId);
+    const resolvedModel = await context.resolveAudioModel(
+      modelCanonicalId,
+      interfaceId
+    );
     if (!resolvedModel) {
       return this.createErrorResult(
         `Model "${modelCanonicalId}" is not available for this organization.`
       );
     }
-
-    const interfaceId =
-      typeof context.inputs.ai_interface_id === "string" &&
-      context.inputs.ai_interface_id.trim().length > 0
-        ? context.inputs.ai_interface_id.trim()
-        : resolvedModel.interfaceId;
 
     const resolvedInterface = await context.resolveAiInterface({ interfaceId });
     if (!resolvedInterface) {

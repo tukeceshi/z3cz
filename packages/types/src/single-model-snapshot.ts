@@ -1,6 +1,7 @@
 import { VOLCANO_AI_MODEL_CATALOG } from "./ai-model-catalog";
 import type { OrganizationAiInterface } from "./ai-interface";
 import type { AiModelModality } from "./ai-model-catalog";
+import { resolveInterfaceModelAlias } from "./org-model-label";
 import {
   isSingleModelProviderMetadata,
   type SingleModelModelConfig,
@@ -31,7 +32,10 @@ export function buildSingleModelSnapshotFromMetadata(
 ): SingleModelSnapshotResponse {
   const models = Object.entries(metadata.models).map(([canonicalId, config]) => ({
     canonicalId,
-    alias: catalogAliasFor(canonicalId),
+    alias: resolveInterfaceModelAlias({
+      alias: config.alias,
+      platformDisplayName: catalogAliasFor(canonicalId),
+    }),
     modality: config.modality,
     upstreamModelId: config.upstreamModelId,
     enabled: config.enabled,

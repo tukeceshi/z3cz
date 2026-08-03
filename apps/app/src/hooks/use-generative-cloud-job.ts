@@ -19,7 +19,7 @@ import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
-import type { LocalMediaReference, MediaReference } from "@dafthunk/types";
+import type { ImageGenerationRequestSnapshot, LocalMediaReference, MediaReference } from "@dafthunk/types";
 
 const JOB_POLL_INTERVAL_MS = 3_000;
 
@@ -32,11 +32,16 @@ function sleep(ms: number): Promise<void> {
 async function waitForJobFinalMedia(
   organizationId: string,
   jobId: string
-): Promise<readonly MediaReference[]> {
+): Promise<ResolveGenerativeJobMediaResult> {
   while (true) {
     const response = await getGenerationJob(organizationId, jobId);
     if (response.job.status === "succeeded") {
-      return response.finalMedia ?? [];
+      return {
+        media: response.finalMedia ?? [],
+        owned: false,
+        requestSnapshot: response.job.resultJson?.requestSnapshot,
+        modelCanonicalId: response.job.modelCanonicalId,
+      };
     }
     if (
       response.job.status === "failed" ||
@@ -50,10 +55,26 @@ async function waitForJobFinalMedia(
   }
 }
 
+async function readJobPersistMeta(
+  organizationId: string,
+  jobId: string
+): Promise<{
+  readonly requestSnapshot?: ImageGenerationRequestSnapshot;
+  readonly modelCanonicalId?: string;
+}> {
+  const response = await getGenerationJob(organizationId, jobId);
+  return {
+    requestSnapshot: response.job.resultJson?.requestSnapshot,
+    modelCanonicalId: response.job.modelCanonicalId,
+  };
+}
+
 export interface ResolveGenerativeJobMediaResult {
   readonly media: readonly MediaReference[];
   /** True only for the caller that claimed resume and ran local persist. */
   readonly owned: boolean;
+  readonly requestSnapshot?: ImageGenerationRequestSnapshot;
+  readonly modelCanonicalId?: string;
 }
 
 interface UseGenerativeCloudJobOptions {
@@ -78,7 +99,7 @@ interface UseGenerativeCloudJobOptions {
     busy: boolean
   ) => Record<string, string> | undefined;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
-  readonly onResumeSuccess?: (media: readonly MediaReference[]) => void;
+  readonly onResumeSuccess?: (result: ResolveGenerativeJobMediaResult) => void;
   readonly onResumeError?: (error: unknown) => void;
 }
 
@@ -134,8 +155,7 @@ export function useGenerativeCloudJobProgress(
       const claimed = tryClaimGenerativeJobResume(jobId);
       if (!claimed) {
         try {
-          const media = await waitForJobFinalMedia(options.orgId!, jobId);
-          return { media, owned: false };
+          return await waitForJobFinalMedia(options.orgId!, jobId);
         } catch {
           // Owner (or another waiter) surfaces job failure; do not fight over UI.
           return { media: [], owned: false };
@@ -165,7 +185,13 @@ export function useGenerativeCloudJobProgress(
             options.onStaged?.(localMedia);
           },
         });
-        return { media, owned: true };
+        const meta = await readJobPersistMeta(options.orgId!, jobId);
+        return {
+          media,
+          owned: true,
+          requestSnapshot: meta.requestSnapshot,
+          modelCanonicalId: meta.modelCanonicalId,
+        };
       } finally {
         releaseGenerativeJobResume(jobId);
       }
@@ -224,7 +250,7 @@ export function useGenerativeCloudJobProgress(
         if (!result.owned) {
           return;
         }
-        options.onResumeSuccess?.(result.media);
+        options.onResumeSuccess?.(result);
         clearProgress();
       })
       .catch((error) => {

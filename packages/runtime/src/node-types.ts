@@ -296,9 +296,10 @@ export interface NodeContext {
       readonly canonicalId: string;
     }
   ) => Promise<string | undefined>;
-  /** Execute a platform text model via the highest-priority enabled channel (single attempt). */
+  /** Execute a platform text model on the selected AI interface. */
   executeTextModel?: (params: {
     readonly canonicalId: string;
+    readonly interfaceId: string;
     readonly effectivePrompt: string;
     readonly referenceImageUrls?: readonly string[];
     readonly referenceImageInline?: readonly {
@@ -315,7 +316,8 @@ export interface NodeContext {
   }>;
   /** Resolve a platform text model to interface + provider model id. */
   resolveTextModel?: (
-    canonicalId: string
+    canonicalId: string,
+    interfaceId: string
   ) => Promise<
     | {
         readonly interfaceId: string;
@@ -323,23 +325,14 @@ export interface NodeContext {
       }
     | undefined
   >;
-  listTextModelCandidates?: (
-    canonicalId: string
-  ) => Promise<
-    readonly {
-      readonly interfaceId: string;
-      readonly interfaceName: string;
-      readonly providerModelId: string;
-      readonly channelKind: "aggregate" | "api";
-    }[]
-  >;
   disableTextModelOnInterface?: (params: {
     readonly interfaceId: string;
     readonly canonicalId: string;
   }) => Promise<boolean>;
   /** Resolve a platform image model to interface + provider model id. */
   resolveImageModel?: (
-    canonicalId: string
+    canonicalId: string,
+    interfaceId: string
   ) => Promise<
     | {
         readonly interfaceId: string;
@@ -350,7 +343,8 @@ export interface NodeContext {
   >;
   /** Resolve a platform video model to interface + provider model id. */
   resolveVideoModel?: (
-    canonicalId: string
+    canonicalId: string,
+    interfaceId: string
   ) => Promise<
     | {
         readonly interfaceId: string;
@@ -361,7 +355,8 @@ export interface NodeContext {
   >;
   /** Resolve a platform audio model to interface + provider model id. */
   resolveAudioModel?: (
-    canonicalId: string
+    canonicalId: string,
+    interfaceId: string
   ) => Promise<
     | {
         readonly interfaceId: string;

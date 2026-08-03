@@ -3,13 +3,13 @@ import type {
   VolcanoModelSnapshotRow,
   VolcanoSnapshotPricingRow,
 } from "@dafthunk/types";
-import { formatPlatformModelLabel } from "@dafthunk/types";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getVolcanoEffectiveActivationStatus, isVolcanoModelActivationBlocking } from "@/utils/volcano-activation";
 
+import { ModelAliasInlineEdit } from "./model-alias-inline-edit";
 import { VolcanoPricingPopover } from "./volcano-pricing-popover";
 import { VolcanoUsageMeter } from "./volcano-usage-meter";
 
@@ -21,6 +21,7 @@ interface VolcanoModelRowProps {
   pricingRow?: VolcanoSnapshotPricingRow | null;
   pricingDocUrl?: string;
   onEnabledChange?: (enabled: boolean) => void;
+  onAliasChange?: (alias: string) => void;
 }
 
 function activationBadgeVariant(
@@ -46,15 +47,12 @@ export function VolcanoModelRow({
   pricingRow = null,
   pricingDocUrl,
   onEnabledChange,
+  onAliasChange,
 }: VolcanoModelRowProps) {
   const { t } = useTranslation();
   const modalityShort = t(
     `pages.aiInterfaces.volcano.modalityShort.${row.modality}`
   );
-  const modelLabel = formatPlatformModelLabel({
-    alias: row.alias,
-    modalityLabel: modalityShort,
-  });
   const isWizard = hintVariant === "wizard";
   const effectiveActivation = getVolcanoEffectiveActivationStatus(row);
   const enableBlocked = !isWizard && isVolcanoModelActivationBlocking(row);
@@ -84,7 +82,12 @@ export function VolcanoModelRow({
         />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{modelLabel}</span>
+            <ModelAliasInlineEdit
+              alias={row.alias}
+              modalityLabel={modalityShort}
+              disabled={disabled || isWizard}
+              onAliasChange={onAliasChange}
+            />
             {showActivationBadge && badgeStatus ? (
               <Badge
                 variant={

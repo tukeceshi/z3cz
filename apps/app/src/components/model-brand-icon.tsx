@@ -2,14 +2,15 @@ import HardDrive from "lucide-react/icons/hard-drive";
 import SparklesIcon from "lucide-react/icons/sparkles";
 import type { ReactNode } from "react";
 
-import claudeIcon from "@/assets/model-brand-icons/claude.png";
-import deepseekIcon from "@/assets/model-brand-icons/deepseek.png";
-import doubaoIcon from "@/assets/model-brand-icons/doubao.png";
-import geminiIcon from "@/assets/model-brand-icons/gemini.svg";
-import glmIcon from "@/assets/model-brand-icons/glm.avif";
-import grokIcon from "@/assets/model-brand-icons/grok.png";
-import kimiIcon from "@/assets/model-brand-icons/kimi.png";
-import openaiIcon from "@/assets/model-brand-icons/openai.svg";
+import claudeIcon from "@/assets/model-brand-icons/claude.svg?raw";
+import deepseekIcon from "@/assets/model-brand-icons/deepseek.svg?raw";
+import doubaoIcon from "@/assets/model-brand-icons/doubao.svg?raw";
+import geminiIcon from "@/assets/model-brand-icons/gemini.svg?raw";
+import glmIcon from "@/assets/model-brand-icons/glm.svg?raw";
+import grokIcon from "@/assets/model-brand-icons/grok.svg?raw";
+import kimiIcon from "@/assets/model-brand-icons/kimi.svg?raw";
+import minimaxIcon from "@/assets/model-brand-icons/minimax.svg?raw";
+import openaiIcon from "@/assets/model-brand-icons/openai.svg?raw";
 import { cn } from "@/utils/utils";
 
 export type ModelBrandKey =
@@ -20,11 +21,12 @@ export type ModelBrandKey =
   | "glm"
   | "grok"
   | "kimi"
+  | "minimax"
   | "openai"
   | "volcano"
   | "tos";
 
-const BRAND_ICON_SOURCES = {
+const BRAND_ICON_SVGS = {
   claude: claudeIcon,
   deepseek: deepseekIcon,
   doubao: doubaoIcon,
@@ -32,33 +34,85 @@ const BRAND_ICON_SOURCES = {
   glm: glmIcon,
   grok: grokIcon,
   kimi: kimiIcon,
+  minimax: minimaxIcon,
   openai: openaiIcon,
-} as const satisfies Record<Exclude<ModelBrandKey, "volcano" | "tos">, string>;
+} as const satisfies Record<
+  Exclude<ModelBrandKey, "volcano" | "tos">,
+  string
+>;
+
+/** Icons available when configuring a model group logo. */
+export const GROUP_ICON_OPTIONS = [
+  "sparkles",
+  "claude",
+  "deepseek",
+  "doubao",
+  "gemini",
+  "glm",
+  "grok",
+  "kimi",
+  "minimax",
+  "openai",
+] as const;
+
+export type GroupIconOption = (typeof GROUP_ICON_OPTIONS)[number];
 
 const GROUP_ID_BRAND_KEYS: Partial<Record<string, ModelBrandKey>> = {
   claude: "claude",
   deepseek: "deepseek",
   doubao: "doubao",
+  "doubao-text": "doubao",
+  seed: "doubao",
+  seedance: "doubao",
+  seedream: "doubao",
   gemini: "gemini",
   glm: "glm",
   grok: "grok",
+  "grok-text": "grok",
+  "grok-video": "grok",
   kimi: "kimi",
   openai: "openai",
-  minimax: "volcano",
+  "openai-image": "openai",
+  minimax: "minimax",
   veo: "gemini",
   "nano-banana": "gemini",
-  seed: "doubao",
 };
+
+export function isSelectableBrandIcon(
+  value: string
+): value is Exclude<ModelBrandKey, "volcano" | "tos"> {
+  return Object.prototype.hasOwnProperty.call(BRAND_ICON_SVGS, value);
+}
+
+function brandFromGroupId(
+  groupId: string | null | undefined
+): ModelBrandKey | undefined {
+  if (!groupId) return undefined;
+  const direct = GROUP_ID_BRAND_KEYS[groupId];
+  if (direct) return direct;
+
+  const base = groupId.replace(/-(text|image|video|audio)$/, "");
+  if (base !== groupId) {
+    return GROUP_ID_BRAND_KEYS[base];
+  }
+  return undefined;
+}
 
 export function resolveModelBrandKey(params: {
   readonly canonicalId?: string;
   readonly presetId?: string;
   readonly groupId?: string | null;
+  readonly icon?: string | null;
 }): ModelBrandKey {
-  const { canonicalId, presetId, groupId } = params;
+  const { canonicalId, presetId, groupId, icon } = params;
 
-  if (groupId && GROUP_ID_BRAND_KEYS[groupId]) {
-    return GROUP_ID_BRAND_KEYS[groupId]!;
+  if (icon && isSelectableBrandIcon(icon)) {
+    return icon;
+  }
+
+  const fromGroup = brandFromGroupId(groupId);
+  if (fromGroup) {
+    return fromGroup;
   }
 
   if (presetId === "provider:deepseek") {
@@ -99,7 +153,7 @@ export function resolveModelBrandKey(params: {
     return "claude";
   }
   if (presetId === "provider:minimax-speech") {
-    return "volcano";
+    return "minimax";
   }
   if (presetId === "provider:seedance") {
     return "doubao";
@@ -136,8 +190,8 @@ export function resolveModelBrandKey(params: {
   if (id.startsWith("claude-")) {
     return "claude";
   }
-  if (id.startsWith("minimax-speech-")) {
-    return "volcano";
+  if (id.startsWith("minimax-speech-") || id.startsWith("minimax-")) {
+    return "minimax";
   }
   if (
     id.startsWith("doubao-") ||
@@ -150,20 +204,39 @@ export function resolveModelBrandKey(params: {
   return "volcano";
 }
 
-function brandIconSource(brandKey: ModelBrandKey): string | undefined {
+function brandIconSvg(brandKey: ModelBrandKey): string | undefined {
   if (brandKey === "volcano") {
-    return BRAND_ICON_SOURCES.doubao;
+    return BRAND_ICON_SVGS.doubao;
   }
   if (brandKey === "tos") {
     return undefined;
   }
-  return BRAND_ICON_SOURCES[brandKey];
+  return BRAND_ICON_SVGS[brandKey];
+}
+
+function SparklesFallback({
+  className,
+}: {
+  readonly className?: string;
+}): ReactNode {
+  return (
+    <span
+      className={cn(
+        "inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted/80 text-muted-foreground",
+        className
+      )}
+    >
+      <SparklesIcon className="size-3" />
+    </span>
+  );
 }
 
 interface ModelBrandIconProps {
   readonly canonicalId?: string;
   readonly presetId?: string;
   readonly groupId?: string | null;
+  /** Group logo key (`sparkles` or a brand id). Takes priority when set. */
+  readonly icon?: string | null;
   readonly className?: string;
 }
 
@@ -171,9 +244,25 @@ export function ModelBrandIcon({
   canonicalId,
   presetId,
   groupId,
+  icon,
   className,
 }: ModelBrandIconProps): ReactNode {
-  const brandKey = resolveModelBrandKey({ canonicalId, presetId, groupId });
+  const brandKey = resolveModelBrandKey({
+    canonicalId,
+    presetId,
+    groupId,
+    icon: icon === "sparkles" ? null : icon,
+  });
+
+  // Explicit default logo with no other brand signal.
+  if (
+    icon === "sparkles" &&
+    !brandFromGroupId(groupId) &&
+    !canonicalId &&
+    !presetId
+  ) {
+    return <SparklesFallback className={className} />;
+  }
 
   if (brandKey === "tos") {
     return (
@@ -188,27 +277,21 @@ export function ModelBrandIcon({
     );
   }
 
-  const iconSource = brandIconSource(brandKey);
-  if (!iconSource) {
-    return (
-      <span
-        className={cn(
-          "inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted/80 text-muted-foreground",
-          className
-        )}
-      >
-        <SparklesIcon className="size-3" />
-      </span>
-    );
+  const iconSvg = brandIconSvg(brandKey);
+  if (!iconSvg) {
+    return <SparklesFallback className={className} />;
   }
 
   return (
-    <img
-      src={iconSource}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className={cn("size-5 shrink-0 rounded object-contain", className)}
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex size-5 shrink-0 text-foreground [&_svg]:block [&_svg]:size-full",
+        className
+      )}
+      dangerouslySetInnerHTML={{
+        __html: iconSvg.replaceAll('fill="#000000"', 'fill="currentColor"'),
+      }}
     />
   );
 }

@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { updateSingleModelModelEnabled } from "@/services/organization-ai-interface-service";
+import { updateSingleModelModelEnabled, updateSingleModelModelAlias } from "@/services/organization-ai-interface-service";
 
 import {
   ApiChannelBadge,
@@ -41,6 +41,7 @@ export function SingleModelProviderPanel({
   const [expanded, setExpanded] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [aliasSavingId, setAliasSavingId] = useState<string | null>(null);
 
   const snapshot = useMemo(
     () => buildSingleModelSnapshotFromInterface(iface),
@@ -81,6 +82,20 @@ export function SingleModelProviderPanel({
     }
   };
 
+  const handleAliasChange = async (canonicalId: string, alias: string) => {
+    setAliasSavingId(canonicalId);
+    try {
+      await updateSingleModelModelAlias(organizationId, iface.id, {
+        [canonicalId]: alias,
+      });
+      await onUpdated();
+    } catch {
+      appToast.error("pages.aiInterfaces.singleModel.aliasSaveFailed");
+    } finally {
+      setAliasSavingId(null);
+    }
+  };
+
   return (
     <>
       <InterfaceCardShell
@@ -101,9 +116,15 @@ export function SingleModelProviderPanel({
             <div key={row.canonicalId} className="mb-3 break-inside-avoid">
               <SingleModelModelRow
                 row={row}
-                disabled={togglingId === row.canonicalId}
+                disabled={
+                  togglingId === row.canonicalId ||
+                  aliasSavingId === row.canonicalId
+                }
                 onEnabledChange={(enabled) =>
                   void handleToggle(row.canonicalId, enabled)
+                }
+                onAliasChange={(alias) =>
+                  void handleAliasChange(row.canonicalId, alias)
                 }
               />
             </div>

@@ -36,6 +36,7 @@ interface UseWorkflowStateProps {
   disabled?: boolean;
   allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
+  orgId?: string;
 }
 
 interface UseWorkflowStateReturn {
@@ -110,6 +111,7 @@ export function useWorkflowState({
   disabled = false,
   allowedNodeTypes,
   nodeTypes = [],
+  orgId,
 }: UseWorkflowStateProps): UseWorkflowStateReturn {
   // Core graph state and operations
   const graphOps = useGraphOperations({
@@ -120,6 +122,7 @@ export function useWorkflowState({
     disabled,
     allowedNodeTypes,
     nodeTypes,
+    orgId,
   });
 
   const graphLocked = disabled;

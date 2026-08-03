@@ -28,6 +28,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  useOrgAudioModels,
+  useOrgImageModels,
+  useOrgTextModels,
+  useOrgVideoModels,
+} from "@/services/platform-ai-model-service";
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
@@ -59,6 +65,14 @@ import type {
   WorkflowExecution,
   WorkflowNodeType,
 } from "./workflow-types";
+
+function PrefetchOrgModels({ orgId }: { readonly orgId: string }) {
+  useOrgTextModels(orgId);
+  useOrgImageModels(orgId);
+  useOrgVideoModels(orgId);
+  useOrgAudioModels(orgId);
+  return null;
+}
 
 /** Serialize a React Flow node into the backend Node shape (unsaved editor values). */
 function serializeNodeSnapshot(
@@ -283,6 +297,7 @@ export function WorkflowBuilder({
     disabled: readOnly,
     allowedNodeTypes,
     nodeTypes,
+    orgId,
   });
 
   // Execution state
@@ -587,6 +602,7 @@ export function WorkflowBuilder({
           onReturnToCanvasFromDetail={handleReturnToCanvasFromDetail}
         >
           <CreativeStudioCanvasSync selectNode={selectNode} />
+          <PrefetchOrgModels orgId={orgId} />
           {workflowsListUrl ? (
             <WorkflowEditorBreadcrumbEffect
               workflowName={workflowName ?? ""}

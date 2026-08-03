@@ -44,6 +44,7 @@ import {
 import {
   AiImageHistoryOverlay,
 } from "./ai-image-history-overlay";
+import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
 import {
   isAiImageGenerating,
   readAiImageCardImages,
@@ -620,6 +621,25 @@ function StudioImageDetail({
     [disabled, nodeId, updateNodeData]
   );
 
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "image");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.images[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
+  );
+
   return (
     <>
       {uploadConfirmDialog}
@@ -677,6 +697,7 @@ function StudioImageDetail({
           currentImages={images}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>
@@ -727,12 +748,34 @@ function StudioVideoDetail({
     [disabled, nodeId, updateNodeData]
   );
 
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "video");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.videos[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
+  );
+
   const historyAsImageHistory = {
     items: historyItems.items.map((item) => ({
       id: item.id,
       images: item.videos,
       prompt: item.prompt,
       params: item.params,
+      platformModelId: item.platformModelId,
+      providerModelId: item.providerModelId,
+      modelDisplayName: item.modelDisplayName,
       createdAt: item.createdAt,
     })),
     selectedId: historyItems.selectedId,
@@ -795,6 +838,7 @@ function StudioVideoDetail({
           currentImages={videos}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>
@@ -845,12 +889,34 @@ function StudioAudioDetail({
     [disabled, nodeId, updateNodeData]
   );
 
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "audio");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.audios[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
+  );
+
   const historyAsImageHistory = {
     items: historyItems.items.map((item) => ({
       id: item.id,
       images: item.audios,
       prompt: item.prompt,
       params: item.params,
+      platformModelId: item.platformModelId,
+      providerModelId: item.providerModelId,
+      modelDisplayName: item.modelDisplayName,
       createdAt: item.createdAt,
     })),
     selectedId: historyItems.selectedId,
@@ -913,6 +979,7 @@ function StudioAudioDetail({
           currentImages={audios}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

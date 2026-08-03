@@ -44,6 +44,19 @@ export async function updateAdminPlatformAiModel(
   return response.model;
 }
 
+export async function reorderAdminPlatformAiModelGroups(
+  orderedGroupIds: readonly string[]
+): Promise<readonly PlatformAiModelGroup[]> {
+  const response = await makeRequest<{ groups: readonly PlatformAiModelGroup[] }>(
+    `${ADMIN_MODELS_BASE}/groups/reorder`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ orderedGroupIds }),
+    }
+  );
+  return response.groups;
+}
+
 export async function reorderAdminPlatformAiModels(
   orderedCanonicalIds: readonly string[]
 ): Promise<readonly PlatformAiModel[]> {

@@ -1,23 +1,7 @@
-import { formatPlatformModelLabel } from "./format-platform-model-label";
 import type { GenerativeCardError } from "./generative-card-error";
-import type { AiModelModality } from "./ai-model-catalog";
 import { buildTextModelInvocationErrorParts } from "./interpret-upstream-text-model-error";
 
 export type TextModelChannelKind = "aggregate" | "api";
-
-const MODALITY_LABEL_ZH: Record<AiModelModality, string> = {
-  text: "文字",
-  image: "图片",
-  video: "视频",
-  audio: "音频",
-};
-
-const MODALITY_LABEL_EN: Record<AiModelModality, string> = {
-  text: "Text",
-  image: "Image",
-  video: "Video",
-  audio: "Audio",
-};
 
 function channelTag(
   channelKind: TextModelChannelKind,
@@ -29,26 +13,11 @@ function channelTag(
   return "API";
 }
 
-export function buildTextModelDisplayLabel(params: {
-  readonly displayName: string;
-  readonly modality: AiModelModality;
-  readonly locale?: "zh" | "en";
-}): string {
-  const locale = params.locale ?? "zh";
-  const labels = locale === "zh" ? MODALITY_LABEL_ZH : MODALITY_LABEL_EN;
-  return formatPlatformModelLabel({
-    alias: params.displayName,
-    modalityLabel: labels[params.modality],
-  });
-}
-
 export interface TextModelFailureMessageParams {
   readonly failedInterfaceName: string;
   readonly channelKind: TextModelChannelKind;
   readonly modelDisplayLabel: string;
   readonly upstreamError?: string;
-  readonly nextInterfaceName?: string;
-  readonly nextChannelKind?: TextModelChannelKind;
   readonly locale?: "zh" | "en";
   /** When false, do not claim the interface was auto-disabled. Default true. */
   readonly disabledInterface?: boolean;
@@ -70,18 +39,9 @@ function buildTextModelFailureCardLines(
       );
     } else {
       lines.push(
-        `接口 「${failedTag}」${params.failedInterfaceName} 暂时失败，模型未关闭。`
+        `接口 「${failedTag}」${params.failedInterfaceName} 暂时失败，模型未关闭。`,
+        "请稍后重试。"
       );
-    }
-    if (params.nextInterfaceName && params.nextChannelKind) {
-      const nextTag = channelTag(params.nextChannelKind, locale);
-      lines.push(
-        `重试将使用接口「${nextTag}」${params.nextInterfaceName}。`
-      );
-    } else if (disabledInterface) {
-      lines.push("已无其他可用接口。");
-    } else {
-      lines.push("请稍后重试。");
     }
     return lines;
   }
@@ -94,16 +54,9 @@ function buildTextModelFailureCardLines(
     );
   } else {
     lines.push(
-      `Interface "${failedTag}" ${params.failedInterfaceName} failed temporarily; the model was not disabled.`
+      `Interface "${failedTag}" ${params.failedInterfaceName} failed temporarily; the model was not disabled.`,
+      "Please try again later."
     );
-  }
-  if (params.nextInterfaceName && params.nextChannelKind) {
-    const nextTag = channelTag(params.nextChannelKind, locale);
-    lines.push(`Retry will use interface "${nextTag}" ${params.nextInterfaceName}.`);
-  } else if (disabledInterface) {
-    lines.push("No other interfaces are available.");
-  } else {
-    lines.push("Please try again later.");
   }
   return lines;
 }

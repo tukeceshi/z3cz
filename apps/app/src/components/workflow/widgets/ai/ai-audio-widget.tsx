@@ -38,6 +38,7 @@ import {
   withAiAudioGenerateError,
   withAiAudioManualUpload,
 } from "../../ai-audio-node-utils";
+import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -291,6 +292,25 @@ function AiAudioWidget({
     [disabled, historyItems.items, nodeId, updateNodeData]
   );
 
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "audio");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.audios[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
+  );
+
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
       if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId) return;
@@ -367,6 +387,9 @@ function AiAudioWidget({
       images: item.audios,
       prompt: item.prompt,
       params: item.params,
+      platformModelId: item.platformModelId,
+      providerModelId: item.providerModelId,
+      modelDisplayName: item.modelDisplayName,
       createdAt: item.createdAt,
     })),
     selectedId: historyItems.selectedId,
@@ -474,6 +497,7 @@ function AiAudioWidget({
           currentImages={audios}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

@@ -186,6 +186,42 @@ export const convertValueByType = (
   return value;
 };
 
+export function upsertNodeInputValue(
+  inputs: readonly WorkflowParameter[],
+  inputId: string,
+  value: unknown,
+  type: WorkflowParameter["type"] = "string"
+): WorkflowParameter[] {
+  if (inputs.some((input) => input.id === inputId)) {
+    return inputs.map((input) =>
+      input.id === inputId ? ({ ...input, value } as WorkflowParameter) : input
+    );
+  }
+
+  return [
+    ...inputs,
+    {
+      id: inputId,
+      name: inputId,
+      type,
+      hidden: true,
+      value,
+    } as WorkflowParameter,
+  ];
+}
+
+export function upsertNodeInputValues(
+  inputs: readonly WorkflowParameter[],
+  values: Readonly<Record<string, unknown>>,
+  types: Partial<Record<string, WorkflowParameter["type"]>> = {}
+): WorkflowParameter[] {
+  let next = [...inputs];
+  for (const [inputId, value] of Object.entries(values)) {
+    next = upsertNodeInputValue(next, inputId, value, types[inputId] ?? "string");
+  }
+  return next;
+}
+
 export const updateNodeInput = (
   nodeId: string,
   inputId: string,
@@ -195,9 +231,7 @@ export const updateNodeInput = (
   edges?: ReactFlowEdge<WorkflowEdgeType>[],
   deleteEdge?: DeleteEdgeFn
 ): readonly WorkflowParameter[] => {
-  const updatedInputs = inputs.map((input) =>
-    input.id === inputId ? ({ ...input, value } as WorkflowParameter) : input
-  );
+  const updatedInputs = upsertNodeInputValue(inputs, inputId, value);
 
   if (edges && deleteEdge) {
     const connectedEdges = edges.filter(

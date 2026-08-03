@@ -1246,6 +1246,7 @@ export abstract class Runtime<Env = unknown> {
               this.textModelService!.executeTextModel({
                 organizationId: context.organizationId,
                 canonicalId: params.canonicalId,
+                interfaceId: params.interfaceId,
                 effectivePrompt: params.effectivePrompt,
                 referenceImageUrls: params.referenceImageUrls,
                 referenceImageInline: params.referenceImageInline,
@@ -1253,17 +1254,11 @@ export abstract class Runtime<Env = unknown> {
               })
           : undefined,
         resolveTextModel: this.textModelService
-          ? (canonicalId) =>
+          ? (canonicalId, interfaceId) =>
               this.textModelService!.resolveTextModel({
                 organizationId: context.organizationId,
                 canonicalId,
-              })
-          : undefined,
-        listTextModelCandidates: this.textModelService
-          ? (canonicalId) =>
-              this.textModelService!.listTextModelCandidates({
-                organizationId: context.organizationId,
-                canonicalId,
+                interfaceId,
               })
           : undefined,
         disableTextModelOnInterface: this.textModelService
@@ -1283,24 +1278,27 @@ export abstract class Runtime<Env = unknown> {
               })
           : undefined,
         resolveImageModel: this.imageModelService
-          ? (canonicalId) =>
+          ? (canonicalId, interfaceId) =>
               this.imageModelService!.resolveImageModel({
                 organizationId: context.organizationId,
                 canonicalId,
+                interfaceId,
               })
           : undefined,
         resolveVideoModel: this.videoModelService
-          ? (canonicalId) =>
+          ? (canonicalId, interfaceId) =>
               this.videoModelService!.resolveVideoModel({
                 organizationId: context.organizationId,
                 canonicalId,
+                interfaceId,
               })
           : undefined,
         resolveAudioModel: this.audioModelService
-          ? (canonicalId) =>
+          ? (canonicalId, interfaceId) =>
               this.audioModelService!.resolveAudioModel({
                 organizationId: context.organizationId,
                 canonicalId,
+                interfaceId,
               })
           : undefined,
         resolveAiImageStorage: this.resolveAiImageStorage

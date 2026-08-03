@@ -2,8 +2,6 @@
 
 **开源可视化工作流与 AI 创作工作台**
 
-（工程与安装路径仍使用 `dafthunk` 技术名，不影响使用。）
-
 [快速开始](#快速开始) · [核心功能](#核心功能) · [效果展示](#效果展示) · [项目结构](#项目结构) 
 
 ## 核心功能
@@ -19,20 +17,13 @@
 
 ## 效果展示
 
-<table width="100%">
-  <tr>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192540_619.png" alt="画布：文本与图片节点连线"></td>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192552_354.png" alt="创作视图：图片详情与生成"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192744_715.png" alt="画布暗色主题"></td>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192639_979.png" alt="AI/资源接口与用量"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192705_744.png" alt="选择接入渠道"></td>
-    <td width="50%"><img src="docs/images/ScreenShot_2026-07-31_192714_807.png" alt="选择模型与功能"></td>
-  </tr>
-</table>
+
+|     |     |
+| --- | --- |
+|     |     |
+|     |     |
+|     |     |
+
 
 ---
 
@@ -46,8 +37,6 @@
 
 - Linux（推荐 Ubuntu）
 - 内存 4G + （不足时自动 swap 增加虚拟内存）
-
-
 
 #### 安装（四步）
 
@@ -65,16 +54,12 @@ sudo bash /var/dafthunk/scripts/host/https-setup.sh
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
 
-
-
 #### 更新
 
 ```bash
 # pull → 预检/按序迁移 → rebuild
 sudo bash /var/dafthunk/scripts/host/update.sh
 ```
-
-
 
 #### HTTPS 模式
 
@@ -95,8 +80,6 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 /var/dafthunk/docker-host/shared/caddy/certs/<域名>/privkey.pem
 ```
 
-
-
 #### 手动上传证书（按需，不是必要步骤）
 
 1. 上传上述两个文件（覆盖即可）
@@ -107,16 +90,12 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 
 ---
 
-
-
 ### 本地开发
 
 #### 前置要求
 
 - [Docker](https://docs.docker.com/get-docker/) 24+
 - [Docker Compose](https://docs.docker.com/compose/) v2.1+（需支持 `up --wait`）
-
-
 
 #### Docker 安装
 
@@ -166,8 +145,6 @@ docker compose up -d --build --wait   # 或 pnpm dev
 
 ---
 
-
-
 ## Docker 日常命令
 
 ```bash
@@ -177,11 +154,7 @@ docker compose logs -f api www appt    # 查看日志，可以只带对应的桶
 docker compose down                    # 停止容器
 ```
 
-
-
 ---
-
-
 
 ## 项目结构
 
@@ -196,11 +169,7 @@ docker-host/         自托管 launcher / setup（Caddy 单域名）
 docker/              开发 entrypoint、Nginx、Caddyfile.dev
 ```
 
-
-
 ---
-
-
 
 ## Cloudflare部署（未验证，本地化改动太大了）
 
@@ -233,11 +202,7 @@ DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 
 ---
 
-
-
 ## 关于本仓库
-
-本仓库对外品牌为 **z3cz**；代码包名与自托管路径仍为 dafthunk / @dafthunk/*（刻意保留，避免破坏已有部署）。
 
 本仓库的代码修改主要借助 [Cursor](https://cursor.com) 完成。
 

@@ -9,7 +9,6 @@ import type {
   GenerateAiTextResponse,
   GetGenerationJobResponse,
   ListAiModelInvocationsResponse,
-  ListModelInterfacePrioritiesResponse,
   ListOrgAudioModelsResponse,
   ListOrgImageModelsResponse,
   ListOrgTextModelsResponse,
@@ -19,7 +18,6 @@ import type {
   PollAiVideoTaskResponse,
   SubmitAiVideoRequest,
   SubmitAiVideoResponse,
-  UpdateModelInterfacePriorityRequest,
 } from "@dafthunk/types";
 import useSWR from "swr";
 
@@ -29,90 +27,109 @@ function platformAiEndpoint(organizationId: string): string {
   return `/${organizationId}/platform-ai`;
 }
 
+const ORG_MODELS_SWR_OPTIONS = {
+  revalidateOnFocus: false,
+  dedupingInterval: 60_000,
+} as const;
+
 export function useOrgTextModels(orgId: string | undefined) {
   const key = orgId ? `${platformAiEndpoint(orgId)}/text-models` : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListOrgTextModelsResponse>(`${key}`)
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListOrgTextModelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
   );
 
   return {
     models: data?.models ?? [],
     groups: data?.groups ?? [],
     modelsError: error,
-    isLoading,
+    isLoading: !data && isLoading,
     refreshModels: mutate,
   };
 }
 
 export function useOrgImageModels(orgId: string | undefined) {
   const key = orgId ? `${platformAiEndpoint(orgId)}/image-models` : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListOrgImageModelsResponse>(`${key}`)
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListOrgImageModelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
   );
 
   return {
     models: data?.models ?? [],
     groups: data?.groups ?? [],
     modelsError: error,
-    isLoading,
+    isLoading: !data && isLoading,
     refreshModels: mutate,
   };
 }
 
 export function useOrgVideoModels(orgId: string | undefined) {
   const key = orgId ? `${platformAiEndpoint(orgId)}/video-models` : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListOrgVideoModelsResponse>(`${key}`)
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListOrgVideoModelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
   );
 
   return {
     models: data?.models ?? [],
     groups: data?.groups ?? [],
     modelsError: error,
-    isLoading,
+    isLoading: !data && isLoading,
     refreshModels: mutate,
   };
 }
 
 export function useOrgAudioModels(orgId: string | undefined) {
   const key = orgId ? `${platformAiEndpoint(orgId)}/audio-models` : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListOrgAudioModelsResponse>(`${key}`)
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListOrgAudioModelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
   );
 
   return {
     models: data?.models ?? [],
     groups: data?.groups ?? [],
     modelsError: error,
-    isLoading,
+    isLoading: !data && isLoading,
     refreshModels: mutate,
   };
 }
 
 export async function resolveOrgImageModel(
   orgId: string,
-  canonicalId: string
+  canonicalId: string,
+  interfaceId: string
 ): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  const query = new URLSearchParams({ aiInterfaceId: interfaceId });
   return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
-    `${platformAiEndpoint(orgId)}/image-models/${encodeURIComponent(canonicalId)}/resolve`
+    `${platformAiEndpoint(orgId)}/image-models/${encodeURIComponent(canonicalId)}/resolve?${query.toString()}`
   );
 }
 
 export async function resolveOrgVideoModel(
   orgId: string,
-  canonicalId: string
+  canonicalId: string,
+  interfaceId: string
 ): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  const query = new URLSearchParams({ aiInterfaceId: interfaceId });
   return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
-    `${platformAiEndpoint(orgId)}/video-models/${encodeURIComponent(canonicalId)}/resolve`
+    `${platformAiEndpoint(orgId)}/video-models/${encodeURIComponent(canonicalId)}/resolve?${query.toString()}`
   );
 }
 
 export async function resolveOrgAudioModel(
   orgId: string,
-  canonicalId: string
+  canonicalId: string,
+  interfaceId: string
 ): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  const query = new URLSearchParams({ aiInterfaceId: interfaceId });
   return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
-    `${platformAiEndpoint(orgId)}/audio-models/${encodeURIComponent(canonicalId)}/resolve`
+    `${platformAiEndpoint(orgId)}/audio-models/${encodeURIComponent(canonicalId)}/resolve?${query.toString()}`
   );
 }
 
@@ -298,10 +315,12 @@ export async function requestGenerationJobServerPersist(
 
 export async function resolveOrgTextModel(
   orgId: string,
-  canonicalId: string
+  canonicalId: string,
+  interfaceId: string
 ): Promise<{ aiInterfaceId: string; providerModelId: string }> {
+  const query = new URLSearchParams({ aiInterfaceId: interfaceId });
   return makeRequest<{ aiInterfaceId: string; providerModelId: string }>(
-    `${platformAiEndpoint(orgId)}/text-models/${encodeURIComponent(canonicalId)}/resolve`
+    `${platformAiEndpoint(orgId)}/text-models/${encodeURIComponent(canonicalId)}/resolve?${query.toString()}`
   );
 }
 
@@ -440,32 +459,6 @@ export async function generateAiTextStream(
   }
 
   return donePayload;
-}
-
-export function useModelInterfacePriorities(orgId: string | undefined) {
-  const key = orgId
-    ? `${platformAiEndpoint(orgId)}/model-interface-priorities`
-    : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListModelInterfacePrioritiesResponse>(`${key}`)
-  );
-
-  return {
-    priorities: data?.priorities ?? [],
-    prioritiesError: error,
-    isLoading,
-    refreshPriorities: mutate,
-  };
-}
-
-export async function updateModelInterfacePriority(
-  orgId: string,
-  body: UpdateModelInterfacePriorityRequest
-): Promise<void> {
-  await makeRequest(`${platformAiEndpoint(orgId)}/model-interface-priorities`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
 }
 
 export function useModelCalls(

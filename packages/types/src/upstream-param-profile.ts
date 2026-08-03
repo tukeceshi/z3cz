@@ -15,4 +15,6 @@ export interface UpstreamParamProfileField {
   /** When true, field is UI-only and must not be sent to upstream APIs. */
   readonly clientOnly?: boolean;
   readonly enumValues?: readonly string[];
+  /** How a UI feature is translated into the provider request. */
+  readonly implementationMode?: "direct" | "ratio_prompt" | "pixel_size" | "sequential_count";
 }

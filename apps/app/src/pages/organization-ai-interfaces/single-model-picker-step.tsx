@@ -68,6 +68,8 @@ import {
 } from "@/services/platform-ai-model-service";
 import { cn } from "@/utils/utils";
 
+import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
+
 import { ModelBrandIcon } from "./model-brand-icon";
 import { resolveSingleModelPresetCardName } from "./single-model-display-name";
 
@@ -180,7 +182,7 @@ function PresetTile({
         "hover:border-primary/50 hover:bg-muted/40",
         selected
           ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-          : "border-border bg-card"
+          : "border-border bg-card dark:bg-neutral-800"
       )}
     >
       <ModelBrandIcon canonicalId={canonicalId} presetId={presetId} />
@@ -673,7 +675,7 @@ export function SingleModelPickerStep({
           />
         ))}
       </div>
-      <div className="max-h-64 overflow-y-auto pr-1">
+      <div className={cn("max-h-64", LIST_SCROLL_CLASS)}>
         {activeFilter === "storage" ? (
           <div className="bg-muted/40 text-muted-foreground rounded-lg border p-4 text-sm">
             <p>{t("pages.aiInterfaces.singleModel.storageTabEmpty")}</p>

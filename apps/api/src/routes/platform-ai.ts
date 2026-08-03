@@ -27,7 +27,6 @@ import {
   getAiModelInvocation,
   listAiModelInvocations,
   listPlatformAiModelGroups,
-  upsertModelInterfacePriority,
 } from "../db/platform-ai-model-queries";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { requireModelCallsAccess } from "../middleware/org-permissions";
@@ -268,7 +267,7 @@ platformAiRoutes.get("/text-models", async (c) => {
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgTextModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db),
+    listPlatformAiModelGroups(db, "text"),
   ]);
   return c.json({ models, groups });
 });
@@ -278,7 +277,7 @@ platformAiRoutes.get("/image-models", async (c) => {
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgImageModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db),
+    listPlatformAiModelGroups(db, "image"),
   ]);
   return c.json({ models, groups });
 });
@@ -288,7 +287,7 @@ platformAiRoutes.get("/video-models", async (c) => {
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgVideoModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db),
+    listPlatformAiModelGroups(db, "video"),
   ]);
   return c.json({ models, groups });
 });
@@ -298,18 +297,23 @@ platformAiRoutes.get("/audio-models", async (c) => {
   const db = createDatabase(c.env);
   const [models, groups] = await Promise.all([
     listOrgAudioModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db),
+    listPlatformAiModelGroups(db, "audio"),
   ]);
   return c.json({ models, groups });
 });
 
 platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
   const organizationId = c.get("organizationId")!;
+  const interfaceId = c.req.query("aiInterfaceId")?.trim();
+  if (!interfaceId) {
+    return c.json({ error: "aiInterfaceId is required" }, 400);
+  }
   const db = createDatabase(c.env);
   const resolved = await resolveVideoModelInterface(
     db,
     organizationId,
-    c.req.param("canonicalId")
+    c.req.param("canonicalId"),
+    interfaceId
   );
 
   if (!resolved) {
@@ -324,11 +328,16 @@ platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
 
 platformAiRoutes.get("/image-models/:canonicalId/resolve", async (c) => {
   const organizationId = c.get("organizationId")!;
+  const interfaceId = c.req.query("aiInterfaceId")?.trim();
+  if (!interfaceId) {
+    return c.json({ error: "aiInterfaceId is required" }, 400);
+  }
   const db = createDatabase(c.env);
   const resolved = await resolveImageModelInterface(
     db,
     organizationId,
-    c.req.param("canonicalId")
+    c.req.param("canonicalId"),
+    interfaceId
   );
 
   if (!resolved) {
@@ -343,11 +352,16 @@ platformAiRoutes.get("/image-models/:canonicalId/resolve", async (c) => {
 
 platformAiRoutes.get("/audio-models/:canonicalId/resolve", async (c) => {
   const organizationId = c.get("organizationId")!;
+  const interfaceId = c.req.query("aiInterfaceId")?.trim();
+  if (!interfaceId) {
+    return c.json({ error: "aiInterfaceId is required" }, 400);
+  }
   const db = createDatabase(c.env);
   const resolved = await resolveAudioModelInterface(
     db,
     organizationId,
-    c.req.param("canonicalId")
+    c.req.param("canonicalId"),
+    interfaceId
   );
 
   if (!resolved) {
@@ -362,11 +376,16 @@ platformAiRoutes.get("/audio-models/:canonicalId/resolve", async (c) => {
 
 platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
   const organizationId = c.get("organizationId")!;
+  const interfaceId = c.req.query("aiInterfaceId")?.trim();
+  if (!interfaceId) {
+    return c.json({ error: "aiInterfaceId is required" }, 400);
+  }
   const db = createDatabase(c.env);
   const resolved = await resolveTextModelInterface(
     db,
     organizationId,
-    c.req.param("canonicalId")
+    c.req.param("canonicalId"),
+    interfaceId
   );
 
   if (!resolved) {
@@ -378,38 +397,6 @@ platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
     providerModelId: resolved.providerModelId,
   });
 });
-
-platformAiRoutes.get("/model-interface-priorities", async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const db = createDatabase(c.env);
-  const { listModelInterfacePriorities } = await import(
-    "../db/platform-ai-model-queries"
-  );
-  const priorities = await listModelInterfacePriorities(db, organizationId);
-  return c.json({ priorities });
-});
-
-const prioritySchema = z.object({
-  canonicalId: z.string().min(1),
-  interfaceIds: z.array(z.string()),
-});
-
-platformAiRoutes.put(
-  "/model-interface-priorities",
-  zValidator("json", prioritySchema),
-  async (c) => {
-    const organizationId = c.get("organizationId")!;
-    const body = c.req.valid("json");
-    const db = createDatabase(c.env);
-    const priority = await upsertModelInterfacePriority(
-      db,
-      organizationId,
-      body.canonicalId,
-      body.interfaceIds
-    );
-    return c.json({ priority });
-  }
-);
 
 platformAiRoutes.get("/model-calls", async (c) => {
   const organizationId = c.get("organizationId")!;
@@ -449,6 +436,7 @@ const referenceImageInlineSchema = z.object({
 
 const generateSchema = z.object({
   modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
   prompt: z.string().optional(),
   references: z.array(aiTextReferenceSchema).optional(),
   referenceImageUrls: z.array(z.string().min(1)).optional(),
@@ -469,7 +457,9 @@ platformAiRoutes.post(
 
     const options = await listOrgTextModelOptions(db, organizationId);
     const modelOption = options.find(
-      (entry) => entry.canonicalId === body.modelCanonicalId
+      (entry) =>
+        entry.canonicalId === body.modelCanonicalId &&
+        entry.interfaceId === body.aiInterfaceId
     );
 
     if (!modelOption?.selectable) {
@@ -529,6 +519,7 @@ platformAiRoutes.post(
       db,
       organizationId,
       canonicalId: body.modelCanonicalId,
+      interfaceId: body.aiInterfaceId,
       effectivePrompt,
       outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
       referenceImageUrls: body.referenceImageUrls,
@@ -575,7 +566,9 @@ platformAiRoutes.post(
 
     const options = await listOrgTextModelOptions(db, organizationId);
     const modelOption = options.find(
-      (entry) => entry.canonicalId === body.modelCanonicalId
+      (entry) =>
+        entry.canonicalId === body.modelCanonicalId &&
+        entry.interfaceId === body.aiInterfaceId
     );
 
     if (!modelOption?.selectable) {
@@ -635,6 +628,7 @@ platformAiRoutes.post(
       db,
       organizationId,
       canonicalId: body.modelCanonicalId,
+      interfaceId: body.aiInterfaceId,
       effectivePrompt,
       outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
       referenceImageUrls: body.referenceImageUrls,
@@ -707,7 +701,6 @@ platformAiRoutes.post(
               candidate: prepared.prepared.candidate,
               upstreamError: event.error,
               displayName: modelOption.displayName,
-              modality: modelOption.modality,
             });
             if (!finalized) {
               finalized = true;
@@ -742,7 +735,6 @@ platformAiRoutes.post(
               candidate: prepared.prepared.candidate,
               upstreamError: message,
               displayName: modelOption.displayName,
-              modality: modelOption.modality,
             });
             await finalizeAiModelInvocation(db, {
               id: invocationId,
@@ -778,6 +770,7 @@ platformAiRoutes.post(
 
 const generateImageSchema = z.object({
   modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   referenceImageUrls: z.array(z.string().min(1)).optional(),
@@ -848,7 +841,8 @@ platformAiRoutes.post(
     const resolvedModel = await resolveImageModelInterface(
       db,
       organizationId,
-      body.modelCanonicalId
+      body.modelCanonicalId,
+      body.aiInterfaceId
     );
 
     if (!resolvedModel) {
@@ -874,22 +868,19 @@ platformAiRoutes.post(
       return c.json({ error: "Could not resolve AI interface" }, 400);
     }
 
-    const catalogProviderModelId = (
-      await listOrgImageModelOptions(db, organizationId)
-    ).find((entry) => entry.canonicalId === body.modelCanonicalId)
-      ?.providerModelId;
-
-    if (!catalogProviderModelId) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
-    }
-
     const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
       db,
       organizationId,
       interfaceId: resolvedModel.interfaceId,
       canonicalId: resolvedModel.canonicalId,
-      catalogProviderModelId,
     });
+
+    if (!inferenceModelId) {
+      return c.json(
+        { error: "Upstream model id is not configured on this AI interface" },
+        400
+      );
+    }
 
     const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
     const invocationId = crypto.randomUUID();
@@ -980,6 +971,7 @@ platformAiRoutes.post(
         images: ephemeralImages,
         clientRequestId: body.clientRequestId,
         invocationId,
+        requestSnapshot: result.requestSnapshot,
       });
 
       return c.json({
@@ -989,6 +981,9 @@ platformAiRoutes.post(
         storageMode: "cloud" as const,
         jobId,
         phase: "ready_to_persist" as const,
+        requestedCount: result.requestedCount,
+        returnedCount: images.length,
+        requestSnapshot: result.requestSnapshot,
       });
     }
 
@@ -1006,12 +1001,16 @@ platformAiRoutes.post(
       aiInterfaceId: resolvedModel.interfaceId,
       storageMode: storageResolution.storageMode,
       phase: "succeeded" as const,
+      requestedCount: result.requestedCount,
+      returnedCount: images.length,
+      requestSnapshot: result.requestSnapshot,
     });
   }
 );
 
 const generateAudioSchema = z.object({
   modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().optional(),
@@ -1076,7 +1075,8 @@ platformAiRoutes.post(
     const resolvedModel = await resolveAudioModelInterface(
       db,
       organizationId,
-      body.modelCanonicalId
+      body.modelCanonicalId,
+      body.aiInterfaceId
     );
 
     if (!resolvedModel) {
@@ -1225,6 +1225,7 @@ platformAiRoutes.post(
 
 const submitVideoSchema = z.object({
   modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   referenceImageUrls: z.array(z.string().min(1)).optional(),
@@ -1295,7 +1296,8 @@ platformAiRoutes.post(
     const resolvedModel = await resolveVideoModelInterface(
       db,
       organizationId,
-      body.modelCanonicalId
+      body.modelCanonicalId,
+      body.aiInterfaceId
     );
 
     if (!resolvedModel) {
@@ -1321,26 +1323,23 @@ platformAiRoutes.post(
       return c.json({ error: "Could not resolve AI interface" }, 400);
     }
 
-    const catalogProviderModelId = (
-      await listOrgVideoModelOptions(db, organizationId)
-    ).find((entry) => entry.canonicalId === body.modelCanonicalId)
-      ?.providerModelId;
-
-    if (!catalogProviderModelId) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
-    }
-
     const inferenceModelId =
       isVeoCanonicalId(resolvedModel.canonicalId) ||
       isGrokImagineVideoCanonicalId(resolvedModel.canonicalId)
         ? resolvedModel.providerModelId
         : await resolveVolcanoInferenceModelIdAfterEnsure({
-          db,
-          organizationId,
-          interfaceId: resolvedModel.interfaceId,
-          canonicalId: resolvedModel.canonicalId,
-          catalogProviderModelId,
-        });
+            db,
+            organizationId,
+            interfaceId: resolvedModel.interfaceId,
+            canonicalId: resolvedModel.canonicalId,
+          });
+
+    if (!inferenceModelId) {
+      return c.json(
+        { error: "Upstream model id is not configured on this AI interface" },
+        400
+      );
+    }
 
     const invocationId = crypto.randomUUID();
     const promptExcerpt =

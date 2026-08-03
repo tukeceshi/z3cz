@@ -17,12 +17,12 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 | 数据库 | `apps/api/src/db/migrations/00NN_*.sql` | `platform_ai_models`；可选 `platform_ai_model_groups` |
 | 迁移注册 | `apps/api/src/db/migrations/meta/_journal.json` | 与 SQL 同步登记 |
 
-**执行迁移前**，types 与 SQL 中的 `provider_model_id` 必须一致；**只改 types 不跑迁移** → Admin / 画布不可见。
+**执行迁移前**，types catalog 的 `providerModelId` 与接口 metadata 种子一致即可；平台表**不再**存默认上游 ID。**只改 types 不跑迁移** → Admin / 画布不可见。
 
 ## 新增前向用户确认
 
 - `canonicalId`、`displayName`、模态（text / image / video）
-- **`providerModelId`**：在线推理 ModelId（见下），不是控制台展示名或 Coding Plan 名
+- **`providerModelId`**：在线推理 ModelId（见下），写入 **静态 catalog**，用作新建/补全接口 metadata 的种子；不是平台「默认上游」
 - 资源包：按模型 ID 匹配账单包 Code（见 `volcano-package-catalog`；特殊匹配键另列）
 - 定价与 `monthlyFreeQuota`
 - 文字模型 `parameter_rules`（可复制已有同模态条目）
@@ -30,7 +30,8 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 ## providerModelId 怎么定
 
 - 来源：火山 **`ListFoundationModels` → `ListFoundationModelVersions` → 行的 `ModelId`**
-- 写入：`ai-model-catalog`、`platform_ai_models.provider_model_id`
+- 写入：`ai-model-catalog`（`VOLCANO_AI_MODEL_CATALOG`）；创建接口时种子到 `metadata.models[canonicalId].providerModelId`
+- **不要**写入 `platform_ai_models`（该列已删除）
 - 例：`glm-5-2` → `glm-5-2-260617`（带日期后缀的在线推理 ID）
 
 探测脚本（可选）：`apps/api/scripts/probe-billing-catalog-map.ts`、`probe-glm-chat.ts`
@@ -44,7 +45,7 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 | 接口级 Key | 每个火山接口 **一个** `api_key_encrypted`，由 `ensureVolcanoApiKey` 统一签发/续期 |
 | endpoint 映射 | 存在 **`metadata.arkEndpoints`**（canonicalId → `ep-*`），**不要**在 `VolcanoModelConfig` 上分散 `endpointId` |
 | Key 作用域 | `metadata.arkApiKeyScope`：`endpoint`（临时 Key 绑 endpoint）或 `model`（控制台 Raw Key） |
-| 实际 `model` 字段 | `resolveVolcanoInferenceModelId`：endpoint 作用域且有映射 → `ep-*`；否则 → `providerModelId` |
+| 实际 `model` 字段 | `resolveVolcanoInferenceModelId`：endpoint 作用域且有映射 → `ep-*`；否则 → **接口 metadata** 的 `providerModelId`（无则失败，无平台回退） |
 
 **首次调用 403 教训**：须在 **`ensureVolcanoApiKey` 完成之后** 再解析 inference model id（`resolveVolcanoInferenceModelIdAfterEnsure`）。生成入口：`platform-ai.ts` 各 generate/submit 路由；工作流：`ai-text-node` 在 `resolveAiInterface` 之后刷新。
 
@@ -53,11 +54,12 @@ description: 在 Dafthunk 新增或下线火山方舟模型 — types 目录、D
 - `integrations/volcengine/ensure-api-key.ts`、`get-api-key.ts`
 - `integrations/volcengine/resolve-inference-model-id.ts`
 - `packages/types/src/volcano-ark-access.ts`
-- `services/resolve-text-model-interface.ts`
+- `services/resolve-text-model-interface.ts`（`ensureVolcanoModelsIncludePlatformCatalog` **只补缺不覆盖**已有 upstream）
 
 ## 已有接口的行为
 
-- 新模型进 catalog 后，已有火山接口 metadata 会在快照/同步时以 **`enabled: false`** 补全，用户需在面板手动开启。
+- 新模型进 catalog 后，已有火山接口 metadata 会在快照/同步时以 **`enabled: false`** 补全（种子 `providerModelId` 来自 catalog），用户需在面板手动开启。
+- **不会**用 catalog/平台值覆盖组织已配置的 `providerModelId`。
 - 资源包已开通但 probe  stale 时，以 **`volcano-effective-activation`**（包 provisioned 覆盖 probe）为准。
 
 ## 下线模型

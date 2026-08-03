@@ -61,38 +61,37 @@ describe("buildTextModelInvocationError", () => {
 });
 
 describe("formatTextModelFailureMessage", () => {
-  it("uses the four-line card template with upstream reason", () => {
+  it("uses the card template with upstream reason when interface is disabled", () => {
     const message = formatTextModelFailureMessage({
       failedInterfaceName: "DeepSeek",
       channelKind: "api",
       modelDisplayLabel: "DeepSeek V4 Flash（文字）",
       upstreamError: "Invalid API key",
-      nextInterfaceName: "火山引擎-火山方舟-字节跳动旗下",
-      nextChannelKind: "aggregate",
       locale: "zh",
     });
 
     expect(message).toContain("DeepSeek V4 Flash（文字）调用失败");
     expect(message).toContain("已自动关闭错误接口 「API」DeepSeek。");
     expect(message).toContain("请检查配置，可在「AI/资源 接口」重新启用接口。");
-    expect(message).toContain(
-      "重试将使用接口「聚合」火山引擎-火山方舟-字节跳动旗下。"
-    );
     expect(message).toContain("解读：");
     expect(message).toContain("Invalid API key");
-    expect(message).not.toContain("原因：");
+    expect(message).not.toContain("重试将使用接口");
+    expect(message).not.toContain("已无其他可用接口");
   });
 
-  it("states no other interfaces when next is absent", () => {
+  it("asks to retry later for transient failures", () => {
     const message = formatTextModelFailureMessage({
       failedInterfaceName: "火山方舟",
       channelKind: "aggregate",
       modelDisplayLabel: "DeepSeek V4 Pro（文字）",
+      disabledInterface: false,
       locale: "zh",
     });
 
-    expect(message).toContain("已无其他可用接口。");
+    expect(message).toContain("暂时失败，模型未关闭");
+    expect(message).toContain("请稍后重试。");
     expect(message).not.toContain("重试将使用接口");
+    expect(message).not.toContain("已无其他可用接口");
   });
 });
 
@@ -103,8 +102,6 @@ describe("buildTextModelFailureCardParts", () => {
       channelKind: "api",
       modelDisplayLabel: "DeepSeek V4 Flash（文字）",
       upstreamError: "Invalid API key",
-      nextInterfaceName: "火山引擎-火山方舟-字节跳动旗下",
-      nextChannelKind: "aggregate",
       locale: "zh",
     });
 
@@ -112,7 +109,6 @@ describe("buildTextModelFailureCardParts", () => {
       "DeepSeek V4 Flash（文字）调用失败",
       "已自动关闭错误接口 「API」DeepSeek。",
       "请检查配置，可在「AI/资源 接口」重新启用接口。",
-      "重试将使用接口「聚合」火山引擎-火山方舟-字节跳动旗下。",
       "解读：API Key 无效或已失效，请检查接口配置。",
       "Invalid API key",
     ]);

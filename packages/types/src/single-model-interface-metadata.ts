@@ -274,6 +274,8 @@ export interface SingleModelModelConfig {
   readonly enabled: boolean;
   readonly upstreamModelId: string;
   readonly modality: AiModelModality;
+  /** Org-custom display name; falls back to platform display name when unset. */
+  readonly alias?: string;
 }
 
 export interface SingleModelProviderMetadata {
@@ -522,6 +524,25 @@ export function mergeSingleModelModelEnabled(
     if (existing) {
       models[canonicalId] = { ...existing, enabled };
     }
+  }
+  return { ...metadata, models };
+}
+
+export function mergeSingleModelModelAlias(
+  metadata: SingleModelProviderMetadata,
+  aliases: Readonly<Record<string, string>>
+): SingleModelProviderMetadata {
+  const models = { ...metadata.models };
+  for (const [canonicalId, alias] of Object.entries(aliases)) {
+    const existing = models[canonicalId];
+    if (!existing) {
+      continue;
+    }
+    const trimmed = alias.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    models[canonicalId] = { ...existing, alias: trimmed };
   }
   return { ...metadata, models };
 }

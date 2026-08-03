@@ -1,4 +1,7 @@
-import type { UpstreamParamProfileField } from "@dafthunk/types";
+import {
+  resolveGenerateCountOptions,
+  type UpstreamParamProfileField,
+} from "@dafthunk/types";
 import Volume2Icon from "lucide-react/icons/volume-2";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -11,6 +14,8 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/utils/utils";
+
+import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
 
 export interface AiVideoGenerationParamsPanelProps {
   readonly fields: readonly UpstreamParamProfileField[];
@@ -194,12 +199,13 @@ export function formatVideoGenerationParamSummaryWithAudio(
 }
 
 export function parseVideoGenerateCount(
-  params: Readonly<Record<string, unknown>>
+  params: Readonly<Record<string, unknown>>,
+  maxCount = 15
 ): number {
   const raw = params.generate_count ?? params.batch_count ?? 1;
   const count = typeof raw === "number" ? raw : Number(raw);
-  if (count === 2 || count === 4) return count;
-  return 1;
+  if (!Number.isFinite(count) || count < 1) return 1;
+  return Math.min(Math.floor(count), Math.max(1, maxCount));
 }
 
 function coerceFieldValue(
@@ -265,15 +271,24 @@ function FieldSection({ field, value, disabled = false, onChange }: FieldSection
   if (
     (RESOLUTION_FIELD_NAMES.has(field.name) ||
       GENERATE_COUNT_FIELD_NAMES.has(field.name)) &&
-    field.enumValues?.length
+    (field.enumValues?.length || GENERATE_COUNT_FIELD_NAMES.has(field.name))
   ) {
-    const selected = String(value ?? field.default ?? "");
+    const options = GENERATE_COUNT_FIELD_NAMES.has(field.name)
+      ? resolveGenerateCountOptions(field)
+      : (field.enumValues ?? []);
+    if (options.length === 0) {
+      return null;
+    }
+    const selected = String(value ?? field.default ?? options[0] ?? "");
+    const safeSelected = options.includes(selected)
+      ? selected
+      : String(options[0] ?? "");
     return (
       <div className="space-y-2">
         <Label className="text-xs font-medium text-foreground">{title}</Label>
         <SegmentedControl
-          options={field.enumValues}
-          value={selected}
+          options={options}
+          value={safeSelected}
           disabled={disabled}
           formatOption={
             GENERATE_COUNT_FIELD_NAMES.has(field.name)
@@ -421,11 +436,7 @@ export function AiVideoGenerationParamsPanel({
         <button
           type="button"
           disabled={disabled}
-          className={cn(
-            "inline-flex h-9 max-w-[220px] items-center gap-1 rounded-lg border border-border/70",
-            "bg-background px-2.5 text-xs text-foreground hover:bg-muted/40",
-            "disabled:pointer-events-none disabled:opacity-50"
-          )}
+          className={AI_BOTTOM_CHIP_CLASS}
         >
           <span className="truncate">
             {summary.text || triggerLabel}

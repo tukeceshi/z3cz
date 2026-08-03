@@ -16,21 +16,17 @@ import {
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import LoaderIcon from "lucide-react/icons/loader-circle";
-import SparklesIcon from "lucide-react/icons/sparkles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
 import {
   pollAiVideoTask,
-  resolveOrgVideoModel,
   submitAiVideo,
   useOrgVideoModels,
 } from "@/services/platform-ai-model-service";
@@ -68,10 +64,18 @@ import {
   collectImageReferenceMedia,
   connectGenerativeReferenceEdge,
 } from "./generative-reference-utils";
+import { AiGenerateButton } from "./ai-generate-button";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
+import {
+  clearModelBindingInputs,
+  persistModelBindingToInputs,
+  rememberModelBinding,
+  resolveHydrateModelBindingAction,
+  resolveSelectedModelBinding,
+} from "./org-model-selection-utils";
 import {
   AiTextReferenceBar,
   type AiTextReferenceChip,
@@ -94,14 +98,12 @@ import {
   AI_VIDEO_REFERENCE_HANDLE_ID,
   countAiVideoReferences,
   canGenerateAiVideo,
-  pickDefaultVideoModelCanonicalId,
   referencesFitVideoModelLimits,
   appendAiVideoGeneratedHistoryItems,
   withAiVideoStagingPreview,
   withAiVideoGeneratingFlag,
   withAiVideoGenerateError,
 } from "./ai-video-node-utils";
-import { formatGenerativeApiError } from "./format-generative-api-error";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import {
@@ -127,7 +129,7 @@ import {
   useGenerativeCloudJobProgress,
   generativeVideoProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
-import { updateNodeInput, useWorkflow } from "./workflow-context";
+import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
@@ -247,6 +249,7 @@ export function AiVideoConfigPanel({
   );
 
   const selectedModelId = getInputString(data, "model");
+  const selectedInterfaceId = getInputString(data, "ai_interface_id");
   const promptValue = getInputString(data, "prompt");
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
@@ -302,15 +305,14 @@ export function AiVideoConfigPanel({
   );
 
   const selectedModel = useMemo(
-    () => models.find((entry) => entry.canonicalId === selectedModelId),
-    [models, selectedModelId]
+    () =>
+      resolveSelectedModelBinding(
+        models,
+        selectedModelId,
+        selectedInterfaceId
+      ),
+    [models, selectedInterfaceId, selectedModelId]
   );
-
-  const generationFields = useMemo(() => {
-    if (!selectedModel) return [];
-    return normalizeVideoModelParameterRules(selectedModel.parameterRules)
-      .generationFields;
-  }, [selectedModel]);
 
   const referenceCount = useMemo(
     () => countAiVideoReferences(nodeId, edges),
@@ -336,6 +338,16 @@ export function AiVideoConfigPanel({
     [modelFitsCurrentRefs, selectableModels]
   );
 
+  const activeModel =
+    selectedModel ?? modelsFittingRefs.find((entry) => entry.selectable);
+  const selectedOptionId = activeModel?.optionId ?? "";
+
+  const generationFields = useMemo(() => {
+    if (!activeModel) return [];
+    return normalizeVideoModelParameterRules(activeModel.parameterRules)
+      .generationFields;
+  }, [activeModel]);
+
   const showOverLimitHint =
     selectableModels.length > 0 &&
     modelsFittingRefs.length === 0 &&
@@ -346,18 +358,14 @@ export function AiVideoConfigPanel({
   const clearModelSelection = useCallback(() => {
     if (!updateNodeData) return;
     updateNodeData(nodeId, (current) => ({
-      inputs: current.inputs.map((input) =>
-        input.id === "model"
-          ? ({ ...input, value: "" } as WorkflowParameter)
-          : input
-      ),
+      inputs: clearModelBindingInputs(current.inputs),
     }));
   }, [nodeId, updateNodeData]);
 
   const applyModelSelection = useCallback(
-    async (canonicalId: string) => {
-      if (disabled || !updateNodeData || !orgId) return;
-      const model = models.find((entry) => entry.canonicalId === canonicalId);
+    (optionId: string) => {
+      if (disabled || !updateNodeData) return;
+      const model = models.find((entry) => entry.optionId === optionId);
       if (!model?.selectable || !modelFitsCurrentRefs(model)) return;
 
       const rules = normalizeVideoModelParameterRules(model.parameterRules);
@@ -366,56 +374,52 @@ export function AiVideoConfigPanel({
       );
       setGenerationParams(defaultParams);
 
-      const inputsAfterModel = updateNodeInput(
-        nodeId,
-        "model",
-        canonicalId,
-        data.inputs,
-        updateNodeData
-      );
-      updateNodeInput(
-        nodeId,
-        "params",
-        defaultParams,
-        inputsAfterModel,
-        updateNodeData
-      );
+      rememberModelBinding(orgId, "video", {
+        canonicalId: model.canonicalId,
+        interfaceId: model.interfaceId,
+      });
 
-      try {
-        const resolved = await resolveOrgVideoModel(orgId, canonicalId);
-        updateNodeInput(
-          nodeId,
-          "ai_interface_id",
-          resolved.aiInterfaceId,
-          inputsAfterModel,
-          updateNodeData
-        );
-      } catch {
-        updateNodeInput(
-          nodeId,
-          "ai_interface_id",
-          "",
-          inputsAfterModel,
-          updateNodeData
-        );
-      }
+      updateNodeData(nodeId, (current) => ({
+        inputs: upsertNodeInputValues(
+          current.inputs,
+          {
+            model: model.canonicalId,
+            ai_interface_id: model.interfaceId,
+            params: defaultParams,
+          },
+          { params: "json" }
+        ),
+      }));
     },
-    [data.inputs, disabled, modelFitsCurrentRefs, models, nodeId, orgId, updateNodeData]
+    [disabled, modelFitsCurrentRefs, models, nodeId, orgId, updateNodeData]
   );
 
   useEffect(() => {
-    if (disabled || isLoading || selectedModelId || modelsFittingRefs.length === 0) {
-      return;
-    }
-    const defaultId = pickDefaultVideoModelCanonicalId(modelsFittingRefs);
-    if (!defaultId) return;
-    void applyModelSelection(defaultId);
+    if (disabled || isLoading || !updateNodeData) return;
+
+    const action = resolveHydrateModelBindingAction(
+      models,
+      selectedModelId,
+      selectedInterfaceId
+    );
+    if (action.kind === "none") return;
+
+    updateNodeData(nodeId, (current) => ({
+      inputs:
+        action.kind === "clear"
+          ? clearModelBindingInputs(current.inputs)
+          : upsertNodeInputValues(current.inputs, {
+              ai_interface_id: action.interfaceId,
+            }),
+    }));
   }, [
-    applyModelSelection,
     disabled,
     isLoading,
-    modelsFittingRefs,
+    models,
+    nodeId,
+    selectedInterfaceId,
     selectedModelId,
+    updateNodeData,
   ]);
 
   useEffect(() => {
@@ -770,10 +774,10 @@ export function AiVideoConfigPanel({
   };
 
   const handleGenerate = async () => {
-    if (disabled || !orgId || !selectedModel) return;
+    if (disabled || !orgId || !activeModel) return;
     if (generateInFlightRef.current) return;
 
-    if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
+    if (!activeModel.selectable || !modelFitsCurrentRefs(activeModel)) {
       return;
     }
 
@@ -814,6 +818,10 @@ export function AiVideoConfigPanel({
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
+      inputs: persistModelBindingToInputs(current.inputs, {
+        canonicalId: activeModel.canonicalId,
+        interfaceId: activeModel.interfaceId,
+      }),
       metadata: withAiVideoGenerateError(
         withGenerativeProgress(
           withAiVideoGeneratingFlag(current.metadata, true),
@@ -848,7 +856,8 @@ export function AiVideoConfigPanel({
       }
 
       const submitPayload = {
-        modelCanonicalId: selectedModel.canonicalId,
+        modelCanonicalId: activeModel.canonicalId,
+        aiInterfaceId: activeModel.interfaceId,
         prompt,
         params: generationParams,
         referenceImageUrls:
@@ -977,17 +986,17 @@ export function AiVideoConfigPanel({
           {
             prompt,
             params: generationParams,
-            platformModelId: selectedModel.canonicalId,
-            providerModelId: selectedModel.providerModelId,
+            platformModelId: activeModel.canonicalId,
+            aiInterfaceId: lastAiInterfaceId || activeModel.interfaceId,
+            modelDisplayName: activeModel.displayName,
           }
         );
-        const inputs = (withResult.inputs ?? current.inputs).map((input) =>
-          input.id === "ai_interface_id"
-            ? ({
-                ...input,
-                value: lastAiInterfaceId,
-              } as WorkflowParameter)
-            : input
+        const inputs = persistModelBindingToInputs(
+          withResult.inputs ?? current.inputs,
+          {
+            canonicalId: activeModel.canonicalId,
+            interfaceId: lastAiInterfaceId || activeModel.interfaceId,
+          }
         );
         return {
           ...withResult,
@@ -1057,12 +1066,21 @@ export function AiVideoConfigPanel({
                 {
                   prompt,
                   params: generationParams,
-                  platformModelId: selectedModel.canonicalId,
-                  providerModelId: selectedModel.providerModelId,
+                  platformModelId: activeModel.canonicalId,
+                  aiInterfaceId: activeModel.interfaceId,
+                  modelDisplayName: activeModel.displayName,
+                }
+              );
+              const inputs = persistModelBindingToInputs(
+                withResult.inputs ?? current.inputs,
+                {
+                  canonicalId: activeModel.canonicalId,
+                  interfaceId: activeModel.interfaceId,
                 }
               );
               return {
                 ...withResult,
+                inputs,
                 metadata: withAiVideoGenerateError(
                   withAiVideoGeneratingFlag(
                     clearGenerativeProgress(withResult.metadata),
@@ -1082,20 +1100,19 @@ export function AiVideoConfigPanel({
         }
       }
 
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
+      const raw = error instanceof Error ? error.message : String(error);
+      const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiVideoGenerateError(
           withAiVideoGeneratingFlag(
             clearGenerativeProgress(current.metadata),
             false
           ),
-          prepareGenerativeCardError(formatted, t)
+          cardError
         ),
       }));
-      toast.errorRaw(formatted);
+      toast.errorRaw(cardError.summary);
+      toast.errorRaw(cardError.summary);
     } finally {
       generateInFlightRef.current = false;
       if (ownsJobProgress) {
@@ -1114,8 +1131,8 @@ export function AiVideoConfigPanel({
   const canGenerate =
     !disabled &&
     !isGenerating &&
-    Boolean(selectedModel?.selectable) &&
-    (!selectedModel || modelFitsCurrentRefs(selectedModel)) &&
+    Boolean(activeModel?.selectable) &&
+    (!activeModel || modelFitsCurrentRefs(activeModel)) &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiVideo({
       prompt: promptForGenerate,
@@ -1276,25 +1293,24 @@ export function AiVideoConfigPanel({
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-end gap-2">
-            {models.length > 0 || modelsError ? (
-              <AiTextModelPicker
-                orgId={orgId}
-                models={models as unknown as readonly OrgTextModelOption[]}
-                groups={groups}
-                selectedModelId={selectedModelId}
-                disabled={disabled || isLoading}
-                loadError={Boolean(modelsError)}
+            <AiTextModelPicker
+              orgId={orgId}
+              models={models as unknown as readonly OrgTextModelOption[]}
+              groups={groups}
+              selectedOptionId={selectedOptionId}
+              disabled={disabled || isLoading}
+              isLoading={isLoading}
+              loadError={Boolean(modelsError)}
                 onRetryLoad={() => {
                   void refreshModels();
                 }}
                 modelFitsCurrentRefs={(model) =>
                   modelFitsCurrentRefs(model as unknown as OrgVideoModelOption)
                 }
-                onSelect={(canonicalId) => {
-                  void applyModelSelection(canonicalId);
-                }}
-              />
-            ) : null}
+              onSelect={(optionId) => {
+                applyModelSelection(optionId);
+              }}
+            />
             {generationFields.length > 0 ? (
               <AiVideoGenerationParamsPanel
                 fields={generationFields}
@@ -1324,22 +1340,14 @@ export function AiVideoConfigPanel({
             </div>
           </div>
 
-          <Button
-            type="button"
-            size="sm"
-            className="h-9 shrink-0 gap-1 rounded-lg text-xs"
+          <AiGenerateButton
             disabled={!canGenerate}
+            isGenerating={isGenerating}
+            label={progressButtonLabel}
             onClick={() => {
               void handleGenerate();
             }}
-          >
-            {isGenerating ? (
-              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <SparklesIcon className="h-3.5 w-3.5" />
-            )}
-            {progressButtonLabel}
-          </Button>
+          />
         </div>
       </GenerativeConfigPanelShell>
 

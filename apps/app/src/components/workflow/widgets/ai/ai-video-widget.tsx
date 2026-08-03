@@ -36,6 +36,7 @@ import {
   withAiVideoGenerateError,
   withAiVideoManualUpload,
 } from "../../ai-video-node-utils";
+import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
 import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
@@ -249,6 +250,25 @@ function AiVideoWidget({
     [disabled, historyItems.items, nodeId, updateNodeData]
   );
 
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "video");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.videos[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
+  );
+
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
       if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId) return;
@@ -325,6 +345,9 @@ function AiVideoWidget({
       images: item.videos,
       prompt: item.prompt,
       params: item.params,
+      platformModelId: item.platformModelId,
+      providerModelId: item.providerModelId,
+      modelDisplayName: item.modelDisplayName,
       createdAt: item.createdAt,
     })),
     selectedId: historyItems.selectedId,
@@ -425,6 +448,7 @@ function AiVideoWidget({
           createObjectUrl={createObjectUrl}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

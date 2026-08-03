@@ -1,5 +1,4 @@
 import {
-  buildTextModelDisplayLabel,
   buildTextModelFailureCardParts,
   buildTextModelInvocationErrorFromFailure,
   isTransientTextModelUpstreamError,
@@ -15,7 +14,7 @@ import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface
 import { disableTextModelOnInterface } from "./disable-text-model-on-interface";
 import {
   listOrgTextModelOptions,
-  listTextModelInterfaceCandidates,
+  resolveOrgModelInterfaceCandidate,
   type TextModelInterfaceCandidate,
 } from "./resolve-text-model-interface";
 
@@ -54,21 +53,19 @@ async function executeTextModelCandidate(params: {
     return { ok: false, error: "Could not resolve AI interface" };
   }
 
-  const catalogProviderModelId = (
-    await listOrgTextModelOptions(params.db, params.organizationId)
-  ).find((entry) => entry.canonicalId === params.canonicalId)?.providerModelId;
-
-  if (!catalogProviderModelId) {
-    return { ok: false, error: "Model is not available for this organization" };
-  }
-
   const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
     db: params.db,
     organizationId: params.organizationId,
     interfaceId: params.candidate.interfaceId,
     canonicalId: params.canonicalId,
-    catalogProviderModelId,
   });
+
+  if (!inferenceModelId) {
+    return {
+      ok: false,
+      error: "Upstream model id is not configured on this AI interface",
+    };
+  }
 
   const result = await executeAiInterfaceSync({
     resolved: withSelectedModel(iface, inferenceModelId),
@@ -89,14 +86,13 @@ async function executeTextModelCandidate(params: {
       : undefined,
   });
 
-  if (result.status === "failed") {
-    return { ok: false, error: result.error ?? "AI interface request failed" };
+  if (!result.ok) {
+    return { ok: false, error: result.error };
   }
 
-  const text =
-    result.outputs?.text ?? result.outputs?.content ?? result.outputs?.result;
-  if (typeof text !== "string") {
-    return { ok: false, error: "AI interface returned no text" };
+  const text = result.outputs.text;
+  if (typeof text !== "string" || text.trim().length === 0) {
+    return { ok: false, error: "Model returned empty text" };
   }
 
   return { ok: true, text };
@@ -107,31 +103,34 @@ export async function executeTextModel(params: {
   readonly db: Database;
   readonly organizationId: string;
   readonly canonicalId: string;
+  readonly interfaceId: string;
   readonly effectivePrompt: string;
   readonly outputMaxTokens?: number;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
 }): Promise<ExecuteTextModelResult> {
-  const [candidates, options] = await Promise.all([
-    listTextModelInterfaceCandidates(
+  const [candidate, options] = await Promise.all([
+    resolveOrgModelInterfaceCandidate(
       params.db,
       params.organizationId,
-      params.canonicalId
+      params.canonicalId,
+      params.interfaceId
     ),
     listOrgTextModelOptions(params.db, params.organizationId),
   ]);
 
-  if (candidates.length === 0) {
+  if (!candidate) {
     return {
       ok: false,
-      error: `Model "${params.canonicalId}" is not available for this organization.`,
+      error: `Model "${params.canonicalId}" is not available on this AI interface.`,
     };
   }
 
-  const candidate = candidates[0]!;
   const modelOption = options.find(
-    (entry) => entry.canonicalId === params.canonicalId
+    (entry) =>
+      entry.canonicalId === params.canonicalId &&
+      entry.interfaceId === params.interfaceId
   );
 
   const result = await executeTextModelCandidate({
@@ -166,21 +165,13 @@ export async function executeTextModel(params: {
     );
   }
 
-  const next = transient ? undefined : candidates[1];
-  const modelDisplayLabel = modelOption
-    ? buildTextModelDisplayLabel({
-        displayName: modelOption.displayName,
-        modality: modelOption.modality,
-      })
-    : params.canonicalId;
+  const modelDisplayLabel = modelOption?.displayName ?? params.canonicalId;
 
   const failure = buildTextModelFailureCardParts({
     failedInterfaceName: candidate.interfaceName,
     channelKind: candidate.channelKind,
     modelDisplayLabel,
     upstreamError: result.error,
-    nextInterfaceName: next?.interfaceName,
-    nextChannelKind: next?.channelKind,
     disabledInterface: !transient,
   });
 

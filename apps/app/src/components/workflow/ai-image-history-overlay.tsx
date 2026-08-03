@@ -11,6 +11,11 @@ import { cn } from "@/utils/utils";
 
 import { MediaImageField } from "./fields/media-image-field";
 import { LazyMediaImageField } from "./fields/lazy-media-image-field";
+import {
+  collectImageHistoryParamParts,
+  formatHistoryCreatedAt,
+  resolveHistoryModelLabel,
+} from "./generative-history-utils";
 
 export interface AiImageHistoryOverlayProps {
   readonly open: boolean;
@@ -18,6 +23,8 @@ export interface AiImageHistoryOverlayProps {
   readonly currentImages: readonly MediaReference[];
   readonly createObjectUrl?: (objectReference: import("@dafthunk/types").ObjectReference) => string;
   readonly onSelect: (id: string) => void;
+  /** Create a sibling node from the previewed history item. */
+  readonly onExpandToNode?: (id: string) => void;
   readonly onClose: () => void;
 }
 
@@ -38,6 +45,7 @@ export function AiImageHistoryOverlay({
   currentImages,
   createObjectUrl,
   onSelect,
+  onExpandToNode,
   onClose,
 }: AiImageHistoryOverlayProps) {
   const { t } = useTranslation();
@@ -51,7 +59,7 @@ export function AiImageHistoryOverlay({
       : history.selectedId &&
           matchingCurrent.some((item) => item.id === history.selectedId)
         ? history.selectedId
-        : matchingCurrent[0]?.id;
+        : matchingCurrent[0]?.id ?? history.selectedId;
 
   const [previewId, setPreviewId] = useState<string | null>(null);
   const listScrollRef = useRef<HTMLDivElement>(null);
@@ -84,10 +92,32 @@ export function AiImageHistoryOverlay({
   const previewItem =
     history.items.find((item) => item.id === previewId) ?? history.items[0];
   const total = history.items.length;
+  const previewMedia = previewItem?.images[0];
+  const modelLabel = previewItem
+    ? resolveHistoryModelLabel(previewItem)
+    : null;
+  const paramParts = collectImageHistoryParamParts({
+    params: previewItem?.params,
+    requestSnapshot: previewItem?.requestSnapshot,
+  }).map((part) => {
+    if (part === "watermark") {
+      return t("workflow.aiImagePanel.historyWatermark");
+    }
+    if (part === "auto" || part === "adaptive") {
+      return t("workflow.aiImagePanel.smartOption");
+    }
+    return part;
+  });
 
   const handleApply = () => {
     if (!previewItem) return;
     onSelect(previewItem.id);
+    onClose();
+  };
+
+  const handleExpand = () => {
+    if (!previewItem || !onExpandToNode) return;
+    onExpandToNode(previewItem.id);
     onClose();
   };
 
@@ -103,7 +133,7 @@ export function AiImageHistoryOverlay({
         className="nodrag nopan nowheel flex h-[min(85vh,720px)] w-[min(92vw,820px)] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex w-[200px] shrink-0 flex-col border-r border-border bg-muted/30">
+        <div className="flex w-[220px] shrink-0 flex-col border-r border-border bg-muted/30">
           <div className="border-b border-border px-3 py-3">
             <h3 className="text-sm font-medium">
               {t("workflow.aiImagePanel.historyTitle")}
@@ -126,6 +156,7 @@ export function AiImageHistoryOverlay({
                 const isCurrent = item.id === derivedCurrentId;
                 const ordinal = total - index;
                 const thumb = item.images[0];
+                const listModel = resolveHistoryModelLabel(item);
                 return (
                   <button
                     key={item.id}
@@ -164,6 +195,14 @@ export function AiImageHistoryOverlay({
                           </span>
                         )}
                       </div>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {formatHistoryCreatedAt(item.createdAt)}
+                      </span>
+                      {listModel ? (
+                        <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                          {listModel}
+                        </span>
+                      ) : null}
                       {isCurrent ? (
                         <span className="mt-1 block text-[10px] text-muted-foreground">
                           {t("workflow.aiImagePanel.historySelected")}
@@ -193,41 +232,58 @@ export function AiImageHistoryOverlay({
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {previewItem && previewItem.images.length > 0 ? (
-              <div
-                className={cn(
-                  "grid gap-2",
-                  previewItem.images.length === 1
-                    ? "grid-cols-1"
-                    : previewItem.images.length <= 4
-                      ? "grid-cols-2"
-                      : "grid-cols-3",
-                  previewItem.prompt ? "mb-3" : undefined
-                )}
-              >
-                {previewItem.images.map((img, idx) => (
-                  <MediaImageField
-                    key={getMediaReferenceKey(img) ?? idx}
-                    value={img}
-                    createObjectUrl={createObjectUrl}
-                    className="w-full"
-                    imageClassName="max-h-[min(52vh,480px)] object-contain"
-                  />
-                ))}
+            {previewMedia ? (
+              <div className="mb-3">
+                <MediaImageField
+                  value={previewMedia}
+                  createObjectUrl={createObjectUrl}
+                  className="w-full"
+                  imageClassName="max-h-[min(48vh,440px)] object-contain"
+                />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {t("workflow.aiImagePanel.historyEmpty")}
               </p>
             )}
-            {previewItem?.prompt ? (
-              <div className="rounded-md border border-border/70 bg-muted/20 p-2">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("workflow.aiImagePanel.historyPrompt")}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-xs text-foreground">
-                  {previewItem.prompt}
-                </p>
+            {previewItem ? (
+              <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("workflow.aiImagePanel.historyTime")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-foreground">
+                    {formatHistoryCreatedAt(previewItem.createdAt)}
+                  </p>
+                </div>
+                {modelLabel ? (
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("workflow.aiImagePanel.historyModel")}
+                    </p>
+                    <p className="mt-0.5 text-xs text-foreground">{modelLabel}</p>
+                  </div>
+                ) : null}
+                {paramParts.length > 0 ? (
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("workflow.aiImagePanel.historyParams")}
+                    </p>
+                    <p className="mt-0.5 text-xs text-foreground">
+                      {paramParts.join(" · ")}
+                    </p>
+                  </div>
+                ) : null}
+                {previewItem.prompt ? (
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("workflow.aiImagePanel.historyPrompt")}
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-xs text-foreground">
+                      {previewItem.prompt}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -235,6 +291,16 @@ export function AiImageHistoryOverlay({
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
+            {onExpandToNode ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!previewItem}
+                onClick={handleExpand}
+              >
+                {t("workflow.aiImagePanel.historyExpandToNode")}
+              </Button>
+            ) : null}
             <Button
               type="button"
               disabled={!previewItem}

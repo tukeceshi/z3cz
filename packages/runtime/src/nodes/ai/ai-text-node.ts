@@ -116,6 +116,16 @@ export class AiTextNode extends ExecutableNode {
       return this.createErrorResult("A platform model must be selected.");
     }
 
+    const interfaceId =
+      typeof context.inputs.ai_interface_id === "string" &&
+      context.inputs.ai_interface_id.trim().length > 0
+        ? context.inputs.ai_interface_id.trim()
+        : undefined;
+
+    if (!interfaceId) {
+      return this.createErrorResult("An AI interface must be selected.");
+    }
+
     if (!context.executeTextModel) {
       return this.createErrorResult(
         "Text model execution is unavailable in this runtime."
@@ -141,6 +151,7 @@ export class AiTextNode extends ExecutableNode {
 
     const result = await context.executeTextModel({
       canonicalId: modelCanonicalId,
+      interfaceId,
       effectivePrompt,
       referenceImageUrls:
         referenceImageUrls.length > 0 ? referenceImageUrls : undefined,

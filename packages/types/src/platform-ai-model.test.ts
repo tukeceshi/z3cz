@@ -2,11 +2,29 @@ import { describe, expect, it } from "vitest";
 
 import {
   AI_TEXT_DEFAULT_QUESTION,
+  applyAiImageRatioToPrompt,
   buildAiTextUserPrompt,
+  buildImageGenerationRequestSnapshot,
+  buildVolcanoImageGenerationBody,
+  DEFAULT_IMAGE_GENERATION_FIELDS,
   formatAiTextReferenceBlock,
+  IMAGE_GENERATION_FIELD_CATALOG,
+  mergeImageGenerationParams,
   normalizeAiTextReferences,
+  sanitizeImageGenerationParams,
   validateAiTextPromptAssembly,
+  type UpstreamParamProfileField,
 } from "./platform-ai-model";
+
+function imageGenerationFieldsWithCount(): readonly UpstreamParamProfileField[] {
+  const generateCount = IMAGE_GENERATION_FIELD_CATALOG.find(
+    (field) => field.name === "generate_count"
+  );
+  if (!generateCount) {
+    throw new Error("generate_count missing from IMAGE_GENERATION_FIELD_CATALOG");
+  }
+  return [...DEFAULT_IMAGE_GENERATION_FIELDS, generateCount];
+}
 
 describe("formatAiTextReferenceBlock", () => {
   it("wraps content in DeepSeek file blocks", () => {
@@ -97,5 +115,165 @@ describe("validateAiTextPromptAssembly", () => {
         parameterRules: rules,
       }).ok
     ).toBe(false);
+  });
+});
+
+describe("sanitizeImageGenerationParams", () => {
+  it("drops params outside current model fields", () => {
+    expect(
+      sanitizeImageGenerationParams(DEFAULT_IMAGE_GENERATION_FIELDS, {
+        size: "2K",
+        ratio: "16:9",
+        watermark: false,
+        web_search: true,
+      })
+    ).toEqual({
+      size: "2K",
+      ratio: "16:9",
+      watermark: false,
+    });
+  });
+
+  it("falls back to field default for invalid enum values", () => {
+    expect(
+      sanitizeImageGenerationParams(DEFAULT_IMAGE_GENERATION_FIELDS, {
+        size: "8K",
+        ratio: "16:9",
+      })
+    ).toEqual({
+      size: "auto",
+      ratio: "16:9",
+      watermark: false,
+    });
+  });
+
+  it("uses admin defaults when stored params are missing", () => {
+    expect(sanitizeImageGenerationParams(DEFAULT_IMAGE_GENERATION_FIELDS)).toEqual({
+      size: "auto",
+      ratio: "auto",
+      watermark: false,
+    });
+  });
+});
+
+describe("applyAiImageRatioToPrompt", () => {
+  it("returns prompt unchanged for auto ratio", () => {
+    expect(applyAiImageRatioToPrompt("hello", "auto")).toBe("hello");
+  });
+
+  it("appends ratio hint for fixed ratio", () => {
+    expect(applyAiImageRatioToPrompt("hello", "16:9")).toBe(
+      "hello, 画面比例 16:9"
+    );
+  });
+});
+
+describe("buildVolcanoImageGenerationBody", () => {
+  it("passes size auto to outbound body", () => {
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "gpt-image-2",
+      prompt: "a cat",
+      generationFields: DEFAULT_IMAGE_GENERATION_FIELDS,
+      params: { size: "auto" },
+    });
+    expect(body.size).toBe("auto");
+    expect(body.prompt).toBe("a cat");
+  });
+
+  it("skips clientOnly ratio field", () => {
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "seedream",
+      prompt: "a cat",
+      generationFields: DEFAULT_IMAGE_GENERATION_FIELDS,
+      params: { ratio: "16:9", size: "2K" },
+    });
+    expect(body.ratio).toBeUndefined();
+    expect(body.size).toBe("2K");
+  });
+
+  it("enables sequential generation when generate_count > 1", () => {
+    const generationFields = imageGenerationFieldsWithCount();
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "seedream",
+      prompt: "a cat",
+      generationFields,
+      params: mergeImageGenerationParams(generationFields, {
+        generate_count: 3,
+      }),
+    });
+    expect(body.sequential_image_generation).toBe("auto");
+    expect(body.sequential_image_generation_options).toEqual({
+      max_images: 3,
+    });
+  });
+
+  it("uses generate_count apiName for sequential options key", () => {
+    const generationFields = imageGenerationFieldsWithCount().map((field) =>
+      field.name === "generate_count"
+        ? { ...field, apiName: "batch_size" }
+        : field
+    );
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "seedream",
+      prompt: "a cat",
+      generationFields,
+      params: mergeImageGenerationParams(generationFields, {
+        generate_count: 2,
+      }),
+    });
+    expect(body.sequential_image_generation_options).toEqual({
+      batch_size: 2,
+    });
+  });
+
+  it("skips multi-image body when countPolicy is disabled", () => {
+    const generationFields = imageGenerationFieldsWithCount();
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "seedream",
+      prompt: "a cat",
+      generationFields,
+      params: mergeImageGenerationParams(generationFields, {
+        generate_count: 3,
+      }),
+      countPolicy: { enabled: false, effectMode: "sequential_image_generation" },
+    });
+    expect(body.sequential_image_generation).toBe("disabled");
+    expect(body.sequential_image_generation_options).toBeUndefined();
+  });
+
+  it("uses direct countPolicy effectMode for top-level api field", () => {
+    const generationFields = imageGenerationFieldsWithCount();
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "gpt-image-2",
+      prompt: "a cat",
+      generationFields,
+      params: mergeImageGenerationParams(generationFields, {
+        generate_count: 2,
+      }),
+      countPolicy: { enabled: true, effectMode: "direct" },
+    });
+    expect(body.sequential_image_generation).toBe("disabled");
+    expect(body.max_images).toBe(2);
+  });
+});
+
+describe("buildImageGenerationRequestSnapshot", () => {
+  it("captures outbound generation fields without secrets", () => {
+    const generationFields = imageGenerationFieldsWithCount();
+    const body = buildVolcanoImageGenerationBody({
+      providerModelId: "gpt-image-2",
+      prompt: "a cat",
+      generationFields,
+      params: { size: "auto", watermark: false, generate_count: 2 },
+    });
+    expect(
+      buildImageGenerationRequestSnapshot({ body, prompt: "a cat" })
+    ).toEqual({
+      size: "auto",
+      watermark: false,
+      sequentialImageGeneration: "auto",
+      maxImages: 2,
+      promptExcerpt: "a cat",
+    });
   });
 });

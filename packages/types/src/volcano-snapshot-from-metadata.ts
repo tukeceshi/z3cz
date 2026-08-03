@@ -1,5 +1,6 @@
 import { VOLCANO_AGGREGATE_MODEL_CATALOG } from "./ai-model-catalog";
 import type { OrganizationAiInterface } from "./ai-interface";
+import { resolveInterfaceModelAlias } from "./org-model-label";
 import {
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
@@ -149,7 +150,10 @@ export function buildVolcanoSnapshotFromMetadata(
 
     return {
       canonicalId: entry.canonicalId,
-      alias: entry.alias,
+      alias: resolveInterfaceModelAlias({
+        alias: config?.alias,
+        platformDisplayName: entry.alias,
+      }),
       modality: entry.modality,
       providerModelId: entry.providerModelId,
       enabled,

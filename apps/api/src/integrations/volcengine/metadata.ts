@@ -142,6 +142,26 @@ export function mergeVolcanoModelEnabled(
   return pruneVolcanoMetadataToCatalog({ ...metadata, models }, catalogEntries);
 }
 
+export function mergeVolcanoModelAlias(
+  metadata: VolcanoInterfaceMetadata,
+  aliases: Readonly<Record<string, string>>,
+  catalogEntries?: readonly AiModelCatalogEntry[]
+): VolcanoInterfaceMetadata {
+  const models = { ...metadata.models };
+  for (const [canonicalId, alias] of Object.entries(aliases)) {
+    const existing = models[canonicalId];
+    if (!existing) {
+      continue;
+    }
+    const trimmed = alias.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    models[canonicalId] = { ...existing, alias: trimmed };
+  }
+  return pruneVolcanoMetadataToCatalog({ ...metadata, models }, catalogEntries);
+}
+
 export function mergeVolcanoActivationCache(
   metadata: VolcanoInterfaceMetadata,
   results: readonly VolcanoActivationProbeResult[],

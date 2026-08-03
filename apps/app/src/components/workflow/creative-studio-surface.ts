@@ -5,7 +5,7 @@ export const STUDIO_SHELL =
 
 export const STUDIO_HEADER = "border-b border-border dark:border-neutral-700";
 
-export const STUDIO_SCROLL = "studio-scrollbar";
+export const STUDIO_SCROLL = "thin-scrollbar";
 
 /** List panels match generative node cards in dark mode. */
 export const STUDIO_PANEL =
@@ -41,7 +41,7 @@ export const STUDIO_AUDIO_GRID =
   "grid grid-cols-[repeat(auto-fill,minmax(60px,1fr))] content-start gap-2 py-1";
 
 export const STUDIO_LIST_BODY =
-  "studio-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pt-1.5 pb-2";
+  "thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pt-1.5 pb-2";
 
 /** Row divider; vertical spacing via STUDIO_LIST_ITEM padding. */
 export const STUDIO_LIST_ITEM =

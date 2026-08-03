@@ -14,19 +14,17 @@ import {
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import LoaderIcon from "lucide-react/icons/loader-circle";
-import SparklesIcon from "lucide-react/icons/sparkles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
+import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { cn } from "@/utils/utils";
-import { useOrgImageModels, generateAiImage, resolveOrgImageModel } from "@/services/platform-ai-model-service";
+import { useOrgImageModels, generateAiImage } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
 import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
@@ -56,18 +54,29 @@ import {
   collectImageReferenceMedia,
   connectGenerativeReferenceEdge,
 } from "./generative-reference-utils";
+import { AiGenerateButton } from "./ai-generate-button";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
+import {
+  clearModelBindingInputs,
+  persistModelBindingToInputs,
+  rememberModelBinding,
+  resolveHydrateModelBindingAction,
+  resolveSelectedModelBinding,
+} from "./org-model-selection-utils";
 import {
   AiTextReferenceBar,
   type AiTextReferenceChip,
 } from "./ai-text-reference-bar";
 import {
   AiImageParamsPopover,
+  applyAiImageRatioToPrompt,
   buildDefaultImageGenerationParams,
+  mergeImageGenerationParams,
   readAiImageGenerationParams,
+  sanitizeImageGenerationParams,
 } from "./ai-image-params-popover";
 import {
   AI_IMAGE_OUTPUT_ID,
@@ -77,14 +86,12 @@ import {
   countAiImageReferences,
   canGenerateAiImage,
   mergeAiImageNodeCatalogInputs,
-  pickDefaultImageModelCanonicalId,
   referencesFitImageModelLimits,
   withAiImageGeneratedResult,
   withAiImageStagingPreview,
   withAiImageGeneratingFlag,
   withAiImageGenerateError,
 } from "./ai-image-node-utils";
-import { formatGenerativeApiError } from "./format-generative-api-error";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import {
@@ -106,8 +113,8 @@ import {
   collectAiImageUnifiedReferenceChips,
 } from "./ai-image-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
-import { updateNodeInput, useWorkflow } from "./workflow-context";
-import { useGenerativeCloudJobProgress, generativeProgressButtonKey } from "@/hooks/use-generative-cloud-job";
+import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
+import { useGenerativeCloudJobProgress, generativeProgressButtonKey, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
@@ -176,6 +183,7 @@ export function AiImageConfigPanel({
   );
 
   const selectedModelId = getInputString(data, "model");
+  const selectedInterfaceId = getInputString(data, "ai_interface_id");
   const promptValue = getInputString(data, "prompt");
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
@@ -235,14 +243,24 @@ export function AiImageConfigPanel({
     [modelRules]
   );
 
+  const resolvedGenerationParams = useMemo(
+    () => sanitizeImageGenerationParams(generationFields, generationParams),
+    [generationFields, generationParams]
+  );
+
   const referenceCount = useMemo(
     () => countAiImageReferences(nodeId, edges),
     [edges, nodeId]
   );
 
   const selectedModel = useMemo(
-    () => models.find((entry) => entry.canonicalId === selectedModelId),
-    [models, selectedModelId]
+    () =>
+      resolveSelectedModelBinding(
+        models,
+        selectedModelId,
+        selectedInterfaceId
+      ),
+    [models, selectedInterfaceId, selectedModelId]
   );
 
   const selectableModels = useMemo(
@@ -264,6 +282,10 @@ export function AiImageConfigPanel({
     [modelFitsCurrentRefs, selectableModels]
   );
 
+  const activeModel =
+    selectedModel ?? modelsFittingRefs.find((entry) => entry.selectable);
+  const selectedOptionId = activeModel?.optionId ?? "";
+
   const showOverLimitHint =
     selectableModels.length > 0 &&
     modelsFittingRefs.length === 0 &&
@@ -274,18 +296,14 @@ export function AiImageConfigPanel({
   const clearModelSelection = useCallback(() => {
     if (!updateNodeData) return;
     updateNodeData(nodeId, (current) => ({
-      inputs: current.inputs.map((input) =>
-        input.id === "model"
-          ? ({ ...input, value: "" } as WorkflowParameter)
-          : input
-      ),
+      inputs: clearModelBindingInputs(current.inputs),
     }));
   }, [nodeId, updateNodeData]);
 
   const applyModelSelection = useCallback(
-    async (canonicalId: string) => {
-      if (disabled || !updateNodeData || !orgId) return;
-      const model = models.find((entry) => entry.canonicalId === canonicalId);
+    (optionId: string) => {
+      if (disabled || !updateNodeData) return;
+      const model = models.find((entry) => entry.optionId === optionId);
       if (!model?.selectable || !modelFitsCurrentRefs(model)) return;
 
       const rules = normalizeImageModelParameterRules(model.parameterRules);
@@ -294,56 +312,52 @@ export function AiImageConfigPanel({
       );
       setGenerationParams(defaultParams);
 
-      const inputsAfterModel = updateNodeInput(
-        nodeId,
-        "model",
-        canonicalId,
-        data.inputs,
-        updateNodeData
-      );
-      updateNodeInput(
-        nodeId,
-        "params",
-        defaultParams,
-        inputsAfterModel,
-        updateNodeData
-      );
+      rememberModelBinding(orgId, "image", {
+        canonicalId: model.canonicalId,
+        interfaceId: model.interfaceId,
+      });
 
-      try {
-        const resolved = await resolveOrgImageModel(orgId, canonicalId);
-        updateNodeInput(
-          nodeId,
-          "ai_interface_id",
-          resolved.aiInterfaceId,
-          inputsAfterModel,
-          updateNodeData
-        );
-      } catch {
-        updateNodeInput(
-          nodeId,
-          "ai_interface_id",
-          "",
-          inputsAfterModel,
-          updateNodeData
-        );
-      }
+      updateNodeData(nodeId, (current) => ({
+        inputs: upsertNodeInputValues(
+          current.inputs,
+          {
+            model: model.canonicalId,
+            ai_interface_id: model.interfaceId,
+            params: defaultParams,
+          },
+          { params: "json" }
+        ),
+      }));
     },
-    [data.inputs, disabled, modelFitsCurrentRefs, models, nodeId, orgId, updateNodeData]
+    [disabled, modelFitsCurrentRefs, models, nodeId, orgId, updateNodeData]
   );
 
   useEffect(() => {
-    if (disabled || isLoading || selectedModelId || modelsFittingRefs.length === 0) {
-      return;
-    }
-    const defaultId = pickDefaultImageModelCanonicalId(modelsFittingRefs);
-    if (!defaultId) return;
-    void applyModelSelection(defaultId);
+    if (disabled || isLoading || !updateNodeData) return;
+
+    const action = resolveHydrateModelBindingAction(
+      models,
+      selectedModelId,
+      selectedInterfaceId
+    );
+    if (action.kind === "none") return;
+
+    updateNodeData(nodeId, (current) => ({
+      inputs:
+        action.kind === "clear"
+          ? clearModelBindingInputs(current.inputs)
+          : upsertNodeInputValues(current.inputs, {
+              ai_interface_id: action.interfaceId,
+            }),
+    }));
   }, [
-    applyModelSelection,
     disabled,
     isLoading,
-    modelsFittingRefs,
+    models,
+    nodeId,
+    selectedInterfaceId,
     selectedModelId,
+    updateNodeData,
   ]);
 
   useEffect(() => {
@@ -456,19 +470,31 @@ export function AiImageConfigPanel({
 
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
-      setGenerationParams(next);
+      const sanitized = sanitizeImageGenerationParams(generationFields, next);
+      setGenerationParams(sanitized);
       if (disabled || !updateNodeData) return;
-      updateNodeInput(nodeId, "params", next, data.inputs, updateNodeData);
+      updateNodeInput(nodeId, "params", sanitized, data.inputs, updateNodeData);
     },
-    [data.inputs, disabled, nodeId, updateNodeData]
+    [data.inputs, disabled, generationFields, nodeId, updateNodeData]
   );
 
   useEffect(() => {
-    const stored = readAiImageGenerationParams(data.inputs);
-    if (Object.keys(stored).length > 0) {
-      setGenerationParams(stored);
+    if (generationFields.length === 0) {
+      return;
     }
-  }, [data.inputs]);
+    const stored = readAiImageGenerationParams(data.inputs);
+    const sanitized = sanitizeImageGenerationParams(generationFields, stored);
+    setGenerationParams((prev) =>
+      JSON.stringify(prev) === JSON.stringify(sanitized) ? prev : sanitized
+    );
+    if (
+      !disabled &&
+      updateNodeData &&
+      JSON.stringify(stored) !== JSON.stringify(sanitized)
+    ) {
+      updateNodeInput(nodeId, "params", sanitized, data.inputs, updateNodeData);
+    }
+  }, [data.inputs, disabled, generationFields, nodeId, updateNodeData]);
 
   const connectReferenceEdge = useCallback(
     (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
@@ -662,10 +688,10 @@ export function AiImageConfigPanel({
   };
 
   const handleGenerate = async () => {
-    if (disabled || !orgId || !selectedModel) return;
+    if (disabled || !orgId || !activeModel) return;
     if (generateInFlightRef.current) return;
 
-    if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
+    if (!activeModel.selectable || !modelFitsCurrentRefs(activeModel)) {
       return;
     }
 
@@ -698,12 +724,36 @@ export function AiImageConfigPanel({
       return;
     }
 
+    const promptForApi = applyAiImageRatioToPrompt(
+      prompt,
+      generationParams.ratio
+    );
+
+    if (promptForApi.length > promptMaxLength) {
+      toast.error(
+        hasPromptReference
+          ? "workflow.aiImagePanel.referencedPromptTooLong"
+          : "workflow.generativeErrors.promptTooLong",
+        { max: promptMaxLength }
+      );
+      return;
+    }
+
+    const mergedGenerationParams = mergeImageGenerationParams(
+      generationFields,
+      generationParams
+    );
+
     generateInFlightRef.current = true;
     setIsGenerating(true);
     /** False when another caller owns persist/progress for this job. */
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
+      inputs: persistModelBindingToInputs(current.inputs, {
+        canonicalId: activeModel.canonicalId,
+        interfaceId: activeModel.interfaceId,
+      }),
       metadata: withAiImageGenerateError(
         withGenerativeProgress(
           withAiImageGeneratingFlag(current.metadata, true),
@@ -738,9 +788,10 @@ export function AiImageConfigPanel({
       }
 
       const response = await generateAiImage(orgId, {
-        modelCanonicalId: selectedModel.canonicalId,
-        prompt,
-        params: generationParams,
+        modelCanonicalId: activeModel.canonicalId,
+        aiInterfaceId: activeModel.interfaceId,
+        prompt: promptForApi,
+        params: mergedGenerationParams,
         referenceImageUrls:
           resolved.referenceImageUrls.length > 0
             ? resolved.referenceImageUrls
@@ -756,9 +807,13 @@ export function AiImageConfigPanel({
 
       let finalImages = response.images;
       let finalizeJobId: string | null = null;
+      let jobPersistMeta:
+        | Pick<ResolveGenerativeJobMediaResult, "requestSnapshot" | "modelCanonicalId">
+        | undefined;
       if (response.jobId && response.phase === "ready_to_persist") {
         finalizeJobId = response.jobId;
         const resolvedJob = await resolveJobMedia(response.jobId);
+        jobPersistMeta = resolvedJob;
         finalImages = resolvedJob.media;
         ownsJobProgress = resolvedJob.owned;
         if (!ownsJobProgress) {
@@ -798,17 +853,20 @@ export function AiImageConfigPanel({
 
         const withResult = withAiImageGeneratedResult(current, finalImages, {
           prompt,
-          params: generationParams,
-          platformModelId: selectedModel.canonicalId,
-          providerModelId: selectedModel.providerModelId,
+          params: mergedGenerationParams,
+          platformModelId: activeModel.canonicalId,
+          aiInterfaceId: response.aiInterfaceId,
+          providerModelId: activeModel.providerModelId,
+          modelDisplayName: activeModel.displayName,
+          requestSnapshot:
+            response.requestSnapshot ?? jobPersistMeta?.requestSnapshot,
         });
-        const inputs = (withResult.inputs ?? current.inputs).map((input) =>
-          input.id === "ai_interface_id"
-            ? ({
-                ...input,
-                value: response.aiInterfaceId,
-              } as WorkflowParameter)
-            : input
+        const inputs = persistModelBindingToInputs(
+          withResult.inputs ?? current.inputs,
+          {
+            canonicalId: activeModel.canonicalId,
+            interfaceId: response.aiInterfaceId,
+          }
         );
         return {
           ...withResult,
@@ -864,12 +922,23 @@ export function AiImageConfigPanel({
               }
               const withResult = withAiImageGeneratedResult(current, finalImages, {
                 prompt,
-                params: generationParams,
-                platformModelId: selectedModel.canonicalId,
-                providerModelId: selectedModel.providerModelId,
+                params: mergedGenerationParams,
+                platformModelId: activeModel.canonicalId,
+                aiInterfaceId: activeModel.interfaceId,
+                providerModelId: activeModel.providerModelId,
+                modelDisplayName: activeModel.displayName,
+                requestSnapshot: resolvedJob.requestSnapshot,
               });
+              const inputs = persistModelBindingToInputs(
+                withResult.inputs ?? current.inputs,
+                {
+                  canonicalId: activeModel.canonicalId,
+                  interfaceId: activeModel.interfaceId,
+                }
+              );
               return {
                 ...withResult,
+                inputs,
                 metadata: withAiImageGenerateError(
                   withAiImageGeneratingFlag(
                     clearGenerativeProgress(withResult.metadata),
@@ -889,17 +958,15 @@ export function AiImageConfigPanel({
         }
       }
 
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
+      const raw = error instanceof Error ? error.message : String(error);
+      const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiImageGenerateError(
           withAiImageGeneratingFlag(current.metadata, false),
-          prepareGenerativeCardError(formatted, t)
+          cardError
         ),
       }));
-      toast.errorRaw(formatted);
+      toast.errorRaw(cardError.summary);
     } finally {
       generateInFlightRef.current = false;
       if (ownsJobProgress) {
@@ -918,8 +985,8 @@ export function AiImageConfigPanel({
   const canGenerate =
     !disabled &&
     !isGenerating &&
-    Boolean(selectedModel?.selectable) &&
-    (!selectedModel || modelFitsCurrentRefs(selectedModel)) &&
+    Boolean(activeModel?.selectable) &&
+    (!activeModel || modelFitsCurrentRefs(activeModel)) &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiImage({
       prompt: promptForGenerate,
@@ -1047,6 +1114,7 @@ export function AiImageConfigPanel({
             }
             className={cn(
               "h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0",
+              LIST_SCROLL_CLASS,
               hasPromptReference &&
                 "read-only:cursor-default read-only:text-foreground"
             )}
@@ -1079,14 +1147,15 @@ export function AiImageConfigPanel({
         ) : null}
 
         <div className="mt-2 flex items-end justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-end gap-2">
-            {models.length > 0 || modelsError ? (
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-end gap-2">
               <AiTextModelPicker
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
                 groups={groups}
-                selectedModelId={selectedModelId}
+                selectedOptionId={selectedOptionId}
                 disabled={disabled || isLoading}
+                isLoading={isLoading}
                 loadError={Boolean(modelsError)}
                 onRetryLoad={() => {
                   void refreshModels();
@@ -1094,57 +1163,46 @@ export function AiImageConfigPanel({
                 modelFitsCurrentRefs={(model) =>
                   modelFitsCurrentRefs(model as unknown as OrgImageModelOption)
                 }
-                onSelect={(canonicalId) => {
-                  void applyModelSelection(canonicalId);
+                onSelect={(optionId) => {
+                  applyModelSelection(optionId);
                 }}
               />
-            ) : null}
-            {generationFields.length > 0 ? (
-              <AiImageParamsPopover
-                fields={generationFields}
-                values={generationParams}
-                disabled={disabled}
-                triggerLabel={t("workflow.aiImagePanel.params")}
-                title={t("workflow.aiImagePanel.paramsTitle")}
-                onChange={commitGenerationParams}
-              />
-            ) : null}
-            <div className="min-w-0">
-              {models.length > 0 && selectableModels.length === 0 ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {t("workflow.aiImagePanel.enableModelsHint")}{" "}
-                  <Link
-                    to={getOrgUrl("/ai-interfaces")}
-                    className="underline underline-offset-2"
-                  >
-                    {t("workflow.aiImagePanel.openAiInterfaces")}
-                  </Link>
-                </p>
-              ) : null}
-              {showOverLimitHint ? (
-                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                  {t("workflow.aiImagePanel.referencesExceedModels")}
-                </p>
+              {generationFields.length > 0 ? (
+                <AiImageParamsPopover
+                  fields={generationFields}
+                  values={resolvedGenerationParams}
+                  disabled={disabled}
+                  triggerLabel={t("workflow.aiImagePanel.params")}
+                  title={t("workflow.aiImagePanel.paramsTitle")}
+                  onChange={commitGenerationParams}
+                />
               ) : null}
             </div>
+            {models.length > 0 && selectableModels.length === 0 ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {t("workflow.aiImagePanel.enableModelsHint")}{" "}
+                <Link
+                  to={getOrgUrl("/ai-interfaces")}
+                  className="underline underline-offset-2"
+                >
+                  {t("workflow.aiImagePanel.openAiInterfaces")}
+                </Link>
+              </p>
+            ) : null}
+            {showOverLimitHint ? (
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                {t("workflow.aiImagePanel.referencesExceedModels")}
+              </p>
+            ) : null}
           </div>
-
-          <Button
-            type="button"
-            size="sm"
-            className="h-9 shrink-0 gap-1 rounded-lg text-xs"
+          <AiGenerateButton
             disabled={!canGenerate}
+            isGenerating={isGenerating}
+            label={t(generativeProgressButtonKey(activeProgressPhase))}
             onClick={() => {
               void handleGenerate();
             }}
-          >
-            {isGenerating ? (
-              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <SparklesIcon className="h-3.5 w-3.5" />
-            )}
-            {t(generativeProgressButtonKey(activeProgressPhase))}
-          </Button>
+          />
         </div>
       </GenerativeConfigPanelShell>
 

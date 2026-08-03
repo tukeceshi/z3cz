@@ -9,7 +9,7 @@ import { snapshotGenerativeProgressForPersist } from "./generative-progress-util
 import { stripWorkflowNodeCanvasUi } from "./workflow-node-canvas-ui";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
-const PERSIST_DEBOUNCE_MS = 250;
+const PERSIST_DEBOUNCE_MS = 0;
 
 const stripExecutionFields = (
   data: WorkflowNodeType

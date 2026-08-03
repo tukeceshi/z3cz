@@ -1,5 +1,4 @@
 import {
-  buildTextModelDisplayLabel,
   buildTextModelFailureCardParts,
   buildTextModelInvocationErrorFromFailure,
   isTransientTextModelUpstreamError,
@@ -19,8 +18,7 @@ import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volce
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
 import { disableTextModelOnInterface } from "./disable-text-model-on-interface";
 import {
-  listOrgTextModelOptions,
-  listTextModelInterfaceCandidates,
+  resolveOrgModelInterfaceCandidate,
   type TextModelInterfaceCandidate,
 } from "./resolve-text-model-interface";
 
@@ -36,6 +34,7 @@ export async function prepareTextModelStream(params: {
   readonly db: Database;
   readonly organizationId: string;
   readonly canonicalId: string;
+  readonly interfaceId: string;
   readonly effectivePrompt: string;
   readonly outputMaxTokens?: number;
   readonly referenceImageUrls?: readonly string[];
@@ -45,23 +44,20 @@ export async function prepareTextModelStream(params: {
   | { readonly ok: true; readonly prepared: PreparedTextModelStream }
   | { readonly ok: false; readonly error: string; readonly invocationError?: string }
 > {
-  const [candidates, options] = await Promise.all([
-    listTextModelInterfaceCandidates(
-      params.db,
-      params.organizationId,
-      params.canonicalId
-    ),
-    listOrgTextModelOptions(params.db, params.organizationId),
-  ]);
+  const candidate = await resolveOrgModelInterfaceCandidate(
+    params.db,
+    params.organizationId,
+    params.canonicalId,
+    params.interfaceId
+  );
 
-  if (candidates.length === 0) {
+  if (!candidate) {
     return {
       ok: false,
-      error: `Model "${params.canonicalId}" is not available for this organization.`,
+      error: `Model "${params.canonicalId}" is not available on this AI interface.`,
     };
   }
 
-  const candidate = candidates[0]!;
   const service = new CloudflareAiInterfaceService(params.env);
   const iface = await service.resolveOrgInterface({
     organizationId: params.organizationId,
@@ -79,21 +75,19 @@ export async function prepareTextModelStream(params: {
     };
   }
 
-  const catalogProviderModelId = options.find(
-    (entry) => entry.canonicalId === params.canonicalId
-  )?.providerModelId;
-
-  if (!catalogProviderModelId) {
-    return { ok: false, error: "Model is not available for this organization" };
-  }
-
   const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
     db: params.db,
     organizationId: params.organizationId,
     interfaceId: candidate.interfaceId,
     canonicalId: params.canonicalId,
-    catalogProviderModelId,
   });
+
+  if (!inferenceModelId) {
+    return {
+      ok: false,
+      error: "Upstream model id is not configured on this AI interface",
+    };
+  }
 
   return {
     ok: true,
@@ -139,8 +133,6 @@ export async function handleTextModelStreamFailure(params: {
   readonly candidate: TextModelInterfaceCandidate;
   readonly upstreamError: string;
   readonly displayName: string;
-  readonly modality: "text" | "image" | "video" | "audio";
-  readonly nextCandidate?: TextModelInterfaceCandidate;
 }): Promise<{ readonly error: string; readonly invocationError: string }> {
   const transient = isTransientTextModelUpstreamError(params.upstreamError);
   if (!transient) {
@@ -152,19 +144,13 @@ export async function handleTextModelStreamFailure(params: {
     );
   }
 
-  const next = transient ? undefined : params.nextCandidate;
-  const modelDisplayLabel = buildTextModelDisplayLabel({
-    displayName: params.displayName,
-    modality: params.modality,
-  });
+  const modelDisplayLabel = params.displayName;
 
   const failure = buildTextModelFailureCardParts({
     failedInterfaceName: params.candidate.interfaceName,
     channelKind: params.candidate.channelKind,
     modelDisplayLabel,
     upstreamError: params.upstreamError,
-    nextInterfaceName: next?.interfaceName,
-    nextChannelKind: next?.channelKind,
     disabledInterface: !transient,
   });
 

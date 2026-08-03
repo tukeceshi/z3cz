@@ -10,12 +10,14 @@ export class CloudflareImageModelService {
   async resolveImageModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeImageModel | undefined> {
     const db = createDatabase(this.env);
     const resolved = await resolveImageModelInterface(
       db,
       params.organizationId,
-      params.canonicalId
+      params.canonicalId,
+      params.interfaceId
     );
 
     if (!resolved) {

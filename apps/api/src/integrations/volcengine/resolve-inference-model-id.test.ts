@@ -34,13 +34,40 @@ describe("resolveVolcanoInferenceModelIdAfterEnsure", () => {
       organizationId: "org-1",
       interfaceId: "iface-1",
       canonicalId: "glm-5-2",
-      catalogProviderModelId: "glm-5-2-260617",
     });
 
     expect(inferenceModelId).toBe("ep-glm");
   });
 
-  it("falls back to catalog provider model id for non-volcano interfaces", async () => {
+  it("reads providerModelId from volcano interface metadata", async () => {
+    vi.mocked(getOrganizationAiInterfaceRow).mockResolvedValue({
+      metadata: JSON.stringify({
+        credentialMode: "volcengine_iam",
+        accessKeyId: "ak",
+        secretAccessKeyEncrypted: "enc",
+        arkApiKeyDurationSeconds: 3600,
+        region: "cn-beijing",
+        models: {
+          "glm-5-2": {
+            enabled: true,
+            providerModelId: "glm-5-2-260617",
+            modality: "text",
+          },
+        },
+      }),
+    } as never);
+
+    const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+      db: {} as never,
+      organizationId: "org-1",
+      interfaceId: "iface-1",
+      canonicalId: "glm-5-2",
+    });
+
+    expect(inferenceModelId).toBe("glm-5-2-260617");
+  });
+
+  it("returns null when interface metadata has no upstream id", async () => {
     vi.mocked(getOrganizationAiInterfaceRow).mockResolvedValue({
       metadata: JSON.stringify({ provider: "openai" }),
     } as never);
@@ -50,9 +77,8 @@ describe("resolveVolcanoInferenceModelIdAfterEnsure", () => {
       organizationId: "org-1",
       interfaceId: "iface-1",
       canonicalId: "glm-5-2",
-      catalogProviderModelId: "glm-5-2-260617",
     });
 
-    expect(inferenceModelId).toBe("glm-5-2-260617");
+    expect(inferenceModelId).toBeNull();
   });
 });

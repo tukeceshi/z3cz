@@ -18,6 +18,8 @@ export interface VolcanoModelConfig {
   readonly enabled: boolean;
   readonly providerModelId: string;
   readonly modality: AiModelModality;
+  /** Org-custom display name; falls back to platform display name when unset. */
+  readonly alias?: string;
 }
 
 export type VolcanoArkApiKeyScope = "endpoint" | "model";

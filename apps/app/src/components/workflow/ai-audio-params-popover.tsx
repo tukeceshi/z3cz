@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/utils/utils";
+
+import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
 
 export interface AiAudioParamsPopoverProps {
   readonly fields: readonly UpstreamParamProfileField[];
@@ -191,11 +192,7 @@ export function AiAudioParamsPopover({
         <button
           type="button"
           disabled={disabled}
-          className={cn(
-            "inline-flex h-9 max-w-[180px] items-center gap-1 rounded-lg border border-border/70",
-            "bg-background px-2.5 text-xs text-foreground hover:bg-muted/40",
-            "disabled:pointer-events-none disabled:opacity-50"
-          )}
+          className={AI_BOTTOM_CHIP_CLASS}
         >
           <span className="truncate">{summary || triggerLabel}</span>
         </button>

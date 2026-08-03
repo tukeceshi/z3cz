@@ -8,6 +8,7 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -18,6 +19,7 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import { splitHistoryMediaRows } from "./generative-history-utils";
 
 export const AI_AUDIO_PROMPT_HANDLE_ID = "prompt_reference" as const;
 export const AI_AUDIO_OUTPUT_ID = "audios" as const;
@@ -45,11 +47,14 @@ export const AI_AUDIO_MAX_HISTORY_ITEMS = 30;
 
 export interface AiAudioResultHistoryItem {
   readonly id: string;
+  /** Always one audio per history row (legacy multi-audio rows are split on read). */
   readonly audios: readonly MediaReference[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly platformModelId?: string;
+  readonly aiInterfaceId?: string;
   readonly providerModelId?: string;
+  readonly modelDisplayName?: string;
   readonly createdAt: string;
 }
 
@@ -177,7 +182,7 @@ export function readAiAudioResultHistory(
     items?: unknown;
     selectedId?: unknown;
   };
-  const items = Array.isArray(record.items)
+  const rawItems = Array.isArray(record.items)
     ? record.items.filter(
         (entry): entry is AiAudioResultHistoryItem =>
           !!entry &&
@@ -194,6 +199,12 @@ export function readAiAudioResultHistory(
         };
       })
     : [];
+
+  const items = splitHistoryMediaRows({
+    items: rawItems,
+    getMedia: (item) => item.audios,
+    withMedia: (item, audios) => ({ ...item, audios }),
+  });
 
   return {
     items,
@@ -312,25 +323,32 @@ export function appendAiAudioGeneratedHistoryItems(
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
     readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (audios.length === 0) return {};
 
   const history = readAiAudioResultHistory(current.inputs);
-  const item: AiAudioResultHistoryItem = {
-    id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    audios: [...audios],
+  const createdAt = new Date().toISOString();
+  const batchId = Date.now();
+  const newItems: AiAudioResultHistoryItem[] = audios.map((audio, index) => ({
+    id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    audios: [audio],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
     platformModelId: meta?.platformModelId,
+    aiInterfaceId: meta?.aiInterfaceId,
     providerModelId: meta?.providerModelId,
-    createdAt: new Date().toISOString(),
-  };
+    modelDisplayName: meta?.modelDisplayName,
+    createdAt,
+  }));
+  const primary = newItems[0]!;
 
   const nextHistory: AiAudioResultHistory = {
-    items: [item, ...history.items].slice(0, AI_AUDIO_MAX_HISTORY_ITEMS),
-    selectedId: item.id,
+    items: [...newItems, ...history.items].slice(0, AI_AUDIO_MAX_HISTORY_ITEMS),
+    selectedId: primary.id,
   };
 
   let inputs = upsertInputValue(
@@ -341,8 +359,7 @@ export function appendAiAudioGeneratedHistoryItems(
   );
   inputs = upsertInputValue(inputs, "manual_audios", [], "json");
 
-  const primary = audios[0]!;
-  const result = withAiAudioResult(current, [primary], { inputs });
+  const result = withAiAudioResult(current, [audios[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -357,20 +374,20 @@ export function withAiAudioHistorySelection(
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  const promptInputs = upsertInputValue(
+  let nextInputs = upsertInputValue(
     current.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  const paramsInputs =
-    selected.params !== undefined
-      ? upsertInputValue(promptInputs, "params", selected.params, "json")
-      : promptInputs;
+  if (selected.params !== undefined) {
+    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
+  }
+  nextInputs = applyHistoryItemModelBinding(nextInputs, selected);
 
-  const result = withAiAudioResult(current, selected.audios, {
+  const result = withAiAudioResult(current, selected.audios.slice(0, 1), {
     inputs: upsertInputValue(
-      paramsInputs,
+      nextInputs,
       AI_AUDIO_HISTORY_INPUT_ID,
       { items: history.items, selectedId },
       "json"

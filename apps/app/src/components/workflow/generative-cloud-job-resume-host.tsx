@@ -25,9 +25,6 @@ import {
   withAiVideoStagingPreview,
 } from "@/components/workflow/ai-video-node-utils";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import {
-  formatGenerativeApiError,
-} from "@/components/workflow/format-generative-api-error";
 import { prepareGenerativeCardError } from "@/components/workflow/prepare-generative-card-error";
 import { readGenerativePrompt } from "@/components/workflow/generative-card-upload-utils";
 import {
@@ -39,7 +36,7 @@ import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { useWorkflow } from "@/components/workflow/workflow-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { useGenerativeCloudJobProgress } from "@/hooks/use-generative-cloud-job";
+import { useGenerativeCloudJobProgress, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 
 export type GenerativeCloudJobResumeModality = "image" | "video" | "audio";
@@ -112,8 +109,8 @@ export function GenerativeCloudJobResumeHost({
   );
 
   const handleResumeSuccess = useCallback(
-    (media: readonly MediaReference[]) => {
-      if (!updateNodeData || media.length === 0) {
+    (result: ResolveGenerativeJobMediaResult) => {
+      if (!updateNodeData || result.media.length === 0) {
         return;
       }
 
@@ -146,13 +143,18 @@ export function GenerativeCloudJobResumeHost({
 
         const withResult =
           modality === "image"
-            ? withAiImageGeneratedResult(current, media, { prompt, params })
+            ? withAiImageGeneratedResult(current, result.media, {
+                prompt,
+                params,
+                platformModelId: result.modelCanonicalId,
+                requestSnapshot: result.requestSnapshot,
+              })
             : modality === "video"
-              ? appendAiVideoGeneratedHistoryItems(current, [media[0]!], {
+              ? appendAiVideoGeneratedHistoryItems(current, [result.media[0]!], {
                   prompt,
                   params,
                 })
-              : appendAiAudioGeneratedHistoryItems(current, [media[0]!], {
+              : appendAiAudioGeneratedHistoryItems(current, [result.media[0]!], {
                   prompt,
                   params,
                 });
@@ -189,31 +191,20 @@ export function GenerativeCloudJobResumeHost({
 
   const handleResumeError = useCallback(
     (error: unknown) => {
-      const formatted = formatGenerativeApiError(
-        error instanceof Error ? error.message : String(error),
-        t
-      );
+      const raw = error instanceof Error ? error.message : String(error);
+      const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => {
         const cleared = clearGenerativeProgress(current.metadata);
         const withBusy = applyBusyMetadata(cleared, false);
         const withError =
           modality === "image"
-            ? withAiImageGenerateError(
-                withBusy,
-                prepareGenerativeCardError(formatted, t)
-              )
+            ? withAiImageGenerateError(withBusy, cardError)
             : modality === "video"
-              ? withAiVideoGenerateError(
-                  withBusy,
-                  prepareGenerativeCardError(formatted, t)
-                )
-              : withAiAudioGenerateError(
-                  withBusy,
-                  prepareGenerativeCardError(formatted, t)
-                );
+              ? withAiVideoGenerateError(withBusy, cardError)
+              : withAiAudioGenerateError(withBusy, cardError);
         return { metadata: withError };
       });
-      toast.errorRaw(formatted);
+      toast.errorRaw(cardError.summary);
     },
     [applyBusyMetadata, modality, nodeId, t, toast, updateNodeData]
   );

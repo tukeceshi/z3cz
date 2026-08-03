@@ -1,14 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
-  <defs>
-    <linearGradient id="gemini-gradient" x1="0" x2="24" y1="24" y2="0" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1C7DFF" />
-      <stop offset="0.33" stop-color="#1C69FF" />
-      <stop offset="0.66" stop-color="#F0A" />
-      <stop offset="1" stop-color="#FFB746" />
-    </linearGradient>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
   <path
-    d="M12 0C12 6.627 6.627 12 0 12c6.627 0 12 5.373 12 12 0-6.627 5.373-12 12-12-6.627 0-12-5.373-12-12z"
-    fill="url(#gemini-gradient)"
+    fill="currentColor"
+    d="m21.882 10.458-.103-.428h-9.485v3.939h5.667c-.588 2.74-3.318 4.184-5.549 4.184-1.623 0-3.333-.67-4.465-1.746a6.3 6.3 0 01-1.4-2.022 6.2 6.2 0 01-.502-2.393c0-1.659.76-3.318 1.865-4.41 1.106-1.091 2.776-1.702 4.437-1.702 1.902 0 3.264.99 3.774 1.443l2.853-2.784c-.837-.722-3.136-2.54-6.72-2.54C9.49 2 6.84 3.04 4.903 4.934 2.99 6.799 2 9.496 2 12s.937 5.066 2.79 6.946c1.98 2.005 4.784 3.053 7.671 3.053 2.627 0 5.117-1.01 6.892-2.841 1.745-1.804 2.647-4.3 2.647-6.916 0-1.101-.113-1.755-.118-1.784"
   />
 </svg>

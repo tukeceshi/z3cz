@@ -35,6 +35,7 @@ import {
   withAiImageGenerateError,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
+import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
 import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
@@ -176,6 +177,25 @@ function AiImageWidget({
       );
     },
     [disabled, historyItems.items, nodeId, updateNodeData]
+  );
+
+  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "image");
+
+  const handleHistoryExpand = useCallback(
+    (id: string) => {
+      const item = historyItems.items.find((entry) => entry.id === id);
+      const media = item?.images[0];
+      if (!item || !media) return;
+      expandHistoryItem({
+        media,
+        prompt: item.prompt,
+        params: item.params,
+        platformModelId: item.platformModelId,
+        modelDisplayName: item.modelDisplayName,
+        createdAt: item.createdAt,
+      });
+    },
+    [expandHistoryItem, historyItems.items]
   );
 
   const handleUploadFiles = useCallback(
@@ -353,6 +373,7 @@ function AiImageWidget({
           createObjectUrl={createObjectUrl}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
+          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

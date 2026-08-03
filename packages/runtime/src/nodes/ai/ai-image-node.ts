@@ -275,12 +275,18 @@ export class AiImageNode extends ExecutableNode {
 
 
     if (!modelCanonicalId) {
-
       return this.createErrorResult("A model selection is required.");
-
     }
 
+    const interfaceId =
+      typeof context.inputs.ai_interface_id === "string" &&
+      context.inputs.ai_interface_id.trim().length > 0
+        ? context.inputs.ai_interface_id.trim()
+        : undefined;
 
+    if (!interfaceId) {
+      return this.createErrorResult("An AI interface must be selected.");
+    }
 
     if (!context.resolveImageModel) {
 
@@ -294,7 +300,10 @@ export class AiImageNode extends ExecutableNode {
 
 
 
-    const resolvedModel = await context.resolveImageModel(modelCanonicalId);
+    const resolvedModel = await context.resolveImageModel(
+      modelCanonicalId,
+      interfaceId
+    );
 
     if (!resolvedModel) {
 
@@ -305,20 +314,6 @@ export class AiImageNode extends ExecutableNode {
       );
 
     }
-
-
-
-    const interfaceId =
-
-      typeof context.inputs.ai_interface_id === "string" &&
-
-      context.inputs.ai_interface_id.trim().length > 0
-
-        ? context.inputs.ai_interface_id.trim()
-
-        : resolvedModel.interfaceId;
-
-
 
     const resolvedInterface = await context.resolveAiInterface({ interfaceId });
 

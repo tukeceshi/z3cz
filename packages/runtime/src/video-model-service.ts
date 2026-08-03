@@ -10,5 +10,6 @@ export interface VideoModelService {
   resolveVideoModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeVideoModel | undefined>;
 }

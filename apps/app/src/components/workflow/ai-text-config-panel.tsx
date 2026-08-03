@@ -15,30 +15,34 @@ import {
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import LoaderIcon from "lucide-react/icons/loader-circle";
-import SparklesIcon from "lucide-react/icons/sparkles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import {
   generateAiTextStream,
-  resolveOrgTextModel,
   useOrgTextModels,
 } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
 import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
+import { AiGenerateButton } from "./ai-generate-button";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
-import { AiTextModelPicker, rememberAiTextRecentModel } from "./ai-text-model-picker";
+import {
+  clearModelBindingInputs,
+  persistModelBindingToInputs,
+  rememberModelBinding,
+  resolveHydrateModelBindingAction,
+  resolveSelectedModelBinding,
+} from "./org-model-selection-utils";
+import { AiTextModelPicker } from "./ai-text-model-picker";
 import {
   AiTextReferenceBar,
   collectAiTextReferenceChips,
@@ -53,14 +57,12 @@ import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX,
   classifyReferenceFromNodeType,
-  pickDefaultTextModelCanonicalId,
   probeVideoUrlDurationSeconds,
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
   withAiTextGeneratedResult,
   withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
-import { formatGenerativeApiError, extractGenerativeApiErrorMessage } from "./format-generative-api-error";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
@@ -72,7 +74,7 @@ import {
 } from "./generative-pick-node-dialog";
 import { connectGenerativeReferenceEdge } from "./generative-reference-utils";
 import { useBufferedTextValue } from "./use-buffered-text-value";
-import { updateNodeInput, useWorkflow } from "./workflow-context";
+import { upsertNodeInputValues, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export interface AiTextConfigPanelProps {
@@ -128,6 +130,7 @@ export function AiTextConfigPanel({
   );
 
   const selectedModelId = getInputString(data, "model");
+  const selectedInterfaceId = getInputString(data, "ai_interface_id");
   const promptValue = getInputString(data, "prompt");
 
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
@@ -155,8 +158,13 @@ export function AiTextConfigPanel({
   );
 
   const selectedModel = useMemo(
-    () => models.find((entry) => entry.canonicalId === selectedModelId),
-    [models, selectedModelId]
+    () =>
+      resolveSelectedModelBinding(
+        models,
+        selectedModelId,
+        selectedInterfaceId
+      ),
+    [models, selectedInterfaceId, selectedModelId]
   );
 
   const modelRules = useMemo(
@@ -220,62 +228,66 @@ export function AiTextConfigPanel({
     [modelFitsCurrentRefs, selectableModels]
   );
 
-  const applyModelSelection = async (canonicalId: string) => {
-    if (disabled || !updateNodeData || !orgId) return;
+  const activeModel =
+    selectedModel ?? modelsFittingRefs.find((entry) => entry.selectable);
+  const selectedOptionId = activeModel?.optionId ?? "";
 
-    const model = models.find((entry) => entry.canonicalId === canonicalId);
+  const applyModelSelection = (optionId: string) => {
+    if (disabled || !updateNodeData) return;
+
+    const model = models.find((entry) => entry.optionId === optionId);
     if (!model?.selectable || !modelFitsCurrentRefs(model)) return;
 
-    const inputsAfterModel = updateNodeInput(
-      nodeId,
-      "model",
-      canonicalId,
-      data.inputs,
-      updateNodeData
-    );
-
-    try {
-      const resolved = await resolveOrgTextModel(orgId, canonicalId);
-      const rules = normalizeTextModelParameterRules(model.parameterRules);
-      updateNodeInput(
-        nodeId,
-        "ai_interface_id",
-        resolved.aiInterfaceId,
-        inputsAfterModel,
-        updateNodeData
-      );
-      updateNodeData(nodeId, (current) => ({
-        metadata: {
-          ...(current.metadata ?? {}),
-          refMaxText: String(rules.maxTextReferences),
-          refMaxImage: String(rules.maxImageReferences),
-          refMaxVideo: String(rules.maxVideoReferences),
-        },
-      }));
-    } catch {
-      updateNodeInput(
-        nodeId,
-        "ai_interface_id",
-        "",
-        inputsAfterModel,
-        updateNodeData
-      );
-    }
+    const rules = normalizeTextModelParameterRules(model.parameterRules);
+    rememberModelBinding(orgId, "text", {
+      canonicalId: model.canonicalId,
+      interfaceId: model.interfaceId,
+    });
+    updateNodeData(nodeId, (current) => ({
+      inputs: upsertNodeInputValues(current.inputs, {
+        model: model.canonicalId,
+        ai_interface_id: model.interfaceId,
+      }),
+      metadata: {
+        ...(current.metadata ?? {}),
+        refMaxText: String(rules.maxTextReferences),
+        refMaxImage: String(rules.maxImageReferences),
+        refMaxVideo: String(rules.maxVideoReferences),
+      },
+    }));
   };
 
   useEffect(() => {
-    if (disabled || isLoading || selectedModelId || modelsFittingRefs.length === 0) {
-      return;
-    }
-    const defaultId = pickDefaultTextModelCanonicalId(modelsFittingRefs);
-    if (!defaultId) return;
-    void applyModelSelection(defaultId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-pick when empty
-  }, [disabled, isLoading, selectedModelId, modelsFittingRefs, orgId, updateNodeData, nodeId]);
+    if (disabled || isLoading || !updateNodeData) return;
+
+    const action = resolveHydrateModelBindingAction(
+      models,
+      selectedModelId,
+      selectedInterfaceId
+    );
+    if (action.kind === "none") return;
+
+    updateNodeData(nodeId, (current) => ({
+      inputs:
+        action.kind === "clear"
+          ? clearModelBindingInputs(current.inputs)
+          : upsertNodeInputValues(current.inputs, {
+              ai_interface_id: action.interfaceId,
+            }),
+    }));
+  }, [
+    disabled,
+    isLoading,
+    models,
+    nodeId,
+    selectedInterfaceId,
+    selectedModelId,
+    updateNodeData,
+  ]);
 
   useEffect(() => {
-    if (disabled || !updateNodeData || !selectedModel) return;
-    const rules = normalizeTextModelParameterRules(selectedModel.parameterRules);
+    if (disabled || !updateNodeData || !activeModel) return;
+    const rules = normalizeTextModelParameterRules(activeModel.parameterRules);
     updateNodeData(nodeId, (current) => {
       const meta = current.metadata ?? {};
       if (
@@ -294,7 +306,7 @@ export function AiTextConfigPanel({
         },
       };
     });
-  }, [disabled, nodeId, selectedModel, updateNodeData]);
+  }, [disabled, nodeId, activeModel, updateNodeData]);
 
   const commitPrompt = useCallback(
     (value: string) => {
@@ -437,9 +449,9 @@ export function AiTextConfigPanel({
   };
 
   const handleGenerate = async () => {
-    if (!orgId || !selectedModel || disabled) return;
+    if (!orgId || !activeModel || disabled) return;
     if (generateInFlightRef.current) return;
-    if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
+    if (!activeModel.selectable || !modelFitsCurrentRefs(activeModel)) {
       return;
     }
 
@@ -474,6 +486,10 @@ export function AiTextConfigPanel({
     generateAbortRef.current = abortController;
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
+      inputs: persistModelBindingToInputs(current.inputs, {
+        canonicalId: activeModel.canonicalId,
+        interfaceId: activeModel.interfaceId,
+      }),
       metadata: withGenerativeCardGenerateError(
         withAiTextGeneratingFlag(current.metadata, true),
         null
@@ -508,7 +524,8 @@ export function AiTextConfigPanel({
       const response: GenerateAiTextResponse = await generateAiTextStream(
         orgId,
         {
-          modelCanonicalId: selectedModel.canonicalId,
+          modelCanonicalId: activeModel.canonicalId,
+          aiInterfaceId: activeModel.interfaceId,
           prompt: question,
           references:
             textReferences.length > 0 ? textReferences : undefined,
@@ -543,19 +560,19 @@ export function AiTextConfigPanel({
       }
       streamPreviewPendingRef.current = null;
 
-      rememberAiTextRecentModel(orgId, selectedModel.canonicalId);
-
       if (!updateNodeData) return;
 
       updateNodeData(nodeId, (current) => {
         const withResult = withAiTextGeneratedResult(current, response.text, {
-          platformModelId: selectedModel.canonicalId,
-          providerModelId: selectedModel.providerModelId,
+          platformModelId: activeModel.canonicalId,
+          aiInterfaceId: response.aiInterfaceId,
         });
-        const inputs = (withResult.inputs ?? current.inputs).map((input) =>
-          input.id === "ai_interface_id"
-            ? ({ ...input, value: response.aiInterfaceId } as WorkflowParameter)
-            : input
+        const inputs = persistModelBindingToInputs(
+          withResult.inputs ?? current.inputs,
+          {
+            canonicalId: activeModel.canonicalId,
+            interfaceId: response.aiInterfaceId,
+          }
         );
         return {
           ...withResult,
@@ -573,17 +590,14 @@ export function AiTextConfigPanel({
         return;
       }
       const raw = error instanceof Error ? error.message : String(error);
-      const extracted = extractGenerativeApiErrorMessage(raw);
-      const formatted = extracted.includes("\n")
-        ? extracted
-        : formatGenerativeApiError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => ({
         metadata: withGenerativeCardGenerateError(
           withAiTextGeneratingFlag(current.metadata, false),
-          prepareGenerativeCardError(formatted, t)
+          cardError
         ),
       }));
-      toast.errorRaw(formatted);
+      toast.errorRaw(cardError.summary);
     } finally {
       if (streamPreviewRafRef.current !== null) {
         window.cancelAnimationFrame(streamPreviewRafRef.current);
@@ -602,8 +616,8 @@ export function AiTextConfigPanel({
   };
 
   const selectedModelOk =
-    Boolean(selectedModel?.selectable) &&
-    Boolean(selectedModel && modelFitsCurrentRefs(selectedModel));
+    Boolean(activeModel?.selectable) &&
+    Boolean(activeModel && modelFitsCurrentRefs(activeModel));
 
   const canGenerate =
     selectedModelOk &&
@@ -681,15 +695,16 @@ export function AiTextConfigPanel({
               orgId={orgId}
               models={models}
               groups={groups}
-              selectedModelId={selectedModelId}
+              selectedOptionId={selectedOptionId}
               disabled={disabled || isLoading}
+              isLoading={isLoading}
               loadError={Boolean(modelsError)}
               onRetryLoad={() => {
                 void refreshModels();
               }}
               modelFitsCurrentRefs={modelFitsCurrentRefs}
-              onSelect={(canonicalId) => {
-                void applyModelSelection(canonicalId);
+              onSelect={(optionId) => {
+                applyModelSelection(optionId);
               }}
             />
             {models.length > 0 && selectableModels.length === 0 ? (
@@ -709,22 +724,16 @@ export function AiTextConfigPanel({
               </p>
             ) : null}
           </div>
-          <Button
-            type="button"
-            size="sm"
-            className="h-9 shrink-0 gap-1 rounded-lg text-xs"
+          <AiGenerateButton
             disabled={!canGenerate}
+            isGenerating={isGenerating}
+            label={
+              isGenerating
+                ? t("workflow.aiTextPanel.generating")
+                : t("workflow.aiTextPanel.generate")
+            }
             onClick={handleGenerate}
-          >
-            {isGenerating ? (
-              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <SparklesIcon className="h-3.5 w-3.5" />
-            )}
-            {isGenerating
-              ? t("workflow.aiTextPanel.generating")
-              : t("workflow.aiTextPanel.generate")}
-          </Button>
+          />
         </div>
       </GenerativeConfigPanelShell>
 

@@ -10,6 +10,7 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
@@ -268,6 +269,7 @@ export function withAiTextGeneratedResult(
   text: string,
   meta?: {
     readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
   }
 ): Partial<WorkflowNodeType> {
@@ -276,6 +278,7 @@ export function withAiTextGeneratedResult(
     id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     text,
     platformModelId: meta?.platformModelId,
+    aiInterfaceId: meta?.aiInterfaceId,
     providerModelId: meta?.providerModelId,
     createdAt: new Date().toISOString(),
   };
@@ -328,11 +331,14 @@ export function withAiTextHistorySelection(
   if (!selected) return {};
 
   const result = withAiTextResult(current, selected.text, {
-    inputs: upsertInputValue(
-      current.inputs,
-      AI_TEXT_RESULT_HISTORY_INPUT_ID,
-      { items: history.items, selectedId },
-      "json"
+    inputs: applyHistoryItemModelBinding(
+      upsertInputValue(
+        current.inputs,
+        AI_TEXT_RESULT_HISTORY_INPUT_ID,
+        { items: history.items, selectedId },
+        "json"
+      ),
+      selected
     ),
   });
   return {

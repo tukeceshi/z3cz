@@ -1,4 +1,5 @@
 import type { MediaReference } from "./media-reference";
+import type { ImageGenerationRequestSnapshot } from "./platform-ai-model";
 
 export type GenerationJobModality = "image" | "video" | "audio";
 
@@ -80,6 +81,7 @@ export type GenerationJobPersistDispatch = "api" | "worker";
 
 export type GenerationJobUpstreamVideoStatus = "queued" | "running";
 
+/** Outbound image-generation params stored on the job for audit. */
 export interface GenerationJobResultJson {
   readonly pendingMedia?: readonly GenerationJobPendingMedia[];
   readonly finalMedia?: readonly MediaReference[];
@@ -95,6 +97,8 @@ export interface GenerationJobResultJson {
   readonly workerClaimedAt?: string;
   /** Latest non-terminal upstream video poll phase (Volcengine queued/running). */
   readonly upstreamVideoStatus?: GenerationJobUpstreamVideoStatus;
+  /** Snapshot of outbound /images/generations fields (image jobs). */
+  readonly requestSnapshot?: ImageGenerationRequestSnapshot;
 }
 
 export interface GenerationJobRecord {

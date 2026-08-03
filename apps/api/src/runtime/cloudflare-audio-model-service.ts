@@ -10,12 +10,14 @@ export class CloudflareAudioModelService {
   async resolveAudioModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeAudioModel | undefined> {
     const db = createDatabase(this.env);
     const resolved = await resolveAudioModelInterface(
       db,
       params.organizationId,
-      params.canonicalId
+      params.canonicalId,
+      params.interfaceId
     );
 
     if (!resolved) {

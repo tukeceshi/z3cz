@@ -38,6 +38,7 @@ function resolveProviderModelId(params: {
   );
 }
 
+/** Sync modality from catalog only — never overwrite org-configured upstream IDs. */
 function syncModelFromCatalog(
   canonicalId: string,
   config: VolcanoInterfaceMetadata["models"][string],
@@ -48,16 +49,12 @@ function syncModelFromCatalog(
     return config;
   }
 
-  if (
-    config.providerModelId === catalogEntry.providerModelId &&
-    config.modality === catalogEntry.modality
-  ) {
+  if (config.modality === catalogEntry.modality) {
     return config;
   }
 
   return {
     ...config,
-    providerModelId: catalogEntry.providerModelId,
     modality: catalogEntry.modality,
   };
 }

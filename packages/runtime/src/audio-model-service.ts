@@ -10,5 +10,6 @@ export interface AudioModelService {
   resolveAudioModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeAudioModel | undefined>;
 }

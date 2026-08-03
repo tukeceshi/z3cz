@@ -51,7 +51,7 @@ import {
   probeVolcanoActivation,
 
   updateVolcanoModelEnabled,
-
+  updateVolcanoModelAlias,
   VOLCANO_ARK_NOT_OPENED_CODE,
 
 } from "@/services/organization-ai-interface-service";
@@ -251,6 +251,7 @@ export function VolcanoInterfacePanel({
   const [isProbingTos, setIsProbingTos] = useState(false);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [aliasSavingId, setAliasSavingId] = useState<string | null>(null);
 
   const loadInFlightRef = useRef(false);
 
@@ -868,6 +869,32 @@ export function VolcanoInterfacePanel({
 
 
 
+  const handleAliasChange = async (canonicalId: string, alias: string) => {
+    setAliasSavingId(canonicalId);
+    try {
+      await updateVolcanoModelAlias(organizationId, iface.id, {
+        [canonicalId]: alias,
+      });
+      await onUpdated();
+      if (snapshot) {
+        setSnapshot({
+          ...snapshot,
+          models: snapshot.models.map((modelRow) =>
+            modelRow.canonicalId === canonicalId
+              ? { ...modelRow, alias }
+              : modelRow
+          ),
+        });
+      }
+    } catch {
+      appToast.error("pages.aiInterfaces.volcano.aliasSaveFailed");
+    } finally {
+      setAliasSavingId(null);
+    }
+  };
+
+
+
   const displayName = resolveVolcanoInterfaceDisplayName(iface.name);
 
 
@@ -1017,7 +1044,10 @@ export function VolcanoInterfacePanel({
 
                       showUsage
 
-                      disabled={togglingId === row.canonicalId}
+                      disabled={
+                        togglingId === row.canonicalId ||
+                        aliasSavingId === row.canonicalId
+                      }
 
                       pricingRow={pricingByCanonicalId.get(row.canonicalId) ?? null}
 
@@ -1030,6 +1060,12 @@ export function VolcanoInterfacePanel({
                       onEnabledChange={(enabled) =>
 
                         void handleToggle(row.canonicalId, enabled)
+
+                      }
+
+                      onAliasChange={(alias) =>
+
+                        void handleAliasChange(row.canonicalId, alias)
 
                       }
 

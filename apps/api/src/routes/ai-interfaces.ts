@@ -59,6 +59,7 @@ import {
   createVolcanoMetadata,
   isVolcanoMetadata,
   mergeVolcanoModelEnabled,
+  mergeVolcanoModelAlias,
   mergeVolcanoActivationCache,
   parseInterfaceMetadata,
   resolveVolcanoCatalogEntries,
@@ -66,6 +67,7 @@ import {
 } from "../integrations/volcengine/metadata";
 import {
   mergeSingleModelModelEnabledMetadata,
+  mergeSingleModelModelAliasMetadata,
   mergeSingleModelUpstreamModelIdsMetadata,
   parseSingleModelMetadata,
 } from "../integrations/single-model/metadata";
@@ -220,7 +222,9 @@ const updateSchema = z
     selectedModel: z.string().nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     volcanoModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    volcanoModelAlias: z.record(z.string(), z.string()).optional(),
     singleModelModelEnabled: z.record(z.string(), z.boolean()).optional(),
+    singleModelModelAlias: z.record(z.string(), z.string()).optional(),
     singleModelUpstreamModelIds: z.record(z.string(), z.string()).optional(),
     tosStorage: z
       .object({
@@ -1049,6 +1053,20 @@ aiInterfaceRoutes.patch(
         );
       }
 
+      if (body.volcanoModelAlias) {
+        const current = parseInterfaceMetadata(
+          metadataUpdate ?? existing.metadata
+        );
+        if (!isVolcanoMetadata(current)) {
+          return c.json({ error: "Volcano metadata not configured" }, 400);
+        }
+        metadataUpdate = mergeVolcanoModelAlias(
+          current,
+          body.volcanoModelAlias,
+          catalogEntries
+        );
+      }
+
       if (body.singleModelModelEnabled) {
         const current = parseSingleModelMetadata(
           metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
@@ -1059,6 +1077,19 @@ aiInterfaceRoutes.patch(
         metadataUpdate = mergeSingleModelModelEnabledMetadata(
           current,
           body.singleModelModelEnabled
+        );
+      }
+
+      if (body.singleModelModelAlias) {
+        const current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        metadataUpdate = mergeSingleModelModelAliasMetadata(
+          current,
+          body.singleModelModelAlias
         );
       }
 

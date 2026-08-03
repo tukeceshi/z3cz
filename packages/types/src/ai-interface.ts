@@ -233,7 +233,9 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly selectedModel?: string | null;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly volcanoModelEnabled?: Readonly<Record<string, boolean>>;
+  readonly volcanoModelAlias?: Readonly<Record<string, string>>;
   readonly singleModelModelEnabled?: Readonly<Record<string, boolean>>;
+  readonly singleModelModelAlias?: Readonly<Record<string, string>>;
   readonly singleModelUpstreamModelIds?: Readonly<Record<string, string>>;
   readonly tosStorage?: VolcanoTosStorageConfig & {
     readonly createBucket?: boolean;

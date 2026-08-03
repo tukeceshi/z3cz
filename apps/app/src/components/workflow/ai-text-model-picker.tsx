@@ -3,15 +3,16 @@ import type {
   PlatformAiModelGroup,
 } from "@dafthunk/types";
 import CheckIcon from "lucide-react/icons/check";
-import ChevronDownIcon from "lucide-react/icons/chevron-down";
-import ChevronRightIcon from "lucide-react/icons/chevron-right";
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
+import { Link } from "react-router";
 
 import { useTranslation } from "@/components/locale-provider";
 import { ModelBrandIcon } from "@/components/model-brand-icon";
@@ -21,46 +22,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { TranslationKey } from "@/i18n";
+import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
 
-const RECENT_STORAGE_PREFIX = "dafthunk.ai-text.recent-models.";
-const MAX_RECENT = 1;
+import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
+
+import {
+  AI_BOTTOM_CHIP_CLASS,
+  AI_BOTTOM_CHIP_OPEN_CLASS,
+} from "./ai-bottom-chip";
+
 const UNGROUPED_SECTION_ID = "__ungrouped";
-const LIST_MAX_HEIGHT_PX = 500;
 const FLYOUT_GAP_PX = 6;
-
-function readRecentIds(orgId: string | undefined): readonly string[] {
-  if (!orgId || typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(`${RECENT_STORAGE_PREFIX}${orgId}`);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((entry): entry is string => typeof entry === "string");
-  } catch {
-    return [];
-  }
-}
-
-function writeRecentId(orgId: string | undefined, canonicalId: string): void {
-  if (!orgId || typeof window === "undefined") return;
-  const next = [
-    canonicalId,
-    ...readRecentIds(orgId).filter((id) => id !== canonicalId),
-  ].slice(0, MAX_RECENT);
-  window.localStorage.setItem(
-    `${RECENT_STORAGE_PREFIX}${orgId}`,
-    JSON.stringify(next)
-  );
-}
-
-/** Persist a model as recently used after a successful generate. */
-export function rememberAiTextRecentModel(
-  orgId: string | undefined,
-  canonicalId: string
-): void {
-  writeRecentId(orgId, canonicalId);
-}
+const FLYOUT_WIDTH_PX = 240;
+const FLYOUT_MAX_HEIGHT_PX = 280;
+const VIEWPORT_PADDING_PX = 8;
 
 export interface ModelBrandSection {
   readonly id: string;
@@ -86,7 +62,7 @@ export function buildModelBrandSections(params: {
       (model) => model.groupId === group.id
     );
     if (groupModels.length === 0) continue;
-    for (const model of groupModels) seen.add(model.canonicalId);
+    for (const model of groupModels) seen.add(model.optionId);
     sections.push({
       id: group.id,
       name: group.name,
@@ -96,7 +72,7 @@ export function buildModelBrandSections(params: {
     });
   }
 
-  const ungrouped = params.models.filter((model) => !seen.has(model.canonicalId));
+  const ungrouped = params.models.filter((model) => !seen.has(model.optionId));
   if (ungrouped.length > 0) {
     sections.push({
       id: UNGROUPED_SECTION_ID,
@@ -111,39 +87,67 @@ export function buildModelBrandSections(params: {
 }
 
 export function resolveActiveBrandId(params: {
-  readonly selectedModel: OrgTextModelOption | undefined;
+  readonly selectedOptionId: string;
   readonly sections: readonly ModelBrandSection[];
 }): string | null {
-  if (!params.selectedModel) return null;
-  if (params.selectedModel.groupId) {
-    return params.selectedModel.groupId;
-  }
+  if (!params.selectedOptionId) return null;
 
-  const ungrouped = params.sections.find(
-    (section) => section.id === UNGROUPED_SECTION_ID
-  );
-  if (
-    ungrouped?.models.some(
-      (model) => model.canonicalId === params.selectedModel?.canonicalId
-    )
-  ) {
-    return UNGROUPED_SECTION_ID;
+  for (const section of params.sections) {
+    if (
+      section.models.some(
+        (model) => model.optionId === params.selectedOptionId
+      )
+    ) {
+      return section.id;
+    }
   }
 
   return null;
 }
 
-export function resolveBrandFlyoutPlacement(params: {
-  readonly spaceAbove: number;
-  readonly spaceBelow: number;
-  readonly flyoutHeight: number;
+export interface BrandFlyoutLayout {
+  readonly top: number;
+  readonly left: number;
+  readonly width: number;
+  readonly maxHeight: number;
+}
+
+export function resolveBrandFlyoutLayout(params: {
+  readonly rowRect: Pick<DOMRect, "top" | "left" | "right" | "width">;
   readonly gap?: number;
-}): "above" | "below" {
+  readonly viewportWidth?: number;
+  readonly viewportHeight?: number;
+  readonly viewportPadding?: number;
+  readonly flyoutWidth?: number;
+  readonly maxFlyoutHeight?: number;
+}): BrandFlyoutLayout {
   const gap = params.gap ?? FLYOUT_GAP_PX;
-  if (params.spaceAbove >= params.flyoutHeight + gap) {
-    return "above";
-  }
-  return "below";
+  const padding = params.viewportPadding ?? VIEWPORT_PADDING_PX;
+  const viewportWidth = params.viewportWidth ?? 800;
+  const viewportHeight = params.viewportHeight ?? 800;
+  const flyoutWidth = params.flyoutWidth ?? FLYOUT_WIDTH_PX;
+  const maxFlyoutCap = params.maxFlyoutHeight ?? FLYOUT_MAX_HEIGHT_PX;
+
+  const rowRight = params.rowRect.right;
+  const spaceRight = viewportWidth - rowRight - padding;
+
+  const left =
+    spaceRight >= flyoutWidth + gap
+      ? rowRight + gap
+      : Math.max(padding, params.rowRect.left - gap - flyoutWidth);
+
+  const top = Math.max(padding, params.rowRect.top);
+  const maxHeight = Math.min(
+    maxFlyoutCap,
+    Math.max(viewportHeight - top - padding, 0)
+  );
+
+  return {
+    top,
+    left,
+    width: flyoutWidth,
+    maxHeight,
+  };
 }
 
 function unavailableReasonKey(
@@ -165,68 +169,60 @@ export interface AiTextModelPickerProps {
   readonly orgId: string | undefined;
   readonly models: readonly OrgTextModelOption[];
   readonly groups: readonly PlatformAiModelGroup[];
-  readonly selectedModelId: string;
+  readonly selectedOptionId: string;
   readonly disabled?: boolean;
+  readonly isLoading?: boolean;
   readonly loadError?: boolean;
   readonly onRetryLoad?: () => void;
   readonly modelFitsCurrentRefs: (model: OrgTextModelOption) => boolean;
-  readonly onSelect: (canonicalId: string) => void;
+  readonly onSelect: (optionId: string) => void;
 }
 
 export function AiTextModelPicker({
-  orgId,
   models,
   groups,
-  selectedModelId,
+  selectedOptionId,
   disabled = false,
+  isLoading = false,
   loadError = false,
   onRetryLoad,
   modelFitsCurrentRefs,
   onSelect,
 }: AiTextModelPickerProps) {
   const { t } = useTranslation();
+  const { getOrgUrl } = useOrgUrl();
   const [open, setOpen] = useState(false);
-  const [recentTick, setRecentTick] = useState(0);
   const [flyoutBrandId, setFlyoutBrandId] = useState<string | null>(null);
-  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const selected = models.find((entry) => entry.canonicalId === selectedModelId);
+  const selected = models.find((entry) => entry.optionId === selectedOptionId);
 
-  const recentIds = useMemo(() => {
-    void recentTick;
-    return readRecentIds(orgId);
-  }, [orgId, recentTick]);
-
-  const recentModels = useMemo(() => {
-    const byId = new Map(models.map((model) => [model.canonicalId, model]));
-    return recentIds
-      .map((id) => byId.get(id))
-      .filter((entry): entry is OrgTextModelOption => Boolean(entry))
-      .slice(0, MAX_RECENT);
-  }, [models, recentIds]);
+  const availableModels = useMemo(
+    () => models.filter((model) => model.selectable),
+    [models]
+  );
 
   const brandSections = useMemo(
     () =>
       buildModelBrandSections({
-        models,
+        models: availableModels,
         groups,
         otherGroupLabel: t("workflow.aiTextPanel.modelGroupOther"),
       }),
-    [groups, models, t]
+    [availableModels, groups, t]
   );
 
   const activeBrandId = useMemo(
     () =>
       resolveActiveBrandId({
-        selectedModel: selected,
+        selectedOptionId,
         sections: brandSections,
       }),
-    [brandSections, selected]
+    [brandSections, selectedOptionId]
   );
 
   const handleSelect = (model: OrgTextModelOption) => {
     if (!model.selectable || !modelFitsCurrentRefs(model)) return;
-    onSelect(model.canonicalId);
+    onSelect(model.optionId);
     setFlyoutBrandId(null);
     setOpen(false);
   };
@@ -249,7 +245,7 @@ export function AiTextModelPicker({
     );
   };
 
-  if (loadError && models.length === 0) {
+  if (loadError && availableModels.length === 0 && models.length === 0) {
     return (
       <button
         type="button"
@@ -271,6 +267,27 @@ export function AiTextModelPicker({
     );
   }
 
+  if (!isLoading && !loadError && models.length === 0) {
+    return (
+      <div
+        className={cn(
+          "nodrag inline-flex h-8 max-w-[280px] items-center gap-1.5 rounded-full px-3 text-xs",
+          "bg-muted/45 text-muted-foreground"
+        )}
+      >
+        <span className="truncate">
+          {t("workflow.aiTextPanel.noModelsAvailable")}
+        </span>
+        <Link
+          to={getOrgUrl("/ai-interfaces")}
+          className="shrink-0 underline underline-offset-2 hover:text-foreground"
+        >
+          {t("workflow.aiTextPanel.openAiInterfaces")}
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <Popover
       open={open}
@@ -279,75 +296,55 @@ export function AiTextModelPicker({
         if (!nextOpen) {
           setFlyoutBrandId(null);
         }
-        if (nextOpen) {
-          setRecentTick((value) => value + 1);
-        }
       }}
     >
       <PopoverTrigger asChild>
         <button
           type="button"
-          disabled={disabled || models.length === 0}
+          disabled={disabled || availableModels.length === 0}
           className={cn(
-            "nodrag inline-flex h-8 max-w-[240px] items-center gap-1.5 rounded-full px-3 text-left text-xs transition",
-            "bg-muted/45 text-muted-foreground hover:bg-muted/65",
-            open && "bg-muted/75 text-foreground",
-            "disabled:pointer-events-none disabled:opacity-50"
+            "nodrag",
+            AI_BOTTOM_CHIP_CLASS,
+            open && AI_BOTTOM_CHIP_OPEN_CLASS
           )}
         >
+
           <ModelBrandIcon
             canonicalId={selected?.canonicalId}
             groupId={selected?.groupId}
+            icon={
+              selected?.groupId
+                ? groups.find((group) => group.id === selected.groupId)?.icon
+                : undefined
+            }
             className="size-4"
           />
           <span className="truncate">
             {selected?.displayName ?? t("workflow.aiTextPanel.selectModel")}
           </span>
-          <ChevronDownIcon className="ml-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         side="top"
-        className="nodrag nowheel w-[320px] p-0"
+        data-ai-model-picker-popover=""
+        className="nodrag nowheel w-[320px] border-border bg-card p-0 dark:border-neutral-700 dark:bg-neutral-800"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="border-b border-border/60 px-3 py-2 text-xs font-medium text-foreground">
-          {t("workflow.aiTextPanel.modelPickerTitle")}
-        </div>
-        <div
-          ref={listContainerRef}
-          className="relative overflow-y-auto p-2"
-          style={{ maxHeight: LIST_MAX_HEIGHT_PX }}
-        >
-          {recentModels.length > 0 ? (
-            <div className="mb-2 last:mb-0">
-              <div className="mb-1 px-2 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t("workflow.aiTextPanel.modelRecent")}
-              </div>
-              <div className="space-y-0.5">
-                {recentModels.map((model) => (
-                  <ModelOptionRow
-                    key={`recent-${model.canonicalId}`}
-                    model={model}
-                    selected={model.canonicalId === selectedModelId}
-                    fitsReferences={modelFitsCurrentRefs(model)}
-                    onSelect={handleSelect}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-1">
+        <div className={cn("max-h-[500px] p-1", LIST_SCROLL_CLASS)}>
+          <div className="space-y-0.5">
             {brandSections.map((section) => (
               <BrandSectionBlock
                 key={section.id}
                 section={section}
                 isActiveBrand={activeBrandId === section.id}
                 isFlyoutOpen={flyoutBrandId === section.id}
-                selectedModelId={selectedModelId}
-                listContainerRef={listContainerRef}
+                selectedOptionId={selectedOptionId}
+                selectedModelName={
+                  activeBrandId === section.id
+                    ? (selected?.displayName ?? null)
+                    : null
+                }
                 modelFitsCurrentRefs={modelFitsCurrentRefs}
                 onBrandClick={() =>
                   handleBrandClick(
@@ -355,14 +352,15 @@ export function AiTextModelPicker({
                     section.models.length === 1 ? section.models[0] : undefined
                   )
                 }
+                onCloseFlyout={() => setFlyoutBrandId(null)}
                 onSelectModel={handleSelect}
               />
             ))}
           </div>
 
-          {models.length === 0 ? (
+          {availableModels.length === 0 ? (
             <p className="px-2 py-3 text-xs text-muted-foreground">
-              {t("workflow.aiTextPanel.selectModel")}
+              {t("workflow.aiTextPanel.noModelsAvailable")}
             </p>
           ) : null}
         </div>
@@ -375,85 +373,169 @@ function BrandSectionBlock({
   section,
   isActiveBrand,
   isFlyoutOpen,
-  selectedModelId,
-  listContainerRef,
+  selectedOptionId,
+  selectedModelName,
   modelFitsCurrentRefs,
   onBrandClick,
+  onCloseFlyout,
   onSelectModel,
 }: {
   readonly section: ModelBrandSection;
   readonly isActiveBrand: boolean;
   readonly isFlyoutOpen: boolean;
-  readonly selectedModelId: string;
-  readonly listContainerRef: RefObject<HTMLDivElement | null>;
+  readonly selectedOptionId: string;
+  readonly selectedModelName: string | null;
   readonly modelFitsCurrentRefs: (model: OrgTextModelOption) => boolean;
   readonly onBrandClick: () => void;
+  readonly onCloseFlyout: () => void;
   readonly onSelectModel: (model: OrgTextModelOption) => void;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
-  const flyoutRef = useRef<HTMLDivElement>(null);
-  const [flyoutPlacement, setFlyoutPlacement] = useState<"above" | "below">(
-    "above"
-  );
 
   const hasMultipleModels = section.models.length > 1;
   const representativeCanonicalId = section.models[0]?.canonicalId;
 
-  useLayoutEffect(() => {
-    if (!isFlyoutOpen || !rowRef.current || !listContainerRef.current) {
-      return;
-    }
-
-    const container = listContainerRef.current;
-    const row = rowRef.current;
-    const flyout = flyoutRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    const flyoutHeight = flyout?.offsetHeight ?? section.models.length * 34 + 12;
-
-    setFlyoutPlacement(
-      resolveBrandFlyoutPlacement({
-        spaceAbove: rowRect.top - containerRect.top,
-        spaceBelow: containerRect.bottom - rowRect.bottom,
-        flyoutHeight,
-      })
-    );
-  }, [isFlyoutOpen, listContainerRef, section.models.length]);
-
   return (
-    <div ref={rowRef} className="relative">
+    <div ref={rowRef}>
       <BrandRow
         section={section}
         representativeCanonicalId={representativeCanonicalId}
         isActiveBrand={isActiveBrand}
         isFlyoutOpen={isFlyoutOpen}
         hasMultipleModels={hasMultipleModels}
+        selectedModelName={selectedModelName}
         onClick={onBrandClick}
       />
 
       {isFlyoutOpen && hasMultipleModels ? (
-        <div
-          ref={flyoutRef}
-          className={cn(
-            "absolute inset-x-0 z-50 overflow-y-auto rounded-lg border border-border/90 bg-popover p-1 shadow-lg",
-            flyoutPlacement === "above"
-              ? "bottom-full mb-1.5"
-              : "top-full mt-1.5"
-          )}
-          style={{ maxHeight: Math.min(280, LIST_MAX_HEIGHT_PX - 48) }}
-        >
-          {section.models.map((model) => (
-            <ModelOptionRow
-              key={model.canonicalId}
-              model={model}
-              selected={model.canonicalId === selectedModelId}
-              fitsReferences={modelFitsCurrentRefs(model)}
-              onSelect={onSelectModel}
-            />
-          ))}
-        </div>
+        <BrandModelFlyoutPortal
+          anchorRef={rowRef}
+          section={section}
+          selectedOptionId={selectedOptionId}
+          modelFitsCurrentRefs={modelFitsCurrentRefs}
+          onSelectModel={onSelectModel}
+          onClose={onCloseFlyout}
+        />
       ) : null}
     </div>
+  );
+}
+
+function BrandModelFlyoutPortal({
+  anchorRef,
+  section,
+  selectedOptionId,
+  modelFitsCurrentRefs,
+  onSelectModel,
+  onClose,
+}: {
+  readonly anchorRef: RefObject<HTMLDivElement | null>;
+  readonly section: ModelBrandSection;
+  readonly selectedOptionId: string;
+  readonly modelFitsCurrentRefs: (model: OrgTextModelOption) => boolean;
+  readonly onSelectModel: (model: OrgTextModelOption) => void;
+  readonly onClose: () => void;
+}) {
+  const flyoutRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<BrandFlyoutLayout>({
+    top: 0,
+    left: 0,
+    width: FLYOUT_WIDTH_PX,
+    maxHeight: FLYOUT_MAX_HEIGHT_PX,
+  });
+  const [visible, setVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+
+    setLayout(
+      resolveBrandFlyoutLayout({
+        rowRect: anchor.getBoundingClientRect(),
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })
+    );
+    setVisible(true);
+  }, [anchorRef, section.id]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const handleReposition = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      setLayout(
+        resolveBrandFlyoutLayout({
+          rowRect: anchor.getBoundingClientRect(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        })
+      );
+    };
+
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [anchorRef, visible]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (flyoutRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+
+      const popoverRoot = anchorRef.current?.closest(
+        "[data-ai-model-picker-popover]"
+      );
+      if (popoverRoot?.contains(target)) {
+        onClose();
+        return;
+      }
+
+      onClose();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [anchorRef, onClose]);
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      ref={flyoutRef}
+      className={cn(
+        "nodrag nowheel fixed z-[60] rounded-lg border border-border bg-card p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800",
+        LIST_SCROLL_CLASS
+      )}
+      style={{
+        top: layout.top,
+        left: layout.left,
+        width: layout.width,
+        maxHeight: layout.maxHeight,
+        visibility: visible ? "visible" : "hidden",
+      }}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      {section.models.map((model) => (
+        <ModelOptionRow
+          key={model.optionId}
+          model={model}
+          selected={model.optionId === selectedOptionId}
+          fitsReferences={modelFitsCurrentRefs(model)}
+          onSelect={onSelectModel}
+        />
+      ))}
+    </div>,
+    document.body
   );
 }
 
@@ -463,6 +545,7 @@ function BrandRow({
   isActiveBrand,
   isFlyoutOpen,
   hasMultipleModels,
+  selectedModelName,
   onClick,
 }: {
   readonly section: ModelBrandSection;
@@ -470,44 +553,49 @@ function BrandRow({
   readonly isActiveBrand: boolean;
   readonly isFlyoutOpen: boolean;
   readonly hasMultipleModels: boolean;
+  readonly selectedModelName: string | null;
   readonly onClick: () => void;
 }) {
+  const title = hasMultipleModels
+    ? section.name
+    : (section.models[0]?.displayName ?? section.name);
+  const subtitle = hasMultipleModels
+    ? isActiveBrand && selectedModelName
+      ? selectedModelName
+      : section.description
+    : null;
+
   return (
     <button
       type="button"
       className={cn(
-        "flex w-full items-start gap-2.5 rounded-lg px-2 py-2.5 text-left transition",
-        "hover:bg-muted/80",
-        isActiveBrand && "bg-muted/70 ring-1 ring-border/70",
-        isFlyoutOpen && "bg-muted/90 ring-1 ring-border"
+        "flex h-[50px] w-full items-center gap-2 rounded-lg px-2 text-left transition",
+        "hover:bg-muted/30 dark:hover:bg-neutral-700/40",
+        isActiveBrand && "bg-muted/30 dark:bg-neutral-700/40",
+        isFlyoutOpen && "bg-muted/40 dark:bg-neutral-700/50"
       )}
       onClick={onClick}
     >
-      <span className="mt-0.5">
+      <span className="flex size-[34px] shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-neutral-700">
         <ModelBrandIcon
           groupId={section.id === UNGROUPED_SECTION_ID ? null : section.id}
+          icon={section.icon}
           canonicalId={representativeCanonicalId}
-          className="size-5"
+          className="size-4 bg-transparent"
         />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">
-          {section.name}
+        <span className="block truncate text-sm font-medium leading-5 text-foreground">
+          {title}
         </span>
-        {section.description ? (
-          <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-            {section.description}
+        {subtitle ? (
+          <span className="block truncate text-xs leading-4 text-muted-foreground">
+            {subtitle}
           </span>
         ) : null}
       </span>
-      {hasMultipleModels ? (
-        <span className="mt-0.5 shrink-0 text-muted-foreground">
-          {isFlyoutOpen ? (
-            <ChevronDownIcon className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRightIcon className="h-3.5 w-3.5" />
-          )}
-        </span>
+      {isActiveBrand ? (
+        <CheckIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
       ) : null}
     </button>
   );
@@ -540,8 +628,10 @@ function ModelOptionRow({
       disabled={!available}
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition",
-        available ? "hover:bg-muted/80" : "opacity-50",
-        selected && "bg-muted/90"
+        available
+          ? "hover:bg-muted/30 dark:hover:bg-neutral-700/40"
+          : "opacity-50",
+        selected && "bg-muted/30 dark:bg-neutral-700/40"
       )}
       onClick={() => onSelect(model)}
     >
@@ -549,9 +639,6 @@ function ModelOptionRow({
         {model.displayName}
         {suffix}
       </span>
-      {selected ? (
-        <CheckIcon className="h-3 w-3 shrink-0 text-emerald-500" />
-      ) : null}
     </button>
   );
 }

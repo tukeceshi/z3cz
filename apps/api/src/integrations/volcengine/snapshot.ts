@@ -2,6 +2,7 @@ import {
   VOLCANO_AGGREGATE_MODEL_CATALOG,
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
+  resolveInterfaceModelAlias,
   type VolcanoModelUsage,
   type VolcanoResourcePackageRow,
   type VolcanoSnapshotResponse,
@@ -209,7 +210,10 @@ export async function buildVolcanoSnapshot(params: {
         : activationCacheEntry;
     const base = {
       canonicalId: entry.canonicalId,
-      alias: entry.alias,
+      alias: resolveInterfaceModelAlias({
+        alias: config?.alias,
+        platformDisplayName: entry.alias,
+      }),
       modality: entry.modality,
       providerModelId: entry.providerModelId,
       enabled,

@@ -5,7 +5,6 @@ import type {
   AiModelModality,
   CreatePlatformAiModelGroupRequest,
   ListAiModelInvocationsResponse,
-  OrganizationModelInterfacePriority,
   PlatformAiModel,
   PlatformAiModelGroup,
   PlatformAiModelParameterRules,
@@ -35,7 +34,6 @@ import type { Database } from "./index";
 import { parseJsonColumn } from "./parse-json-column";
 import {
   aiModelInvocations,
-  organizationModelInterfacePriorities,
   platformAiModelGroups,
   platformAiModels,
 } from "./schema";
@@ -48,7 +46,6 @@ function mapPlatformModelRow(
     displayName: row.displayName,
     modality: row.modality as AiModelModality,
     platformEnabled: row.platformEnabled,
-    providerModelId: row.providerModelId,
     parameterRules: parseJsonColumn<PlatformAiModelParameterRules>(
       row.parameterRules
     ),
@@ -67,6 +64,7 @@ function mapPlatformGroupRow(
     name: row.name,
     description: row.description,
     icon: row.icon,
+    modality: (row.modality as PlatformAiModelGroup["modality"]) || "text",
     sortOrder: row.sortOrder,
     updatedAt: row.updatedAt?.toISOString(),
   };
@@ -144,12 +142,11 @@ export async function updatePlatformAiModel(
     .set({
       displayName: patch.displayName ?? existing.displayName,
       platformEnabled: patch.platformEnabled ?? existing.platformEnabled,
-      providerModelId: patch.providerModelId ?? existing.providerModelId,
       parameterRules: nextRules,
-      sortOrder: patch.sortOrder ?? existing.sortOrder,
       groupId:
         patch.groupId !== undefined ? patch.groupId : existing.groupId,
       description: patch.description ?? existing.description,
+      sortOrder: patch.sortOrder ?? existing.sortOrder,
       updatedAt: new Date(),
     })
     .where(eq(platformAiModels.canonicalId, canonicalId));
@@ -158,11 +155,15 @@ export async function updatePlatformAiModel(
 }
 
 export async function listPlatformAiModelGroups(
-  db: Database
+  db: Database,
+  modality?: AiModelModality
 ): Promise<readonly PlatformAiModelGroup[]> {
   const rows = await db
     .select()
     .from(platformAiModelGroups)
+    .where(
+      modality ? eq(platformAiModelGroups.modality, modality) : undefined
+    )
     .orderBy(asc(platformAiModelGroups.sortOrder));
 
   return rows.map(mapPlatformGroupRow);
@@ -190,6 +191,7 @@ export async function createPlatformAiModelGroup(
     name: body.name,
     description: body.description ?? "",
     icon: body.icon ?? "sparkles",
+    modality: body.modality,
     sortOrder: body.sortOrder ?? 0,
   });
   const created = await getPlatformAiModelGroup(db, body.id);
@@ -213,6 +215,7 @@ export async function updatePlatformAiModelGroup(
       name: patch.name ?? existing.name,
       description: patch.description ?? existing.description,
       icon: patch.icon ?? existing.icon,
+      modality: patch.modality ?? existing.modality,
       sortOrder: patch.sortOrder ?? existing.sortOrder,
       updatedAt: new Date(),
     })
@@ -238,49 +241,6 @@ export async function deletePlatformAiModelGroup(
     .where(eq(platformAiModelGroups.id, id));
 
   return true;
-}
-
-export async function listModelInterfacePriorities(
-  db: Database,
-  organizationId: string
-): Promise<readonly OrganizationModelInterfacePriority[]> {
-  const rows = await db
-    .select()
-    .from(organizationModelInterfacePriorities)
-    .where(eq(organizationModelInterfacePriorities.organizationId, organizationId));
-
-  return rows.map((row) => ({
-    canonicalId: row.canonicalId,
-    interfaceIds: parseJsonColumn<string[]>(row.interfaceIds),
-  }));
-}
-
-export async function upsertModelInterfacePriority(
-  db: Database,
-  organizationId: string,
-  canonicalId: string,
-  interfaceIds: readonly string[]
-): Promise<OrganizationModelInterfacePriority> {
-  await db
-    .insert(organizationModelInterfacePriorities)
-    .values({
-      organizationId,
-      canonicalId,
-      interfaceIds: [...interfaceIds],
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [
-        organizationModelInterfacePriorities.organizationId,
-        organizationModelInterfacePriorities.canonicalId,
-      ],
-      set: {
-        interfaceIds: [...interfaceIds],
-        updatedAt: new Date(),
-      },
-    });
-
-  return { canonicalId, interfaceIds };
 }
 
 export async function createAiModelInvocation(

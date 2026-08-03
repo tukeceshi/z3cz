@@ -10,12 +10,14 @@ export class CloudflareVideoModelService {
   async resolveVideoModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeVideoModel | undefined> {
     const db = createDatabase(this.env);
     const resolved = await resolveVideoModelInterface(
       db,
       params.organizationId,
-      params.canonicalId
+      params.canonicalId,
+      params.interfaceId
     );
 
     if (!resolved) {

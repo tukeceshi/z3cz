@@ -2,6 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   type AiImageResultHistory,
   type AiImageResultHistoryItem,
+  type ImageGenerationRequestSnapshot,
   normalizeImageModelParameterRules,
   type ImageModelParameterRules,
   isMediaReference,
@@ -9,6 +10,7 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -19,6 +21,7 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import { splitHistoryMediaRows } from "./generative-history-utils";
 
 import {
   AI_IMAGE_EMPTY_CARD_SIZE,
@@ -192,7 +195,7 @@ export function readAiImageResultHistory(
     items?: unknown;
     selectedId?: unknown;
   };
-  const items = Array.isArray(record.items)
+  const rawItems = Array.isArray(record.items)
     ? record.items.filter(
         (entry): entry is AiImageResultHistoryItem =>
           !!entry &&
@@ -209,6 +212,12 @@ export function readAiImageResultHistory(
         };
       })
     : [];
+
+  const items = splitHistoryMediaRows({
+    items: rawItems,
+    getMedia: (item) => item.images,
+    withMedia: (item, images) => ({ ...item, images }),
+  });
 
   return {
     items,
@@ -329,22 +338,33 @@ export function withAiImageGeneratedResult(
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
     readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
+    readonly requestSnapshot?: ImageGenerationRequestSnapshot;
   }
 ): Partial<WorkflowNodeType> {
+  if (images.length === 0) return {};
+
   const history = readAiImageResultHistory(current.inputs);
-  const item: AiImageResultHistoryItem = {
-    id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    images: [...images],
+  const createdAt = new Date().toISOString();
+  const batchId = Date.now();
+  const newItems: AiImageResultHistoryItem[] = images.map((image, index) => ({
+    id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    images: [image],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
     platformModelId: meta?.platformModelId,
+    aiInterfaceId: meta?.aiInterfaceId,
     providerModelId: meta?.providerModelId,
-    createdAt: new Date().toISOString(),
-  };
+    modelDisplayName: meta?.modelDisplayName,
+    requestSnapshot: meta?.requestSnapshot,
+    createdAt,
+  }));
+  const primary = newItems[0]!;
   const nextHistory: AiImageResultHistory = {
-    items: [item, ...history.items].slice(0, AI_IMAGE_MAX_HISTORY_ITEMS),
-    selectedId: item.id,
+    items: [...newItems, ...history.items].slice(0, AI_IMAGE_MAX_HISTORY_ITEMS),
+    selectedId: primary.id,
   };
 
   let inputs = upsertInputValue(
@@ -355,7 +375,7 @@ export function withAiImageGeneratedResult(
   );
   inputs = upsertInputValue(inputs, "manual_images", [], "json");
 
-  const result = withAiImageResult(current, images, { inputs });
+  const result = withAiImageResult(current, [images[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -370,20 +390,20 @@ export function withAiImageHistorySelection(
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  const promptInputs = upsertInputValue(
+  let nextInputs = upsertInputValue(
     current.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  const paramsInputs =
-    selected.params !== undefined
-      ? upsertInputValue(promptInputs, "params", selected.params, "json")
-      : promptInputs;
+  if (selected.params !== undefined) {
+    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
+  }
+  nextInputs = applyHistoryItemModelBinding(nextInputs, selected);
 
-  const result = withAiImageResult(current, selected.images, {
+  const result = withAiImageResult(current, selected.images.slice(0, 1), {
     inputs: upsertInputValue(
-      paramsInputs,
+      nextInputs,
       AI_IMAGE_HISTORY_INPUT_ID,
       { items: history.items, selectedId },
       "json"

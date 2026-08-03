@@ -1,135 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ensureVolcanoModelsIncludePlatformCatalog,
-  evaluateOrgTextModelAvailability,
+  resolveOrgModelInterfaceBinding,
   toVolcanoCatalogEntriesFromPlatform,
 } from "./resolve-text-model-interface";
-import type { PlatformAiModel, VolcanoInterfaceMetadata } from "@dafthunk/types";
+import type {
+  PlatformAiModel,
+  PlatformAiModelParameterRules,
+  VolcanoInterfaceMetadata,
+} from "@dafthunk/types";
+import { DEFAULT_TEXT_MODEL_PARAMETER_RULES } from "@dafthunk/types";
 
-describe("evaluateOrgTextModelAvailability", () => {
-  it("returns no_org_interface when no volcano interfaces", () => {
-    expect(evaluateOrgTextModelAvailability("deepseek-v4-flash", [])).toEqual({
-      selectable: false,
-      unavailableReason: "no_org_interface",
-    });
-  });
-
-  it("is selectable when a single-model interface enables the canonical id", () => {
-    expect(
-      evaluateOrgTextModelAvailability(
-        "deepseek-v4-flash",
-        [],
-        [
-          {
-            id: "iface-1",
-            createdAt: new Date("2026-01-01"),
-            singleModelPresetId: "provider:deepseek",
-            models: {
-              "deepseek-v4-flash": {
-                enabled: true,
-                upstreamModelId: "deepseek-v4-flash",
-                modality: "text",
-              },
-            },
-          },
-        ]
-      )
-    ).toEqual({ selectable: true });
-  });
-
-  it("is selectable when any interface enables the model", () => {
-    expect(
-      evaluateOrgTextModelAvailability("deepseek-v4-flash", [
-        {
-          id: "a",
-          createdAt: new Date("2026-01-01"),
-          models: {
-            "deepseek-v4-flash": {
-              enabled: false,
-              providerModelId: "deepseek-v4-flash-260425",
-              modality: "text",
-            },
-          },
-        },
-        {
-          id: "b",
-          createdAt: new Date("2026-02-01"),
-          models: {
-            "deepseek-v4-flash": {
-              enabled: true,
-              providerModelId: "deepseek-v4-flash-260425",
-              modality: "text",
-            },
-          },
-        },
-      ])
-    ).toEqual({ selectable: true });
-  });
-
-  it("returns model_disabled_on_interface when key exists but off", () => {
-    expect(
-      evaluateOrgTextModelAvailability("deepseek-v4-flash", [
-        {
-          id: "a",
-          createdAt: new Date("2026-01-01"),
-          models: {
-            "deepseek-v4-flash": {
-              enabled: false,
-              providerModelId: "deepseek-v4-flash-260425",
-              modality: "text",
-            },
-          },
-        },
-      ])
-    ).toEqual({
-      selectable: false,
-      unavailableReason: "model_disabled_on_interface",
-    });
-  });
-
-  it("returns model_missing_on_interface when key absent", () => {
-    expect(
-      evaluateOrgTextModelAvailability("deepseek-v4-flash", [
-        {
-          id: "a",
-          createdAt: new Date("2026-01-01"),
-          models: {
-            "deepseek-v4-pro": {
-              enabled: true,
-              providerModelId: "deepseek-v4-pro-260425",
-              modality: "text",
-            },
-          },
-        },
-      ])
-    ).toEqual({
-      selectable: false,
-      unavailableReason: "model_missing_on_interface",
-    });
-  });
-});
+const testTextRules =
+  DEFAULT_TEXT_MODEL_PARAMETER_RULES as PlatformAiModelParameterRules;
 
 describe("toVolcanoCatalogEntriesFromPlatform", () => {
-  it("maps platform models to volcano catalog entries", () => {
+  it("maps platform models using static volcano catalog providerModelIds", () => {
     const models: readonly PlatformAiModel[] = [
       {
         canonicalId: "deepseek-v4-flash",
         displayName: "DeepSeek V4 Flash",
         modality: "text",
-        providerModelId: "deepseek-v4-flash-260425",
         platformEnabled: true,
         sortOrder: 0,
-        parameterRules: {
-          schemaVersion: 1,
-          referenceInputs: [{ type: "string", field: "keywords", maxCount: 1 }],
-          keywordsMaxChars: 2000,
-          promptMaxChars: 8000,
-          outputMaxTokens: 4096,
-          outputMaxTokensLimit: 8192,
-          outputMaxChars: 20000,
-          contextWindowTokens: 128000,
-        },
+        groupId: null,
+        description: "",
+        parameterRules: testTextRules,
       },
     ];
 
@@ -149,37 +46,21 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
         canonicalId: "kimi-k3",
         displayName: "Kimi K3",
         modality: "text",
-        providerModelId: "kimi-k3",
         platformEnabled: true,
         sortOrder: 41,
-        parameterRules: {
-          schemaVersion: 1,
-          referenceInputs: [{ type: "string", field: "keywords", maxCount: 1 }],
-          keywordsMaxChars: 2000,
-          promptMaxChars: 8000,
-          outputMaxTokens: 4096,
-          outputMaxTokensLimit: 8192,
-          outputMaxChars: 20000,
-          contextWindowTokens: 128000,
-        },
+        groupId: null,
+        description: "",
+        parameterRules: testTextRules,
       },
       {
         canonicalId: "deepseek-v4-pro",
         displayName: "DeepSeek V4 Pro",
         modality: "text",
-        providerModelId: "deepseek-v4-pro-260425",
         platformEnabled: true,
         sortOrder: 0,
-        parameterRules: {
-          schemaVersion: 1,
-          referenceInputs: [{ type: "string", field: "keywords", maxCount: 1 }],
-          keywordsMaxChars: 2000,
-          promptMaxChars: 8000,
-          outputMaxTokens: 4096,
-          outputMaxTokensLimit: 8192,
-          outputMaxChars: 20000,
-          contextWindowTokens: 128000,
-        },
+        groupId: null,
+        description: "",
+        parameterRules: testTextRules,
       },
     ];
 
@@ -191,6 +72,88 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
         providerModelId: "deepseek-v4-pro-260425",
       },
     ]);
+  });
+});
+
+describe("resolveOrgModelInterfaceBinding", () => {
+  it("resolves using modality-specific options without requiring text catalog membership", async () => {
+    const candidateSpy = vi
+      .spyOn(
+        await import("./resolve-text-model-interface"),
+        "resolveOrgModelInterfaceCandidate"
+      )
+      .mockResolvedValue({
+        interfaceId: "iface-1",
+        interfaceName: "Volcano",
+        channelKind: "aggregate",
+        providerModelId: "seedream-id",
+      });
+
+    const db = {} as import("../db").Database;
+    const listOptions = vi.fn(async () => [
+      {
+        canonicalId: "doubao-seedream-5",
+        interfaceId: "iface-1",
+        selectable: true,
+        displayName: "[聚合] Seedream 5",
+        parameterRules: { promptMaxChars: 2000 },
+      },
+    ]);
+
+    const resolved = await resolveOrgModelInterfaceBinding(
+      db,
+      "org-1",
+      "doubao-seedream-5",
+      "iface-1",
+      listOptions
+    );
+
+    expect(resolved).toEqual({
+      canonicalId: "doubao-seedream-5",
+      displayName: "[聚合] Seedream 5",
+      interfaceId: "iface-1",
+      interfaceName: "Volcano",
+      providerModelId: "seedream-id",
+      parameterRules: { promptMaxChars: 2000 },
+    });
+    expect(listOptions).toHaveBeenCalledWith(db, "org-1");
+    candidateSpy.mockRestore();
+  });
+
+  it("returns null when binding is not selectable", async () => {
+    const candidateSpy = vi
+      .spyOn(
+        await import("./resolve-text-model-interface"),
+        "resolveOrgModelInterfaceCandidate"
+      )
+      .mockResolvedValue({
+        interfaceId: "iface-1",
+        interfaceName: "Volcano",
+        channelKind: "aggregate",
+        providerModelId: "seedream-id",
+      });
+
+    const db = {} as import("../db").Database;
+    const listOptions = vi.fn(async () => [
+      {
+        canonicalId: "doubao-seedream-5",
+        interfaceId: "iface-1",
+        selectable: false,
+        displayName: "[聚合] Seedream 5",
+        parameterRules: { promptMaxChars: 2000 },
+      },
+    ]);
+
+    const resolved = await resolveOrgModelInterfaceBinding(
+      db,
+      "org-1",
+      "doubao-seedream-5",
+      "iface-1",
+      listOptions
+    );
+
+    expect(resolved).toBeNull();
+    candidateSpy.mockRestore();
   });
 });
 
@@ -234,7 +197,7 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
     });
   });
 
-  it("syncs providerModelId when platform catalog changes", () => {
+  it("does not overwrite existing providerModelId", () => {
     const metadata: VolcanoInterfaceMetadata = {
       credentialMode: "volcengine_iam",
       accessKeyId: "ak",
@@ -261,7 +224,7 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
 
     expect(next.models["glm-5-2"]).toEqual({
       enabled: true,
-      providerModelId: "glm-5-2-260617",
+      providerModelId: "glm-5.2",
       modality: "text",
     });
   });

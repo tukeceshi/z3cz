@@ -125,6 +125,16 @@ export async function updateVolcanoModelEnabled(
   });
 }
 
+export async function updateVolcanoModelAlias(
+  organizationId: string,
+  interfaceId: string,
+  volcanoModelAlias: Record<string, string>
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    volcanoModelAlias,
+  });
+}
+
 export async function updateSingleModelModelEnabled(
   organizationId: string,
   interfaceId: string,
@@ -132,6 +142,16 @@ export async function updateSingleModelModelEnabled(
 ): Promise<OrganizationAiInterface> {
   return updateOrganizationAiInterface(organizationId, interfaceId, {
     singleModelModelEnabled,
+  });
+}
+
+export async function updateSingleModelModelAlias(
+  organizationId: string,
+  interfaceId: string,
+  singleModelModelAlias: Record<string, string>
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    singleModelModelAlias,
   });
 }
 

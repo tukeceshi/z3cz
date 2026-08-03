@@ -1,5 +1,6 @@
 import {
   isSingleModelProviderMetadata,
+  mergeSingleModelModelAlias,
   mergeSingleModelModelEnabled,
   mergeSingleModelUpstreamModelIds,
   type SingleModelProviderMetadata,
@@ -32,4 +33,11 @@ export function mergeSingleModelUpstreamModelIdsMetadata(
   updates: Readonly<Record<string, string>>
 ): SingleModelProviderMetadata {
   return mergeSingleModelUpstreamModelIds(metadata, updates);
+}
+
+export function mergeSingleModelModelAliasMetadata(
+  metadata: SingleModelProviderMetadata,
+  aliases: Readonly<Record<string, string>>
+): SingleModelProviderMetadata {
+  return mergeSingleModelModelAlias(metadata, aliases);
 }

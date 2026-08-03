@@ -10,5 +10,6 @@ export interface ImageModelService {
   resolveImageModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeImageModel | undefined>;
 }

@@ -8,11 +8,7 @@ import { createDatabase } from "../db";
 import { executeTextModel } from "../services/execute-text-model";
 import { disableTextModelOnInterface } from "../services/disable-text-model-on-interface";
 import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
-import {
-  listOrgTextModelOptions,
-  listTextModelInterfaceCandidates,
-  resolveTextModelInterface,
-} from "../services/resolve-text-model-interface";
+import { resolveTextModelInterface } from "../services/resolve-text-model-interface";
 
 export class CloudflareTextModelService {
   constructor(private readonly env: Bindings) {}
@@ -20,12 +16,14 @@ export class CloudflareTextModelService {
   async resolveTextModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
   }): Promise<ResolvedRuntimeTextModel | undefined> {
     const db = createDatabase(this.env);
     const resolved = await resolveTextModelInterface(
       db,
       params.organizationId,
-      params.canonicalId
+      params.canonicalId,
+      params.interfaceId
     );
 
     if (!resolved) {
@@ -41,6 +39,7 @@ export class CloudflareTextModelService {
   async executeTextModel(params: {
     organizationId: string;
     canonicalId: string;
+    interfaceId: string;
     effectivePrompt: string;
     referenceImageUrls?: readonly string[];
     referenceImageInline?: readonly {
@@ -55,23 +54,12 @@ export class CloudflareTextModelService {
       db,
       organizationId: params.organizationId,
       canonicalId: params.canonicalId,
+      interfaceId: params.interfaceId,
       effectivePrompt: params.effectivePrompt,
       referenceImageUrls: params.referenceImageUrls,
       referenceImageInline: params.referenceImageInline,
       referenceVideoUrls: params.referenceVideoUrls,
     });
-  }
-
-  async listTextModelCandidates(params: {
-    organizationId: string;
-    canonicalId: string;
-  }) {
-    const db = createDatabase(this.env);
-    return listTextModelInterfaceCandidates(
-      db,
-      params.organizationId,
-      params.canonicalId
-    );
   }
 
   async disableTextModelOnInterface(params: {
@@ -94,20 +82,13 @@ export class CloudflareTextModelService {
     canonicalId: string;
   }): Promise<string | undefined> {
     const db = createDatabase(this.env);
-    const catalogProviderModelId = (
-      await listOrgTextModelOptions(db, params.organizationId)
-    ).find((entry) => entry.canonicalId === params.canonicalId)?.providerModelId;
-
-    if (!catalogProviderModelId) {
-      return undefined;
-    }
-
-    return resolveVolcanoInferenceModelIdAfterEnsure({
+    const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
       db,
       organizationId: params.organizationId,
       interfaceId: params.interfaceId,
       canonicalId: params.canonicalId,
-      catalogProviderModelId,
     });
+
+    return inferenceModelId ?? undefined;
   }
 }

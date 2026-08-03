@@ -51,7 +51,6 @@ import { cn, getModifierKey, getModifierSymbol } from "@/utils/utils";
 import { AiEditorOverlays } from "./ai-editor-overlays";
 import {
   buildConnectedHandleKeysByNode,
-  connectedHandleKeysEqual,
 } from "./workflow-connected-handles";
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
 import { WorkflowNode } from "./workflow-node";
@@ -703,24 +702,12 @@ export function WorkflowCanvas({
   );
 
   const renderNodes = useMemo(() => {
-    return displayNodes.map((node) => {
+    const baseNodes = isDraggingRef?.current ? displayNodes : nodes;
+
+    return baseNodes.map((node) => {
       const handleKeys = connectedKeysByNode.get(node.id) ?? [];
       const isHost = node.id === soleSelectedNodeId;
-      const prevKeys = node.data.connectedHandleKeys as
-        | readonly string[]
-        | undefined;
-      const prevHost = node.data.showBottomPanelHost === true;
-      const prevZoom = node.data.viewportZoom;
-      const prevMoving = node.data.isViewportMoving === true;
       const nextMoving = isHost && isViewportMoving;
-
-      if (
-        connectedHandleKeysEqual(prevKeys, handleKeys) &&
-        prevHost === isHost &&
-        (!isHost || (prevZoom === zoom && prevMoving === nextMoving))
-      ) {
-        return node;
-      }
 
       return {
         ...node,
@@ -737,6 +724,8 @@ export function WorkflowCanvas({
   }, [
     connectedKeysByNode,
     displayNodes,
+    nodes,
+    isDraggingRef,
     isViewportMoving,
     soleSelectedNodeId,
     zoom,

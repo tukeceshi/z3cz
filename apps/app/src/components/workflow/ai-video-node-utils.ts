@@ -10,6 +10,7 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -20,6 +21,7 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import { splitHistoryMediaRows } from "./generative-history-utils";
 
 import {
   AI_VIDEO_EMPTY_CARD_SIZE,
@@ -191,7 +193,7 @@ export function readAiVideoResultHistory(
     items?: unknown;
     selectedId?: unknown;
   };
-  const items = Array.isArray(record.items)
+  const rawItems = Array.isArray(record.items)
     ? record.items.filter(
         (entry): entry is AiVideoResultHistoryItem =>
           !!entry &&
@@ -208,6 +210,12 @@ export function readAiVideoResultHistory(
         };
       })
     : [];
+
+  const items = splitHistoryMediaRows({
+    items: rawItems,
+    getMedia: (item) => item.videos,
+    withMedia: (item, videos) => ({ ...item, videos }),
+  });
 
   return {
     items,
@@ -328,7 +336,9 @@ export function withAiVideoGeneratedResult(
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
     readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
   }
 ): Partial<WorkflowNodeType> {
   const primary = videos[0];
@@ -337,7 +347,7 @@ export function withAiVideoGeneratedResult(
   return appendAiVideoGeneratedHistoryItems(current, [primary], meta);
 }
 
-/** Append one history entry per generation batch; card shows the first video. */
+/** Append one history row per video; card shows the first. */
 export function appendAiVideoGeneratedHistoryItems(
   current: WorkflowNodeType,
   videos: readonly MediaReference[],
@@ -345,25 +355,32 @@ export function appendAiVideoGeneratedHistoryItems(
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
     readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (videos.length === 0) return {};
 
   const history = readAiVideoResultHistory(current.inputs);
-  const item: AiVideoResultHistoryItem = {
-    id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    videos: [...videos],
+  const createdAt = new Date().toISOString();
+  const batchId = Date.now();
+  const newItems: AiVideoResultHistoryItem[] = videos.map((video, index) => ({
+    id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    videos: [video],
     prompt: meta?.prompt ?? "",
     params: meta?.params,
     platformModelId: meta?.platformModelId,
+    aiInterfaceId: meta?.aiInterfaceId,
     providerModelId: meta?.providerModelId,
-    createdAt: new Date().toISOString(),
-  };
+    modelDisplayName: meta?.modelDisplayName,
+    createdAt,
+  }));
+  const primary = newItems[0]!;
 
   const nextHistory: AiVideoResultHistory = {
-    items: [item, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
-    selectedId: item.id,
+    items: [...newItems, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
+    selectedId: primary.id,
   };
 
   let inputs = upsertInputValue(
@@ -374,8 +391,7 @@ export function appendAiVideoGeneratedHistoryItems(
   );
   inputs = upsertInputValue(inputs, "manual_videos", [], "json");
 
-  const primary = videos[0]!;
-  const result = withAiVideoResult(current, [primary], { inputs });
+  const result = withAiVideoResult(current, [videos[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -390,20 +406,20 @@ export function withAiVideoHistorySelection(
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  const promptInputs = upsertInputValue(
+  let nextInputs = upsertInputValue(
     current.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  const paramsInputs =
-    selected.params !== undefined
-      ? upsertInputValue(promptInputs, "params", selected.params, "json")
-      : promptInputs;
+  if (selected.params !== undefined) {
+    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
+  }
+  nextInputs = applyHistoryItemModelBinding(nextInputs, selected);
 
-  const result = withAiVideoResult(current, selected.videos, {
+  const result = withAiVideoResult(current, selected.videos.slice(0, 1), {
     inputs: upsertInputValue(
-      paramsInputs,
+      nextInputs,
       AI_VIDEO_HISTORY_INPUT_ID,
       { items: history.items, selectedId },
       "json"

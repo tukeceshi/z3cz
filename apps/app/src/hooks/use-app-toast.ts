@@ -10,6 +10,9 @@ export function useAppToast() {
     success(key: TranslationKey, params?: Record<string, string | number>) {
       toast.success(t(key, params));
     },
+    warning(key: TranslationKey, params?: Record<string, string | number>) {
+      toast.warning(t(key, params));
+    },
     error(key: TranslationKey, params?: Record<string, string | number>) {
       toast.error(t(key, params));
     },

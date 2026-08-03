@@ -69,6 +69,11 @@ import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
+import {
+  persistModelBindingToInputs,
+  readLastUsedModelBinding,
+  type GenerativeModelModality,
+} from "./org-model-selection-utils";
 import type {
   ConnectionValidationState,
   NodeExecutionState,
@@ -159,6 +164,27 @@ function updateNodesWithExecutionError(
   );
 }
 
+function keepLocalInputValues(
+  incoming: readonly WorkflowParameter[],
+  local: readonly WorkflowParameter[] | undefined
+): WorkflowParameter[] {
+  if (!local?.length) {
+    return [...incoming];
+  }
+
+  const localValues = new Map(
+    local
+      .filter((input) => input.value != null && input.value !== "")
+      .map((input) => [input.id, input.value])
+  );
+
+  return incoming.map((input) =>
+    localValues.has(input.id)
+      ? ({ ...input, value: localValues.get(input.id) } as WorkflowParameter)
+      : input
+  );
+}
+
 function mergeGenerativeNodeCatalogInputs(
   nodeType: string | undefined,
   inputs: readonly WorkflowParameter[],
@@ -179,18 +205,62 @@ function mergeGenerativeNodeCatalogInputs(
   );
 }
 
+function resolveGenerativeModality(
+  nodeType: string
+): GenerativeModelModality | undefined {
+  switch (nodeType) {
+    case AI_TEXT_NODE_TYPE:
+      return "text";
+    case AI_IMAGE_NODE_TYPE:
+      return "image";
+    case AI_VIDEO_NODE_TYPE:
+      return "video";
+    case AI_AUDIO_NODE_TYPE:
+      return "audio";
+    default:
+      return undefined;
+  }
+}
+
+function applyLastUsedModelBindingToInputs(
+  nodeType: string,
+  orgId: string | undefined,
+  inputs: WorkflowParameter[]
+): WorkflowParameter[] {
+  if (!orgId) {
+    return inputs;
+  }
+
+  const modality = resolveGenerativeModality(nodeType);
+  if (!modality) {
+    return inputs;
+  }
+
+  const binding = readLastUsedModelBinding(orgId, modality);
+  if (!binding) {
+    return inputs;
+  }
+
+  return persistModelBindingToInputs(inputs, binding);
+}
+
 function createReactFlowNode(
   nodeType: NodeType,
   position: { x: number; y: number },
   createObjectUrl: (objectReference: ObjectReference) => string,
   existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>,
   t: (key: string) => string,
+  orgId: string | undefined,
   id?: string
 ): ReactFlowNode<WorkflowNodeType> {
-  const inputs = mergeGenerativeNodeCatalogInputs(
+  const inputs = applyLastUsedModelBindingToInputs(
     nodeType.type,
-    nodeType.inputs.map((param) => ({ ...param, id: param.name })),
-    nodeType
+    orgId,
+    mergeGenerativeNodeCatalogInputs(
+      nodeType.type,
+      nodeType.inputs.map((param) => ({ ...param, id: param.name })),
+      nodeType
+    )
   );
 
   return {
@@ -231,6 +301,7 @@ export interface UseGraphOperationsProps {
   disabled?: boolean;
   allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
+  orgId?: string;
 }
 
 export interface UseGraphOperationsReturn {
@@ -311,6 +382,7 @@ export function useGraphOperations({
   disabled: readOnlyDisabled = false,
   allowedNodeTypes,
   nodeTypes = [],
+  orgId,
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   const { t } = useTranslation();
   // Core state
@@ -477,6 +549,13 @@ export function useGraphOperations({
         if (currentNode) {
           return {
             ...newNode,
+            data: {
+              ...newNode.data,
+              inputs: keepLocalInputValues(
+                newNode.data.inputs,
+                currentNode.data.inputs
+              ),
+            },
             selected: currentNode.selected,
             dragging: currentNode.dragging,
           };
@@ -737,7 +816,8 @@ export function useGraphOperations({
         placement.position,
         createObjectUrl,
         nodesRef.current,
-        t
+        t,
+        orgId
       );
       newNode.selected = true;
 
@@ -756,7 +836,7 @@ export function useGraphOperations({
         );
       }
     },
-    [reactFlowInstance, setNodes, createObjectUrl, nodesRef, t]
+    [reactFlowInstance, setNodes, createObjectUrl, nodesRef, t, orgId]
   );
 
   // Update node execution data (batched for multi-node execution ticks)
@@ -997,6 +1077,7 @@ export function useGraphOperations({
           createObjectUrl,
           nodesRef.current,
           t,
+          orgId,
           `${nodeType.type}-${Date.now()}-${i}`
         );
       });
@@ -1005,7 +1086,7 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl, t]
+    [nodeTypes, setNodes, createObjectUrl, t, orgId]
   );
 
   return {
