@@ -961,7 +961,10 @@ export function resolveImageGenerateCount(
   if (!Number.isFinite(count) || count < 1) {
     return 1;
   }
-  const maxOption = Number(resolveGenerateCountOptions(field).at(-1) ?? 1);
+  const countOptions = resolveGenerateCountOptions(field);
+  const maxOption = Number(
+    countOptions.length > 0 ? countOptions[countOptions.length - 1] : 1
+  );
   return Math.min(Math.floor(count), maxOption, IMAGE_GENERATE_COUNT_MAX);
 }
 
@@ -1037,7 +1040,7 @@ function resolveImageGenerationFieldValue(
   if (field.enumValues?.length) {
     const raw = isStoredGenerationValuePresent(stored) ? String(stored) : "";
     if (raw && field.enumValues.includes(raw)) {
-      return field.type === "number" ? Number(raw) : raw;
+      return raw;
     }
     if (field.default !== undefined && field.default !== null && field.default !== "") {
       return field.default;
