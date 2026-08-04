@@ -2,7 +2,7 @@ import type { ObjectReference } from "@dafthunk/types";
 import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { useNodes } from "@xyflow/react";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
-import { createElement, useState } from "react";
+import { createElement, memo, useState } from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -35,7 +35,18 @@ export interface WorkflowNodeBottomPanelProps {
   createObjectUrl: (objectReference: ObjectReference) => string;
 }
 
-export function WorkflowNodeBottomPanel({
+function workflowNodeBottomPanelPropsAreEqual(
+  prev: WorkflowNodeBottomPanelProps,
+  next: WorkflowNodeBottomPanelProps
+): boolean {
+  return (
+    prev.nodeId === next.nodeId &&
+    prev.createObjectUrl === next.createObjectUrl &&
+    prev.data === next.data
+  );
+}
+
+function WorkflowNodeBottomPanelInner({
   nodeId,
   data,
   createObjectUrl,
@@ -349,3 +360,10 @@ export function WorkflowNodeBottomPanel({
     </div>
   );
 }
+
+export const WorkflowNodeBottomPanel = memo(
+  WorkflowNodeBottomPanelInner,
+  workflowNodeBottomPanelPropsAreEqual
+);
+
+WorkflowNodeBottomPanel.displayName = "WorkflowNodeBottomPanel";

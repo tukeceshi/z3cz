@@ -220,6 +220,23 @@ export interface ListOrgTextModelsResponse {
   readonly groups: readonly PlatformAiModelGroup[];
 }
 
+/** Platform-enabled models for add-interface wizards — not org interface bindings. */
+export interface PlatformCatalogModelOption {
+  readonly canonicalId: string;
+  readonly displayName: string;
+  readonly modality: AiModelModality;
+  readonly description: string;
+  readonly groupId: string | null;
+  readonly groupName: string | null;
+  readonly groupDescription: string | null;
+  readonly groupIcon: string | null;
+}
+
+export interface ListPlatformCatalogModelsResponse {
+  readonly models: readonly PlatformCatalogModelOption[];
+  readonly groups: readonly PlatformAiModelGroup[];
+}
+
 export type AiModelInvocationStatus = "pending" | "completed" | "failed";
 
 export interface AiModelInvocation {

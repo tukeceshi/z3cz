@@ -110,6 +110,7 @@ import {
   useWorkflowActions,
 } from "./workflow-context";
 import { WorkflowNodeBottomPanel } from "./workflow-node-bottom-panel";
+import { useWorkflowNodeBottomPanelData } from "./workflow-node-canvas-ui";
 import { WorkflowToolSelector } from "./workflow-tool-selector";
 import {
   InputOutputType,
@@ -363,6 +364,9 @@ export const WorkflowNode = memo(
       (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
         : shouldShowGenerativeBottomPanel(data.metadata));
+    const bottomPanelData = useWorkflowNodeBottomPanelData(
+      data as unknown as CanvasWorkflowNodeType
+    );
     const isGenerativeConnectionTarget = useGenerativeConnectionHighlight(
       id,
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
@@ -1029,14 +1033,19 @@ export const WorkflowNode = memo(
         </div>
         </div>
 
-        {showBottomPanelHost && !isDragging && !isViewportMovingCanvas ? (
+        {showBottomPanelHost ? (
           <div
-            className={cn(!showBottomPanel && "hidden pointer-events-none")}
-            aria-hidden={!showBottomPanel}
+            className={cn(
+              (!showBottomPanel || isDragging || isViewportMovingCanvas) &&
+                "invisible pointer-events-none"
+            )}
+            aria-hidden={
+              !showBottomPanel || isDragging || isViewportMovingCanvas
+            }
           >
             <WorkflowNodeBottomPanel
               nodeId={id}
-              data={data as unknown as CanvasWorkflowNodeType}
+              data={bottomPanelData}
               createObjectUrl={data.createObjectUrl}
             />
           </div>

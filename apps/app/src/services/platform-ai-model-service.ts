@@ -13,6 +13,7 @@ import type {
   ListOrgImageModelsResponse,
   ListOrgTextModelsResponse,
   ListOrgVideoModelsResponse,
+  ListPlatformCatalogModelsResponse,
   OrgCloudStorageConfiguredStatus,
   OrgCloudStorageStatus,
   PollAiVideoTaskResponse,
@@ -31,6 +32,61 @@ const ORG_MODELS_SWR_OPTIONS = {
   revalidateOnFocus: false,
   dedupingInterval: 0,
 } as const;
+
+const CATALOG_MODELS_QUERY = "scope=catalog";
+
+function usePlatformCatalogModels(
+  orgId: string | undefined,
+  modality: "text" | "image" | "video" | "audio",
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled
+      ? `${platformAiEndpoint(orgId)}/${modality}-models?${CATALOG_MODELS_QUERY}`
+      : null;
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListPlatformCatalogModelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
+  );
+
+  return {
+    models: data?.models ?? [],
+    groups: data?.groups ?? [],
+    modelsError: error,
+    isLoading: !data && isLoading,
+    refreshModels: mutate,
+  };
+}
+
+export function usePlatformCatalogTextModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  return usePlatformCatalogModels(orgId, "text", options);
+}
+
+export function usePlatformCatalogImageModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  return usePlatformCatalogModels(orgId, "image", options);
+}
+
+export function usePlatformCatalogVideoModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  return usePlatformCatalogModels(orgId, "video", options);
+}
+
+export function usePlatformCatalogAudioModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  return usePlatformCatalogModels(orgId, "audio", options);
+}
 
 export function useOrgTextModels(
   orgId: string | undefined,

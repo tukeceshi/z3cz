@@ -69,7 +69,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { createOrganizationAiInterface } from "@/services/organization-ai-interface-service";
-import { useOrgAudioModels, useOrgImageModels, useOrgTextModels, useOrgVideoModels } from "@/services/platform-ai-model-service";
+import { usePlatformCatalogAudioModels, usePlatformCatalogImageModels, usePlatformCatalogTextModels, usePlatformCatalogVideoModels } from "@/services/platform-ai-model-service";
 import { cn } from "@/utils/utils";
 
 import { DeepSeekModelConfigList } from "./deepseek-model-config-row";
@@ -117,10 +117,10 @@ export function SingleModelWizardContent({
 }: SingleModelWizardContentProps) {
   const { t } = useTranslation();
   const appToast = useAppToast();
-  const { models: platformModels } = useOrgTextModels(organizationId);
-  const { models: imagePlatformModels } = useOrgImageModels(organizationId);
-  const { models: videoPlatformModels } = useOrgVideoModels(organizationId);
-  const { models: audioPlatformModels } = useOrgAudioModels(organizationId);
+  const { models: platformModels } = usePlatformCatalogTextModels(organizationId);
+  const { models: imagePlatformModels } = usePlatformCatalogImageModels(organizationId);
+  const { models: videoPlatformModels } = usePlatformCatalogVideoModels(organizationId);
+  const { models: audioPlatformModels } = usePlatformCatalogAudioModels(organizationId);
 
   const deepSeekAvailableModels = useMemo(
     () =>

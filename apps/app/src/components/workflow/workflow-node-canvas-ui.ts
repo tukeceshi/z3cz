@@ -1,3 +1,7 @@
+import { useMemo } from "react";
+
+import type { WorkflowNodeType } from "./workflow-types";
+
 /** Transient canvas-only fields merged into node.data at render time (not persisted). */
 export interface WorkflowNodeCanvasUiData {
   readonly connectedHandleKeys?: readonly string[];
@@ -21,4 +25,28 @@ export function stripWorkflowNodeCanvasUi<T extends Record<string, unknown>>(
     delete next[key];
   }
   return next;
+}
+
+/** Stable workflow payload for the bottom panel — ignores zoom/move transient fields. */
+export function useWorkflowNodeBottomPanelData(
+  data: WorkflowNodeType & WorkflowNodeCanvasUiData
+): WorkflowNodeType {
+  return useMemo(
+    () =>
+      stripWorkflowNodeCanvasUi(
+        data as Record<string, unknown>
+      ) as WorkflowNodeType,
+    [
+      data.name,
+      data.inputs,
+      data.outputs,
+      data.error,
+      data.executionState,
+      data.nodeType,
+      data.functionCalling,
+      data.asTool,
+      data.icon,
+      data.metadata,
+    ]
+  );
 }

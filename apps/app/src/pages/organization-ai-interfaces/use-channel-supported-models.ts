@@ -5,10 +5,10 @@ import {
 import { useMemo } from "react";
 
 import {
-  useOrgAudioModels,
-  useOrgImageModels,
-  useOrgTextModels,
-  useOrgVideoModels,
+  usePlatformCatalogAudioModels,
+  usePlatformCatalogImageModels,
+  usePlatformCatalogTextModels,
+  usePlatformCatalogVideoModels,
 } from "@/services/platform-ai-model-service";
 
 interface PlatformModelLike {
@@ -55,10 +55,10 @@ function displayNamesFor(
 }
 
 export function useChannelSupportedModels(organizationId: string | undefined) {
-  const { models: textModels } = useOrgTextModels(organizationId);
-  const { models: imageModels } = useOrgImageModels(organizationId);
-  const { models: videoModels } = useOrgVideoModels(organizationId);
-  const { models: audioModels } = useOrgAudioModels(organizationId);
+  const { models: textModels } = usePlatformCatalogTextModels(organizationId);
+  const { models: imageModels } = usePlatformCatalogImageModels(organizationId);
+  const { models: videoModels } = usePlatformCatalogVideoModels(organizationId);
+  const { models: audioModels } = usePlatformCatalogAudioModels(organizationId);
 
   return useMemo(() => {
     const allModels = mergePlatformModels([

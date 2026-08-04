@@ -39,6 +39,7 @@ import {
   listOrgTextModelOptions,
   resolveTextModelInterface,
 } from "../services/resolve-text-model-interface";
+import { listPlatformCatalogModelOptions } from "../services/list-platform-catalog-model-options";
 import { executeTextModel } from "../services/execute-text-model";
 import {
   handleTextModelStreamFailure,
@@ -265,6 +266,14 @@ platformAiRoutes.post(
 platformAiRoutes.get("/text-models", async (c) => {
   const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
+  const scope = c.req.query("scope");
+  if (scope === "catalog") {
+    const [models, groups] = await Promise.all([
+      listPlatformCatalogModelOptions(db, "text"),
+      listPlatformAiModelGroups(db, "text"),
+    ]);
+    return c.json({ models, groups });
+  }
   const [models, groups] = await Promise.all([
     listOrgTextModelOptions(db, organizationId),
     listPlatformAiModelGroups(db, "text"),
@@ -275,6 +284,14 @@ platformAiRoutes.get("/text-models", async (c) => {
 platformAiRoutes.get("/image-models", async (c) => {
   const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
+  const scope = c.req.query("scope");
+  if (scope === "catalog") {
+    const [models, groups] = await Promise.all([
+      listPlatformCatalogModelOptions(db, "image"),
+      listPlatformAiModelGroups(db, "image"),
+    ]);
+    return c.json({ models, groups });
+  }
   const [models, groups] = await Promise.all([
     listOrgImageModelOptions(db, organizationId),
     listPlatformAiModelGroups(db, "image"),
@@ -285,6 +302,14 @@ platformAiRoutes.get("/image-models", async (c) => {
 platformAiRoutes.get("/video-models", async (c) => {
   const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
+  const scope = c.req.query("scope");
+  if (scope === "catalog") {
+    const [models, groups] = await Promise.all([
+      listPlatformCatalogModelOptions(db, "video"),
+      listPlatformAiModelGroups(db, "video"),
+    ]);
+    return c.json({ models, groups });
+  }
   const [models, groups] = await Promise.all([
     listOrgVideoModelOptions(db, organizationId),
     listPlatformAiModelGroups(db, "video"),
@@ -295,6 +320,14 @@ platformAiRoutes.get("/video-models", async (c) => {
 platformAiRoutes.get("/audio-models", async (c) => {
   const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
+  const scope = c.req.query("scope");
+  if (scope === "catalog") {
+    const [models, groups] = await Promise.all([
+      listPlatformCatalogModelOptions(db, "audio"),
+      listPlatformAiModelGroups(db, "audio"),
+    ]);
+    return c.json({ models, groups });
+  }
   const [models, groups] = await Promise.all([
     listOrgAudioModelOptions(db, organizationId),
     listPlatformAiModelGroups(db, "audio"),

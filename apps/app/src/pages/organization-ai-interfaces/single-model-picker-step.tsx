@@ -61,10 +61,10 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
 import {
-  useOrgAudioModels,
-  useOrgImageModels,
-  useOrgTextModels,
-  useOrgVideoModels,
+  usePlatformCatalogAudioModels,
+  usePlatformCatalogImageModels,
+  usePlatformCatalogTextModels,
+  usePlatformCatalogVideoModels,
 } from "@/services/platform-ai-model-service";
 import { cn } from "@/utils/utils";
 
@@ -204,10 +204,10 @@ export function SingleModelPickerStep({
 }: SingleModelPickerStepProps) {
   const { t } = useTranslation();
   const grouped = getSingleModelPresetsByCategory();
-  const { models: textModels } = useOrgTextModels(organizationId);
-  const { models: imageModels } = useOrgImageModels(organizationId);
-  const { models: videoModels } = useOrgVideoModels(organizationId);
-  const { models: audioModels } = useOrgAudioModels(organizationId);
+  const { models: textModels } = usePlatformCatalogTextModels(organizationId);
+  const { models: imageModels } = usePlatformCatalogImageModels(organizationId);
+  const { models: videoModels } = usePlatformCatalogVideoModels(organizationId);
+  const { models: audioModels } = usePlatformCatalogAudioModels(organizationId);
 
   const selectedPreset =
     selection.kind === "preset"
