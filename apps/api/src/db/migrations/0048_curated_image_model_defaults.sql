@@ -1,0 +1,14 @@
+-- Curated Admin defaults for Seedream 5.0 lite and GPT Image 2.
+
+UPDATE "platform_ai_models"
+SET
+  "display_name" = 'Seedream 5.0 lite',
+  "parameter_rules" = '{"schemaVersion":1,"maxReferenceImages":8,"maxImageReferenceBytes":10485760,"promptMaxChars":600,"sizePolicy":{"enabled":true,"effectMode":"legacy"},"countPolicy":{"enabled":true,"effectMode":"sequential_image_generation"},"generationFields":[{"name":"size","apiName":"size","type":"string","description":"分辨率","default":"2K","enumValues":["2K","4K"]},{"name":"ratio","apiName":"","type":"string","description":"选择比例","default":"auto","enumValues":["auto","21:9","16:9","3:2","4:3","1:1","3:4","2:3","9:16"],"clientOnly":true},{"name":"generate_count","apiName":"max_images","type":"number","description":"生成数量","default":1,"enumValues":["1","2","3","4","5","6","7","8"],"clientOnly":true},{"name":"watermark","apiName":"watermark","type":"boolean","description":"水印","default":false},{"name":"output_format","apiName":"output_format","type":"string","description":"输出格式","default":"jpeg","enumValues":["png","jpeg"]},{"name":"web_search","apiName":"web_search","type":"boolean","description":"联网搜索","default":false}]}'::jsonb,
+  "updated_at" = now()
+WHERE "canonical_id" = 'doubao-seedream-5';
+
+UPDATE "platform_ai_models"
+SET
+  "parameter_rules" = '{"schemaVersion":1,"maxReferenceImages":4,"maxImageReferenceBytes":10485760,"promptMaxChars":32000,"sizePolicy":{"enabled":true,"effectMode":"pixel_size"},"countPolicy":{"enabled":true,"effectMode":"direct"},"generationFields":[{"name":"size","apiName":"size","type":"string","description":"分辨率","default":"auto","enumValues":["auto","1K","2K"]},{"name":"ratio","apiName":"","type":"string","description":"选择比例","default":"auto","enumValues":["auto","16:9","1:1","9:16"],"clientOnly":true},{"name":"generate_count","apiName":"n","type":"number","description":"生成数量","default":1,"enumValues":["1","2","3","4"],"clientOnly":true},{"name":"optimize_prompt_mode","apiName":"optimize_prompt_options.mode","type":"string","description":"Prompt optimization mode","default":"standard","enumValues":["standard","fast"],"hidden":true},{"name":"quality","apiName":"quality","type":"string","description":"图片质量","default":"auto","enumValues":["auto","low","medium","high"]},{"name":"output_format","apiName":"output_format","type":"string","description":"输出格式","default":"jpeg","enumValues":["png","jpeg"]},{"name":"web_search","apiName":"web_search","type":"boolean","description":"Enable web search tools when supported","default":false,"hidden":true},{"name":"output_compression","apiName":"output_compression","type":"number","description":"输出压缩（0–100）","default":100},{"name":"moderation","apiName":"moderation","type":"string","description":"内容审核强度","default":"auto","enumValues":["auto","low"]}]}'::jsonb,
+  "updated_at" = now()
+WHERE "canonical_id" = 'gpt-image-2';
