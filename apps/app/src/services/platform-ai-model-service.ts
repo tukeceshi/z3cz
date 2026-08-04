@@ -29,11 +29,16 @@ function platformAiEndpoint(organizationId: string): string {
 
 const ORG_MODELS_SWR_OPTIONS = {
   revalidateOnFocus: false,
-  dedupingInterval: 60_000,
+  dedupingInterval: 0,
 } as const;
 
-export function useOrgTextModels(orgId: string | undefined) {
-  const key = orgId ? `${platformAiEndpoint(orgId)}/text-models` : null;
+export function useOrgTextModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/text-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListOrgTextModelsResponse>(`${key}`),
@@ -49,8 +54,13 @@ export function useOrgTextModels(orgId: string | undefined) {
   };
 }
 
-export function useOrgImageModels(orgId: string | undefined) {
-  const key = orgId ? `${platformAiEndpoint(orgId)}/image-models` : null;
+export function useOrgImageModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/image-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListOrgImageModelsResponse>(`${key}`),
@@ -66,8 +76,13 @@ export function useOrgImageModels(orgId: string | undefined) {
   };
 }
 
-export function useOrgVideoModels(orgId: string | undefined) {
-  const key = orgId ? `${platformAiEndpoint(orgId)}/video-models` : null;
+export function useOrgVideoModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/video-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListOrgVideoModelsResponse>(`${key}`),
@@ -83,8 +98,13 @@ export function useOrgVideoModels(orgId: string | undefined) {
   };
 }
 
-export function useOrgAudioModels(orgId: string | undefined) {
-  const key = orgId ? `${platformAiEndpoint(orgId)}/audio-models` : null;
+export function useOrgAudioModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/audio-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListOrgAudioModelsResponse>(`${key}`),

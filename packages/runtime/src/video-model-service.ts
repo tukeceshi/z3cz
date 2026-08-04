@@ -12,4 +12,8 @@ export interface VideoModelService {
     canonicalId: string;
     interfaceId: string;
   }): Promise<ResolvedRuntimeVideoModel | undefined>;
+  inferVideoModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined>;
 }

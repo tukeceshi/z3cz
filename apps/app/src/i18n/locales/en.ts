@@ -2604,6 +2604,8 @@ export const en = {
       promptTooLong: "Prompt is too long. Shorten it and try again",
       timedOut: "Generation timed out. Please try again later",
       generationFailed: "Generation failed. Please try again later",
+      modelSelectionBlocked:
+        "Model selection is unavailable in read-only mode",
       modelUnavailable:
         "This model is unavailable. Check your AI interface settings",
       interfaceUnavailable:

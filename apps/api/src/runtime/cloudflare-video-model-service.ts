@@ -3,6 +3,8 @@ import type { ResolvedRuntimeVideoModel } from "@dafthunk/runtime";
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
 import { resolveVideoModelInterface } from "../services/resolve-video-model-interface";
+import { listOrgVideoModelOptions } from "../services/resolve-video-model-interface";
+import { inferOrgModelInterfaceId } from "../services/resolve-text-model-interface";
 
 export class CloudflareVideoModelService {
   constructor(private readonly env: Bindings) {}
@@ -29,5 +31,18 @@ export class CloudflareVideoModelService {
       providerModelId: resolved.providerModelId,
       parameterRules: resolved.parameterRules,
     };
+  }
+
+  async inferVideoModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined> {
+    const db = createDatabase(this.env);
+    return inferOrgModelInterfaceId(
+      db,
+      params.organizationId,
+      params.canonicalId,
+      listOrgVideoModelOptions
+    );
   }
 }

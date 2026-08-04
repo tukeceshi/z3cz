@@ -37,6 +37,7 @@ export interface SaveWorkflowRecord {
   nodes: any[];
   edges: any[];
   editorViewport?: WorkflowType["editorViewport"];
+  generativeDefaults?: WorkflowType["generativeDefaults"];
   createdAt?: Date;
   updatedAt?: Date;
   apiHost?: string;
@@ -638,6 +639,9 @@ export class WorkflowStore {
       edges,
       ...(record.editorViewport
         ? { editorViewport: record.editorViewport }
+        : {}),
+      ...(record.generativeDefaults
+        ? { generativeDefaults: record.generativeDefaults }
         : {}),
     };
 

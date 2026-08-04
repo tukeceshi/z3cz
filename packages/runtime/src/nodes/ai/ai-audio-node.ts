@@ -10,6 +10,10 @@ import {
 import { executeMinimaxAudioGeneration } from "../../ai-interface/execute-minimax-audio-generation";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode, isObjectReference } from "../../node-types";
+import {
+  readModelInterfaceIdInput,
+  resolveModelInterfaceIdFromInputs,
+} from "./resolve-model-interface-id";
 
 export const AI_AUDIO_NODE_TYPE = "ai-audio" as const;
 
@@ -122,11 +126,11 @@ export class AiAudioNode extends ExecutableNode {
       return this.createErrorResult("A model selection is required.");
     }
 
-    const interfaceId =
-      typeof context.inputs.ai_interface_id === "string" &&
-      context.inputs.ai_interface_id.trim().length > 0
-        ? context.inputs.ai_interface_id.trim()
-        : undefined;
+    const interfaceId = await resolveModelInterfaceIdFromInputs(
+      readModelInterfaceIdInput(context),
+      modelCanonicalId,
+      context.inferAudioModelInterfaceId
+    );
 
     if (!interfaceId) {
       return this.createErrorResult("An AI interface must be selected.");

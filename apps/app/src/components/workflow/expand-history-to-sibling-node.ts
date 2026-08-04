@@ -25,6 +25,7 @@ import {
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
+import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   resolveGenerativeNodeDefaultBaseName,
   resolveGenerativeNodeDisplayName,
@@ -80,6 +81,7 @@ export function buildSiblingNodeFromHistoryItem(params: {
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly platformModelId?: string;
+  readonly aiInterfaceId?: string;
   readonly modelDisplayName?: string;
   readonly createdAt: string;
   readonly existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>;
@@ -134,9 +136,10 @@ export function buildSiblingNodeFromHistoryItem(params: {
   if (params.params !== undefined) {
     inputs = upsertParam(inputs, "params", params.params, "json");
   }
-  if (params.platformModelId) {
-    inputs = upsertParam(inputs, "model", params.platformModelId, "string");
-  }
+  inputs = applyHistoryItemModelBinding(inputs, {
+    platformModelId: params.platformModelId,
+    aiInterfaceId: params.aiInterfaceId,
+  });
 
   if (params.kind === "image") {
     inputs = upsertParam(inputs, AI_IMAGE_RESULT_INPUT_ID, [params.media], "json");
@@ -151,6 +154,7 @@ export function buildSiblingNodeFromHistoryItem(params: {
             prompt: params.prompt,
             params: params.params,
             platformModelId: params.platformModelId,
+            aiInterfaceId: params.aiInterfaceId,
             modelDisplayName: params.modelDisplayName,
             createdAt: params.createdAt,
           },
@@ -173,6 +177,7 @@ export function buildSiblingNodeFromHistoryItem(params: {
             prompt: params.prompt,
             params: params.params,
             platformModelId: params.platformModelId,
+            aiInterfaceId: params.aiInterfaceId,
             modelDisplayName: params.modelDisplayName,
             createdAt: params.createdAt,
           },
@@ -195,6 +200,7 @@ export function buildSiblingNodeFromHistoryItem(params: {
             prompt: params.prompt,
             params: params.params,
             platformModelId: params.platformModelId,
+            aiInterfaceId: params.aiInterfaceId,
             modelDisplayName: params.modelDisplayName,
             createdAt: params.createdAt,
           },

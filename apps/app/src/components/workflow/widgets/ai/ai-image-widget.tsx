@@ -191,6 +191,7 @@ function AiImageWidget({
         prompt: item.prompt,
         params: item.params,
         platformModelId: item.platformModelId,
+        aiInterfaceId: item.aiInterfaceId,
         modelDisplayName: item.modelDisplayName,
         createdAt: item.createdAt,
       });

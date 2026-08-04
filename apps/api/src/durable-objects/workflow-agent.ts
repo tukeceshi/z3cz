@@ -468,6 +468,8 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       edges: filteredEdges,
       editorViewport:
         message.state.editorViewport ?? this.workflowState.editorViewport,
+      generativeDefaults:
+        message.state.generativeDefaults ?? this.workflowState.generativeDefaults,
     };
 
     const graphUnchanged =
@@ -478,8 +480,11 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     const viewportChanged =
       JSON.stringify(this.workflowState.editorViewport ?? null) !==
       JSON.stringify(message.state.editorViewport ?? null);
+    const generativeDefaultsChanged =
+      JSON.stringify(this.workflowState.generativeDefaults ?? null) !==
+      JSON.stringify(message.state.generativeDefaults ?? null);
 
-    if (graphUnchanged && viewportChanged) {
+    if (graphUnchanged && (viewportChanged || generativeDefaultsChanged)) {
       await this.flushPersist();
     } else {
       await this.schedulePersist();

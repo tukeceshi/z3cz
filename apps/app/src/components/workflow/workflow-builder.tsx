@@ -4,6 +4,7 @@ import type {
   ObjectReference,
   Parameter,
   WorkflowEditorViewport,
+  WorkflowGenerativeDefaults,
   WorkflowRuntime,
   WorkflowTrigger,
 } from "@dafthunk/types";
@@ -28,12 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  useOrgAudioModels,
-  useOrgImageModels,
-  useOrgTextModels,
-  useOrgVideoModels,
-} from "@/services/platform-ai-model-service";
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
@@ -58,7 +53,14 @@ import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
-import { isValidWorkflowEditorViewport } from "./workflow-viewport-utils";
+import {
+  readAgentSidebarPersistedState,
+  writeAgentSidebarPersistedState,
+} from "./workflow-agent-sidebar-persisted-state";
+import {
+  isValidWorkflowEditorViewport,
+  restoreEditorViewportWhenPaneStable,
+} from "./workflow-viewport-utils";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -66,13 +68,6 @@ import type {
   WorkflowNodeType,
 } from "./workflow-types";
 
-function PrefetchOrgModels({ orgId }: { readonly orgId: string }) {
-  useOrgTextModels(orgId);
-  useOrgImageModels(orgId);
-  useOrgVideoModels(orgId);
-  useOrgAudioModels(orgId);
-  return null;
-}
 
 /** Serialize a React Flow node into the backend Node shape (unsaved editor values). */
 function serializeNodeSnapshot(
@@ -201,6 +196,11 @@ export interface WorkflowBuilderProps {
   initialViewportOneToOne?: boolean;
   savedEditorViewport?: WorkflowEditorViewport | null;
   onEditorViewportChange?: (viewport: WorkflowEditorViewport) => void;
+  onCommitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
+  generativeDefaults?: WorkflowGenerativeDefaults;
+  onGenerativeDefaultsChange?: (
+    defaults: WorkflowGenerativeDefaults
+  ) => void;
   workflowSettingsOpen?: boolean;
   onWorkflowSettingsOpenChange?: (open: boolean) => void;
   workflowsListUrl?: string;
@@ -234,6 +234,9 @@ export function WorkflowBuilder({
   initialViewportOneToOne = false,
   savedEditorViewport,
   onEditorViewportChange,
+  onCommitEditorViewport,
+  generativeDefaults,
+  onGenerativeDefaultsChange,
   workflowSettingsOpen = false,
   onWorkflowSettingsOpenChange,
   workflowsListUrl,
@@ -249,6 +252,8 @@ export function WorkflowBuilder({
     () => buildCatalogAllowedNodeTypeSet(nodeTypes),
     [nodeTypes]
   );
+
+  const suppressViewportPersistEndRef = useRef(false);
 
   // Graph state & operations
   const {
@@ -298,6 +303,9 @@ export function WorkflowBuilder({
     allowedNodeTypes,
     nodeTypes,
     orgId,
+    generativeDefaults,
+    commitEditorViewport: onCommitEditorViewport,
+    suppressViewportPersistEndRef,
   });
 
   // Execution state
@@ -317,8 +325,21 @@ export function WorkflowBuilder({
     deselectAll,
   });
 
-  // Sidebar (Agent panel) — collapsed by default; user opens via toggle
-  const sidebar = useResizableSidebar({ initialVisible: false });
+  const agentSidebarPersisted = useMemo(
+    () => readAgentSidebarPersistedState(workflowId),
+    [workflowId]
+  );
+  const handleAgentSidebarPersist = useCallback(
+    (state: { visible: boolean; width: number }) => {
+      writeAgentSidebarPersistedState(workflowId, state);
+    },
+    [workflowId]
+  );
+  const sidebar = useResizableSidebar({
+    initialVisible: agentSidebarPersisted?.visible ?? false,
+    initialWidth: agentSidebarPersisted?.width,
+    onPersist: handleAgentSidebarPersist,
+  });
 
   const handleQuickAddAiNode = useCallback(
     (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => {
@@ -366,8 +387,6 @@ export function WorkflowBuilder({
     nodeCount: nodes.length,
   });
 
-  const suppressViewportPersistEndRef = useRef(false);
-
   const handleFitToScreen = useCallback(() => {
     reactFlowInstance?.fitView({
       padding: fitViewPadding,
@@ -376,49 +395,12 @@ export function WorkflowBuilder({
     });
   }, [reactFlowInstance, fitViewPadding]);
 
-  const handleReactFlowInit = useCallback(
-    (
-      instance: ReactFlowInstance<
-        ReactFlowNode<WorkflowNodeType>,
-        ReactFlowEdge<WorkflowEdgeType>
-      >
-    ) => {
-      setReactFlowInstance(instance);
+  const [canPersistViewport, setCanPersistViewport] = useState(false);
+  const appliedViewportKeyRef = useRef<string | null>(null);
+  const cancelViewportRestoreRef = useRef<(() => void) | null>(null);
+  const noSavedViewportPersistTimerRef = useRef<number | null>(null);
 
-      if (!initialViewportOneToOne) {
-        return;
-      }
-
-      suppressViewportPersistEndRef.current = true;
-      const flowNodes = instance.getNodes();
-      if (flowNodes.length === 0) {
-        void instance.setViewport({ x: 0, y: 0, zoom: 1 });
-        return;
-      }
-
-      void instance.fitView({
-        padding: fitViewPadding,
-        minZoom: 1,
-        maxZoom: 1,
-        duration: 0,
-      });
-    },
-    [setReactFlowInstance, initialViewportOneToOne, fitViewPadding]
-  );
-
-  const handleZoomOneToOne = useCallback(() => {
-    reactFlowInstance?.zoomTo(1, { duration: 200 });
-  }, [reactFlowInstance]);
-
-  const [isViewportMoving, setIsViewportMoving] = useState(false);
-  const handleViewportMoveStart = useCallback(() => {
-    setIsViewportMoving(true);
-  }, []);
-  const handleViewportMoveEnd = useCallback(() => {
-    setIsViewportMoving(false);
-  }, []);
-
-  const restoredDefaultViewport = useMemo(() => {
+  const mountDefaultViewport = useMemo(() => {
     if (initialViewportOneToOne) {
       return undefined;
     }
@@ -431,67 +413,159 @@ export function WorkflowBuilder({
     return undefined;
   }, [initialViewportOneToOne, savedEditorViewport]);
 
-  const skipInitialFitView =
-    initialViewportOneToOne || restoredDefaultViewport != null;
+  const hasSavedViewport = mountDefaultViewport != null;
+  const skipInitialFitView = initialViewportOneToOne || hasSavedViewport;
 
-  const [canPersistViewport, setCanPersistViewport] = useState(false);
+  const [canvasRevealed, setCanvasRevealed] = useState(
+    () => !hasSavedViewport && !initialViewportOneToOne
+  );
 
-  useEffect(() => {
-    if (restoredDefaultViewport) {
+  const enableViewportPersistence = useCallback(() => {
+    setCanPersistViewport(true);
+  }, []);
+
+  const handleReactFlowInit = useCallback(
+    (
+      instance: ReactFlowInstance<
+        ReactFlowNode<WorkflowNodeType>,
+        ReactFlowEdge<WorkflowEdgeType>
+      >
+    ) => {
+      setReactFlowInstance(instance);
+
+      if (initialViewportOneToOne) {
+        suppressViewportPersistEndRef.current = true;
+        const flowNodes = instance.getNodes();
+        if (flowNodes.length === 0) {
+          void instance.setViewport({ x: 0, y: 0, zoom: 1 });
+        } else {
+          void instance.fitView({
+            padding: fitViewPadding,
+            minZoom: 1,
+            maxZoom: 1,
+            duration: 0,
+          });
+        }
+        setCanvasRevealed(true);
+        window.setTimeout(() => {
+          enableViewportPersistence();
+        }, 600);
+        return;
+      }
+
+      if (mountDefaultViewport) {
+        suppressViewportPersistEndRef.current = true;
+        cancelViewportRestoreRef.current?.();
+        cancelViewportRestoreRef.current = restoreEditorViewportWhenPaneStable(
+          instance,
+          mountDefaultViewport,
+          () => {
+            appliedViewportKeyRef.current = JSON.stringify(mountDefaultViewport);
+            cancelViewportRestoreRef.current = null;
+            setCanvasRevealed(true);
+            requestAnimationFrame(() => {
+              enableViewportPersistence();
+            });
+          }
+        );
+        return;
+      }
+
+      setCanvasRevealed(true);
+      if (noSavedViewportPersistTimerRef.current === null) {
+        noSavedViewportPersistTimerRef.current = window.setTimeout(() => {
+          noSavedViewportPersistTimerRef.current = null;
+          enableViewportPersistence();
+        }, 600);
+      }
+    },
+    [
+      setReactFlowInstance,
+      initialViewportOneToOne,
+      fitViewPadding,
+      mountDefaultViewport,
+      enableViewportPersistence,
+    ]
+  );
+
+  const restoreSavedEditorViewport = useCallback(
+    (
+      instance: ReactFlowInstance<
+        ReactFlowNode<WorkflowNodeType>,
+        ReactFlowEdge<WorkflowEdgeType>
+      >,
+      viewport: WorkflowEditorViewport
+    ) => {
+      const viewportKey = JSON.stringify(viewport);
+      if (appliedViewportKeyRef.current === viewportKey) {
+        return;
+      }
+
+      cancelViewportRestoreRef.current?.();
       suppressViewportPersistEndRef.current = true;
-    }
-  }, [restoredDefaultViewport]);
-
-  const appliedViewportKeyRef = useRef<string | null>(null);
+      cancelViewportRestoreRef.current = restoreEditorViewportWhenPaneStable(
+        instance,
+        viewport,
+        () => {
+          appliedViewportKeyRef.current = viewportKey;
+          cancelViewportRestoreRef.current = null;
+          setCanvasRevealed(true);
+          requestAnimationFrame(() => {
+            enableViewportPersistence();
+          });
+        }
+      );
+    },
+    [enableViewportPersistence]
+  );
 
   useEffect(() => {
-    if (!reactFlowInstance || initialViewportOneToOne) {
-      return;
-    }
     if (
-      savedEditorViewport == null ||
-      !isValidWorkflowEditorViewport(savedEditorViewport)
+      initialViewportOneToOne ||
+      !reactFlowInstance ||
+      !mountDefaultViewport
     ) {
       return;
     }
 
-    const viewportKey = JSON.stringify(savedEditorViewport);
-    if (appliedViewportKeyRef.current === viewportKey) {
-      return;
-    }
-
-    suppressViewportPersistEndRef.current = true;
-    void reactFlowInstance.setViewport(savedEditorViewport, { duration: 0 });
-    appliedViewportKeyRef.current = viewportKey;
-    const readyTimer = window.setTimeout(() => {
-      setCanPersistViewport(true);
-    }, 0);
-    return () => window.clearTimeout(readyTimer);
-  }, [reactFlowInstance, savedEditorViewport, initialViewportOneToOne]);
+    restoreSavedEditorViewport(reactFlowInstance, mountDefaultViewport);
+  }, [
+    reactFlowInstance,
+    mountDefaultViewport,
+    initialViewportOneToOne,
+    restoreSavedEditorViewport,
+  ]);
 
   useEffect(() => {
-    if (initialViewportOneToOne) {
-      return;
+    appliedViewportKeyRef.current = null;
+    setCanPersistViewport(false);
+    setCanvasRevealed(!hasSavedViewport && !initialViewportOneToOne);
+    if (noSavedViewportPersistTimerRef.current !== null) {
+      window.clearTimeout(noSavedViewportPersistTimerRef.current);
+      noSavedViewportPersistTimerRef.current = null;
     }
-    if (savedEditorViewport != null) {
-      return;
-    }
-
-    const readyTimer = window.setTimeout(() => {
-      setCanPersistViewport(true);
-    }, 600);
-    return () => window.clearTimeout(readyTimer);
-  }, [initialViewportOneToOne, savedEditorViewport]);
+  }, [workflowId, hasSavedViewport, initialViewportOneToOne]);
 
   useEffect(() => {
-    if (!initialViewportOneToOne) {
-      return;
-    }
-    const readyTimer = window.setTimeout(() => {
-      setCanPersistViewport(true);
-    }, 600);
-    return () => window.clearTimeout(readyTimer);
-  }, [initialViewportOneToOne]);
+    return () => {
+      cancelViewportRestoreRef.current?.();
+      if (noSavedViewportPersistTimerRef.current !== null) {
+        window.clearTimeout(noSavedViewportPersistTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleZoomOneToOne = useCallback(() => {
+    reactFlowInstance?.zoomTo(1, { duration: 200 });
+  }, [reactFlowInstance]);
+
+  const [isViewportMoving, setIsViewportMoving] = useState(false);
+  const handleViewportMoveStart = useCallback(() => {
+    setIsViewportMoving(true);
+  }, []);
+  const handleViewportMoveEnd = useCallback(() => {
+    setIsViewportMoving(false);
+  }, []);
 
   // Single-node run: send unsaved editor snapshot, write results back to canvas.
   const handleRunNode = useCallback(
@@ -595,6 +669,8 @@ export function WorkflowBuilder({
         allowedNodeTypes={allowedNodeTypes}
         workflowTrigger={workflowTrigger}
         onRunNode={readOnly ? undefined : handleRunNode}
+        generativeDefaults={generativeDefaults}
+        onGenerativeDefaultChange={onGenerativeDefaultsChange}
       >
         <CreativeStudioProvider
           workflowId={workflowId}
@@ -602,7 +678,6 @@ export function WorkflowBuilder({
           onReturnToCanvasFromDetail={handleReturnToCanvasFromDetail}
         >
           <CreativeStudioCanvasSync selectNode={selectNode} />
-          <PrefetchOrgModels orgId={orgId} />
           {workflowsListUrl ? (
             <WorkflowEditorBreadcrumbEffect
               workflowName={workflowName ?? ""}
@@ -616,7 +691,10 @@ export function WorkflowBuilder({
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly}>
             <div className="flex min-h-0 flex-1">
               <div
-                className="h-full overflow-hidden relative"
+                className={cn(
+                  "h-full overflow-hidden relative",
+                  !canvasRevealed && "invisible"
+                )}
                 style={{
                   width: sidebar.isSidebarVisible
                     ? `calc(100% - ${sidebar.sidebarWidth}px)`
@@ -668,7 +746,7 @@ export function WorkflowBuilder({
                   showBackground={showBackground}
                   fitViewPadding={fitViewPadding}
                   skipInitialFitView={skipInitialFitView}
-                  defaultViewport={restoredDefaultViewport}
+                  defaultViewport={mountDefaultViewport}
                   onEditorViewportChange={
                     readOnly || !canPersistViewport
                       ? undefined

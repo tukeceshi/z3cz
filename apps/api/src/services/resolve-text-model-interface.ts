@@ -11,6 +11,7 @@ import type {
 import {
   isExternalBrandOnlyCanonicalId,
   isVolcanoAiInterfaceProvider,
+  pickLegacyOrgModelInterfaceId,
   resolveVolcanoInferenceModelId,
   VOLCANO_AI_MODEL_CATALOG,
 } from "@dafthunk/types";
@@ -284,6 +285,19 @@ export async function resolveOrgModelInterfaceCandidate(
   }
 
   return null;
+}
+
+export async function inferOrgModelInterfaceId(
+  db: Database,
+  organizationId: string,
+  canonicalId: string,
+  listOptions: (
+    database: Database,
+    orgId: string
+  ) => Promise<readonly OrgModelInterfaceBindingOption[]>
+): Promise<string | undefined> {
+  const options = await listOptions(db, organizationId);
+  return pickLegacyOrgModelInterfaceId(options, canonicalId);
 }
 
 export async function resolveTextModelInterface(

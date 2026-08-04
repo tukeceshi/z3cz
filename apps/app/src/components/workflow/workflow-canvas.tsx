@@ -208,6 +208,7 @@ export interface WorkflowCanvasProps {
   fitViewPadding?: number;
   /** Skip mount-time fitView; caller sets viewport in onInit instead. */
   skipInitialFitView?: boolean;
+  /** Initial React Flow viewport when restoring a saved editor position. */
   defaultViewport?: Viewport;
   onEditorViewportChange?: (viewport: Viewport) => void;
   suppressViewportPersistEndRef?: React.RefObject<boolean>;

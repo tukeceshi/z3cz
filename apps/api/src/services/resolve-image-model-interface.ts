@@ -16,6 +16,7 @@ import {
   collectSingleModelInterfaces,
   collectVolcanoInterfaces,
   resolveOrgModelInterfaceBinding,
+  type ResolvedOrgModelInterface,
 } from "./resolve-text-model-interface";
 
 export type ResolvedImageModelInterface = ResolvedOrgModelInterface<

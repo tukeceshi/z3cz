@@ -8,7 +8,6 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
-import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -383,7 +382,6 @@ export function withAiAudioHistorySelection(
   if (selected.params !== undefined) {
     nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
   }
-  nextInputs = applyHistoryItemModelBinding(nextInputs, selected);
 
   const result = withAiAudioResult(current, selected.audios.slice(0, 1), {
     inputs: upsertInputValue(

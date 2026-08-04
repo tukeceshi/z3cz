@@ -10,7 +10,6 @@ import {
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
-import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
 import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
@@ -331,14 +330,11 @@ export function withAiTextHistorySelection(
   if (!selected) return {};
 
   const result = withAiTextResult(current, selected.text, {
-    inputs: applyHistoryItemModelBinding(
-      upsertInputValue(
-        current.inputs,
-        AI_TEXT_RESULT_HISTORY_INPUT_ID,
-        { items: history.items, selectedId },
-        "json"
-      ),
-      selected
+    inputs: upsertInputValue(
+      current.inputs,
+      AI_TEXT_RESULT_HISTORY_INPUT_ID,
+      { items: history.items, selectedId },
+      "json"
     ),
   });
   return {

@@ -1,4 +1,4 @@
-import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, type ObjectReference, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -18,6 +18,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
+import type { RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -68,12 +69,13 @@ import {
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
-import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import {
-  persistModelBindingToInputs,
-  readLastUsedModelBinding,
-  type GenerativeModelModality,
-} from "./org-model-selection-utils";
+  generativeModalityForNodeType,
+  readWorkflowGenerativeDefault,
+} from "./generative-workflow-defaults";
+import { persistGenerativeBindingWithParams } from "./org-model-selection-utils";
+import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
+import { computeViewportForFlowCenter } from "./workflow-viewport-utils";
 import type {
   ConnectionValidationState,
   NodeExecutionState,
@@ -205,43 +207,27 @@ function mergeGenerativeNodeCatalogInputs(
   );
 }
 
-function resolveGenerativeModality(
-  nodeType: string
-): GenerativeModelModality | undefined {
-  switch (nodeType) {
-    case AI_TEXT_NODE_TYPE:
-      return "text";
-    case AI_IMAGE_NODE_TYPE:
-      return "image";
-    case AI_VIDEO_NODE_TYPE:
-      return "video";
-    case AI_AUDIO_NODE_TYPE:
-      return "audio";
-    default:
-      return undefined;
-  }
-}
-
-function applyLastUsedModelBindingToInputs(
-  nodeType: string,
-  orgId: string | undefined,
-  inputs: WorkflowParameter[]
+function applyGenerativeDefaultsOnCreate(
+  nodeType: string | undefined,
+  inputs: WorkflowParameter[],
+  generativeDefaults: WorkflowGenerativeDefaults | undefined
 ): WorkflowParameter[] {
-  if (!orgId) {
-    return inputs;
-  }
-
-  const modality = resolveGenerativeModality(nodeType);
+  const modality = generativeModalityForNodeType(nodeType);
   if (!modality) {
     return inputs;
   }
-
-  const binding = readLastUsedModelBinding(orgId, modality);
-  if (!binding) {
+  const entry = readWorkflowGenerativeDefault(generativeDefaults, modality);
+  if (!entry) {
     return inputs;
   }
-
-  return persistModelBindingToInputs(inputs, binding);
+  return persistGenerativeBindingWithParams(
+    inputs,
+    {
+      canonicalId: entry.canonicalId,
+      interfaceId: entry.interfaceId,
+    },
+    entry.params ?? {}
+  );
 }
 
 function createReactFlowNode(
@@ -250,17 +236,19 @@ function createReactFlowNode(
   createObjectUrl: (objectReference: ObjectReference) => string,
   existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>,
   t: (key: string) => string,
-  orgId: string | undefined,
+  _orgId: string | undefined,
+  generativeDefaults: WorkflowGenerativeDefaults | undefined,
   id?: string
 ): ReactFlowNode<WorkflowNodeType> {
-  const inputs = applyLastUsedModelBindingToInputs(
+  const mergedInputs = mergeGenerativeNodeCatalogInputs(
     nodeType.type,
-    orgId,
-    mergeGenerativeNodeCatalogInputs(
-      nodeType.type,
-      nodeType.inputs.map((param) => ({ ...param, id: param.name })),
-      nodeType
-    )
+    nodeType.inputs.map((param) => ({ ...param, id: param.name })),
+    nodeType
+  );
+  const inputs = applyGenerativeDefaultsOnCreate(
+    nodeType.type,
+    mergedInputs,
+    generativeDefaults
   );
 
   return {
@@ -302,6 +290,9 @@ export interface UseGraphOperationsProps {
   allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
   orgId?: string;
+  generativeDefaults?: WorkflowGenerativeDefaults;
+  commitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
+  suppressViewportPersistEndRef?: RefObject<boolean>;
 }
 
 export interface UseGraphOperationsReturn {
@@ -383,6 +374,9 @@ export function useGraphOperations({
   allowedNodeTypes,
   nodeTypes = [],
   orgId,
+  generativeDefaults,
+  commitEditorViewport,
+  suppressViewportPersistEndRef,
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   const { t } = useTranslation();
   // Core state
@@ -817,7 +811,8 @@ export function useGraphOperations({
         createObjectUrl,
         nodesRef.current,
         t,
-        orgId
+        orgId,
+        generativeDefaults
       );
       newNode.selected = true;
 
@@ -828,15 +823,36 @@ export function useGraphOperations({
 
       if (placement.shouldPanIntoView) {
         const { width, height } = resolveWorkflowNodeDimensions(nodeType.type);
+        const centerX = placement.position.x + width / 2;
+        const centerY = placement.position.y + height / 2;
         const { zoom } = reactFlowInstance.getViewport();
-        reactFlowInstance.setCenter(
-          placement.position.x + width / 2,
-          placement.position.y + height / 2,
-          { zoom, duration: 200 }
+
+        commitEditorViewport?.(
+          computeViewportForFlowCenter(
+            reactFlowInstance,
+            centerX,
+            centerY,
+            zoom
+          )
         );
+        if (suppressViewportPersistEndRef) {
+          suppressViewportPersistEndRef.current = true;
+        }
+
+        reactFlowInstance.setCenter(centerX, centerY, { zoom, duration: 200 });
       }
     },
-    [reactFlowInstance, setNodes, createObjectUrl, nodesRef, t, orgId]
+    [
+      reactFlowInstance,
+      setNodes,
+      createObjectUrl,
+      nodesRef,
+      t,
+      orgId,
+      generativeDefaults,
+      commitEditorViewport,
+      suppressViewportPersistEndRef,
+    ]
   );
 
   // Update node execution data (batched for multi-node execution ticks)
@@ -1078,6 +1094,7 @@ export function useGraphOperations({
           nodesRef.current,
           t,
           orgId,
+          generativeDefaults,
           `${nodeType.type}-${Date.now()}-${i}`
         );
       });
@@ -1086,7 +1103,7 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl, t, orgId]
+    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults]
   );
 
   return {

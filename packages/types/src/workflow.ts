@@ -392,6 +392,8 @@ export interface Workflow {
   edges: Edge[];
   /** Last editor canvas pan/zoom; restored on next open */
   editorViewport?: WorkflowEditorViewport;
+  /** Last picker-confirmed generative model + params per modality */
+  generativeDefaults?: WorkflowGenerativeDefaults;
 }
 
 /**
@@ -414,6 +416,7 @@ export type NodeExecutionStatus =
   | "pending";
 
 import type { PendingContinuation } from "./workflow-continuation";
+import type { WorkflowGenerativeDefaults } from "./workflow-generative-defaults";
 
 /**
  * Represents the execution state of a single node

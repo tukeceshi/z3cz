@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+export interface AgentSidebarSnapshot {
+  readonly visible: boolean;
+  readonly width: number;
+}
 
 interface UseResizableSidebarProps {
   initialVisible: boolean;
+  initialWidth?: number;
+  onPersist?: (state: AgentSidebarSnapshot) => void;
 }
 
 interface UseResizableSidebarReturn {
@@ -15,14 +22,29 @@ interface UseResizableSidebarReturn {
 
 export function useResizableSidebar({
   initialVisible,
+  initialWidth = 384,
+  onPersist,
 }: UseResizableSidebarProps): UseResizableSidebarReturn {
   const [isSidebarVisible, setIsSidebarVisible] = useState(initialVisible);
-  const [sidebarWidth, setSidebarWidth] = useState(384);
+  const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
   const [isResizing, setIsResizing] = useState(false);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  const persistSnapshot = useCallback(
+    (visible: boolean, width: number) => {
+      onPersist?.({ visible, width });
+    },
+    [onPersist]
+  );
 
   const toggleSidebar = useCallback(() => {
-    setIsSidebarVisible((prev) => !prev);
-  }, []);
+    setIsSidebarVisible((prev) => {
+      const next = !prev;
+      persistSnapshot(next, sidebarWidthRef.current);
+      return next;
+    });
+  }, [persistSnapshot]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,6 +61,7 @@ export function useResizableSidebar({
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      persistSnapshot(isSidebarVisible, sidebarWidthRef.current);
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -48,7 +71,7 @@ export function useResizableSidebar({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, isSidebarVisible, persistSnapshot]);
 
   return {
     isSidebarVisible,

@@ -10,6 +10,10 @@ import {
 
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
+import {
+  readModelInterfaceIdInput,
+  resolveModelInterfaceIdFromInputs,
+} from "./resolve-model-interface-id";
 
 export const AI_TEXT_NODE_TYPE = "ai-text" as const;
 export const AI_TEXT_KEYWORDS_INPUT = "keywords" as const;
@@ -116,11 +120,11 @@ export class AiTextNode extends ExecutableNode {
       return this.createErrorResult("A platform model must be selected.");
     }
 
-    const interfaceId =
-      typeof context.inputs.ai_interface_id === "string" &&
-      context.inputs.ai_interface_id.trim().length > 0
-        ? context.inputs.ai_interface_id.trim()
-        : undefined;
+    const interfaceId = await resolveModelInterfaceIdFromInputs(
+      readModelInterfaceIdInput(context),
+      modelCanonicalId,
+      context.inferTextModelInterfaceId
+    );
 
     if (!interfaceId) {
       return this.createErrorResult("An AI interface must be selected.");

@@ -35,6 +35,7 @@ export function useExpandHistoryToSiblingNode(
       readonly prompt: string;
       readonly params?: Readonly<Record<string, unknown>>;
       readonly platformModelId?: string;
+      readonly aiInterfaceId?: string;
       readonly modelDisplayName?: string;
       readonly createdAt: string;
     }) => {
@@ -64,6 +65,7 @@ export function useExpandHistoryToSiblingNode(
         prompt: item.prompt,
         params: item.params,
         platformModelId: item.platformModelId,
+        aiInterfaceId: item.aiInterfaceId,
         modelDisplayName: item.modelDisplayName,
         createdAt: item.createdAt,
         existingNodes: typedNodes,

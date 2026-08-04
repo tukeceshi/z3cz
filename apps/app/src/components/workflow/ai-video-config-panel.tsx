@@ -69,13 +69,8 @@ import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
-import {
-  clearModelBindingInputs,
-  persistModelBindingToInputs,
-  rememberModelBinding,
-  resolveHydrateModelBindingAction,
-  resolveSelectedModelBinding,
-} from "./org-model-selection-utils";
+import { useGenerativeModelCard } from "./use-generative-model-card";
+import { persistModelBindingToInputs } from "./org-model-selection-utils";
 import {
   AiTextReferenceBar,
   type AiTextReferenceChip,
@@ -86,8 +81,10 @@ import {
 } from "./ai-video-generation-params-panel";
 import {
   buildDefaultVideoGenerationParams,
-  readAiVideoGenerationParams,
 } from "./ai-video-params-popover";
+import {
+  sanitizeCardGenerationParams,
+} from "./generative-card-params";
 import {
   AI_IMAGE_OUTPUT_ID,
   mergeAiImageNodeCatalogInputs,
@@ -225,8 +222,6 @@ export function AiVideoConfigPanel({
     [createObjectUrl, orgId]
   );
 
-  const { models, groups, modelsError, isLoading, refreshModels } =
-    useOrgVideoModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
@@ -235,21 +230,7 @@ export function AiVideoConfigPanel({
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
-  const [generationParams, setGenerationParams] = useState<
-    Record<string, unknown>
-  >(() => readAiVideoGenerationParams(data.inputs));
 
-  const videoModelCatalog = useMemo(
-    () =>
-      models.map((entry) => ({
-        canonicalId: entry.canonicalId,
-        parameterRules: entry.parameterRules,
-      })),
-    [models]
-  );
-
-  const selectedModelId = getInputString(data, "model");
-  const selectedInterfaceId = getInputString(data, "ai_interface_id");
   const promptValue = getInputString(data, "prompt");
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
@@ -295,33 +276,9 @@ export function AiVideoConfigPanel({
     [edges, nodeId, typedNodes]
   );
 
-  const modelRules = useMemo(
-    () =>
-      resolveAiVideoReferenceRules({
-        targetNodeData: data,
-        models: videoModelCatalog,
-      }),
-    [data, videoModelCatalog]
-  );
-
-  const selectedModel = useMemo(
-    () =>
-      resolveSelectedModelBinding(
-        models,
-        selectedModelId,
-        selectedInterfaceId
-      ),
-    [models, selectedInterfaceId, selectedModelId]
-  );
-
   const referenceCount = useMemo(
     () => countAiVideoReferences(nodeId, edges),
     [edges, nodeId]
-  );
-
-  const selectableModels = useMemo(
-    () => models.filter((entry) => entry.selectable),
-    [models]
   );
 
   const modelFitsCurrentRefs = useCallback(
@@ -333,20 +290,79 @@ export function AiVideoConfigPanel({
     [referenceCount]
   );
 
+  const {
+    effectiveModel,
+    selectedOptionId,
+    models,
+    groups,
+    isLoading,
+    modelsError,
+    canGenerate: modelReady,
+    handlePickerOpenChange,
+    applyModelSelection,
+    refreshModels,
+    nodeInputs,
+    cardGenerationParams,
+  } = useGenerativeModelCard({
+    orgId,
+    modality: "video",
+    data,
+    nodeId,
+    disabled,
+    updateNodeData,
+    readModelId: (nodeData) => getInputString(nodeData, "model"),
+    readInterfaceId: (nodeData) => getInputString(nodeData, "ai_interface_id"),
+    readGenerationFields: (model) =>
+      normalizeVideoModelParameterRules(model.parameterRules).generationFields,
+    buildDefaultParams: buildDefaultVideoGenerationParams,
+    useModels: useOrgVideoModels,
+    modelFitsCurrentRefs,
+    onModelSelected: (model, current) => {
+      const rules = normalizeVideoModelParameterRules(model.parameterRules);
+      const defaultParams = buildDefaultVideoGenerationParams(
+        rules.generationFields
+      );
+      return {
+        inputs: upsertNodeInputValues(
+          persistModelBindingToInputs(current.inputs, {
+            canonicalId: model.canonicalId,
+            interfaceId: model.interfaceId,
+          }),
+          { params: defaultParams },
+          { params: "json" }
+        ),
+      };
+    },
+  });
+
+  const videoModelCatalog = useMemo(
+    () =>
+      models.map((entry) => ({
+        canonicalId: entry.canonicalId,
+        parameterRules: entry.parameterRules,
+      })),
+    [models]
+  );
+
+  const modelRules = useMemo(() => {
+    if (effectiveModel) {
+      return normalizeVideoModelParameterRules(effectiveModel.parameterRules);
+    }
+    return resolveAiVideoReferenceRules({
+      targetNodeData: data,
+      models: videoModelCatalog,
+    });
+  }, [data, effectiveModel, videoModelCatalog]);
+
+  const selectableModels = useMemo(
+    () => models.filter((entry) => entry.selectable),
+    [models]
+  );
+
   const modelsFittingRefs = useMemo(
     () => selectableModels.filter(modelFitsCurrentRefs),
     [modelFitsCurrentRefs, selectableModels]
   );
-
-  const activeModel =
-    selectedModel ?? modelsFittingRefs.find((entry) => entry.selectable);
-  const selectedOptionId = activeModel?.optionId ?? "";
-
-  const generationFields = useMemo(() => {
-    if (!activeModel) return [];
-    return normalizeVideoModelParameterRules(activeModel.parameterRules)
-      .generationFields;
-  }, [activeModel]);
 
   const showOverLimitHint =
     selectableModels.length > 0 &&
@@ -354,86 +370,6 @@ export function AiVideoConfigPanel({
     referenceCount > 0;
 
   const allowUpload = modelRules.maxReferenceImages > 0;
-
-  const clearModelSelection = useCallback(() => {
-    if (!updateNodeData) return;
-    updateNodeData(nodeId, (current) => ({
-      inputs: clearModelBindingInputs(current.inputs),
-    }));
-  }, [nodeId, updateNodeData]);
-
-  const applyModelSelection = useCallback(
-    (optionId: string) => {
-      if (disabled || !updateNodeData) return;
-      const model = models.find((entry) => entry.optionId === optionId);
-      if (!model?.selectable || !modelFitsCurrentRefs(model)) return;
-
-      const rules = normalizeVideoModelParameterRules(model.parameterRules);
-      const defaultParams = buildDefaultVideoGenerationParams(
-        rules.generationFields
-      );
-      setGenerationParams(defaultParams);
-
-      rememberModelBinding(orgId, "video", {
-        canonicalId: model.canonicalId,
-        interfaceId: model.interfaceId,
-      });
-
-      updateNodeData(nodeId, (current) => ({
-        inputs: upsertNodeInputValues(
-          current.inputs,
-          {
-            model: model.canonicalId,
-            ai_interface_id: model.interfaceId,
-            params: defaultParams,
-          },
-          { params: "json" }
-        ),
-      }));
-    },
-    [disabled, modelFitsCurrentRefs, models, nodeId, orgId, updateNodeData]
-  );
-
-  useEffect(() => {
-    if (disabled || isLoading || !updateNodeData) return;
-
-    const action = resolveHydrateModelBindingAction(
-      models,
-      selectedModelId,
-      selectedInterfaceId
-    );
-    if (action.kind === "none") return;
-
-    updateNodeData(nodeId, (current) => ({
-      inputs:
-        action.kind === "clear"
-          ? clearModelBindingInputs(current.inputs)
-          : upsertNodeInputValues(current.inputs, {
-              ai_interface_id: action.interfaceId,
-            }),
-    }));
-  }, [
-    disabled,
-    isLoading,
-    models,
-    nodeId,
-    selectedInterfaceId,
-    selectedModelId,
-    updateNodeData,
-  ]);
-
-  useEffect(() => {
-    if (disabled || !selectedModelId || !selectedModel) return;
-    if (!selectedModel.selectable || !modelFitsCurrentRefs(selectedModel)) {
-      clearModelSelection();
-    }
-  }, [
-    clearModelSelection,
-    disabled,
-    modelFitsCurrentRefs,
-    selectedModel,
-    selectedModelId,
-  ]);
 
   const commitPrompt = useCallback(
     (value: string) => {
@@ -568,19 +504,16 @@ export function AiVideoConfigPanel({
 
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
-      setGenerationParams(next);
-      if (disabled || !updateNodeData) return;
-      updateNodeInput(nodeId, "params", next, data.inputs, updateNodeData);
-    },
-    [data.inputs, disabled, nodeId, updateNodeData]
-  );
+      if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
 
-  useEffect(() => {
-    const stored = readAiVideoGenerationParams(data.inputs);
-    if (Object.keys(stored).length > 0) {
-      setGenerationParams(stored);
-    }
-  }, [data.inputs]);
+      const sanitized = sanitizeCardGenerationParams(
+        cardGenerationParams.fields,
+        next
+      );
+      updateNodeInput(nodeId, "params", sanitized, nodeInputs, updateNodeData);
+    },
+    [cardGenerationParams, disabled, nodeId, nodeInputs, updateNodeData]
+  );
 
   const connectReferenceEdge = useCallback(
     (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
@@ -774,12 +707,8 @@ export function AiVideoConfigPanel({
   };
 
   const handleGenerate = async () => {
-    if (disabled || !orgId || !activeModel) return;
-    if (generateInFlightRef.current) return;
-
-    if (!activeModel.selectable || !modelFitsCurrentRefs(activeModel)) {
-      return;
-    }
+    if (disabled || !orgId || !effectiveModel) return;
+    if (!modelReady || generateInFlightRef.current) return;
 
     const prompt = promptForGenerate.trim();
 
@@ -810,7 +739,10 @@ export function AiVideoConfigPanel({
       return;
     }
 
-    const generateCount = parseVideoGenerateCount(generationParams);
+    const generationValues = cardGenerationParams.visible
+      ? cardGenerationParams.values
+      : {};
+    const generateCount = parseVideoGenerateCount(generationValues);
 
     generateInFlightRef.current = true;
     setIsGenerating(true);
@@ -818,10 +750,6 @@ export function AiVideoConfigPanel({
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
-      inputs: persistModelBindingToInputs(current.inputs, {
-        canonicalId: activeModel.canonicalId,
-        interfaceId: activeModel.interfaceId,
-      }),
       metadata: withAiVideoGenerateError(
         withGenerativeProgress(
           withAiVideoGeneratingFlag(current.metadata, true),
@@ -856,10 +784,10 @@ export function AiVideoConfigPanel({
       }
 
       const submitPayload = {
-        modelCanonicalId: activeModel.canonicalId,
-        aiInterfaceId: activeModel.interfaceId,
+        modelCanonicalId: effectiveModel.canonicalId,
+        aiInterfaceId: effectiveModel.interfaceId,
         prompt,
-        params: generationParams,
+        params: generationValues,
         referenceImageUrls:
           resolved.referenceImageUrls.length > 0
             ? resolved.referenceImageUrls
@@ -985,22 +913,14 @@ export function AiVideoConfigPanel({
           videosToAppend,
           {
             prompt,
-            params: generationParams,
-            platformModelId: activeModel.canonicalId,
-            aiInterfaceId: lastAiInterfaceId || activeModel.interfaceId,
-            modelDisplayName: activeModel.displayName,
-          }
-        );
-        const inputs = persistModelBindingToInputs(
-          withResult.inputs ?? current.inputs,
-          {
-            canonicalId: activeModel.canonicalId,
-            interfaceId: lastAiInterfaceId || activeModel.interfaceId,
+            params: generationValues,
+            platformModelId: effectiveModel.canonicalId,
+            aiInterfaceId: lastAiInterfaceId || effectiveModel.interfaceId,
+            modelDisplayName: effectiveModel.displayName,
           }
         );
         return {
           ...withResult,
-          inputs,
           metadata: withAiVideoGenerateError(
             withAiVideoGeneratingFlag(
               clearGenerativeProgress(withResult.metadata),
@@ -1065,22 +985,14 @@ export function AiVideoConfigPanel({
                 [video],
                 {
                   prompt,
-                  params: generationParams,
-                  platformModelId: activeModel.canonicalId,
-                  aiInterfaceId: activeModel.interfaceId,
-                  modelDisplayName: activeModel.displayName,
-                }
-              );
-              const inputs = persistModelBindingToInputs(
-                withResult.inputs ?? current.inputs,
-                {
-                  canonicalId: activeModel.canonicalId,
-                  interfaceId: activeModel.interfaceId,
+                  params: generationValues,
+                  platformModelId: effectiveModel.canonicalId,
+                  aiInterfaceId: effectiveModel.interfaceId,
+                  modelDisplayName: effectiveModel.displayName,
                 }
               );
               return {
                 ...withResult,
-                inputs,
                 metadata: withAiVideoGenerateError(
                   withAiVideoGeneratingFlag(
                     clearGenerativeProgress(withResult.metadata),
@@ -1112,7 +1024,6 @@ export function AiVideoConfigPanel({
         ),
       }));
       toast.errorRaw(cardError.summary);
-      toast.errorRaw(cardError.summary);
     } finally {
       generateInFlightRef.current = false;
       if (ownsJobProgress) {
@@ -1129,10 +1040,9 @@ export function AiVideoConfigPanel({
   };
 
   const canGenerate =
+    modelReady &&
     !disabled &&
     !isGenerating &&
-    Boolean(activeModel?.selectable) &&
-    (!activeModel || modelFitsCurrentRefs(activeModel)) &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiVideo({
       prompt: promptForGenerate,
@@ -1298,23 +1208,23 @@ export function AiVideoConfigPanel({
               models={models as unknown as readonly OrgTextModelOption[]}
               groups={groups}
               selectedOptionId={selectedOptionId}
+              chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
               disabled={disabled || isLoading}
               isLoading={isLoading}
               loadError={Boolean(modelsError)}
-                onRetryLoad={() => {
-                  void refreshModels();
-                }}
-                modelFitsCurrentRefs={(model) =>
-                  modelFitsCurrentRefs(model as unknown as OrgVideoModelOption)
-                }
-              onSelect={(optionId) => {
-                applyModelSelection(optionId);
+              onOpenChange={handlePickerOpenChange}
+              onRetryLoad={() => {
+                void refreshModels();
               }}
+              modelFitsCurrentRefs={(model) =>
+                modelFitsCurrentRefs(model as unknown as OrgVideoModelOption)
+              }
+              onSelect={applyModelSelection}
             />
-            {generationFields.length > 0 ? (
+            {cardGenerationParams.visible ? (
               <AiVideoGenerationParamsPanel
-                fields={generationFields}
-                values={generationParams}
+                fields={cardGenerationParams.fields}
+                values={cardGenerationParams.values}
                 disabled={disabled}
                 triggerLabel={t("workflow.aiVideoPanel.params")}
                 onChange={commitGenerationParams}

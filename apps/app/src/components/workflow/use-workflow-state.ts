@@ -1,4 +1,4 @@
-import type { ObjectReference, WorkflowTrigger } from "@dafthunk/types";
+import type { ObjectReference, WorkflowEditorViewport, WorkflowGenerativeDefaults, WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -37,6 +37,9 @@ interface UseWorkflowStateProps {
   allowedNodeTypes?: ReadonlySet<string>;
   nodeTypes?: NodeType[];
   orgId?: string;
+  generativeDefaults?: WorkflowGenerativeDefaults;
+  commitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
+  suppressViewportPersistEndRef?: RefObject<boolean>;
 }
 
 interface UseWorkflowStateReturn {
@@ -112,6 +115,9 @@ export function useWorkflowState({
   allowedNodeTypes,
   nodeTypes = [],
   orgId,
+  generativeDefaults,
+  commitEditorViewport,
+  suppressViewportPersistEndRef,
 }: UseWorkflowStateProps): UseWorkflowStateReturn {
   // Core graph state and operations
   const graphOps = useGraphOperations({
@@ -123,6 +129,9 @@ export function useWorkflowState({
     allowedNodeTypes,
     nodeTypes,
     orgId,
+    generativeDefaults,
+    commitEditorViewport,
+    suppressViewportPersistEndRef,
   });
 
   const graphLocked = disabled;

@@ -39,3 +39,42 @@ export function formatCanvasModelLabel(params: {
   const prefix = params.channelKind === "aggregate" ? "聚合" : "API";
   return `[${prefix}] ${params.alias}`;
 }
+
+export interface OrgModelBindingPickRef {
+  readonly canonicalId: string;
+  readonly interfaceId: string;
+  readonly selectable: boolean;
+}
+
+/** Resolve ai_interface_id for legacy nodes that only stored model. */
+export function pickLegacyOrgModelInterfaceId<T extends OrgModelBindingPickRef>(
+  bindings: readonly T[],
+  canonicalId: string,
+  preferredInterfaceId?: string
+): string | undefined {
+  const modelId = canonicalId.trim();
+  if (!modelId) {
+    return undefined;
+  }
+
+  const matches = bindings.filter(
+    (entry) => entry.canonicalId === modelId && entry.selectable
+  );
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  const preferredId = preferredInterfaceId?.trim();
+  if (preferredId) {
+    const preferred = matches.find((entry) => entry.interfaceId === preferredId);
+    if (preferred) {
+      return preferred.interfaceId;
+    }
+  }
+
+  if (matches.length === 1) {
+    return matches[0]!.interfaceId;
+  }
+
+  return undefined;
+}

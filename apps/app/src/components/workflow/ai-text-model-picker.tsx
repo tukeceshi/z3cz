@@ -170,10 +170,12 @@ export interface AiTextModelPickerProps {
   readonly models: readonly OrgTextModelOption[];
   readonly groups: readonly PlatformAiModelGroup[];
   readonly selectedOptionId: string;
+  readonly chipModel?: OrgTextModelOption;
   readonly disabled?: boolean;
   readonly isLoading?: boolean;
   readonly loadError?: boolean;
   readonly onRetryLoad?: () => void;
+  readonly onOpenChange?: (open: boolean) => void;
   readonly modelFitsCurrentRefs: (model: OrgTextModelOption) => boolean;
   readonly onSelect: (optionId: string) => void;
 }
@@ -182,10 +184,12 @@ export function AiTextModelPicker({
   models,
   groups,
   selectedOptionId,
+  chipModel,
   disabled = false,
   isLoading = false,
   loadError = false,
   onRetryLoad,
+  onOpenChange,
   modelFitsCurrentRefs,
   onSelect,
 }: AiTextModelPickerProps) {
@@ -194,7 +198,8 @@ export function AiTextModelPicker({
   const [open, setOpen] = useState(false);
   const [flyoutBrandId, setFlyoutBrandId] = useState<string | null>(null);
 
-  const selected = models.find((entry) => entry.optionId === selectedOptionId);
+  const selected =
+    models.find((entry) => entry.optionId === selectedOptionId) ?? chipModel;
 
   const availableModels = useMemo(
     () => models.filter((model) => model.selectable),
@@ -293,6 +298,7 @@ export function AiTextModelPicker({
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
+        onOpenChange?.(nextOpen);
         if (!nextOpen) {
           setFlyoutBrandId(null);
         }

@@ -504,9 +504,7 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
                       orgId,
                       entry.item.schemeId
                     );
-                    navigate(getOrgUrl(`workflows/${entry.item.id}`), {
-                      state: createWorkflowEditorLocationState(),
-                    });
+                    navigate(getOrgUrl(`workflows/${entry.item.id}`));
                   }}
                   onRename={() =>
                     setRenameTarget({ kind: "workflow", item: entry.item })

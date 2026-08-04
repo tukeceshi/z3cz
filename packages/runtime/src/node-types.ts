@@ -325,6 +325,10 @@ export interface NodeContext {
       }
     | undefined
   >;
+  /** Infer ai_interface_id for legacy nodes that only stored model. */
+  inferTextModelInterfaceId?: (
+    canonicalId: string
+  ) => Promise<string | undefined>;
   disableTextModelOnInterface?: (params: {
     readonly interfaceId: string;
     readonly canonicalId: string;
@@ -341,6 +345,9 @@ export interface NodeContext {
       }
     | undefined
   >;
+  inferImageModelInterfaceId?: (
+    canonicalId: string
+  ) => Promise<string | undefined>;
   /** Resolve a platform video model to interface + provider model id. */
   resolveVideoModel?: (
     canonicalId: string,
@@ -353,6 +360,9 @@ export interface NodeContext {
       }
     | undefined
   >;
+  inferVideoModelInterfaceId?: (
+    canonicalId: string
+  ) => Promise<string | undefined>;
   /** Resolve a platform audio model to interface + provider model id. */
   resolveAudioModel?: (
     canonicalId: string,
@@ -365,6 +375,9 @@ export interface NodeContext {
       }
     | undefined
   >;
+  inferAudioModelInterfaceId?: (
+    canonicalId: string
+  ) => Promise<string | undefined>;
   /** Resolve ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution

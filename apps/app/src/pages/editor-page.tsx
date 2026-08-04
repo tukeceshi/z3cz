@@ -66,6 +66,7 @@ function EditorPageContent() {
       }
       return consumePrefetchedWorkflowMetadata(id, orgId);
     });
+  const [httpMetadataLoaded, setHttpMetadataLoaded] = useState(false);
 
   const [workflowSettingsOpen, setWorkflowSettingsOpen] = useState(false);
 
@@ -94,15 +95,20 @@ function EditorPageContent() {
     isWSConnected: _isWSConnected,
     workflowMetadata,
     editorViewport,
+    isEditorViewportReady,
+    generativeDefaults,
     handleNodesChange,
     handleEdgesChange,
     handleEditorViewportChange,
+    commitEditorViewport,
+    handleGenerativeDefaultsChange,
     executeWorkflow: wsExecuteWorkflow,
     updateMetadata: wsUpdateMetadata,
   } = useEditableWorkflow({
     workflowId: id,
     nodeTypes: nodeTypes || [],
     fallbackWorkflow: httpWorkflowMetadata,
+    httpMetadataLoaded,
     onExecutionUpdate: (execution) => {
       if (executionCallbackRef.current) {
         executionCallbackRef.current(execution);
@@ -131,17 +137,40 @@ function EditorPageContent() {
   );
 
   useEffect(() => {
+    if (!id || !orgId) {
+      setHttpWorkflowMetadata(null);
+      setHttpMetadataLoaded(false);
+      return;
+    }
+
+    const prefetched = consumePrefetchedWorkflowMetadata(id, orgId);
+    setHttpWorkflowMetadata(prefetched);
+    setHttpMetadataLoaded(false);
+
+    let cancelled = false;
+
     const fetchWorkflowMetadata = async () => {
-      if (!id || !orgId) return;
       try {
         const metadata = await getWorkflow(id, orgId);
+        if (cancelled) {
+          return;
+        }
         setHttpWorkflowMetadata(metadata);
         clearPrefetchedWorkflowMetadata(id, orgId);
       } catch (error) {
         console.error("Failed to fetch workflow metadata:", error);
+      } finally {
+        if (!cancelled) {
+          setHttpMetadataLoaded(true);
+        }
       }
     };
-    fetchWorkflowMetadata();
+
+    void fetchWorkflowMetadata();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, orgId]);
 
   useEffect(() => {
@@ -218,8 +247,10 @@ function EditorPageContent() {
 
   const isLoading =
     isNodeTypesLoading ||
-    (isWorkflowInitializing && !effectiveWorkflowMetadata) ||
-    editorViewport === undefined;
+    isWorkflowInitializing ||
+    !effectiveWorkflowMetadata ||
+    !httpMetadataLoaded ||
+    !isEditorViewportReady;
 
   if (isLoading) {
     return <InsetLoading />;
@@ -264,6 +295,9 @@ function EditorPageContent() {
           initialViewportOneToOne={initialViewportOneToOneRef.current}
           savedEditorViewport={editorViewport ?? null}
           onEditorViewportChange={handleEditorViewportChange}
+          onCommitEditorViewport={commitEditorViewport}
+          generativeDefaults={generativeDefaults}
+          onGenerativeDefaultsChange={handleGenerativeDefaultsChange}
         />
       </div>
       {!workflowReadOnly ? <CanvasThemeTip /> : null}

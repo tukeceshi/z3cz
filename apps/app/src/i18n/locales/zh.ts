@@ -2512,6 +2512,7 @@ export const zh: TranslationDictionary = {
       promptTooLong: "提示词过长，请缩短后重试",
       timedOut: "生成超时，请稍后重试",
       generationFailed: "生成失败，请稍后重试",
+      modelSelectionBlocked: "当前为只读模式，无法选择模型",
       modelUnavailable: "当前模型不可用，请在设置中检查 AI 接口配置",
       interfaceUnavailable: "未找到可用的 AI 接口，请先完成配置",
       upstreamFailed: "上游服务暂时不可用，请稍后重试",

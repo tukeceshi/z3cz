@@ -17,6 +17,10 @@ export interface TextModelService {
     canonicalId: string;
     interfaceId: string;
   }): Promise<ResolvedRuntimeTextModel | undefined>;
+  inferTextModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined>;
   executeTextModel(params: {
     organizationId: string;
     canonicalId: string;

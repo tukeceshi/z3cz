@@ -47,19 +47,16 @@ import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
-import {
-  clearModelBindingInputs,
-  persistModelBindingToInputs,
-  rememberModelBinding,
-  resolveHydrateModelBindingAction,
-  resolveSelectedModelBinding,
-} from "./org-model-selection-utils";
+import { useGenerativeModelCard } from "./use-generative-model-card";
+import { persistModelBindingToInputs } from "./org-model-selection-utils";
 import { AiTextReferenceBar } from "./ai-text-reference-bar";
 import {
   AiAudioParamsPopover,
   buildDefaultAudioGenerationParams,
-  readAiAudioGenerationParams,
 } from "./ai-audio-params-popover";
+import {
+  sanitizeCardGenerationParams,
+} from "./generative-card-params";
 import {
   AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_AUDIO_PROMPT_HANDLE_ID,
@@ -121,8 +118,6 @@ export function AiAudioConfigPanel({
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
 
-  const { models, groups, modelsError, isLoading, refreshModels } =
-    useOrgAudioModels(orgId);
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
@@ -130,21 +125,7 @@ export function AiAudioConfigPanel({
   );
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
-  const [generationParams, setGenerationParams] = useState<
-    Record<string, unknown>
-  >(() => readAiAudioGenerationParams(data.inputs));
 
-  const audioModelCatalog = useMemo(
-    () =>
-      models.map((entry) => ({
-        canonicalId: entry.canonicalId,
-        parameterRules: entry.parameterRules,
-      })),
-    [models]
-  );
-
-  const selectedModelId = getInputString(data, "model");
-  const selectedInterfaceId = getInputString(data, "ai_interface_id");
   const promptValue = getInputString(data, "prompt");
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
@@ -173,101 +154,76 @@ export function AiAudioConfigPanel({
     [edges, nodeId, typedNodes]
   );
 
-  const modelRules = useMemo(
-    () =>
-      resolveAiAudioModelRules(data, audioModelCatalog),
-    [audioModelCatalog, data]
-  );
-
-  const selectedModel = useMemo(
-    () =>
-      resolveSelectedModelBinding(
-        models,
-        selectedModelId,
-        selectedInterfaceId
-      ),
-    [models, selectedInterfaceId, selectedModelId]
-  );
-
-  const selectableModels = useMemo(
-    () => models.filter((entry) => entry.selectable),
-    [models]
-  );
-
-  const activeModel =
-    selectedModel ?? selectableModels.find((entry) => entry.selectable);
-  const selectedOptionId = activeModel?.optionId ?? "";
-
-  const generationFields = useMemo(() => {
-    if (!activeModel) return [];
-    return normalizeAudioModelParameterRules(activeModel.parameterRules)
-      .generationFields;
-  }, [activeModel]);
-
   const modelFitsCurrentRefs = useCallback(
     (_model: OrgTextModelOption) => true,
     []
   );
 
-  const applyModelSelection = useCallback(
-    (optionId: string) => {
-      if (disabled || !updateNodeData) return;
-      const model = models.find((entry) => entry.optionId === optionId);
-      if (!model?.selectable) return;
-
+  const {
+    effectiveModel,
+    selectedOptionId,
+    models,
+    groups,
+    isLoading,
+    modelsError,
+    canGenerate: modelReady,
+    handlePickerOpenChange,
+    applyModelSelection,
+    refreshModels,
+    nodeInputs,
+    cardGenerationParams,
+  } = useGenerativeModelCard({
+    orgId,
+    modality: "audio",
+    data,
+    nodeId,
+    disabled,
+    updateNodeData,
+    readModelId: (nodeData) => getInputString(nodeData, "model"),
+    readInterfaceId: (nodeData) => getInputString(nodeData, "ai_interface_id"),
+    readGenerationFields: (model) =>
+      normalizeAudioModelParameterRules(model.parameterRules).generationFields,
+    buildDefaultParams: buildDefaultAudioGenerationParams,
+    useModels: useOrgAudioModels,
+    modelFitsCurrentRefs,
+    onModelSelected: (model, current) => {
       const rules = normalizeAudioModelParameterRules(model.parameterRules);
       const defaultParams = buildDefaultAudioGenerationParams(
         rules.generationFields
       );
-      setGenerationParams(defaultParams);
-
-      rememberModelBinding(orgId, "audio", {
-        canonicalId: model.canonicalId,
-        interfaceId: model.interfaceId,
-      });
-
-      updateNodeData(nodeId, (current) => ({
+      return {
         inputs: upsertNodeInputValues(
-          current.inputs,
-          {
-            model: model.canonicalId,
-            ai_interface_id: model.interfaceId,
-            params: defaultParams,
-          },
+          persistModelBindingToInputs(current.inputs, {
+            canonicalId: model.canonicalId,
+            interfaceId: model.interfaceId,
+          }),
+          { params: defaultParams },
           { params: "json" }
         ),
-      }));
+      };
     },
-    [disabled, models, nodeId, orgId, updateNodeData]
+  });
+
+  const audioModelCatalog = useMemo(
+    () =>
+      models.map((entry) => ({
+        canonicalId: entry.canonicalId,
+        parameterRules: entry.parameterRules,
+      })),
+    [models]
   );
 
-  useEffect(() => {
-    if (disabled || isLoading || !updateNodeData) return;
+  const modelRules = useMemo(() => {
+    if (effectiveModel) {
+      return normalizeAudioModelParameterRules(effectiveModel.parameterRules);
+    }
+    return resolveAiAudioModelRules(data, audioModelCatalog);
+  }, [audioModelCatalog, data, effectiveModel]);
 
-    const action = resolveHydrateModelBindingAction(
-      models,
-      selectedModelId,
-      selectedInterfaceId
-    );
-    if (action.kind === "none") return;
-
-    updateNodeData(nodeId, (current) => ({
-      inputs:
-        action.kind === "clear"
-          ? clearModelBindingInputs(current.inputs)
-          : upsertNodeInputValues(current.inputs, {
-              ai_interface_id: action.interfaceId,
-            }),
-    }));
-  }, [
-    disabled,
-    isLoading,
-    models,
-    nodeId,
-    selectedInterfaceId,
-    selectedModelId,
-    updateNodeData,
-  ]);
+  const selectableModels = useMemo(
+    () => models.filter((entry) => entry.selectable),
+    [models]
+  );
 
   const commitPrompt = useCallback(
     (value: string) => {
@@ -366,19 +322,16 @@ export function AiAudioConfigPanel({
 
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
-      setGenerationParams(next);
-      if (disabled || !updateNodeData) return;
-      updateNodeInput(nodeId, "params", next, data.inputs, updateNodeData);
-    },
-    [data.inputs, disabled, nodeId, updateNodeData]
-  );
+      if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
 
-  useEffect(() => {
-    const stored = readAiAudioGenerationParams(data.inputs);
-    if (Object.keys(stored).length > 0) {
-      setGenerationParams(stored);
-    }
-  }, [data.inputs]);
+      const sanitized = sanitizeCardGenerationParams(
+        cardGenerationParams.fields,
+        next
+      );
+      updateNodeInput(nodeId, "params", sanitized, nodeInputs, updateNodeData);
+    },
+    [cardGenerationParams, disabled, nodeId, nodeInputs, updateNodeData]
+  );
 
   const connectReferenceEdge = useCallback(
     (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
@@ -421,8 +374,8 @@ export function AiAudioConfigPanel({
   };
 
   const handleGenerate = async () => {
-    if (disabled || !orgId || !activeModel?.selectable) return;
-    if (generateInFlightRef.current) return;
+    if (disabled || !orgId || !effectiveModel) return;
+    if (!modelReady || generateInFlightRef.current) return;
 
     const prompt = promptForGenerate.trim();
 
@@ -453,14 +406,13 @@ export function AiAudioConfigPanel({
 
     generateInFlightRef.current = true;
     setIsGenerating(true);
+    const generationValues = cardGenerationParams.visible
+      ? cardGenerationParams.values
+      : {};
     /** False when another caller owns persist/progress for this job. */
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
     updateNodeData?.(nodeId, (current) => ({
-      inputs: persistModelBindingToInputs(current.inputs, {
-        canonicalId: activeModel.canonicalId,
-        interfaceId: activeModel.interfaceId,
-      }),
       metadata: withAiAudioGenerateError(
         withGenerativeProgress(
           withAiAudioGeneratingFlag(current.metadata, true),
@@ -472,10 +424,10 @@ export function AiAudioConfigPanel({
 
     try {
       const response = await generateAiAudio(orgId, {
-        modelCanonicalId: activeModel.canonicalId,
-        aiInterfaceId: activeModel.interfaceId,
+        modelCanonicalId: effectiveModel.canonicalId,
+        aiInterfaceId: effectiveModel.interfaceId,
         prompt,
-        params: generationParams,
+        params: generationValues,
         nodeId,
         workflowId,
         clientRequestId: crypto.randomUUID(),
@@ -527,21 +479,13 @@ export function AiAudioConfigPanel({
         }
         const withResult = appendAiAudioGeneratedHistoryItems(current, [audio], {
           prompt,
-          params: generationParams,
-          platformModelId: activeModel.canonicalId,
+          params: generationValues,
+          platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
-          modelDisplayName: activeModel.displayName,
+          modelDisplayName: effectiveModel.displayName,
         });
-        const inputs = persistModelBindingToInputs(
-          withResult.inputs ?? current.inputs,
-          {
-            canonicalId: activeModel.canonicalId,
-            interfaceId: response.aiInterfaceId,
-          }
-        );
         return {
           ...withResult,
-          inputs,
           metadata: withAiAudioGenerateError(
             withAiAudioGeneratingFlag(
               clearGenerativeProgress(withResult.metadata),
@@ -595,22 +539,14 @@ export function AiAudioConfigPanel({
                 [audio],
                 {
                   prompt,
-                  params: generationParams,
-                  platformModelId: activeModel.canonicalId,
-                  aiInterfaceId: activeModel.interfaceId,
-                  modelDisplayName: activeModel.displayName,
-                }
-              );
-              const inputs = persistModelBindingToInputs(
-                withResult.inputs ?? current.inputs,
-                {
-                  canonicalId: activeModel.canonicalId,
-                  interfaceId: activeModel.interfaceId,
+                  params: generationValues,
+                  platformModelId: effectiveModel.canonicalId,
+                  aiInterfaceId: effectiveModel.interfaceId,
+                  modelDisplayName: effectiveModel.displayName,
                 }
               );
               return {
                 ...withResult,
-                inputs,
                 metadata: withAiAudioGenerateError(
                   withAiAudioGeneratingFlag(
                     clearGenerativeProgress(withResult.metadata),
@@ -658,9 +594,9 @@ export function AiAudioConfigPanel({
   };
 
   const canGenerate =
+    modelReady &&
     !disabled &&
     !isGenerating &&
-    Boolean(activeModel?.selectable) &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiAudio({
       prompt: promptForGenerate,
@@ -764,21 +700,21 @@ export function AiAudioConfigPanel({
               models={models as unknown as readonly OrgTextModelOption[]}
               groups={groups}
               selectedOptionId={selectedOptionId}
+              chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
               disabled={disabled || isLoading}
               isLoading={isLoading}
               loadError={Boolean(modelsError)}
-                onRetryLoad={() => {
-                  void refreshModels();
-                }}
-                modelFitsCurrentRefs={modelFitsCurrentRefs}
-              onSelect={(optionId) => {
-                applyModelSelection(optionId);
+              onOpenChange={handlePickerOpenChange}
+              onRetryLoad={() => {
+                void refreshModels();
               }}
+              modelFitsCurrentRefs={modelFitsCurrentRefs}
+              onSelect={applyModelSelection}
             />
-            {generationFields.length > 0 ? (
+            {cardGenerationParams.visible ? (
               <AiAudioParamsPopover
-                fields={generationFields}
-                values={generationParams}
+                fields={cardGenerationParams.fields}
+                values={cardGenerationParams.values}
                 disabled={disabled}
                 triggerLabel={t("workflow.aiAudioPanel.params")}
                 title={t("workflow.aiAudioPanel.paramsTitle")}

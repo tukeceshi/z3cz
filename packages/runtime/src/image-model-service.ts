@@ -12,4 +12,8 @@ export interface ImageModelService {
     canonicalId: string;
     interfaceId: string;
   }): Promise<ResolvedRuntimeImageModel | undefined>;
+  inferImageModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined>;
 }

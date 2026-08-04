@@ -8,7 +8,11 @@ import { createDatabase } from "../db";
 import { executeTextModel } from "../services/execute-text-model";
 import { disableTextModelOnInterface } from "../services/disable-text-model-on-interface";
 import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
-import { resolveTextModelInterface } from "../services/resolve-text-model-interface";
+import {
+  inferOrgModelInterfaceId,
+  listOrgTextModelOptions,
+  resolveTextModelInterface,
+} from "../services/resolve-text-model-interface";
 
 export class CloudflareTextModelService {
   constructor(private readonly env: Bindings) {}
@@ -34,6 +38,19 @@ export class CloudflareTextModelService {
       interfaceId: resolved.interfaceId,
       providerModelId: resolved.providerModelId,
     };
+  }
+
+  async inferTextModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined> {
+    const db = createDatabase(this.env);
+    return inferOrgModelInterfaceId(
+      db,
+      params.organizationId,
+      params.canonicalId,
+      listOrgTextModelOptions
+    );
   }
 
   async executeTextModel(params: {

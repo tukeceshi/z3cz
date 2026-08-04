@@ -633,6 +633,7 @@ function StudioImageDetail({
         prompt: item.prompt,
         params: item.params,
         platformModelId: item.platformModelId,
+        aiInterfaceId: item.aiInterfaceId,
         modelDisplayName: item.modelDisplayName,
         createdAt: item.createdAt,
       });
@@ -760,6 +761,7 @@ function StudioVideoDetail({
         prompt: item.prompt,
         params: item.params,
         platformModelId: item.platformModelId,
+        aiInterfaceId: item.aiInterfaceId,
         modelDisplayName: item.modelDisplayName,
         createdAt: item.createdAt,
       });
@@ -901,6 +903,7 @@ function StudioAudioDetail({
         prompt: item.prompt,
         params: item.params,
         platformModelId: item.platformModelId,
+        aiInterfaceId: item.aiInterfaceId,
         modelDisplayName: item.modelDisplayName,
         createdAt: item.createdAt,
       });

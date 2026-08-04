@@ -1261,6 +1261,13 @@ export abstract class Runtime<Env = unknown> {
                 interfaceId,
               })
           : undefined,
+        inferTextModelInterfaceId: this.textModelService
+          ? (canonicalId) =>
+              this.textModelService!.inferTextModelInterfaceId({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
         disableTextModelOnInterface: this.textModelService
           ? (params) =>
               this.textModelService!.disableTextModelOnInterface({
@@ -1285,6 +1292,13 @@ export abstract class Runtime<Env = unknown> {
                 interfaceId,
               })
           : undefined,
+        inferImageModelInterfaceId: this.imageModelService
+          ? (canonicalId) =>
+              this.imageModelService!.inferImageModelInterfaceId({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
         resolveVideoModel: this.videoModelService
           ? (canonicalId, interfaceId) =>
               this.videoModelService!.resolveVideoModel({
@@ -1293,12 +1307,26 @@ export abstract class Runtime<Env = unknown> {
                 interfaceId,
               })
           : undefined,
+        inferVideoModelInterfaceId: this.videoModelService
+          ? (canonicalId) =>
+              this.videoModelService!.inferVideoModelInterfaceId({
+                organizationId: context.organizationId,
+                canonicalId,
+              })
+          : undefined,
         resolveAudioModel: this.audioModelService
           ? (canonicalId, interfaceId) =>
               this.audioModelService!.resolveAudioModel({
                 organizationId: context.organizationId,
                 canonicalId,
                 interfaceId,
+              })
+          : undefined,
+        inferAudioModelInterfaceId: this.audioModelService
+          ? (canonicalId) =>
+              this.audioModelService!.inferAudioModelInterfaceId({
+                organizationId: context.organizationId,
+                canonicalId,
               })
           : undefined,
         resolveAiImageStorage: this.resolveAiImageStorage

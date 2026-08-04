@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { buildOrgModelOptionId } from "@dafthunk/types";
 
 import {
-  clearModelBindingInputs,
+  applyHistoryItemModelBinding,
+  persistGenerativeBindingWithParams,
   persistModelBindingToInputs,
-  pickInitialModelBinding,
-  readLastUsedModelBinding,
-  rememberModelBinding,
-  resolveHydrateModelBindingAction,
-  resolveHistoryModelBindingFromItems,
-  writeLastUsedModelBinding,
+  readModelSelectionRecord,
+  resolveEffectiveGenerativeModel,
+  resolveModelCandidate,
+  resolveModelCardState,
+  resolveSelectedModelBinding,
 } from "./org-model-selection-utils";
 import type { WorkflowParameter } from "./workflow-types";
 
@@ -27,150 +27,150 @@ function binding(
   };
 }
 
-describe("resolveHydrateModelBindingAction", () => {
-  it("fills missing interface id when the model has a single binding", () => {
+describe("readModelSelectionRecord", () => {
+  it("requires both model and interface id", () => {
     expect(
-      resolveHydrateModelBindingAction(
-        [binding("iface-a", "doubao-seedream-5")],
-        "doubao-seedream-5",
-        ""
-      )
+      readModelSelectionRecord({ modelId: "gpt-image-1", interfaceId: "iface-a" })
     ).toEqual({
-      kind: "fill_interface",
+      canonicalId: "gpt-image-1",
       interfaceId: "iface-a",
     });
-  });
-
-  it("does not guess interface when multiple bindings share a model", () => {
     expect(
-      resolveHydrateModelBindingAction(
-        [
-          binding("iface-a", "doubao-seedream-5"),
-          binding("iface-b", "doubao-seedream-5"),
-        ],
-        "doubao-seedream-5",
-        ""
-      )
-    ).toEqual({ kind: "none" });
-  });
-
-  it("clears stale model and interface pairs", () => {
-    expect(
-      resolveHydrateModelBindingAction(
-        [binding("iface-a", "doubao-seedream-5")],
-        "doubao-seedream-5",
-        "iface-missing"
-      )
-    ).toEqual({ kind: "clear" });
+      readModelSelectionRecord({ modelId: "gpt-image-1", interfaceId: "" })
+    ).toBeUndefined();
   });
 });
 
-describe("pickInitialModelBinding", () => {
-  it("prefers the latest history binding over platform defaults", () => {
-    const models = [
-      binding("iface-default", "deepseek-v4-flash"),
-      binding("iface-history", "doubao-seedream-5"),
-    ];
+describe("resolveEffectiveGenerativeModel", () => {
+  const models = [
+    binding("iface-a", "doubao-seedream-5"),
+    binding("iface-b", "gpt-image-1"),
+  ];
 
+  it("prefers node binding when valid", () => {
     expect(
-      pickInitialModelBinding(models, {
-        canonicalId: "doubao-seedream-5",
-        interfaceId: "iface-history",
-      })?.optionId
-    ).toBe(buildOrgModelOptionId("iface-history", "doubao-seedream-5"));
-  });
-
-  it("prefers history over last used binding", () => {
-    const models = [
-      binding("iface-history", "model-history"),
-      binding("iface-last", "model-last"),
-    ];
-
-    expect(
-      pickInitialModelBinding(
+      resolveEffectiveGenerativeModel({
+        nodeBinding: { canonicalId: "gpt-image-1", interfaceId: "iface-b" },
+        workflowDefault: { canonicalId: "doubao-seedream-5", interfaceId: "iface-a" },
         models,
-        {
-          canonicalId: "model-history",
-          interfaceId: "iface-history",
-        },
-        {
-          canonicalId: "model-last",
-          interfaceId: "iface-last",
-        }
-      )?.optionId
-    ).toBe(buildOrgModelOptionId("iface-history", "model-history"));
-  });
-
-  it("uses last used binding when history is missing", () => {
-    const models = [
-      binding("iface-default", "deepseek-v4-flash"),
-      binding("iface-last", "gpt-image-1"),
-    ];
-
-    expect(
-      pickInitialModelBinding(
-        models,
-        undefined,
-        {
-          canonicalId: "gpt-image-1",
-          interfaceId: "iface-last",
-        }
-      )?.optionId
-    ).toBe(buildOrgModelOptionId("iface-last", "gpt-image-1"));
-  });
-});
-
-describe("last used model binding storage", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  it("round-trips last used binding per org and modality", () => {
-    writeLastUsedModelBinding("org-1", "image", {
-      canonicalId: "gpt-image-1",
-      interfaceId: "iface-gpt",
-    });
-
-    expect(readLastUsedModelBinding("org-1", "image")).toEqual({
-      canonicalId: "gpt-image-1",
-      interfaceId: "iface-gpt",
-    });
-    expect(readLastUsedModelBinding("org-1", "text")).toBeUndefined();
-    expect(readLastUsedModelBinding("org-2", "image")).toBeUndefined();
-  });
-
-  it("rememberModelBinding ignores empty org ids", () => {
-    rememberModelBinding(undefined, "image", {
-      canonicalId: "gpt-image-1",
-      interfaceId: "iface-gpt",
-    });
-
-    expect(sessionStorage.length).toBe(0);
-  });
-});
-
-describe("resolveHistoryModelBindingFromItems", () => {
-  it("reads the selected history item binding", () => {
-    expect(
-      resolveHistoryModelBindingFromItems({
-        selectedId: "row-2",
-        items: [
-          {
-            id: "row-1",
-            platformModelId: "model-a",
-            aiInterfaceId: "iface-a",
-          },
-          {
-            id: "row-2",
-            platformModelId: "model-b",
-            aiInterfaceId: "iface-b",
-          },
-        ],
       })
+    ).toEqual({ model: models[1], source: "node" });
+  });
+
+  it("falls back to workflow default when node binding is missing", () => {
+    expect(
+      resolveEffectiveGenerativeModel({
+        nodeBinding: undefined,
+        workflowDefault: { canonicalId: "gpt-image-1", interfaceId: "iface-b" },
+        models,
+      })
+    ).toEqual({ model: models[1], source: "workflow" });
+  });
+
+  it("falls back to first selectable model in list order", () => {
+    expect(
+      resolveEffectiveGenerativeModel({
+        nodeBinding: undefined,
+        workflowDefault: undefined,
+        models,
+      })
+    ).toEqual({ model: models[0], source: "list" });
+  });
+
+  it("returns undefined when selection is stale and no fallback exists", () => {
+    expect(
+      resolveEffectiveGenerativeModel({
+        nodeBinding: { canonicalId: "missing", interfaceId: "iface-a" },
+        workflowDefault: undefined,
+        models: [],
+      })
+    ).toBeUndefined();
+  });
+});
+
+describe("resolveModelCandidate", () => {
+  const models = [
+    binding("iface-a", "doubao-seedream-5"),
+    binding("iface-b", "gpt-image-1"),
+  ];
+
+  it("matches selection record when present", () => {
+    expect(
+      resolveModelCandidate(
+        { canonicalId: "gpt-image-1", interfaceId: "iface-b" },
+        models
+      )
+    ).toBe(models[1]);
+  });
+
+  it("returns first selectable model without selection", () => {
+    expect(resolveModelCandidate(undefined, models)).toBe(models[0]);
+  });
+
+  it("returns undefined when selection is stale", () => {
+    expect(
+      resolveModelCandidate(
+        { canonicalId: "missing", interfaceId: "iface-a" },
+        models
+      )
+    ).toBeUndefined();
+  });
+});
+
+describe("resolveModelCardState", () => {
+  const models = [
+    binding("iface-a", "doubao-seedream-5"),
+    binding("iface-b", "gpt-image-1"),
+  ];
+
+  it("returns ready when an effective model is resolved", () => {
+    expect(
+      resolveModelCardState(
+        resolveEffectiveGenerativeModel({
+          nodeBinding: { canonicalId: "gpt-image-1", interfaceId: "iface-b" },
+          workflowDefault: undefined,
+          models,
+        }),
+        false
+      )
     ).toEqual({
-      canonicalId: "model-b",
-      interfaceId: "iface-b",
+      status: "ready",
+      model: models[1],
+      source: "node",
     });
+  });
+
+  it("returns pick when no effective model exists", () => {
+    expect(
+      resolveModelCardState(
+        resolveEffectiveGenerativeModel({
+          nodeBinding: { canonicalId: "missing", interfaceId: "iface-a" },
+          workflowDefault: undefined,
+          models: [binding("iface-a", "disabled", false)],
+        }),
+        false
+      )
+    ).toEqual({ status: "pick" });
+  });
+
+  it("returns loading while models are loading", () => {
+    expect(resolveModelCardState(undefined, true)).toEqual({ status: "loading" });
+  });
+});
+
+describe("resolveSelectedModelBinding", () => {
+  it("matches exact interface id only", () => {
+    const models = [
+      binding("iface-a", "doubao-seedream-5"),
+      binding("iface-b", "doubao-seedream-5"),
+    ];
+
+    expect(
+      resolveSelectedModelBinding(models, "doubao-seedream-5", "iface-b")
+    ).toBe(models[1]);
+    expect(
+      resolveSelectedModelBinding(models, "doubao-seedream-5", "iface-missing")
+    ).toBeUndefined();
   });
 });
 
@@ -202,33 +202,60 @@ describe("persistModelBindingToInputs", () => {
   });
 });
 
-describe("clearModelBindingInputs", () => {
-  it("clears model and ai_interface_id together", () => {
-    const inputs: WorkflowParameter[] = [
+describe("persistGenerativeBindingWithParams", () => {
+  it("writes model binding and params together", () => {
+    expect(
+      persistGenerativeBindingWithParams([], {
+        canonicalId: "gpt-image-1",
+        interfaceId: "iface-a",
+      }, { ratio: "16:9" })
+    ).toEqual([
       {
         id: "model",
         name: "model",
         type: "string",
-        value: "doubao-seedream-5",
+        hidden: true,
+        value: "gpt-image-1",
       },
       {
         id: "ai_interface_id",
         name: "ai_interface_id",
         type: "string",
+        hidden: true,
         value: "iface-a",
       },
       {
-        id: "prompt",
-        name: "prompt",
-        type: "string",
-        value: "hello",
+        id: "params",
+        name: "params",
+        type: "json",
+        hidden: true,
+        value: { ratio: "16:9" },
       },
-    ];
-
-    expect(clearModelBindingInputs(inputs)).toEqual([
-      { ...inputs[0], value: "" },
-      { ...inputs[1], value: "" },
-      inputs[2],
     ]);
+  });
+});
+
+describe("applyHistoryItemModelBinding", () => {
+  it("writes model selection record from usage history item", () => {
+    const inputs: WorkflowParameter[] = [];
+    expect(
+      applyHistoryItemModelBinding(inputs, {
+        platformModelId: "gpt-image-1",
+        aiInterfaceId: "iface-a",
+      })
+    ).toEqual(
+      persistModelBindingToInputs(inputs, {
+        canonicalId: "gpt-image-1",
+        interfaceId: "iface-a",
+      })
+    );
+  });
+
+  it("ignores history items without interface id", () => {
+    expect(
+      applyHistoryItemModelBinding([], {
+        platformModelId: "gpt-image-1",
+      })
+    ).toEqual([]);
   });
 });

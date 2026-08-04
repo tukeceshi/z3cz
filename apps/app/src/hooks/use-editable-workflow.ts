@@ -4,6 +4,7 @@ import type {
   Node as WorkflowBackendNode,
   WorkflowEditorViewport,
   WorkflowExecution,
+  WorkflowGenerativeDefaults,
   WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
@@ -32,11 +33,14 @@ import {
 } from "@/components/workflow/workflow-viewport-utils";
 
 const VIEWPORT_PERSIST_DEBOUNCE_MS = 300;
+const GENERATIVE_DEFAULTS_PERSIST_DEBOUNCE_MS = 300;
 
 interface UseEditableWorkflowProps {
   workflowId: string | undefined;
   nodeTypes?: NodeType[];
   fallbackWorkflow?: WorkflowWithMetadata | null;
+  /** True after getWorkflow (or prefetch) has supplied workflow metadata for this open. */
+  httpMetadataLoaded?: boolean;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
 }
 
@@ -106,6 +110,7 @@ export function useEditableWorkflow({
   workflowId,
   nodeTypes = [],
   fallbackWorkflow = null,
+  httpMetadataLoaded = false,
   onExecutionUpdate,
 }: UseEditableWorkflowProps) {
   const [nodes, setNodes] = useState<Node<WorkflowNodeType>[]>([]);
@@ -125,6 +130,10 @@ export function useEditableWorkflow({
   } | null>(null);
   const [editorViewport, setEditorViewport] = useState<
     WorkflowEditorViewport | null | undefined
+  >(undefined);
+  const [isEditorViewportReady, setIsEditorViewportReady] = useState(false);
+  const [generativeDefaults, setGenerativeDefaults] = useState<
+    WorkflowGenerativeDefaults | undefined
   >(undefined);
 
   const { organization } = useAuth();
@@ -149,8 +158,13 @@ export function useEditableWorkflow({
   const editorViewportRef = useRef<WorkflowEditorViewport | undefined>(
     undefined
   );
+  const generativeDefaultsRef = useRef<WorkflowGenerativeDefaults | undefined>(
+    undefined
+  );
   const lastPersistedViewportRef = useRef<string>("");
+  const lastPersistedGenerativeDefaultsRef = useRef<string>("");
   const viewportPersistTimerRef = useRef<number | null>(null);
+  const generativeDefaultsPersistTimerRef = useRef<number | null>(null);
 
   // Send the current local graph if it differs from what the server last had.
   // Synchronous (the underlying WS send is synchronous) so it can run from
@@ -204,8 +218,29 @@ export function useEditableWorkflow({
     lastPersistedViewportRef.current = serialized;
   }, [workflowId]);
 
+  const flushGenerativeDefaultsSave = useCallback(() => {
+    const defaults = generativeDefaultsRef.current;
+    if (!hasInitializedRef.current || !workflowId) {
+      return;
+    }
+
+    const serialized = JSON.stringify(defaults ?? null);
+    if (serialized === lastPersistedGenerativeDefaultsRef.current) {
+      return;
+    }
+
+    if (!wsRef.current?.isConnected()) {
+      return;
+    }
+
+    wsRef.current.sendGenerativeDefaultsUpdate(defaults);
+    lastPersistedGenerativeDefaultsRef.current = serialized;
+  }, [workflowId]);
+
   const flushViewportSaveRef = useRef(flushViewportSave);
   flushViewportSaveRef.current = flushViewportSave;
+  const flushGenerativeDefaultsSaveRef = useRef(flushGenerativeDefaultsSave);
+  flushGenerativeDefaultsSaveRef.current = flushGenerativeDefaultsSave;
 
   // Coalesce the separate node and edge change callbacks (which fire in the
   // same commit) into a single save once both refs are up to date.
@@ -218,70 +253,115 @@ export function useEditableWorkflow({
   const fallbackWorkflowRef = useRef(fallbackWorkflow);
   fallbackWorkflowRef.current = fallbackWorkflow;
 
-  const applyFallbackFromHttp = useCallback(() => {
-    const fallback = fallbackWorkflowRef.current;
-    if (hasInitializedRef.current || !fallback?.id) {
-      return false;
-    }
+  const applyEditorViewportFromState = useCallback(
+    (state: Pick<WorkflowState, "editorViewport">) => {
+      if (!isValidWorkflowEditorViewport(state.editorViewport)) {
+        return;
+      }
 
-    const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
-      fallback.nodes ?? [],
-      nodeTypes
-    );
-    const reactFlowEdges = (fallback.edges ?? []).map((edge) => ({
-      id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceOutput,
-      targetHandle: edge.targetInput,
-      type: "workflowEdge" as const,
-      data: {
-        isValid: true,
-        sourceType: edge.sourceOutput,
-        targetType: edge.targetInput,
-      },
-    }));
-
-    setWorkflowMetadata({
-      id: fallback.id,
-      name: fallback.name || "",
-      description: fallback.description,
-      schemeId: fallback.schemeId,
-      trigger: fallback.trigger || "manual",
-      runtime: fallback.runtime as WorkflowRuntime | undefined,
-    });
-    nodesRef.current = reactFlowNodes;
-    edgesRef.current = reactFlowEdges;
-    lastSavedSerializedRef.current = JSON.stringify(
-      buildWorkflowPayload(reactFlowNodes, reactFlowEdges)
-    );
-    setNodes(reactFlowNodes);
-    setEdges(reactFlowEdges);
-    if (isValidWorkflowEditorViewport(fallback.editorViewport)) {
-      const normalized = normalizeWorkflowEditorViewport(
-        fallback.editorViewport
-      );
+      const normalized = normalizeWorkflowEditorViewport(state.editorViewport);
       editorViewportRef.current = normalized;
       lastPersistedViewportRef.current = JSON.stringify(normalized);
       setEditorViewport(normalized);
-    } else {
-      setEditorViewport(null);
-    }
-    hasInitializedRef.current = true;
-    setIsInitializing(false);
-    return true;
-  }, [nodeTypes]);
+      setIsEditorViewportReady(true);
+    },
+    []
+  );
+
+  const markNoSavedEditorViewport = useCallback(() => {
+    editorViewportRef.current = undefined;
+    setEditorViewport(null);
+    setIsEditorViewportReady(true);
+  }, []);
+
+  const applyFallbackFromHttp = useCallback(() => {
+      const fallback = fallbackWorkflowRef.current;
+      if (hasInitializedRef.current || !fallback?.id) {
+        return false;
+      }
+
+      const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+        fallback.nodes ?? [],
+        nodeTypes
+      );
+      const reactFlowEdges = (fallback.edges ?? []).map((edge) => ({
+        id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceOutput,
+        targetHandle: edge.targetInput,
+        type: "workflowEdge" as const,
+        data: {
+          isValid: true,
+          sourceType: edge.sourceOutput,
+          targetType: edge.targetInput,
+        },
+      }));
+
+      setWorkflowMetadata({
+        id: fallback.id,
+        name: fallback.name || "",
+        description: fallback.description,
+        schemeId: fallback.schemeId,
+        trigger: fallback.trigger || "manual",
+        runtime: fallback.runtime as WorkflowRuntime | undefined,
+      });
+      nodesRef.current = reactFlowNodes;
+      edgesRef.current = reactFlowEdges;
+      lastSavedSerializedRef.current = JSON.stringify(
+        buildWorkflowPayload(reactFlowNodes, reactFlowEdges)
+      );
+      setNodes(reactFlowNodes);
+      setEdges(reactFlowEdges);
+      generativeDefaultsRef.current = fallback.generativeDefaults;
+      lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
+        fallback.generativeDefaults ?? null
+      );
+      setGenerativeDefaults(fallback.generativeDefaults);
+      hasInitializedRef.current = true;
+      setIsInitializing(false);
+      return true;
+    },
+    [nodeTypes]
+  );
 
   const applyFallbackFromHttpRef = useRef(applyFallbackFromHttp);
   applyFallbackFromHttpRef.current = applyFallbackFromHttp;
 
-  // Apply HTTP workflow data as soon as it arrives (don't wait for WS timeout).
   useEffect(() => {
-    if (hasInitializedRef.current || !fallbackWorkflow?.id) {
+    setEditorViewport(undefined);
+    editorViewportRef.current = undefined;
+    setIsEditorViewportReady(false);
+    hasInitializedRef.current = false;
+  }, [workflowId]);
+
+  // HTTP is authoritative for saved viewport on editor open.
+  useEffect(() => {
+    if (!httpMetadataLoaded || !workflowId) {
+      return;
+    }
+
+    if (isValidWorkflowEditorViewport(fallbackWorkflow?.editorViewport)) {
+      applyEditorViewportFromState(fallbackWorkflow);
+      return;
+    }
+
+    markNoSavedEditorViewport();
+  }, [
+    httpMetadataLoaded,
+    workflowId,
+    fallbackWorkflow,
+    applyEditorViewportFromState,
+    markNoSavedEditorViewport,
+  ]);
+
+  // Apply HTTP workflow graph when it arrives before WS init.
+  useEffect(() => {
+    if (hasInitializedRef.current || !fallbackWorkflow?.id || !httpMetadataLoaded) {
       return;
     }
     applyFallbackFromHttpRef.current();
-  }, [fallbackWorkflow, nodeTypes]);
+  }, [fallbackWorkflow, nodeTypes, httpMetadataLoaded]);
 
   // WebSocket connection effect
   useEffect(() => {
@@ -290,12 +370,13 @@ export function useEditableWorkflow({
       return;
     }
 
+    setIsInitializing(true);
+
     // Prevent duplicate connections if already connected
     if (wsRef.current?.isConnected()) {
-      return;
+      wsRef.current.disconnect();
+      wsRef.current = null;
     }
-
-    setIsInitializing(true);
 
     // Add a small delay to avoid race conditions during React strict mode double-mount
     let cancelled = false;
@@ -344,16 +425,13 @@ export function useEditableWorkflow({
         setNodes(reactFlowNodes);
         setEdges(reactFlowEdges);
 
-        if (isValidWorkflowEditorViewport(state.editorViewport)) {
-          const normalized = normalizeWorkflowEditorViewport(
-            state.editorViewport
-          );
-          editorViewportRef.current = normalized;
-          lastPersistedViewportRef.current = JSON.stringify(normalized);
-          setEditorViewport(normalized);
-        } else {
-          setEditorViewport(null);
-        }
+        applyEditorViewportFromState(state);
+
+        generativeDefaultsRef.current = state.generativeDefaults;
+        lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
+          state.generativeDefaults ?? null
+        );
+        setGenerativeDefaults(state.generativeDefaults);
       };
 
       const handleStateUpdate = (state: WorkflowState) => {
@@ -374,6 +452,8 @@ export function useEditableWorkflow({
               setIsInitializing(false);
               return;
             }
+
+            applyEditorViewportFromState(state);
 
             const localSerialized = JSON.stringify(
               buildWorkflowPayload(nodesRef.current, edgesRef.current)
@@ -449,15 +529,20 @@ export function useEditableWorkflow({
       clearTimeout(fallbackTimeoutId);
       flushSaveRef.current();
       flushViewportSaveRef.current();
+      flushGenerativeDefaultsSaveRef.current();
       if (viewportPersistTimerRef.current !== null) {
         window.clearTimeout(viewportPersistTimerRef.current);
+      }
+      if (generativeDefaultsPersistTimerRef.current !== null) {
+        window.clearTimeout(generativeDefaultsPersistTimerRef.current);
       }
       if (wsRef.current) {
         wsRef.current.disconnect();
         wsRef.current = null;
       }
+      hasInitializedRef.current = false;
     };
-  }, [workflowId, organization?.id]);
+  }, [workflowId, organization?.id, applyEditorViewportFromState]);
 
   // Flush pending edits on tab close / refresh.
   // not fire this; the connection effect cleanup covers that case instead.
@@ -465,10 +550,28 @@ export function useEditableWorkflow({
     const handleBeforeUnload = () => {
       flushSaveRef.current();
       flushViewportSaveRef.current();
+      flushGenerativeDefaultsSaveRef.current();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
+
+  const handleGenerativeDefaultsChange = useCallback(
+    (defaults: WorkflowGenerativeDefaults) => {
+      generativeDefaultsRef.current = defaults;
+      setGenerativeDefaults(defaults);
+
+      if (generativeDefaultsPersistTimerRef.current !== null) {
+        window.clearTimeout(generativeDefaultsPersistTimerRef.current);
+      }
+
+      generativeDefaultsPersistTimerRef.current = window.setTimeout(() => {
+        generativeDefaultsPersistTimerRef.current = null;
+        flushGenerativeDefaultsSaveRef.current();
+      }, GENERATIVE_DEFAULTS_PERSIST_DEBOUNCE_MS);
+    },
+    []
+  );
 
   const handleEditorViewportChange = useCallback(
     (viewport: WorkflowEditorViewport) => {
@@ -484,6 +587,22 @@ export function useEditableWorkflow({
         viewportPersistTimerRef.current = null;
         flushViewportSaveRef.current();
       }, VIEWPORT_PERSIST_DEBOUNCE_MS);
+    },
+    []
+  );
+
+  const commitEditorViewport = useCallback(
+    (viewport: WorkflowEditorViewport) => {
+      const normalized = normalizeWorkflowEditorViewport(viewport);
+      editorViewportRef.current = normalized;
+      setEditorViewport(normalized);
+
+      if (viewportPersistTimerRef.current !== null) {
+        window.clearTimeout(viewportPersistTimerRef.current);
+        viewportPersistTimerRef.current = null;
+      }
+
+      flushViewportSaveRef.current();
     },
     []
   );
@@ -554,9 +673,13 @@ export function useEditableWorkflow({
     isWSConnected,
     workflowMetadata,
     editorViewport,
+    isEditorViewportReady,
+    generativeDefaults,
     handleNodesChange,
     handleEdgesChange,
     handleEditorViewportChange,
+    commitEditorViewport,
+    handleGenerativeDefaultsChange,
     executeWorkflow,
     updateMetadata,
   };

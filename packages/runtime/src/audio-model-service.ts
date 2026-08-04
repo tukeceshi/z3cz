@@ -12,4 +12,8 @@ export interface AudioModelService {
     canonicalId: string;
     interfaceId: string;
   }): Promise<ResolvedRuntimeAudioModel | undefined>;
+  inferAudioModelInterfaceId(params: {
+    organizationId: string;
+    canonicalId: string;
+  }): Promise<string | undefined>;
 }

@@ -5,6 +5,7 @@ import type {
   ServerMessage,
   WorkflowExecution,
   WorkflowEditorViewport,
+  WorkflowGenerativeDefaults,
   WorkflowRuntime,
   WorkflowState,
   WorkflowTrigger,
@@ -306,6 +307,29 @@ export class WorkflowWebSocket {
     const success = this.sendMessage(
       { type: "update", state: updatedState },
       "send viewport update"
+    );
+
+    if (success) {
+      this.currentState = updatedState;
+    }
+  }
+
+  sendGenerativeDefaultsUpdate(
+    defaults: WorkflowGenerativeDefaults | undefined
+  ): void {
+    if (!this.currentState) {
+      return;
+    }
+
+    const updatedState: WorkflowState = {
+      ...this.currentState,
+      generativeDefaults: defaults,
+      timestamp: Date.now(),
+    };
+
+    const success = this.sendMessage(
+      { type: "update", state: updatedState },
+      "send generative defaults update"
     );
 
     if (success) {

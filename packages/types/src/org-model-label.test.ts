@@ -4,6 +4,7 @@ import {
   buildOrgModelOptionId,
   formatCanvasModelLabel,
   parseOrgModelOptionId,
+  pickLegacyOrgModelInterfaceId,
   resolveInterfaceModelAlias,
 } from "./org-model-label";
 
@@ -38,5 +39,39 @@ describe("org-model-label", () => {
         platformDisplayName: "Seed 1.8",
       })
     ).toBe("My Name");
+  });
+
+  it("picks a unique legacy interface binding", () => {
+    const bindings = [
+      {
+        canonicalId: "gpt-image-1",
+        interfaceId: "iface-a",
+        selectable: true,
+      },
+    ];
+
+    expect(pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1")).toBe(
+      "iface-a"
+    );
+  });
+
+  it("prefers a matching preferred interface among duplicates", () => {
+    const bindings = [
+      {
+        canonicalId: "gpt-image-1",
+        interfaceId: "iface-a",
+        selectable: true,
+      },
+      {
+        canonicalId: "gpt-image-1",
+        interfaceId: "iface-b",
+        selectable: true,
+      },
+    ];
+
+    expect(
+      pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1", "iface-b")
+    ).toBe("iface-b");
+    expect(pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1")).toBeUndefined();
   });
 });

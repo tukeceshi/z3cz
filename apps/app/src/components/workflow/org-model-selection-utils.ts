@@ -1,7 +1,4 @@
-import {
-  buildOrgModelOptionId,
-  DEEPSEEK_V4_FLASH_CANONICAL_ID,
-} from "@dafthunk/types";
+import { buildOrgModelOptionId } from "@dafthunk/types";
 
 import { upsertNodeInputValues } from "./workflow-context";
 import type { WorkflowParameter } from "./workflow-types";
@@ -13,6 +10,11 @@ export interface OrgModelBindingRef {
   readonly selectable: boolean;
 }
 
+export interface ModelSelectionRecord {
+  readonly canonicalId: string;
+  readonly interfaceId: string;
+}
+
 export interface ModelBindingRef {
   readonly canonicalId: string;
   readonly interfaceId: string;
@@ -20,96 +22,28 @@ export interface ModelBindingRef {
 
 export type GenerativeModelModality = "text" | "image" | "video" | "audio";
 
-const LAST_USED_MODEL_STORAGE_PREFIX = "dafthunk:last-model:";
+export type ModelResolutionSource = "node" | "workflow" | "list";
 
-function lastUsedModelStorageKey(
-  orgId: string,
-  modality: GenerativeModelModality
-): string {
-  return `${LAST_USED_MODEL_STORAGE_PREFIX}${orgId}:${modality}`;
+export interface ModelResolution<T extends OrgModelBindingRef> {
+  readonly model: T;
+  readonly source: ModelResolutionSource;
 }
 
-export function readLastUsedModelBinding(
-  orgId: string,
-  modality: GenerativeModelModality
-): ModelBindingRef | undefined {
-  if (typeof sessionStorage === "undefined") {
+export type ModelCardState<T extends OrgModelBindingRef> =
+  | { readonly status: "loading" }
+  | { readonly status: "pick" }
+  | { readonly status: "ready"; readonly model: T; readonly source: ModelResolutionSource };
+
+export function readModelSelectionRecord(params: {
+  readonly modelId: string;
+  readonly interfaceId: string;
+}): ModelSelectionRecord | undefined {
+  const canonicalId = params.modelId.trim();
+  const interfaceId = params.interfaceId.trim();
+  if (!canonicalId || !interfaceId) {
     return undefined;
   }
-
-  try {
-    const raw = sessionStorage.getItem(lastUsedModelStorageKey(orgId, modality));
-    if (!raw) {
-      return undefined;
-    }
-
-    const parsed = JSON.parse(raw) as {
-      canonicalId?: string;
-      interfaceId?: string;
-    };
-    const canonicalId = parsed.canonicalId?.trim();
-    if (!canonicalId) {
-      return undefined;
-    }
-
-    return {
-      canonicalId,
-      interfaceId: parsed.interfaceId?.trim() ?? "",
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-export function writeLastUsedModelBinding(
-  orgId: string,
-  modality: GenerativeModelModality,
-  binding: ModelBindingRef
-): void {
-  if (typeof sessionStorage === "undefined") {
-    return;
-  }
-
-  const canonicalId = binding.canonicalId.trim();
-  if (!canonicalId) {
-    return;
-  }
-
-  try {
-    sessionStorage.setItem(
-      lastUsedModelStorageKey(orgId, modality),
-      JSON.stringify({
-        canonicalId,
-        interfaceId: binding.interfaceId.trim(),
-      })
-    );
-  } catch {
-    // Ignore quota / privacy mode errors.
-  }
-}
-
-export function rememberModelBinding(
-  orgId: string | undefined,
-  modality: GenerativeModelModality,
-  binding: ModelBindingRef | undefined
-): void {
-  if (!orgId || !binding?.canonicalId.trim()) {
-    return;
-  }
-
-  writeLastUsedModelBinding(orgId, modality, binding);
-}
-
-export interface HistoryModelBinding {
-  readonly platformModelId?: string;
-  readonly aiInterfaceId?: string;
-}
-
-export interface HistoryModelBindingSource<
-  T extends HistoryModelBinding & { readonly id: string },
-> {
-  readonly items: readonly T[];
-  readonly selectedId: string | null;
+  return { canonicalId, interfaceId };
 }
 
 export function resolveSelectedModelBinding<T extends OrgModelBindingRef>(
@@ -117,7 +51,11 @@ export function resolveSelectedModelBinding<T extends OrgModelBindingRef>(
   canonicalId: string,
   interfaceId: string
 ): T | undefined {
-  if (interfaceId) {
+  if (!canonicalId.trim()) {
+    return undefined;
+  }
+
+  if (interfaceId.trim()) {
     const exact = models.find(
       (entry) =>
         entry.canonicalId === canonicalId &&
@@ -128,24 +66,73 @@ export function resolveSelectedModelBinding<T extends OrgModelBindingRef>(
     }
   }
 
-  return models.find(
-    (entry) => entry.canonicalId === canonicalId && entry.selectable
-  );
+  return undefined;
 }
 
-export function pickDefaultModelBinding<T extends OrgModelBindingRef>(
+export function pickFirstSelectableModelBinding<T extends OrgModelBindingRef>(
   models: readonly T[]
 ): T | undefined {
-  const selectable = models.filter((entry) => entry.selectable);
-  if (selectable.length === 0) {
-    return undefined;
+  return models.find((entry) => entry.selectable);
+}
+
+/** @deprecated Use pickFirstSelectableModelBinding */
+export const pickPreviewModelBinding = pickFirstSelectableModelBinding;
+
+/** Layer A: resolve effective model from node, workflow default, or list order. */
+export function resolveEffectiveGenerativeModel<T extends OrgModelBindingRef>(
+  params: {
+    readonly nodeBinding: ModelSelectionRecord | undefined;
+    readonly workflowDefault: ModelBindingRef | undefined;
+    readonly models: readonly T[];
+  }
+): ModelResolution<T> | undefined {
+  const { nodeBinding, workflowDefault, models } = params;
+
+  if (nodeBinding) {
+    const match = resolveSelectedModelBinding(
+      models,
+      nodeBinding.canonicalId,
+      nodeBinding.interfaceId
+    );
+    if (match?.selectable) {
+      return { model: match, source: "node" };
+    }
   }
 
-  return (
-    selectable.find(
-      (entry) => entry.canonicalId === DEEPSEEK_V4_FLASH_CANONICAL_ID
-    ) ?? selectable[0]
-  );
+  if (workflowDefault) {
+    const match = resolveSelectedModelBinding(
+      models,
+      workflowDefault.canonicalId,
+      workflowDefault.interfaceId
+    );
+    if (match?.selectable) {
+      return { model: match, source: "workflow" };
+    }
+  }
+
+  const fallback = pickFirstSelectableModelBinding(models);
+  if (fallback) {
+    return { model: fallback, source: "list" };
+  }
+
+  return undefined;
+}
+
+export function resolveModelCardState<T extends OrgModelBindingRef>(
+  resolution: ModelResolution<T> | undefined,
+  isLoading: boolean
+): ModelCardState<T> {
+  if (isLoading) {
+    return { status: "loading" };
+  }
+  if (resolution) {
+    return {
+      status: "ready",
+      model: resolution.model,
+      source: resolution.source,
+    };
+  }
+  return { status: "pick" };
 }
 
 export function buildModelBindingOptionId(
@@ -155,6 +142,20 @@ export function buildModelBindingOptionId(
   return buildOrgModelOptionId(interfaceId, canonicalId);
 }
 
+/** Write model binding + generation params onto node inputs. */
+export function persistGenerativeBindingWithParams(
+  inputs: readonly WorkflowParameter[],
+  binding: ModelBindingRef,
+  params: Readonly<Record<string, unknown>>
+): WorkflowParameter[] {
+  return upsertNodeInputValues(
+    persistModelBindingToInputs(inputs, binding),
+    { params },
+    { params: "json" }
+  );
+}
+
+/** Write model selection record (picker or explicit history replace). */
 export function persistModelBindingToInputs(
   inputs: readonly WorkflowParameter[],
   binding: ModelBindingRef
@@ -165,31 +166,24 @@ export function persistModelBindingToInputs(
   });
 }
 
+export interface HistoryModelBinding {
+  readonly platformModelId?: string;
+  readonly aiInterfaceId?: string;
+}
+
 export function resolveHistoryModelBinding(
   item: HistoryModelBinding | undefined
 ): ModelBindingRef | undefined {
   const canonicalId = item?.platformModelId?.trim();
-  if (!canonicalId) {
+  const interfaceId = item?.aiInterfaceId?.trim();
+  if (!canonicalId || !interfaceId) {
     return undefined;
   }
 
-  return {
-    canonicalId,
-    interfaceId: item?.aiInterfaceId?.trim() ?? "",
-  };
+  return { canonicalId, interfaceId };
 }
 
-export function resolveHistoryModelBindingFromItems<
-  T extends HistoryModelBinding & { readonly id: string },
->(history: HistoryModelBindingSource<T>): ModelBindingRef | undefined {
-  const item =
-    (history.selectedId
-      ? history.items.find((entry) => entry.id === history.selectedId)
-      : undefined) ?? history.items[0];
-
-  return resolveHistoryModelBinding(item);
-}
-
+/** Copy usage record from history into node model selection record. */
 export function applyHistoryItemModelBinding(
   inputs: readonly WorkflowParameter[],
   item: HistoryModelBinding
@@ -199,102 +193,7 @@ export function applyHistoryItemModelBinding(
     return [...inputs];
   }
 
-  if (!binding.interfaceId) {
-    return upsertNodeInputValues(inputs, { model: binding.canonicalId });
-  }
-
   return persistModelBindingToInputs(inputs, binding);
-}
-
-export function pickInitialModelBinding<T extends OrgModelBindingRef>(
-  models: readonly T[],
-  historyBinding: ModelBindingRef | undefined,
-  lastUsedBinding: ModelBindingRef | undefined = undefined
-): T | undefined {
-  if (historyBinding?.canonicalId && historyBinding.interfaceId) {
-    const exact = resolveSelectedModelBinding(
-      models,
-      historyBinding.canonicalId,
-      historyBinding.interfaceId
-    );
-    if (exact?.selectable) {
-      return exact;
-    }
-  }
-
-  if (historyBinding?.canonicalId) {
-    const fromHistory = resolveSelectedModelBinding(
-      models,
-      historyBinding.canonicalId,
-      historyBinding.interfaceId
-    );
-    if (fromHistory?.selectable) {
-      return fromHistory;
-    }
-  }
-
-  if (lastUsedBinding?.canonicalId && lastUsedBinding.interfaceId) {
-    const exact = resolveSelectedModelBinding(
-      models,
-      lastUsedBinding.canonicalId,
-      lastUsedBinding.interfaceId
-    );
-    if (exact?.selectable) {
-      return exact;
-    }
-  }
-
-  if (lastUsedBinding?.canonicalId) {
-    const fromLastUsed = resolveSelectedModelBinding(
-      models,
-      lastUsedBinding.canonicalId,
-      lastUsedBinding.interfaceId
-    );
-    if (fromLastUsed?.selectable) {
-      return fromLastUsed;
-    }
-  }
-
-  return pickDefaultModelBinding(models);
-}
-
-export type HydrateModelBindingAction =
-  | { readonly kind: "none" }
-  | { readonly kind: "fill_interface"; readonly interfaceId: string }
-  | { readonly kind: "clear" };
-
-export function resolveHydrateModelBindingAction<T extends OrgModelBindingRef>(
-  models: readonly T[],
-  canonicalId: string,
-  interfaceId: string
-): HydrateModelBindingAction {
-  const modelId = canonicalId.trim();
-  if (!modelId) {
-    return { kind: "none" };
-  }
-
-  const ifaceId = interfaceId.trim();
-  if (ifaceId) {
-    const exact = models.some(
-      (entry) =>
-        entry.canonicalId === modelId &&
-        entry.interfaceId === ifaceId &&
-        entry.selectable
-    );
-    return exact ? { kind: "none" } : { kind: "clear" };
-  }
-
-  const matches = models.filter(
-    (entry) => entry.canonicalId === modelId && entry.selectable
-  );
-  if (matches.length === 1) {
-    return { kind: "fill_interface", interfaceId: matches[0]!.interfaceId };
-  }
-  if (matches.length === 0) {
-    return { kind: "clear" };
-  }
-
-  return { kind: "none" };
 }
 
 export function clearModelBindingInputs(
@@ -305,4 +204,16 @@ export function clearModelBindingInputs(
       ? ({ ...input, value: "" } as WorkflowParameter)
       : input
   );
+}
+
+/** Layer A legacy alias */
+export function resolveModelCandidate<T extends OrgModelBindingRef>(
+  selection: ModelSelectionRecord | undefined,
+  models: readonly T[]
+): T | undefined {
+  return resolveEffectiveGenerativeModel({
+    nodeBinding: selection,
+    workflowDefault: undefined,
+    models,
+  })?.model;
 }

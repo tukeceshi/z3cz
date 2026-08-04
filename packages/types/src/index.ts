@@ -69,5 +69,6 @@ export * from "./upstream-param-profile";
 export * from "./usage";
 export * from "./whatsapp";
 export * from "./workflow";
+export * from "./workflow-generative-defaults";
 export * from "./workflow-continuation";
 export * from "./workflow-scheme";

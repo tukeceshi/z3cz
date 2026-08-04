@@ -1,4 +1,4 @@
-import type { WorkflowTrigger } from "@dafthunk/types";
+import type { WorkflowTrigger, WorkflowGenerativeDefaults } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge } from "@xyflow/react";
 import { createContext, ReactNode, useContext, useMemo } from "react";
 
@@ -32,6 +32,8 @@ export interface WorkflowActionsContextValue {
   allowedNodeTypes: ReadonlySet<string>;
   workflowTrigger?: WorkflowTrigger;
   onRunNode?: RunNodeFn;
+  generativeDefaults?: WorkflowGenerativeDefaults;
+  onGenerativeDefaultChange?: (defaults: WorkflowGenerativeDefaults) => void;
 }
 
 /** Volatile graph UI state — changes on selection, edges, viewport gestures. */
@@ -53,6 +55,8 @@ const defaultActions: WorkflowActionsContextValue = {
   expandedOutputs: false,
   nodeTypes: [],
   allowedNodeTypes: new Set(),
+  generativeDefaults: undefined,
+  onGenerativeDefaultChange: undefined,
 };
 
 const defaultGraph: WorkflowGraphContextValue = {
@@ -110,6 +114,10 @@ export interface WorkflowProviderProps {
   readonly allowedNodeTypes?: ReadonlySet<string>;
   readonly workflowTrigger?: WorkflowTrigger;
   readonly onRunNode?: RunNodeFn;
+  readonly generativeDefaults?: WorkflowGenerativeDefaults;
+  readonly onGenerativeDefaultChange?: (
+    defaults: WorkflowGenerativeDefaults
+  ) => void;
 }
 
 export function WorkflowProvider({
@@ -126,6 +134,8 @@ export function WorkflowProvider({
   allowedNodeTypes = new Set(),
   workflowTrigger,
   onRunNode,
+  generativeDefaults,
+  onGenerativeDefaultChange,
 }: WorkflowProviderProps) {
   const actionsValue = useMemo(
     () => ({
@@ -138,6 +148,8 @@ export function WorkflowProvider({
       allowedNodeTypes,
       workflowTrigger,
       onRunNode,
+      generativeDefaults,
+      onGenerativeDefaultChange,
     }),
     [
       updateNodeData,
@@ -149,6 +161,8 @@ export function WorkflowProvider({
       allowedNodeTypes,
       workflowTrigger,
       onRunNode,
+      generativeDefaults,
+      onGenerativeDefaultChange,
     ]
   );
 
