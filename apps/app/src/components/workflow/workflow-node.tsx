@@ -38,6 +38,7 @@ import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
+  AI_TEXT_CARD_HEIGHT_PX,
   hasAiTextGeneratedHistory,
   isAiTextGenerating,
   withAiTextEditedResult,
@@ -724,7 +725,7 @@ export const WorkflowNode = memo(
             isGenerativeCanvasNode
               ? GENERATIVE_NODE_CARD_CLASS
               : "rounded-md",
-            isAiTextNode && "ai-text-node-card group/aitext",
+            isAiTextNode && "ai-text-node-card group/aitext flex flex-col overflow-hidden",
             isAiImageNode && "ai-image-node-card group/aiimage",
             isAiVideoNode && "ai-video-node-card group/aivideo",
             isAiAudioNode && "ai-audio-node-card group/aiaudio",
@@ -746,7 +747,11 @@ export const WorkflowNode = memo(
           )}
           style={
             isAiTextNode
-              ? { width: AI_TEXT_CARD_WIDTH_PX }
+              ? {
+                  width: AI_TEXT_CARD_WIDTH_PX,
+                  height: AI_TEXT_CARD_HEIGHT_PX,
+                  boxSizing: "border-box",
+                }
               : isAiAudioNode
                 ? { width: AI_AUDIO_CARD_WIDTH_PX }
                 : undefined
@@ -795,9 +800,14 @@ export const WorkflowNode = memo(
             <div
               className={cn(
                 "px-0 py-0",
-                isAiImageNode || isAiVideoNode || isAiAudioNode
-                  ? cn("overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS)
-                  : "border-b",
+                isAiTextNode && "flex-1 min-h-0 overflow-hidden border-b",
+                (isAiImageNode || isAiVideoNode || isAiAudioNode) &&
+                  cn("overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS),
+                !isAiTextNode &&
+                  !isAiImageNode &&
+                  !isAiVideoNode &&
+                  !isAiAudioNode &&
+                  "border-b",
                 !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode && "nodrag"
               )}
             >

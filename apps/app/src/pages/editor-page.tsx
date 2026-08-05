@@ -95,11 +95,13 @@ function EditorPageContent() {
     isWSConnected: _isWSConnected,
     workflowMetadata,
     editorViewport,
+    editorViewportSyncRevision,
     isEditorViewportReady,
     generativeDefaults,
     handleNodesChange,
     handleEdgesChange,
     handleEditorViewportChange,
+    handleEditorViewportGestureEnd,
     commitEditorViewport,
     handleGenerativeDefaultsChange,
     executeWorkflow: wsExecuteWorkflow,
@@ -294,7 +296,9 @@ function EditorPageContent() {
           onOpenWorkflowSettings={handleOpenWorkflowSettings}
           initialViewportOneToOne={initialViewportOneToOneRef.current}
           savedEditorViewport={editorViewport ?? null}
+          editorViewportSyncRevision={editorViewportSyncRevision}
           onEditorViewportChange={handleEditorViewportChange}
+          onEditorViewportGestureEnd={handleEditorViewportGestureEnd}
           onCommitEditorViewport={commitEditorViewport}
           generativeDefaults={generativeDefaults}
           onGenerativeDefaultsChange={handleGenerativeDefaultsChange}

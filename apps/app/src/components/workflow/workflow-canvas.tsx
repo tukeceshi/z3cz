@@ -211,6 +211,7 @@ export interface WorkflowCanvasProps {
   /** Initial React Flow viewport when restoring a saved editor position. */
   defaultViewport?: Viewport;
   onEditorViewportChange?: (viewport: Viewport) => void;
+  onEditorViewportGestureEnd?: (viewport: Viewport) => void;
   suppressViewportPersistEndRef?: React.RefObject<boolean>;
   soleSelectedNodeId?: string | null;
   isViewportMoving?: boolean;
@@ -682,6 +683,7 @@ export function WorkflowCanvas({
   skipInitialFitView = false,
   defaultViewport,
   onEditorViewportChange,
+  onEditorViewportGestureEnd,
   suppressViewportPersistEndRef,
   soleSelectedNodeId = null,
   isViewportMoving = false,
@@ -804,7 +806,8 @@ export function WorkflowCanvas({
         {onEditorViewportChange && (
           <WorkflowViewportPersistenceListener
             disabled={disabled}
-            onViewportEnd={onEditorViewportChange}
+            onViewportChange={onEditorViewportChange}
+            onViewportGestureEnd={onEditorViewportGestureEnd}
             suppressNextEndRef={suppressViewportPersistEndRef}
           />
         )}

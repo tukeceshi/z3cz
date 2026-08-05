@@ -60,6 +60,7 @@ import {
 import {
   isValidWorkflowEditorViewport,
   restoreEditorViewportWhenPaneStable,
+  viewportNearlyEqual,
 } from "./workflow-viewport-utils";
 import type {
   NodeType,
@@ -195,7 +196,10 @@ export interface WorkflowBuilderProps {
   /** After workflow creation: center canvas at 100% zoom on first editor open only. */
   initialViewportOneToOne?: boolean;
   savedEditorViewport?: WorkflowEditorViewport | null;
+  /** Bumps when a remote tab or reconnect pushes a new saved viewport. */
+  editorViewportSyncRevision?: number;
   onEditorViewportChange?: (viewport: WorkflowEditorViewport) => void;
+  onEditorViewportGestureEnd?: (viewport: WorkflowEditorViewport) => void;
   onCommitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
   generativeDefaults?: WorkflowGenerativeDefaults;
   onGenerativeDefaultsChange?: (
@@ -233,7 +237,9 @@ export function WorkflowBuilder({
   fitViewPadding = 0.25,
   initialViewportOneToOne = false,
   savedEditorViewport,
+  editorViewportSyncRevision = 0,
   onEditorViewportChange,
+  onEditorViewportGestureEnd,
   onCommitEditorViewport,
   generativeDefaults,
   onGenerativeDefaultsChange,
@@ -396,7 +402,9 @@ export function WorkflowBuilder({
   }, [reactFlowInstance, fitViewPadding]);
 
   const [canPersistViewport, setCanPersistViewport] = useState(false);
+  const [isViewportMoving, setIsViewportMoving] = useState(false);
   const appliedViewportKeyRef = useRef<string | null>(null);
+  const pendingRemoteViewportRef = useRef<WorkflowEditorViewport | null>(null);
   const cancelViewportRestoreRef = useRef<(() => void) | null>(null);
   const noSavedViewportPersistTimerRef = useRef<number | null>(null);
 
@@ -501,6 +509,12 @@ export function WorkflowBuilder({
         return;
       }
 
+      const live = instance.getViewport();
+      if (viewportNearlyEqual(live, viewport)) {
+        appliedViewportKeyRef.current = viewportKey;
+        return;
+      }
+
       cancelViewportRestoreRef.current?.();
       suppressViewportPersistEndRef.current = true;
       cancelViewportRestoreRef.current = restoreEditorViewportWhenPaneStable(
@@ -523,21 +537,45 @@ export function WorkflowBuilder({
     if (
       initialViewportOneToOne ||
       !reactFlowInstance ||
-      !mountDefaultViewport
+      !savedEditorViewport ||
+      !isValidWorkflowEditorViewport(savedEditorViewport) ||
+      editorViewportSyncRevision === 0
     ) {
       return;
     }
 
-    restoreSavedEditorViewport(reactFlowInstance, mountDefaultViewport);
+    if (isViewportMoving) {
+      pendingRemoteViewportRef.current = savedEditorViewport;
+      return;
+    }
+
+    restoreSavedEditorViewport(reactFlowInstance, savedEditorViewport);
   }, [
-    reactFlowInstance,
-    mountDefaultViewport,
+    editorViewportSyncRevision,
+    savedEditorViewport,
     initialViewportOneToOne,
+    reactFlowInstance,
+    isViewportMoving,
     restoreSavedEditorViewport,
   ]);
 
   useEffect(() => {
+    if (isViewportMoving || !reactFlowInstance) {
+      return;
+    }
+
+    const pending = pendingRemoteViewportRef.current;
+    if (!pending) {
+      return;
+    }
+
+    pendingRemoteViewportRef.current = null;
+    restoreSavedEditorViewport(reactFlowInstance, pending);
+  }, [isViewportMoving, reactFlowInstance, restoreSavedEditorViewport]);
+
+  useEffect(() => {
     appliedViewportKeyRef.current = null;
+    pendingRemoteViewportRef.current = null;
     setCanPersistViewport(false);
     setCanvasRevealed(!hasSavedViewport && !initialViewportOneToOne);
     if (noSavedViewportPersistTimerRef.current !== null) {
@@ -559,7 +597,6 @@ export function WorkflowBuilder({
     reactFlowInstance?.zoomTo(1, { duration: 200 });
   }, [reactFlowInstance]);
 
-  const [isViewportMoving, setIsViewportMoving] = useState(false);
   const handleViewportMoveStart = useCallback(() => {
     setIsViewportMoving(true);
   }, []);
@@ -751,6 +788,11 @@ export function WorkflowBuilder({
                     readOnly || !canPersistViewport
                       ? undefined
                       : onEditorViewportChange
+                  }
+                  onEditorViewportGestureEnd={
+                    readOnly || !canPersistViewport
+                      ? undefined
+                      : onEditorViewportGestureEnd
                   }
                   suppressViewportPersistEndRef={suppressViewportPersistEndRef}
                   soleSelectedNodeId={soleSelectedNodeId}

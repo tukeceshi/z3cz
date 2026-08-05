@@ -3,6 +3,7 @@ import type { InternalNode, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveGenerativeLayoutContentSize,
   resolveGenerativeNodeContentSize,
   GENERATIVE_NODE_TITLE_OFFSET_PX,
   snapGenerativeContentBorderPoint,
@@ -49,6 +50,10 @@ describe("generative-node-content-geometry", () => {
       internals: { positionAbsolute: { x: 0, y: 0 } },
     } as InternalNode<Node>;
 
+    expect(resolveGenerativeLayoutContentSize(AI_TEXT_NODE_TYPE)).toEqual({
+      width: AI_TEXT_CARD_WIDTH_PX,
+      height: AI_TEXT_CARD_HEIGHT_PX,
+    });
     expect(resolveGenerativeNodeContentSize(text)).toEqual({
       width: AI_TEXT_CARD_WIDTH_PX,
       height: AI_TEXT_CARD_HEIGHT_PX,
@@ -56,6 +61,17 @@ describe("generative-node-content-geometry", () => {
     expect(resolveGenerativeNodeContentSize(image)).toEqual({
       width: AI_IMAGE_CARD_WIDTH_PX,
       height: AI_IMAGE_CARD_HEIGHT_PX,
+    });
+  });
+
+  it("ignores measured border drift for ai-text layout size", () => {
+    expect(
+      resolveGenerativeLayoutContentSize(AI_TEXT_NODE_TYPE, {
+        measured: { width: 360, height: 199 },
+      })
+    ).toEqual({
+      width: AI_TEXT_CARD_WIDTH_PX,
+      height: AI_TEXT_CARD_HEIGHT_PX,
     });
   });
 });

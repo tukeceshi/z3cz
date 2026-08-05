@@ -32,6 +32,11 @@ import {
   normalizeWorkflowEditorViewport,
 } from "@/components/workflow/workflow-viewport-utils";
 
+interface ApplyEditorViewportOptions {
+  /** When true, canvas should apply this viewport (remote tab / reconnect). */
+  readonly syncToCanvas?: boolean;
+}
+
 const VIEWPORT_PERSIST_DEBOUNCE_MS = 300;
 const GENERATIVE_DEFAULTS_PERSIST_DEBOUNCE_MS = 300;
 
@@ -131,6 +136,8 @@ export function useEditableWorkflow({
   const [editorViewport, setEditorViewport] = useState<
     WorkflowEditorViewport | null | undefined
   >(undefined);
+  const [editorViewportSyncRevision, setEditorViewportSyncRevision] =
+    useState(0);
   const [isEditorViewportReady, setIsEditorViewportReady] = useState(false);
   const [generativeDefaults, setGenerativeDefaults] = useState<
     WorkflowGenerativeDefaults | undefined
@@ -254,16 +261,34 @@ export function useEditableWorkflow({
   fallbackWorkflowRef.current = fallbackWorkflow;
 
   const applyEditorViewportFromState = useCallback(
-    (state: Pick<WorkflowState, "editorViewport">) => {
+    (
+      state: Pick<WorkflowState, "editorViewport">,
+      options?: ApplyEditorViewportOptions
+    ) => {
       if (!isValidWorkflowEditorViewport(state.editorViewport)) {
         return;
       }
 
       const normalized = normalizeWorkflowEditorViewport(state.editorViewport);
+      const serialized = JSON.stringify(normalized);
+      const localSerialized = JSON.stringify(editorViewportRef.current ?? null);
+      const localHasUnpersistedViewport =
+        localSerialized !== lastPersistedViewportRef.current;
+
+      if (options?.syncToCanvas && localHasUnpersistedViewport) {
+        return;
+      }
+
+      const viewportChanged = serialized !== localSerialized;
+
       editorViewportRef.current = normalized;
-      lastPersistedViewportRef.current = JSON.stringify(normalized);
+      lastPersistedViewportRef.current = serialized;
       setEditorViewport(normalized);
       setIsEditorViewportReady(true);
+
+      if (options?.syncToCanvas && viewportChanged) {
+        setEditorViewportSyncRevision((revision) => revision + 1);
+      }
     },
     []
   );
@@ -331,6 +356,7 @@ export function useEditableWorkflow({
   useEffect(() => {
     setEditorViewport(undefined);
     editorViewportRef.current = undefined;
+    setEditorViewportSyncRevision(0);
     setIsEditorViewportReady(false);
     hasInitializedRef.current = false;
   }, [workflowId]);
@@ -386,7 +412,10 @@ export function useEditableWorkflow({
         return;
       }
 
-      const applyRemoteState = (state: WorkflowState) => {
+      const applyRemoteState = (
+        state: WorkflowState,
+        options?: ApplyEditorViewportOptions
+      ) => {
         if (state.id && state.trigger) {
           setWorkflowMetadata({
             id: state.id,
@@ -425,7 +454,7 @@ export function useEditableWorkflow({
         setNodes(reactFlowNodes);
         setEdges(reactFlowEdges);
 
-        applyEditorViewportFromState(state);
+        applyEditorViewportFromState(state, options);
 
         generativeDefaultsRef.current = state.generativeDefaults;
         lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
@@ -434,9 +463,12 @@ export function useEditableWorkflow({
         setGenerativeDefaults(state.generativeDefaults);
       };
 
-      const handleStateUpdate = (state: WorkflowState) => {
+      const handleStateUpdate = (
+        state: WorkflowState,
+        options?: ApplyEditorViewportOptions
+      ) => {
         try {
-          applyRemoteState(state);
+          applyRemoteState(state, options);
         } catch (error) {
           console.error("Error processing WebSocket state:", error);
           wsRef.current?.disconnect();
@@ -453,7 +485,7 @@ export function useEditableWorkflow({
               return;
             }
 
-            applyEditorViewportFromState(state);
+            applyEditorViewportFromState(state, { syncToCanvas: true });
 
             const localSerialized = JSON.stringify(
               buildWorkflowPayload(nodesRef.current, edgesRef.current)
@@ -465,7 +497,7 @@ export function useEditableWorkflow({
             }
           },
           onUpdate: (state: WorkflowState) => {
-            handleStateUpdate(state);
+            handleStateUpdate(state, { syncToCanvas: true });
           },
           onExecutionUpdate: (execution: WorkflowExecution) => {
             onExecutionUpdate?.(execution);
@@ -573,11 +605,10 @@ export function useEditableWorkflow({
     []
   );
 
-  const handleEditorViewportChange = useCallback(
+  const persistEditorViewportRef = useCallback(
     (viewport: WorkflowEditorViewport) => {
       const normalized = normalizeWorkflowEditorViewport(viewport);
       editorViewportRef.current = normalized;
-      setEditorViewport(normalized);
 
       if (viewportPersistTimerRef.current !== null) {
         window.clearTimeout(viewportPersistTimerRef.current);
@@ -591,11 +622,32 @@ export function useEditableWorkflow({
     []
   );
 
+  const handleEditorViewportChange = useCallback(
+    (viewport: WorkflowEditorViewport) => {
+      persistEditorViewportRef(viewport);
+    },
+    [persistEditorViewportRef]
+  );
+
+  const handleEditorViewportGestureEnd = useCallback(
+    (viewport: WorkflowEditorViewport) => {
+      const normalized = normalizeWorkflowEditorViewport(viewport);
+      editorViewportRef.current = normalized;
+
+      if (viewportPersistTimerRef.current !== null) {
+        window.clearTimeout(viewportPersistTimerRef.current);
+        viewportPersistTimerRef.current = null;
+      }
+
+      flushViewportSaveRef.current();
+    },
+    []
+  );
+
   const commitEditorViewport = useCallback(
     (viewport: WorkflowEditorViewport) => {
       const normalized = normalizeWorkflowEditorViewport(viewport);
       editorViewportRef.current = normalized;
-      setEditorViewport(normalized);
 
       if (viewportPersistTimerRef.current !== null) {
         window.clearTimeout(viewportPersistTimerRef.current);
@@ -673,11 +725,13 @@ export function useEditableWorkflow({
     isWSConnected,
     workflowMetadata,
     editorViewport,
+    editorViewportSyncRevision,
     isEditorViewportReady,
     generativeDefaults,
     handleNodesChange,
     handleEdgesChange,
     handleEditorViewportChange,
+    handleEditorViewportGestureEnd,
     commitEditorViewport,
     handleGenerativeDefaultsChange,
     executeWorkflow,

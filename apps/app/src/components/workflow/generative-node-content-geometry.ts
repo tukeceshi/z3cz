@@ -4,7 +4,7 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
 } from "@dafthunk/types";
-import type { InternalNode, Node } from "@xyflow/react";
+import type { InternalNode, Node, Node as ReactFlowNode } from "@xyflow/react";
 
 import {
   AI_AUDIO_CARD_HEIGHT_PX,
@@ -48,13 +48,24 @@ function fallbackContentSize(nodeType: string | undefined): {
   return { width: AI_TEXT_CARD_WIDTH_PX, height: AI_TEXT_CARD_HEIGHT_PX };
 }
 
-/** Content card size — measured body, not the floating title above. */
-export function resolveGenerativeNodeContentSize(
-  node: InternalNode<Node>
+/**
+ * Shared content-card size for layout and edge anchors.
+ * Text/audio use fixed constants (ignore measured border drift).
+ * Image/video use measured adaptive size when available.
+ */
+export function resolveGenerativeLayoutContentSize(
+  nodeType: string | undefined,
+  node?: Pick<ReactFlowNode, "measured" | "width" | "height">
 ): { width: number; height: number } {
-  const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType;
-  const measuredW = node.measured?.width ?? node.width;
-  const measuredH = node.measured?.height ?? node.height;
+  if (
+    nodeType === AI_TEXT_NODE_TYPE ||
+    nodeType === AI_AUDIO_NODE_TYPE
+  ) {
+    return fallbackContentSize(nodeType);
+  }
+
+  const measuredW = node?.measured?.width ?? node?.width;
+  const measuredH = node?.measured?.height ?? node?.height;
   if (
     typeof measuredW === "number" &&
     measuredW > 0 &&
@@ -64,6 +75,14 @@ export function resolveGenerativeNodeContentSize(
     return { width: measuredW, height: measuredH };
   }
   return fallbackContentSize(nodeType);
+}
+
+/** Content card size — measured body, not the floating title above. */
+export function resolveGenerativeNodeContentSize(
+  node: InternalNode<Node>
+): { width: number; height: number } {
+  const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType;
+  return resolveGenerativeLayoutContentSize(nodeType, node);
 }
 
 /** Left/right border midpoint of the content card (title excluded). */

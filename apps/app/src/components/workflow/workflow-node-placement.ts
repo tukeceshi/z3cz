@@ -1,23 +1,8 @@
 import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import type { ReactFlowInstance, Node as ReactFlowNode } from "@xyflow/react";
 
-import {
-  AI_IMAGE_CARD_HEIGHT_PX,
-  AI_IMAGE_CARD_WIDTH_PX,
-} from "./ai-image-node-utils";
-import {
-  AI_AUDIO_CARD_HEIGHT_PX,
-  AI_AUDIO_CARD_WIDTH_PX,
-} from "./ai-audio-node-utils";
-import {
-  AI_VIDEO_CARD_HEIGHT_PX,
-  AI_VIDEO_CARD_WIDTH_PX,
-} from "./ai-video-node-utils";
+import { resolveGenerativeLayoutContentSize } from "./generative-node-content-geometry";
 import { AI_TEXT_EDGE_PLUS_OUTER_PX } from "./ai-text-connection-utils";
-import {
-  AI_TEXT_CARD_HEIGHT_PX,
-  AI_TEXT_CARD_WIDTH_PX,
-} from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 
 /** Same spacing as Dagre layout (`nodesep` / `ranksep`). */
@@ -76,35 +61,20 @@ export function resolveWorkflowNodeDimensions(
   nodeType: string | undefined,
   node?: Pick<ReactFlowNode, "measured" | "width" | "height">
 ): NodeDimensions {
+  if (
+    nodeType === AI_TEXT_NODE_TYPE ||
+    nodeType === AI_IMAGE_NODE_TYPE ||
+    nodeType === AI_VIDEO_NODE_TYPE ||
+    nodeType === AI_AUDIO_NODE_TYPE
+  ) {
+    return resolveGenerativeLayoutContentSize(nodeType, node);
+  }
+
   if (node?.measured?.width && node?.measured?.height) {
     return { width: node.measured.width, height: node.measured.height };
   }
   if (node?.width && node?.height) {
     return { width: node.width, height: node.height };
-  }
-  if (nodeType === AI_TEXT_NODE_TYPE) {
-    return {
-      width: AI_TEXT_CARD_WIDTH_PX,
-      height: AI_TEXT_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_IMAGE_NODE_TYPE) {
-    return {
-      width: AI_IMAGE_CARD_WIDTH_PX,
-      height: AI_IMAGE_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_VIDEO_NODE_TYPE) {
-    return {
-      width: AI_VIDEO_CARD_WIDTH_PX,
-      height: AI_VIDEO_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_AUDIO_NODE_TYPE) {
-    return {
-      width: AI_AUDIO_CARD_WIDTH_PX,
-      height: AI_AUDIO_CARD_HEIGHT_PX,
-    };
   }
   const isOutputNode = nodeType?.startsWith("output-") ?? false;
   return { width: 200, height: isOutputNode ? 250 : 100 };
@@ -115,42 +85,15 @@ export function resolveWorkflowNodeCardSizeForPlacement(
   nodeType: string | undefined,
   node?: Pick<ReactFlowNode, "measured" | "width" | "height">
 ): NodeDimensions {
-  if (nodeType === AI_TEXT_NODE_TYPE) {
-    return {
-      width: AI_TEXT_CARD_WIDTH_PX,
-      height: AI_TEXT_CARD_HEIGHT_PX,
-    };
+  if (
+    nodeType === AI_TEXT_NODE_TYPE ||
+    nodeType === AI_IMAGE_NODE_TYPE ||
+    nodeType === AI_VIDEO_NODE_TYPE ||
+    nodeType === AI_AUDIO_NODE_TYPE
+  ) {
+    return resolveGenerativeLayoutContentSize(nodeType, node);
   }
-  if (nodeType === AI_IMAGE_NODE_TYPE) {
-    if (node?.measured?.width && node?.measured?.height) {
-      return { width: node.measured.width, height: node.measured.height };
-    }
-    if (node?.width && node?.height) {
-      return { width: node.width, height: node.height };
-    }
-    return {
-      width: AI_IMAGE_CARD_WIDTH_PX,
-      height: AI_IMAGE_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_VIDEO_NODE_TYPE) {
-    if (node?.measured?.width && node?.measured?.height) {
-      return { width: node.measured.width, height: node.measured.height };
-    }
-    if (node?.width && node?.height) {
-      return { width: node.width, height: node.height };
-    }
-    return {
-      width: AI_VIDEO_CARD_WIDTH_PX,
-      height: AI_VIDEO_CARD_HEIGHT_PX,
-    };
-  }
-  if (nodeType === AI_AUDIO_NODE_TYPE) {
-    return {
-      width: AI_AUDIO_CARD_WIDTH_PX,
-      height: AI_AUDIO_CARD_HEIGHT_PX,
-    };
-  }
+
   if (node?.measured?.width && node?.measured?.height) {
     return { width: node.measured.width, height: node.measured.height };
   }

@@ -15,7 +15,6 @@ import {
   AiTextHistoryOverlay,
 } from "../../ai-text-history-overlay";
 import {
-  AI_TEXT_CARD_HEIGHT_PX,
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
   readAiTextResult,
@@ -145,11 +144,10 @@ function AiTextWidget({
     <>
       <div
         className={cn(
-          "relative overflow-hidden p-3",
+          "relative flex h-full min-h-0 flex-col overflow-hidden p-3",
           !editing && "cursor-grab select-none",
           className
         )}
-        style={{ height: AI_TEXT_CARD_HEIGHT_PX }}
         onDoubleClick={handleDoubleClick}
       >
         {editing && !generateError && !isGenerating ? (
@@ -164,10 +162,10 @@ function AiTextWidget({
             readOnly={editLocked}
             maxLength={outputMaxChars}
             placeholder={cardPlaceholder}
-            className="nodrag h-full min-h-0 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
+            className="nodrag min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
           />
         ) : (
-          <div className="h-full overflow-hidden whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80">
+          <div className="min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80">
             {textBuffer.value || (
               <span className="text-muted-foreground/50 italic">
                 {cardPlaceholder}

@@ -27,6 +27,21 @@ export function normalizeWorkflowEditorViewport(
   };
 }
 
+const VIEWPORT_NEARLY_EQUAL_ZOOM_EPS = 0.01;
+const VIEWPORT_NEARLY_EQUAL_XY_EPS = 2;
+
+/** Skip redundant setViewport when live canvas already matches the target. */
+export function viewportNearlyEqual(
+  a: WorkflowEditorViewport,
+  b: WorkflowEditorViewport
+): boolean {
+  return (
+    Math.abs(a.x - b.x) < VIEWPORT_NEARLY_EQUAL_XY_EPS &&
+    Math.abs(a.y - b.y) < VIEWPORT_NEARLY_EQUAL_XY_EPS &&
+    Math.abs(a.zoom - b.zoom) < VIEWPORT_NEARLY_EQUAL_ZOOM_EPS
+  );
+}
+
 /** Matches React Flow `setCenter` target viewport (x/y before pan animation). */
 export function computeViewportForFlowCenter(
   reactFlowInstance: ReactFlowInstance,
@@ -63,6 +78,11 @@ export function restoreEditorViewportWhenPaneStable(
 
   const apply = () => {
     if (cancelled) {
+      return;
+    }
+    const live = instance.getViewport();
+    if (viewportNearlyEqual(live, viewport)) {
+      onRestored();
       return;
     }
     void instance.setViewport(viewport, { duration: 0 });
