@@ -54,6 +54,9 @@ import {
 } from "./workflow-connected-handles";
 import { WorkflowConnectionLine, WorkflowEdge } from "./workflow-edge";
 import { WorkflowNode } from "./workflow-node";
+import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
+import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
+import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
 import {
   WORKFLOW_CANVAS_CLASS,
@@ -215,6 +218,14 @@ export interface WorkflowCanvasProps {
   suppressViewportPersistEndRef?: React.RefObject<boolean>;
   soleSelectedNodeId?: string | null;
   isViewportMoving?: boolean;
+  addNodeMenu?: WorkflowAddNodeMenuState | null;
+  onAddNodeMenuSelect?: (
+    nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio",
+    menu: WorkflowAddNodeMenuState
+  ) => void;
+  onCloseAddNodeMenu?: () => void;
+  onPaneClick?: () => void;
+  onPaneContextMenu?: (event: React.MouseEvent) => void;
 }
 
 interface ActionButtonProps {
@@ -687,6 +698,11 @@ export function WorkflowCanvas({
   suppressViewportPersistEndRef,
   soleSelectedNodeId = null,
   isViewportMoving = false,
+  addNodeMenu = null,
+  onAddNodeMenuSelect,
+  onCloseAddNodeMenu,
+  onPaneClick,
+  onPaneContextMenu,
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
   const { zoom } = useViewport();
@@ -760,6 +776,8 @@ export function WorkflowCanvas({
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
+        onPaneClick={onPaneClick}
+        onPaneContextMenu={onPaneContextMenu}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
@@ -788,7 +806,8 @@ export function WorkflowCanvas({
           WORKFLOW_CANVAS_CLASS,
           "h-full w-full",
           showBackground && "bg-neutral-100/50",
-          disabled && "cursor-default"
+          disabled && "cursor-default",
+          addNodeMenu && "cursor-default"
         )}
         onlyRenderVisibleElements
         nodesDraggable={!disabled && showControls}
@@ -797,7 +816,7 @@ export function WorkflowCanvas({
         selectNodesOnDrag={!disabled && showControls}
         multiSelectionKeyCode={showControls ? "Shift" : undefined}
         deleteKeyCode={null}
-        panOnDrag={showControls}
+        panOnDrag={showControls && !addNodeMenu}
         zoomOnScroll={showControls}
         zoomOnPinch={showControls}
         zoomOnDoubleClick={showControls}
@@ -826,6 +845,7 @@ export function WorkflowCanvas({
             className="stroke-foreground/5 opacity-50 dark:opacity-100"
           />
         )}
+        <WorkflowAddNodePreviewLine menu={addNodeMenu} />
 
         {/* Status Bar - hidden in read-only mode */}
         {!disabled && (
@@ -953,6 +973,13 @@ export function WorkflowCanvas({
           </Panel>
         )}
       </ReactFlow>
+      {onAddNodeMenuSelect && onCloseAddNodeMenu && (
+        <WorkflowAddNodeMenu
+          state={addNodeMenu}
+          onSelect={onAddNodeMenuSelect}
+          onClose={onCloseAddNodeMenu}
+        />
+      )}
       </div>
     </TooltipProvider>
   );

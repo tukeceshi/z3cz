@@ -41,20 +41,24 @@ import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
 } from "./ai-video-node-utils";
+import {
+  AI_TEXT_EDGE_PLUS_OUTER_PX,
+  AI_TEXT_EDGE_SHELL_W_PX,
+  AI_TEXT_HANDLE_HIT_PX,
+  AI_TEXT_HANDLE_PLUS_PX,
+  AI_TEXT_PLUS_BORDER_GAP_PX,
+  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
+} from "./generative-edge-connection-config";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
-/** LibTV-style circular hit zone (px). */
-export const AI_TEXT_HANDLE_HIT_PX = 80;
-/** Visible plus icon (px). */
-export const AI_TEXT_HANDLE_PLUS_PX = 20;
-/** Gap between card border and nearest plus edge (px). */
-export const AI_TEXT_PLUS_BORDER_GAP_PX = 10;
-/** Plus band outside the border (gap + icon). */
-export const AI_TEXT_EDGE_PLUS_OUTER_PX =
-  AI_TEXT_PLUS_BORDER_GAP_PX + AI_TEXT_HANDLE_PLUS_PX;
-/** Interaction shell width: handle zone + outer plus band. */
-export const AI_TEXT_EDGE_SHELL_W_PX =
-  AI_TEXT_HANDLE_HIT_PX + AI_TEXT_EDGE_PLUS_OUTER_PX;
+export {
+  AI_TEXT_EDGE_PLUS_OUTER_PX,
+  AI_TEXT_EDGE_SHELL_W_PX,
+  AI_TEXT_HANDLE_HIT_PX,
+  AI_TEXT_HANDLE_PLUS_PX,
+  AI_TEXT_PLUS_BORDER_GAP_PX,
+  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
+};
 
 interface AiTextSnapTarget {
   readonly nodeId: string;

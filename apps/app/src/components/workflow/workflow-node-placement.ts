@@ -2,7 +2,7 @@ import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NOD
 import type { ReactFlowInstance, Node as ReactFlowNode } from "@xyflow/react";
 
 import { resolveGenerativeLayoutContentSize } from "./generative-node-content-geometry";
-import { AI_TEXT_EDGE_PLUS_OUTER_PX } from "./ai-text-connection-utils";
+import { GENERATIVE_EDGE_PLUS_OUTER_PX } from "./generative-edge-connection-config";
 import type { WorkflowNodeType } from "./workflow-types";
 
 /** Same spacing as Dagre layout (`nodesep` / `ranksep`). */
@@ -13,7 +13,7 @@ export const WORKFLOW_NODE_GAP_PX = 100;
  * (~70px), without changing layout config.
  */
 export const WORKFLOW_NODE_ADD_GAP_PX =
-  WORKFLOW_NODE_GAP_PX - AI_TEXT_EDGE_PLUS_OUTER_PX;
+  WORKFLOW_NODE_GAP_PX - GENERATIVE_EDGE_PLUS_OUTER_PX;
 
 /** Finer step for center-outward placement search (avoids ~400px grid gaps). */
 export const WORKFLOW_NODE_PLACEMENT_SPIRAL_STEP_PX = 40;
@@ -415,6 +415,77 @@ export function findFallbackNodePosition(
   }
 
   return { x: minX, y: maxBottom + gap };
+}
+
+function findOpenNodePositionNearSeed(
+  seed: FlowPoint,
+  nodeSize: NodeDimensions,
+  occupied: readonly FlowRect[],
+  gap: number = WORKFLOW_NODE_ADD_GAP_PX,
+  spiralStep: number = WORKFLOW_NODE_PLACEMENT_SPIRAL_STEP_PX
+): FlowPoint {
+  const baseX = seed.x - nodeSize.width / 2;
+  const baseY = seed.y - nodeSize.height / 2;
+  const maxRadius =
+    Math.max(nodeSize.width, nodeSize.height) * 8 + WORKFLOW_NODE_GAP_PX * 4;
+
+  for (const { dx, dy } of iterateCenterSpiralOffsets(spiralStep, maxRadius)) {
+    const candidate: FlowRect = {
+      x: baseX + dx,
+      y: baseY + dy,
+      width: nodeSize.width,
+      height: nodeSize.height,
+    };
+    if (!overlapsOccupied(candidate, occupied, gap)) {
+      return { x: candidate.x, y: candidate.y };
+    }
+  }
+
+  return { x: baseX, y: baseY };
+}
+
+/** Place a node near a flow point (e.g. context-menu click), avoiding overlaps. */
+export function findOpenNodePositionNearPoint(params: {
+  readonly flowPoint: FlowPoint;
+  readonly nodeType: string | undefined;
+  readonly existingNodes: readonly PlacementNode[];
+}): FlowPoint {
+  const nodeSize = resolveWorkflowNodeCardSizeForPlacement(params.nodeType);
+  const occupied = collectOccupiedRects(params.existingNodes);
+  return findOpenNodePositionNearSeed(params.flowPoint, nodeSize, occupied);
+}
+
+/** Place a new node to the right of a source generative node. */
+export function findOpenNodePositionFromSource(params: {
+  readonly sourceNode: PlacementNode;
+  readonly targetNodeType: string | undefined;
+  readonly existingNodes: readonly PlacementNode[];
+  readonly dropFlowY?: number;
+}): FlowPoint {
+  const sourceDims = resolveWorkflowNodeDimensions(
+    params.sourceNode.data.nodeType,
+    params.sourceNode
+  );
+  const targetDims = resolveWorkflowNodeCardSizeForPlacement(
+    params.targetNodeType
+  );
+  const occupied = collectOccupiedRects(params.existingNodes);
+  const seedY =
+    params.dropFlowY ??
+    params.sourceNode.position.y + sourceDims.height / 2;
+
+  return findOpenNodePositionNearSeed(
+    {
+      x:
+        params.sourceNode.position.x +
+        sourceDims.width +
+        WORKFLOW_NODE_ADD_GAP_PX +
+        targetDims.width / 2,
+      y: seedY,
+    },
+    targetDims,
+    occupied
+  );
 }
 
 export function findOpenNodePosition(params: {

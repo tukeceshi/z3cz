@@ -298,6 +298,11 @@ export function WorkflowBuilder({
     onNodeDragStart,
     onNodeDragStop,
     isDraggingRef,
+    addNodeMenu,
+    closeAddNodeMenu,
+    handlePaneClick,
+    handlePaneContextMenu,
+    handleAddNodeMenuSelect,
   } = useWorkflowState({
     initialNodes,
     initialEdges,
@@ -797,6 +802,15 @@ export function WorkflowBuilder({
                   suppressViewportPersistEndRef={suppressViewportPersistEndRef}
                   soleSelectedNodeId={soleSelectedNodeId}
                   isViewportMoving={isViewportMoving}
+                  addNodeMenu={addNodeMenu}
+                  onAddNodeMenuSelect={
+                    readOnly ? undefined : handleAddNodeMenuSelect
+                  }
+                  onCloseAddNodeMenu={readOnly ? undefined : closeAddNodeMenu}
+                  onPaneClick={readOnly ? undefined : handlePaneClick}
+                  onPaneContextMenu={
+                    readOnly ? undefined : handlePaneContextMenu
+                  }
                 />
               </div>
 

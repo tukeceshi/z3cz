@@ -19,13 +19,13 @@ import {
   buildGenerativeDragPreviewState,
 } from "./generative-connection-preview";
 import {
-  AI_TEXT_PLUS_BORDER_GAP_PX,
   getAiTextEdgePathOffset,
   resolveAiTextEdgeAnchors,
   resolveWorkflowEdgeHandles,
   snapAiTextKeywordsBorderPoint,
   snapAiTextOutputBorderPoint,
 } from "./ai-text-connection-utils";
+import { GENERATIVE_EDGE_PLUS_BORDER_GAP_PX } from "./generative-edge-connection-config";
 import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_OUTPUT_ID,
@@ -48,7 +48,7 @@ interface SmoothStepPathParams {
   offset?: number;
 }
 
-function buildSmoothStepPath(params: SmoothStepPathParams): string {
+export function buildWorkflowSmoothStepPath(params: SmoothStepPathParams): string {
   const { offset = 20 } = params;
   const [edgePath] = getSmoothStepPath({
     sourceX: params.sourceX,
@@ -63,7 +63,7 @@ function buildSmoothStepPath(params: SmoothStepPathParams): string {
   return edgePath;
 }
 
-function renderPath(
+export function renderWorkflowEdgePath(
   path: string,
   color: string,
   options: {
@@ -173,7 +173,7 @@ export const WorkflowEdge = memo(
       ]
     );
 
-    const edgePath = buildSmoothStepPath({
+    const edgePath = buildWorkflowSmoothStepPath({
       sourceX: anchors.sourceX,
       sourceY: anchors.sourceY,
       targetX: anchors.targetX,
@@ -193,7 +193,7 @@ export const WorkflowEdge = memo(
       return "#d4d4d4";
     };
 
-    return renderPath(edgePath, getColor(), {
+    return renderWorkflowEdgePath(edgePath, getColor(), {
       isActive,
       isSelectionFlow,
       zIndex,
@@ -290,7 +290,7 @@ export const WorkflowConnectionLine = memo(
         outboundFromOutput ||
         outboundFromImageOutput
       ) {
-        return AI_TEXT_PLUS_BORDER_GAP_PX;
+        return GENERATIVE_EDGE_PLUS_BORDER_GAP_PX;
       }
       const fromType = (
         connection.fromNode?.data as { nodeType?: string } | undefined
@@ -374,7 +374,7 @@ export const WorkflowConnectionLine = memo(
       ]
     );
 
-    const edgePath = buildSmoothStepPath({
+    const edgePath = buildWorkflowSmoothStepPath({
       sourceX: anchors.sourceX,
       sourceY: anchors.sourceY,
       targetX: anchors.targetX,
@@ -390,7 +390,7 @@ export const WorkflowConnectionLine = memo(
       return "#d4d4d4";
     };
 
-    return renderPath(edgePath, getColor(), { zIndex: undefined });
+    return renderWorkflowEdgePath(edgePath, getColor(), { zIndex: undefined });
   }
 );
 

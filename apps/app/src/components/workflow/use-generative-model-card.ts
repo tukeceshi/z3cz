@@ -15,9 +15,9 @@ import {
   sanitizeCardGenerationParams,
   type CardGenerationParams,
 } from "./generative-card-params";
+import { applyModelBindingToNodeData } from "./generative-model-binding";
 import {
   readWorkflowGenerativeDefault,
-  writeWorkflowGenerativeDefault,
 } from "./generative-workflow-defaults";
 import {
   buildModelBindingOptionId,
@@ -360,45 +360,24 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
 
       setOptimisticOptionId(optionId);
       updateNodeData(nodeId, (current) => {
-        const extras = onModelSelected?.(model, current);
-        const nextInputs =
-          extras?.inputs ??
-          persistGenerativeBindingWithParams(
-            current.inputs,
-            {
-              canonicalId: model.canonicalId,
-              interfaceId: model.interfaceId,
-            },
-            buildDefaultParams && readGenerationFields
-              ? sanitizeCardGenerationParams(
-                  readGenerationFields(model),
-                  buildDefaultParams(readGenerationFields(model))
-                )
-              : {}
-          );
-
-        const paramsEntry = readNodeGenerationParams(nextInputs);
-        onGenerativeDefaultChange?.(
-          writeWorkflowGenerativeDefault(generativeDefaults, modality, {
-            canonicalId: model.canonicalId,
-            interfaceId: model.interfaceId,
-            params: paramsEntry,
-          })
-        );
+        const patch = applyModelBindingToNodeData({
+          model,
+          current,
+          modality,
+          updateWorkflowDefault: true,
+          generativeDefaults,
+          workflowDefaultEntry: workflowDefault,
+          handlers: {
+            readGenerationFields,
+            buildDefaultParams,
+            onModelSelected,
+          },
+          onGenerativeDefaultChange,
+        });
 
         materializedRef.current = `${nodeId}:${model.optionId}`;
 
-        return {
-          inputs: nextInputs,
-          ...(extras?.metadata
-            ? {
-                metadata: {
-                  ...(current.metadata ?? {}),
-                  ...extras.metadata,
-                },
-              }
-            : {}),
-        };
+        return patch;
       });
     },
     [
@@ -414,6 +393,7 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       readGenerationFields,
       toast,
       updateNodeData,
+      workflowDefault,
     ]
   );
 

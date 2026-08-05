@@ -2660,6 +2660,10 @@ export const en = {
       clearErrors: "Clear Errors & Reset",
       resume: "Resume Workflow",
       nodeTypeUnavailable: "This node type is not available for this workflow.",
+      referenceConnectFailed:
+        "{{targetName}} cannot reference {{sourceName}}; node created only.",
+      referenceConnectModelError:
+        "Failed to load models; node created without a connection.",
     },
     studio: {
       title: "Studio",

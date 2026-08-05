@@ -1,4 +1,4 @@
-import type { ObjectReference, WorkflowEditorViewport, WorkflowGenerativeDefaults, WorkflowTrigger } from "@dafthunk/types";
+import type { AiGenerativeNodeType, ObjectReference, WorkflowEditorViewport, WorkflowGenerativeDefaults, WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -11,13 +11,14 @@ import type {
   ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import type { RefObject } from "react";
+import type { RefObject, MouseEvent } from "react";
 import { useMemo } from "react";
 
 import { useClipboard } from "./use-clipboard";
 import { useGraphOperations } from "./use-graph-operations";
 import { useGraphPersistence } from "./use-graph-persistence";
 import { useLayout } from "./use-layout";
+import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import type {
   ConnectionValidationState,
   NodeExecutionUpdate,
@@ -100,6 +101,14 @@ interface UseWorkflowStateReturn {
   hasClipboardData: boolean;
   soleSelectedNodeId: string | null;
   isDraggingRef: RefObject<boolean>;
+  addNodeMenu: WorkflowAddNodeMenuState | null;
+  closeAddNodeMenu: () => void;
+  handlePaneClick: () => void;
+  handlePaneContextMenu: (event: MouseEvent) => void;
+  handleAddNodeMenuSelect: (
+    nodeType: AiGenerativeNodeType,
+    menu: WorkflowAddNodeMenuState
+  ) => void;
 }
 
 const NOOP = () => {};

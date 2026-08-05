@@ -2536,6 +2536,9 @@ export const zh: TranslationDictionary = {
       aiVideo: "视频",
       aiAudio: "音频",
       nodeTypeUnavailable: "当前工作流不可用此节点类型。",
+      referenceConnectFailed:
+        "{{targetName}}无法引用{{sourceName}}，仅做节点创建",
+      referenceConnectModelError: "模型加载失败，仅做节点创建",
       agent: "Agent",
       showAgent: "显示 Agent",
       hideAgent: "隐藏 Agent",

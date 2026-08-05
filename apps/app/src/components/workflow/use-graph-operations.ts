@@ -1,4 +1,4 @@
-import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, type AiGenerativeNodeType, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -13,15 +13,15 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import {
-  addEdge,
   getConnectedEdges,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import type { RefObject } from "react";
+import type { RefObject, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { useAppToast } from "@/hooks/use-app-toast";
 
 import {
   ALL_TRIGGER_NODE_TYPE_IDS,
@@ -48,24 +48,18 @@ import {
   mergeAiTextNodeCatalogInputs,
 } from "./ai-text-node-utils";
 import {
-  AI_IMAGE_PROMPT_HANDLE_ID,
-  AI_IMAGE_REFERENCE_HANDLE_ID,
   mergeAiImageNodeCatalogInputs,
 } from "./ai-image-node-utils";
 import {
-  AI_AUDIO_PROMPT_HANDLE_ID,
   mergeAiAudioNodeCatalogInputs,
 } from "./ai-audio-node-utils";
 import {
-  AI_VIDEO_PROMPT_HANDLE_ID,
-  AI_VIDEO_REFERENCE_HANDLE_ID,
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
 import {
-  edgeTouchesInputHandle,
-  resolveConnectionEndpoints,
   validateWorkflowConnection,
 } from "./workflow-connection-validation";
+import { buildReferenceConnectionToNewNode } from "./workflow-add-node-connection";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
@@ -74,7 +68,20 @@ import {
   readWorkflowGenerativeDefault,
 } from "./generative-workflow-defaults";
 import { persistGenerativeBindingWithParams } from "./org-model-selection-utils";
-import { findOpenNodePosition, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
+import {
+  mergePreparedWorkflowEdge,
+  prepareWorkflowConnectionAppend,
+} from "./workflow-connection-commit";
+import {
+  resolveAddNodeReferenceModel,
+} from "./workflow-add-node-model";
+import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
+import {
+  findOpenNodePosition,
+  findOpenNodePositionFromSource,
+  findOpenNodePositionNearPoint,
+  resolveWorkflowNodeDimensions,
+} from "./workflow-node-placement";
 import { computeViewportForFlowCenter } from "./workflow-viewport-utils";
 import type {
   ConnectionValidationState,
@@ -361,6 +368,14 @@ export interface UseGraphOperationsReturn {
   selectNode: (nodeId: string) => void;
   addTriggerNodes: (trigger: WorkflowTrigger) => void;
   removeTriggerNodes: () => void;
+  addNodeMenu: WorkflowAddNodeMenuState | null;
+  closeAddNodeMenu: () => void;
+  handlePaneClick: () => void;
+  handlePaneContextMenu: (event: MouseEvent) => void;
+  handleAddNodeMenuSelect: (
+    nodeType: AiGenerativeNodeType,
+    menu: WorkflowAddNodeMenuState
+  ) => void;
 }
 
 const NOOP = () => {};
@@ -379,6 +394,7 @@ export function useGraphOperations({
   suppressViewportPersistEndRef,
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   const { t } = useTranslation();
+  const toast = useAppToast();
   // Core state
   const [nodes, setNodes, onNodesChange] =
     useNodesState<ReactFlowNode<WorkflowNodeType>>(initialNodes);
@@ -393,6 +409,24 @@ export function useGraphOperations({
   const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
   const [connectionValidationState, setConnectionValidationState] =
     useState<ConnectionValidationState>("default");
+  const [addNodeMenu, setAddNodeMenu] =
+    useState<WorkflowAddNodeMenuState | null>(null);
+  const addNodeMenuDismissGuardRef = useRef(false);
+
+  const openAddNodeMenu = useCallback((menu: WorkflowAddNodeMenuState) => {
+    addNodeMenuDismissGuardRef.current = true;
+    setAddNodeMenu(menu);
+    requestAnimationFrame(() => {
+      addNodeMenuDismissGuardRef.current = false;
+    });
+  }, []);
+
+  const closeAddNodeMenu = useCallback(() => {
+    if (addNodeMenuDismissGuardRef.current) {
+      return;
+    }
+    setAddNodeMenu(null);
+  }, []);
 
   const nodesRef = useRef(initialNodes);
   const edgesRef = useRef(initialEdges);
@@ -640,7 +674,7 @@ export function useGraphOperations({
           nodes,
           edges,
           extraValidate: validateConnection,
-          graphEditBlocked,
+          disabled: graphEditBlocked,
         });
 
         setConnectionValidationState(valid ? "valid" : "invalid");
@@ -650,69 +684,58 @@ export function useGraphOperations({
     );
 
   // Handle connection
+  const appendWorkflowConnection = useCallback(
+    (
+      connection: Connection,
+      nodesSnapshot: readonly ReactFlowNode<WorkflowNodeType>[],
+      edgesSnapshot: readonly ReactFlowEdge<WorkflowEdgeType>[]
+    ): boolean => {
+      const prepared = prepareWorkflowConnectionAppend({
+        connection,
+        nodes: nodesSnapshot,
+        edges: edgesSnapshot,
+        createObjectUrl,
+        extraValidate: validateConnection,
+        disabled: graphEditBlocked,
+      });
+      if (!prepared) {
+        return false;
+      }
+
+      setEdges((currentEdges) => {
+        const nextEdges = mergePreparedWorkflowEdge(currentEdges, prepared);
+        edgesRef.current = nextEdges;
+        return nextEdges;
+      });
+      return true;
+    },
+    [createObjectUrl, graphEditBlocked, setEdges, validateConnection]
+  );
+
+  const commitNodesAndConnection = useCallback(
+    (
+      nextNodes: ReactFlowNode<WorkflowNodeType>[],
+      connection: Connection | null
+    ) => {
+      nodesRef.current = nextNodes;
+      setNodes(nextNodes);
+
+      if (!connection) {
+        return;
+      }
+
+      appendWorkflowConnection(connection, nextNodes, edgesRef.current);
+    },
+    [appendWorkflowConnection, setNodes]
+  );
+
   const onConnect = useCallback(
     (connection: Connection) => {
       if (graphEditBlocked) return;
       if (!connection.source || !connection.target) return;
-      if (!isValidConnection(connection)) return;
-
-      const sourceNode = nodes.find((node) => node.id === connection.source);
-      const targetNode = nodes.find((node) => node.id === connection.target);
-      if (!sourceNode || !targetNode) return;
-
-      const normalizedConnection =
-        targetNode.data.nodeType === AI_IMAGE_NODE_TYPE &&
-        connection.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID &&
-        sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
-          ? { ...connection, targetHandle: AI_IMAGE_PROMPT_HANDLE_ID }
-          : targetNode.data.nodeType === AI_VIDEO_NODE_TYPE &&
-              connection.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID &&
-              sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
-            ? { ...connection, targetHandle: AI_VIDEO_PROMPT_HANDLE_ID }
-            : connection;
-
-      const endpoints = resolveConnectionEndpoints(
-        normalizedConnection,
-        sourceNode,
-        targetNode
-      );
-      if (!endpoints) return;
-
-      const { inputNodeId, inputHandleId, inputParam } = endpoints;
-      // Outputs may fan out; only non-repeated inputs replace prior edges.
-      const acceptsMultipleConnections = Boolean(inputParam.repeated);
-
-      const newEdge: ReactFlowEdge<WorkflowEdgeType> = {
-        ...normalizedConnection,
-        id: `${normalizedConnection.source}-${normalizedConnection.sourceHandle}-${normalizedConnection.target}-${normalizedConnection.targetHandle}-${Date.now()}`,
-        type: "workflowEdge",
-        data: {
-          isValid: true,
-          isActive: false,
-          sourceType: normalizedConnection.sourceHandle ?? undefined,
-          targetType: normalizedConnection.targetHandle ?? undefined,
-          createObjectUrl,
-        },
-        zIndex: 0,
-      };
-
-      setEdges((eds) => {
-        let filteredEdges = eds;
-
-        if (!acceptsMultipleConnections) {
-          filteredEdges = eds.filter(
-            (edge) =>
-              !edgeTouchesInputHandle(edge, inputNodeId, inputHandleId)
-          );
-        }
-
-        return addEdge(
-          newEdge,
-          filteredEdges.map((edge) => ({ ...edge, zIndex: 0 }))
-        );
-      });
+      appendWorkflowConnection(connection, nodes, edges);
     },
-    [setEdges, isValidConnection, graphEditBlocked, createObjectUrl, nodes]
+    [appendWorkflowConnection, edges, graphEditBlocked, nodes]
   );
 
   const onConnectEnd = useCallback<OnConnectEnd>(
@@ -728,6 +751,36 @@ export function useGraphOperations({
           ".react-flow__node"
         ) as HTMLElement | null;
         const hoveredNodeId = nodeEl?.getAttribute("data-id");
+
+        if (
+          !hoveredNodeId &&
+          connectionState.fromHandle?.type === "source" &&
+          isGenerativeAiNodeType(
+            (connectionState.fromNode.data as WorkflowNodeType).nodeType
+          ) &&
+          reactFlowInstance
+        ) {
+          const flowPoint = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          });
+          openAddNodeMenu({
+            screenX: event.clientX,
+            screenY: event.clientY,
+            flowX: flowPoint.x,
+            flowY: flowPoint.y,
+            sourceContext: {
+              nodeId: connectionState.fromNode.id,
+              handle: {
+                type: connectionState.fromHandle.type,
+                id: connectionState.fromHandle.id,
+              },
+            },
+          });
+          setConnectionValidationState("default");
+          return;
+        }
+
         if (hoveredNodeId) {
           const policyNodes = nodesRef.current.map((node) => ({
             id: node.id,
@@ -776,7 +829,7 @@ export function useGraphOperations({
               connection: drop,
               nodes: nodesRef.current,
               edges: edgesRef.current,
-              graphEditBlocked,
+              disabled: graphEditBlocked,
             })
           ) {
             onConnect(drop);
@@ -786,7 +839,186 @@ export function useGraphOperations({
 
       setConnectionValidationState("default");
     },
-    [graphEditBlocked, onConnect, edgesRef, nodesRef]
+    [graphEditBlocked, onConnect, edgesRef, nodesRef, openAddNodeMenu, reactFlowInstance]
+  );
+
+  const handlePaneClick = useCallback(() => {
+    if (addNodeMenu) {
+      closeAddNodeMenu();
+    }
+  }, [addNodeMenu, closeAddNodeMenu]);
+
+  const handlePaneContextMenu = useCallback(
+    (event: MouseEvent) => {
+      if (graphEditBlocked || !reactFlowInstance) {
+        return;
+      }
+      event.preventDefault();
+      if (addNodeMenu) {
+        setAddNodeMenu(null);
+        return;
+      }
+      const flowPoint = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      openAddNodeMenu({
+        screenX: event.clientX,
+        screenY: event.clientY,
+        flowX: flowPoint.x,
+        flowY: flowPoint.y,
+      });
+    },
+    [addNodeMenu, graphEditBlocked, openAddNodeMenu, reactFlowInstance]
+  );
+
+  const handleAddNodeMenuSelect = useCallback(
+    (targetType: AiGenerativeNodeType, menu: WorkflowAddNodeMenuState) => {
+      if (graphEditBlocked || !reactFlowInstance) {
+        return;
+      }
+
+      setAddNodeMenu(null);
+
+      const template = nodeTypes.find((entry) => entry.type === targetType);
+      if (!template) {
+        toast.error("workflow.canvas.nodeTypeUnavailable");
+        return;
+      }
+
+      const existingNodes = nodesRef.current;
+      const sourceContext = menu.sourceContext;
+      let position: { x: number; y: number };
+
+      if (sourceContext) {
+        const sourceNode = existingNodes.find(
+          (node) => node.id === sourceContext.nodeId
+        );
+        if (!sourceNode) {
+          return;
+        }
+        position = findOpenNodePositionFromSource({
+          sourceNode,
+          targetNodeType: targetType,
+          existingNodes,
+          dropFlowY: menu.flowY,
+        });
+      } else {
+        position = findOpenNodePositionNearPoint({
+          flowPoint: { x: menu.flowX, y: menu.flowY },
+          nodeType: targetType,
+          existingNodes,
+        });
+      }
+
+      const newNode = createReactFlowNode(
+        template,
+        position,
+        createObjectUrl,
+        existingNodes,
+        t,
+        orgId,
+        generativeDefaults
+      );
+      newNode.selected = true;
+
+      const deselectAndAppend = (
+        node: ReactFlowNode<WorkflowNodeType>
+      ): ReactFlowNode<WorkflowNodeType>[] => [
+        ...existingNodes.map((entry) => ({ ...entry, selected: false })),
+        node,
+      ];
+
+      if (!sourceContext) {
+        commitNodesAndConnection(deselectAndAppend(newNode), null);
+        return;
+      }
+
+      const sourceNode = existingNodes.find(
+        (node) => node.id === sourceContext.nodeId
+      );
+      if (!sourceNode) {
+        commitNodesAndConnection(deselectAndAppend(newNode), null);
+        return;
+      }
+
+      const nodesWithNew = [...existingNodes, newNode];
+      const policyNodes = nodesWithNew.map((node) => ({
+        id: node.id,
+        data: node.data,
+      }));
+      const connection = buildReferenceConnectionToNewNode({
+        dragFromNodeId: sourceContext.nodeId,
+        dragFromHandle: sourceContext.handle,
+        targetNodeId: newNode.id,
+        nodes: policyNodes,
+      });
+
+      if (!connection) {
+        commitNodesAndConnection(deselectAndAppend(newNode), null);
+        return;
+      }
+
+      void (async () => {
+        try {
+          const modelResult = await resolveAddNodeReferenceModel({
+            orgId,
+            targetType,
+            targetNodeData: newNode.data,
+            connection,
+            sourceNodeType: sourceNode.data.nodeType,
+            generativeDefaults,
+          });
+
+          if (!modelResult.canConnect) {
+            toast.warning("workflow.canvas.referenceConnectFailed", {
+              targetName: newNode.data.name ?? targetType,
+              sourceName: sourceNode.data.name ?? sourceContext.nodeId,
+            });
+            return;
+          }
+
+          const finalNode = {
+            ...newNode,
+            data: modelResult.nodeData,
+          };
+          const nodesWithPrepared = [...existingNodes, finalNode];
+
+          if (
+            !validateWorkflowConnection({
+              connection,
+              nodes: nodesWithPrepared,
+              edges: edgesRef.current,
+              disabled: graphEditBlocked,
+            })
+          ) {
+            toast.warning("workflow.canvas.referenceConnectFailed", {
+              targetName: newNode.data.name ?? targetType,
+              sourceName: sourceNode.data.name ?? sourceContext.nodeId,
+            });
+            return;
+          }
+
+          commitNodesAndConnection(
+            deselectAndAppend(finalNode),
+            connection
+          );
+        } catch {
+          toast.error("workflow.canvas.referenceConnectModelError");
+        }
+      })();
+    },
+    [
+      commitNodesAndConnection,
+      createObjectUrl,
+      generativeDefaults,
+      graphEditBlocked,
+      nodeTypes,
+      orgId,
+      reactFlowInstance,
+      t,
+      toast,
+    ]
   );
 
   // Node management
@@ -1160,5 +1392,10 @@ export function useGraphOperations({
     selectNode,
     addTriggerNodes: graphEditBlocked ? NOOP : addTriggerNodes,
     removeTriggerNodes: graphEditBlocked ? NOOP : removeTriggerNodes,
+    addNodeMenu,
+    closeAddNodeMenu,
+    handlePaneClick: graphEditBlocked ? NOOP : handlePaneClick,
+    handlePaneContextMenu: graphEditBlocked ? NOOP : handlePaneContextMenu,
+    handleAddNodeMenuSelect: graphEditBlocked ? NOOP : handleAddNodeMenuSelect,
   };
 }

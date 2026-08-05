@@ -75,10 +75,7 @@ import {
   WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
   WORKFLOW_NODE_SELECTED_BORDER_CLASS,
 } from "./workflow-canvas-styles";
-import { AiTextConnectionSides } from "./ai-text-connection-handles";
-import { AiImageConnectionSides } from "./ai-image-connection-handles";
-import { AiAudioConnectionSides } from "./ai-audio-connection-handles";
-import { AiVideoConnectionSides } from "./ai-video-connection-handles";
+import { GenerativeConnectionSides } from "./generative-edge-connection-side";
 import { useGenerativeConnectionHighlight } from "./generative-connection-highlight";
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
@@ -358,6 +355,15 @@ export const WorkflowNode = memo(
     const isAiImageNode = nodeType === AI_IMAGE_NODE_TYPE;
     const isAiVideoNode = nodeType === AI_VIDEO_NODE_TYPE;
     const isAiAudioNode = nodeType === AI_AUDIO_NODE_TYPE;
+    const generativeEdgeModality = isAiTextNode
+      ? "text"
+      : isAiImageNode
+        ? "image"
+        : isAiVideoNode
+          ? "video"
+          : isAiAudioNode
+            ? "audio"
+            : null;
     const isGenerativeCanvasNode =
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode;
     const showBottomPanel =
@@ -725,7 +731,7 @@ export const WorkflowNode = memo(
             isGenerativeCanvasNode
               ? GENERATIVE_NODE_CARD_CLASS
               : "rounded-md",
-            isAiTextNode && "ai-text-node-card group/aitext flex flex-col overflow-hidden",
+            isAiTextNode && "ai-text-node-card group/aitext flex flex-col",
             isAiImageNode && "ai-image-node-card group/aiimage",
             isAiVideoNode && "ai-video-node-card group/aivideo",
             isAiAudioNode && "ai-audio-node-card group/aiaudio",
@@ -819,25 +825,6 @@ export const WorkflowNode = memo(
               })}
             </div>
           )}
-
-          {isAiTextNode ? (
-            <AiTextConnectionSides disabled={disabled} />
-          ) : null}
-
-          {isAiImageNode ? (
-            <AiImageConnectionSides disabled={disabled} />
-          ) : null}
-
-          {isAiVideoNode ? (
-            <AiVideoConnectionSides disabled={disabled} />
-          ) : null}
-
-          {isAiAudioNode ? (
-            <AiAudioConnectionSides
-              disabled={disabled}
-              promptInputDisabled={isGenerativeManualContent(data.metadata)}
-            />
-          ) : null}
 
           {/* Resource Selectors (database, dataset, queue, email, integration) */}
           {resourceInputs.length > 0 && (
@@ -1041,6 +1028,17 @@ export const WorkflowNode = memo(
           </div>
           ) : null}
         </div>
+
+        {generativeEdgeModality ? (
+          <GenerativeConnectionSides
+            modality={generativeEdgeModality}
+            disabled={disabled}
+            leftDisabled={
+              generativeEdgeModality === "audio" &&
+              isGenerativeManualContent(data.metadata)
+            }
+          />
+        ) : null}
         </div>
 
         {showBottomPanelHost ? (

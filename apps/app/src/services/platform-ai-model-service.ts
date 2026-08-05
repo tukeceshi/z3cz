@@ -88,6 +88,38 @@ export function usePlatformCatalogAudioModels(
   return usePlatformCatalogModels(orgId, "audio", options);
 }
 
+export async function fetchOrgTextModels(
+  orgId: string
+): Promise<ListOrgTextModelsResponse> {
+  return makeRequest<ListOrgTextModelsResponse>(
+    `${platformAiEndpoint(orgId)}/text-models`
+  );
+}
+
+export async function fetchOrgImageModels(
+  orgId: string
+): Promise<ListOrgImageModelsResponse> {
+  return makeRequest<ListOrgImageModelsResponse>(
+    `${platformAiEndpoint(orgId)}/image-models`
+  );
+}
+
+export async function fetchOrgVideoModels(
+  orgId: string
+): Promise<ListOrgVideoModelsResponse> {
+  return makeRequest<ListOrgVideoModelsResponse>(
+    `${platformAiEndpoint(orgId)}/video-models`
+  );
+}
+
+export async function fetchOrgAudioModels(
+  orgId: string
+): Promise<ListOrgAudioModelsResponse> {
+  return makeRequest<ListOrgAudioModelsResponse>(
+    `${platformAiEndpoint(orgId)}/audio-models`
+  );
+}
+
 export function useOrgTextModels(
   orgId: string | undefined,
   options?: { readonly enabled?: boolean }
@@ -97,7 +129,7 @@ export function useOrgTextModels(
     orgId && enabled ? `${platformAiEndpoint(orgId)}/text-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    async () => makeRequest<ListOrgTextModelsResponse>(`${key}`),
+    async () => fetchOrgTextModels(orgId!),
     ORG_MODELS_SWR_OPTIONS
   );
 
@@ -119,7 +151,7 @@ export function useOrgImageModels(
     orgId && enabled ? `${platformAiEndpoint(orgId)}/image-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    async () => makeRequest<ListOrgImageModelsResponse>(`${key}`),
+    async () => fetchOrgImageModels(orgId!),
     ORG_MODELS_SWR_OPTIONS
   );
 
@@ -141,7 +173,7 @@ export function useOrgVideoModels(
     orgId && enabled ? `${platformAiEndpoint(orgId)}/video-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    async () => makeRequest<ListOrgVideoModelsResponse>(`${key}`),
+    async () => fetchOrgVideoModels(orgId!),
     ORG_MODELS_SWR_OPTIONS
   );
 
@@ -163,7 +195,7 @@ export function useOrgAudioModels(
     orgId && enabled ? `${platformAiEndpoint(orgId)}/audio-models` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    async () => makeRequest<ListOrgAudioModelsResponse>(`${key}`),
+    async () => fetchOrgAudioModels(orgId!),
     ORG_MODELS_SWR_OPTIONS
   );
 
