@@ -237,13 +237,10 @@ export function LoginForm({
     if (isSubAccountInvite) {
       return t("auth.createSubAccount");
     }
-    if (isBootstrap) {
-      return t("auth.loginRegister");
-    }
     if (pendingRegister) {
       return t("auth.confirmRegister");
     }
-    return t("auth.loginOnly");
+    return t("auth.loginRegister");
   })();
 
   if (isSubAccountInvite && invitationError) {
