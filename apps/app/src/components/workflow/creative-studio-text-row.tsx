@@ -6,6 +6,12 @@ import { cn } from "@/utils/utils";
 import { readAiTextResult } from "./ai-text-node-utils";
 import { readStudioModelLabel } from "./creative-studio-media-meta";
 import {
+  SURFACE_CARD_SOFT,
+  SURFACE_ROW_ACTIVE,
+  SURFACE_ROW_HOVER,
+} from "@/components/ui/surface";
+
+import {
   STUDIO_META_ROW,
   STUDIO_META_TAG,
   STUDIO_NODE_LABEL,
@@ -36,10 +42,10 @@ export function CreativeStudioTextRow({
     <button
       type="button"
       className={cn(
-        "flex h-[168px] w-full flex-col gap-2 rounded-xl border border-border/50 p-3 text-left transition-colors dark:border-neutral-700",
-        "bg-card dark:bg-neutral-800",
-        "hover:bg-muted/25 dark:hover:bg-neutral-700/35",
-        isActive && "bg-muted/30 dark:bg-neutral-700/40"
+        "flex h-[168px] w-full flex-col gap-2 rounded-xl p-3 text-left",
+        SURFACE_CARD_SOFT,
+        SURFACE_ROW_HOVER,
+        isActive && SURFACE_ROW_ACTIVE
       )}
       onClick={onOpenDetail}
     >

@@ -14,6 +14,12 @@ describe("formatImageGenerationOptionLabel", () => {
     expect(
       formatImageGenerationOptionLabel("ratio", "auto", "智能")
     ).toBe("智能");
+    expect(
+      formatImageGenerationOptionLabel("ratio", "adaptive", "Auto")
+    ).toBe("Auto");
+    expect(
+      formatImageGenerationOptionLabel("aspect_ratio", "adaptive", "Auto")
+    ).toBe("Auto");
   });
 
   it("keeps fixed values unchanged", () => {

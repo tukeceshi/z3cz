@@ -15,6 +15,7 @@ import {
   type AiTextReferenceKind,
 } from "./ai-text-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import { readTextReferenceLimitsFromMetadata } from "./generative-reference-metadata";
 
 export type AiTextReferenceRejectReason =
   | "unsupported_source"
@@ -86,20 +87,13 @@ export function resolveAiTextReferenceRules(params: {
     meta.refMaxImage !== undefined ||
     meta.refMaxVideo !== undefined
   ) {
+    const limits = readTextReferenceLimitsFromMetadata(
+      meta,
+      DEFAULT_TEXT_MODEL_PARAMETER_RULES
+    );
     return normalizeTextModelParameterRules({
       ...DEFAULT_TEXT_MODEL_PARAMETER_RULES,
-      maxTextReferences: Number(
-        meta.refMaxText ??
-          DEFAULT_TEXT_MODEL_PARAMETER_RULES.maxTextReferences
-      ),
-      maxImageReferences: Number(
-        meta.refMaxImage ??
-          DEFAULT_TEXT_MODEL_PARAMETER_RULES.maxImageReferences
-      ),
-      maxVideoReferences: Number(
-        meta.refMaxVideo ??
-          DEFAULT_TEXT_MODEL_PARAMETER_RULES.maxVideoReferences
-      ),
+      ...limits,
     });
   }
 

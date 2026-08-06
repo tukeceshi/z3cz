@@ -14,6 +14,7 @@ import {
   edgeTouchesInputHandle,
   resolveConnectionEndpoints,
   validateWorkflowConnection,
+  type ValidateWorkflowConnectionParams,
 } from "./workflow-connection-validation";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
@@ -22,6 +23,7 @@ export interface PrepareWorkflowConnectionAppendParams {
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly generativeReferenceCatalogs?: ValidateWorkflowConnectionParams["generativeReferenceCatalogs"];
   readonly extraValidate?: (connection: Connection) => boolean;
   readonly disabled?: boolean;
 }
@@ -66,6 +68,7 @@ export function prepareWorkflowConnectionAppend(
       connection: params.connection,
       nodes: params.nodes,
       edges: params.edges,
+      generativeReferenceCatalogs: params.generativeReferenceCatalogs,
       extraValidate: params.extraValidate,
       disabled: params.disabled,
     })

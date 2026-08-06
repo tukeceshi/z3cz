@@ -49,20 +49,24 @@ export async function submitOrgVideoTask(params: {
     readonly mimeType: string;
     readonly dataBase64: string;
   }>;
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
 }): Promise<VolcanoVideoSubmitResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
 
   if (backend === "grok" || backend === "veo") {
     if (
       (params.referenceImageUrls?.length ?? 0) > 0 ||
-      (params.referenceImageInline?.length ?? 0) > 0
+      (params.referenceImageInline?.length ?? 0) > 0 ||
+      (params.referenceVideoUrls?.length ?? 0) > 0 ||
+      (params.referenceAudioUrls?.length ?? 0) > 0
     ) {
       return {
         status: "failed",
         error:
           backend === "grok"
-            ? "Reference images are not supported for Grok Imagine Video in this version"
-            : "Reference images are not supported for Veo in this version",
+            ? "Reference media is not supported for Grok Imagine Video in this version"
+            : "Reference media is not supported for Veo in this version",
       };
     }
   }
@@ -98,6 +102,8 @@ export async function submitOrgVideoTask(params: {
     generationParams: params.generationParams,
     referenceImageUrls: params.referenceImageUrls,
     referenceImageInline: params.referenceImageInline,
+    referenceVideoUrls: params.referenceVideoUrls,
+    referenceAudioUrls: params.referenceAudioUrls,
   });
 }
 

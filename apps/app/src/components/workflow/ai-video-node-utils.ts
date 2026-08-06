@@ -1,9 +1,12 @@
 import {
+  AI_AUDIO_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   type AiVideoResultHistory,
   type AiVideoResultHistoryItem,
   normalizeVideoModelParameterRules,
+  referencesFitVideoModelReferenceLimits,
+  type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
   isMediaReference,
   type MediaReference,
@@ -51,18 +54,35 @@ export {
 
 export const AI_VIDEO_MAX_HISTORY_ITEMS = 30;
 
-/** Image-to-video reference sources. */
+/** Image / video / audio reference sources for multimodal video generation. */
 export const AI_VIDEO_ALLOWED_REFERENCE_NODE_TYPES = [
   AI_IMAGE_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+  AI_AUDIO_NODE_TYPE,
 ] as const;
 
 export type AiVideoAllowedReferenceNodeType =
   (typeof AI_VIDEO_ALLOWED_REFERENCE_NODE_TYPES)[number];
 
+export type AiVideoReferenceKind = "image" | "video" | "audio";
+
+export function classifyAiVideoReferenceFromNodeType(
+  nodeType: string | undefined
+): AiVideoReferenceKind | null {
+  if (nodeType === AI_IMAGE_NODE_TYPE) return "image";
+  if (nodeType === AI_VIDEO_NODE_TYPE) return "video";
+  if (nodeType === AI_AUDIO_NODE_TYPE) return "audio";
+  return null;
+}
+
 export function isAiVideoAllowedReferenceNodeType(
   nodeType: string | undefined
 ): nodeType is AiVideoAllowedReferenceNodeType {
-  return nodeType === AI_IMAGE_NODE_TYPE;
+  return (
+    nodeType === AI_IMAGE_NODE_TYPE ||
+    nodeType === AI_VIDEO_NODE_TYPE ||
+    nodeType === AI_AUDIO_NODE_TYPE
+  );
 }
 
 function parseMediaReferences(value: unknown): MediaReference[] {
@@ -110,7 +130,7 @@ export function mergeAiVideoNodeCatalogInputs(
       type: "any",
       hidden: true,
       repeated: true,
-      description: "Upstream image references for image-to-video.",
+      description: "Upstream media references for video generation.",
     },
     {
       id: AI_VIDEO_PROMPT_HANDLE_ID,
@@ -452,6 +472,39 @@ export function withAiVideoGeneratingFlag(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+export function countAiVideoReferenceCounts(
+  targetNodeId: string,
+  edges: readonly {
+    readonly source: string;
+    readonly target: string;
+    readonly targetHandle?: string | null;
+  }[],
+  nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[]
+): SubmitAiVideoMediaReferenceCounts {
+  const counts: SubmitAiVideoMediaReferenceCounts = {
+    imageCount: 0,
+    videoCount: 0,
+    audioCount: 0,
+  };
+
+  for (const edge of edges) {
+    if (
+      edge.target !== targetNodeId ||
+      edge.targetHandle !== AI_VIDEO_REFERENCE_HANDLE_ID
+    ) {
+      continue;
+    }
+    const source = nodes.find((node) => node.id === edge.source);
+    const kind = classifyAiVideoReferenceFromNodeType(source?.data.nodeType);
+    if (kind === "image") counts.imageCount += 1;
+    else if (kind === "video") counts.videoCount += 1;
+    else if (kind === "audio") counts.audioCount += 1;
+  }
+
+  return counts;
+}
+
+/** @deprecated Prefer countAiVideoReferenceCounts. */
 export function countAiVideoReferences(
   targetNodeId: string,
   edges: readonly {
@@ -460,41 +513,48 @@ export function countAiVideoReferences(
     readonly targetHandle?: string | null;
   }[]
 ): number {
-  return edges.filter(
+  const imageCount = edges.filter(
     (edge) =>
       edge.target === targetNodeId &&
       edge.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID
   ).length;
+  return imageCount;
 }
 
 export function referencesFitVideoModelLimits(
-  referenceCount: number,
+  counts: SubmitAiVideoMediaReferenceCounts,
   rules: VideoModelParameterRules
 ): boolean {
-  return referenceCount <= rules.maxReferenceImages;
+  return referencesFitVideoModelReferenceLimits(counts, rules);
 }
 
-/** Model allows image/video references in generation params. */
+/** Model allows image / video / audio references in generation params. */
 export function videoModelAllowsMediaReferences(
   rules: VideoModelParameterRules
 ): boolean {
   const normalized = normalizeVideoModelParameterRules(rules);
   return (
-    normalized.maxReferenceImages > 0 || normalized.maxReferenceVideos > 0
+    normalized.maxReferenceImages > 0 ||
+    normalized.maxReferenceVideos > 0 ||
+    normalized.maxReferenceAudios > 0
   );
 }
 
 /** Prompt text or connected media references satisfy the generate gate. */
 export function canGenerateAiVideo(params: {
   readonly prompt: string;
-  readonly referenceCount: number;
+  readonly referenceCounts: SubmitAiVideoMediaReferenceCounts;
   readonly rules: VideoModelParameterRules;
   readonly blocksGenerativeMedia?: boolean;
 }): boolean {
   if (params.blocksGenerativeMedia) return false;
   if (params.prompt.trim().length > 0) return true;
   if (!videoModelAllowsMediaReferences(params.rules)) return false;
-  return params.referenceCount > 0;
+  const total =
+    params.referenceCounts.imageCount +
+    params.referenceCounts.videoCount +
+    params.referenceCounts.audioCount;
+  return total > 0;
 }
 
 export function pickDefaultVideoModelCanonicalId(

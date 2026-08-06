@@ -2,11 +2,16 @@ import {
   applyAiImageRatioToPrompt as applyAiImageRatioToPromptFromTypes,
   formatImageGenerationOptionLabel,
   mergeImageGenerationParams,
+  resolveDurationOptions,
   resolveGenerateCountOptions,
   resolveImageGenerateCount,
   sanitizeImageGenerationParams,
+  VIDEO_DURATION_MAX,
+  VIDEO_DURATION_MIN,
   type UpstreamParamProfileField,
 } from "@dafthunk/types";
+import Volume2Icon from "lucide-react/icons/volume-2";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
@@ -21,6 +26,14 @@ import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { cn } from "@/utils/utils";
 
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
+import { DurationDragSlider } from "./duration-drag-slider";
+import { readNodeGenerationParams } from "./generative-card-params";
+import {
+  formatGenerationDurationLabel,
+  resolveGenerationFieldLabel,
+  resolveGenerationOptionLabel,
+} from "./generative-param-labels";
+import type { TranslateFn } from "@/i18n";
 
 export { applyAiImageRatioToPromptFromTypes as applyAiImageRatioToPrompt };
 export { mergeImageGenerationParams, resolveImageGenerateCount, sanitizeImageGenerationParams } from "@dafthunk/types";
@@ -38,6 +51,9 @@ export const RATIO_FIELD_NAMES = new Set(["ratio", "aspect_ratio"]);
 export const RESOLUTION_FIELD_NAMES = new Set(["resolution", "size"]);
 
 const GENERATE_COUNT_FIELD_NAMES = new Set(["generate_count", "batch_count"]);
+const DURATION_FIELD_NAMES = new Set(["duration"]);
+const GENERATE_AUDIO_FIELD_NAME = "generate_audio";
+const REFERENCE_MODE_FIELD_NAME = "reference_mode";
 const WATERMARK_FIELD_NAMES = new Set(["watermark"]);
 
 const TAIL_FIELD_NAMES = new Set([
@@ -46,6 +62,9 @@ const TAIL_FIELD_NAMES = new Set([
   "web_search",
   "output_compression",
   "moderation",
+  "return_last_frame",
+  "virtual_avatar_library",
+  GENERATE_AUDIO_FIELD_NAME,
 ]);
 
 const TAIL_FIELD_ORDER = [
@@ -54,6 +73,9 @@ const TAIL_FIELD_ORDER = [
   "web_search",
   "output_compression",
   "moderation",
+  "return_last_frame",
+  "virtual_avatar_library",
+  GENERATE_AUDIO_FIELD_NAME,
 ] as const;
 
 function partitionVisibleFields(
@@ -173,33 +195,91 @@ function formatParamSummary(
   optimizePromptLabels: Readonly<{
     readonly standard: string;
     readonly fast: string;
-  }>
-): string {
-  return fields
-    .filter((field) => !field.hidden)
-    .map((field) => {
-      const raw = readFieldValue(field, values);
-      if (raw === undefined || raw === null || raw === "") return null;
-      if (typeof raw === "boolean") return raw ? field.name : null;
-      if (GENERATE_COUNT_FIELD_NAMES.has(field.name)) {
-        const count = typeof raw === "number" ? raw : Number(raw);
-        if (!Number.isFinite(count) || count < 1) return null;
-        return formatCount(count);
+  }>,
+  t: TranslateFn
+): { readonly text: string; readonly showAudio: boolean } {
+  const parts: string[] = [];
+  let showAudio = false;
+
+  let referenceModeLabel: string | undefined;
+
+  for (const field of fields.filter((entry) => !entry.hidden)) {
+    const raw = readFieldValue(field, values);
+    if (raw === undefined || raw === null || raw === "") continue;
+
+    if (field.name === REFERENCE_MODE_FIELD_NAME) {
+      referenceModeLabel = resolveGenerationOptionLabel(
+        field.name,
+        String(raw),
+        t
+      );
+      continue;
+    }
+
+    if (field.name === GENERATE_AUDIO_FIELD_NAME) {
+      showAudio = raw === true;
+      continue;
+    }
+
+    if (typeof raw === "boolean") {
+      continue;
+    }
+
+    if (GENERATE_COUNT_FIELD_NAMES.has(field.name)) {
+      const count = typeof raw === "number" ? raw : Number(raw);
+      if (Number.isFinite(count) && count >= 1) {
+        parts.push(formatCount(count));
       }
-      if (RATIO_FIELD_NAMES.has(field.name)) {
-        return formatRatioLabel(String(raw), smartLabel);
+      continue;
+    }
+
+    if (DURATION_FIELD_NAMES.has(field.name)) {
+      parts.push(formatGenerationDurationLabel(raw as number | string, t));
+      continue;
+    }
+
+    if (RATIO_FIELD_NAMES.has(field.name)) {
+      parts.push(formatRatioLabel(String(raw), smartLabel));
+      continue;
+    }
+
+    if (RESOLUTION_FIELD_NAMES.has(field.name)) {
+      if (field.name === "resolution") {
+        parts.push(
+          resolveGenerationOptionLabel(
+            field.name,
+            String(raw),
+            t,
+            String(raw).toUpperCase()
+          )
+        );
+      } else {
+        parts.push(formatResolutionLabel(String(raw), smartLabel, sizeLabels));
       }
-      if (RESOLUTION_FIELD_NAMES.has(field.name)) {
-        return formatResolutionLabel(String(raw), smartLabel, sizeLabels);
-      }
-      if (field.name === "optimize_prompt_mode") {
-        return formatOptimizePromptLabel(String(raw), smartLabel, optimizePromptLabels);
-      }
-      return String(raw);
-    })
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" · ");
+      continue;
+    }
+
+    if (field.name === "optimize_prompt_mode") {
+      parts.push(
+        formatOptimizePromptLabel(String(raw), smartLabel, optimizePromptLabels)
+      );
+      continue;
+    }
+
+    if (field.enumValues?.length) {
+      parts.push(resolveGenerationOptionLabel(field.name, String(raw), t));
+      continue;
+    }
+
+    parts.push(String(raw));
+  }
+
+  const summaryParts = parts.slice(0, 3);
+  if (referenceModeLabel) {
+    summaryParts.push(referenceModeLabel);
+  }
+
+  return { text: summaryParts.join(" · "), showAudio };
 }
 
 function coerceFieldValue(
@@ -214,6 +294,145 @@ function coerceFieldValue(
     return raw;
   }
   return raw;
+}
+
+function resolveDurationBounds(field: UpstreamParamProfileField): {
+  readonly min: number;
+  readonly max: number;
+} {
+  const options = resolveDurationOptions(field)
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isFinite(entry));
+  if (options.length === 0) {
+    return { min: VIDEO_DURATION_MIN, max: VIDEO_DURATION_MAX };
+  }
+  return { min: Math.min(...options), max: Math.max(...options) };
+}
+
+function clampDuration(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function readCommittedDuration(
+  value: unknown,
+  field: UpstreamParamProfileField,
+  min: number,
+  max: number
+): number {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : Number(value ?? field.default ?? min);
+  return clampDuration(Number.isFinite(numeric) ? numeric : min, min, max);
+}
+
+const DURATION_INPUT_CLASS = cn(
+  "h-5 w-12 rounded-md bg-muted/45 px-1.5 py-0.5 text-center text-xs outline-none transition-colors",
+  "focus:bg-muted/65",
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+);
+
+interface DurationFieldSectionProps {
+  readonly title: string;
+  readonly value: unknown;
+  readonly field: UpstreamParamProfileField;
+  readonly disabled?: boolean;
+  readonly onChange: (next: unknown) => void;
+}
+
+function DurationFieldSection({
+  title,
+  value,
+  field,
+  disabled = false,
+  onChange,
+}: DurationFieldSectionProps) {
+  const { min: durationMin, max: durationMax } = resolveDurationBounds(field);
+  const committed = readCommittedDuration(
+    value,
+    field,
+    durationMin,
+    durationMax
+  );
+  const [localDuration, setLocalDuration] = useState(committed);
+  const [inputDraft, setInputDraft] = useState<string | null>(null);
+  const isDraggingRef = useRef(false);
+  const isInputFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isDraggingRef.current && !isInputFocusedRef.current) {
+      setLocalDuration(committed);
+    }
+  }, [committed]);
+
+  const commitDuration = useCallback(
+    (next: number) => {
+      const clamped = clampDuration(next, durationMin, durationMax);
+      setLocalDuration(clamped);
+      onChange(clamped);
+    },
+    [durationMin, durationMax, onChange]
+  );
+
+  const handleInputCommit = useCallback(
+    (raw: string) => {
+      isInputFocusedRef.current = false;
+      setInputDraft(null);
+      if (raw.trim() === "") {
+        return;
+      }
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      commitDuration(parsed);
+    },
+    [commitDuration]
+  );
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-medium text-foreground">{title}</Label>
+      <div className="flex items-center gap-2">
+        <DurationDragSlider
+          min={durationMin}
+          max={durationMax}
+          value={localDuration}
+          disabled={disabled}
+          onDragStart={() => {
+            isDraggingRef.current = true;
+            setInputDraft(null);
+          }}
+          onPreview={setLocalDuration}
+          onCommit={(next) => {
+            isDraggingRef.current = false;
+            commitDuration(next);
+          }}
+        />
+        <div className="flex shrink-0 items-center gap-1">
+          <Input
+            type="text"
+            inputMode="numeric"
+            value={inputDraft ?? String(localDuration)}
+            disabled={disabled}
+            className={DURATION_INPUT_CLASS}
+            onFocus={() => {
+              isInputFocusedRef.current = true;
+              setInputDraft(String(localDuration));
+            }}
+            onChange={(event) => setInputDraft(event.target.value)}
+            onBlur={(event) => handleInputCommit(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+          />
+          <span className="text-xs text-muted-foreground">s</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface SegmentedControlProps {
@@ -274,7 +493,7 @@ function FieldSection({
   onChange,
 }: FieldSectionProps) {
   const { t } = useTranslation();
-  const title = field.description || field.name;
+  const title = resolveGenerationFieldLabel(field, t);
 
   if (RATIO_FIELD_NAMES.has(field.name) && field.enumValues?.length) {
     const rawSelected = String(value ?? field.default ?? "");
@@ -309,6 +528,18 @@ function FieldSection({
     );
   }
 
+  if (DURATION_FIELD_NAMES.has(field.name)) {
+    return (
+      <DurationFieldSection
+        title={title}
+        value={value}
+        field={field}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    );
+  }
+
   if (
     (RESOLUTION_FIELD_NAMES.has(field.name) ||
       GENERATE_COUNT_FIELD_NAMES.has(field.name)) &&
@@ -337,8 +568,16 @@ function FieldSection({
                   t("workflow.aiVideoPanel.generateCountOption", {
                     count: Number(option),
                   })
-              : (option) =>
-                  formatResolutionLabel(option, smartLabel, sizeLabels)
+              : field.name === "resolution"
+                ? (option) =>
+                    resolveGenerationOptionLabel(
+                      field.name,
+                      option,
+                      t,
+                      option.toUpperCase()
+                    )
+                : (option) =>
+                    formatResolutionLabel(option, smartLabel, sizeLabels)
           }
           onSelect={(option) =>
             onChange(field.type === "number" ? Number(option) : option)
@@ -378,7 +617,13 @@ function FieldSection({
               standard: t("workflow.aiImagePanel.optimizePromptStandard"),
               fast: t("workflow.aiImagePanel.optimizePromptFast"),
             })
-        : undefined;
+        : (option: string) =>
+            resolveGenerationOptionLabel(
+              field.name,
+              option,
+              t,
+              field.name === "output_format" ? option.toUpperCase() : option
+            );
     return (
       <div className="space-y-2">
         <Label className="text-xs font-medium text-foreground">{title}</Label>
@@ -424,7 +669,8 @@ const PLAIN_NUMBER_INPUT_CLASS = cn(
 function formatTailOptionLabel(
   field: UpstreamParamProfileField,
   option: string,
-  smartLabel: string
+  smartLabel: string,
+  t: TranslateFn
 ): string {
   if (option === "auto" || option === "adaptive") {
     return smartLabel;
@@ -432,7 +678,7 @@ function formatTailOptionLabel(
   if (field.name === "output_format") {
     return option.toUpperCase();
   }
-  return option;
+  return resolveGenerationOptionLabel(field.name, option, t, option);
 }
 
 interface TailFieldSectionProps {
@@ -451,7 +697,7 @@ function TailFieldSection({
   onChange,
 }: TailFieldSectionProps) {
   const { t } = useTranslation();
-  const title = field.description || field.name;
+  const title = resolveGenerationFieldLabel(field, t);
 
   if (field.type === "boolean") {
     const selected = value === true ? "true" : "false";
@@ -491,7 +737,7 @@ function TailFieldSection({
           options={field.enumValues}
           value={selected}
           disabled={disabled}
-          formatOption={(option) => formatTailOptionLabel(field, option, smartLabel)}
+          formatOption={(option) => formatTailOptionLabel(field, option, smartLabel, t)}
           onSelect={(option) => onChange(option)}
         />
       </div>
@@ -550,8 +796,10 @@ export function AiImageParamsPopover({
     formatCount,
     smartLabel,
     sizeLabels,
-    optimizePromptLabels
+    optimizePromptLabels,
+    t
   );
+  const summaryText = summary.text;
   const { mainFields, tailFields } = partitionVisibleFields(fields);
 
   const handleFieldChange = (
@@ -572,55 +820,61 @@ export function AiImageParamsPopover({
           disabled={disabled}
           className={AI_BOTTOM_CHIP_CLASS}
         >
-          <span className="truncate">{summary || triggerLabel}</span>
+          <span className="truncate">{summaryText || triggerLabel}</span>
+          {summary.showAudio ? (
+            <Volume2Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         side="top"
-        className={cn(
-          "w-[22.5rem] space-y-4 p-3 pr-2 dark:border-neutral-700 dark:bg-neutral-800",
-          "max-h-[min(70vh,28rem)]",
-          LIST_SCROLL_CLASS
-        )}
+        className="w-[22.5rem] p-3 dark:border-neutral-700 dark:bg-neutral-800"
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        {mainFields.map((field) => (
-          <FieldSection
-            key={field.name}
-            field={field}
-            value={readFieldValue(field, values)}
-            disabled={disabled}
-            sizeLabels={sizeLabels}
-            smartLabel={smartLabel}
-            onChange={(next) =>
-              handleFieldChange(
-                field,
-                next as string | number | boolean
-              )
-            }
-          />
-        ))}
-        {tailFields.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            {tailFields.map((field) => (
-              <TailFieldSection
-                key={field.name}
-                field={field}
-                value={readFieldValue(field, values)}
-                disabled={disabled}
-                smartLabel={smartLabel}
-                onChange={(next) =>
-                  handleFieldChange(
-                    field,
-                    next as string | number | boolean
-                  )
-                }
-              />
-            ))}
-          </div>
-        ) : null}
+        <div
+          className={cn(
+            "space-y-4 max-h-[min(70vh,28rem)]",
+            LIST_SCROLL_CLASS
+          )}
+        >
+          {mainFields.map((field) => (
+            <FieldSection
+              key={field.name}
+              field={field}
+              value={readFieldValue(field, values)}
+              disabled={disabled}
+              sizeLabels={sizeLabels}
+              smartLabel={smartLabel}
+              onChange={(next) =>
+                handleFieldChange(
+                  field,
+                  next as string | number | boolean
+                )
+              }
+            />
+          ))}
+          {tailFields.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {tailFields.map((field) => (
+                <TailFieldSection
+                  key={field.name}
+                  field={field}
+                  value={readFieldValue(field, values)}
+                  disabled={disabled}
+                  smartLabel={smartLabel}
+                  onChange={(next) =>
+                    handleFieldChange(
+                      field,
+                      next as string | number | boolean
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -635,9 +889,5 @@ export function buildDefaultImageGenerationParams(
 export function readAiImageGenerationParams(
   inputs: readonly { readonly id: string; readonly value?: unknown }[]
 ): Record<string, unknown> {
-  const raw = inputs.find((input) => input.id === "params")?.value;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return {};
-  }
-  return { ...(raw as Record<string, unknown>) };
+  return readNodeGenerationParams(inputs);
 }

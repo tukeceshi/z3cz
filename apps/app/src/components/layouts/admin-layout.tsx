@@ -17,6 +17,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { PageProvider } from "@/components/page-context";
 import { SiteBrandingEffect } from "@/components/site-branding-effect";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import type { NavMainProps } from "@/components/sidebar/nav-main";
 import * as Sidebar from "@/components/ui/sidebar";
 import { useAdminSupportUnreadCount } from "@/services/admin-service";
@@ -135,7 +136,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Sidebar.SidebarProvider>
             <AppSidebar title={t("sidebar.admin")} groups={adminSidebarItems} />
             <Sidebar.SidebarInset className="bg-neutral-50 dark:bg-neutral-800">
-              <div className="h-full w-full overflow-y-auto">{children}</div>
+              <div className={`h-full w-full ${PAGE_SCROLL_CLASS}`}>{children}</div>
             </Sidebar.SidebarInset>
           </Sidebar.SidebarProvider>
         </div>

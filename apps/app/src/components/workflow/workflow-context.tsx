@@ -8,6 +8,10 @@ import {
   WorkflowNodeType,
   WorkflowParameter,
 } from "./workflow-types";
+import {
+  EMPTY_GENERATIVE_REFERENCE_MODEL_CATALOGS,
+  type GenerativeReferenceModelCatalogs,
+} from "./generative-reference-model-catalogs";
 
 type UpdateNodeFn = (nodeId: string, data: Partial<WorkflowNodeType>) => void;
 
@@ -34,6 +38,7 @@ export interface WorkflowActionsContextValue {
   onRunNode?: RunNodeFn;
   generativeDefaults?: WorkflowGenerativeDefaults;
   onGenerativeDefaultChange?: (defaults: WorkflowGenerativeDefaults) => void;
+  generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
 }
 
 /** Volatile graph UI state — changes on selection, edges, viewport gestures. */
@@ -57,6 +62,7 @@ const defaultActions: WorkflowActionsContextValue = {
   allowedNodeTypes: new Set(),
   generativeDefaults: undefined,
   onGenerativeDefaultChange: undefined,
+  generativeReferenceCatalogs: EMPTY_GENERATIVE_REFERENCE_MODEL_CATALOGS,
 };
 
 const defaultGraph: WorkflowGraphContextValue = {
@@ -118,6 +124,7 @@ export interface WorkflowProviderProps {
   readonly onGenerativeDefaultChange?: (
     defaults: WorkflowGenerativeDefaults
   ) => void;
+  readonly generativeReferenceCatalogs?: GenerativeReferenceModelCatalogs;
 }
 
 export function WorkflowProvider({
@@ -136,6 +143,7 @@ export function WorkflowProvider({
   onRunNode,
   generativeDefaults,
   onGenerativeDefaultChange,
+  generativeReferenceCatalogs = EMPTY_GENERATIVE_REFERENCE_MODEL_CATALOGS,
 }: WorkflowProviderProps) {
   const actionsValue = useMemo(
     () => ({
@@ -150,6 +158,7 @@ export function WorkflowProvider({
       onRunNode,
       generativeDefaults,
       onGenerativeDefaultChange,
+      generativeReferenceCatalogs,
     }),
     [
       updateNodeData,
@@ -163,6 +172,7 @@ export function WorkflowProvider({
       onRunNode,
       generativeDefaults,
       onGenerativeDefaultChange,
+      generativeReferenceCatalogs,
     ]
   );
 

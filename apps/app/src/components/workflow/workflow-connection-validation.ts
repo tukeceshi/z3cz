@@ -1,5 +1,6 @@
 import type { Connection, Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
+import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
 import {
   evaluateAiImageReferenceStructural,
   isAiImageReferenceTarget,
@@ -196,6 +197,7 @@ export interface ValidateWorkflowConnectionParams {
   readonly connection: Connection;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  readonly generativeReferenceCatalogs?: GenerativeReferenceModelCatalogs;
   readonly extraValidate?: (connection: Connection) => boolean;
   readonly disabled?: boolean;
 }
@@ -278,6 +280,7 @@ export function validateWorkflowConnection(
         targetNodeData: hostNode.data,
         edges,
         nodes: nodes.map((node) => ({ id: node.id, data: node.data })),
+        models: params.generativeReferenceCatalogs?.imageModels,
       });
       if (!verdict.ok) return false;
     }
@@ -329,6 +332,7 @@ export function validateWorkflowConnection(
         targetNodeData: hostNode.data,
         edges,
         nodes: nodes.map((node) => ({ id: node.id, data: node.data })),
+        models: params.generativeReferenceCatalogs?.videoModels,
       });
       if (!verdict.ok) return false;
     }

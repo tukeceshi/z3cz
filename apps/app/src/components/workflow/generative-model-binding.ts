@@ -4,13 +4,11 @@ import type {
   WorkflowGenerativeDefaults,
   OrgAudioModelOption,
   OrgImageModelOption,
-  OrgTextModelOption,
   OrgVideoModelOption,
 } from "@dafthunk/types";
 import {
   normalizeAudioModelParameterRules,
   normalizeImageModelParameterRules,
-  normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
 } from "@dafthunk/types";
 
@@ -34,6 +32,7 @@ import {
   type GenerativeModelModality,
   type OrgModelBindingRef,
 } from "./org-model-selection-utils";
+import { generativeReferenceMetadataForModel } from "./generative-reference-metadata";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface GenerativeModelBindingHandlers<T extends OrgModelBindingRef> {
@@ -139,15 +138,20 @@ export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
     );
   }
 
+  const referenceMetadata = generativeReferenceMetadataForModel(
+    params.modality,
+    model
+  );
+  const nextMetadata = {
+    ...(current.metadata ?? {}),
+    ...(extras?.metadata ?? {}),
+    ...(referenceMetadata ?? {}),
+  };
+
   return {
     inputs: nextInputs,
-    ...(extras?.metadata
-      ? {
-          metadata: {
-            ...(current.metadata ?? {}),
-            ...extras.metadata,
-          },
-        }
+    ...(Object.keys(nextMetadata).length > 0
+      ? { metadata: nextMetadata }
       : {}),
   };
 }
@@ -215,20 +219,7 @@ export function generativeModelBindingHandlersForModality(
 ): GenerativeModelBindingHandlers<OrgModelBindingRef> {
   switch (modality) {
     case "text":
-      return {
-        onModelSelected: (model) => {
-          const rules = normalizeTextModelParameterRules(
-            (model as OrgTextModelOption).parameterRules
-          );
-          return {
-            metadata: {
-              refMaxText: String(rules.maxTextReferences),
-              refMaxImage: String(rules.maxImageReferences),
-              refMaxVideo: String(rules.maxVideoReferences),
-            },
-          };
-        },
-      };
+      return {};
     case "image":
       return {
         readGenerationFields: (model) =>

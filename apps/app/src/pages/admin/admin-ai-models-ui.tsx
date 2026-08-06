@@ -1,9 +1,9 @@
 import type { PlatformAiModel, PlatformAiModelGroup } from "@dafthunk/types";
-import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import PencilIcon from "lucide-react/icons/pencil";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  SURFACE_BORDER,
+  SURFACE_MUTED_INSET,
+  SURFACE_ROW_HOVER,
+} from "@/components/ui/surface";
 import { cn } from "@/utils/utils";
 
 export const ADMIN_NO_GROUP_VALUE = "__none__";
@@ -42,6 +46,12 @@ export const ADMIN_CONTROL_WIDTH_CLASS = "w-56";
 
 /** Standard height + full-width for settings inputs, selects, and triggers. */
 export const ADMIN_CONTROL_CLASS = "h-9 w-full";
+
+/** Read-only settings control (e.g. model ID). */
+export const ADMIN_READONLY_CONTROL_CLASS = cn(
+  ADMIN_CONTROL_CLASS,
+  "cursor-default border-dashed bg-muted/40 text-muted-foreground focus-visible:ring-0"
+);
 
 /** Three-column settings grid (matches application / count policy sections). */
 export const ADMIN_SETTINGS_GRID_CLASS = "grid grid-cols-1 gap-3 sm:grid-cols-3";
@@ -89,7 +99,7 @@ export function AdminModelList({
 
   if (isLoading) {
     return (
-      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      <p className="py-8 text-center text-sm text-muted-foreground">
         {t("common.loading")}
       </p>
     );
@@ -97,14 +107,14 @@ export function AdminModelList({
 
   if (models.length === 0) {
     return (
-      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      <p className="py-8 text-center text-sm text-muted-foreground">
         {emptyLabel}
       </p>
     );
   }
 
   return (
-    <div className="space-y-1.5 p-3 sm:p-4">
+    <div className="space-y-2">
       {models.map((model) => (
         <AdminModelListRow
           key={model.canonicalId}
@@ -141,7 +151,9 @@ function AdminModelListRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2 py-2 sm:gap-3 sm:px-3",
+        "flex items-center gap-2 rounded-lg border px-2 py-2 sm:gap-3 sm:px-3",
+        SURFACE_BORDER,
+        SURFACE_ROW_HOVER,
         !model.platformEnabled && "opacity-60"
       )}
     >
@@ -203,13 +215,14 @@ export function ModelSettingsDialogShell({
             ? ADMIN_MODEL_SETTINGS_DIALOG_800_CLASS
             : ADMIN_MODEL_SETTINGS_DIALOG_CLASS
         }
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <DialogHeader className="space-y-1.5 px-6 pt-6 text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="thin-scrollbar flex-1 space-y-3 overflow-y-auto px-6 py-4 pr-5">
+        <div className={cn(PAGE_SCROLL_CLASS, "flex-1 space-y-3 px-6 py-4 pr-5")}>
           {children}
         </div>
 
@@ -283,7 +296,7 @@ export function SettingsSection({
 
   if (compact) {
     return (
-      <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+      <div className={cn("rounded-lg border p-3", SURFACE_BORDER, SURFACE_MUTED_INSET)}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="text-xs font-medium text-foreground">{title}</p>
@@ -303,8 +316,8 @@ export function SettingsSection({
   }
 
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20">
-      <div className="border-b border-border/60 px-3 py-2">
+    <div className={cn("rounded-lg border", SURFACE_BORDER, SURFACE_MUTED_INSET)}>
+      <div className={cn("border-b px-3 py-2", SURFACE_BORDER)}>
         <p className="text-sm font-semibold">{title}</p>
       </div>
       <div
@@ -358,7 +371,9 @@ export function ImageModelBasicFields({
       <AdminFieldRow label={t("pages.adminAiModels.modelCanonicalId")}>
         <Input
           readOnly
-          className={cn(ADMIN_CONTROL_CLASS, "font-mono text-xs")}
+          tabIndex={-1}
+          aria-readonly
+          className={cn(ADMIN_READONLY_CONTROL_CLASS, "font-mono text-xs")}
           value={canonicalId}
         />
       </AdminFieldRow>
@@ -387,41 +402,6 @@ export function ImageModelBasicFields({
         </Select>
       </AdminFieldRow>
     </>
-  );
-}
-
-export function CollapsibleSettingsSection({
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  readonly title: string;
-  readonly children: ReactNode;
-  readonly defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="rounded-lg border border-border/60 bg-muted/20">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-medium"
-        onClick={() => setOpen((value) => !value)}
-      >
-        {title}
-        <ChevronDownIcon
-          className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-180"
-          )}
-        />
-      </button>
-      {open ? (
-        <div className="grid gap-3 border-t border-border/60 p-3 sm:grid-cols-2">
-          {children}
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -482,80 +462,5 @@ export function MbField({
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
-  );
-}
-
-export function ModelBasicFields({
-  displayName,
-  onDisplayNameChange,
-  description,
-  onDescriptionChange,
-  groupId,
-  onGroupIdChange,
-  groups,
-  promptMaxChars,
-  onPromptMaxCharsChange,
-}: {
-  readonly displayName: string;
-  readonly onDisplayNameChange: (value: string) => void;
-  readonly description: string;
-  readonly onDescriptionChange: (value: string) => void;
-  readonly groupId: string;
-  readonly onGroupIdChange: (value: string) => void;
-  readonly groups: readonly PlatformAiModelGroup[];
-  readonly promptMaxChars?: string;
-  readonly onPromptMaxCharsChange?: (value: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label className="text-sm">
-          {t("pages.adminAiModels.modelDisplayName")}
-        </Label>
-        <Input
-          className={ADMIN_CONTROL_CLASS}
-          value={displayName}
-          onChange={(event) => onDisplayNameChange(event.target.value)}
-        />
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label className="text-sm">
-          {t("pages.adminAiModels.modelDescription")}
-        </Label>
-        <Textarea
-          className="min-h-[72px] resize-y"
-          value={description}
-          onChange={(event) => onDescriptionChange(event.target.value)}
-        />
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label className="text-sm">{t("pages.adminAiModels.modelGroup")}</Label>
-        <Select value={groupId} onValueChange={onGroupIdChange}>
-          <SelectTrigger className={ADMIN_CONTROL_CLASS}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ADMIN_NO_GROUP_VALUE}>
-              {t("pages.adminAiModels.noGroup")}
-            </SelectItem>
-            {groups.map((group) => (
-              <SelectItem key={group.id} value={group.id}>
-                {group.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {promptMaxChars !== undefined && onPromptMaxCharsChange ? (
-        <NumberField
-          className="sm:col-span-2"
-          label={t("pages.adminAiModels.promptMaxChars")}
-          value={promptMaxChars}
-          onChange={onPromptMaxCharsChange}
-        />
-      ) : null}
-    </>
   );
 }

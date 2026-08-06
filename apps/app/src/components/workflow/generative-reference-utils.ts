@@ -1,5 +1,6 @@
 import type { MediaReference, ObjectReference } from "@dafthunk/types";
 import {
+  AI_AUDIO_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   isMediaReference,
@@ -7,9 +8,14 @@ import {
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 import { addEdge, type Connection } from "@xyflow/react";
 
+import { readAiAudioCardAudios } from "./ai-audio-node-utils";
 import { readAiImageCardImages } from "./ai-image-node-utils";
 import type { AiTextReferenceKind } from "./ai-text-node-utils";
 import { readAiVideoCardVideos } from "./ai-video-node-utils";
+import {
+  classifyAiVideoReferenceFromNodeType,
+  type AiVideoReferenceKind,
+} from "./ai-video-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export interface GenerativeReferenceChip {
@@ -19,6 +25,7 @@ export interface GenerativeReferenceChip {
   readonly previewUrl?: string;
   readonly textExcerpt?: string;
   readonly media?: MediaReference;
+  readonly overlayLabel?: string;
 }
 
 function firstMediaReference(value: unknown): MediaReference | null {
@@ -35,7 +42,7 @@ function firstMediaReference(value: unknown): MediaReference | null {
 }
 
 export function resolveReferenceMediaFromSource(params: {
-  readonly kind: AiTextReferenceKind;
+  readonly kind: AiTextReferenceKind | AiVideoReferenceKind;
   readonly sourceData: WorkflowNodeType;
   readonly outputValue: unknown;
 }): MediaReference | undefined {
@@ -59,6 +66,17 @@ export function resolveReferenceMediaFromSource(params: {
     params.sourceData.nodeType === AI_VIDEO_NODE_TYPE
   ) {
     return readAiVideoCardVideos(
+      params.sourceData.inputs,
+      params.sourceData.outputs,
+      params.sourceData.metadata
+    )[0];
+  }
+
+  if (
+    params.kind === "audio" &&
+    params.sourceData.nodeType === AI_AUDIO_NODE_TYPE
+  ) {
+    return readAiAudioCardAudios(
       params.sourceData.inputs,
       params.sourceData.outputs,
       params.sourceData.metadata
@@ -182,6 +200,25 @@ export function collectImageReferenceMedia(params: {
     nodeType: string | undefined
   ) => AiTextReferenceKind | null;
 }): readonly MediaReference[] {
+  return collectGenerativeReferenceMedia({
+    ...params,
+    classifyKind: (nodeType) => {
+      const kind = params.classifyKind(nodeType);
+      return kind === "image" ? "image" : null;
+    },
+  });
+}
+
+/** Collect image / video / audio media references wired to a reference handle. */
+export function collectGenerativeReferenceMedia(params: {
+  readonly nodeId: string;
+  readonly targetHandle: string;
+  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+  readonly classifyKind?: (
+    nodeType: string | undefined
+  ) => AiVideoReferenceKind | null;
+}): readonly MediaReference[] {
   return params.edges
     .filter(
       (edge) =>
@@ -193,8 +230,10 @@ export function collectImageReferenceMedia(params: {
       if (!source) return [];
 
       const sourceData = source.data as WorkflowNodeType;
-      const kind = params.classifyKind(sourceData.nodeType);
-      if (kind !== "image") return [];
+      const kind =
+        params.classifyKind?.(sourceData.nodeType) ??
+        classifyAiVideoReferenceFromNodeType(sourceData.nodeType);
+      if (!kind) return [];
 
       const output = sourceData.outputs?.find(
         (entry) => entry.id === edge.sourceHandle

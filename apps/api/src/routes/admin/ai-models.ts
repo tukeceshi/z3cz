@@ -66,16 +66,6 @@ const countPolicySchema = z.object({
   effectMode: z.enum(["direct", "sequential", "sequential_image_generation"]),
 });
 
-const imageRulesSchema = z.object({
-  schemaVersion: z.literal(1),
-  sizePolicy: sizePolicySchema.optional(),
-  countPolicy: countPolicySchema.optional(),
-  maxReferenceImages: z.number().int().nonnegative(),
-  maxImageReferenceBytes: z.number().int().positive(),
-  promptMaxChars: z.number().int().positive(),
-  generationFields: z.array(generationFieldSchema),
-});
-
 const videoRulesSchema = z.object({
   schemaVersion: z.literal(1),
   sizePolicy: sizePolicySchema.optional(),
@@ -84,14 +74,30 @@ const videoRulesSchema = z.object({
   maxReferenceVideos: z.number().int().nonnegative(),
   maxVideoReferenceBytes: z.number().int().positive(),
   maxVideoReferenceSeconds: z.number().int().positive(),
+  maxReferenceAudios: z.number().int().nonnegative(),
+  maxAudioReferenceBytes: z.number().int().positive(),
+  maxAudioReferenceSeconds: z.number().int().positive(),
   promptMaxChars: z.number().int().positive(),
   generationFields: z.array(generationFieldSchema),
 });
 
+const imageRulesSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    sizePolicy: sizePolicySchema.optional(),
+    countPolicy: countPolicySchema.optional(),
+    maxReferenceImages: z.number().int().nonnegative(),
+    maxImageReferenceBytes: z.number().int().positive(),
+    promptMaxChars: z.number().int().positive(),
+    generationFields: z.array(generationFieldSchema),
+  })
+  .strict();
+
+/** Video before image: video payloads are a superset; image schema would strip video-only keys. */
 const parameterRulesSchema = z.union([
   textRulesSchema,
-  imageRulesSchema,
   videoRulesSchema,
+  imageRulesSchema,
 ]);
 
 const patchSchema = z.object({

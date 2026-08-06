@@ -1,11 +1,13 @@
 import {
   buildVolcanoVideoGenerationBody,
+  countSubmitAiVideoMediaReferences,
   createEphemeralMediaExpiresAt,
   type MediaReference,
   type ObjectReference,
   type VideoModelParameterRules,
   type ReferenceImageInline,
   normalizeVideoModelParameterRules,
+  validateSubmitAiVideoReferences,
 } from "@dafthunk/types";
 
 import type { ObjectStore } from "../node-types";
@@ -100,15 +102,19 @@ export async function submitVolcanoVideoTask(params: {
   readonly generationParams?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
-  const hasReferences =
-    (params.referenceImageUrls?.length ?? 0) > 0 ||
-    (params.referenceImageInline?.length ?? 0) > 0;
-
-  if (!trimmedPrompt && !hasReferences) {
-    return { status: "failed", error: "Prompt is required" };
+  const mediaCounts = countSubmitAiVideoMediaReferences(params);
+  const referenceValidation = validateSubmitAiVideoReferences({
+    prompt: trimmedPrompt,
+    counts: mediaCounts,
+    rules,
+  });
+  if (!referenceValidation.ok) {
+    return { status: "failed", error: referenceValidation.error };
   }
 
   if (
@@ -128,6 +134,8 @@ export async function submitVolcanoVideoTask(params: {
     params: params.generationParams,
     referenceImageUrls: params.referenceImageUrls,
     referenceImageInline: params.referenceImageInline,
+    referenceVideoUrls: params.referenceVideoUrls,
+    referenceAudioUrls: params.referenceAudioUrls,
   });
 
   const baseUrl = params.baseUrl.replace(/\/$/, "");

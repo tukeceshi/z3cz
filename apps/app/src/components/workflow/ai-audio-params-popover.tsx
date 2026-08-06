@@ -18,6 +18,11 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
+import {
+  resolveGenerationFieldLabel,
+  resolveGenerationOptionLabel,
+} from "./generative-param-labels";
+import type { TranslateFn } from "@/i18n";
 
 export interface AiAudioParamsPopoverProps {
   readonly fields: readonly UpstreamParamProfileField[];
@@ -53,22 +58,27 @@ function readFieldValue(
 
 function formatSummaryPart(
   field: UpstreamParamProfileField,
-  raw: unknown
+  raw: unknown,
+  t: TranslateFn
 ): string | null {
   if (raw === undefined || raw === null || raw === "") return null;
   if (SPEED_FIELD_NAMES.has(field.name)) return `${raw}x`;
-  if (VOL_FIELD_NAMES.has(field.name)) return `vol ${raw}`;
-  if (PITCH_FIELD_NAMES.has(field.name)) return `pitch ${raw}`;
+  if (VOL_FIELD_NAMES.has(field.name)) return `${raw}`;
+  if (PITCH_FIELD_NAMES.has(field.name)) return `${raw}`;
+  if (EMOTION_FIELD_NAMES.has(field.name)) {
+    return resolveGenerationOptionLabel(field.name, String(raw), t);
+  }
   return String(raw);
 }
 
 function formatParamSummary(
   fields: readonly UpstreamParamProfileField[],
-  values: Readonly<Record<string, unknown>>
+  values: Readonly<Record<string, unknown>>,
+  t: TranslateFn
 ): string {
   return fields
     .filter((field) => !field.hidden)
-    .map((field) => formatSummaryPart(field, readFieldValue(field, values)))
+    .map((field) => formatSummaryPart(field, readFieldValue(field, values), t))
     .filter((part): part is string => part !== null)
     .slice(0, 3)
     .join(" · ");
@@ -86,6 +96,7 @@ function coerceFieldValue(
 
 interface SliderFieldProps {
   readonly field: UpstreamParamProfileField;
+  readonly title: string;
   readonly value: number;
   readonly min: number;
   readonly max: number;
@@ -97,6 +108,7 @@ interface SliderFieldProps {
 
 function SliderFieldSection({
   field,
+  title,
   value,
   min,
   max,
@@ -105,7 +117,6 @@ function SliderFieldSection({
   formatValue,
   onChange,
 }: SliderFieldProps) {
-  const title = field.description || field.name;
   const clamped = Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
 
   return (
@@ -173,7 +184,7 @@ export function AiAudioParamsPopover({
   onChange,
 }: AiAudioParamsPopoverProps) {
   const { t } = useTranslation();
-  const summary = formatParamSummary(fields, values);
+  const summary = formatParamSummary(fields, values, t);
   const visibleFields = fields.filter((field) => !field.hidden);
 
   const handleFieldChange = (
@@ -207,6 +218,7 @@ export function AiAudioParamsPopover({
         <p className="text-xs font-medium text-foreground">{title}</p>
         {visibleFields.map((field) => {
           const current = readFieldValue(field, values);
+          const fieldLabel = resolveGenerationFieldLabel(field, t);
 
           if (SPEED_FIELD_NAMES.has(field.name)) {
             const numeric =
@@ -217,6 +229,7 @@ export function AiAudioParamsPopover({
               <SliderFieldSection
                 key={field.name}
                 field={field}
+                title={fieldLabel}
                 value={numeric}
                 min={SPEED_MIN}
                 max={SPEED_MAX}
@@ -237,6 +250,7 @@ export function AiAudioParamsPopover({
               <SliderFieldSection
                 key={field.name}
                 field={field}
+                title={fieldLabel}
                 value={numeric}
                 min={VOL_MIN}
                 max={VOL_MAX}
@@ -257,6 +271,7 @@ export function AiAudioParamsPopover({
               <SliderFieldSection
                 key={field.name}
                 field={field}
+                title={fieldLabel}
                 value={numeric}
                 min={PITCH_MIN}
                 max={PITCH_MAX}
@@ -276,7 +291,7 @@ export function AiAudioParamsPopover({
             return (
               <div key={field.name} className="space-y-1">
                 <Label className="text-xs text-muted-foreground">
-                  {field.description || field.name}
+                  {fieldLabel}
                 </Label>
                 <Select
                   value={
@@ -295,7 +310,7 @@ export function AiAudioParamsPopover({
                   <SelectContent>
                     {field.enumValues.map((option) => (
                       <SelectItem key={option} value={option} className="text-xs">
-                        {option}
+                        {resolveGenerationOptionLabel(field.name, option, t)}
                       </SelectItem>
                     ))}
                   </SelectContent>

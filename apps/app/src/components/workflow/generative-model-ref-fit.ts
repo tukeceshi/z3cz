@@ -11,6 +11,7 @@ import {
   type OrgImageModelOption,
   type OrgTextModelOption,
   type OrgVideoModelOption,
+  type SubmitAiVideoMediaReferenceCounts,
 } from "@dafthunk/types";
 import type { Connection } from "@xyflow/react";
 
@@ -22,6 +23,7 @@ import {
 import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
+  classifyAiVideoReferenceFromNodeType,
   referencesFitVideoModelLimits,
 } from "./ai-video-node-utils";
 import {
@@ -58,14 +60,26 @@ export function imageModelFitsReferenceCount(
   );
 }
 
+export function videoModelFitsReferenceCounts(
+  model: OrgVideoModelOption,
+  counts: SubmitAiVideoMediaReferenceCounts
+): boolean {
+  return referencesFitVideoModelLimits(
+    counts,
+    normalizeVideoModelParameterRules(model.parameterRules)
+  );
+}
+
+/** @deprecated Prefer videoModelFitsReferenceCounts. */
 export function videoModelFitsReferenceCount(
   model: OrgVideoModelOption,
   referenceCount: number
 ): boolean {
-  return referencesFitVideoModelLimits(
-    referenceCount,
-    normalizeVideoModelParameterRules(model.parameterRules)
-  );
+  return videoModelFitsReferenceCounts(model, {
+    imageCount: referenceCount,
+    videoCount: 0,
+    audioCount: 0,
+  });
 }
 
 /** Projected reference counts for a would-be connection onto a new empty node. */
@@ -77,11 +91,13 @@ export function projectedReferenceCountsForConnection(params: {
   readonly textCounts: AiTextReferenceCounts;
   readonly imageReferenceCount: number;
   readonly videoReferenceCount: number;
+  readonly audioReferenceCount: number;
   readonly countsAsPromptOnly: boolean;
 } {
   const textCounts = emptyAiTextReferenceCounts();
   let imageReferenceCount = 0;
   let videoReferenceCount = 0;
+  let audioReferenceCount = 0;
   let countsAsPromptOnly = false;
 
   switch (params.targetType) {
@@ -107,7 +123,12 @@ export function projectedReferenceCountsForConnection(params: {
       } else if (
         params.connection.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID
       ) {
-        videoReferenceCount = 1;
+        const kind = classifyAiVideoReferenceFromNodeType(
+          params.sourceNodeType
+        );
+        if (kind === "image") imageReferenceCount = 1;
+        else if (kind === "video") videoReferenceCount = 1;
+        else if (kind === "audio") audioReferenceCount = 1;
       }
       break;
     case AI_AUDIO_NODE_TYPE:
@@ -121,6 +142,7 @@ export function projectedReferenceCountsForConnection(params: {
     textCounts,
     imageReferenceCount,
     videoReferenceCount,
+    audioReferenceCount,
     countsAsPromptOnly,
   };
 }
@@ -154,10 +176,11 @@ export function createProjectedModelFits(params: {
     case AI_VIDEO_NODE_TYPE:
       return (model) =>
         model.selectable &&
-        videoModelFitsReferenceCount(
-          model as OrgVideoModelOption,
-          projected.videoReferenceCount
-        );
+        videoModelFitsReferenceCounts(model as OrgVideoModelOption, {
+          imageCount: projected.imageReferenceCount,
+          videoCount: projected.videoReferenceCount,
+          audioCount: projected.audioReferenceCount,
+        });
     case AI_AUDIO_NODE_TYPE:
       return (model) => model.selectable;
     default:

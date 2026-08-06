@@ -118,6 +118,37 @@ export async function getPlatformAiModel(
   return row ? mapPlatformModelRow(row) : null;
 }
 
+function normalizeParameterRulesForModality(
+  modality: AiModelModality,
+  rules: PlatformAiModelParameterRules
+): PlatformAiModelParameterRules {
+  switch (modality) {
+    case "text":
+      return isTextModelParameterRules(rules)
+        ? normalizeTextModelParameterRules(rules)
+        : DEFAULT_TEXT_MODEL_PARAMETER_RULES;
+    case "image":
+      return isImageModelParameterRules(rules)
+        ? normalizeImageModelParameterRules(rules)
+        : DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
+    case "video":
+      return normalizeVideoModelParameterRules(
+        isVideoModelParameterRules(rules)
+          ? rules
+          : {
+              ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+              ...rules,
+            }
+      );
+    case "audio":
+      return isAudioModelParameterRules(rules)
+        ? normalizeAudioModelParameterRules(rules)
+        : DEFAULT_AUDIO_MODEL_PARAMETER_RULES;
+    default:
+      return rules;
+  }
+}
+
 export async function updatePlatformAiModel(
   db: Database,
   canonicalId: string,
@@ -127,15 +158,10 @@ export async function updatePlatformAiModel(
   if (!existing) return null;
 
   const nextRulesRaw = patch.parameterRules ?? existing.parameterRules;
-  const nextRules = isTextModelParameterRules(nextRulesRaw)
-    ? normalizeTextModelParameterRules(nextRulesRaw)
-    : isImageModelParameterRules(nextRulesRaw)
-      ? normalizeImageModelParameterRules(nextRulesRaw)
-      : isVideoModelParameterRules(nextRulesRaw)
-        ? normalizeVideoModelParameterRules(nextRulesRaw)
-        : isAudioModelParameterRules(nextRulesRaw)
-          ? normalizeAudioModelParameterRules(nextRulesRaw)
-          : nextRulesRaw;
+  const nextRules = normalizeParameterRulesForModality(
+    existing.modality,
+    nextRulesRaw
+  );
 
   await db
     .update(platformAiModels)

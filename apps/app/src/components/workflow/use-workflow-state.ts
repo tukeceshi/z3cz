@@ -15,6 +15,7 @@ import type { RefObject, MouseEvent } from "react";
 import { useMemo } from "react";
 
 import { useClipboard } from "./use-clipboard";
+import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
 import { useGraphOperations } from "./use-graph-operations";
 import { useGraphPersistence } from "./use-graph-persistence";
 import { useLayout } from "./use-layout";
@@ -109,6 +110,7 @@ interface UseWorkflowStateReturn {
     nodeType: AiGenerativeNodeType,
     menu: WorkflowAddNodeMenuState
   ) => void;
+  generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
 }
 
 const NOOP = () => {};

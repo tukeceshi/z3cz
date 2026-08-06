@@ -114,6 +114,9 @@ export interface VideoModelParameterRules {
   readonly maxReferenceVideos: number;
   readonly maxVideoReferenceBytes: number;
   readonly maxVideoReferenceSeconds: number;
+  readonly maxReferenceAudios: number;
+  readonly maxAudioReferenceBytes: number;
+  readonly maxAudioReferenceSeconds: number;
   readonly promptMaxChars: number;
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
@@ -433,9 +436,17 @@ export interface SubmitAiVideoRequest {
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
   readonly workflowId?: string;
   readonly nodeId?: string;
   readonly clientRequestId?: string;
+}
+
+export interface SubmitAiVideoMediaReferenceCounts {
+  readonly imageCount: number;
+  readonly videoCount: number;
+  readonly audioCount: number;
 }
 
 export interface SubmitAiVideoResponse {
@@ -697,63 +708,182 @@ export const DEFAULT_IMAGE_MODEL_PARAMETER_RULES: ImageModelParameterRules = {
   generationFields: DEFAULT_IMAGE_GENERATION_FIELDS,
 };
 
-export const DEFAULT_VIDEO_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
+export const VIDEO_DURATION_MIN = 4;
+export const VIDEO_DURATION_MAX = 15;
+
+export const VIDEO_REFERENCE_MODE_OPTIONS = [
+  "reference_image",
+  "first_last_frame",
+] as const;
+
+export type VideoReferenceMode = (typeof VIDEO_REFERENCE_MODE_OPTIONS)[number];
+
+export function buildDurationOptions(
+  minSeconds: number,
+  maxSeconds: number
+): readonly string[] {
+  const min = Math.max(1, Math.floor(minSeconds));
+  const max = Math.max(min, Math.floor(maxSeconds));
+  return Array.from({ length: max - min + 1 }, (_, index) => String(min + index));
+}
+
+export function resolveDurationOptions(
+  field: UpstreamParamProfileField | undefined
+): readonly string[] {
+  if (!field) {
+    return buildDurationOptions(VIDEO_DURATION_MIN, VIDEO_DURATION_MAX);
+  }
+  const fromEnum = (field.enumValues ?? [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1);
+  if (fromEnum.length > 0) {
+    return buildDurationOptions(Math.min(...fromEnum), Math.max(...fromEnum));
+  }
+  const fallbackDefault =
+    typeof field.default === "number"
+      ? field.default
+      : Number(field.default) || VIDEO_DURATION_MIN;
+  return buildDurationOptions(
+    VIDEO_DURATION_MIN,
+    Math.max(VIDEO_DURATION_MAX, fallbackDefault)
+  );
+}
+
+const IMAGE_GENERATE_COUNT_MAX = 15;
+
+export function buildGenerateCountOptions(maxCount: number): readonly string[] {
+  const max = Math.min(
+    IMAGE_GENERATE_COUNT_MAX,
+    Math.max(1, Math.floor(maxCount))
+  );
+  return Array.from({ length: max }, (_, index) => String(index + 1));
+}
+
+export const VIDEO_RATIO_OPTIONS = [
+  "adaptive",
+  "16:9",
+  "9:16",
+  "4:3",
+  "1:1",
+  "3:4",
+  "21:9",
+] as const;
+
+export const VIDEO_RESOLUTION_OPTIONS = [
+  "480p",
+  "720p",
+  "1080p",
+  "4k",
+] as const;
+
+/** Full video-generation field catalog for Admin and runtime. */
+export const VIDEO_GENERATION_FIELD_CATALOG: readonly UpstreamParamProfileField[] =
   [
     {
       name: "ratio",
       apiName: "ratio",
       type: "string",
-      description: "Output aspect ratio",
+      description: "画面比例",
       default: "16:9",
-      enumValues: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "adaptive"],
+      enumValues: [...VIDEO_RATIO_OPTIONS],
     },
     {
       name: "duration",
       apiName: "duration",
       type: "number",
-      description: "Video duration in seconds",
+      description: "视频时长",
       default: 5,
+      enumValues: buildDurationOptions(VIDEO_DURATION_MIN, VIDEO_DURATION_MAX),
     },
     {
       name: "resolution",
       apiName: "resolution",
       type: "string",
-      description: "Output resolution",
+      description: "分辨率",
       default: "720p",
-      enumValues: ["480p", "720p", "1080p"],
+      enumValues: [...VIDEO_RESOLUTION_OPTIONS],
     },
     {
       name: "generate_audio",
       apiName: "generate_audio",
       type: "boolean",
-      description: "Generate synchronized audio",
+      description: "生成音频",
       default: true,
     },
     {
       name: "watermark",
       apiName: "watermark",
       type: "boolean",
-      description: "Add AI-generated watermark",
+      description: "水印",
+      default: false,
+    },
+    {
+      name: "reference_mode",
+      apiName: "",
+      type: "string",
+      description: "参考模式",
+      default: "reference_image",
+      enumValues: [...VIDEO_REFERENCE_MODE_OPTIONS],
+      clientOnly: true,
+    },
+    {
+      name: "web_search",
+      apiName: "web_search",
+      type: "boolean",
+      description: "联网搜索",
+      default: false,
+    },
+    {
+      name: "virtual_avatar_library",
+      apiName: "",
+      type: "boolean",
+      description: "虚拟形象库",
+      default: false,
+      clientOnly: true,
+    },
+    {
+      name: "return_last_frame",
+      apiName: "return_last_frame",
+      type: "boolean",
+      description: "返回尾帧",
       default: false,
     },
     {
       name: "seed",
       apiName: "seed",
       type: "number",
-      description: "Random seed (-1 for random)",
+      description: "随机种子（-1 为随机）",
       default: -1,
       hidden: true,
     },
     {
-      name: "generate_count",
-      apiName: "",
+      name: "execution_expires_after",
+      apiName: "execution_expires_after",
       type: "number",
-      description: "生成数量",
-      default: 1,
-      enumValues: ["1", "2", "4"],
-      clientOnly: true,
+      description: "任务超时（秒）",
+      default: 172_800,
+      hidden: true,
     },
   ] as const;
+
+const DEFAULT_VIDEO_FIELD_NAMES = new Set([
+  "ratio",
+  "duration",
+  "resolution",
+  "generate_audio",
+  "watermark",
+  "reference_mode",
+  "web_search",
+  "virtual_avatar_library",
+  "return_last_frame",
+  "seed",
+]);
+
+/** Seedance-aligned defaults for new video models. */
+export const DEFAULT_VIDEO_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
+  VIDEO_GENERATION_FIELD_CATALOG.filter((field) =>
+    DEFAULT_VIDEO_FIELD_NAMES.has(field.name)
+  );
 
 export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   schemaVersion: PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
@@ -762,6 +892,9 @@ export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   maxReferenceVideos: 1,
   maxVideoReferenceBytes: 50 * 1024 * 1024,
   maxVideoReferenceSeconds: 60,
+  maxReferenceAudios: 3,
+  maxAudioReferenceBytes: 15 * 1024 * 1024,
+  maxAudioReferenceSeconds: 15,
   promptMaxChars: 1000,
   generationFields: DEFAULT_VIDEO_GENERATION_FIELDS,
 };
@@ -772,28 +905,28 @@ export const DEFAULT_AUDIO_GENERATION_FIELDS: readonly UpstreamParamProfileField
       name: "speed",
       apiName: "voice_setting.speed",
       type: "number",
-      description: "Speech speed multiplier",
+      description: "语速",
       default: 1,
     },
     {
       name: "vol",
       apiName: "voice_setting.vol",
       type: "number",
-      description: "Speech volume",
+      description: "音量",
       default: 1,
     },
     {
       name: "pitch",
       apiName: "voice_setting.pitch",
       type: "number",
-      description: "Speech pitch adjustment",
+      description: "音调",
       default: 0,
     },
     {
       name: "emotion",
       apiName: "voice_setting.emotion",
       type: "string",
-      description: "Speech emotion style",
+      description: "情感风格",
       default: "neutral",
       enumValues: [
         "happy",
@@ -809,7 +942,7 @@ export const DEFAULT_AUDIO_GENERATION_FIELDS: readonly UpstreamParamProfileField
       name: "voice_id",
       apiName: "voice_setting.voice_id",
       type: "string",
-      description: "Default voice identifier",
+      description: "默认音色",
       default: "male-qn-qingse",
       hidden: true,
     },
@@ -863,10 +996,11 @@ export function isAudioModelParameterRules(
 export function normalizeVideoModelParameterRules(
   rules: VideoModelParameterRules
 ): VideoModelParameterRules {
-  const generationFields =
+  const generationFields = (
     rules.generationFields?.length > 0
       ? rules.generationFields
-      : DEFAULT_VIDEO_MODEL_PARAMETER_RULES.generationFields;
+      : DEFAULT_VIDEO_MODEL_PARAMETER_RULES.generationFields
+  ).filter((field) => field.name !== "generate_count");
 
   return {
     ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
@@ -887,11 +1021,81 @@ export function normalizeVideoModelParameterRules(
     maxVideoReferenceSeconds:
       rules.maxVideoReferenceSeconds ??
       DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
+    maxReferenceAudios:
+      rules.maxReferenceAudios ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceAudios,
+    maxAudioReferenceBytes:
+      rules.maxAudioReferenceBytes ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxAudioReferenceBytes,
+    maxAudioReferenceSeconds:
+      rules.maxAudioReferenceSeconds ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxAudioReferenceSeconds,
     promptMaxChars:
       rules.promptMaxChars ??
       DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
     generationFields,
   };
+}
+
+export function countSubmitAiVideoMediaReferences(
+  body: Pick<
+    SubmitAiVideoRequest,
+    | "referenceImageUrls"
+    | "referenceImageInline"
+    | "referenceVideoUrls"
+    | "referenceAudioUrls"
+  >
+): SubmitAiVideoMediaReferenceCounts {
+  return {
+    imageCount:
+      (body.referenceImageUrls?.length ?? 0) +
+      (body.referenceImageInline?.length ?? 0),
+    videoCount: body.referenceVideoUrls?.length ?? 0,
+    audioCount: body.referenceAudioUrls?.length ?? 0,
+  };
+}
+
+export function referencesFitVideoModelReferenceLimits(
+  counts: SubmitAiVideoMediaReferenceCounts,
+  rules: VideoModelParameterRules
+): boolean {
+  const normalized = normalizeVideoModelParameterRules(rules);
+  return (
+    counts.imageCount <= normalized.maxReferenceImages &&
+    counts.videoCount <= normalized.maxReferenceVideos &&
+    counts.audioCount <= normalized.maxReferenceAudios
+  );
+}
+
+export function validateSubmitAiVideoReferences(params: {
+  readonly prompt: string;
+  readonly counts: SubmitAiVideoMediaReferenceCounts;
+  readonly rules: VideoModelParameterRules;
+}): { readonly ok: true } | { readonly ok: false; readonly error: string } {
+  const trimmedPrompt = params.prompt.trim();
+  const totalMedia =
+    params.counts.imageCount + params.counts.videoCount + params.counts.audioCount;
+
+  if (!trimmedPrompt && totalMedia === 0) {
+    return { ok: false, error: "Prompt is required" };
+  }
+
+  if (!referencesFitVideoModelReferenceLimits(params.counts, params.rules)) {
+    return { ok: false, error: "Reference count exceeds model limits" };
+  }
+
+  if (
+    params.counts.audioCount > 0 &&
+    params.counts.imageCount === 0 &&
+    params.counts.videoCount === 0
+  ) {
+    return {
+      ok: false,
+      error: "Audio references require at least one image or video reference",
+    };
+  }
+
+  return { ok: true };
 }
 
 export function normalizeImageModelParameterRules(
@@ -936,16 +1140,6 @@ export function normalizeAudioModelParameterRules(
       DEFAULT_AUDIO_MODEL_PARAMETER_RULES.promptMaxChars,
     generationFields,
   };
-}
-
-const IMAGE_GENERATE_COUNT_MAX = 15;
-
-export function buildGenerateCountOptions(maxCount: number): readonly string[] {
-  const max = Math.min(
-    IMAGE_GENERATE_COUNT_MAX,
-    Math.max(1, Math.floor(maxCount))
-  );
-  return Array.from({ length: max }, (_, index) => String(index + 1));
 }
 
 /** Options shown in the node UI: 1..max from field enumValues / default. */
@@ -1273,6 +1467,56 @@ export function buildVolcanoImageGenerationBody(params: {
   return body;
 }
 
+export function resolveVideoReferenceMode(
+  fields: readonly UpstreamParamProfileField[],
+  params?: Readonly<Record<string, unknown>>
+): VideoReferenceMode {
+  const field = fields.find((entry) => entry.name === "reference_mode");
+  if (!field || field.hidden) {
+    return "reference_image";
+  }
+  const raw = params?.reference_mode ?? field.default;
+  return raw === "first_last_frame" ? "first_last_frame" : "reference_image";
+}
+
+export function appendVideoReferenceImagesToContent(
+  content: Record<string, unknown>[],
+  imageUrls: readonly string[],
+  mode: VideoReferenceMode,
+  hasNonImageReferences: boolean
+): void {
+  if (imageUrls.length === 0) {
+    return;
+  }
+
+  const useReferenceImage =
+    mode === "reference_image" ||
+    hasNonImageReferences ||
+    imageUrls.length !== 2;
+
+  if (useReferenceImage) {
+    for (const url of imageUrls) {
+      content.push({
+        type: "image_url",
+        image_url: { url },
+        role: "reference_image",
+      });
+    }
+    return;
+  }
+
+  content.push({
+    type: "image_url",
+    image_url: { url: imageUrls[0]! },
+    role: "first_frame",
+  });
+  content.push({
+    type: "image_url",
+    image_url: { url: imageUrls[1]! },
+    role: "last_frame",
+  });
+}
+
 /** Build Volcano /contents/generations/tasks body from admin field definitions. */
 export function buildVolcanoVideoGenerationBody(params: {
   readonly providerModelId: string;
@@ -1281,7 +1525,13 @@ export function buildVolcanoVideoGenerationBody(params: {
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
 }): Record<string, unknown> {
+  const mergedParams = mergeImageGenerationParams(
+    params.generationFields,
+    params.params
+  );
   const trimmedPrompt = params.prompt.trim();
   const content: Record<string, unknown>[] = [];
 
@@ -1289,24 +1539,37 @@ export function buildVolcanoVideoGenerationBody(params: {
     content.push({ type: "text", text: trimmedPrompt });
   }
 
+  const referenceMode = resolveVideoReferenceMode(
+    params.generationFields,
+    mergedParams
+  );
+  const hasNonImageReferences =
+    (params.referenceVideoUrls?.length ?? 0) > 0 ||
+    (params.referenceAudioUrls?.length ?? 0) > 0;
   const referenceValues = mergeReferenceImageValues({
     referenceImageUrls: params.referenceImageUrls,
     referenceImageInline: params.referenceImageInline,
   });
-  if (referenceValues.length === 1) {
+  appendVideoReferenceImagesToContent(
+    content,
+    referenceValues,
+    referenceMode,
+    hasNonImageReferences
+  );
+
+  for (const url of params.referenceVideoUrls ?? []) {
     content.push({
-      type: "image_url",
-      image_url: { url: referenceValues[0] },
-      role: "first_frame",
+      type: "video_url",
+      video_url: { url },
+      role: "reference_video",
     });
-  } else if (referenceValues.length > 1) {
-    for (const url of referenceValues) {
-      content.push({
-        type: "image_url",
-        image_url: { url },
-        role: "reference_image",
-      });
-    }
+  }
+  for (const url of params.referenceAudioUrls ?? []) {
+    content.push({
+      type: "audio_url",
+      audio_url: { url },
+      role: "reference_audio",
+    });
   }
 
   const body: Record<string, unknown> = {
@@ -1319,13 +1582,25 @@ export function buildVolcanoVideoGenerationBody(params: {
       continue;
     }
 
-    const raw = params.params?.[field.name];
+    const raw = mergedParams[field.name];
     const value =
       raw === undefined || raw === null || raw === ""
         ? field.default
         : raw;
 
     if (value === undefined || value === null || value === "") {
+      continue;
+    }
+
+    if (field.type === "boolean") {
+      body[field.apiName] = value === true;
+      continue;
+    }
+
+    if (field.apiName === "web_search") {
+      if (value === true) {
+        body.tools = [{ type: "web_search" }];
+      }
       continue;
     }
 

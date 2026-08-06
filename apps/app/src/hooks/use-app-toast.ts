@@ -19,5 +19,8 @@ export function useAppToast() {
     errorRaw(message: string) {
       toast.error(message);
     },
+    info(key: TranslationKey, params?: Record<string, string | number>) {
+      toast.info(t(key, params));
+    },
   };
 }

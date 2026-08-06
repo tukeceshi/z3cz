@@ -330,6 +330,13 @@
       "when": 1787160000000,
       "tag": "0048_curated_image_model_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1787240000000,
+      "tag": "0049_seedance_video_generation_fields",
+      "breakpoints": true
     }
   ]
 }

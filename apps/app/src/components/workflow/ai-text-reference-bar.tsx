@@ -76,21 +76,29 @@ function ReferenceChipMediaThumb({
   });
   const url = displayUrl ?? chip.previewUrl;
 
-  if (url && chip.kind === "image") {
-    return (
+  const mediaContent =
+    url && chip.kind === "image" ? (
       <img
         src={url}
         alt={chip.label}
         className="h-full w-full object-cover"
       />
+    ) : url && chip.kind === "video" ? (
+      <video src={url} className="h-full w-full object-cover" muted />
+    ) : (
+      <span className="text-muted-foreground">{fallbackIcon}</span>
     );
-  }
 
-  if (url && chip.kind === "video") {
-    return <video src={url} className="h-full w-full object-cover" muted />;
-  }
-
-  return <span className="text-muted-foreground">{fallbackIcon}</span>;
+  return (
+    <>
+      {mediaContent}
+      {chip.overlayLabel ? (
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-0.5 py-px text-center text-[9px] font-medium leading-tight text-white">
+          {chip.overlayLabel}
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 function ReferenceHoverPreview({
@@ -249,19 +257,26 @@ export function AiTextReferenceBar({
     []
   );
 
+  const confirmDisconnect = () => {
+    if (pendingDisconnectId) {
+      onDisconnect(pendingDisconnectId);
+    }
+    setPendingDisconnectId(null);
+  };
+
   return (
     <div className="relative flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
         <div
           key={chip.edgeId}
-          className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background"
+          className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
           onMouseEnter={(event) => handleChipMouseEnter(chip, event)}
           onMouseLeave={() => handleChipMouseLeave(chip)}
         >
           {onInjectChip ? (
             <button
               type="button"
-              className="nodrag flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
+              className="nodrag relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
               disabled={disabled}
               onClick={() => onInjectChip(chip)}
               title={chip.label}
@@ -273,7 +288,7 @@ export function AiTextReferenceBar({
             </button>
           ) : (
             <div
-              className="nodrag flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
+              className="nodrag relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
               title={chip.label}
             >
               <ReferenceChipMediaThumb
@@ -366,7 +381,13 @@ export function AiTextReferenceBar({
           if (!open) setPendingDisconnectId(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            confirmDisconnect();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t("workflow.aiTextPanel.disconnectConfirmTitle")}
@@ -377,14 +398,7 @@ export function AiTextReferenceBar({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingDisconnectId) {
-                  onDisconnect(pendingDisconnectId);
-                }
-                setPendingDisconnectId(null);
-              }}
-            >
+            <AlertDialogAction autoFocus onClick={confirmDisconnect}>
               {t("workflow.aiTextPanel.disconnectConfirmAction")}
             </AlertDialogAction>
           </AlertDialogFooter>

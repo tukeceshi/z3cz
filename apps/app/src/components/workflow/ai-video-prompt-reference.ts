@@ -1,5 +1,4 @@
 import {
-  AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   type MediaReference,
@@ -16,6 +15,7 @@ import {
   collectGenerativeReferenceChips,
   type GenerativeReferenceChip,
 } from "./generative-reference-utils";
+import { classifyAiVideoReferenceFromNodeType } from "./ai-video-node-utils";
 import { isGenerativeManualContent } from "./generative-card-mode-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
@@ -199,17 +199,16 @@ export function collectAiVideoUnifiedReferenceChips(params: {
     resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: () => "text",
   });
-  const imageChips = collectGenerativeReferenceChips({
+  const mediaChips = collectGenerativeReferenceChips({
     nodeId: params.nodeId,
     targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
     createObjectUrl: params.createObjectUrl,
     resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
-    classifyKind: (nodeType) =>
-      nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
+    classifyKind: (nodeType) => classifyAiVideoReferenceFromNodeType(nodeType),
   });
-  return [...promptChips, ...imageChips];
+  return [...promptChips, ...mediaChips];
 }
 
 /** Canvas card drop: AI text output → AI video prompt (unified left handle). */

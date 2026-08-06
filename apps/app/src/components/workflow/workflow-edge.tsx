@@ -31,6 +31,7 @@ import {
   AI_TEXT_OUTPUT_ID,
 } from "./ai-text-node-utils";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
+import { useWorkflowActions } from "./workflow-context";
 import { WorkflowEdgeType } from "./workflow-types";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -214,6 +215,7 @@ export const WorkflowConnectionLine = memo(
     connectionStatus,
   }: ConnectionLineComponentProps) => {
     const connection = useConnection();
+    const { generativeReferenceCatalogs } = useWorkflowActions();
     const nodeLookup = useStore((state) => state.nodeLookup);
     const edges = useStore((state) => state.edges);
     const domNode = useStore((state) => state.domNode);
@@ -242,9 +244,18 @@ export const WorkflowConnectionLine = memo(
               connection: preview,
               nodes: flowNodes,
               edges,
+              generativeReferenceCatalogs,
             })
         ),
-      [connection, domNode, edges, flowNodes, nodeLookup, transform]
+      [
+        connection,
+        domNode,
+        edges,
+        flowNodes,
+        generativeReferenceCatalogs,
+        nodeLookup,
+        transform,
+      ]
     );
 
     const snapped = generativeSnap;

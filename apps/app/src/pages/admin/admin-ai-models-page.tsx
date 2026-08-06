@@ -1,6 +1,7 @@
 import {
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  DEFAULT_VIDEO_GENERATION_FIELDS,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
   isImageModelParameterRules,
   isTextModelParameterRules,
@@ -24,7 +25,9 @@ import ChevronUpIcon from "lucide-react/icons/chevron-up";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { parseNonNegativeInt } from "@/components/workflow/generative-reference-metadata";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { useTranslation } from "@/components/locale-provider";
 import {
   GROUP_ICON_OPTIONS,
@@ -47,6 +50,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  SURFACE_BORDER,
+  SURFACE_ROW_HOVER,
+} from "@/components/ui/surface";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -63,17 +70,17 @@ import {
   GenerationFeaturesEditor,
   ImageCountEditor,
   SizePolicyEditor,
+  VideoDurationEditor,
   useGenerationOptionLabels,
 } from "./admin-generation-field-editors";
 import {
   ADMIN_CONTROL_CLASS,
   ADMIN_CONTROL_WIDTH_CLASS,
   ADMIN_NO_GROUP_VALUE,
+  ADMIN_PARAM_HINT_CLASS,
   AdminModelList,
-  CollapsibleSettingsSection,
   ImageModelBasicFields,
   MbField,
-  ModelBasicFields,
   ModelSettingsDialogShell,
   NumberField,
   SettingsSection,
@@ -82,6 +89,22 @@ import {
 const BYTES_PER_MB = 1024 * 1024;
 
 type AdminModelModality = "text" | "image" | "video";
+
+function ensureVideoGenerationFieldsForSave(
+  fields: readonly UpstreamParamProfileField[]
+): UpstreamParamProfileField[] {
+  const withoutCount = fields.filter((field) => field.name !== "generate_count");
+  if (withoutCount.some((field) => field.name === "duration")) {
+    return withoutCount.map((field) => ({ ...field }));
+  }
+  const durationTemplate = DEFAULT_VIDEO_GENERATION_FIELDS.find(
+    (field) => field.name === "duration"
+  );
+  if (!durationTemplate) {
+    return withoutCount.map((field) => ({ ...field }));
+  }
+  return [...withoutCount.map((field) => ({ ...field })), { ...durationTemplate }];
+}
 
 function bytesToMbInput(bytes: number): string {
   const mb = bytes / BYTES_PER_MB;
@@ -302,17 +325,15 @@ export function AdminAiModelsPage() {
   const renderModelPanel = (emptyLabel: string, description: string) => (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{description}</p>
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <AdminModelList
-          models={models}
-          groups={orderedGroups}
-          emptyLabel={emptyLabel}
-          isLoading={isLoading}
-          savingId={savingId}
-          onToggle={handleToggle}
-          onOpenSettings={setSettingsModel}
-        />
-      </div>
+      <AdminModelList
+        models={models}
+        groups={orderedGroups}
+        emptyLabel={emptyLabel}
+        isLoading={isLoading}
+        savingId={savingId}
+        onToggle={handleToggle}
+        onOpenSettings={setSettingsModel}
+      />
     </div>
   );
 
@@ -369,7 +390,7 @@ export function AdminAiModelsPage() {
           if (!open) resetGroupForm();
         }}
       >
-        <DialogContent className="thin-scrollbar max-h-[85vh] overflow-y-auto pr-1 sm:max-w-lg">
+        <DialogContent className={cn(LIST_SCROLL_CLASS, "max-h-[85vh] sm:max-w-lg")}>
           <DialogHeader className="space-y-1.5 text-left">
             <DialogTitle>
               {t("pages.adminAiModels.groupsTitleFor", {
@@ -390,7 +411,11 @@ export function AdminAiModelsPage() {
               orderedGroups.map((group, index) => (
                 <div
                   key={group.id}
-                  className="flex items-start gap-3 rounded-md border px-3 py-2.5"
+                  className={cn(
+                    "flex items-start gap-3 rounded-md border px-3 py-2.5",
+                    SURFACE_BORDER,
+                    SURFACE_ROW_HOVER
+                  )}
                 >
                   <div className="flex flex-col gap-0.5">
                     <Button
@@ -565,7 +590,8 @@ export function AdminAiModelsPage() {
                     <PopoverContent
                       align="start"
                       className={cn(
-                        "thin-scrollbar max-h-64 overflow-y-auto p-2 pr-3",
+                        LIST_SCROLL_CLASS,
+                        "max-h-64 p-2 pr-3",
                         ADMIN_CONTROL_WIDTH_CLASS
                       )}
                     >
@@ -627,7 +653,7 @@ export function AdminAiModelsPage() {
         </DialogContent>
       </Dialog>
 
-      {settingsModel && isTextModelParameterRules(settingsModel.parameterRules) ? (
+      {settingsModel && settingsModel.modality === "text" ? (
         <TextModelSettingsDialog
           model={settingsModel}
           groups={orderedGroups}
@@ -636,7 +662,7 @@ export function AdminAiModelsPage() {
           onSave={(patch) => handleSaveModel(settingsModel, patch)}
         />
       ) : null}
-      {settingsModel && isImageModelParameterRules(settingsModel.parameterRules) ? (
+      {settingsModel && settingsModel.modality === "image" ? (
         <ImageModelSettingsDialog
           model={settingsModel}
           groups={orderedGroups}
@@ -645,7 +671,7 @@ export function AdminAiModelsPage() {
           onSave={(patch) => handleSaveModel(settingsModel, patch)}
         />
       ) : null}
-      {settingsModel && isVideoModelParameterRules(settingsModel.parameterRules) ? (
+      {settingsModel && settingsModel.modality === "video" ? (
         <VideoModelSettingsDialog
           model={settingsModel}
           groups={orderedGroups}
@@ -682,7 +708,6 @@ function TextModelSettingsDialog({
     : DEFAULT_TEXT_MODEL_PARAMETER_RULES;
 
   const [displayName, setDisplayName] = useState(model.displayName);
-  const [description, setDescription] = useState(model.description ?? "");
   const [groupId, setGroupId] = useState(model.groupId ?? ADMIN_NO_GROUP_VALUE);
   const [promptMaxChars, setPromptMaxChars] = useState(
     String(baseRules.promptMaxChars)
@@ -733,7 +758,7 @@ function TextModelSettingsDialog({
     onSave({
       displayName: displayName.trim() || model.displayName,
       groupId: groupId === ADMIN_NO_GROUP_VALUE ? null : groupId,
-      description: description.trim(),
+      description: model.description ?? "",
       rules: {
         ...baseRules,
         promptMaxChars:
@@ -779,6 +804,7 @@ function TextModelSettingsDialog({
 
   return (
     <ModelSettingsDialogShell
+      dialogWidth="800"
       title={t("pages.adminAiModels.settingsTitle", {
         name: model.displayName,
       })}
@@ -787,43 +813,59 @@ function TextModelSettingsDialog({
       onClose={onClose}
       onSave={handleSave}
     >
-      <SettingsSection title={t("pages.adminAiModels.sectionBasic")}>
-        <ModelBasicFields
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionBasic")}
+      >
+        <ImageModelBasicFields
+          canonicalId={model.canonicalId}
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
-          description={description}
-          onDescriptionChange={setDescription}
           groupId={groupId}
           onGroupIdChange={setGroupId}
           groups={groups}
         />
       </SettingsSection>
 
-      <SettingsSection title={t("pages.adminAiModels.sectionPrompt")}>
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionPrompt")}
+      >
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.promptMaxChars")}
           value={promptMaxChars}
           onChange={setPromptMaxChars}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.keywordsMaxChars")}
           value={keywordsMaxChars}
           onChange={setKeywordsMaxChars}
         />
       </SettingsSection>
 
-      <CollapsibleSettingsSection title={t("pages.adminAiModels.sectionOutput")}>
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionOutput")}
+      >
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.outputMaxTokens")}
           value={outputMaxTokens}
           onChange={setOutputMaxTokens}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.outputMaxTokensLimit")}
           value={outputMaxTokensLimit}
           onChange={setOutputMaxTokensLimit}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.outputMaxChars")}
           value={outputMaxChars}
           onChange={(value) => {
@@ -835,55 +877,65 @@ function TextModelSettingsDialog({
             setOutputMaxChars(value);
           }}
         />
-        <p className="col-span-full text-xs text-muted-foreground">
+        <p className={cn("col-span-full", ADMIN_PARAM_HINT_CLASS)}>
           {t("pages.adminAiModels.outputMaxCharsHint")}
         </p>
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.contextWindowTokens")}
           value={contextWindowTokens}
           onChange={setContextWindowTokens}
         />
-      </CollapsibleSettingsSection>
+      </SettingsSection>
 
-      <CollapsibleSettingsSection
+      <SettingsSection
+        compact
+        columns={3}
         title={t("pages.adminAiModels.sectionReferences")}
       >
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxTextReferences")}
           value={maxTextReferences}
           onChange={setMaxTextReferences}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxTextReferenceChars")}
           value={maxTextReferenceChars}
           onChange={setMaxTextReferenceChars}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxImageReferences")}
           value={maxImageReferences}
           onChange={setMaxImageReferences}
         />
         <MbField
+          paramLabel
           label={t("pages.adminAiModels.maxImageReferenceBytes")}
           value={maxImageReferenceBytes}
           onChange={setMaxImageReferenceBytes}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferences")}
           value={maxVideoReferences}
           onChange={setMaxVideoReferences}
         />
         <MbField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferenceBytes")}
           value={maxVideoReferenceBytes}
           onChange={setMaxVideoReferenceBytes}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferenceSeconds")}
           value={maxVideoReferenceSeconds}
           onChange={setMaxVideoReferenceSeconds}
         />
-      </CollapsibleSettingsSection>
+      </SettingsSection>
     </ModelSettingsDialogShell>
   );
 }
@@ -974,9 +1026,10 @@ function ImageModelSettingsDialog({
         ...baseRules,
         sizePolicy,
         countPolicy,
-        maxReferenceImages:
-          Number(maxReferenceImages) ||
-          DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxReferenceImages,
+        maxReferenceImages: parseNonNegativeInt(
+          maxReferenceImages,
+          DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxReferenceImages
+        ),
         maxImageReferenceBytes: mbInputToBytes(
           maxImageReferenceBytes,
           DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxImageReferenceBytes
@@ -1016,7 +1069,7 @@ function ImageModelSettingsDialog({
       <SettingsSection
         compact
         columns={3}
-        title={t("pages.adminAiModels.sectionApplication")}
+        title={t("pages.adminAiModels.sectionReferences")}
       >
         <NumberField
           paramLabel
@@ -1119,7 +1172,6 @@ function VideoModelSettingsDialog({
     : DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
 
   const [displayName, setDisplayName] = useState(model.displayName);
-  const [description, setDescription] = useState(model.description ?? "");
   const [groupId, setGroupId] = useState(model.groupId ?? ADMIN_NO_GROUP_VALUE);
   const [maxReferenceImages, setMaxReferenceImages] = useState(
     String(baseRules.maxReferenceImages)
@@ -1136,30 +1188,54 @@ function VideoModelSettingsDialog({
   const [maxVideoReferenceSeconds, setMaxVideoReferenceSeconds] = useState(
     String(baseRules.maxVideoReferenceSeconds)
   );
+  const [maxReferenceAudios, setMaxReferenceAudios] = useState(
+    String(baseRules.maxReferenceAudios)
+  );
+  const [maxAudioReferenceBytes, setMaxAudioReferenceBytes] = useState(
+    bytesToMbInput(baseRules.maxAudioReferenceBytes)
+  );
+  const [maxAudioReferenceSeconds, setMaxAudioReferenceSeconds] = useState(
+    String(baseRules.maxAudioReferenceSeconds)
+  );
   const [promptMaxChars, setPromptMaxChars] = useState(
     String(baseRules.promptMaxChars)
   );
   const [generationFields, setGenerationFields] = useState<
     UpstreamParamProfileField[]
   >(baseRules.generationFields.map((field) => ({ ...field })));
+  const durationApiName =
+    generationFields.find((field) => field.name === "duration")?.apiName ??
+    "duration";
+  const durationApiNameHeader = useAdminParamApiNameAddon(
+    durationApiName,
+    (next) => {
+      setGenerationFields((fields) =>
+        fields.map((field) =>
+          field.name === "duration" ? { ...field, apiName: next } : field
+        )
+      );
+    }
+  );
 
   const handleSave = () => {
     onSave({
       displayName: displayName.trim() || model.displayName,
       groupId: groupId === ADMIN_NO_GROUP_VALUE ? null : groupId,
-      description: description.trim(),
+      description: model.description ?? "",
       rules: {
         ...baseRules,
-        maxReferenceImages:
-          Number(maxReferenceImages) ||
-          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceImages,
+        maxReferenceImages: parseNonNegativeInt(
+          maxReferenceImages,
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceImages
+        ),
         maxImageReferenceBytes: mbInputToBytes(
           maxImageReferenceBytes,
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxImageReferenceBytes
         ),
-        maxReferenceVideos:
-          Number(maxReferenceVideos) ||
-          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos,
+        maxReferenceVideos: parseNonNegativeInt(
+          maxReferenceVideos,
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos
+        ),
         maxVideoReferenceBytes: mbInputToBytes(
           maxVideoReferenceBytes,
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceBytes
@@ -1167,74 +1243,129 @@ function VideoModelSettingsDialog({
         maxVideoReferenceSeconds:
           Number(maxVideoReferenceSeconds) ||
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
+        maxReferenceAudios: parseNonNegativeInt(
+          maxReferenceAudios,
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceAudios
+        ),
+        maxAudioReferenceBytes: mbInputToBytes(
+          maxAudioReferenceBytes,
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxAudioReferenceBytes
+        ),
+        maxAudioReferenceSeconds:
+          Number(maxAudioReferenceSeconds) ||
+          DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxAudioReferenceSeconds,
         promptMaxChars:
           Number(promptMaxChars) ||
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
-        generationFields,
+        generationFields: ensureVideoGenerationFieldsForSave(generationFields),
       },
     });
   };
 
   return (
     <ModelSettingsDialogShell
+      dialogWidth="800"
       title={t("pages.adminAiModels.settingsTitle", { name: model.displayName })}
       description={t("pages.adminAiModels.videoSettingsDescription")}
       saving={saving}
       onClose={onClose}
       onSave={handleSave}
     >
-      <SettingsSection title={t("pages.adminAiModels.sectionBasic")}>
-        <ModelBasicFields
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionBasic")}
+      >
+        <ImageModelBasicFields
+          canonicalId={model.canonicalId}
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
-          description={description}
-          onDescriptionChange={setDescription}
           groupId={groupId}
           onGroupIdChange={setGroupId}
           groups={groups}
-          promptMaxChars={promptMaxChars}
-          onPromptMaxCharsChange={setPromptMaxChars}
         />
       </SettingsSection>
 
-      <SettingsSection title={t("pages.adminAiModels.sectionReferences")}>
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionReferences")}
+      >
         <NumberField
+          paramLabel
+          label={t("pages.adminAiModels.promptMaxChars")}
+          value={promptMaxChars}
+          onChange={setPromptMaxChars}
+        />
+        <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxImageReferences")}
           value={maxReferenceImages}
           onChange={setMaxReferenceImages}
         />
         <MbField
+          paramLabel
           label={t("pages.adminAiModels.maxImageReferenceBytes")}
           value={maxImageReferenceBytes}
           onChange={setMaxImageReferenceBytes}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferences")}
           value={maxReferenceVideos}
           onChange={setMaxReferenceVideos}
         />
         <MbField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferenceBytes")}
           value={maxVideoReferenceBytes}
           onChange={setMaxVideoReferenceBytes}
         />
         <NumberField
+          paramLabel
           label={t("pages.adminAiModels.maxVideoReferenceSeconds")}
           value={maxVideoReferenceSeconds}
           onChange={setMaxVideoReferenceSeconds}
         />
+        <NumberField
+          paramLabel
+          label={t("pages.adminAiModels.maxAudioReferences")}
+          value={maxReferenceAudios}
+          onChange={setMaxReferenceAudios}
+        />
+        <MbField
+          paramLabel
+          label={t("pages.adminAiModels.maxAudioReferenceBytes")}
+          value={maxAudioReferenceBytes}
+          onChange={setMaxAudioReferenceBytes}
+        />
+        <NumberField
+          paramLabel
+          label={t("pages.adminAiModels.maxAudioReferenceSeconds")}
+          value={maxAudioReferenceSeconds}
+          onChange={setMaxAudioReferenceSeconds}
+        />
       </SettingsSection>
 
-      <SettingsSection title={t("pages.adminAiModels.sectionFeatures")}>
-        <div className="col-span-full rounded-lg border border-border/60 bg-background p-3">
-          <GenerationFeaturesEditor
-            fields={generationFields}
-            modality="video"
-            optionLabels={optionLabels}
-            onChange={setGenerationFields}
-          />
-        </div>
+      <SettingsSection
+        compact
+        stacked
+        title={t("pages.adminAiModels.videoDurationLabel")}
+        titleAddon={durationApiNameHeader.titleAddon}
+      >
+        <VideoDurationEditor
+          fields={generationFields}
+          onFieldsChange={setGenerationFields}
+        />
       </SettingsSection>
+
+      <GenerationFeaturesEditor
+        fields={generationFields}
+        modality="video"
+        layout="flat"
+        optionLabels={optionLabels}
+        onChange={setGenerationFields}
+      />
     </ModelSettingsDialogShell>
   );
 }

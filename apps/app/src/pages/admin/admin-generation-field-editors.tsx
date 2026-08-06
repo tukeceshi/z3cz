@@ -1,15 +1,21 @@
 import {
+  buildDurationOptions,
   buildGenerateCountOptions,
   DEFAULT_IMAGE_GENERATION_FIELDS,
   DEFAULT_VIDEO_GENERATION_FIELDS,
   formatImageGenerationOptionLabel,
   IMAGE_GENERATION_FIELD_CATALOG,
+  VIDEO_DURATION_MAX,
+  VIDEO_DURATION_MIN,
+  VIDEO_GENERATION_FIELD_CATALOG,
   type GenerationCountEffectMode,
   type GenerationCountPolicy,
   type GenerationSizeEffectMode,
   type UpstreamParamProfileField,
   normalizeGenerationCountEffectMode,
 } from "@dafthunk/types";
+
+import { useCallback } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
@@ -41,6 +47,9 @@ export const ADMIN_ENUM_CHIP_CLASS = cn(
   "inline-flex h-7 min-w-10 items-center justify-center rounded-md border px-2 text-[11px] transition-colors",
   "border-border/60 bg-background hover:bg-muted/50"
 );
+
+const ADMIN_NUMBER_INPUT_CLASS =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 function adminGenerationOptionChipClass({
   enabled,
@@ -85,9 +94,14 @@ function AdminGenerationOptionChip({
 
 const SIZE_POLICY_FIELD_NAMES = new Set(["size", "ratio"]);
 const COUNT_FIELD_NAMES = new Set(["generate_count"]);
+const VIDEO_DURATION_FIELD_NAMES = new Set(["duration"]);
 
 function imageGenerationFieldCatalog(): readonly UpstreamParamProfileField[] {
   return IMAGE_GENERATION_FIELD_CATALOG;
+}
+
+function videoGenerationFieldCatalog(): readonly UpstreamParamProfileField[] {
+  return VIDEO_GENERATION_FIELD_CATALOG;
 }
 
 function normalizeSizeEffectMode(
@@ -109,6 +123,8 @@ export interface GenerationOptionLabels {
   readonly size4K: string;
   readonly optimizePromptStandard: string;
   readonly optimizePromptFast: string;
+  readonly referenceModeReferenceImage: string;
+  readonly referenceModeFirstLastFrame: string;
 }
 
 function formatAdminGenerationOptionLabel(
@@ -116,6 +132,10 @@ function formatAdminGenerationOptionLabel(
   option: string,
   labels: GenerationOptionLabels
 ): string {
+  const videoLabel = formatAdminVideoGenerationOptionLabel(fieldName, option, labels);
+  if (videoLabel !== option) {
+    return videoLabel;
+  }
   const smart = formatImageGenerationOptionLabel(fieldName, option, labels.smartOption, {
     optimizePromptStandard: labels.optimizePromptStandard,
     optimizePromptFast: labels.optimizePromptFast,
@@ -132,6 +152,25 @@ function formatAdminGenerationOptionLabel(
   return option;
 }
 
+function formatAdminVideoGenerationOptionLabel(
+  fieldName: string,
+  option: string,
+  labels: {
+    readonly referenceModeReferenceImage: string;
+    readonly referenceModeFirstLastFrame: string;
+  }
+): string {
+  if (fieldName === "reference_mode") {
+    if (option === "reference_image") {
+      return labels.referenceModeReferenceImage;
+    }
+    if (option === "first_last_frame") {
+      return labels.referenceModeFirstLastFrame;
+    }
+  }
+  return option;
+}
+
 function catalogEnumOptions(
   field: UpstreamParamProfileField,
   modality: "image" | "video"
@@ -139,7 +178,7 @@ function catalogEnumOptions(
   const catalog =
     modality === "image"
       ? imageGenerationFieldCatalog()
-      : DEFAULT_VIDEO_GENERATION_FIELDS;
+      : videoGenerationFieldCatalog();
   const catalogValues =
     catalog.find((entry) => entry.name === field.name)?.enumValues ?? [];
   const current = field.enumValues ?? [];
@@ -491,6 +530,152 @@ export function ImageCountEditor({
   );
 }
 
+function resolveMinDurationFromField(
+  field: UpstreamParamProfileField
+): number {
+  const fromEnum = (field.enumValues ?? [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1);
+  if (fromEnum.length > 0) {
+    return Math.min(...fromEnum);
+  }
+  return VIDEO_DURATION_MIN;
+}
+
+function resolveMaxDurationFromField(
+  field: UpstreamParamProfileField
+): number {
+  const fromEnum = (field.enumValues ?? [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1);
+  if (fromEnum.length > 0) {
+    return Math.max(...fromEnum);
+  }
+  return VIDEO_DURATION_MAX;
+}
+
+function resolveDefaultDurationFromField(
+  field: UpstreamParamProfileField
+): number {
+  const raw = field.default;
+  const parsed = typeof raw === "number" ? raw : Number(raw);
+  if (Number.isFinite(parsed) && parsed >= 1) {
+    return Math.floor(parsed);
+  }
+  return 5;
+}
+
+export function VideoDurationEditor({
+  fields,
+  onFieldsChange,
+}: {
+  readonly fields: readonly UpstreamParamProfileField[];
+  readonly onFieldsChange: (fields: UpstreamParamProfileField[]) => void;
+}) {
+  const { t } = useTranslation();
+  const template = DEFAULT_VIDEO_GENERATION_FIELDS.find(
+    (field) => field.name === "duration"
+  );
+  const durationField = fields.find((field) => field.name === "duration");
+  const working = durationField ?? template;
+
+  if (!working) {
+    return null;
+  }
+
+  const minDuration = resolveMinDurationFromField(working);
+  const maxDuration = resolveMaxDurationFromField(working);
+  const defaultDuration = Math.min(
+    resolveDefaultDurationFromField(working),
+    maxDuration
+  );
+
+  const setDurationField = (next: UpstreamParamProfileField) => {
+    if (durationField) {
+      onFieldsChange(
+        fields.map((field) => (field.name === "duration" ? next : field))
+      );
+      return;
+    }
+    onFieldsChange([...fields, next]);
+  };
+
+  const handleMinDurationChange = (value: string) => {
+    const nextMin = Math.max(1, Math.floor(Number(value)) || VIDEO_DURATION_MIN);
+    const nextMax = Math.max(nextMin, maxDuration);
+    setDurationField({
+      ...working,
+      enumValues: [...buildDurationOptions(nextMin, nextMax)],
+      default: Math.min(Math.max(defaultDuration, nextMin), nextMax),
+    });
+  };
+
+  const handleMaxDurationChange = (value: string) => {
+    const nextMax = Math.max(
+      minDuration,
+      Math.floor(Number(value)) || VIDEO_DURATION_MAX
+    );
+    setDurationField({
+      ...working,
+      enumValues: [...buildDurationOptions(minDuration, nextMax)],
+      default: Math.min(Math.max(defaultDuration, minDuration), nextMax),
+    });
+  };
+
+  const handleDefaultDurationChange = (value: string) => {
+    const nextDefault = Math.min(
+      maxDuration,
+      Math.max(minDuration, Math.floor(Number(value)) || minDuration)
+    );
+    setDurationField({
+      ...working,
+      default: nextDefault,
+    });
+  };
+
+  return (
+    <div className={ADMIN_SETTINGS_GRID_CLASS}>
+      <div className="space-y-1.5">
+        <Label className={ADMIN_PARAM_LABEL_CLASS}>
+          {t("pages.adminAiModels.videoDurationMinLabel")}
+        </Label>
+        <Input
+          type="number"
+          min={1}
+          className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
+          value={minDuration}
+          onChange={(event) => handleMinDurationChange(event.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className={ADMIN_PARAM_LABEL_CLASS}>
+          {t("pages.adminAiModels.videoDurationMaxLabel")}
+        </Label>
+        <Input
+          type="number"
+          min={minDuration}
+          className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
+          value={maxDuration}
+          onChange={(event) => handleMaxDurationChange(event.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className={ADMIN_PARAM_LABEL_CLASS}>
+          {t("pages.adminAiModels.videoDurationDefaultLabel")}
+        </Label>
+        <Input
+          type="number"
+          min={minDuration}
+          max={maxDuration}
+          className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
+          value={defaultDuration}
+          onChange={(event) => handleDefaultDurationChange(event.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function getGenerationFeatureRows(
   fields: readonly UpstreamParamProfileField[],
   modality: "image" | "video"
@@ -498,7 +683,7 @@ function getGenerationFeatureRows(
   const catalog =
     modality === "image"
       ? imageGenerationFieldCatalog()
-      : DEFAULT_VIDEO_GENERATION_FIELDS;
+      : videoGenerationFieldCatalog();
   const catalogVisible = catalog.filter((field) => {
     if (field.hidden) return false;
     if (modality === "image") {
@@ -507,7 +692,7 @@ function getGenerationFeatureRows(
         !COUNT_FIELD_NAMES.has(field.name)
       );
     }
-    return true;
+    return !VIDEO_DURATION_FIELD_NAMES.has(field.name);
   });
   const catalogNames = new Set(catalog.map((field) => field.name));
   const extraVisible = fields.filter(
@@ -515,7 +700,8 @@ function getGenerationFeatureRows(
       !field.hidden &&
       !catalogNames.has(field.name) &&
       !SIZE_POLICY_FIELD_NAMES.has(field.name) &&
-      !COUNT_FIELD_NAMES.has(field.name)
+      !COUNT_FIELD_NAMES.has(field.name) &&
+      !VIDEO_DURATION_FIELD_NAMES.has(field.name)
   );
   return [...catalogVisible, ...extraVisible];
 }
@@ -618,6 +804,47 @@ function GenerationFeatureRowContent({
   );
 }
 
+function useGenerationFieldTitleResolver(modality: "image" | "video") {
+  const { t } = useTranslation();
+
+  return useCallback(
+    (template: UpstreamParamProfileField): string => {
+      const fallback = template.description || template.name;
+      if (modality !== "video") {
+        return fallback;
+      }
+
+      switch (template.name) {
+        case "ratio":
+          return t("pages.adminAiModels.videoFieldLabels.ratio");
+        case "duration":
+          return t("pages.adminAiModels.videoFieldLabels.duration");
+        case "resolution":
+          return t("pages.adminAiModels.videoFieldLabels.resolution");
+        case "generate_audio":
+          return t("pages.adminAiModels.videoFieldLabels.generate_audio");
+        case "watermark":
+          return t("pages.adminAiModels.videoFieldLabels.watermark");
+        case "seed":
+          return t("pages.adminAiModels.videoFieldLabels.seed");
+        case "reference_mode":
+          return t("pages.adminAiModels.videoFieldLabels.reference_mode");
+        case "web_search":
+          return t("pages.adminAiModels.videoFieldLabels.web_search");
+        case "virtual_avatar_library":
+          return t("pages.adminAiModels.videoFieldLabels.virtual_avatar_library");
+        case "return_last_frame":
+          return t("pages.adminAiModels.videoFieldLabels.return_last_frame");
+        case "execution_expires_after":
+          return t("pages.adminAiModels.videoFieldLabels.execution_expires_after");
+        default:
+          return fallback;
+      }
+    },
+    [modality, t]
+  );
+}
+
 function FlatFeatureParamSection({
   template,
   active,
@@ -638,6 +865,7 @@ function FlatFeatureParamSection({
   readonly onFieldChange: (next: UpstreamParamProfileField) => void;
 }) {
   const working = active ?? template;
+  const resolveFieldTitle = useGenerationFieldTitleResolver(modality);
   const hasApiName = Boolean(working.apiName?.trim());
   const { titleAddon } = useAdminParamApiNameAddon(
     working.apiName ?? "",
@@ -653,7 +881,7 @@ function FlatFeatureParamSection({
     <SettingsSection
       compact
       stacked
-      title={template.description || template.name}
+      title={resolveFieldTitle(template)}
       titleAddon={
         hasApiName ? (
           enabled ? (
@@ -695,10 +923,11 @@ export function GenerationFeaturesEditor({
   readonly layout?: "grouped" | "flat";
   readonly onChange: (fields: UpstreamParamProfileField[]) => void;
 }) {
+  const resolveFieldTitle = useGenerationFieldTitleResolver(modality);
   const catalog =
     modality === "image"
       ? imageGenerationFieldCatalog()
-      : DEFAULT_VIDEO_GENERATION_FIELDS;
+      : videoGenerationFieldCatalog();
   const rows = getGenerationFeatureRows(fields, modality);
   const fieldByName = new Map(fields.map((field) => [field.name, field]));
 
@@ -767,7 +996,7 @@ export function GenerationFeaturesEditor({
           <div key={template.name} className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <Label className={ADMIN_PARAM_LABEL_CLASS}>
-                {template.description || template.name}
+                {resolveFieldTitle(template)}
               </Label>
               <Switch
                 checked={enabled}
@@ -801,5 +1030,11 @@ export function useGenerationOptionLabels(): GenerationOptionLabels {
     size4K: t("workflow.aiImagePanel.sizeLabel4K"),
     optimizePromptStandard: t("workflow.aiImagePanel.optimizePromptStandard"),
     optimizePromptFast: t("workflow.aiImagePanel.optimizePromptFast"),
+    referenceModeReferenceImage: t(
+      "pages.adminAiModels.videoReferenceMode.referenceImage"
+    ),
+    referenceModeFirstLastFrame: t(
+      "pages.adminAiModels.videoReferenceMode.firstLastFrame"
+    ),
   };
 }

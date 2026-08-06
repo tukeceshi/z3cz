@@ -3,24 +3,37 @@ import {
   AI_VIDEO_NODE_TYPE,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
   normalizeVideoModelParameterRules,
+  referencesFitVideoModelReferenceLimits,
+  type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
+import { AI_AUDIO_OUTPUT_ID } from "./ai-audio-node-utils";
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
 import {
+  readVideoReferenceLimitsFromMetadata,
+  REF_MAX_AUDIOS_META_KEY,
+  REF_MAX_IMAGES_META_KEY,
+  REF_MAX_VIDEOS_META_KEY,
+} from "./generative-reference-metadata";
+import {
+  AI_VIDEO_OUTPUT_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
-  countAiVideoReferences,
+  classifyAiVideoReferenceFromNodeType,
+  countAiVideoReferenceCounts,
   isAiVideoAllowedReferenceNodeType,
   isAiVideoReferenceTarget,
-  referencesFitVideoModelLimits,
+  type AiVideoReferenceKind,
 } from "./ai-video-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export type AiVideoReferenceRejectReason =
   | "unsupported_source"
   | "self_connection"
-  | "image_limit";
+  | "image_limit"
+  | "video_limit"
+  | "audio_limit";
 
 export interface AiVideoReferenceVerdict {
   readonly ok: boolean;
@@ -56,6 +69,22 @@ function readModelId(targetNodeData: WorkflowNodeType): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function expectedSourceHandle(kind: AiVideoReferenceKind): string {
+  if (kind === "image") return AI_IMAGE_OUTPUT_ID;
+  if (kind === "video") return AI_VIDEO_OUTPUT_ID;
+  return AI_AUDIO_OUTPUT_ID;
+}
+
+function maxForKind(
+  rules: VideoModelParameterRules,
+  kind: AiVideoReferenceKind
+): number {
+  const normalized = normalizeVideoModelParameterRules(rules);
+  if (kind === "image") return normalized.maxReferenceImages;
+  if (kind === "video") return normalized.maxReferenceVideos;
+  return normalized.maxReferenceAudios;
+}
+
 export function resolveAiVideoReferenceRules(params: {
   readonly targetNodeData: WorkflowNodeType;
   readonly models?: readonly AiVideoReferenceModelOption[];
@@ -70,18 +99,66 @@ export function resolveAiVideoReferenceRules(params: {
     }
   }
 
+  const metadata = params.targetNodeData.metadata;
+  if (
+    metadata?.[REF_MAX_IMAGES_META_KEY] !== undefined ||
+    metadata?.[REF_MAX_VIDEOS_META_KEY] !== undefined ||
+    metadata?.[REF_MAX_AUDIOS_META_KEY] !== undefined
+  ) {
+    const limits = readVideoReferenceLimitsFromMetadata(
+      metadata,
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES
+    );
+    return normalizeVideoModelParameterRules({
+      ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+      ...limits,
+    });
+  }
+
   return DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
+}
+
+function referencesFitResolvedVideoLimits(
+  counts: SubmitAiVideoMediaReferenceCounts,
+  rules: VideoModelParameterRules
+): boolean {
+  return referencesFitVideoModelReferenceLimits(counts, rules);
 }
 
 /** Count / limit check for panel pick lists (no target edge context). */
 export function canAcceptAiVideoReference(params: {
   readonly rules: VideoModelParameterRules;
-  readonly currentCount: number;
+  readonly kind: AiVideoReferenceKind;
+  readonly currentCounts: SubmitAiVideoMediaReferenceCounts;
+  readonly targetNodeData?: WorkflowNodeType;
 }): { readonly ok: boolean } {
   const rules = normalizeVideoModelParameterRules(params.rules);
-  if (params.currentCount >= rules.maxReferenceImages) {
+  const limit = maxForKind(rules, params.kind);
+  const current =
+    params.kind === "image"
+      ? params.currentCounts.imageCount
+      : params.kind === "video"
+        ? params.currentCounts.videoCount
+        : params.currentCounts.audioCount;
+  if (current >= limit) {
     return { ok: false };
   }
+
+  const nextCounts: SubmitAiVideoMediaReferenceCounts = {
+    imageCount:
+      params.currentCounts.imageCount + (params.kind === "image" ? 1 : 0),
+    videoCount:
+      params.currentCounts.videoCount + (params.kind === "video" ? 1 : 0),
+    audioCount:
+      params.currentCounts.audioCount + (params.kind === "audio" ? 1 : 0),
+  };
+
+  if (params.targetNodeData) {
+    return {
+      ok: referencesFitResolvedVideoLimits(nextCounts, rules),
+    };
+  }
+
   return { ok: true };
 }
 
@@ -92,8 +169,10 @@ export function evaluateAiVideoReferenceStructural(
     return { ok: false, reason: "self_connection", phase: "structural" };
   }
 
+  const kind = classifyAiVideoReferenceFromNodeType(context.sourceNodeType);
   if (
-    context.sourceHandle !== AI_IMAGE_OUTPUT_ID ||
+    !kind ||
+    context.sourceHandle !== expectedSourceHandle(kind) ||
     !isAiVideoAllowedReferenceNodeType(context.sourceNodeType)
   ) {
     return { ok: false, reason: "unsupported_source", phase: "structural" };
@@ -104,17 +183,34 @@ export function evaluateAiVideoReferenceStructural(
     models: context.models,
   });
 
-  const existing = countAiVideoReferences(context.targetNodeId, context.edges);
+  const existing = countAiVideoReferenceCounts(
+    context.targetNodeId,
+    context.edges,
+    context.nodes.map((node) => ({ id: node.id, data: node.data }))
+  );
   const isReplacement = context.edges.some(
     (edge) =>
       edge.source === context.sourceNodeId &&
       edge.target === context.targetNodeId &&
       edge.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID
   );
-  const nextCount = isReplacement ? existing : existing + 1;
 
-  if (!referencesFitVideoModelLimits(nextCount, rules)) {
-    return { ok: false, reason: "image_limit", phase: "structural" };
+  const nextCounts: SubmitAiVideoMediaReferenceCounts = isReplacement
+    ? existing
+    : {
+        imageCount: existing.imageCount + (kind === "image" ? 1 : 0),
+        videoCount: existing.videoCount + (kind === "video" ? 1 : 0),
+        audioCount: existing.audioCount + (kind === "audio" ? 1 : 0),
+      };
+
+  if (!referencesFitResolvedVideoLimits(nextCounts, rules)) {
+    if (kind === "image") {
+      return { ok: false, reason: "image_limit", phase: "structural" };
+    }
+    if (kind === "video") {
+      return { ok: false, reason: "video_limit", phase: "structural" };
+    }
+    return { ok: false, reason: "audio_limit", phase: "structural" };
   }
 
   return { ok: true, phase: "structural" };
@@ -137,12 +233,14 @@ export function listPickableAiVideoReferenceSources(params: {
 
   for (const node of params.nodes) {
     if (node.id === params.targetNodeId) continue;
-    if (!isAiVideoAllowedReferenceNodeType(node.data.nodeType)) continue;
+    const kind = classifyAiVideoReferenceFromNodeType(node.data.nodeType);
+    if (!kind) continue;
 
+    const sourceHandle = expectedSourceHandle(kind);
     const verdict = evaluateAiVideoReferenceStructural({
       targetNodeId: params.targetNodeId,
       sourceNodeId: node.id,
-      sourceHandle: AI_IMAGE_OUTPUT_ID,
+      sourceHandle,
       sourceNodeType: node.data.nodeType,
       targetNodeData: params.targetNodeData,
       edges: params.edges,
@@ -159,7 +257,7 @@ export function listPickableAiVideoReferenceSources(params: {
     );
     if (alreadyConnected) continue;
 
-    results.push({ nodeId: node.id, sourceHandle: AI_IMAGE_OUTPUT_ID });
+    results.push({ nodeId: node.id, sourceHandle });
   }
 
   return results;
@@ -173,19 +271,21 @@ interface FlowConnectionLike {
   } | null;
 }
 
-/** Canvas drag: image output from an AI image node into a reference slot. */
+/** Canvas drag: media output into a video reference slot. */
 export function isIncomingAiVideoReferenceConnection(
   connection: FlowConnectionLike
 ): boolean {
   if (!connection.fromNode) return false;
   const fromHandle = connection.fromHandle;
-  const isSourceDrag =
-    fromHandle?.type === "source" || fromHandle?.id === AI_IMAGE_OUTPUT_ID;
-  if (!isSourceDrag) return false;
-
   const fromType = (connection.fromNode.data as WorkflowNodeType | undefined)
     ?.nodeType;
-  return isAiVideoAllowedReferenceNodeType(fromType);
+  const kind = classifyAiVideoReferenceFromNodeType(fromType);
+  if (!kind) return false;
+
+  const expectedHandle = expectedSourceHandle(kind);
+  const isSourceDrag =
+    fromHandle?.type === "source" || fromHandle?.id === expectedHandle;
+  return isSourceDrag;
 }
 
 /** Whole-card drop while dragging a reference onto / from AI video. */
@@ -218,9 +318,13 @@ export function buildAiVideoReferenceConnectionFromCardDrop(params: {
     );
     if (targetNode?.data.nodeType !== AI_VIDEO_NODE_TYPE) return null;
     if (sourceNode?.data.nodeType === AI_TEXT_NODE_TYPE) return null;
+
+    const kind = classifyAiVideoReferenceFromNodeType(sourceNode?.data.nodeType);
+    if (!kind) return null;
+
     return {
       source: params.dragFromNodeId,
-      sourceHandle: params.dragFromHandle.id ?? AI_IMAGE_OUTPUT_ID,
+      sourceHandle: params.dragFromHandle.id ?? expectedSourceHandle(kind),
       target: params.hoveredNodeId,
       targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
     };

@@ -13,6 +13,8 @@ import {
 } from "./generative-connection-preview";
 import type { AiTextConnectionContext } from "./ai-text-connection-utils";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
+import { useWorkflowActions } from "./workflow-context";
+import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 function readNodeType(node: InternalNode<Node> | undefined): string | undefined {
@@ -43,7 +45,8 @@ export function findGenerativeConnectionHighlightTargetId(
   edges: readonly Pick<
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "sourceHandle" | "targetHandle"
-  >[]
+  >[],
+  generativeReferenceCatalogs?: GenerativeReferenceModelCatalogs
 ): string | null {
   if (!connection.inProgress || !connection.fromNode) return null;
 
@@ -58,6 +61,7 @@ export function findGenerativeConnectionHighlightTargetId(
         connection: preview,
         nodes: flowNodes,
         edges,
+        generativeReferenceCatalogs,
       })
   );
 
@@ -81,6 +85,7 @@ export function useGenerativeConnectionHighlight(
   nodeId: string,
   enabled: boolean
 ): boolean {
+  const { generativeReferenceCatalogs } = useWorkflowActions();
   return useStore(
     useCallback(
       (state) => {
@@ -97,11 +102,12 @@ export function useGenerativeConnectionHighlight(
           state.connection,
           { domNode: state.domNode, transform: state.transform },
           state.nodeLookup,
-          state.edges
+          state.edges,
+          generativeReferenceCatalogs
         );
         return highlightTargetId === nodeId;
       },
-      [enabled, nodeId]
+      [enabled, generativeReferenceCatalogs, nodeId]
     )
   );
 }

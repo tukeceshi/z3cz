@@ -303,6 +303,7 @@ export function WorkflowBuilder({
     handlePaneClick,
     handlePaneContextMenu,
     handleAddNodeMenuSelect,
+    generativeReferenceCatalogs,
   } = useWorkflowState({
     initialNodes,
     initialEdges,
@@ -713,6 +714,7 @@ export function WorkflowBuilder({
         onRunNode={readOnly ? undefined : handleRunNode}
         generativeDefaults={generativeDefaults}
         onGenerativeDefaultChange={onGenerativeDefaultsChange}
+        generativeReferenceCatalogs={generativeReferenceCatalogs}
       >
         <CreativeStudioProvider
           workflowId={workflowId}

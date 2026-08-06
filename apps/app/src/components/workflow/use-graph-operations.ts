@@ -22,7 +22,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
+import {
+  useOrgImageModels,
+  useOrgVideoModels,
+} from "@/services/platform-ai-model-service";
 
+import {
+  buildGenerativeReferenceModelCatalogs,
+  EMPTY_GENERATIVE_REFERENCE_MODEL_CATALOGS,
+  type GenerativeReferenceModelCatalogs,
+} from "./generative-reference-model-catalogs";
 import {
   ALL_TRIGGER_NODE_TYPE_IDS,
   getTriggerNodeTypes,
@@ -376,6 +385,7 @@ export interface UseGraphOperationsReturn {
     nodeType: AiGenerativeNodeType,
     menu: WorkflowAddNodeMenuState
   ) => void;
+  generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
 }
 
 const NOOP = () => {};
@@ -395,6 +405,22 @@ export function useGraphOperations({
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   const { t } = useTranslation();
   const toast = useAppToast();
+  const { models: orgImageModels } = useOrgImageModels(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const { models: orgVideoModels } = useOrgVideoModels(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const generativeReferenceCatalogs = useMemo(
+    () =>
+      orgId
+        ? buildGenerativeReferenceModelCatalogs({
+            imageModels: orgImageModels,
+            videoModels: orgVideoModels,
+          })
+        : EMPTY_GENERATIVE_REFERENCE_MODEL_CATALOGS,
+    [orgId, orgImageModels, orgVideoModels]
+  );
   // Core state
   const [nodes, setNodes, onNodesChange] =
     useNodesState<ReactFlowNode<WorkflowNodeType>>(initialNodes);
@@ -673,6 +699,7 @@ export function useGraphOperations({
           connection: conn,
           nodes,
           edges,
+          generativeReferenceCatalogs,
           extraValidate: validateConnection,
           disabled: graphEditBlocked,
         });
@@ -680,7 +707,13 @@ export function useGraphOperations({
         setConnectionValidationState(valid ? "valid" : "invalid");
         return valid;
       },
-      [nodes, edges, validateConnection, graphEditBlocked]
+      [
+        edges,
+        generativeReferenceCatalogs,
+        graphEditBlocked,
+        nodes,
+        validateConnection,
+      ]
     );
 
   // Handle connection
@@ -695,6 +728,7 @@ export function useGraphOperations({
         nodes: nodesSnapshot,
         edges: edgesSnapshot,
         createObjectUrl,
+        generativeReferenceCatalogs,
         extraValidate: validateConnection,
         disabled: graphEditBlocked,
       });
@@ -709,7 +743,7 @@ export function useGraphOperations({
       });
       return true;
     },
-    [createObjectUrl, graphEditBlocked, setEdges, validateConnection]
+    [createObjectUrl, generativeReferenceCatalogs, graphEditBlocked, setEdges, validateConnection]
   );
 
   const commitNodesAndConnection = useCallback(
@@ -829,6 +863,7 @@ export function useGraphOperations({
               connection: drop,
               nodes: nodesRef.current,
               edges: edgesRef.current,
+              generativeReferenceCatalogs,
               disabled: graphEditBlocked,
             })
           ) {
@@ -839,7 +874,7 @@ export function useGraphOperations({
 
       setConnectionValidationState("default");
     },
-    [graphEditBlocked, onConnect, edgesRef, nodesRef, openAddNodeMenu, reactFlowInstance]
+    [generativeReferenceCatalogs, graphEditBlocked, onConnect, edgesRef, nodesRef, openAddNodeMenu, reactFlowInstance]
   );
 
   const handlePaneClick = useCallback(() => {
@@ -989,6 +1024,7 @@ export function useGraphOperations({
               connection,
               nodes: nodesWithPrepared,
               edges: edgesRef.current,
+              generativeReferenceCatalogs,
               disabled: graphEditBlocked,
             })
           ) {
@@ -1011,6 +1047,7 @@ export function useGraphOperations({
     [
       commitNodesAndConnection,
       createObjectUrl,
+      generativeReferenceCatalogs,
       generativeDefaults,
       graphEditBlocked,
       nodeTypes,
@@ -1397,5 +1434,6 @@ export function useGraphOperations({
     handlePaneClick: graphEditBlocked ? NOOP : handlePaneClick,
     handlePaneContextMenu: graphEditBlocked ? NOOP : handlePaneContextMenu,
     handleAddNodeMenuSelect: graphEditBlocked ? NOOP : handleAddNodeMenuSelect,
+    generativeReferenceCatalogs,
   };
 }

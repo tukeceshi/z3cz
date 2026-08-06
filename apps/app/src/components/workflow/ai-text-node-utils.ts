@@ -366,12 +366,13 @@ export function withAiTextGeneratingFlag(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-export type AiTextReferenceKind = "text" | "image" | "video";
+export type AiTextReferenceKind = "text" | "image" | "video" | "audio";
 
 export interface AiTextReferenceCounts {
   readonly text: number;
   readonly image: number;
   readonly video: number;
+  readonly audio: number;
 }
 
 export function classifyReferenceFromNodeType(
@@ -394,7 +395,7 @@ export function classifyReferenceOutputType(
 }
 
 export function emptyAiTextReferenceCounts(): AiTextReferenceCounts {
-  return { text: 0, image: 0, video: 0 };
+  return { text: 0, image: 0, video: 0, audio: 0 };
 }
 
 export function referencesFitModelLimits(

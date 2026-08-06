@@ -1,6 +1,8 @@
 import {
   countGenerateAiTextMediaReferences,
+  countSubmitAiVideoMediaReferences,
   validateAiTextPromptAssembly,
+  validateSubmitAiVideoReferences,
   type CompleteGenerationJobUploadRequest,
   type GenerateAiAudioRequest,
   type GenerateAiImageRequest,
@@ -1263,6 +1265,8 @@ const submitVideoSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   referenceImageUrls: z.array(z.string().min(1)).optional(),
   referenceImageInline: z.array(referenceImageInlineSchema).optional(),
+  referenceVideoUrls: z.array(z.string().min(1)).optional(),
+  referenceAudioUrls: z.array(z.string().min(1)).optional(),
   workflowId: z.string().optional(),
   nodeId: z.string().optional(),
   clientRequestId: z.string().min(1).max(128).optional(),
@@ -1278,13 +1282,7 @@ platformAiRoutes.post(
     const db = createDatabase(c.env);
 
     const prompt = body.prompt?.trim() ?? "";
-    const hasReferences =
-      (body.referenceImageUrls?.length ?? 0) > 0 ||
-      (body.referenceImageInline?.length ?? 0) > 0;
-
-    if (!prompt && !hasReferences) {
-      return c.json({ error: "Prompt is required" }, 400);
-    }
+    const mediaCounts = countSubmitAiVideoMediaReferences(body);
 
     const existingJob = await findGenerationJobByClientRequestId(db, {
       organizationId,
@@ -1335,6 +1333,15 @@ platformAiRoutes.post(
 
     if (!resolvedModel) {
       return c.json({ error: "Model is not available for this organization" }, 400);
+    }
+
+    const referenceValidation = validateSubmitAiVideoReferences({
+      prompt,
+      counts: mediaCounts,
+      rules: resolvedModel.parameterRules,
+    });
+    if (!referenceValidation.ok) {
+      return c.json({ error: referenceValidation.error }, 400);
     }
 
     if (prompt.length > resolvedModel.parameterRules.promptMaxChars) {
@@ -1406,6 +1413,8 @@ platformAiRoutes.post(
       generationParams: body.params,
       referenceImageUrls: body.referenceImageUrls,
       referenceImageInline: body.referenceImageInline,
+      referenceVideoUrls: body.referenceVideoUrls,
+      referenceAudioUrls: body.referenceAudioUrls,
     });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {

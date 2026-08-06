@@ -6,10 +6,13 @@ import {
   type Transform,
 } from "@xyflow/react";
 import {
+  AI_VIDEO_OUTPUT_ID,
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
+  classifyAiVideoReferenceFromNodeType,
   isAiVideoAllowedReferenceNodeType,
 } from "./ai-video-node-utils";
+import { AI_AUDIO_OUTPUT_ID } from "./ai-audio-node-utils";
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
 import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
 import {
@@ -64,6 +67,16 @@ function isAiVideoTargetNode(node: InternalNode<Node>): boolean {
   );
 }
 
+function expectedReferenceSourceHandle(
+  fromType: string | undefined
+): string | null {
+  const kind = classifyAiVideoReferenceFromNodeType(fromType);
+  if (kind === "image") return AI_IMAGE_OUTPUT_ID;
+  if (kind === "video") return AI_VIDEO_OUTPUT_ID;
+  if (kind === "audio") return AI_AUDIO_OUTPUT_ID;
+  return null;
+}
+
 function isIncomingAiVideoReferenceConnection(
   connection: FlowConnection
 ): boolean {
@@ -71,9 +84,11 @@ function isIncomingAiVideoReferenceConnection(
   const fromType = (
     connection.fromNode.data as { nodeType?: string } | undefined
   )?.nodeType;
+  const expectedHandle = expectedReferenceSourceHandle(fromType);
   const fromHandle = connection.fromHandle?.id;
   return (
-    fromHandle === AI_IMAGE_OUTPUT_ID &&
+    !!expectedHandle &&
+    fromHandle === expectedHandle &&
     isAiVideoAllowedReferenceNodeType(fromType)
   );
 }
@@ -91,9 +106,11 @@ function isAllowedAiVideoOutputTarget(
   const fromType = (
     connection.fromNode?.data as { nodeType?: string } | undefined
   )?.nodeType;
+  const expectedHandle = expectedReferenceSourceHandle(fromType);
 
   return (
-    fromHandle === AI_IMAGE_OUTPUT_ID &&
+    !!expectedHandle &&
+    fromHandle === expectedHandle &&
     isAiVideoAllowedReferenceNodeType(fromType)
   );
 }

@@ -15,6 +15,10 @@ import {
   isAiImageReferenceTarget,
   referencesFitImageModelLimits,
 } from "./ai-image-node-utils";
+import {
+  readImageReferenceLimitFromMetadata,
+  REF_MAX_IMAGES_META_KEY,
+} from "./generative-reference-metadata";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 export type AiImageReferenceRejectReason =
@@ -68,6 +72,17 @@ export function resolveAiImageReferenceRules(params: {
     if (selected) {
       return normalizeImageModelParameterRules(selected.parameterRules);
     }
+  }
+
+  const fromMetadata = readImageReferenceLimitFromMetadata(
+    params.targetNodeData.metadata,
+    DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxReferenceImages
+  );
+  if (params.targetNodeData.metadata?.[REF_MAX_IMAGES_META_KEY] !== undefined) {
+    return normalizeImageModelParameterRules({
+      ...DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
+      maxReferenceImages: fromMetadata,
+    });
   }
 
   return DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
