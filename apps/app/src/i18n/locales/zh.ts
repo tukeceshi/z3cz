@@ -1888,12 +1888,16 @@ export const zh: TranslationDictionary = {
       view: "查看",
       statusPending: "生成中",
       statusCompleted: "已完成",
+      statusCancelled: "已取消",
       statusFailed: "失败",
     },
     adminModelInvocations: {
       title: "模型调用记录",
       empty: "暂无模型调用记录。",
       view: "查看",
+      tabSummary: "摘要",
+      tabApiLogs: "接口日志",
+      apiLogsEmpty: "该次调用暂无接口日志。",
     },
     bots: {
       title: "机器人",
@@ -2532,6 +2536,12 @@ export const zh: TranslationDictionary = {
       errorDescription:
         "计算额度已用尽。感谢体验预览版。源码见 https://github.com/tukeceshi/dafthunk。",
       close: "关闭",
+    },
+    generativeCancel: {
+      action: "中止",
+      failed: "取消未生效，生成仍在进行",
+      inProgress: "取消中…",
+      success: "已取消",
     },
     generativeErrors: {
       promptRequired: "请先填写提示词，或添加参考图后再生成",
@@ -3186,6 +3196,8 @@ export const zh: TranslationDictionary = {
       cardUploadPlaceholder: "双击上传视频…",
       cardQueued: "排队中…",
       cardGenerating: "生成中…",
+      cardCancelling: "取消中…",
+      cardCancelled: "已取消",
       cardDownloading: "下载中…",
       cardUploading: "上传中…",
       cardServerPersisting: "服务端保存中…",

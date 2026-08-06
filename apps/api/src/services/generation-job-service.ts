@@ -1,4 +1,5 @@
 import type {
+  CancelGenerationJobResponse,
   EphemeralMediaReference,
   GenerationJobDisplayPhase,
   GenerationJobPendingMedia,
@@ -11,9 +12,13 @@ import type {
 import {
   isEphemeralMediaReference,
   isGenerationJobReadyAtExpired,
+  isVideoUpstreamPollDue,
+  nextVideoUpstreamPollAt,
   shouldDeferClientPersistToServer,
 } from "@dafthunk/types";
 import { pollOrgVideoTask } from "./org-video-task";
+import { createJobUpstreamRequestLogger } from "./job-upstream-request-logger";
+import { fetchWithUpstreamLog } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import { createDatabase, type Database } from "../db";
@@ -22,6 +27,7 @@ import {
   extractFinalMediaFromJob,
   extractPendingMediaFromJob,
   getGenerationJob,
+  getGenerationJobByClientRequestId,
   updateGenerationJob,
 } from "../db/generation-job-queries";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
@@ -30,6 +36,7 @@ import { resolveAiImageStorage } from "./ai-image-storage";
 import { resolveAiVideoStorage } from "./ai-video-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "./assert-cloud-storage-healthy-for-generative-media";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
+import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 import {
   isPersistWorkerPoolActive,
   releaseWorkerPersistJobAssignment,
@@ -162,14 +169,20 @@ function pendingMediaFromEphemeralMedia(
 
 async function persistPendingMediaOnServer(
   env: Bindings,
+  db: Database,
   job: GenerationJobRecord,
   pendingMedia: readonly GenerationJobPendingMedia[]
 ): Promise<readonly MediaReference[]> {
   const workflowId = job.workflowId?.trim() || "unknown";
   const finalMedia: MediaReference[] = [];
+  const downloadLog = createJobUpstreamRequestLogger(db, job, "download");
 
   for (const item of pendingMedia) {
-    const response = await fetch(item.sourceUrl);
+    const response = await fetchWithUpstreamLog(
+      item.sourceUrl,
+      { method: "GET" },
+      downloadLog
+    );
     if (!response.ok) {
       throw new Error(`Failed to download generated media (${response.status})`);
     }
@@ -246,12 +259,59 @@ async function persistPendingMediaOnServer(
   return finalMedia;
 }
 
-async function pollVideoGenerationJob(
+function toCancelGenerationJobResponse(
+  job: GenerationJobRecord
+): CancelGenerationJobResponse {
+  return {
+    ...toGetGenerationJobResponse(job),
+    cancelled: job.status === "cancelled",
+  };
+}
+
+async function cancelGenerationJobRecord(
+  db: Database,
+  job: GenerationJobRecord
+): Promise<CancelGenerationJobResponse> {
+  if (job.status === "cancelled") {
+    return toCancelGenerationJobResponse(job);
+  }
+
+  if (job.status !== "pending" && job.status !== "generating") {
+    return toCancelGenerationJobResponse(job);
+  }
+
+  const cancelled = await updateGenerationJob(db, {
+    id: job.id,
+    organizationId: job.organizationId,
+    status: "cancelled",
+    expectedStatuses: ["pending", "generating"],
+    failureReason: "Generation cancelled",
+  });
+
+  if (cancelled) {
+    await syncGenerationJobInvocation(db, cancelled);
+    await writeGenerationJobCancelLog(db, cancelled);
+    return toCancelGenerationJobResponse(cancelled);
+  }
+
+  const latest = await getGenerationJob(db, job.id, job.organizationId);
+  return toCancelGenerationJobResponse(latest ?? job);
+}
+
+export async function pollVideoGenerationJob(
   env: Bindings,
   db: Database,
   job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
   if (job.modality !== "video" || !job.upstreamTaskId) {
+    return job;
+  }
+
+  if (job.status === "cancelled" || job.status === "failed") {
+    return job;
+  }
+
+  if (!isVideoUpstreamPollDue(job.resultJson)) {
     return job;
   }
 
@@ -281,6 +341,7 @@ async function pollVideoGenerationJob(
     baseUrl,
     upstreamTaskId: job.upstreamTaskId,
     videoPollUrl: job.resultJson?.videoPollUrl,
+    upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
   });
 
   if (pollResult.status === "failed") {
@@ -299,9 +360,6 @@ async function pollVideoGenerationJob(
 
   if (pollResult.status !== "completed" || !pollResult.videoUrl) {
     const upstreamVideoStatus = pollResult.upstreamPhase ?? "running";
-    if (job.resultJson?.upstreamVideoStatus === upstreamVideoStatus) {
-      return job;
-    }
     return (
       (await updateGenerationJob(db, {
         id: job.id,
@@ -311,6 +369,7 @@ async function pollVideoGenerationJob(
         resultJson: {
           ...(job.resultJson ?? {}),
           upstreamVideoStatus,
+          nextUpstreamPollAt: nextVideoUpstreamPollAt(upstreamVideoStatus),
         },
       })) ?? job
     );
@@ -354,6 +413,7 @@ async function completeInlineServerGenerationJobPersist(
   try {
     const finalMedia = await persistPendingMediaOnServer(
       env,
+      db,
       claimed,
       pendingMedia
     );
@@ -604,6 +664,37 @@ export async function requestServerGenerationJobPersist(
 
   const persisted = await runServerGenerationJobPersist(env, db, job);
   return toGetGenerationJobResponse(persisted);
+}
+
+export async function cancelUserGenerationJob(
+  env: Bindings,
+  organizationId: string,
+  jobId: string
+): Promise<CancelGenerationJobResponse | null> {
+  const db = createDatabase(env);
+  const job = await getGenerationJob(db, jobId, organizationId);
+  if (!job) {
+    return null;
+  }
+
+  return cancelGenerationJobRecord(db, job);
+}
+
+export async function cancelUserGenerationJobByClientRequestId(
+  env: Bindings,
+  organizationId: string,
+  clientRequestId: string
+): Promise<CancelGenerationJobResponse | null> {
+  const db = createDatabase(env);
+  const job = await getGenerationJobByClientRequestId(db, {
+    organizationId,
+    clientRequestId,
+  });
+  if (!job) {
+    return null;
+  }
+
+  return cancelGenerationJobRecord(db, job);
 }
 
 export async function refreshGenerationJob(

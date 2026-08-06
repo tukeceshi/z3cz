@@ -13,6 +13,10 @@ import {
 } from "@dafthunk/types";
 
 import type { ObjectStore } from "../node-types";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export type VolcanoImageStorageMode = "ephemeral" | "cloud";
 
@@ -64,6 +68,7 @@ export async function executeVolcanoImageGeneration(params: {
   readonly workflowId?: string;
   readonly cloudUpload?: CloudImageUploadTarget;
   readonly timeoutMs?: number;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoImageGenerationResult> {
   const rules = normalizeImageModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -116,15 +121,19 @@ export async function executeVolcanoImageGeneration(params: {
   );
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${params.apiKey}`,
-        "Content-Type": "application/json",
+    const response = await fetchWithUpstreamLog(
+      url,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${params.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
       },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+      params.upstreamLog
+    );
 
     const text = await response.text();
     let parsed: VolcanoImageResponse = {};

@@ -1944,12 +1944,16 @@ export const en = {
       view: "View",
       statusPending: "Generating",
       statusCompleted: "Completed",
+      statusCancelled: "Cancelled",
       statusFailed: "Failed",
     },
     adminModelInvocations: {
       title: "Model Invocations",
       empty: "No model invocations yet.",
       view: "View",
+      tabSummary: "Summary",
+      tabApiLogs: "API Logs",
+      apiLogsEmpty: "No API logs for this invocation.",
     },
     bots: {
       title: "Bots",
@@ -2624,6 +2628,12 @@ export const en = {
       errorDescription:
         "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/tukeceshi/dafthunk.",
       close: "Close",
+    },
+    generativeCancel: {
+      action: "Cancel",
+      failed: "Cancel was not confirmed. Generation is still in progress",
+      inProgress: "Cancelling…",
+      success: "Cancelled",
     },
     generativeErrors: {
       promptRequired: "Enter a prompt or add a reference image before generating",
@@ -3301,6 +3311,8 @@ export const en = {
       cardUploadPlaceholder: "Double-click to upload a video…",
       cardQueued: "Queued…",
       cardGenerating: "Generating…",
+      cardCancelling: "Cancelling…",
+      cardCancelled: "Cancelled",
       cardDownloading: "Downloading…",
       cardUploading: "Uploading…",
       cardServerPersisting: "Saving on server…",

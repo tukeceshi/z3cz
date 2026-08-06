@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import type {
   AiModelInvocation,
@@ -87,6 +87,8 @@ function mapInvocationRow(
     status: row.status as AiModelInvocation["status"],
     error: row.error,
     generationJobId: row.generationJobId,
+    workflowId: row.workflowId,
+    nodeId: row.nodeId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -285,6 +287,8 @@ export async function createAiModelInvocation(
     readonly status: AiModelInvocation["status"];
     readonly error?: string;
     readonly generationJobId?: string;
+    readonly workflowId?: string;
+    readonly nodeId?: string;
   }
 ): Promise<AiModelInvocation> {
   await db.insert(aiModelInvocations).values({
@@ -301,6 +305,8 @@ export async function createAiModelInvocation(
     status: params.status,
     error: params.error ?? null,
     generationJobId: params.generationJobId ?? null,
+    workflowId: params.workflowId ?? null,
+    nodeId: params.nodeId ?? null,
   });
 
   const rows = await db
@@ -375,7 +381,31 @@ export async function failAiModelInvocationForGenerationJob(
       and(
         eq(aiModelInvocations.organizationId, params.organizationId),
         eq(aiModelInvocations.generationJobId, params.generationJobId),
-        eq(aiModelInvocations.status, "pending")
+        ne(aiModelInvocations.status, "completed")
+      )
+    );
+}
+
+export async function cancelAiModelInvocationForGenerationJob(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly generationJobId: string;
+    readonly content?: string;
+  }
+): Promise<void> {
+  await db
+    .update(aiModelInvocations)
+    .set({
+      status: "cancelled",
+      error: null,
+      ...(params.content !== undefined ? { content: params.content } : {}),
+    })
+    .where(
+      and(
+        eq(aiModelInvocations.organizationId, params.organizationId),
+        eq(aiModelInvocations.generationJobId, params.generationJobId),
+        ne(aiModelInvocations.status, "completed")
       )
     );
 }

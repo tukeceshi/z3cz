@@ -5,6 +5,10 @@ import type {
 
 import { buildBodyFromSlots } from "./build-body";
 import { resolveSyncRequestUrl } from "./execute-sync";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export type AiInterfaceStreamEvent =
   | { readonly type: "delta"; readonly text: string }
@@ -42,6 +46,7 @@ export async function* iterateAiInterfaceChatStream(params: {
   readonly signal?: AbortSignal;
   /** Overall idle/hard timeout. Default 10 minutes for long Seed replies. */
   readonly timeoutMs?: number;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): AsyncGenerator<AiInterfaceStreamEvent> {
   const artifact = params.resolved.artifact;
   if (artifact.execution.mode !== "sync") {
@@ -95,16 +100,21 @@ export async function* iterateAiInterfaceChatStream(params: {
   let fullText = "";
 
   try {
-    const response = await fetch(url, {
-      method: sync.method,
-      headers,
-      body: JSON.stringify({
-        ...bodyResult,
-        ...(params.bodyExtensions ?? {}),
-        stream: true,
-      }),
-      signal: controller.signal,
-    });
+    const response = await fetchWithUpstreamLog(
+      url,
+      {
+        method: sync.method,
+        headers,
+        body: JSON.stringify({
+          ...bodyResult,
+          ...(params.bodyExtensions ?? {}),
+          stream: true,
+        }),
+        signal: controller.signal,
+      },
+      params.upstreamLog,
+      { responseMode: "stream" }
+    );
 
     if (!response.ok) {
       const text = await response.text();

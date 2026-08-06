@@ -4,6 +4,8 @@ import type { GenerationJobRecord } from "@dafthunk/types";
 import {
   GENERATION_JOB_SERVER_PERSIST_AFTER_MS,
   isGenerationJobReadyAtExpired,
+  isVideoUpstreamPollDue,
+  nextVideoUpstreamPollAt,
   shouldDeferClientPersistToServer,
 } from "@dafthunk/types";
 
@@ -102,5 +104,39 @@ describe("shouldDeferClientPersistToServer", () => {
     expect(
       shouldDeferClientPersistToServer(makeJob({ status: "ready_to_persist" }))
     ).toBe(false);
+  });
+});
+
+describe("video upstream poll scheduling", () => {
+  it("treats missing nextUpstreamPollAt as due", () => {
+    expect(isVideoUpstreamPollDue(null)).toBe(true);
+    expect(isVideoUpstreamPollDue(undefined)).toBe(true);
+    expect(isVideoUpstreamPollDue({})).toBe(true);
+  });
+
+  it("respects nextUpstreamPollAt", () => {
+    const nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    expect(
+      isVideoUpstreamPollDue(
+        { nextUpstreamPollAt: "2026-01-01T00:00:10.000Z" },
+        nowMs
+      )
+    ).toBe(false);
+    expect(
+      isVideoUpstreamPollDue(
+        { nextUpstreamPollAt: "2026-01-01T00:00:00.000Z" },
+        nowMs
+      )
+    ).toBe(true);
+  });
+
+  it("uses longer interval for queued upstream phase", () => {
+    const nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    expect(nextVideoUpstreamPollAt("running", nowMs)).toBe(
+      "2026-01-01T00:00:10.000Z"
+    );
+    expect(nextVideoUpstreamPollAt("queued", nowMs)).toBe(
+      "2026-01-01T00:00:15.000Z"
+    );
   });
 });

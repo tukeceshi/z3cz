@@ -12,6 +12,10 @@ import {
 
 import type { ObjectStore } from "../node-types";
 import type { CloudImageUploadTarget } from "./execute-volcano-image";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export const VOLCANO_VIDEO_PROVIDER = "volcano_video" as const;
 
@@ -104,6 +108,7 @@ export async function submitVolcanoVideoTask(params: {
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -141,14 +146,18 @@ export async function submitVolcanoVideoTask(params: {
   const baseUrl = params.baseUrl.replace(/\/$/, "");
   const url = `${baseUrl}/contents/generations/tasks`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: VolcanoVideoTaskResponse = {};
@@ -185,13 +194,19 @@ export async function submitVolcanoVideoTask(params: {
 export async function pollVolcanoVideoTask(params: {
   readonly apiKey: string;
   readonly pollUrl: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
-  const response = await fetch(params.pollUrl, {
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    params.pollUrl,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
     },
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: VolcanoVideoTaskResponse = {};
@@ -248,8 +263,13 @@ export async function downloadVolcanoVideo(params: {
   readonly workflowId?: string;
   readonly executionId?: string;
   readonly cloudUpload?: CloudImageUploadTarget;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoDownloadResult> {
-  const response = await fetch(params.videoUrl);
+  const response = await fetchWithUpstreamLog(
+    params.videoUrl,
+    { method: "GET" },
+    params.upstreamLog
+  );
   if (!response.ok) {
     return {
       status: "failed",

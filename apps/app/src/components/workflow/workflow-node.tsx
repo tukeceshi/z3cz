@@ -28,10 +28,11 @@ import TrashIcon from "lucide-react/icons/trash-2";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import WrenchIcon from "lucide-react/icons/wrench";
-import { createElement, memo, useEffect, useMemo, useState } from "react";
+import { createElement, memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { useTranslation } from "@/components/locale-provider";
+import { useAuth } from "@/components/auth-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { TranslateFn } from "@/i18n";
@@ -58,13 +59,17 @@ import { readGenerativeCardError } from "./generative-card-error-utils";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
+  GENERATIVE_CARD_STATE_LABEL_CLASS,
   GENERATIVE_NODE_CARD_CLASS,
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
 import {
   formatGenerativeBusyOverlayLabel,
+  isGenerativePhaseCancellable,
+  isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
 } from "./generative-progress-utils";
+import { cancelGenerativeGenerationForNode } from "./generative-generation-cancel";
 import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
 import {
   generativeAudioProgressButtonKey,
@@ -337,6 +342,8 @@ export const WorkflowNode = memo(
       allowedNodeTypes,
     } = useWorkflowActions();
     const { t } = useTranslation();
+    const { organization } = useAuth();
+    const orgId = organization?.id;
     const connectedHandleKeys =
       (data.connectedHandleKeys as readonly string[] | undefined) ?? [];
     const showBottomPanelHost = data.showBottomPanelHost === true;
@@ -585,7 +592,8 @@ export const WorkflowNode = memo(
       (isAiImageGenerating(data.metadata) || progressPhase !== undefined);
     const isAiVideoBusy =
       isAiVideoNode &&
-      (isAiVideoGenerating(data.metadata) || progressPhase !== undefined);
+      (isAiVideoGenerating(data.metadata) ||
+        isGenerativeProgressBusyPhase(progressPhase));
     const isAiAudioBusy =
       isAiAudioNode &&
       (isAiAudioGenerating(data.metadata) || progressPhase !== undefined);
@@ -595,6 +603,9 @@ export const WorkflowNode = memo(
         : undefined;
     const showBusyOverlay =
       isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
+    const showCancelledOverlay =
+      isAiVideoNode && progressPhase === "cancelled";
+    const showProgressOverlay = showBusyOverlay || showCancelledOverlay;
     const isError =
       (data.executionState === "error" && !!data.error) ||
       Boolean(generativeCardError);
@@ -623,6 +634,9 @@ export const WorkflowNode = memo(
       }
       if (!isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy && !progressPhase) {
         return null;
+      }
+      if (progressPhase === "cancelled" && isAiVideoNode) {
+        return t(generativeVideoProgressButtonKey("cancelled"));
       }
 
       const phase = progressPhase ?? "generating";
@@ -665,6 +679,34 @@ export const WorkflowNode = memo(
       progressNowMs,
       progressPhase,
       t,
+    ]);
+
+    const overlayProgressPhase =
+      progressPhase ??
+      (isAiImageBusy || isAiVideoBusy ? ("generating" as const) : null);
+    const showOverlayCancel =
+      isAiVideoNode &&
+      showBusyOverlay &&
+      progressPhase !== "cancelling" &&
+      isGenerativePhaseCancellable(overlayProgressPhase);
+
+    const handleOverlayCancel = useCallback(() => {
+      if (!showOverlayCancel) {
+        return;
+      }
+      void cancelGenerativeGenerationForNode({
+        nodeId: id,
+        orgId,
+        metadata: data.metadata,
+        modality: "video",
+        updateNodeData,
+      });
+    }, [
+      data.metadata,
+      id,
+      orgId,
+      showOverlayCancel,
+      updateNodeData,
     ]);
 
     const nodeDisplayName = data.name;
@@ -764,23 +806,50 @@ export const WorkflowNode = memo(
           }
         >
           {/* Execution / generate overlay */}
-          {showBusyOverlay && (
+          {showProgressOverlay ? (
             <div
               className={cn(
-                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
+                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]",
+                showCancelledOverlay
+                  ? "bg-card/60"
+                  : "bg-card/70",
                 isGenerativeCanvasNode
                   ? GENERATIVE_NODE_CARD_RADIUS_CLASS
                   : "rounded-md"
               )}
             >
-              <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
-              {busyOverlayLabel ? (
-                <p className="max-w-[90%] px-3 text-center text-[11px] leading-snug text-muted-foreground">
+              {showCancelledOverlay ? (
+                <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
                   {busyOverlayLabel}
                 </p>
-              ) : null}
+              ) : (
+                <>
+                  <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
+                  {busyOverlayLabel ? (
+                    <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
+                      {busyOverlayLabel}
+                    </p>
+                  ) : null}
+                  {showOverlayCancel ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        "nodrag rounded-md px-3 py-1 text-[11px] font-medium",
+                        "bg-red-600 text-white hover:bg-red-500",
+                        "dark:bg-red-500 dark:hover:bg-red-400"
+                      )}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOverlayCancel();
+                      }}
+                    >
+                      {t("workflow.generativeCancel.action")}
+                    </button>
+                  ) : null}
+                </>
+              )}
             </div>
-          )}
+          ) : null}
 
           {(isAiImageNode || isAiVideoNode || isAiAudioNode) && !disabled ? (
             <GenerativeCloudJobResumeHost

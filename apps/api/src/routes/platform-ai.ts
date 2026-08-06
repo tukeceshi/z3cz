@@ -30,6 +30,8 @@ import {
   listAiModelInvocations,
   listPlatformAiModelGroups,
 } from "../db/platform-ai-model-queries";
+import { createUpstreamRequestLogger } from "../services/create-upstream-request-logger";
+import { createJobUpstreamRequestLogger } from "../services/job-upstream-request-logger";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { requireModelCallsAccess } from "../middleware/org-permissions";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
@@ -94,7 +96,10 @@ import {
   createReadyToPersistAudioJob,
   GenerationJobUploadValidationError,
   markVideoGenerationJobReadyToPersist,
+  pollVideoGenerationJob,
   refreshGenerationJob,
+  cancelUserGenerationJob,
+  cancelUserGenerationJobByClientRequestId,
   requestServerGenerationJobPersist,
 } from "../services/generation-job-service";
 import {
@@ -543,10 +548,20 @@ platformAiRoutes.post(
       userId: jwtPayload?.sub,
       canonicalId: modelOption.canonicalId,
       displayName: modelOption.displayName,
+      interfaceId: body.aiInterfaceId,
       promptExcerpt,
       content: "",
       source: "ai-text-node-generate",
       status: "pending",
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
+    });
+
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: body.aiInterfaceId,
+      invocationId,
+      operation: "submit",
     });
 
     const result = await executeTextModel({
@@ -560,6 +575,7 @@ platformAiRoutes.post(
       referenceImageUrls: body.referenceImageUrls,
       referenceImageInline: body.referenceImageInline,
       referenceVideoUrls: body.referenceVideoUrls,
+      upstreamLog,
     });
 
     if (!result.ok || !result.text || !result.interfaceId) {
@@ -652,10 +668,13 @@ platformAiRoutes.post(
       userId: jwtPayload?.sub,
       canonicalId: modelOption.canonicalId,
       displayName: modelOption.displayName,
+      interfaceId: body.aiInterfaceId,
       promptExcerpt,
       content: "",
       source: "ai-text-node-generate",
       status: "pending",
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
     });
 
     const prepared = await prepareTextModelStream({
@@ -681,6 +700,13 @@ platformAiRoutes.post(
       return c.json({ error: prepared.error }, 502);
     }
 
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: body.aiInterfaceId,
+      invocationId,
+      operation: "submit",
+    });
+
     const encoder = new TextEncoder();
     const clientSignal = c.req.raw.signal;
     let finalized = false;
@@ -697,6 +723,7 @@ platformAiRoutes.post(
           for await (const event of streamPreparedTextModel({
             prepared: prepared.prepared,
             signal: clientSignal,
+            upstreamLog,
           })) {
             if (clientSignal.aborted) {
               break;
@@ -946,6 +973,16 @@ platformAiRoutes.post(
       content: "",
       source: "ai-image-node-generate",
       status: "pending",
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
+    });
+
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: resolvedModel.interfaceId,
+      invocationId,
+      generationJobId: jobId,
+      operation: "submit",
     });
 
     const result = await executeVolcanoImageGeneration({
@@ -962,6 +999,7 @@ platformAiRoutes.post(
       organizationId,
       workflowId: body.workflowId,
       cloudUpload: deferCloudPersist ? undefined : storageResolution.cloudUpload,
+      upstreamLog,
     });
 
     if (result.status === "failed") {
@@ -1160,6 +1198,16 @@ platformAiRoutes.post(
       content: "",
       source: "ai-audio-node-generate",
       status: "pending",
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
+    });
+
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: resolvedModel.interfaceId,
+      invocationId,
+      generationJobId: jobId,
+      operation: "submit",
     });
 
     const result = await executeMinimaxSpeech({
@@ -1169,6 +1217,7 @@ platformAiRoutes.post(
       text: prompt,
       parameterRules: resolvedModel.parameterRules,
       generationParams: body.params,
+      upstreamLog,
     });
 
     if (result.status === "failed" || !result.audio || !result.mimeType) {
@@ -1401,6 +1450,15 @@ platformAiRoutes.post(
       content: "",
       source: "ai-video-node-submit",
       status: "pending",
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
+    });
+
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: resolvedModel.interfaceId,
+      invocationId,
+      operation: "submit",
     });
 
     const submitResult = await submitOrgVideoTask({
@@ -1415,6 +1473,7 @@ platformAiRoutes.post(
       referenceImageInline: body.referenceImageInline,
       referenceVideoUrls: body.referenceVideoUrls,
       referenceAudioUrls: body.referenceAudioUrls,
+      upstreamLog,
     });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
@@ -1458,6 +1517,7 @@ platformAiRoutes.post(
           videoPollUrl: submitResult.pollUrl,
           aiInterfaceId: resolvedModel.interfaceId,
           invocationId,
+          nextUpstreamPollAt: new Date().toISOString(),
         },
       });
 
@@ -1493,6 +1553,35 @@ platformAiRoutes.get("/generation-jobs/:jobId", async (c) => {
   const organizationId = c.get("organizationId")!;
   const jobId = c.req.param("jobId");
   const response = await refreshGenerationJob(c.env, organizationId, jobId);
+  if (!response) {
+    return c.json({ error: "Generation job not found" }, 404);
+  }
+  return c.json(response);
+});
+
+platformAiRoutes.post("/generation-jobs/:jobId/cancel", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const jobId = c.req.param("jobId");
+  const response = await cancelUserGenerationJob(c.env, organizationId, jobId);
+  if (!response) {
+    return c.json({ error: "Generation job not found" }, 404);
+  }
+  return c.json(response);
+});
+
+platformAiRoutes.post("/generation-jobs/cancel-by-client-request", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const body = await c.req.json<{ clientRequestId?: string }>();
+  const clientRequestId = body.clientRequestId?.trim();
+  if (!clientRequestId) {
+    return c.json({ error: "clientRequestId is required" }, 400);
+  }
+
+  const response = await cancelUserGenerationJobByClientRequestId(
+    c.env,
+    organizationId,
+    clientRequestId
+  );
   if (!response) {
     return c.json({ error: "Generation job not found" }, 404);
   }
@@ -1621,12 +1710,43 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     );
   }
 
+  if (trackedJob?.status === "generating") {
+    const job = await pollVideoGenerationJob(c.env, db, trackedJob);
+
+    if (job.status === "failed") {
+      return c.json({
+        status: "failed" as const,
+        error: job.failureReason ?? "Poll failed",
+      });
+    }
+
+    if (job.status === "ready_to_persist") {
+      return c.json({ status: "running" as const });
+    }
+
+    return c.json({
+      status:
+        job.resultJson?.upstreamVideoStatus === "queued"
+          ? ("queued" as const)
+          : ("running" as const),
+    });
+  }
+
+  const pollLog = trackedJob
+    ? createJobUpstreamRequestLogger(db, trackedJob, "poll")
+    : createUpstreamRequestLogger(db, {
+        organizationId,
+        interfaceId,
+        operation: "poll",
+      });
+
   const pollResult = await pollOrgVideoTask({
     apiKey: iface.apiKey,
     canonicalId: modelCanonicalId,
     baseUrl: iface.baseUrl,
     upstreamTaskId: taskId,
     videoPollUrl: trackedJob?.resultJson?.videoPollUrl,
+    upstreamLog: pollLog,
   });
 
   if (pollResult.status === "failed") {

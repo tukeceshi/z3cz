@@ -30,6 +30,7 @@ export * from "./volcano-pricing-catalog";
 export * from "./volcano-package-catalog";
 export * from "./volcano-branding";
 export * from "./volcano-resource-package-usage";
+export * from "./api-interface-request-log";
 export * from "./api-key";
 export * from "./auth";
 export * from "./auth-config";

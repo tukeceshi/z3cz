@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { ApiContext } from "../../context";
 import { createDatabase } from "../../db";
+import { listApiInterfaceRequestLogsByInvocationId } from "../../db/api-interface-request-log-queries";
 import {
   getAdminAiModelInvocation,
   listAdminAiModelInvocations,
@@ -19,11 +20,15 @@ adminModelInvocationsRoutes.get("/", async (c) => {
 
 adminModelInvocationsRoutes.get("/:id", async (c) => {
   const db = createDatabase(c.env);
-  const invocation = await getAdminAiModelInvocation(db, c.req.param("id"));
+  const invocationId = c.req.param("id");
+  const invocation = await getAdminAiModelInvocation(db, invocationId);
   if (!invocation) {
     return c.json({ error: "Invocation not found" }, 404);
   }
-  return c.json({ invocation });
+  const apiLogs = await listApiInterfaceRequestLogsByInvocationId(db, {
+    invocationId,
+  });
+  return c.json({ invocation, apiLogs });
 });
 
 export default adminModelInvocationsRoutes;

@@ -7,6 +7,10 @@ import {
   type VolcanoVideoPollResult,
   type VolcanoVideoSubmitResult,
 } from "./execute-volcano-video";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export const VEO_VIDEO_PROVIDER = "veo_video" as const;
 
@@ -108,6 +112,7 @@ export async function submitVeoVideoTask(params: {
   readonly prompt: string;
   readonly parameterRules: VideoModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -130,14 +135,18 @@ export async function submitVeoVideoTask(params: {
     parameters: buildVeoParameters(params.generationParams),
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": params.apiKey,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": params.apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: VeoSubmitResponse = {};
@@ -174,13 +183,19 @@ export async function submitVeoVideoTask(params: {
 export async function pollVeoVideoTask(params: {
   readonly apiKey: string;
   readonly pollUrl: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
-  const response = await fetch(params.pollUrl, {
-    headers: {
-      "x-goog-api-key": params.apiKey,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    params.pollUrl,
+    {
+      method: "GET",
+      headers: {
+        "x-goog-api-key": params.apiKey,
+        "Content-Type": "application/json",
+      },
     },
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: VeoOperationResponse = {};
@@ -255,6 +270,7 @@ export async function downloadVeoVideo(params: {
   readonly workflowId?: string;
   readonly executionId?: string;
   readonly cloudUpload?: import("./execute-volcano-image").CloudImageUploadTarget;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoDownloadResult> {
   const downloadUrl = new URL(params.videoUrl);
   if (!downloadUrl.searchParams.has("key")) {
@@ -269,6 +285,7 @@ export async function downloadVeoVideo(params: {
     workflowId: params.workflowId,
     executionId: params.executionId,
     cloudUpload: params.cloudUpload,
+    upstreamLog: params.upstreamLog,
   });
 }
 

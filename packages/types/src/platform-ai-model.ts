@@ -240,7 +240,11 @@ export interface ListPlatformCatalogModelsResponse {
   readonly groups: readonly PlatformAiModelGroup[];
 }
 
-export type AiModelInvocationStatus = "pending" | "completed" | "failed";
+export type AiModelInvocationStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export interface AiModelInvocation {
   readonly id: string;
@@ -256,6 +260,9 @@ export interface AiModelInvocation {
   readonly status: AiModelInvocationStatus;
   readonly error: string | null;
   readonly generationJobId: string | null;
+  /** Canvas correlation — optional; join to api_interface_request_logs via id. */
+  readonly workflowId: string | null;
+  readonly nodeId: string | null;
   readonly createdAt: string;
 }
 

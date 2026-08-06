@@ -424,6 +424,8 @@ export const aiModelInvocations = pgTable(
     status: text("status").notNull(),
     error: text("error"),
     generationJobId: text("generation_job_id"),
+    workflowId: text("workflow_id"),
+    nodeId: text("node_id"),
     createdAt: createCreatedAt(),
   },
   (table) => [
@@ -432,6 +434,40 @@ export const aiModelInvocations = pgTable(
       table.createdAt
     ),
     index("ai_model_invocations_generation_job_idx").on(
+      table.generationJobId
+    ),
+  ]
+);
+
+/** Upstream AI interface HTTP calls — correlate via invocation_id / generation_job_id. */
+export const apiInterfaceRequestLogs = pgTable(
+  "api_interface_request_logs",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    interfaceId: text("interface_id"),
+    invocationId: text("invocation_id"),
+    generationJobId: text("generation_job_id"),
+    operation: text("operation"),
+    method: text("method").notNull(),
+    url: text("url").notNull(),
+    httpStatus: integer("http_status"),
+    durationMs: integer("duration_ms"),
+    upstreamRequestId: text("upstream_request_id"),
+    requestBody: jsonb("request_body").$type<Record<string, unknown> | null>(),
+    responseExcerpt: text("response_excerpt"),
+    error: text("error"),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [
+    index("api_interface_request_logs_org_created_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
+    index("api_interface_request_logs_invocation_idx").on(table.invocationId),
+    index("api_interface_request_logs_generation_job_idx").on(
       table.generationJobId
     ),
   ]

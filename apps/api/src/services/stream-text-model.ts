@@ -11,6 +11,7 @@ import {
   iterateAiInterfaceChatStream,
   type AiInterfaceStreamEvent,
 } from "@dafthunk/runtime/ai-interface/execute-stream";
+import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
@@ -117,12 +118,14 @@ export async function prepareTextModelStream(params: {
 export async function* streamPreparedTextModel(params: {
   readonly prepared: PreparedTextModelStream;
   readonly signal?: AbortSignal;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): AsyncGenerator<AiInterfaceStreamEvent> {
   yield* iterateAiInterfaceChatStream({
     resolved: params.prepared.resolved,
     inputs: params.prepared.inputs,
     bodyExtensions: params.prepared.bodyExtensions,
     signal: params.signal,
+    upstreamLog: params.upstreamLog,
   });
 }
 

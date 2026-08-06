@@ -1,6 +1,7 @@
 import type { LocalMediaReference, MediaReference } from "@dafthunk/types";
 
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
+import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { runGenerationJobPersistWorker } from "@/services/generation-job-persist-worker";
 
 export type PersistGenerativeMediaPhase = "downloading" | "uploading";
@@ -13,6 +14,7 @@ export async function resolveCloudGenerationJobMedia(params: {
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
+  readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly MediaReference[]> {
   params.onProgressPhase?.("generating");
 
@@ -24,5 +26,6 @@ export async function resolveCloudGenerationJobMedia(params: {
     onPhase: params.onPhase,
     onProgressPhase: params.onProgressPhase,
     onStaged: params.onStaged,
+    shouldAbortJobPoll: params.shouldAbortJobPoll,
   });
 }

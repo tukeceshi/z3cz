@@ -32,6 +32,10 @@ import {
   readGenerativeProgressJobId,
   withGenerativeProgress,
 } from "@/components/workflow/generative-progress-utils";
+import {
+  isGenerativeGenerationCancelled,
+  isNodeGenerationCancelled,
+} from "@/components/workflow/generative-generation-cancel";
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { useWorkflow } from "@/components/workflow/workflow-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -63,6 +67,11 @@ export function GenerativeCloudJobResumeHost({
     "downloading" | "uploading" | null
   >(null);
   const [isResuming, setIsResuming] = useState(false);
+
+  const shouldAbortJobPoll = useCallback(
+    () => isNodeGenerationCancelled(nodeId),
+    [nodeId]
+  );
 
   const applyBusyMetadata = useCallback(
     (metadata: Record<string, string> | undefined, busy: boolean) => {
@@ -191,6 +200,12 @@ export function GenerativeCloudJobResumeHost({
 
   const handleResumeError = useCallback(
     (error: unknown) => {
+      if (
+        isGenerativeGenerationCancelled(error) ||
+        isNodeGenerationCancelled(nodeId)
+      ) {
+        return;
+      }
       const raw = error instanceof Error ? error.message : String(error);
       const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => {
@@ -225,6 +240,7 @@ export function GenerativeCloudJobResumeHost({
     onStaged: handleStaged,
     onResumeSuccess: handleResumeSuccess,
     onResumeError: handleResumeError,
+    shouldAbortJobPoll: modality === "video" ? shouldAbortJobPoll : undefined,
   });
 
   return null;

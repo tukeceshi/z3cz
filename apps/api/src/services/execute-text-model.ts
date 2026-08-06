@@ -6,6 +6,7 @@ import {
   type ReferenceImageInline,
 } from "@dafthunk/types";
 import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
+import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
@@ -40,6 +41,7 @@ async function executeTextModelCandidate(params: {
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<
   { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }
 > {
@@ -84,10 +86,11 @@ async function executeTextModelCandidate(params: {
     bodyExtensions: params.outputMaxTokens
       ? { max_tokens: params.outputMaxTokens }
       : undefined,
+    upstreamLog: params.upstreamLog,
   });
 
-  if (!result.ok) {
-    return { ok: false, error: result.error };
+  if (result.status !== "completed" || !result.outputs) {
+    return { ok: false, error: result.error ?? "Generation failed" };
   }
 
   const text = result.outputs.text;
@@ -109,6 +112,7 @@ export async function executeTextModel(params: {
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<ExecuteTextModelResult> {
   const [candidate, options] = await Promise.all([
     resolveOrgModelInterfaceCandidate(
@@ -144,6 +148,7 @@ export async function executeTextModel(params: {
     referenceImageUrls: params.referenceImageUrls,
     referenceImageInline: params.referenceImageInline,
     referenceVideoUrls: params.referenceVideoUrls,
+    upstreamLog: params.upstreamLog,
   });
 
   if (result.ok) {

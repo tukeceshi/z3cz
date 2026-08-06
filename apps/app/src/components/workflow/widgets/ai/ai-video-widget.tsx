@@ -27,7 +27,7 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
-import { readGenerativeProgressPhase } from "../../generative-progress-utils";
+import { isGenerativeProgressBusyPhase, readGenerativeProgressPhase } from "../../generative-progress-utils";
 import {
   isAiVideoGenerating,
   readAiVideoCardVideos,
@@ -43,6 +43,7 @@ import {
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
+import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import type { VideoFrameCaptureMode } from "../../capture-video-frame";
 import {
   shouldShowGenerativeHistoryIcon,
@@ -171,8 +172,10 @@ function AiVideoWidget({
   );
   const progressPhase = readGenerativeProgressPhase(metadata);
   const isGenerating =
-    isAiVideoGenerating(metadata) || progressPhase !== undefined;
-  useGenerativeMediaWorkSession(uploading || progressPhase !== undefined);
+    isAiVideoGenerating(metadata) || isGenerativeProgressBusyPhase(progressPhase);
+  useGenerativeMediaWorkSession(
+    uploading || isGenerativeProgressBusyPhase(progressPhase)
+  );
   const generateError = readGenerativeCardError(metadata);
   const cardPlaceholder = t(
     generativeCardProgressKey(
@@ -393,9 +396,9 @@ function AiVideoWidget({
           }
         }}
       >
-        {!activeVideo && !generateError ? (
+        {!activeVideo && !generateError && progressPhase !== "cancelled" ? (
           <div className="flex h-full items-center justify-center px-3">
-            <p className="text-center text-[11px] italic text-muted-foreground/50">
+            <p className={GENERATIVE_CARD_STATE_LABEL_CLASS}>
               {cardPlaceholder}
             </p>
           </div>

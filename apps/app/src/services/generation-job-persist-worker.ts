@@ -9,9 +9,11 @@ import {
   isGenerationJobReadyAtExpired,
   isServerPersistInProgress,
   shouldDeferClientPersistToServer,
+  VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
 } from "@dafthunk/types";
 
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
+import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 import {
   readGenerativeStagingByMediaId,
@@ -26,7 +28,7 @@ import { uploadGenerativeMediaFromLocalStaging } from "@/services/upload-generat
 
 export type PersistGenerativeMediaPhase = "downloading" | "uploading";
 
-const JOB_POLL_INTERVAL_MS = 3_000;
+const JOB_POLL_INTERVAL_MS = VIDEO_JOB_CLIENT_POLL_INTERVAL_MS;
 const MIN_RETRY_INTERVAL_MS = 3_000;
 const MAX_RETRY_INTERVAL_MS = 30_000;
 
@@ -128,6 +130,7 @@ async function waitForJobReadyToPersist(params: {
   readonly organizationId: string;
   readonly jobId: string;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+  readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<Awaited<ReturnType<typeof getGenerationJob>>> {
   while (true) {
     const response = await getGenerationJob(params.organizationId, params.jobId);
@@ -143,6 +146,10 @@ async function waitForJobReadyToPersist(params: {
         response.job.resultJson?.persistOwner === "client")
     ) {
       return response;
+    }
+
+    if (params.shouldAbortJobPoll?.()) {
+      throw new GenerativeGenerationCancelledError();
     }
 
     if (
@@ -196,6 +203,7 @@ export async function runGenerationJobPersistWorker(params: {
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
+  readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly MediaReference[]> {
   const notify = params.onProgressPhase;
 
@@ -203,6 +211,7 @@ export async function runGenerationJobPersistWorker(params: {
     organizationId: params.organizationId,
     jobId: params.jobId,
     onProgressPhase: notify,
+    shouldAbortJobPoll: params.shouldAbortJobPoll,
   });
 
   if (ready.finalMedia && ready.finalMedia.length > 0) {

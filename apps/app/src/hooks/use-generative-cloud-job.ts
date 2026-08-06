@@ -9,6 +9,7 @@ import {
   withGenerativeProgress,
   type GenerativeProgressPhase,
 } from "@/components/workflow/generative-progress-utils";
+import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import {
   releaseGenerativeJobResume,
@@ -20,8 +21,9 @@ import {
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
 import type { ImageGenerationRequestSnapshot, LocalMediaReference, MediaReference } from "@dafthunk/types";
+import { VIDEO_JOB_CLIENT_POLL_INTERVAL_MS } from "@dafthunk/types";
 
-const JOB_POLL_INTERVAL_MS = 3_000;
+const JOB_POLL_INTERVAL_MS = VIDEO_JOB_CLIENT_POLL_INTERVAL_MS;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -31,7 +33,8 @@ function sleep(ms: number): Promise<void> {
 
 async function waitForJobFinalMedia(
   organizationId: string,
-  jobId: string
+  jobId: string,
+  shouldAbort?: () => boolean
 ): Promise<ResolveGenerativeJobMediaResult> {
   while (true) {
     const response = await getGenerationJob(organizationId, jobId);
@@ -44,12 +47,17 @@ async function waitForJobFinalMedia(
       };
     }
     if (
-      response.job.status === "failed" ||
-      response.job.status === "cancelled"
+      response.job.status === "failed"
     ) {
       throw new Error(
         response.job.failureReason ?? "Generation failed"
       );
+    }
+    if (response.job.status === "cancelled") {
+      throw new GenerativeGenerationCancelledError();
+    }
+    if (shouldAbort?.()) {
+      throw new GenerativeGenerationCancelledError();
     }
     await sleep(JOB_POLL_INTERVAL_MS);
   }
@@ -101,6 +109,7 @@ interface UseGenerativeCloudJobOptions {
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
   readonly onResumeSuccess?: (result: ResolveGenerativeJobMediaResult) => void;
   readonly onResumeError?: (error: unknown) => void;
+  readonly shouldAbortJobPoll?: () => boolean;
 }
 
 export function useGenerativeCloudJobProgress(
@@ -118,6 +127,9 @@ export function useGenerativeCloudJobProgress(
   readonly activeProgressPhase: GenerativeProgressPhase | null;
 } {
   const resumeAttemptedRef = useRef(false);
+  const initialResumeJobIdRef = useRef(
+    readGenerativeProgressJobId(options.metadata)
+  );
 
   const syncProgress = useCallback(
     (params: {
@@ -155,8 +167,15 @@ export function useGenerativeCloudJobProgress(
       const claimed = tryClaimGenerativeJobResume(jobId);
       if (!claimed) {
         try {
-          return await waitForJobFinalMedia(options.orgId!, jobId);
-        } catch {
+          return await waitForJobFinalMedia(
+            options.orgId!,
+            jobId,
+            options.shouldAbortJobPoll
+          );
+        } catch (error) {
+          if (error instanceof GenerativeGenerationCancelledError) {
+            throw error;
+          }
           // Owner (or another waiter) surfaces job failure; do not fight over UI.
           return { media: [], owned: false };
         }
@@ -184,6 +203,7 @@ export function useGenerativeCloudJobProgress(
             });
             options.onStaged?.(localMedia);
           },
+          shouldAbortJobPoll: options.shouldAbortJobPoll,
         });
         const meta = await readJobPersistMeta(options.orgId!, jobId);
         return {
@@ -201,6 +221,7 @@ export function useGenerativeCloudJobProgress(
       options.onStaged,
       options.orgId,
       options.setPersistPhase,
+      options.shouldAbortJobPoll,
       options.workflowId,
       syncProgress,
     ]
@@ -229,7 +250,7 @@ export function useGenerativeCloudJobProgress(
       return;
     }
 
-    const jobId = readGenerativeProgressJobId(options.metadata);
+    const jobId = initialResumeJobIdRef.current;
     if (
       !jobId ||
       !options.orgId ||
@@ -266,7 +287,6 @@ export function useGenerativeCloudJobProgress(
     options.autoResume,
     options.cloudConfigured,
     options.isGenerating,
-    options.metadata,
     options.onResumeError,
     options.onResumeSuccess,
     options.orgId,
@@ -316,6 +336,10 @@ export function generativeVideoProgressButtonKey(
       return "workflow.aiVideoPanel.queued";
     case "generating":
       return "workflow.aiVideoPanel.generating";
+    case "cancelling":
+      return "workflow.generativeCancel.inProgress";
+    case "cancelled":
+      return "workflow.generativeCancel.success";
     default:
       return "workflow.aiVideoPanel.generate";
   }
@@ -362,6 +386,10 @@ export function generativeCardProgressKey(
       return `${prefix}.cardQueued`;
     case "generating":
       return `${prefix}.cardGenerating`;
+    case "cancelling":
+      return `${prefix}.cardCancelling`;
+    case "cancelled":
+      return `${prefix}.cardCancelled`;
     default:
       if (mediaKind === "image") {
         return "workflow.aiImagePanel.cardUploadPlaceholder";

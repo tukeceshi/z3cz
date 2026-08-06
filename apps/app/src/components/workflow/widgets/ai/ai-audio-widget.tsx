@@ -44,6 +44,7 @@ import {
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
+import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
   withGenerativeCardEditing,
@@ -437,7 +438,7 @@ function AiAudioWidget({
       >
         {!activeAudio && !generateError ? (
           <div className="flex h-full items-center justify-center px-3">
-            <p className="text-center text-[11px] italic text-muted-foreground/50">
+            <p className={GENERATIVE_CARD_STATE_LABEL_CLASS}>
               {cardPlaceholder}
             </p>
           </div>

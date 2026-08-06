@@ -2,6 +2,10 @@ import type {
   AudioModelParameterRules,
   UpstreamParamProfileField,
 } from "@dafthunk/types";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 const MINIMAX_SPEECH_MIME_TYPE = "audio/mpeg" as const;
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -13,6 +17,7 @@ export interface ExecuteMinimaxSpeechParams {
   readonly text: string;
   readonly parameterRules: AudioModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }
 
 export interface ExecuteMinimaxSpeechResult {
@@ -77,7 +82,7 @@ export async function executeMinimaxSpeech(
       params.generationParams
     );
 
-    const response = await fetch(
+    const response = await fetchWithUpstreamLog(
       `${normalizeBaseUrl(params.baseUrl)}/v1/t2a_v2`,
       {
         method: "POST",
@@ -96,7 +101,8 @@ export async function executeMinimaxSpeech(
           },
         }),
         signal: controller.signal,
-      }
+      },
+      params.upstreamLog
     );
 
     const parsed = (await response.json()) as MinimaxT2aResponse;

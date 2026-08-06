@@ -20,6 +20,7 @@ import {
   fetchModelCallDetail,
   useModelCalls,
 } from "@/services/platform-ai-model-service";
+import { formatModelCallSummary } from "@/utils/format-model-call-detail";
 import {
   invocationStatusBadgeVariant,
   invocationStatusLabelKey,
@@ -64,7 +65,7 @@ function ModelCallsPageContent() {
     setSelectedId(id);
     const invocation = await fetchModelCallDetail(orgId, id);
     setDetailTitle(invocation.displayName);
-    setDetailContent(invocation.content || invocation.error || "");
+    setDetailContent(formatModelCallSummary(invocation));
   };
 
   return (
@@ -110,7 +111,7 @@ function ModelCallsPageContent() {
           <DialogHeader>
             <DialogTitle>{detailTitle}</DialogTitle>
           </DialogHeader>
-          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap text-xs">
+          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap text-xs">
             {detailContent}
           </pre>
         </DialogContent>

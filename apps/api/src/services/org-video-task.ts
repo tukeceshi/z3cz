@@ -23,6 +23,7 @@ import {
   isVeoCanonicalId,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
+import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 type OrgVideoBackend = "grok" | "veo" | "volcano";
 
@@ -51,6 +52,7 @@ export async function submitOrgVideoTask(params: {
   }>;
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoSubmitResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
 
@@ -79,6 +81,7 @@ export async function submitOrgVideoTask(params: {
       prompt: params.prompt,
       parameterRules: params.parameterRules,
       generationParams: params.generationParams,
+      upstreamLog: params.upstreamLog,
     });
   }
 
@@ -90,6 +93,7 @@ export async function submitOrgVideoTask(params: {
       prompt: params.prompt,
       parameterRules: params.parameterRules,
       generationParams: params.generationParams,
+      upstreamLog: params.upstreamLog,
     });
   }
 
@@ -104,6 +108,7 @@ export async function submitOrgVideoTask(params: {
     referenceImageInline: params.referenceImageInline,
     referenceVideoUrls: params.referenceVideoUrls,
     referenceAudioUrls: params.referenceAudioUrls,
+    upstreamLog: params.upstreamLog,
   });
 }
 
@@ -113,6 +118,7 @@ export async function pollOrgVideoTask(params: {
   readonly baseUrl: string;
   readonly upstreamTaskId: string;
   readonly videoPollUrl?: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
   const baseUrl = params.baseUrl.replace(/\/$/, "");
@@ -123,6 +129,7 @@ export async function pollOrgVideoTask(params: {
     return pollGrokVideoTask({
       apiKey: params.apiKey,
       pollUrl,
+      upstreamLog: params.upstreamLog,
     });
   }
 
@@ -132,12 +139,16 @@ export async function pollOrgVideoTask(params: {
     return pollVeoVideoTask({
       apiKey: params.apiKey,
       pollUrl,
+      upstreamLog: params.upstreamLog,
     });
   }
 
   return pollVolcanoVideoTask({
     apiKey: params.apiKey,
-    pollUrl: `${baseUrl}/contents/generations/tasks/${params.upstreamTaskId}`,
+    pollUrl:
+      params.videoPollUrl ??
+      `${baseUrl}/contents/generations/tasks/${params.upstreamTaskId}`,
+    upstreamLog: params.upstreamLog,
   });
 }
 
@@ -151,6 +162,7 @@ export async function downloadOrgVideo(params: {
   readonly workflowId?: string;
   readonly executionId?: string;
   readonly cloudUpload?: CloudImageUploadTarget;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoDownloadResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
 
@@ -163,6 +175,7 @@ export async function downloadOrgVideo(params: {
       workflowId: params.workflowId,
       executionId: params.executionId,
       cloudUpload: params.cloudUpload,
+      upstreamLog: params.upstreamLog,
     });
   }
 
@@ -176,6 +189,7 @@ export async function downloadOrgVideo(params: {
       workflowId: params.workflowId,
       executionId: params.executionId,
       cloudUpload: params.cloudUpload,
+      upstreamLog: params.upstreamLog,
     });
   }
 
@@ -187,5 +201,6 @@ export async function downloadOrgVideo(params: {
     workflowId: params.workflowId,
     executionId: params.executionId,
     cloudUpload: params.cloudUpload,
+    upstreamLog: params.upstreamLog,
   });
 }

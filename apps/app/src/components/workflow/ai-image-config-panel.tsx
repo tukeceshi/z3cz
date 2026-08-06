@@ -38,6 +38,7 @@ import {
   clearGenerativeProgress,
   withGenerativeProgress,
 } from "./generative-progress-utils";
+import { isGenerativeGenerationCancelled } from "./generative-generation-cancel";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
 import {
@@ -367,6 +368,15 @@ export function AiImageConfigPanel({
     [nodeId, updateNodeData]
   );
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  const beginSession = useCallback((): AbortSignal => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    return controller.signal;
+  }, []);
+
   const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
     useGenerativeCloudJobProgress({
       nodeId,
@@ -668,6 +678,7 @@ export function AiImageConfigPanel({
 
     generateInFlightRef.current = true;
     setIsGenerating(true);
+    const signal = beginSession();
     /** False when another caller owns persist/progress for this job. */
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
@@ -705,23 +716,29 @@ export function AiImageConfigPanel({
         return;
       }
 
-      const response = await generateAiImage(orgId, {
-        modelCanonicalId: effectiveModel.canonicalId,
-        aiInterfaceId: effectiveModel.interfaceId,
-        prompt: promptForApi,
-        params: mergedGenerationParams,
-        referenceImageUrls:
-          resolved.referenceImageUrls.length > 0
-            ? resolved.referenceImageUrls
-            : undefined,
-        referenceImageInline:
-          resolved.referenceImageInline.length > 0
-            ? resolved.referenceImageInline
-            : undefined,
-        nodeId,
-        workflowId,
-        clientRequestId: crypto.randomUUID(),
-      });
+      const clientRequestId = crypto.randomUUID();
+
+      const response = await generateAiImage(
+        orgId,
+        {
+          modelCanonicalId: effectiveModel.canonicalId,
+          aiInterfaceId: effectiveModel.interfaceId,
+          prompt: promptForApi,
+          params: mergedGenerationParams,
+          referenceImageUrls:
+            resolved.referenceImageUrls.length > 0
+              ? resolved.referenceImageUrls
+              : undefined,
+          referenceImageInline:
+            resolved.referenceImageInline.length > 0
+              ? resolved.referenceImageInline
+              : undefined,
+          nodeId,
+          workflowId,
+          clientRequestId,
+        },
+        { signal }
+      );
 
       let finalImages = response.images;
       let finalizeJobId: string | null = null;
@@ -730,6 +747,7 @@ export function AiImageConfigPanel({
         | undefined;
       if (response.jobId && response.phase === "ready_to_persist") {
         finalizeJobId = response.jobId;
+        syncProgress({ jobId: response.jobId, phase: "generating" });
         const resolvedJob = await resolveJobMedia(response.jobId);
         jobPersistMeta = resolvedJob;
         finalImages = resolvedJob.media;
@@ -795,6 +813,9 @@ export function AiImageConfigPanel({
         toast.success("workflow.aiImagePanel.generated");
       }
     } catch (error) {
+      if (isGenerativeGenerationCancelled(error)) {
+        return;
+      }
       const activeJobId = readActiveGenerationJobId(error);
       if (activeJobId && orgId) {
         try {

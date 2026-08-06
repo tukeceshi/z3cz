@@ -5,6 +5,10 @@ import type {
 
 import { buildBodyFromSlots } from "./build-body";
 import { readDotPath } from "./extract-path";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export function resolveSyncRequestUrl(baseUrl: string, path: string): string {
   const normalizedBase = baseUrl.trim().replace(/\/$/, "");
@@ -28,6 +32,7 @@ export async function executeAiInterfaceSync(params: {
   resolved: ResolvedOrgAiInterface;
   inputs: Readonly<Record<string, unknown>>;
   readonly bodyExtensions?: Readonly<Record<string, unknown>>;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<AiInterfaceSyncExecutionResult> {
   const { resolved, inputs } = params;
   const artifact = resolved.artifact;
@@ -65,15 +70,19 @@ export async function executeAiInterfaceSync(params: {
   );
 
   try {
-    const response = await fetch(url, {
-      method: sync.method,
-      headers,
-      body: JSON.stringify({
-        ...bodyResult,
-        ...(params.bodyExtensions ?? {}),
-      }),
-      signal: controller.signal,
-    });
+    const response = await fetchWithUpstreamLog(
+      url,
+      {
+        method: sync.method,
+        headers,
+        body: JSON.stringify({
+          ...bodyResult,
+          ...(params.bodyExtensions ?? {}),
+        }),
+        signal: controller.signal,
+      },
+      params.upstreamLog
+    );
 
     const text = await response.text();
     if (!response.ok) {

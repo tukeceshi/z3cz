@@ -13,6 +13,10 @@ import type {
   CloudImageUploadTarget,
   VolcanoImageStorageMode,
 } from "./execute-volcano-image";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 const MINIMAX_SPEECH_MIME_TYPE = "audio/mpeg" as const;
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -84,6 +88,7 @@ async function requestMinimaxSpeech(params: {
   readonly text: string;
   readonly parameterRules: AudioModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<
   | { readonly ok: true; readonly audio: Uint8Array; readonly mimeType: string }
   | { readonly ok: false; readonly error: string }
@@ -97,7 +102,7 @@ async function requestMinimaxSpeech(params: {
       params.generationParams
     );
 
-    const response = await fetch(
+    const response = await fetchWithUpstreamLog(
       `${normalizeBaseUrl(params.baseUrl)}/v1/t2a_v2`,
       {
         method: "POST",
@@ -116,7 +121,8 @@ async function requestMinimaxSpeech(params: {
           },
         }),
         signal: controller.signal,
-      }
+      },
+      params.upstreamLog
     );
 
     const parsed = (await response.json()) as MinimaxT2aResponse;
@@ -169,6 +175,7 @@ export async function executeMinimaxAudioGeneration(params: {
   readonly organizationId: string;
   readonly workflowId?: string;
   readonly cloudUpload?: CloudImageUploadTarget;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<MinimaxAudioGenerationResult> {
   const rules = normalizeAudioModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -191,6 +198,7 @@ export async function executeMinimaxAudioGeneration(params: {
     text: trimmedPrompt,
     parameterRules: rules,
     generationParams: params.generationParams,
+    upstreamLog: params.upstreamLog,
   });
 
   if (!speechResult.ok) {

@@ -1,4 +1,6 @@
 import type {
+  AiModelInvocation,
+  CancelGenerationJobResponse,
   CompleteGenerationJobUploadRequest,
   CompleteGenerationJobUploadResponse,
   GenerateAiAudioRequest,
@@ -323,26 +325,30 @@ export function useOrgCloudStorageStatus(orgId: string | undefined) {
 
 export async function generateAiImage(
   orgId: string,
-  body: GenerateAiImageRequest
+  body: GenerateAiImageRequest,
+  options?: { readonly signal?: AbortSignal }
 ): Promise<GenerateAiImageResponse> {
   return makeRequest<GenerateAiImageResponse>(
     `${platformAiEndpoint(orgId)}/ai-image/generate`,
     {
       method: "POST",
       body: JSON.stringify(body),
+      signal: options?.signal,
     }
   );
 }
 
 export async function submitAiVideo(
   orgId: string,
-  body: SubmitAiVideoRequest
+  body: SubmitAiVideoRequest,
+  options?: { readonly signal?: AbortSignal }
 ): Promise<SubmitAiVideoResponse> {
   return makeRequest<SubmitAiVideoResponse>(
     `${platformAiEndpoint(orgId)}/ai-video/submit`,
     {
       method: "POST",
       body: JSON.stringify(body),
+      signal: options?.signal,
     }
   );
 }
@@ -351,7 +357,11 @@ export async function pollAiVideoTask(
   orgId: string,
   taskId: string,
   aiInterfaceId: string,
-  options?: { readonly workflowId?: string; readonly modelCanonicalId?: string }
+  options?: {
+    readonly workflowId?: string;
+    readonly modelCanonicalId?: string;
+    readonly signal?: AbortSignal;
+  }
 ): Promise<PollAiVideoTaskResponse> {
   const query = new URLSearchParams({ aiInterfaceId });
   if (options?.workflowId) {
@@ -361,7 +371,8 @@ export async function pollAiVideoTask(
     query.set("modelCanonicalId", options.modelCanonicalId);
   }
   return makeRequest<PollAiVideoTaskResponse>(
-    `${platformAiEndpoint(orgId)}/ai-video/tasks/${encodeURIComponent(taskId)}?${query.toString()}`
+    `${platformAiEndpoint(orgId)}/ai-video/tasks/${encodeURIComponent(taskId)}?${query.toString()}`,
+    { signal: options?.signal }
   );
 }
 
@@ -380,10 +391,35 @@ export async function generateAiAudio(
 
 export async function getGenerationJob(
   orgId: string,
-  jobId: string
+  jobId: string,
+  options?: { readonly signal?: AbortSignal }
 ): Promise<GetGenerationJobResponse> {
   return makeRequest<GetGenerationJobResponse>(
-    `${platformAiEndpoint(orgId)}/generation-jobs/${encodeURIComponent(jobId)}`
+    `${platformAiEndpoint(orgId)}/generation-jobs/${encodeURIComponent(jobId)}`,
+    { signal: options?.signal }
+  );
+}
+
+export async function cancelGenerationJob(
+  orgId: string,
+  jobId: string
+): Promise<CancelGenerationJobResponse> {
+  return makeRequest<CancelGenerationJobResponse>(
+    `${platformAiEndpoint(orgId)}/generation-jobs/${encodeURIComponent(jobId)}/cancel`,
+    { method: "POST" }
+  );
+}
+
+export async function cancelGenerationJobByClientRequestId(
+  orgId: string,
+  clientRequestId: string
+): Promise<CancelGenerationJobResponse> {
+  return makeRequest<CancelGenerationJobResponse>(
+    `${platformAiEndpoint(orgId)}/generation-jobs/cancel-by-client-request`,
+    {
+      method: "POST",
+      body: JSON.stringify({ clientRequestId }),
+    }
   );
 }
 
@@ -601,9 +637,9 @@ export function useModelCalls(
 export async function fetchModelCallDetail(
   orgId: string,
   id: string
-): Promise<ListAiModelInvocationsResponse["invocations"][number]> {
-  const response = await makeRequest<{
-    invocation: ListAiModelInvocationsResponse["invocations"][number];
-  }>(`${platformAiEndpoint(orgId)}/model-calls/${id}`);
+): Promise<AiModelInvocation> {
+  const response = await makeRequest<{ invocation: AiModelInvocation }>(
+    `${platformAiEndpoint(orgId)}/model-calls/${id}`
+  );
   return response.invocation;
 }

@@ -1,6 +1,8 @@
 export type GenerativeProgressPhase =
   | "queued"
   | "generating"
+  | "cancelling"
+  | "cancelled"
   | "downloading"
   | "uploading"
   | "server_persisting";
@@ -13,6 +15,8 @@ const GENERATIVE_PROGRESS_STARTED_AT_META_KEY = "genProgressStartedAt";
 const PROGRESS_PHASES = new Set<string>([
   "queued",
   "generating",
+  "cancelling",
+  "cancelled",
   "downloading",
   "uploading",
   "server_persisting",
@@ -107,6 +111,20 @@ export function isGenerativeProgressActive(
   return Boolean(readGenerativeProgressPhase(metadata));
 }
 
+/** User may abort only while upstream generation is still running. */
+export function isGenerativePhaseCancellable(
+  phase: GenerativeProgressPhase | null | undefined
+): boolean {
+  return phase === "queued" || phase === "generating";
+}
+
+/** True while work is in-flight; excludes terminal cancelled feedback. */
+export function isGenerativeProgressBusyPhase(
+  phase: GenerativeProgressPhase | undefined
+): boolean {
+  return phase !== undefined && phase !== "cancelled";
+}
+
 /** Persist immediately when job id or staged blob ids change (refresh resume). */
 export function snapshotGenerativeProgressForPersist(
   nodes: readonly { readonly id: string; readonly data: { readonly metadata?: Record<string, string> } }[]
@@ -137,6 +155,9 @@ export function formatGenerativeBusyOverlayLabel(params: {
     values?: Record<string, string | number>
   ) => string;
 }): string {
+  if (params.phase === "cancelling" || params.phase === "cancelled") {
+    return params.t(params.progressButtonKey(params.phase));
+  }
   const base = params.t(params.progressButtonKey(params.phase));
   const startedAt = readGenerativeProgressStartedAt(params.metadata);
   if (!startedAt) {

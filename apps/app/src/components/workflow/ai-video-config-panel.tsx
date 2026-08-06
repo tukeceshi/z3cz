@@ -12,6 +12,7 @@ import {
   type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
+  VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS,
 } from "@dafthunk/types";
 import {
   useNodes,
@@ -55,9 +56,17 @@ import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
   formatGenerativeProgressElapsed,
+  isGenerativePhaseCancellable,
+  isGenerativeProgressBusyPhase,
+  readGenerativeProgressPhase,
   readGenerativeProgressStartedAt,
   withGenerativeProgress,
 } from "./generative-progress-utils";
+import {
+  GenerativeGenerationCancelledError,
+  isGenerativeGenerationCancelled,
+  isGenerativeGenerationCancelRejected,
+} from "./generative-generation-cancel";
 import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
@@ -107,6 +116,7 @@ import {
   withAiVideoStagingPreview,
   withAiVideoGeneratingFlag,
   withAiVideoGenerateError,
+  isAiVideoGenerating,
 } from "./ai-video-node-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
@@ -133,10 +143,11 @@ import {
   useGenerativeCloudJobProgress,
   generativeVideoProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
+import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
 import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
-const VIDEO_POLL_INTERVAL_MS = 3000;
+const VIDEO_POLL_INTERVAL_MS = VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS;
 const VIDEO_POLL_MAX_ATTEMPTS = 120;
 
 export interface AiVideoConfigPanelProps {
@@ -166,12 +177,21 @@ async function pollUntilVideoReady(
   aiInterfaceId: string,
   modelCanonicalId: string,
   workflowId: string | undefined,
-  onPhase?: (phase: "queued" | "generating") => void
+  onPhase?: (phase: "queued" | "generating") => void,
+  options?: {
+    readonly signal?: AbortSignal;
+    readonly shouldAbort?: () => boolean;
+  }
 ): Promise<MediaReference> {
   for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
+    if (options?.shouldAbort?.() || options?.signal?.aborted) {
+      throw new GenerativeGenerationCancelledError();
+    }
+
     const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId, {
       workflowId,
       modelCanonicalId,
+      signal: options?.signal,
     });
     if (result.status === "succeeded") {
       const stored = result.videos?.[0];
@@ -183,7 +203,10 @@ async function pollUntilVideoReady(
       }
       throw new Error("Video generation succeeded without a playable reference");
     }
-    if (result.status === "failed" || result.status === "expired" || result.status === "cancelled") {
+    if (result.status === "cancelled") {
+      throw new GenerativeGenerationCancelledError();
+    }
+    if (result.status === "failed" || result.status === "expired") {
       throw new Error(result.error ?? "Video generation failed");
     }
     if (result.status === "queued") {
@@ -231,6 +254,7 @@ export function AiVideoConfigPanel({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
+  const cancelInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
     null
   );
@@ -489,6 +513,50 @@ export function AiVideoConfigPanel({
     [nodeId, updateNodeData]
   );
 
+  const applyCancelledUiState = useCallback(() => {
+    setPersistPhase(null);
+    setIsGenerating(false);
+    generateInFlightRef.current = false;
+    updateNodeData?.(nodeId, (current) => ({
+      metadata: withAiVideoGenerateError(
+        withGenerativeProgress(
+          withAiVideoGeneratingFlag(
+            clearGenerativeProgress(current.metadata),
+            false
+          ),
+          { phase: "cancelled", jobId: null }
+        ),
+        null
+      ),
+    }));
+  }, [nodeId, updateNodeData]);
+
+  const {
+    beginSession,
+    trackJobId,
+    trackClientRequestId,
+    isCancelConfirmed,
+    isCancelling,
+    shouldAbortJobPoll,
+    cancel: cancelGeneration,
+    flushDeferredCancelIfPending,
+  } = useGenerativeGenerationSession({
+    nodeId,
+    orgId,
+    metadata: data.metadata,
+    onCancelConfirmed: applyCancelledUiState,
+    setIsGenerating,
+    setPersistPhase,
+    generateInFlightRef,
+  });
+
+  const metadataProgressPhase = readGenerativeProgressPhase(data.metadata);
+  const metadataBusy =
+    isAiVideoGenerating(data.metadata) ||
+    isGenerativeProgressBusyPhase(metadataProgressPhase);
+
+  const isBusyForUi = isGenerating || isCancelling || metadataBusy;
+
   const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
     useGenerativeCloudJobProgress({
       nodeId,
@@ -496,7 +564,7 @@ export function AiVideoConfigPanel({
       workflowId,
       cloudConfigured,
       metadata: data.metadata,
-      isGenerating,
+      isGenerating: isBusyForUi,
       persistPhase,
       autoResume: false,
       updateNodeData,
@@ -505,6 +573,7 @@ export function AiVideoConfigPanel({
       applyBusyMetadata: (metadata, busy) =>
         withAiVideoGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
+      shouldAbortJobPoll,
     });
 
   useEffect(() => {
@@ -521,6 +590,12 @@ export function AiVideoConfigPanel({
   }, [activeProgressPhase]);
 
   const progressButtonLabel = useMemo(() => {
+    if (activeProgressPhase === "cancelled") {
+      return t(generativeVideoProgressButtonKey("cancelled"));
+    }
+    if (isCancelling || activeProgressPhase === "cancelling") {
+      return t(generativeVideoProgressButtonKey("cancelling"));
+    }
     const base = t(generativeVideoProgressButtonKey(activeProgressPhase));
     const startedAt = readGenerativeProgressStartedAt(data.metadata);
     if (!activeProgressPhase || !startedAt) {
@@ -541,7 +616,20 @@ export function AiVideoConfigPanel({
       label: base.replace(/[….]+$/u, "").trimEnd(),
       elapsed,
     });
-  }, [activeProgressPhase, data.metadata, progressNowMs, t]);
+  }, [activeProgressPhase, data.metadata, isCancelling, progressNowMs, t]);
+
+  const finalizeCancelUiState = useCallback(() => {
+    setPersistPhase(null);
+    clearProgress();
+    setIsGenerating(false);
+    generateInFlightRef.current = false;
+    updateNodeData?.(nodeId, (current) => ({
+      metadata: withAiVideoGeneratingFlag(
+        clearGenerativeProgress(current.metadata),
+        false
+      ),
+    }));
+  }, [clearProgress, nodeId, updateNodeData]);
 
   const promptReferenceSourceName = useMemo(() => {
     const edge = edges.find(
@@ -817,6 +905,9 @@ export function AiVideoConfigPanel({
 
     generateInFlightRef.current = true;
     setIsGenerating(true);
+    const signal = beginSession();
+    const clientRequestId = crypto.randomUUID();
+    trackClientRequestId(clientRequestId);
     /** False when another caller owns persist/progress for any job in this run. */
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
@@ -877,7 +968,7 @@ export function AiVideoConfigPanel({
             : undefined,
         nodeId,
         workflowId,
-        clientRequestId: crypto.randomUUID(),
+        clientRequestId,
       } as const;
 
       interface CompletedVideo {
@@ -889,12 +980,44 @@ export function AiVideoConfigPanel({
       }
 
       const runOneGeneration = async (): Promise<CompletedVideo> => {
-        const submitResponse = await submitAiVideo(orgId, submitPayload);
+        const submitResponse = await submitAiVideo(orgId, submitPayload, {
+          signal,
+        });
+
+        if (isCancelConfirmed()) {
+          throw new GenerativeGenerationCancelledError();
+        }
+
         let video: MediaReference | null = null;
         let jobId: string | null = null;
         let owned = true;
         if (submitResponse.jobId) {
           jobId = submitResponse.jobId;
+          trackJobId(submitResponse.jobId);
+
+          const deferredResult = await flushDeferredCancelIfPending();
+          if (
+            deferredResult?.kind === "cancelled" ||
+            isCancelConfirmed()
+          ) {
+            throw new GenerativeGenerationCancelledError();
+          }
+          if (deferredResult?.kind === "completed") {
+            const completedJobId = deferredResult.response.job.id;
+            trackJobId(completedJobId);
+            const resolvedJob = await resolveJobMedia(completedJobId);
+            owned = resolvedJob.owned;
+            video = resolvedJob.media[0] ?? null;
+            return {
+              video,
+              aiInterfaceId: submitResponse.aiInterfaceId,
+              completedAt: Date.now(),
+              jobId: completedJobId,
+              owned,
+            };
+          }
+
+          syncProgress({ jobId: submitResponse.jobId, phase: "generating" });
           const resolvedJob = await resolveJobMedia(submitResponse.jobId);
           owned = resolvedJob.owned;
           video = resolvedJob.media[0] ?? null;
@@ -908,7 +1031,8 @@ export function AiVideoConfigPanel({
             submitResponse.aiInterfaceId,
             submitPayload.modelCanonicalId,
             workflowId,
-            (phase) => syncProgress({ phase })
+            (phase) => syncProgress({ phase }),
+            { signal, shouldAbort: isCancelConfirmed }
           );
         }
         return {
@@ -1025,6 +1149,15 @@ export function AiVideoConfigPanel({
         clearProgress();
       }
     } catch (error) {
+      if (
+        isGenerativeGenerationCancelled(error) ||
+        isCancelConfirmed()
+      ) {
+        if (isCancelConfirmed()) {
+          applyCancelledUiState();
+        }
+        return;
+      }
       const activeJobId = readActiveGenerationJobId(error);
       if (activeJobId && orgId && updateNodeData) {
         try {
@@ -1092,6 +1225,9 @@ export function AiVideoConfigPanel({
       }
 
       const raw = error instanceof Error ? error.message : String(error);
+      if (isCancelling || isCancelConfirmed()) {
+        return;
+      }
       const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiVideoGenerateError(
@@ -1104,6 +1240,12 @@ export function AiVideoConfigPanel({
       }));
       toast.errorRaw(cardError.summary);
     } finally {
+      if (isCancelConfirmed()) {
+        generateInFlightRef.current = false;
+        setPersistPhase(null);
+        setIsGenerating(false);
+        return;
+      }
       generateInFlightRef.current = false;
       if (ownsJobProgress) {
         updateNodeData?.(nodeId, (current) => ({
@@ -1118,10 +1260,124 @@ export function AiVideoConfigPanel({
     }
   };
 
+  const canCancelGeneration = isGenerativePhaseCancellable(activeProgressPhase);
+
+  const handleCancelGeneration = async (): Promise<void> => {
+    if (cancelInFlightRef.current || isCancelling) {
+      return;
+    }
+    cancelInFlightRef.current = true;
+
+    syncProgress({ phase: "cancelling" });
+    updateNodeData?.(nodeId, (current) => ({
+      metadata: withGenerativeProgress(
+        withAiVideoGeneratingFlag(current.metadata, true),
+        { phase: "cancelling" }
+      ),
+    }));
+
+    try {
+      const result = await cancelGeneration();
+      if (result.kind === "pending" || result.kind === "cancelled") {
+        return;
+      }
+      if (result.kind !== "completed" || !orgId || !updateNodeData) {
+        return;
+      }
+
+      const jobId = result.response.job.id;
+      trackJobId(jobId);
+      const resolvedJob = await resolveJobMedia(jobId);
+      if (!resolvedJob.owned) {
+        return;
+      }
+
+      const video = resolvedJob.media[0];
+      if (!video) {
+        finalizeCancelUiState();
+        return;
+      }
+
+      if (workflowId) {
+        void ensureGenerativeMediaCached({
+          organizationId: orgId,
+          workflowId,
+          media: video,
+          nodeType: "ai-video",
+        });
+      }
+
+      const generationValues = cardGenerationParams.visible
+        ? cardGenerationParams.values
+        : {};
+      const mergedGenerationParams = mergeImageGenerationParams(
+        cardGenerationParams.visible
+          ? cardGenerationParams.fields
+          : normalizeVideoModelParameterRules(effectiveModel!.parameterRules)
+              .generationFields,
+        generationValues
+      );
+      const canWriteHistory = tryClaimGenerativeJobFinalize(jobId);
+      updateNodeData(nodeId, (current) => {
+        if (!canWriteHistory) {
+          return {
+            metadata: withAiVideoGenerateError(
+              withAiVideoGeneratingFlag(
+                clearGenerativeProgress(current.metadata),
+                false
+              ),
+              null
+            ),
+          };
+        }
+        const withResult = appendAiVideoGeneratedHistoryItems(
+          current,
+          [video],
+          {
+            prompt: promptForGenerate,
+            params: mergedGenerationParams,
+            platformModelId: effectiveModel!.canonicalId,
+            aiInterfaceId: effectiveModel!.interfaceId,
+            modelDisplayName: effectiveModel!.displayName,
+          }
+        );
+        return {
+          ...withResult,
+          metadata: withAiVideoGenerateError(
+            withAiVideoGeneratingFlag(
+              clearGenerativeProgress(withResult.metadata),
+              false
+            ),
+            null
+          ),
+        };
+      });
+      finalizeCancelUiState();
+      if (canWriteHistory) {
+        toast.success("workflow.aiVideoPanel.generated");
+      }
+    } catch (error) {
+      if (isGenerativeGenerationCancelRejected(error)) {
+        toast.error("workflow.generativeCancel.failed");
+        syncProgress({ phase: "generating" });
+        updateNodeData?.(nodeId, (current) => ({
+          metadata: withGenerativeProgress(
+            withAiVideoGeneratingFlag(current.metadata, true),
+            { phase: "generating" }
+          ),
+        }));
+        return;
+      }
+      finalizeCancelUiState();
+    } finally {
+      cancelInFlightRef.current = false;
+    }
+  };
+
   const canGenerate =
     modelReady &&
     !disabled &&
-    !isGenerating &&
+    !isBusyForUi &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiVideo({
       prompt: promptForGenerate,
@@ -1341,10 +1597,16 @@ export function AiVideoConfigPanel({
 
           <AiGenerateButton
             disabled={!canGenerate}
-            isGenerating={isGenerating}
+            isGenerating={isBusyForUi}
+            isCancelling={isCancelling || activeProgressPhase === "cancelling"}
+            canCancel={canCancelGeneration && !isCancelling}
             label={progressButtonLabel}
+            cancelLabel={t("workflow.generativeCancel.action")}
             onClick={() => {
               void handleGenerate();
+            }}
+            onCancel={() => {
+              void handleCancelGeneration();
             }}
           />
         </div>

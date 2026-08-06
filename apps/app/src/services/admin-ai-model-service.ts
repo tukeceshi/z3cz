@@ -1,4 +1,5 @@
 import type {
+  AiModelInvocationDetailResponse,
   CreatePlatformAiModelGroupRequest,
   ListPlatformAiModelGroupsResponse,
   ListPlatformAiModelsResponse,
@@ -147,9 +148,8 @@ export function useAdminModelInvocations(options?: {
 
 export async function fetchAdminModelCallDetail(
   id: string
-): Promise<ListAiModelInvocationsResponse["invocations"][number]> {
-  const response = await makeRequest<{
-    invocation: ListAiModelInvocationsResponse["invocations"][number];
-  }>(`/admin/model-invocations/${id}`);
-  return response.invocation;
+): Promise<AiModelInvocationDetailResponse> {
+  return makeRequest<AiModelInvocationDetailResponse>(
+    `/admin/model-invocations/${id}`
+  );
 }

@@ -24,6 +24,18 @@ export type ActiveGenerationJobStatus =
 
 export const GENERATION_JOB_SERVER_PERSIST_AFTER_MS = 1_800_000;
 
+/** Min interval between upstream video status polls (running). */
+export const VIDEO_UPSTREAM_POLL_INTERVAL_MS = 10_000;
+
+/** Min interval when upstream reports queued. */
+export const VIDEO_UPSTREAM_POLL_QUEUED_INTERVAL_MS = 15_000;
+
+/** Client poll interval for cloud generation jobs (video included). */
+export const VIDEO_JOB_CLIENT_POLL_INTERVAL_MS = 5_000;
+
+/** Client poll interval for direct /ai-video/tasks polling (no job record). */
+export const VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS = 10_000;
+
 export function isGenerationJobReadyAtExpired(
   readyAt: string | null | undefined,
   nowMs: number = Date.now()
@@ -81,6 +93,28 @@ export type GenerationJobPersistDispatch = "api" | "worker";
 
 export type GenerationJobUpstreamVideoStatus = "queued" | "running";
 
+export function isVideoUpstreamPollDue(
+  resultJson: Pick<GenerationJobResultJson, "nextUpstreamPollAt"> | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  const next = resultJson?.nextUpstreamPollAt;
+  if (!next) {
+    return true;
+  }
+  return Date.parse(next) <= nowMs;
+}
+
+export function nextVideoUpstreamPollAt(
+  upstreamPhase: GenerationJobUpstreamVideoStatus | undefined,
+  nowMs: number = Date.now()
+): string {
+  const intervalMs =
+    upstreamPhase === "queued"
+      ? VIDEO_UPSTREAM_POLL_QUEUED_INTERVAL_MS
+      : VIDEO_UPSTREAM_POLL_INTERVAL_MS;
+  return new Date(nowMs + intervalMs).toISOString();
+}
+
 /** Outbound image-generation params stored on the job for audit. */
 export interface GenerationJobResultJson {
   readonly pendingMedia?: readonly GenerationJobPendingMedia[];
@@ -97,6 +131,8 @@ export interface GenerationJobResultJson {
   readonly workerClaimedAt?: string;
   /** Latest non-terminal upstream video poll phase (Volcengine queued/running). */
   readonly upstreamVideoStatus?: GenerationJobUpstreamVideoStatus;
+  /** Do not call upstream before this time (ISO). */
+  readonly nextUpstreamPollAt?: string;
   /** Snapshot of outbound /images/generations fields (image jobs). */
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;
 }
@@ -129,6 +165,22 @@ export interface GetGenerationJobResponse {
   readonly displayPhase?: GenerationJobDisplayPhase;
   /** True when server is persisting or job succeeded — client must not upload locally. */
   readonly deferClientPersistToServer?: boolean;
+}
+
+/** Result of a user-initiated generation job cancel request. */
+export interface CancelGenerationJobResponse extends GetGenerationJobResponse {
+  /** True only when the job ended in `cancelled` status. */
+  readonly cancelled: boolean;
+}
+
+export function isGenerationJobPastUpstreamGeneration(job: {
+  readonly status: GenerationJobStatus;
+}): boolean {
+  return (
+    job.status === "ready_to_persist" ||
+    job.status === "uploading" ||
+    job.status === "succeeded"
+  );
 }
 
 export interface ClaimGenerationJobClientUploadResponse {

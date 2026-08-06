@@ -7,6 +7,10 @@ import {
   type VolcanoVideoPollResult,
   type VolcanoVideoSubmitResult,
 } from "./execute-volcano-video";
+import {
+  fetchWithUpstreamLog,
+  type UpstreamRequestLogSink,
+} from "./upstream-request-log";
 
 export const GROK_VIDEO_PROVIDER = "grok_video" as const;
 
@@ -101,6 +105,7 @@ export async function submitGrokVideoTask(params: {
   readonly prompt: string;
   readonly parameterRules: VideoModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -124,14 +129,18 @@ export async function submitGrokVideoTask(params: {
     generationParams: params.generationParams,
   });
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: GrokVideoSubmitResponse = {};
@@ -168,13 +177,19 @@ export async function submitGrokVideoTask(params: {
 export async function pollGrokVideoTask(params: {
   readonly apiKey: string;
   readonly pollUrl: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
-  const response = await fetch(params.pollUrl, {
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithUpstreamLog(
+    params.pollUrl,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
     },
-  });
+    params.upstreamLog
+  );
 
   const text = await response.text();
   let parsed: GrokVideoPollResponse = {};
@@ -251,6 +266,7 @@ export async function downloadGrokVideo(params: {
   readonly workflowId?: string;
   readonly executionId?: string;
   readonly cloudUpload?: import("./execute-volcano-image").CloudImageUploadTarget;
+  readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoDownloadResult> {
   return downloadVolcanoVideo({
     videoUrl: params.videoUrl,
@@ -260,5 +276,6 @@ export async function downloadGrokVideo(params: {
     workflowId: params.workflowId,
     executionId: params.executionId,
     cloudUpload: params.cloudUpload,
+    upstreamLog: params.upstreamLog,
   });
 }

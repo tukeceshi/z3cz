@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   clearGenerativeProgress,
   formatGenerativeProgressElapsed,
+  isGenerativePhaseCancellable,
   readGenerativeProgressJobId,
   readGenerativeProgressPhase,
   readGenerativeProgressStartedAt,
@@ -47,5 +48,16 @@ describe("generative-progress-utils", () => {
     expect(
       formatGenerativeProgressElapsed(1_000, 1_000 + 200_000)
     ).toEqual({ minutes: 3, seconds: 20 });
+  });
+
+  it("allows cancel only during queued and generating phases", () => {
+    expect(isGenerativePhaseCancellable("queued")).toBe(true);
+    expect(isGenerativePhaseCancellable("generating")).toBe(true);
+    expect(isGenerativePhaseCancellable("cancelling")).toBe(false);
+    expect(isGenerativePhaseCancellable("cancelled")).toBe(false);
+    expect(isGenerativePhaseCancellable("downloading")).toBe(false);
+    expect(isGenerativePhaseCancellable("uploading")).toBe(false);
+    expect(isGenerativePhaseCancellable("server_persisting")).toBe(false);
+    expect(isGenerativePhaseCancellable(null)).toBe(false);
   });
 });
