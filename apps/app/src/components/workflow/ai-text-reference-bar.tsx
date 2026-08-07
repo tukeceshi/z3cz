@@ -1,4 +1,4 @@
-import type { ObjectReference, MediaReference } from "@dafthunk/types";
+import type { MediaReference } from "@dafthunk/types";
 import { isMediaReference } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 import ImageIcon from "lucide-react/icons/image";
@@ -26,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
 import {
@@ -69,22 +69,18 @@ function ReferenceChipMediaThumb({
   readonly fallbackIcon: ReactNode;
 }) {
   const media = chipMedia(chip);
-  const { displayUrl } = useMediaDisplayUrl({
+  const thumbUrl = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
-    size: "thumb",
   });
-  const url = displayUrl ?? chip.previewUrl;
 
   const mediaContent =
-    url && chip.kind === "image" ? (
+    thumbUrl && (chip.kind === "image" || chip.kind === "video") ? (
       <img
-        src={url}
+        src={thumbUrl}
         alt={chip.label}
         className="h-full w-full object-cover"
       />
-    ) : url && chip.kind === "video" ? (
-      <video src={url} className="h-full w-full object-cover" muted />
     ) : (
       <span className="text-muted-foreground">{fallbackIcon}</span>
     );
@@ -109,12 +105,10 @@ function ReferenceHoverPreview({
   readonly anchor: DOMRect;
 }) {
   const media = chipMedia(chip);
-  const { displayUrl } = useMediaDisplayUrl({
+  const thumbUrl = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
-    size: "thumb",
   });
-  const url = displayUrl ?? chip.previewUrl;
 
   const style = {
     left: anchor.left + anchor.width / 2,
@@ -122,42 +116,20 @@ function ReferenceHoverPreview({
     transform: "translate(-50%, -100%)",
   } as const;
 
-  if (chip.kind === "image" && url) {
+  if ((chip.kind === "image" || chip.kind === "video") && thumbUrl) {
     return createPortal(
       <div
         className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
         style={style}
       >
         <img
-          src={url}
+          src={thumbUrl}
           alt=""
           className="max-h-[150px] max-w-[150px] object-contain"
           style={{
             maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
             maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
           }}
-        />
-      </div>,
-      document.body
-    );
-  }
-
-  if (chip.kind === "video" && url) {
-    return createPortal(
-      <div
-        className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
-        style={style}
-      >
-        <video
-          src={url}
-          className="max-h-[150px] max-w-[150px] object-contain"
-          style={{
-            maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
-            maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
-          }}
-          muted
-          autoPlay
-          loop
         />
       </div>,
       document.body
@@ -185,16 +157,12 @@ export function collectAiTextReferenceChips(params: {
   readonly nodeId: string;
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
-  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
 }): readonly AiTextReferenceChip[] {
   return collectGenerativeReferenceChips({
     nodeId: params.nodeId,
     targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
-    createObjectUrl: params.createObjectUrl,
-    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: classifyReferenceFromNodeType,
   });
 }

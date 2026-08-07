@@ -1,4 +1,4 @@
-import type { MediaReference, ObjectReference } from "@dafthunk/types";
+import type { MediaReference } from "@dafthunk/types";
 import {
   AI_AUDIO_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
@@ -22,7 +22,6 @@ export interface GenerativeReferenceChip {
   readonly edgeId: string;
   readonly kind: AiTextReferenceKind;
   readonly label: string;
-  readonly previewUrl?: string;
   readonly textExcerpt?: string;
   readonly media?: MediaReference;
   readonly overlayLabel?: string;
@@ -86,46 +85,12 @@ export function resolveReferenceMediaFromSource(params: {
   return firstMediaReference(params.outputValue) ?? undefined;
 }
 
-function resolveChipPreviewUrl(params: {
-  readonly kind: AiTextReferenceKind;
-  readonly sourceData: WorkflowNodeType;
-  readonly outputValue: unknown;
-  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
-  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
-}): string | undefined {
-  if (params.kind === "text") {
-    return undefined;
-  }
-
-  const media = resolveReferenceMediaFromSource({
-    kind: params.kind,
-    sourceData: params.sourceData,
-    outputValue: params.outputValue,
-  });
-
-  if (!media) {
-    return undefined;
-  }
-
-  if (params.resolveMediaPreviewUrl) {
-    return params.resolveMediaPreviewUrl(media) ?? undefined;
-  }
-
-  if ("id" in media && params.createObjectUrl) {
-    return params.createObjectUrl(media);
-  }
-
-  return undefined;
-}
-
 /** Collect reference chips wired into a generative node's reference handle. */
 export function collectGenerativeReferenceChips(params: {
   readonly nodeId: string;
   readonly targetHandle: string;
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
-  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
   readonly classifyKind: (
     nodeType: string | undefined
   ) => AiTextReferenceKind | null;
@@ -148,7 +113,6 @@ export function collectGenerativeReferenceChips(params: {
         (entry) => entry.id === edge.sourceHandle
       );
 
-      let previewUrl: string | undefined;
       let textExcerpt: string | undefined;
       let media: MediaReference | undefined;
 
@@ -168,13 +132,6 @@ export function collectGenerativeReferenceChips(params: {
           sourceData,
           outputValue: output?.value,
         });
-        previewUrl = resolveChipPreviewUrl({
-          kind,
-          sourceData,
-          outputValue: output?.value,
-          createObjectUrl: params.createObjectUrl,
-          resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
-        });
       }
 
       return [
@@ -182,7 +139,6 @@ export function collectGenerativeReferenceChips(params: {
           edgeId: edge.id,
           kind,
           label: sourceData.name || edge.source,
-          previewUrl,
           textExcerpt,
           media,
         },

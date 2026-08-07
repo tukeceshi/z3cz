@@ -2539,6 +2539,7 @@ export const zh: TranslationDictionary = {
     },
     generativeCancel: {
       action: "中止",
+      dismiss: "知道了",
       failed: "取消未生效，生成仍在进行",
       inProgress: "取消中…",
       success: "已取消",
@@ -3095,6 +3096,17 @@ export const zh: TranslationDictionary = {
       downloadWarningDescription:
         "本地暂存仅用于浏览器内预览。若原文件仍在云存储或你的设备上，请从那里获取。只有在你已丢失文件、不得不从暂存恢复时，才应使用此功能。",
       downloadConfirmAction: "仍要下载",
+      usageBreakdown: "原图 {{original}} · 缩略图 {{thumbs}}",
+      resourceEmpty: "此工作流暂无暂存项",
+      resourceSizeBreakdown: "原图 {{original}} · 缩略图 {{thumbs}} · 合计 {{total}}",
+      tierThumb: "列表缩略图",
+      tierCanvasS: "小图",
+      tierCanvasM: "中图",
+      tierCanvasL: "大图",
+      noThumbs: "尚无缩略图",
+      regenerateThumbs: "重新生成",
+      deleteThumbs: "清理缩略图",
+      deleteResource: "删除",
     },
     aiTextSlot: {
       keywordsReference: "关键词 — 拖入连线",
@@ -3168,6 +3180,11 @@ export const zh: TranslationDictionary = {
       promptReferenceHint: "点击取消提示词引用",
       promptReferenceEditHint: "请在引用的「{{nodeName}}」节点中编辑输出内容作为提示词",
       promptReferenceEditHintFallback: "上游 AI 文本",
+      historyTime: "生成时间",
+      historyModel: "模型",
+      historyParams: "参数",
+      historyExpandToNode: "展开为新节点",
+      historyWatermark: "水印",
       historyPrompt: "使用的提示词",
     },
     aiVideoPanel: {

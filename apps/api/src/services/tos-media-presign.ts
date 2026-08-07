@@ -5,6 +5,7 @@ import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
 import { decryptSecret } from "../utils/encryption";
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
+import { registerMediaResourceTransitions } from "./media-resource-catalog-service";
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
 
 const DEFAULT_PRESIGN_SECONDS = 3600;
@@ -45,6 +46,7 @@ export async function presignTosMediaUpload(
     readonly mimeType: string;
     readonly contentLength: number;
     readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
+    readonly replacesResourceId?: string;
   }
 ): Promise<TosPresignUploadResult | null> {
   const db = createDatabase(env);
@@ -71,15 +73,27 @@ export async function presignTosMediaUpload(
     contentLength: params.contentLength,
   });
 
+  const reference: ObjectReference = {
+    id: objectId,
+    mimeType: params.mimeType,
+    storageKey,
+    storageBackend: "volcengine_tos",
+  };
+
+  await registerMediaResourceTransitions(db, {
+    organizationId: params.organizationId,
+    transitions: [
+      {
+        fromResourceId: params.replacesResourceId,
+        reference,
+      },
+    ],
+  });
+
   return {
     uploadUrl: signed.url,
     uploadHeaders: signed.headers,
-    reference: {
-      id: objectId,
-      mimeType: params.mimeType,
-      storageKey,
-      storageBackend: "volcengine_tos",
-    },
+    reference,
   };
 }
 

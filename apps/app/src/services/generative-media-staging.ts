@@ -3,6 +3,12 @@ import {
   readCachedMediaBlobByMediaId,
   writeGenerativeMediaCacheBlob,
 } from "@/services/ai-media-cache-service";
+import {
+  createStableBlobUrl,
+  findStableBlobUrlForMediaId,
+  stagingBlobUrlKey,
+} from "@/services/media-display-blob-url-registry";
+import { registerLocalMediaResource } from "@/services/media-resource-service";
 
 const LEGACY_DB_NAME = "dafthunk-local-media-staging";
 const LEGACY_DB_VERSION = 1;
@@ -15,7 +21,6 @@ interface LegacyLocalMediaRecord {
   readonly createdAt: string;
 }
 
-const previewUrlCache = new Map<string, string>();
 let legacyMigrationPromise: Promise<void> | null = null;
 
 function inferNodeTypeFromMime(
@@ -27,17 +32,29 @@ function inferNodeTypeFromMime(
   return "ai-image";
 }
 
-function rememberPreviewUrl(mediaId: string, blob: Blob): void {
-  if (previewUrlCache.has(mediaId)) {
-    return;
+async function registerStagingBlobUrlFromIndexedDb(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<string | null> {
+  const blob = await getCachedMediaBlob({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId: params.mediaId,
+  });
+  if (!blob) {
+    return null;
   }
-  previewUrlCache.set(mediaId, URL.createObjectURL(blob));
+
+  return createStableBlobUrl(stagingBlobUrlKey(params), blob);
 }
 
+/** @deprecated Use findStableBlobUrlForMediaId from media-display-blob-url-registry. */
 export function getGenerativeStagingPreviewUrl(mediaId: string): string | null {
-  return previewUrlCache.get(mediaId) ?? null;
+  return findStableBlobUrlForMediaId(mediaId);
 }
 
+/** @deprecated Prefer createStableBlobUrl with a stable key. */
 export function createGenerativeStagingObjectUrl(blob: Blob): string {
   return URL.createObjectURL(blob);
 }
@@ -54,16 +71,27 @@ export async function writeGenerativeStaging(params: {
   const stored = await writeGenerativeMediaCacheBlob({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
-    workflowName: params.workflowName,
+    workflowName: params.workflowName ?? params.workflowId,
     mediaId: params.mediaId,
     blob: params.blob,
     mimeType: params.mimeType,
     nodeType: params.nodeType,
   });
-  if (stored) {
-    rememberPreviewUrl(params.mediaId, params.blob);
+  if (!stored) {
+    return false;
   }
-  return stored;
+
+  await registerStagingBlobUrlFromIndexedDb({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId: params.mediaId,
+  });
+  void registerLocalMediaResource({
+    organizationId: params.organizationId,
+    mediaId: params.mediaId,
+    mimeType: params.mimeType,
+  });
+  return true;
 }
 
 export async function writeGenerativeStagingWithNewId(params: {
@@ -96,7 +124,14 @@ export async function readGenerativeStagingBlob(params: {
       mediaId: params.mediaId,
     });
     if (blob) {
-      rememberPreviewUrl(params.mediaId, blob);
+      createStableBlobUrl(
+        stagingBlobUrlKey({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          mediaId: params.mediaId,
+        }),
+        blob
+      );
       return {
         blob,
         mimeType: blob.type || "application/octet-stream",
@@ -106,7 +141,10 @@ export async function readGenerativeStagingBlob(params: {
 
   const entry = await readCachedMediaBlobByMediaId(params.mediaId);
   if (entry) {
-    rememberPreviewUrl(params.mediaId, entry.blob);
+    const existing = findStableBlobUrlForMediaId(params.mediaId);
+    if (!existing) {
+      createStableBlobUrl(`media:${params.mediaId}:staging`, entry.blob);
+    }
     return entry;
   }
 

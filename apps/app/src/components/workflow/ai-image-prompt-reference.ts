@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type MediaReference, type ObjectReference } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type MediaReference } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import { AI_TEXT_OUTPUT_ID, readAiTextPromptSource } from "./ai-text-node-utils";
@@ -181,16 +181,12 @@ export function collectAiImageUnifiedReferenceChips(params: {
   readonly nodeId: string;
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
-  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
 }): readonly GenerativeReferenceChip[] {
   const promptChips = collectGenerativeReferenceChips({
     nodeId: params.nodeId,
     targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
-    createObjectUrl: params.createObjectUrl,
-    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: () => "text",
   });
   const imageChips = collectGenerativeReferenceChips({
@@ -198,8 +194,6 @@ export function collectAiImageUnifiedReferenceChips(params: {
     targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
-    createObjectUrl: params.createObjectUrl,
-    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: (nodeType) =>
       nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
   });

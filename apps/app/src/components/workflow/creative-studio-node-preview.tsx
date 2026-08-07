@@ -12,7 +12,6 @@ import Music from "lucide-react/icons/music";
 import Play from "lucide-react/icons/play";
 import Type from "lucide-react/icons/type";
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -20,11 +19,9 @@ import {
   type ReactNode,
 } from "react";
 
-import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
-import { useObjectService } from "@/services/object-service";
-import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
+import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
 import { readAiAudioCardAudios } from "./ai-audio-node-utils";
@@ -550,17 +547,8 @@ export function CreativeStudioReferenceThumbs({
   data,
   max = 3,
 }: CreativeStudioReferenceThumbsProps) {
-  const { organization } = useAuth();
-  const { createObjectUrl } = useObjectService();
   const { edges = [] } = useWorkflow();
   const nodes = useNodes<WorkflowNodeType>();
-  const orgId = organization?.id;
-
-  const resolveMediaPreviewUrl = useCallback(
-    (media: MediaReference) =>
-      orgId ? resolveMediaFetchUrl(media, orgId) : null,
-    [orgId]
-  );
 
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
   const nodeType = data.nodeType ?? "";
@@ -571,8 +559,6 @@ export function CreativeStudioReferenceThumbs({
         nodeId,
         edges,
         nodes: typedNodes,
-        createObjectUrl,
-        resolveMediaPreviewUrl,
       }).filter((chip) => chip.kind === "image");
     }
     if (nodeType === AI_VIDEO_NODE_TYPE) {
@@ -580,19 +566,10 @@ export function CreativeStudioReferenceThumbs({
         nodeId,
         edges,
         nodes: typedNodes,
-        createObjectUrl,
-        resolveMediaPreviewUrl,
       }).filter((chip) => chip.kind === "image");
     }
     return [];
-  }, [
-    createObjectUrl,
-    edges,
-    nodeId,
-    nodeType,
-    resolveMediaPreviewUrl,
-    typedNodes,
-  ]);
+  }, [edges, nodeId, nodeType, typedNodes]);
 
   const visible = chips.slice(0, max);
   if (visible.length === 0) {
@@ -611,21 +588,19 @@ export function CreativeStudioReferenceThumbs({
 function ReferenceThumb({
   chip,
 }: {
-  readonly chip: { readonly previewUrl?: string; readonly media?: MediaReference };
+  readonly chip: { readonly media?: MediaReference };
 }) {
   const media =
     chip.media && isMediaReference(chip.media) ? chip.media : null;
-  const { displayUrl } = useMediaDisplayUrl({
+  const thumbUrl = useReferenceThumbUrl({
     media,
     nodeType: "ai-image",
-    size: "thumb",
   });
-  const url = displayUrl ?? chip.previewUrl;
 
-  if (url) {
+  if (thumbUrl) {
     return (
       <img
-        src={url}
+        src={thumbUrl}
         alt=""
         className={STUDIO_REFERENCE_THUMB}
       />

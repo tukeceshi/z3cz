@@ -1,4 +1,6 @@
-const THUMB_MAX_WIDTH = 200;
+import { CANVAS_TIER_SHORT_EDGE } from "@/services/canvas-media-tier";
+
+const DEFAULT_THUMB_SHORT_EDGE = CANVAS_TIER_SHORT_EDGE.s;
 const THUMB_JPEG_QUALITY = 0.75;
 
 function resolveImageMimeType(blob: Blob, mimeType?: string): string | null {
@@ -26,12 +28,34 @@ async function loadImageBitmap(blob: Blob, mimeType: string): Promise<ImageBitma
   }
 }
 
+function scaleToShortEdge(
+  naturalWidth: number,
+  naturalHeight: number,
+  maxShortEdge: number
+): { readonly width: number; readonly height: number } {
+  const short = Math.min(naturalWidth, naturalHeight);
+  if (short <= maxShortEdge) {
+    return { width: naturalWidth, height: naturalHeight };
+  }
+  const scale = maxShortEdge / short;
+  return {
+    width: Math.max(1, Math.round(naturalWidth * scale)),
+    height: Math.max(1, Math.round(naturalHeight * scale)),
+  };
+}
+
 export async function generateImageThumbnail(
   blob: Blob,
-  mimeType?: string
+  mimeType?: string,
+  maxShortEdge: number = DEFAULT_THUMB_SHORT_EDGE
 ): Promise<Blob | null> {
   const resolvedType = resolveImageMimeType(blob, mimeType);
   if (!resolvedType) return null;
+
+  const targetShortEdge =
+    Number.isFinite(maxShortEdge) && maxShortEdge > 0
+      ? maxShortEdge
+      : DEFAULT_THUMB_SHORT_EDGE;
 
   let bitmap: ImageBitmap;
   try {
@@ -40,12 +64,11 @@ export async function generateImageThumbnail(
     return null;
   }
 
-  const width =
-    bitmap.width <= THUMB_MAX_WIDTH ? bitmap.width : THUMB_MAX_WIDTH;
-  const height =
-    bitmap.width <= THUMB_MAX_WIDTH
-      ? bitmap.height
-      : Math.round((bitmap.height * THUMB_MAX_WIDTH) / bitmap.width);
+  const { width, height } = scaleToShortEdge(
+    bitmap.width,
+    bitmap.height,
+    targetShortEdge
+  );
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -66,4 +89,26 @@ export async function generateImageThumbnail(
       THUMB_JPEG_QUALITY
     );
   });
+}
+
+export async function readImageNaturalSize(
+  blob: Blob,
+  mimeType?: string
+): Promise<{ readonly width: number; readonly height: number } | null> {
+  const resolvedType = resolveImageMimeType(blob, mimeType);
+  if (!resolvedType) return null;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await loadImageBitmap(blob, resolvedType);
+  } catch {
+    return null;
+  }
+
+  const size = {
+    width: bitmap.width,
+    height: bitmap.height,
+  };
+  bitmap.close();
+  return size;
 }

@@ -16,16 +16,16 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
+import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
 import { useObjectService } from "@/services/object-service";
-import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
 import { AiGenerateButton } from "./ai-generate-button";
@@ -94,12 +94,8 @@ export function AiTextConfigPanel({
   const { getOrgUrl } = useOrgUrl();
   const { createObjectUrl, getObjectMetadata } = useObjectService();
   const orgId = organization?.id;
-
-  const resolveMediaPreviewUrl = useCallback(
-    (media: MediaReference) =>
-      orgId ? resolveMediaFetchUrl(media, orgId) : null,
-    [createObjectUrl, orgId]
-  );
+  const { id: workflowId } = useParams<{ id: string }>();
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
@@ -119,10 +115,8 @@ export function AiTextConfigPanel({
         nodeId,
         edges,
         nodes: typedNodes,
-        createObjectUrl,
-        resolveMediaPreviewUrl,
       }),
-    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
+    [edges, nodeId, typedNodes]
   );
 
   const currentReferenceCounts = useMemo(
@@ -430,6 +424,8 @@ export function AiTextConfigPanel({
       if (mediaReferenceCount > 0) {
         const resolved = await resolveMediaReferencesForTextGenerate({
           organizationId: orgId,
+          workflowId,
+          cloudConfigured,
           references: [...imageMediaReferences, ...videoMediaReferences],
         });
         referenceImageUrls =

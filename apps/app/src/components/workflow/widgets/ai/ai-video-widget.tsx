@@ -4,7 +4,7 @@ import {
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -12,10 +12,10 @@ import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
-import type { MediaDisplaySize } from "@/services/media-display-size";
+import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
@@ -37,14 +37,18 @@ import {
   withAiVideoManualUpload,
 } from "../../ai-video-node-utils";
 import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
-import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
+import { GenerativeCardNoticeBlock } from "../../generative-card-notice-block";
+import {
+  dismissGenerativeCancelledNotice,
+  isGenerativeCancelledNoticeVisible,
+  subscribeGenerativeCancelledNotice,
+} from "../../generative-generation-cancel";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
-import type { VideoFrameCaptureMode } from "../../capture-video-frame";
 import {
   shouldShowGenerativeHistoryIcon,
   withGenerativeCardEditing,
@@ -56,83 +60,12 @@ import {
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
-import { GenerativeMediaDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
+import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
 import { useGenerativeCardDoubleClickUpload } from "../../use-generative-card-double-click-upload";
-import { useVideoFrameToAiImageNode } from "../../use-video-frame-to-ai-image-node";
 import { useWorkflow } from "../../workflow-context";
-import { WorkflowMediaVideoPlayer } from "../../workflow-media-video-player";
+import { CanvasMediaCover } from "../../canvas-media-cover";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
-
-interface MediaVideoPreviewProps {
-  readonly value: MediaReference;
-  readonly createObjectUrl?: (ref: ObjectReference) => string;
-  readonly className?: string;
-  readonly size?: MediaDisplaySize;
-  readonly nodeId: string;
-  readonly disabled?: boolean;
-}
-
-function MediaVideoPreview({
-  value,
-  createObjectUrl,
-  className,
-  nodeId,
-  disabled = false,
-  size = "full",
-}: MediaVideoPreviewProps) {
-  const { t } = useTranslation();
-  const expired = isMediaExpired(value);
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media: expired ? null : value,
-    nodeType: "ai-video",
-    size,
-  });
-  const [mediaError, setMediaError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const { captureFrameToAiImageNode, isCapturing } =
-    useVideoFrameToAiImageNode(nodeId);
-
-  useEffect(() => {
-    setMediaError(false);
-  }, [displayUrl]);
-
-  const handleFrameCapture = useCallback(
-    (mode: VideoFrameCaptureMode) => {
-      const video = videoRef.current;
-      if (!video) return;
-      void captureFrameToAiImageNode(video, mode);
-    },
-    [captureFrameToAiImageNode]
-  );
-
-  if (stale || !displayUrl || mediaError) {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center rounded-none border-0 border-dashed border-neutral-300 bg-neutral-50 px-3 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400",
-          className
-        )}
-      >
-        {t("workflow.aiMediaCache.videoUnavailable")}
-      </div>
-    );
-  }
-
-  return (
-    <WorkflowMediaVideoPlayer
-      src={displayUrl}
-      className={className}
-      objectFit="contain"
-      variant="card"
-      showFrameCapture
-      frameCaptureDisabled={disabled || isCapturing}
-      videoRef={videoRef}
-      onFrameCapture={handleFrameCapture}
-      onError={() => setMediaError(true)}
-    />
-  );
-}
 
 interface AiVideoWidgetProps extends BaseWidgetProps {
   videos: MediaReference[];
@@ -177,6 +110,14 @@ function AiVideoWidget({
     uploading || isGenerativeProgressBusyPhase(progressPhase)
   );
   const generateError = readGenerativeCardError(metadata);
+  const showCancelledNotice = useSyncExternalStore(
+    subscribeGenerativeCancelledNotice,
+    () => isGenerativeCancelledNoticeVisible(nodeId),
+    () => false
+  );
+  const handleDismissCancelledNotice = useCallback(() => {
+    dismissGenerativeCancelledNotice(nodeId);
+  }, [nodeId]);
   const cardPlaceholder = t(
     generativeCardProgressKey(
       progressPhase ??
@@ -186,20 +127,12 @@ function AiVideoWidget({
   );
   const activeVideo = videos[0];
   const activeVideoExpired = activeVideo ? isMediaExpired(activeVideo) : false;
-  const { displayUrl: activeVideoUrl, stale: activeVideoStale } =
-    useMediaDisplayUrl({
-      media: activeVideo && !activeVideoExpired ? activeVideo : null,
-      nodeType: "ai-video",
-    });
-  const canDownloadActiveVideo =
-    Boolean(activeVideo) &&
-    Boolean(activeVideoUrl) &&
-    !activeVideoStale &&
-    !activeVideoExpired;
-  const cardSize = useAdaptiveMediaCardSize({
-    displayUrl: activeVideoUrl,
-    hasMedia: Boolean(activeVideo) && !activeVideoExpired && !activeVideoStale,
+  const activeVideoKey = activeVideo ? getMediaReferenceKey(activeVideo) : null;
+  const canDownloadActiveVideo = Boolean(activeVideo) && !activeVideoExpired;
+  const { cardSize, onNaturalSize } = useCanvasCardSize({
     kind: "video",
+    hasMedia: videos.length > 0,
+    mediaKey: activeVideoKey,
   });
 
   const handleClearPrompt = useCallback(() => {
@@ -275,7 +208,7 @@ function AiVideoWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId) return;
+      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "video");
       if (!normalized) {
@@ -286,7 +219,7 @@ function AiVideoWidget({
       setUploading(true);
       setCardEditing(true);
       try {
-        const value = await stageGenerativeCardUpload({
+        const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
           workflowId,
           file: normalized,
@@ -295,14 +228,22 @@ function AiVideoWidget({
           nodeType: "ai-video",
         });
 
+        warmCardUploadPersist({
+          organizationId: orgId,
+          workflowId,
+          staged,
+          nodeType: "ai-video",
+          cloudConfigured,
+        });
+
         const uploadError = resolveGenerativeCardUploadError({
-          value,
+          value: staged,
           cloudConfigured,
           t,
         });
 
         updateNodeData(nodeId, (current) => {
-          const withMedia = withAiVideoManualUpload(current, [value]);
+          const withMedia = withAiVideoManualUpload(current, [staged]);
           return {
             ...withMedia,
             metadata: withAiVideoGenerateError(
@@ -386,6 +327,10 @@ function AiVideoWidget({
             setErrorDetailOpen(true);
             return;
           }
+          if (showCancelledNotice) {
+            event.stopPropagation();
+            return;
+          }
           if (activeVideo && !isGenerating) {
             event.stopPropagation();
             openCreativeStudio();
@@ -396,29 +341,40 @@ function AiVideoWidget({
           }
         }}
       >
-        {!activeVideo && !generateError && progressPhase !== "cancelled" ? (
+        {!activeVideo && !generateError && !showCancelledNotice ? (
           <div className="flex h-full items-center justify-center px-3">
             <p className={GENERATIVE_CARD_STATE_LABEL_CLASS}>
               {cardPlaceholder}
             </p>
           </div>
         ) : activeVideo ? (
-          <MediaVideoPreview
-            value={activeVideo}
-            createObjectUrl={createObjectUrl}
-            className="h-full w-full"
-            nodeId={nodeId}
-            disabled={disabled}
+          <CanvasMediaCover
+            media={activeVideo}
+            nodeType="ai-video"
+            cardWidthPx={cardSize.width}
+            cardHeightPx={cardSize.height}
+            fitMode="cover"
+            className="h-full w-full rounded-none border-0"
+            onNaturalSize={onNaturalSize}
           />
         ) : null}
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
 
-        {!generateError ? (
+        {showCancelledNotice && !generateError ? (
+          <GenerativeCardNoticeBlock
+            message={t("workflow.generativeCancel.success")}
+            dismissLabel={t("workflow.generativeCancel.dismiss")}
+            onDismiss={handleDismissCancelledNotice}
+          />
+        ) : null}
+
+        {!generateError && !showCancelledNotice ? (
           <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            {canDownloadActiveVideo && activeVideo && activeVideoUrl ? (
-              <GenerativeMediaDownloadButton
-                src={activeVideoUrl}
+            {canDownloadActiveVideo && activeVideo ? (
+              <GenerativeMediaLazyDownloadButton
+                media={activeVideo}
+                nodeType="ai-video"
                 fileName={`video-${getMediaReferenceKey(activeVideo)}.${activeVideo.mimeType.split("/")[1] ?? "mp4"}`}
                 className={GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME}
               />
@@ -449,6 +405,7 @@ function AiVideoWidget({
           open={historyOpen}
           history={historyAsImageHistory}
           currentImages={videos}
+          mediaKind="video"
           createObjectUrl={createObjectUrl}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}

@@ -39,6 +39,7 @@ import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
+import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
 import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import { WorkflowCanvas } from "./workflow-canvas";
 import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
@@ -265,6 +266,7 @@ export function WorkflowBuilder({
   const {
     nodes,
     edges,
+    setNodes,
     selectedNodes,
     selectedEdges,
     soleSelectedNodeId,
@@ -318,6 +320,13 @@ export function WorkflowBuilder({
     generativeDefaults,
     commitEditorViewport: onCommitEditorViewport,
     suppressViewportPersistEndRef,
+  });
+
+  useWorkflowMediaReconcile({
+    organizationId: orgId,
+    workflowId,
+    nodes,
+    setNodes,
   });
 
   // Execution state
@@ -603,11 +612,23 @@ export function WorkflowBuilder({
     reactFlowInstance?.zoomTo(1, { duration: 200 });
   }, [reactFlowInstance]);
 
+  const viewportMoveEndTimerRef = useRef<number | null>(null);
+
   const handleViewportMoveStart = useCallback(() => {
+    if (viewportMoveEndTimerRef.current !== null) {
+      window.clearTimeout(viewportMoveEndTimerRef.current);
+      viewportMoveEndTimerRef.current = null;
+    }
     setIsViewportMoving(true);
   }, []);
   const handleViewportMoveEnd = useCallback(() => {
-    setIsViewportMoving(false);
+    if (viewportMoveEndTimerRef.current !== null) {
+      window.clearTimeout(viewportMoveEndTimerRef.current);
+    }
+    viewportMoveEndTimerRef.current = window.setTimeout(() => {
+      viewportMoveEndTimerRef.current = null;
+      setIsViewportMoving(false);
+    }, 150);
   }, []);
 
   // Single-node run: send unsaved editor snapshot, write results back to canvas.

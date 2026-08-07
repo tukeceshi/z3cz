@@ -147,6 +147,11 @@ export function getMediaReferenceKey(ref: MediaReference): string {
   return ref.storageKey ?? ref.id;
 }
 
+/** Stable resource identifier for display, cache, and server-side link resolution. */
+export function getResourceId(ref: MediaReference): string {
+  return getMediaReferenceKey(ref);
+}
+
 export function isEphemeralMediaExpired(ref: EphemeralMediaReference): boolean {
   if (!ref.expiresAt) return false;
   return Date.parse(ref.expiresAt) <= Date.now();

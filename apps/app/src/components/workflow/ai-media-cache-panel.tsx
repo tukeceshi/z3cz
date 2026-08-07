@@ -2,7 +2,10 @@ import {
   AI_MEDIA_CACHE_MAX_LIMIT_MB,
   AI_MEDIA_CACHE_MIN_LIMIT_MB,
 } from "@dafthunk/types";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import ChevronRight from "lucide-react/icons/chevron-right";
 import Download from "lucide-react/icons/download";
+import RefreshCw from "lucide-react/icons/refresh-cw";
 import Trash2 from "lucide-react/icons/trash-2";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -34,9 +37,16 @@ import {
 } from "@/hooks/use-ai-media-cache";
 import {
   clearAiMediaCache,
+  clearCacheEntriesByKeys,
+  deleteCacheResourceTiers,
   downloadCacheForWorkflows,
   formatBytes,
+  getCacheResourcePreviewUrl,
+  listWorkflowCacheResources,
+  regenerateCacheResourceTiers,
   setAiMediaCacheSettings,
+  type AiMediaCacheResourceSummary,
+  type AiMediaCacheTierKind,
 } from "@/services/ai-media-cache-service";
 import { cn } from "@/utils/utils";
 
@@ -45,6 +55,219 @@ interface AiMediaCachePanelProps {
   readonly currentWorkflowId?: string;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+}
+
+function tierLabelKey(tier: AiMediaCacheTierKind): string {
+  if (tier === "thumb") return "workflow.aiMediaCache.tierThumb";
+  if (tier === "canvas-s") return "workflow.aiMediaCache.tierCanvasS";
+  if (tier === "canvas-m") return "workflow.aiMediaCache.tierCanvasM";
+  return "workflow.aiMediaCache.tierCanvasL";
+}
+
+function CacheResourcePreview({
+  entryKey,
+  nodeType,
+}: {
+  readonly entryKey: string;
+  readonly nodeType: AiMediaCacheResourceSummary["nodeType"];
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCacheResourcePreviewUrl(entryKey).then((url) => {
+      if (!cancelled) {
+        setPreviewUrl(url);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entryKey]);
+
+  if (nodeType === "ai-audio") {
+    return (
+      <div className="flex size-10 shrink-0 items-center justify-center rounded border bg-muted/40 text-[10px] text-muted-foreground">
+        MP3
+      </div>
+    );
+  }
+
+  if (!previewUrl) {
+    return <div className="size-10 shrink-0 rounded border bg-muted/40" />;
+  }
+
+  return (
+    <img
+      src={previewUrl}
+      alt=""
+      className="size-10 shrink-0 rounded border object-cover"
+    />
+  );
+}
+
+function WorkflowResourceList({
+  organizationId,
+  workflowId,
+  onChanged,
+}: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly onChanged: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [resources, setResources] = useState<readonly AiMediaCacheResourceSummary[]>(
+    []
+  );
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await listWorkflowCacheResources({
+        organizationId,
+        workflowId,
+      });
+      setResources(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId, workflowId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const handleDeleteResource = useCallback(
+    async (entryKey: string) => {
+      await clearCacheEntriesByKeys([entryKey]);
+      notifyAiMediaCacheChanged();
+      await reload();
+      await onChanged();
+    },
+    [onChanged, reload]
+  );
+
+  const handleDeleteThumbs = useCallback(
+    async (entryKey: string) => {
+      await deleteCacheResourceTiers(entryKey);
+      notifyAiMediaCacheChanged();
+      await reload();
+      await onChanged();
+    },
+    [onChanged, reload]
+  );
+
+  const handleRegenerateThumbs = useCallback(
+    async (entryKey: string) => {
+      await regenerateCacheResourceTiers(entryKey);
+      notifyAiMediaCacheChanged();
+      await reload();
+      await onChanged();
+    },
+    [onChanged, reload]
+  );
+
+  if (loading) {
+    return (
+      <p className="px-2 py-1 text-xs text-muted-foreground">
+        {t("workflow.aiMediaCache.loading")}
+      </p>
+    );
+  }
+
+  if (resources.length === 0) {
+    return (
+      <p className="px-2 py-1 text-xs text-muted-foreground">
+        {t("workflow.aiMediaCache.resourceEmpty")}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 border-t pt-2">
+      {resources.map((resource) => (
+        <div
+          key={resource.entryKey}
+          className="rounded-md border bg-background/60 p-2"
+        >
+          <div className="flex items-start gap-2">
+            <CacheResourcePreview
+              entryKey={resource.entryKey}
+              nodeType={resource.nodeType}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium">
+                {t(
+                  resource.nodeType === "ai-video"
+                    ? "workflow.aiMediaCache.entryVideo"
+                    : resource.nodeType === "ai-audio"
+                      ? "workflow.aiMediaCache.entryAudio"
+                      : "workflow.aiMediaCache.entryImage"
+                )}{" "}
+                · {resource.mediaId.slice(0, 12)}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {t("workflow.aiMediaCache.resourceSizeBreakdown", {
+                  original: formatBytes(resource.originalBytes),
+                  thumbs: formatBytes(resource.thumbBytes),
+                  total: formatBytes(resource.totalBytes),
+                })}
+              </div>
+              {resource.tiers.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {resource.tiers.map((tier) => (
+                    <span
+                      key={`${resource.entryKey}-${tier.tier}`}
+                      className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {t(tierLabelKey(tier.tier))} {formatBytes(tier.byteSize)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {t("workflow.aiMediaCache.noThumbs")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => void handleRegenerateThumbs(resource.entryKey)}
+            >
+              <RefreshCw className="mr-1 size-3" />
+              {t("workflow.aiMediaCache.regenerateThumbs")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              disabled={resource.thumbBytes <= 0}
+              onClick={() => void handleDeleteThumbs(resource.entryKey)}
+            >
+              {t("workflow.aiMediaCache.deleteThumbs")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => void handleDeleteResource(resource.entryKey)}
+            >
+              <Trash2 className="mr-1 size-3" />
+              {t("workflow.aiMediaCache.deleteResource")}
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AiMediaCacheBar({
@@ -97,6 +320,9 @@ export function AiMediaCachePanel({
   const [enabled, setEnabled] = useState(true);
   const [limitMb, setLimitMb] = useState(1024);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(
+    null
+  );
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmDownloadOpen, setConfirmDownloadOpen] = useState(false);
   const [pendingClearAll, setPendingClearAll] = useState(false);
@@ -107,6 +333,12 @@ export function AiMediaCachePanel({
     setEnabled(stats.enabled);
     setLimitMb(Math.round(stats.limitBytes / (1024 * 1024)));
   }, [stats]);
+
+  useEffect(() => {
+    if (!open) {
+      setExpandedWorkflowId(null);
+    }
+  }, [open]);
 
   const handleSaveSettings = useCallback(async () => {
     await setAiMediaCacheSettings({
@@ -142,6 +374,7 @@ export function AiMediaCachePanel({
     });
     notifyAiMediaCacheChanged();
     setSelected(new Set());
+    setExpandedWorkflowId(null);
     await refresh();
   };
 
@@ -219,11 +452,17 @@ export function AiMediaCachePanel({
             </div>
 
             {stats ? (
-              <div className="text-sm">
+              <div className="space-y-1 text-sm">
                 <p>
                   {t("workflow.aiMediaCache.currentUsage", {
                     used: formatBytes(stats.totalBytes),
                     limit: formatBytes(stats.limitBytes),
+                  })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("workflow.aiMediaCache.usageBreakdown", {
+                    original: formatBytes(stats.originalBytes),
+                    thumbs: formatBytes(stats.thumbBytes),
                   })}
                 </p>
                 {stats.browserQuotaBytes ? (
@@ -252,48 +491,75 @@ export function AiMediaCachePanel({
               </Label>
             </div>
 
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
+            <div className="max-h-80 space-y-2 overflow-y-auto rounded-md border p-2">
               {workflows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {t("workflow.aiMediaCache.empty")}
                 </p>
               ) : (
-                workflows.map((row) => (
-                  <label
-                    key={row.workflowId}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50",
-                      row.workflowId === currentWorkflowId && "bg-muted/30"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.workflowId)}
-                      onChange={(event) =>
-                        handleToggleWorkflow(row.workflowId, event.target.checked)
-                      }
-                      className="size-4 rounded border"
-                    />
-                    <div className="min-w-0 flex-1 text-sm">
-                      <div className="truncate font-medium">
-                        {row.workflowName || row.workflowId}
+                workflows.map((row) => {
+                  const isExpanded = expandedWorkflowId === row.workflowId;
+                  return (
+                    <div
+                      key={row.workflowId}
+                      className={cn(
+                        "rounded-md border px-2 py-1.5",
+                        row.workflowId === currentWorkflowId && "border-primary/30 bg-muted/20"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(row.workflowId)}
+                          onChange={(event) =>
+                            handleToggleWorkflow(row.workflowId, event.target.checked)
+                          }
+                          className="mt-1 size-4 rounded border"
+                        />
+                        <button
+                          type="button"
+                          className="mt-0.5 text-muted-foreground"
+                          onClick={() =>
+                            setExpandedWorkflowId((current) =>
+                              current === row.workflowId ? null : row.workflowId
+                            )
+                          }
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="size-4" />
+                          ) : (
+                            <ChevronRight className="size-4" />
+                          )}
+                        </button>
+                        <div className="min-w-0 flex-1 text-sm">
+                          <div className="truncate font-medium">
+                            {row.workflowName || row.workflowId}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("workflow.aiMediaCache.workflowCounts", {
+                              total:
+                                row.entryCount ??
+                                row.imageCount +
+                                  row.videoCount +
+                                  (row.audioCount ?? 0),
+                              images: row.imageCount,
+                              videos: row.videoCount,
+                              audios: row.audioCount ?? 0,
+                              size: formatBytes(row.totalBytes),
+                            })}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {t("workflow.aiMediaCache.workflowCounts", {
-                          total:
-                            row.entryCount ??
-                            row.imageCount +
-                              row.videoCount +
-                              (row.audioCount ?? 0),
-                          images: row.imageCount,
-                          videos: row.videoCount,
-                          audios: row.audioCount ?? 0,
-                          size: formatBytes(row.totalBytes),
-                        })}
-                      </div>
+                      {isExpanded ? (
+                        <WorkflowResourceList
+                          organizationId={organizationId}
+                          workflowId={row.workflowId}
+                          onChanged={refresh}
+                        />
+                      ) : null}
                     </div>
-                  </label>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

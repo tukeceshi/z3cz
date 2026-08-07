@@ -696,6 +696,7 @@ function StudioImageDetail({
           open={historyOpen}
           history={historyItems}
           currentImages={images}
+          mediaKind="image"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
           onExpandToNode={handleHistoryExpand}
@@ -838,6 +839,7 @@ function StudioVideoDetail({
           open={historyOpen}
           history={historyAsImageHistory}
           currentImages={videos}
+          mediaKind="video"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
           onExpandToNode={handleHistoryExpand}
@@ -980,6 +982,7 @@ function StudioAudioDetail({
           open={historyOpen}
           history={historyAsImageHistory}
           currentImages={audios}
+          mediaKind="audio"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
           onExpandToNode={handleHistoryExpand}

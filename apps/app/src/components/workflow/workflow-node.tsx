@@ -603,9 +603,7 @@ export const WorkflowNode = memo(
         : undefined;
     const showBusyOverlay =
       isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
-    const showCancelledOverlay =
-      isAiVideoNode && progressPhase === "cancelled";
-    const showProgressOverlay = showBusyOverlay || showCancelledOverlay;
+    const showProgressOverlay = showBusyOverlay;
     const isError =
       (data.executionState === "error" && !!data.error) ||
       Boolean(generativeCardError);
@@ -634,9 +632,6 @@ export const WorkflowNode = memo(
       }
       if (!isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy && !progressPhase) {
         return null;
-      }
-      if (progressPhase === "cancelled" && isAiVideoNode) {
-        return t(generativeVideoProgressButtonKey("cancelled"));
       }
 
       const phase = progressPhase ?? "generating";
@@ -809,45 +804,36 @@ export const WorkflowNode = memo(
           {showProgressOverlay ? (
             <div
               className={cn(
-                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]",
-                showCancelledOverlay
-                  ? "bg-card/60"
-                  : "bg-card/70",
+                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
                 isGenerativeCanvasNode
                   ? GENERATIVE_NODE_CARD_RADIUS_CLASS
                   : "rounded-md"
               )}
             >
-              {showCancelledOverlay ? (
-                <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
-                  {busyOverlayLabel}
-                </p>
-              ) : (
-                <>
-                  <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
-                  {busyOverlayLabel ? (
-                    <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
-                      {busyOverlayLabel}
-                    </p>
-                  ) : null}
-                  {showOverlayCancel ? (
-                    <button
-                      type="button"
-                      className={cn(
-                        "nodrag rounded-md px-3 py-1 text-[11px] font-medium",
-                        "bg-red-600 text-white hover:bg-red-500",
-                        "dark:bg-red-500 dark:hover:bg-red-400"
-                      )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOverlayCancel();
-                      }}
-                    >
-                      {t("workflow.generativeCancel.action")}
-                    </button>
-                  ) : null}
-                </>
-              )}
+              <>
+                <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
+                {busyOverlayLabel ? (
+                  <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
+                    {busyOverlayLabel}
+                  </p>
+                ) : null}
+                {showOverlayCancel ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      "nodrag rounded-md px-3 py-1 text-[11px] font-medium",
+                      "bg-red-600 text-white hover:bg-red-500",
+                      "dark:bg-red-500 dark:hover:bg-red-400"
+                    )}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleOverlayCancel();
+                    }}
+                  >
+                    {t("workflow.generativeCancel.action")}
+                  </button>
+                ) : null}
+              </>
             </div>
           ) : null}
 

@@ -114,6 +114,9 @@ import {
   presignTosMediaDownloadUrls,
   presignTosMediaUpload,
 } from "../services/tos-media-presign";
+import {
+  resolveResourceRefs,
+} from "../services/resolve-resource-refs";
 
 const platformAiRoutes = new Hono<ApiContext>();
 
@@ -248,6 +251,31 @@ const objectReferenceSchema = z.object({
 const tosPresignDownloadSchema = z.object({
   references: z.array(objectReferenceSchema).min(1),
 });
+
+const resolveResourceRefsSchema = z.object({
+  resourceIds: z.array(z.string().min(1)).min(1),
+});
+
+platformAiRoutes.post(
+  "/resolve-resource-refs",
+  zValidator("json", resolveResourceRefsSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const body = c.req.valid("json");
+
+    try {
+      const result = await resolveResourceRefs(c.env, {
+        organizationId,
+        resourceIds: body.resourceIds,
+      });
+      return c.json(result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to resolve resource refs";
+      return c.json({ error: message }, 400);
+    }
+  }
+);
 
 platformAiRoutes.post(
   "/tos/presign-download",

@@ -27,6 +27,7 @@ import {
 } from "../db/persist-worker-queries";
 import { generationJobs } from "../db/schema";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
+import { registerMediaResourceTransitions } from "./media-resource-catalog-service";
 import { presignTosMediaUpload } from "./tos-media-presign";
 import {
   assertGenerationJobUploadKeysBelongToOrg,
@@ -223,6 +224,7 @@ export async function presignPersistJobUploadsForWorker(
       mimeType: item.mimeType || pending.mimeType,
       contentLength: item.contentLength,
       mediaKind: pending.mediaKind,
+      replacesResourceId: pending.resourceId,
     });
 
     if (!presigned) {
@@ -305,6 +307,13 @@ export async function completePersistJobFromWorker(
   });
 
   if (succeeded) {
+    await registerMediaResourceTransitions(db, {
+      organizationId: mapped.organizationId,
+      transitions: validatedFinalMedia.map((reference, index) => ({
+        fromResourceId: pendingMedia[index]?.resourceId,
+        reference,
+      })),
+    });
     await decrementPersistWorkerActiveJobs(db, params.workerId);
     await syncGenerationJobInvocation(db, succeeded);
     return succeeded;

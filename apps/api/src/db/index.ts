@@ -75,6 +75,7 @@ export * from "./onboarding";
 export * from "./platform-settings-queries";
 export * from "./workflow-scheme-queries";
 export * from "./queries";
+export * from "./media-resource-queries";
 export * from "./schema";
 export * from "./support-queries";
 export * from "./user-database-schema";

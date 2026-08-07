@@ -36,6 +36,11 @@ import { resolveAiImageStorage } from "./ai-image-storage";
 import { resolveAiVideoStorage } from "./ai-video-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "./assert-cloud-storage-healthy-for-generative-media";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
+import {
+  registerMediaResourceTransitions,
+  registerMediaResourcesFromReferences,
+  type MediaResourceTransition,
+} from "./media-resource-catalog-service";
 import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 import {
   isPersistWorkerPoolActive,
@@ -164,7 +169,18 @@ function pendingMediaFromEphemeralMedia(
       sourceUrl: item.url,
       mimeType: item.mimeType,
       mediaKind,
+      resourceId: item.mediaId,
     }));
+}
+
+function buildMediaResourceTransitionsFromJobComplete(
+  pendingMedia: readonly GenerationJobPendingMedia[],
+  finalMedia: readonly MediaReference[]
+): readonly MediaResourceTransition[] {
+  return finalMedia.map((reference, index) => ({
+    fromResourceId: pendingMedia[index]?.resourceId,
+    reference,
+  }));
 }
 
 async function persistPendingMediaOnServer(
@@ -432,6 +448,13 @@ async function completeInlineServerGenerationJobPersist(
       resultJson: succeededResultJson,
     });
     if (succeeded) {
+      await registerMediaResourceTransitions(db, {
+        organizationId: claimed.organizationId,
+        transitions: buildMediaResourceTransitionsFromJobComplete(
+          pendingMedia,
+          finalMedia
+        ),
+      });
       await syncGenerationJobInvocation(db, succeeded);
       return succeeded;
     }
@@ -793,6 +816,14 @@ export async function completeGenerationJobClientUpload(
   });
 
   if (updated) {
+    const pendingMedia = extractPendingMediaFromJob(job) ?? [];
+    await registerMediaResourceTransitions(db, {
+      organizationId: params.organizationId,
+      transitions: buildMediaResourceTransitionsFromJobComplete(
+        pendingMedia,
+        validatedFinalMedia
+      ),
+    });
     await syncGenerationJobInvocation(db, updated);
     return toGetGenerationJobResponse(updated);
   }
@@ -864,6 +895,12 @@ export async function createReadyToPersistImageJob(
     readyAt,
     resultJson,
     clientRequestId: params.clientRequestId,
+  }).then(async (job) => {
+    await registerMediaResourcesFromReferences(db, {
+      organizationId: params.organizationId,
+      references: params.images,
+    });
+    return job;
   });
 }
 
@@ -902,6 +939,12 @@ export async function createReadyToPersistAudioJob(
     readyAt,
     resultJson,
     clientRequestId: params.clientRequestId,
+  }).then(async (job) => {
+    await registerMediaResourcesFromReferences(db, {
+      organizationId: params.organizationId,
+      references: params.audios,
+    });
+    return job;
   });
 }
 

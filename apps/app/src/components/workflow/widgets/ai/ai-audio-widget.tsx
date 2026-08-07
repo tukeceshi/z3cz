@@ -1,7 +1,6 @@
 import {
   AI_AUDIO_NODE_TYPE,
   getMediaReferenceKey,
-  isLocalMediaReference,
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
@@ -13,12 +12,10 @@ import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
-import { getCachedMediaBlob } from "@/services/ai-media-cache-service";
-import { readGenerativeStagingBlob } from "@/services/generative-media-staging";
-import { isMediaExpired, resolveMediaFetchUrl } from "@/services/media-url-resolver";
+import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
+import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
 import {
@@ -56,65 +53,12 @@ import {
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
-import { GenerativeMediaDownloadButton } from "../../generative-media-download-button";
+import { GenerativeMediaLazyDownloadButton } from "../../generative-media-download-button";
 import { useGenerativeCardDoubleClickUpload } from "../../use-generative-card-double-click-upload";
+import { CanvasAudioCover } from "../../canvas-media-cover";
 import { useWorkflow } from "../../workflow-context";
-import { WorkflowMediaAudioPlayer } from "../../workflow-media-audio-player";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
-
-interface MediaAudioPreviewProps {
-  readonly value: MediaReference;
-  readonly className?: string;
-  readonly nodeId: string;
-}
-
-function MediaAudioPreview({
-  value,
-  className,
-  displayUrl,
-  waveformBlob,
-}: MediaAudioPreviewProps & {
-  readonly displayUrl: string;
-  readonly waveformBlob?: Blob;
-}) {
-  const [mediaError, setMediaError] = useState(false);
-
-  useEffect(() => {
-    setMediaError(false);
-  }, [displayUrl]);
-
-  if (mediaError) {
-    return (
-      <MediaAudioUnavailable className={className} />
-    );
-  }
-
-  return (
-    <WorkflowMediaAudioPlayer
-      src={displayUrl}
-      className={className}
-      variant="card"
-      waveformBlob={waveformBlob}
-      waveformCacheKey={getMediaReferenceKey(value) ?? undefined}
-      onError={() => setMediaError(true)}
-    />
-  );
-}
-
-function MediaAudioUnavailable({ className }: { readonly className?: string }) {
-  const { t } = useTranslation();
-  return (
-    <div
-      className={cn(
-        "flex h-full w-full items-center justify-center px-3 text-center text-xs text-muted-foreground/50",
-        className
-      )}
-    >
-      {t("workflow.aiMediaCache.audioUnavailable")}
-    </div>
-  );
-}
 
 interface AiAudioWidgetProps extends BaseWidgetProps {
   audios: MediaReference[];
@@ -165,82 +109,7 @@ function AiAudioWidget({
   );
   const activeAudio = audios[0];
   const activeAudioExpired = activeAudio ? isMediaExpired(activeAudio) : false;
-  const { displayUrl: activeAudioUrl, stale: activeAudioStale } =
-    useMediaDisplayUrl({
-      media: activeAudio && !activeAudioExpired ? activeAudio : null,
-      nodeType: "ai-audio",
-    });
-  const [waveformBlob, setWaveformBlob] = useState<Blob | undefined>();
-
-  useEffect(() => {
-    if (!activeAudio || !orgId || !workflowId) {
-      setWaveformBlob(undefined);
-      return;
-    }
-
-    let cancelled = false;
-
-    const resolveWaveformBlob = async (): Promise<Blob | undefined> => {
-      if (isLocalMediaReference(activeAudio)) {
-        const entry = await readGenerativeStagingBlob({
-          mediaId: activeAudio.mediaId,
-          organizationId: orgId,
-          workflowId,
-        });
-        return entry?.blob;
-      }
-
-      const mediaId = getMediaReferenceKey(activeAudio);
-      if (!mediaId) {
-        return undefined;
-      }
-
-      const cachedBlob = await getCachedMediaBlob({
-        organizationId: orgId,
-        workflowId,
-        mediaId,
-      });
-      if (cachedBlob) {
-        return cachedBlob;
-      }
-
-      const fetchUrl = resolveMediaFetchUrl(activeAudio, orgId);
-      if (fetchUrl && !fetchUrl.startsWith("blob:")) {
-        const response = await fetch(fetchUrl, { credentials: "include" });
-        if (response.ok) {
-          return response.blob();
-        }
-      }
-
-      if (!activeAudioUrl || activeAudioUrl.startsWith("blob:")) {
-        return undefined;
-      }
-
-      const response = await fetch(activeAudioUrl, { credentials: "include" });
-      if (!response.ok) {
-        return undefined;
-      }
-      return response.blob();
-    };
-
-    void resolveWaveformBlob()
-      .then((blob) => {
-        if (cancelled) {
-          return;
-        }
-        setWaveformBlob(blob);
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        setWaveformBlob(undefined);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeAudio, activeAudioUrl, orgId, workflowId]);
+  const canDownloadActiveAudio = Boolean(activeAudio) && !activeAudioExpired;
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -315,7 +184,7 @@ function AiAudioWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId) return;
+      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "audio");
       if (!normalized) {
@@ -326,7 +195,7 @@ function AiAudioWidget({
       setUploading(true);
       setCardEditing(true);
       try {
-        const value = await stageGenerativeCardUpload({
+        const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
           workflowId,
           file: normalized,
@@ -335,14 +204,22 @@ function AiAudioWidget({
           nodeType: "ai-audio",
         });
 
+        warmCardUploadPersist({
+          organizationId: orgId,
+          workflowId,
+          staged,
+          nodeType: "ai-audio",
+          cloudConfigured,
+        });
+
         const uploadError = resolveGenerativeCardUploadError({
-          value,
+          value: staged,
           cloudConfigured,
           t,
         });
 
         updateNodeData(nodeId, (current) => {
-          const withMedia = withAiAudioManualUpload(current, [value]);
+          const withMedia = withAiAudioManualUpload(current, [staged]);
           return {
             ...withMedia,
             metadata: withAiAudioGenerateError(
@@ -443,27 +320,20 @@ function AiAudioWidget({
             </p>
           </div>
         ) : activeAudio ? (
-          activeAudioStale || !activeAudioUrl ? (
-            <MediaAudioUnavailable className="h-full w-full" />
-          ) : (
-            <MediaAudioPreview
-              value={activeAudio}
-              displayUrl={activeAudioUrl}
-              waveformBlob={waveformBlob}
-              className="h-full w-full"
-              nodeId={nodeId}
-            />
-          )
+          <CanvasAudioCover className="h-full w-full" />
         ) : null}
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
 
-        {!generateError && activeAudio && activeAudioUrl && !activeAudioStale ? (
+        {!generateError && activeAudio ? (
           <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            <GenerativeMediaDownloadButton
-              src={activeAudioUrl}
-              fileName={`audio-${getMediaReferenceKey(activeAudio)}.mp3`}
-            />
+            {canDownloadActiveAudio ? (
+              <GenerativeMediaLazyDownloadButton
+                media={activeAudio}
+                nodeType="ai-audio"
+                fileName={`audio-${getMediaReferenceKey(activeAudio)}.mp3`}
+              />
+            ) : null}
             {showHistoryIcon ? (
               <AiImageHistoryButton
                 count={historyItems.items.length}
@@ -471,15 +341,6 @@ function AiAudioWidget({
               />
             ) : null}
             <AiTextExpandButton onClick={openCreativeStudio} />
-          </div>
-        ) : null}
-
-        {!generateError && showHistoryIcon && (!activeAudio || !activeAudioUrl || activeAudioStale) ? (
-          <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            <AiImageHistoryButton
-              count={historyItems.items.length}
-              onClick={() => setHistoryOpen(true)}
-            />
           </div>
         ) : null}
       </div>
@@ -497,6 +358,7 @@ function AiAudioWidget({
           open={historyOpen}
           history={historyAsImageHistory}
           currentImages={audios}
+          mediaKind="audio"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
           onExpandToNode={handleHistoryExpand}

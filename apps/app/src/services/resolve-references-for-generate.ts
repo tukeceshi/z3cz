@@ -1,32 +1,36 @@
 import type {
   MediaReference,
-  ObjectReference,
   ReferenceImageInline,
 } from "@dafthunk/types";
+import { isLocalMediaReference } from "@dafthunk/types";
+
 import {
-  isCloudObjectReference,
-  isEphemeralMediaReference,
-  isEphemeralMediaExpired,
-  isLocalMediaReference,
-  isObjectReference,
-} from "@dafthunk/types";
+  collectResourceIds,
+  ensureLocalResourcesUploaded,
+  filterCloudResolvableReferences,
+} from "@/services/ensure-resource-cached";
+import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
+import { makeRequest } from "@/services/utils";
 
-import { readGenerativeStagingAsInline } from "./generative-media-staging";
-import { makeRequest } from "./utils";
+export type {
+  ResolvedMediaReferencesForTextGenerate,
+  ResolvedMediaReferencesForVideoGenerate,
+  ResolvedReferencesForGenerate,
+} from "./resolve-references-for-generate.types";
 
-export interface ResolvedReferencesForGenerate {
-  readonly referenceImageUrls: readonly string[];
-  readonly referenceImageInline: readonly ReferenceImageInline[];
-}
+import type {
+  ResolvedMediaReferencesForTextGenerate,
+  ResolvedMediaReferencesForVideoGenerate,
+  ResolvedReferencesForGenerate,
+} from "./resolve-references-for-generate.types";
 
-export interface ResolvedMediaReferencesForTextGenerate {
-  readonly referenceImageUrls: readonly string[];
-  readonly referenceImageInline: readonly ReferenceImageInline[];
-  readonly referenceVideoUrls: readonly string[];
-}
-
-interface PresignDownloadResponse {
-  readonly urls: readonly string[];
+interface ResolveResourceRefsResponse {
+  readonly resolved: readonly {
+    readonly resourceId: string;
+    readonly url: string;
+    readonly mimeType: string;
+  }[];
+  readonly unresolved: readonly string[];
 }
 
 function platformAiEndpoint(organizationId: string): string {
@@ -41,213 +45,200 @@ function isAudioMimeType(mimeType: string): boolean {
   return mimeType.toLowerCase().startsWith("audio/");
 }
 
-async function resolveCloudUrls(
-  organizationId: string,
-  cloudRefs: readonly ObjectReference[]
-): Promise<readonly string[]> {
-  if (cloudRefs.length === 0) {
-    return [];
+async function resolveResourceIdsOnServer(params: {
+  readonly organizationId: string;
+  readonly resourceIds: readonly string[];
+}): Promise<ResolveResourceRefsResponse> {
+  if (params.resourceIds.length === 0) {
+    return { resolved: [], unresolved: [] };
   }
-  const response = await makeRequest<PresignDownloadResponse>(
-    `${platformAiEndpoint(organizationId)}/tos/presign-download`,
+
+  return makeRequest<ResolveResourceRefsResponse>(
+    `${platformAiEndpoint(params.organizationId)}/resolve-resource-refs`,
     {
       method: "POST",
-      body: JSON.stringify({ references: cloudRefs }),
+      body: JSON.stringify({ resourceIds: params.resourceIds }),
     }
   );
-  return response.urls;
 }
 
-export async function resolveReferencesForGenerate(params: {
-  readonly organizationId: string;
-  readonly references: readonly MediaReference[];
-}): Promise<ResolvedReferencesForGenerate> {
-  const referenceImageUrls: string[] = [];
-  const referenceImageInline: ReferenceImageInline[] = [];
-  const cloudRefs: ObjectReference[] = [];
+async function resolveLocalInline(
+  media: readonly MediaReference[]
+): Promise<readonly ReferenceImageInline[]> {
+  const inline: ReferenceImageInline[] = [];
 
-  for (const ref of params.references) {
-    if (isEphemeralMediaReference(ref)) {
-      if (isEphemeralMediaExpired(ref)) {
-        throw new Error("Referenced ephemeral image has expired");
-      }
-      referenceImageUrls.push(ref.url);
-      continue;
+  for (const ref of media) {
+    if (!isLocalMediaReference(ref)) continue;
+    const payload = await readGenerativeStagingAsInline(ref.mediaId);
+    if (!payload) {
+      throw new Error("Local reference is missing from this browser");
     }
-
-    if (isLocalMediaReference(ref)) {
-      const inline = await readGenerativeStagingAsInline(ref.mediaId);
-      if (!inline) {
-        throw new Error("Local reference image is missing from this browser");
-      }
-      referenceImageInline.push(inline);
-      continue;
-    }
-
-    if (isObjectReference(ref)) {
-      if (isCloudObjectReference(ref)) {
-        cloudRefs.push(ref);
-        continue;
-      }
-      throw new Error(
-        "Platform object references require cloud storage for model input"
-      );
-    }
+    inline.push(payload);
   }
 
-  referenceImageUrls.push(
-    ...(await resolveCloudUrls(params.organizationId, cloudRefs))
-  );
-
-  return { referenceImageUrls, referenceImageInline };
+  return inline;
 }
 
-export interface ResolvedMediaReferencesForVideoGenerate {
+async function resolveLocalDataUrls(
+  media: readonly MediaReference[]
+): Promise<readonly string[]> {
+  const urls: string[] = [];
+
+  for (const ref of media) {
+    if (!isLocalMediaReference(ref)) continue;
+    const inline = await readGenerativeStagingAsInline(ref.mediaId);
+    if (!inline) {
+      throw new Error("Local reference is missing from this browser");
+    }
+    urls.push(`data:${inline.mimeType};base64,${inline.data}`);
+  }
+
+  return urls;
+}
+
+async function resolveMediaGroup(params: {
+  readonly organizationId: string;
+  readonly workflowId?: string;
+  readonly media: readonly MediaReference[];
+  readonly cloudConfigured: boolean;
+}): Promise<{
   readonly referenceImageUrls: readonly string[];
   readonly referenceImageInline: readonly ReferenceImageInline[];
   readonly referenceVideoUrls: readonly string[];
   readonly referenceAudioUrls: readonly string[];
-}
-
-/** Resolve image / video / audio refs for video generate. */
-export async function resolveMediaReferencesForVideoGenerate(params: {
-  readonly organizationId: string;
-  readonly references: readonly MediaReference[];
-}): Promise<ResolvedMediaReferencesForVideoGenerate> {
-  const images: MediaReference[] = [];
-  const videos: MediaReference[] = [];
-  const audios: MediaReference[] = [];
-
-  for (const ref of params.references) {
-    if (isVideoMimeType(ref.mimeType)) {
-      videos.push(ref);
-    } else if (isAudioMimeType(ref.mimeType)) {
-      audios.push(ref);
-    } else {
-      images.push(ref);
-    }
+}> {
+  if (params.media.length === 0) {
+    return {
+      referenceImageUrls: [],
+      referenceImageInline: [],
+      referenceVideoUrls: [],
+      referenceAudioUrls: [],
+    };
   }
 
-  const imageResolved = await resolveReferencesForGenerate({
+  let refs = params.media;
+  if (params.cloudConfigured && params.workflowId) {
+    refs = await ensureLocalResourcesUploaded({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      media: params.media,
+      cloudConfigured: true,
+    });
+  }
+
+  const images = refs.filter((entry) => !isVideoMimeType(entry.mimeType) && !isAudioMimeType(entry.mimeType));
+  const videos = refs.filter((entry) => isVideoMimeType(entry.mimeType));
+  const audios = refs.filter((entry) => isAudioMimeType(entry.mimeType));
+
+  const cloudRefs = filterCloudResolvableReferences(refs);
+  const localRefs = refs.filter((entry) => isLocalMediaReference(entry));
+
+  const server = await resolveResourceIdsOnServer({
     organizationId: params.organizationId,
-    references: images,
+    resourceIds: collectResourceIds(cloudRefs),
   });
 
-  async function resolveMediaUrls(
-    media: readonly MediaReference[],
-    label: "video" | "audio"
-  ): Promise<string[]> {
-    const urls: string[] = [];
-    const cloudRefs: ObjectReference[] = [];
-
-    for (const ref of media) {
-      if (isEphemeralMediaReference(ref)) {
-        if (isEphemeralMediaExpired(ref)) {
-          throw new Error(`Referenced ephemeral ${label} has expired`);
-        }
-        urls.push(ref.url);
-        continue;
-      }
-
-      if (isLocalMediaReference(ref)) {
-        const inline = await readGenerativeStagingAsInline(ref.mediaId);
-        if (!inline) {
-          throw new Error(
-            `Local reference ${label} is missing from this browser`
-          );
-        }
-        urls.push(`data:${inline.mimeType};base64,${inline.data}`);
-        continue;
-      }
-
-      if (isObjectReference(ref)) {
-        if (isCloudObjectReference(ref)) {
-          cloudRefs.push(ref);
-          continue;
-        }
-        throw new Error(
-          "Platform object references require cloud storage for model input"
-        );
-      }
-    }
-
-    urls.push(...(await resolveCloudUrls(params.organizationId, cloudRefs)));
-    return urls;
+  if (server.unresolved.length > 0 && localRefs.length === 0) {
+    throw new Error(
+      `Unable to resolve resource references: ${server.unresolved.join(", ")}`
+    );
   }
 
-  const referenceVideoUrls = await resolveMediaUrls(videos, "video");
-  const referenceAudioUrls = await resolveMediaUrls(audios, "audio");
+  const referenceImageUrls: string[] = [];
+  const referenceVideoUrls: string[] = [];
+  const referenceAudioUrls: string[] = [];
+
+  for (const entry of server.resolved) {
+    const mime = entry.mimeType.toLowerCase();
+    if (mime.startsWith("video/")) {
+      referenceVideoUrls.push(entry.url);
+    } else if (mime.startsWith("audio/")) {
+      referenceAudioUrls.push(entry.url);
+    } else {
+      referenceImageUrls.push(entry.url);
+    }
+  }
+
+  const referenceImageInline = await resolveLocalInline(
+    images.filter((entry) => isLocalMediaReference(entry))
+  );
+  referenceVideoUrls.push(
+    ...(await resolveLocalDataUrls(videos.filter((entry) => isLocalMediaReference(entry))))
+  );
+  referenceAudioUrls.push(
+    ...(await resolveLocalDataUrls(audios.filter((entry) => isLocalMediaReference(entry))))
+  );
 
   return {
-    referenceImageUrls: imageResolved.referenceImageUrls,
-    referenceImageInline: imageResolved.referenceImageInline,
+    referenceImageUrls,
+    referenceImageInline,
     referenceVideoUrls,
     referenceAudioUrls,
   };
 }
 
-/** Resolve image + video refs for multimodal text generate (Seed). */
-export async function resolveMediaReferencesForTextGenerate(params: {
+export async function resolveReferencesForGenerate(params: {
   readonly organizationId: string;
+  readonly workflowId?: string;
+  readonly cloudConfigured?: boolean;
   readonly references: readonly MediaReference[];
-}): Promise<ResolvedMediaReferencesForTextGenerate> {
-  const images: MediaReference[] = [];
-  const videos: MediaReference[] = [];
-
-  for (const ref of params.references) {
-    if (isVideoMimeType(ref.mimeType)) {
-      videos.push(ref);
-    } else {
-      images.push(ref);
-    }
-  }
-
-  const imageResolved = await resolveReferencesForGenerate({
+}): Promise<ResolvedReferencesForGenerate> {
+  const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
-    references: images,
+    workflowId: params.workflowId,
+    media: params.references,
+    cloudConfigured: params.cloudConfigured ?? false,
   });
 
-  const referenceVideoUrls: string[] = [];
-  const cloudVideoRefs: ObjectReference[] = [];
+  return {
+    referenceImageUrls: resolved.referenceImageUrls,
+    referenceImageInline: resolved.referenceImageInline,
+  };
+}
 
-  for (const ref of videos) {
-    if (isEphemeralMediaReference(ref)) {
-      if (isEphemeralMediaExpired(ref)) {
-        throw new Error("Referenced ephemeral video has expired");
-      }
-      referenceVideoUrls.push(ref.url);
-      continue;
-    }
-
-    if (isLocalMediaReference(ref)) {
-      const inline = await readGenerativeStagingAsInline(ref.mediaId);
-      if (!inline) {
-        throw new Error("Local reference video is missing from this browser");
-      }
-      referenceVideoUrls.push(
-        `data:${inline.mimeType};base64,${inline.data}`
-      );
-      continue;
-    }
-
-    if (isObjectReference(ref)) {
-      if (isCloudObjectReference(ref)) {
-        cloudVideoRefs.push(ref);
-        continue;
-      }
-      throw new Error(
-        "Platform object references require cloud storage for model input"
-      );
-    }
-  }
-
-  referenceVideoUrls.push(
-    ...(await resolveCloudUrls(params.organizationId, cloudVideoRefs))
-  );
+export async function resolveMediaReferencesForVideoGenerate(params: {
+  readonly organizationId: string;
+  readonly workflowId?: string;
+  readonly cloudConfigured?: boolean;
+  readonly references: readonly MediaReference[];
+}): Promise<ResolvedMediaReferencesForVideoGenerate> {
+  const resolved = await resolveMediaGroup({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    media: params.references,
+    cloudConfigured: params.cloudConfigured ?? false,
+  });
 
   return {
-    referenceImageUrls: imageResolved.referenceImageUrls,
-    referenceImageInline: imageResolved.referenceImageInline,
-    referenceVideoUrls,
+    referenceImageUrls: resolved.referenceImageUrls,
+    referenceImageInline: resolved.referenceImageInline,
+    referenceVideoUrls: resolved.referenceVideoUrls,
+    referenceAudioUrls: resolved.referenceAudioUrls,
   };
+}
+
+export async function resolveMediaReferencesForTextGenerate(params: {
+  readonly organizationId: string;
+  readonly workflowId?: string;
+  readonly cloudConfigured?: boolean;
+  readonly references: readonly MediaReference[];
+}): Promise<ResolvedMediaReferencesForTextGenerate> {
+  const resolved = await resolveMediaGroup({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    media: params.references,
+    cloudConfigured: params.cloudConfigured ?? false,
+  });
+
+  return {
+    referenceImageUrls: resolved.referenceImageUrls,
+    referenceImageInline: resolved.referenceImageInline,
+    referenceVideoUrls: resolved.referenceVideoUrls,
+  };
+}
+
+export function extractReferenceResourceIds(
+  references: readonly MediaReference[]
+): readonly string[] {
+  return collectResourceIds(references);
 }

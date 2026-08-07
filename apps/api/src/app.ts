@@ -168,6 +168,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     lazyRoute(() => import("./routes/platform-ai"))
   );
   app.route(
+    "/:organizationId/resources",
+    lazyRoute(() => import("./routes/resources"))
+  );
+  app.route(
     "/:organizationId/workflows",
     lazyRoute(() => import("./routes/workflows"))
   );

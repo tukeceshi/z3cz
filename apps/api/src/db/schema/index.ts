@@ -560,6 +560,21 @@ export const generationJobs = pgTable(
   ]
 );
 
+export const mediaResources = pgTable(
+  "media_resources",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().$type<"cloud" | "local" | "ephemeral">(),
+    mimeType: text("mime_type").notNull(),
+    storageKey: text("storage_key"),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [index("media_resources_organization_id_idx").on(table.organizationId)]
+);
+
 // Workflows - Workflow definitions created and edited by users
 // Note: Full workflow data is stored in R2, only metadata is in the database
 export const workflowFolders = pgTable(

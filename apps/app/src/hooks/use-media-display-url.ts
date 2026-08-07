@@ -3,26 +3,24 @@ import {
   isMediaReference,
   type MediaReference,
 } from "@dafthunk/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import type { MediaDisplaySize } from "@/services/media-display-size";
+import { isCanvasDisplaySize } from "@/services/media-display-size";
 import {
   isMediaExpired,
   resolveMediaDisplayUrl,
 } from "@/services/media-url-resolver";
+import { resolveResourceDisplayUrl, resolveStableResourceDisplayUrl } from "@/services/resolve-resource-display-url";
 import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
+import { dropStableBlobUrlsForMediaId } from "@/services/media-display-blob-url-registry";
 
 const mediaDisplayUrlCache = new Map<string, string>();
 
-function revokeCachedDisplayUrls(): void {
-  for (const url of mediaDisplayUrlCache.values()) {
-    if (url.startsWith("blob:")) {
-      URL.revokeObjectURL(url);
-    }
-  }
-  mediaDisplayUrlCache.clear();
+export function invalidateMediaDisplayUrlCacheKey(cacheKey: string): void {
+  mediaDisplayUrlCache.delete(cacheKey);
 }
 
 function createMediaDisplayUrlCacheKey(params: {
@@ -45,15 +43,21 @@ interface UseMediaDisplayUrlParams {
   readonly media: MediaReference | null;
   readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
   readonly size?: MediaDisplaySize;
+  readonly localOnly?: boolean;
+  /** When true, skip async refresh but still apply cached/stable URLs (e.g. viewport moving). */
+  readonly paused?: boolean;
 }
 
 export function useMediaDisplayUrl({
   media,
   nodeType,
   size = "full",
+  localOnly = false,
+  paused = false,
 }: UseMediaDisplayUrlParams): {
   readonly displayUrl: string | null;
   readonly stale: boolean;
+  readonly retry: () => void;
 } {
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
@@ -72,17 +76,56 @@ export function useMediaDisplayUrl({
           size,
         })
       : null;
-  const [displayUrl, setDisplayUrl] = useState<string | null>(() =>
-    cacheKey ? mediaDisplayUrlCache.get(cacheKey) ?? null : null
-  );
+  const [displayUrl, setDisplayUrl] = useState<string | null>(() => {
+    if (!cacheKey || !mediaKey || !orgId || !workflowId) {
+      return null;
+    }
+
+    const cached = mediaDisplayUrlCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    if (localOnly || isCanvasDisplaySize(size)) {
+      if (!media) {
+        return null;
+      }
+      return (
+        resolveStableResourceDisplayUrl({
+          media,
+          organizationId: orgId,
+          workflowId,
+          size,
+        }) ?? null
+      );
+    }
+
+    return null;
+  });
   const [stale, setStale] = useState(false);
   const [cacheRevision, setCacheRevision] = useState(0);
-  const expired = media ? isMediaExpired(media) : false;
-  const blobUrlRef = useRef<string | null>(cacheKey ? mediaDisplayUrlCache.get(cacheKey) ?? null : null);
+  const displayUrlRef = useRef(displayUrl);
+  displayUrlRef.current = displayUrl;
+
+  const expired =
+    media && !localOnly && !isCanvasDisplaySize(size)
+      ? isMediaExpired(media)
+      : false;
+
+  const retry = useCallback(() => {
+    if (mediaKey) {
+      dropStableBlobUrlsForMediaId(mediaKey);
+    }
+    if (cacheKey) {
+      invalidateMediaDisplayUrlCacheKey(cacheKey);
+    }
+    setStale(false);
+    setCacheRevision((value) => value + 1);
+  }, [cacheKey, mediaKey]);
 
   useEffect(() => {
     const handler = () => {
-      revokeCachedDisplayUrls();
+      mediaDisplayUrlCache.clear();
       setCacheRevision((value) => value + 1);
     };
     window.addEventListener(CACHE_STATS_EVENT, handler);
@@ -93,7 +136,9 @@ export function useMediaDisplayUrl({
     setStale(false);
 
     if (!media || !orgId || !workflowId || !mediaKey || !cacheKey) {
-      setDisplayUrl(null);
+      if (!displayUrlRef.current) {
+        setDisplayUrl(null);
+      }
       return;
     }
 
@@ -106,14 +151,42 @@ export function useMediaDisplayUrl({
 
     const cached = mediaDisplayUrlCache.get(cacheKey);
     if (cached) {
-      blobUrlRef.current = cached;
       setDisplayUrl(cached);
+      if (paused) {
+        return;
+      }
+      return;
+    }
+
+    if (localOnly || isCanvasDisplaySize(size)) {
+      const stable = resolveStableResourceDisplayUrl({
+        media,
+        organizationId: orgId,
+        workflowId,
+        size,
+      });
+      if (stable) {
+        mediaDisplayUrlCache.set(cacheKey, stable);
+        setDisplayUrl(stable);
+        if (paused) {
+          return;
+        }
+        return;
+      }
+    }
+
+    if (paused) {
       return;
     }
 
     let cancelled = false;
 
-    void resolveMediaDisplayUrl({
+    const resolver =
+      localOnly || isCanvasDisplaySize(size)
+        ? resolveResourceDisplayUrl
+        : resolveMediaDisplayUrl;
+
+    void resolver({
       media,
       organizationId: orgId,
       workflowId,
@@ -121,27 +194,16 @@ export function useMediaDisplayUrl({
       size,
     }).then((url) => {
       if (cancelled) {
-        if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
         return;
       }
       if (!url) {
-        setDisplayUrl(null);
-        setStale(true);
+        if (!displayUrlRef.current) {
+          setDisplayUrl(null);
+          setStale(true);
+        }
         return;
       }
 
-      if (
-        blobUrlRef.current?.startsWith("blob:") &&
-        blobUrlRef.current !== url &&
-        !mediaDisplayUrlCache.has(cacheKey)
-      ) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-      if (url.startsWith("blob:")) {
-        blobUrlRef.current = url;
-      } else {
-        blobUrlRef.current = null;
-      }
       mediaDisplayUrlCache.set(cacheKey, url);
       setDisplayUrl(url);
     });
@@ -157,22 +219,13 @@ export function useMediaDisplayUrl({
     size,
     expired,
     cacheRevision,
+    localOnly,
     cacheKey,
+    paused,
+    media,
   ]);
 
-  useEffect(() => {
-    return () => {
-      if (
-        blobUrlRef.current?.startsWith("blob:") &&
-        (!cacheKey || mediaDisplayUrlCache.get(cacheKey) !== blobUrlRef.current)
-      ) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
-    };
-  }, [cacheKey]);
-
-  return { displayUrl, stale };
+  return { displayUrl, stale, retry };
 }
 
 export function resolveMediaFromValue(

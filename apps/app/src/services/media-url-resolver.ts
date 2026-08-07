@@ -7,10 +7,12 @@ import {
 
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
+import { readGenerativeStagingBlob } from "@/services/generative-media-staging";
 import {
-  getGenerativeStagingPreviewUrl,
-  readGenerativeStagingBlob,
-} from "@/services/generative-media-staging";
+  createStableBlobUrl,
+  findStableBlobUrlForMediaId,
+  stagingBlobUrlKey,
+} from "@/services/media-display-blob-url-registry";
 import {
   createCloudObjectUrl,
   resolveMediaCacheFetchUrl,
@@ -54,15 +56,24 @@ export async function resolveMediaDisplayUrl(params: {
     });
     if (cached) return cached;
 
-    const stagingPreview = getGenerativeStagingPreviewUrl(params.media.mediaId);
-    if (stagingPreview) return stagingPreview;
+    const existing = findStableBlobUrlForMediaId(params.media.mediaId);
+    if (existing) return existing;
+
     const entry = await readGenerativeStagingBlob({
       mediaId: params.media.mediaId,
       organizationId: params.organizationId,
       workflowId: params.workflowId,
     });
     if (!entry) return null;
-    return URL.createObjectURL(entry.blob);
+
+    return createStableBlobUrl(
+      stagingBlobUrlKey({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.media.mediaId,
+      }),
+      entry.blob
+    );
   }
 
   const mediaId = getMediaReferenceKey(params.media);

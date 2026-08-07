@@ -25,5 +25,6 @@ data/ai-interface-templates/
 # Docker bind-mounted API logs (docker-compose.dev.yml)
 logs/
 
-# Local agent / SSH diagnostics (not committed)
+# Local-only: agent/SSH diagnostics + dev test artifacts (cookies, probe dumps, one-off scripts)
+# Layout: .local/dev-test/ — see docs/local-dev-test.md
 .local/

@@ -9,18 +9,25 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
-import { MediaImageField } from "./fields/media-image-field";
-import { LazyMediaImageField } from "./fields/lazy-media-image-field";
+import {
+  CanvasAudioCover,
+  LazyCanvasMediaCover,
+} from "./canvas-media-cover";
 import {
   collectImageHistoryParamParts,
   formatHistoryCreatedAt,
   resolveHistoryModelLabel,
 } from "./generative-history-utils";
+import {
+  GenerativeHistoryMediaPreview,
+  type GenerativeHistoryMediaKind,
+} from "./generative-history-media-preview";
 
 export interface AiImageHistoryOverlayProps {
   readonly open: boolean;
   readonly history: AiImageResultHistory;
   readonly currentImages: readonly MediaReference[];
+  readonly mediaKind?: GenerativeHistoryMediaKind;
   readonly createObjectUrl?: (objectReference: import("@dafthunk/types").ObjectReference) => string;
   readonly onSelect: (id: string) => void;
   /** Create a sibling node from the previewed history item. */
@@ -43,6 +50,7 @@ export function AiImageHistoryOverlay({
   open,
   history,
   currentImages,
+  mediaKind = "image",
   createObjectUrl,
   onSelect,
   onExpandToNode,
@@ -121,6 +129,30 @@ export function AiImageHistoryOverlay({
     onClose();
   };
 
+  const renderListThumb = (thumb: MediaReference | undefined) => {
+    if (!thumb) {
+      return (
+        <span className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          {t("workflow.aiImagePanel.historyEmptyItem")}
+        </span>
+      );
+    }
+
+    if (mediaKind === "audio") {
+      return <CanvasAudioCover className="h-full w-full" />;
+    }
+
+    const nodeType = mediaKind === "video" ? "ai-video" : "ai-image";
+    return (
+      <LazyCanvasMediaCover
+        media={thumb}
+        nodeType={nodeType}
+        className="h-full w-full"
+        scrollRoot={listScrollRoot}
+      />
+    );
+  };
+
   return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
@@ -181,19 +213,7 @@ export function AiImageHistoryOverlay({
                     </span>
                     <span className="min-w-0 flex-1">
                       <div className="mb-1 h-[72px] w-[72px] overflow-hidden rounded">
-                        {thumb ? (
-                          <LazyMediaImageField
-                            value={thumb}
-                            createObjectUrl={createObjectUrl}
-                            className="h-full w-full"
-                            size="thumb"
-                            scrollRoot={listScrollRoot}
-                          />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                            {t("workflow.aiImagePanel.historyEmptyItem")}
-                          </span>
-                        )}
+                        {renderListThumb(thumb)}
                       </div>
                       <span className="block truncate text-[10px] text-muted-foreground">
                         {formatHistoryCreatedAt(item.createdAt)}
@@ -234,7 +254,9 @@ export function AiImageHistoryOverlay({
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {previewMedia ? (
               <div className="mb-3">
-                <MediaImageField
+                <GenerativeHistoryMediaPreview
+                  key={getMediaReferenceKey(previewMedia)}
+                  mediaKind={mediaKind}
                   value={previewMedia}
                   createObjectUrl={createObjectUrl}
                   className="w-full"

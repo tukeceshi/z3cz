@@ -2,7 +2,6 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   type MediaReference,
-  type ObjectReference,
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
@@ -187,16 +186,12 @@ export function collectAiVideoUnifiedReferenceChips(params: {
   readonly nodeId: string;
   readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
-  readonly resolveMediaPreviewUrl?: (media: MediaReference) => string | null;
 }): readonly GenerativeReferenceChip[] {
   const promptChips = collectGenerativeReferenceChips({
     nodeId: params.nodeId,
     targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
-    createObjectUrl: params.createObjectUrl,
-    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: () => "text",
   });
   const mediaChips = collectGenerativeReferenceChips({
@@ -204,8 +199,6 @@ export function collectAiVideoUnifiedReferenceChips(params: {
     targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
     edges: params.edges,
     nodes: params.nodes,
-    createObjectUrl: params.createObjectUrl,
-    resolveMediaPreviewUrl: params.resolveMediaPreviewUrl,
     classifyKind: (nodeType) => classifyAiVideoReferenceFromNodeType(nodeType),
   });
   return [...promptChips, ...mediaChips];

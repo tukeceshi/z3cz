@@ -8,7 +8,7 @@ import {
 
 import { buildApiUrl } from "@/config/api";
 
-import { getGenerativeStagingPreviewUrl } from "./generative-media-staging";
+import { findStableBlobUrlForMediaId } from "./media-display-blob-url-registry";
 
 export function createCloudObjectUrl(
   ref: ObjectReference,
@@ -32,7 +32,7 @@ export function resolveMediaFetchUrl(
     return media.url;
   }
   if (isLocalMediaReference(media)) {
-    return getGenerativeStagingPreviewUrl(media.mediaId);
+    return findStableBlobUrlForMediaId(media.mediaId);
   }
   if (isObjectReference(media)) {
     return createCloudObjectUrl(media, organizationId);

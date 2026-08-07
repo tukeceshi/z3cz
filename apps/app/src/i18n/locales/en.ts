@@ -2631,6 +2631,7 @@ export const en = {
     },
     generativeCancel: {
       action: "Cancel",
+      dismiss: "OK",
       failed: "Cancel was not confirmed. Generation is still in progress",
       inProgress: "Cancelling…",
       success: "Cancelled",
@@ -3205,6 +3206,17 @@ export const en = {
       downloadWarningDescription:
         "Local cache is for in-browser preview. If the originals still exist in cloud storage or on your device, get them from there. Use this only when you've lost the files and must recover from cache.",
       downloadConfirmAction: "Download anyway",
+      usageBreakdown: "Original {{original}} · Thumbnails {{thumbs}}",
+      resourceEmpty: "No cached items in this workflow",
+      resourceSizeBreakdown: "Original {{original}} · Thumbs {{thumbs}} · Total {{total}}",
+      tierThumb: "Thumb",
+      tierCanvasS: "Small",
+      tierCanvasM: "Medium",
+      tierCanvasL: "Large",
+      noThumbs: "No thumbnails yet",
+      regenerateThumbs: "Regenerate",
+      deleteThumbs: "Clear thumbnails",
+      deleteResource: "Delete",
     },
     aiTextSlot: {
       keywordsReference: "Keywords — drag a connection here",
@@ -3282,6 +3294,11 @@ export const en = {
       promptReferenceEditHint:
         "Edit the linked “{{nodeName}}” node’s output to use it as the prompt",
       promptReferenceEditHintFallback: "upstream AI text",
+      historyTime: "Generated at",
+      historyModel: "Model",
+      historyParams: "Parameters",
+      historyExpandToNode: "Expand to new node",
+      historyWatermark: "Watermark",
       historyPrompt: "Prompt used",
     },
     aiVideoPanel: {

@@ -7,13 +7,25 @@ import {
   type MediaReference,
 } from "@dafthunk/types";
 
-import { generateImageThumbnail } from "@/services/generate-image-thumbnail";
+import {
+  createStableBlobUrl,
+  dropStableBlobUrlsForMediaId,
+  getStableBlobUrl,
+} from "@/services/media-display-blob-url-registry";
+import { recordMediaResourceAlias } from "@/services/media-resource-alias-service";
+import {
+  generateImageThumbnail,
+  readImageNaturalSize,
+} from "@/services/generate-image-thumbnail";
+import { generateVideoPoster } from "@/services/generate-video-poster";
+import { displaySizeToMaxWidth, CANVAS_TIER_SHORT_EDGE, LEGACY_CANVAS_S_THUMB_WIDTH } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 import { resolveMediaCacheFetchUrl } from "@/services/media-object-url";
+import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
 
 const DB_NAME = "dafthunk-ai-media-cache";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const ENTRIES_STORE = "entries";
 const THUMBS_STORE = "thumbs";
 const WORKFLOWS_STORE = "workflows";
@@ -29,6 +41,8 @@ export interface AiMediaCacheEntry {
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly mimeType: string;
   readonly byteSize: number;
+  readonly naturalWidth?: number;
+  readonly naturalHeight?: number;
   readonly createdAt: string;
   readonly lastAccessAt: string;
 }
@@ -55,17 +69,42 @@ export interface AiMediaCacheEntrySummary {
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly mimeType: string;
   readonly byteSize: number;
+  readonly naturalWidth?: number;
+  readonly naturalHeight?: number;
   readonly createdAt: string;
   readonly lastAccessAt: string;
 }
 
 export interface AiMediaCacheStats {
   readonly totalBytes: number;
+  readonly originalBytes: number;
+  readonly thumbBytes: number;
   readonly limitBytes: number;
   readonly enabled: boolean;
   readonly browserQuotaBytes: number | null;
   readonly browserUsageBytes: number | null;
   readonly workflows: readonly AiMediaWorkflowSummary[];
+}
+
+export type AiMediaCacheTierKind = "thumb" | "canvas-s" | "canvas-m" | "canvas-l";
+
+export interface AiMediaCacheTierSummary {
+  readonly tier: AiMediaCacheTierKind;
+  readonly maxWidth: number;
+  readonly byteSize: number;
+}
+
+export interface AiMediaCacheResourceSummary {
+  readonly entryKey: string;
+  readonly mediaId: string;
+  readonly nodeType: AiMediaCacheEntry["nodeType"];
+  readonly mimeType: string;
+  readonly originalBytes: number;
+  readonly thumbBytes: number;
+  readonly totalBytes: number;
+  readonly tiers: readonly AiMediaCacheTierSummary[];
+  readonly createdAt: string;
+  readonly lastAccessAt: string;
 }
 
 interface CacheEntryRecord extends AiMediaCacheEntry {
@@ -74,6 +113,10 @@ interface CacheEntryRecord extends AiMediaCacheEntry {
 
 interface ThumbRecord {
   readonly key: string;
+  readonly parentEntryKey?: string;
+  readonly tier?: AiMediaCacheTierKind;
+  readonly maxWidth?: number;
+  readonly createdAt?: string;
   blob: Blob;
   byteSize: number;
 }
@@ -219,9 +262,53 @@ async function withDatabase<T>(
 ): Promise<T> {
   const db = await openDatabase();
   try {
+    await dedupeAliasCacheEntriesOnce(db);
     return await fn(db);
   } finally {
     db.close();
+  }
+}
+
+let aliasDedupeDone = false;
+
+async function dedupeAliasCacheEntriesOnce(db: IDBDatabase): Promise<void> {
+  if (aliasDedupeDone) return;
+  aliasDedupeDone = true;
+
+  const entries = await readAllEntries(db);
+  const groups = new Map<string, CacheEntryRecord[]>();
+
+  for (const entry of entries) {
+    const fingerprint = [
+      entry.organizationId,
+      entry.workflowId,
+      entry.byteSize,
+      entry.mimeType,
+      entry.nodeType,
+    ].join("|");
+    const bucket = groups.get(fingerprint) ?? [];
+    bucket.push(entry);
+    groups.set(fingerprint, bucket);
+  }
+
+  for (const bucket of groups.values()) {
+    if (bucket.length < 2) continue;
+    const cloudEntries = bucket.filter((entry) => entry.mediaId.includes("/"));
+    const aliasEntries = bucket.filter((entry) => !entry.mediaId.includes("/"));
+    if (cloudEntries.length === 0 || aliasEntries.length === 0) continue;
+
+    for (const alias of aliasEntries) {
+      const cloud = cloudEntries[0];
+      if (cloud) {
+        recordMediaResourceAlias({
+          organizationId: alias.organizationId,
+          workflowId: alias.workflowId,
+          fromMediaId: alias.mediaId,
+          toMediaId: cloud.mediaId,
+        });
+      }
+      await deleteEntry(db, alias.key);
+    }
   }
 }
 
@@ -260,14 +347,17 @@ async function readWorkflowSummaries(
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-/** Rebuild workflow summaries and meta.totalBytes from entry rows — heals partial clears. */
+/** Rebuild workflow summaries and meta.totalBytes from entries + thumbs. */
 async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
   const entries = await readAllEntries(db);
+  const entryKeys = new Set(entries.map((entry) => entry.key));
+  const thumbs = await readAllThumbs(db);
   const workflowMap = new Map<string, WorkflowRecord>();
-  let totalBytes = 0;
+  let originalBytes = 0;
+  let thumbBytes = 0;
 
   for (const entry of entries) {
-    totalBytes += entry.byteSize;
+    originalBytes += entry.byteSize;
     const wfKey = workflowKey(entry.organizationId, entry.workflowId);
     const prev = workflowMap.get(wfKey);
     const counts = applyCountDelta(
@@ -302,7 +392,39 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
     }
   }
 
+  const orphanThumbKeys: string[] = [];
+  for (const thumb of thumbs) {
+    const parentKey = thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
+    if (!parentKey || !entryKeys.has(parentKey)) {
+      orphanThumbKeys.push(thumb.key);
+      continue;
+    }
+
+    thumbBytes += thumb.byteSize;
+    const parts = parseCacheEntryKeyParts(parentKey);
+    if (!parts) continue;
+
+    const wfKey = workflowKey(parts.organizationId, parts.workflowId);
+    const summary = workflowMap.get(wfKey);
+    if (summary) {
+      workflowMap.set(wfKey, {
+        ...summary,
+        totalBytes: summary.totalBytes + thumb.byteSize,
+      });
+    }
+  }
+
+  if (orphanThumbKeys.length > 0 && db.objectStoreNames.contains(THUMBS_STORE)) {
+    await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
+      const store = transaction.objectStore(THUMBS_STORE);
+      for (const key of orphanThumbKeys) {
+        store.delete(key);
+      }
+    });
+  }
+
   const meta = await readMeta(db);
+  const totalBytes = originalBytes + thumbBytes;
 
   await runTransaction(
     db,
@@ -327,53 +449,16 @@ async function deleteEntry(db: IDBDatabase, key: string): Promise<void> {
   );
   if (!entry) return;
 
-  const wfKey = workflowKey(entry.organizationId, entry.workflowId);
-  const wfReadTx = db.transaction(WORKFLOWS_STORE, "readonly");
-  const summary = await idbRequest<WorkflowRecord | undefined>(
-    wfReadTx.objectStore(WORKFLOWS_STORE).get(wfKey)
-  );
-  const meta = await readMeta(db);
+  dropStableBlobUrlsForMediaId(entry.mediaId);
 
   await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
     transaction.objectStore(ENTRIES_STORE).delete(key);
     if (db.objectStoreNames.contains(THUMBS_STORE)) {
-      transaction.objectStore(THUMBS_STORE).delete(key);
+      deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), key);
     }
-
-    if (summary) {
-      const entryCount =
-        summary.entryCount ??
-        summary.imageCount + summary.videoCount + (summary.audioCount ?? 0);
-      const counts = applyCountDelta(
-        {
-          imageCount: summary.imageCount,
-          videoCount: summary.videoCount,
-          audioCount: summary.audioCount ?? 0,
-          entryCount,
-        },
-        entry.nodeType,
-        -1
-      );
-      const next: WorkflowRecord = {
-        ...summary,
-        ...counts,
-        totalBytes: Math.max(0, summary.totalBytes - entry.byteSize),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const wfStore = transaction.objectStore(WORKFLOWS_STORE);
-      if (next.entryCount <= 0 || next.totalBytes <= 0) {
-        wfStore.delete(wfKey);
-      } else {
-        wfStore.put(next);
-      }
-    }
-
-    transaction.objectStore(META_STORE).put({
-      ...meta,
-      totalBytes: Math.max(0, meta.totalBytes - entry.byteSize),
-    });
   });
+
+  await reconcileCacheMeta(db);
 }
 
 async function evictLruUntilUnderLimit(
@@ -395,10 +480,85 @@ async function evictLruUntilUnderLimit(
   await reconcileCacheMeta(db);
 }
 
-async function storeThumb(db: IDBDatabase, key: string, blob: Blob): Promise<void> {
+const IMAGE_TIER_SPECS: ReadonlyArray<{
+  readonly tier: AiMediaCacheTierKind;
+  readonly maxWidth: number;
+}> = [
+  { tier: "canvas-s", maxWidth: CANVAS_TIER_SHORT_EDGE.s },
+  { tier: "canvas-m", maxWidth: CANVAS_TIER_SHORT_EDGE.m },
+  { tier: "canvas-l", maxWidth: CANVAS_TIER_SHORT_EDGE.l },
+] as const;
+
+const VIDEO_TIER_SPECS: ReadonlyArray<{
+  readonly tier: AiMediaCacheTierKind;
+  readonly maxWidth: number;
+}> = [
+  { tier: "canvas-s", maxWidth: CANVAS_TIER_SHORT_EDGE.s },
+  { tier: "canvas-m", maxWidth: CANVAS_TIER_SHORT_EDGE.m },
+  { tier: "canvas-l", maxWidth: CANVAS_TIER_SHORT_EDGE.l },
+] as const;
+
+const TIER_THUMB_MAX_WIDTHS = [
+  CANVAS_TIER_SHORT_EDGE.s,
+  CANVAS_TIER_SHORT_EDGE.m,
+  CANVAS_TIER_SHORT_EDGE.l,
+] as const;
+/** Legacy thumb widths still readable after upgrade. */
+const LEGACY_TIER_THUMB_MAX_WIDTHS = [200, 400, 800, 1600] as const;
+
+function tierCacheKey(entryKey: string, maxWidth: number): string {
+  return `${entryKey}|w${maxWidth}`;
+}
+
+function parseThumbParentEntryKey(thumbKey: string): string | null {
+  const pipeIndex = thumbKey.indexOf("|w");
+  if (pipeIndex < 0) {
+    return thumbKey;
+  }
+  return thumbKey.slice(0, pipeIndex);
+}
+
+function maxWidthToTierKind(maxWidth: number): AiMediaCacheTierKind {
+  if (maxWidth <= CANVAS_TIER_SHORT_EDGE.s) return "canvas-s";
+  if (maxWidth <= CANVAS_TIER_SHORT_EDGE.m) return "canvas-m";
+  return "canvas-l";
+}
+
+function deleteEntryThumbs(
+  thumbsStore: IDBObjectStore,
+  entryKey: string
+): void {
+  thumbsStore.delete(entryKey);
+  for (const maxWidth of TIER_THUMB_MAX_WIDTHS) {
+    thumbsStore.delete(tierCacheKey(entryKey, maxWidth));
+  }
+  thumbsStore.delete(tierCacheKey(entryKey, LEGACY_CANVAS_S_THUMB_WIDTH));
+  for (const maxWidth of LEGACY_TIER_THUMB_MAX_WIDTHS) {
+    thumbsStore.delete(tierCacheKey(entryKey, maxWidth));
+  }
+}
+
+async function storeThumb(
+  db: IDBDatabase,
+  params: {
+    readonly key: string;
+    readonly parentEntryKey: string;
+    readonly tier: AiMediaCacheTierKind;
+    readonly maxWidth: number;
+    readonly blob: Blob;
+  }
+): Promise<void> {
   if (!db.objectStoreNames.contains(THUMBS_STORE)) return;
 
-  const record: ThumbRecord = { key, blob, byteSize: blob.size };
+  const record: ThumbRecord = {
+    key: params.key,
+    parentEntryKey: params.parentEntryKey,
+    tier: params.tier,
+    maxWidth: params.maxWidth,
+    createdAt: new Date().toISOString(),
+    blob: params.blob,
+    byteSize: params.blob.size,
+  };
   await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
     transaction.objectStore(THUMBS_STORE).put(record);
   });
@@ -417,20 +577,170 @@ async function readThumbBlob(
   return record?.blob ?? null;
 }
 
-async function getOrCreateThumbBlob(
+async function readTierBlob(
+  db: IDBDatabase,
+  entry: CacheEntryRecord,
+  maxWidth: number
+): Promise<Blob | null> {
+  const key = tierCacheKey(entry.key, maxWidth);
+  const tierBlob = await readThumbBlob(db, key);
+  if (tierBlob) return tierBlob;
+
+  if (maxWidth === CANVAS_TIER_SHORT_EDGE.s) {
+    const legacyCanvasS = await readThumbBlob(
+      db,
+      tierCacheKey(entry.key, LEGACY_CANVAS_S_THUMB_WIDTH)
+    );
+    if (legacyCanvasS) return legacyCanvasS;
+  }
+
+  // Legacy single-thumb key / old widths.
+  if (
+    maxWidth === CANVAS_TIER_SHORT_EDGE.s ||
+    maxWidth === LEGACY_CANVAS_S_THUMB_WIDTH ||
+    maxWidth === 200
+  ) {
+    const legacy = await readThumbBlob(db, entry.key);
+    if (legacy) return legacy;
+  }
+
+  return null;
+}
+
+async function generateCacheResourceTiersForEntry(
   db: IDBDatabase,
   entry: CacheEntryRecord
-): Promise<Blob | null> {
-  const existing = await readThumbBlob(db, entry.key);
-  if (existing) return existing;
+): Promise<void> {
+  const specs =
+    entry.nodeType === "ai-video"
+      ? VIDEO_TIER_SPECS
+      : entry.nodeType === "ai-image"
+        ? IMAGE_TIER_SPECS
+        : [];
 
-  if (entry.nodeType !== "ai-image") return null;
+  await Promise.all(
+    specs.map(async (spec) => {
+      const key = tierCacheKey(entry.key, spec.maxWidth);
+      const existing = await readTierBlob(db, entry, spec.maxWidth);
+      if (existing) return;
 
-  const thumb = await generateImageThumbnail(entry.blob, entry.mimeType);
-  if (!thumb || thumb.size <= 0) return null;
+      let generated: Blob | null = null;
+      if (entry.nodeType === "ai-image") {
+        generated = await generateImageThumbnail(
+          entry.blob,
+          entry.mimeType,
+          spec.maxWidth
+        );
+      } else if (entry.nodeType === "ai-video") {
+        generated = await generateVideoPoster(entry.blob, spec.maxWidth);
+      }
 
-  await storeThumb(db, entry.key, thumb);
-  return thumb;
+      if (!generated || generated.size <= 0) {
+        throw new Error(`Failed to generate ${spec.tier} thumbnail`);
+      }
+
+      await storeThumb(db, {
+        key,
+        parentEntryKey: entry.key,
+        tier: spec.tier,
+        maxWidth: spec.maxWidth,
+        blob: generated,
+      });
+    })
+  );
+
+  await assertCanvasTiersReady(db, entry);
+}
+
+async function assertCanvasTiersReady(
+  db: IDBDatabase,
+  entry: CacheEntryRecord
+): Promise<void> {
+  const specs =
+    entry.nodeType === "ai-video"
+      ? VIDEO_TIER_SPECS
+      : entry.nodeType === "ai-image"
+        ? IMAGE_TIER_SPECS
+        : [];
+
+  for (const spec of specs) {
+    const blob = await readTierBlob(db, entry, spec.maxWidth);
+    if (!blob) {
+      throw new Error(`Missing ${spec.tier} thumbnail`);
+    }
+  }
+}
+
+export async function generateCacheResourceTiers(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<void> {
+  await withDatabase(async (db) => {
+    const entry = await readCachedMediaEntry(db, params);
+    if (!entry) return;
+    await generateCacheResourceTiersForEntry(db, entry);
+    await reconcileCacheMeta(db);
+  });
+}
+
+export async function regenerateCacheResourceTiers(
+  entryKey: string
+): Promise<void> {
+  await withDatabase(async (db) => {
+    const entryReadTx = db.transaction(ENTRIES_STORE, "readonly");
+    const entry = await idbRequest<CacheEntryRecord | undefined>(
+      entryReadTx.objectStore(ENTRIES_STORE).get(entryKey)
+    );
+    if (!entry) return;
+
+    if (db.objectStoreNames.contains(THUMBS_STORE)) {
+      await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
+        deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), entryKey);
+      });
+    }
+
+    await generateCacheResourceTiersForEntry(db, entry);
+    await reconcileCacheMeta(db);
+  });
+}
+
+export async function deleteCacheResourceTiers(
+  entryKey: string,
+  tiers?: readonly AiMediaCacheTierKind[]
+): Promise<void> {
+  await withDatabase(async (db) => {
+    if (!db.objectStoreNames.contains(THUMBS_STORE)) return;
+
+    const entryReadTx = db.transaction(ENTRIES_STORE, "readonly");
+    const entry = await idbRequest<CacheEntryRecord | undefined>(
+      entryReadTx.objectStore(ENTRIES_STORE).get(entryKey)
+    );
+    if (!entry) return;
+
+    dropStableBlobUrlsForMediaId(entry.mediaId);
+
+    const tierFilter = tiers ? new Set(tiers) : null;
+    const specs =
+      entry.nodeType === "ai-video"
+        ? VIDEO_TIER_SPECS
+        : entry.nodeType === "ai-image"
+          ? IMAGE_TIER_SPECS
+          : [];
+
+    await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
+      const store = transaction.objectStore(THUMBS_STORE);
+      for (const spec of specs) {
+        if (tierFilter && !tierFilter.has(spec.tier)) continue;
+        store.delete(tierCacheKey(entryKey, spec.maxWidth));
+      }
+      if (!tierFilter || tierFilter.has("thumb")) {
+        store.delete(entryKey);
+      }
+    });
+
+    await reconcileCacheMeta(db);
+  });
 }
 
 export async function getAiMediaCacheSettings(): Promise<AiMediaCacheSettings> {
@@ -466,6 +776,11 @@ export async function getAiMediaCacheStats(
     await reconcileCacheMeta(db);
     const meta = await readMeta(db);
     const workflows = await readWorkflowSummaries(db, organizationId);
+    const entries = (await readAllEntries(db)).filter(
+      (entry) => entry.organizationId === organizationId
+    );
+    const originalBytes = entries.reduce((sum, entry) => sum + entry.byteSize, 0);
+    const thumbBytes = Math.max(0, meta.totalBytes - originalBytes);
 
     let browserQuotaBytes: number | null = null;
     let browserUsageBytes: number | null = null;
@@ -483,6 +798,8 @@ export async function getAiMediaCacheStats(
 
     return {
       totalBytes: meta.totalBytes,
+      originalBytes,
+      thumbBytes,
       limitBytes: meta.limitMb * 1024 * 1024,
       enabled: meta.enabled,
       browserQuotaBytes,
@@ -519,6 +836,19 @@ async function putCacheBlobRecord(params: {
       existingTx.objectStore(ENTRIES_STORE).get(key)
     );
 
+    let naturalWidth = existing?.naturalWidth;
+    let naturalHeight = existing?.naturalHeight;
+    if (
+      params.nodeType === "ai-image" &&
+      (!naturalWidth || !naturalHeight)
+    ) {
+      const naturalSize = await readImageNaturalSize(storedBlob, params.mimeType);
+      if (naturalSize) {
+        naturalWidth = naturalSize.width;
+        naturalHeight = naturalSize.height;
+      }
+    }
+
     const record: CacheEntryRecord = {
       key,
       organizationId: params.organizationId,
@@ -528,6 +858,9 @@ async function putCacheBlobRecord(params: {
       nodeType: params.nodeType,
       mimeType: params.mimeType,
       byteSize,
+      ...(naturalWidth && naturalHeight
+        ? { naturalWidth, naturalHeight }
+        : {}),
       createdAt: existing?.createdAt ?? now,
       lastAccessAt: now,
       blob: storedBlob,
@@ -538,8 +871,6 @@ async function putCacheBlobRecord(params: {
     const prev = await idbRequest<WorkflowRecord | undefined>(
       wfReadTx.objectStore(WORKFLOWS_STORE).get(wfKey)
     );
-    const meta = await readMeta(db);
-    const deltaBytes = existing ? byteSize - existing.byteSize : byteSize;
     const prevEntryCount =
       prev?.entryCount ??
       (prev?.imageCount ?? 0) + (prev?.videoCount ?? 0) + (prev?.audioCount ?? 0);
@@ -563,35 +894,35 @@ async function putCacheBlobRecord(params: {
 
     await runTransaction(
       db,
-      [ENTRIES_STORE, WORKFLOWS_STORE, META_STORE],
+      [ENTRIES_STORE, WORKFLOWS_STORE],
       "readwrite",
       (transaction) => {
-        transaction.objectStore(ENTRIES_STORE).put(record);
-        transaction.objectStore(WORKFLOWS_STORE).put({
-          key: wfKey,
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          workflowName: params.workflowName,
-          ...counts,
-          totalBytes: Math.max(0, (prev?.totalBytes ?? 0) + deltaBytes),
-          updatedAt: now,
-        });
-        transaction.objectStore(META_STORE).put({
-          ...meta,
-          totalBytes: Math.max(0, meta.totalBytes + deltaBytes),
-        });
-      }
-    );
+      transaction.objectStore(ENTRIES_STORE).put(record);
+      transaction.objectStore(WORKFLOWS_STORE).put({
+        key: wfKey,
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        workflowName: params.workflowName,
+        ...counts,
+        totalBytes: prev?.totalBytes ?? 0,
+        updatedAt: now,
+      });
+    });
 
-    if (params.nodeType === "ai-image") {
-      const thumb = await generateImageThumbnail(storedBlob, params.mimeType);
-      if (thumb && thumb.size > 0) {
-        await storeThumb(db, key, thumb);
-      }
-    }
+    await reconcileCacheMeta(db);
 
     const metaAfterWrite = await readMeta(db);
     await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
+
+    if (params.nodeType === "ai-image" || params.nodeType === "ai-video") {
+      await generateCacheResourceTiers({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+      });
+      notifyAiMediaCacheChanged();
+    }
+
     return true;
   });
 }
@@ -632,9 +963,11 @@ export async function cacheMediaFromUrl(params: {
   readonly media: MediaReference;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly fetchUrl?: string;
+  /** When false, always write staging even if AI media cache is disabled. */
+  readonly requireEnabled?: boolean;
 }): Promise<boolean> {
   const settings = await getAiMediaCacheSettings();
-  if (!settings.enabled) return false;
+  if (params.requireEnabled !== false && !settings.enabled) return false;
 
   const mediaId = getMediaReferenceKey(params.media);
   const fetchUrl =
@@ -672,6 +1005,7 @@ export async function cacheMediaFromUrl(params: {
     nodeType: params.nodeType,
     mimeType,
     blob,
+    requireEnabled: params.requireEnabled,
   });
 }
 
@@ -756,24 +1090,212 @@ export async function readCachedMediaBlobByMediaId(
   return { blob: record.blob, mimeType: entry.mimeType };
 }
 
+function stableBlobUrlKey(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly tierLabel: string;
+}): string {
+  return `${params.organizationId}:${params.workflowId}:${params.mediaId}:${params.tierLabel}`;
+}
+
+export interface CanvasTierUrlSet {
+  readonly s: string;
+  readonly m: string;
+  readonly l: string;
+}
+
+function stableUrlForCanvasTierWidth(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly width: number;
+}): string | null {
+  return getStableBlobUrl(
+    stableBlobUrlKey({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      mediaId: params.mediaId,
+      tierLabel: `w${params.width}`,
+    })
+  );
+}
+
+export function getStableCanvasTierUrlSet(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): CanvasTierUrlSet | null {
+  const s = stableUrlForCanvasTierWidth({
+    ...params,
+    width: CANVAS_TIER_SHORT_EDGE.s,
+  });
+  const m = stableUrlForCanvasTierWidth({
+    ...params,
+    width: CANVAS_TIER_SHORT_EDGE.m,
+  });
+  const l = stableUrlForCanvasTierWidth({
+    ...params,
+    width: CANVAS_TIER_SHORT_EDGE.l,
+  });
+  if (!s || !m || !l) {
+    return null;
+  }
+  return { s, m, l };
+}
+
+export async function getCanvasTierUrlSet(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<CanvasTierUrlSet | null> {
+  const stable = getStableCanvasTierUrlSet(params);
+  if (stable) {
+    return stable;
+  }
+
+  return withDatabase(async (db) => {
+    const entry = await readCachedMediaEntry(db, params);
+    if (!entry) return null;
+    if (entry.nodeType !== "ai-image" && entry.nodeType !== "ai-video") {
+      return null;
+    }
+
+    const tierUrls: Partial<CanvasTierUrlSet> = {};
+    const widths = {
+      s: CANVAS_TIER_SHORT_EDGE.s,
+      m: CANVAS_TIER_SHORT_EDGE.m,
+      l: CANVAS_TIER_SHORT_EDGE.l,
+    } as const;
+
+    for (const [tier, width] of Object.entries(widths) as Array<
+      [keyof CanvasTierUrlSet, number]
+    >) {
+      const tierKey = stableBlobUrlKey({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tierLabel: `w${width}`,
+      });
+      const tierBlob = await readTierBlob(db, entry, width);
+      if (!tierBlob) {
+        return null;
+      }
+      tierUrls[tier] = createStableBlobUrl(tierKey, tierBlob);
+    }
+
+    return tierUrls as CanvasTierUrlSet;
+  });
+}
+
+export function pickCanvasTierUrl(
+  set: CanvasTierUrlSet,
+  size: "canvas-s" | "canvas-m" | "canvas-l"
+): string {
+  if (size === "canvas-s") return set.s;
+  if (size === "canvas-m") return set.m;
+  return set.l;
+}
+
+export function getStableCachedMediaBlobUrl(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly size?: MediaDisplaySize;
+}): string | null {
+  const tierMaxWidth = params.size ? displaySizeToMaxWidth(params.size) : null;
+
+  if (tierMaxWidth !== null) {
+    const set = getStableCanvasTierUrlSet(params);
+    if (!set) {
+      return null;
+    }
+    if (params.size === "canvas-m") {
+      return set.m;
+    }
+    if (params.size === "canvas-l") {
+      return set.l;
+    }
+    return set.s;
+  }
+
+  return getStableBlobUrl(
+    stableBlobUrlKey({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      mediaId: params.mediaId,
+      tierLabel: "full",
+    })
+  );
+}
+
 export async function getCachedMediaBlobUrl(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly mediaId: string;
   readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
+  const tierMaxWidth = params.size ? displaySizeToMaxWidth(params.size) : null;
+
+  if (tierMaxWidth !== null) {
+    const set = await getCanvasTierUrlSet(params);
+    if (!set) {
+      return null;
+    }
+    if (params.size === "canvas-m") {
+      return set.m;
+    }
+    if (params.size === "canvas-l") {
+      return set.l;
+    }
+    return set.s;
+  }
+
+  const stable = getStableBlobUrl(
+    stableBlobUrlKey({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      mediaId: params.mediaId,
+      tierLabel: "full",
+    })
+  );
+  if (stable) {
+    return stable;
+  }
+
   return withDatabase(async (db) => {
     const entry = await readCachedMediaEntry(db, params);
     if (!entry) return null;
 
-    if (params.size === "thumb") {
-      const thumbBlob = await getOrCreateThumbBlob(db, entry);
-      if (thumbBlob) {
-        return URL.createObjectURL(thumbBlob);
-      }
-    }
+    const fullKey = stableBlobUrlKey({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      mediaId: params.mediaId,
+      tierLabel: "full",
+    });
+    return createStableBlobUrl(fullKey, entry.blob);
+  });
+}
 
-    return URL.createObjectURL(entry.blob);
+export async function getCachedMediaNaturalSize(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<{ readonly width: number; readonly height: number } | null> {
+  return withDatabase(async (db) => {
+    const entry = await readCachedMediaEntry(db, params);
+    if (
+      !entry?.naturalWidth ||
+      !entry.naturalHeight ||
+      entry.naturalWidth <= 0 ||
+      entry.naturalHeight <= 0
+    ) {
+      return null;
+    }
+    return {
+      width: entry.naturalWidth,
+      height: entry.naturalHeight,
+    };
   });
 }
 
@@ -808,7 +1330,7 @@ export async function clearAiMediaCache(params: {
       if (db.objectStoreNames.contains(THUMBS_STORE)) {
         const thumbsStore = transaction.objectStore(THUMBS_STORE);
         for (const key of keysToDelete) {
-          thumbsStore.delete(key);
+          deleteEntryThumbs(thumbsStore, key);
         }
       }
     });
@@ -888,6 +1410,75 @@ export async function listOrganizationCacheEntries(
   });
 }
 
+export async function listWorkflowCacheResources(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+}): Promise<readonly AiMediaCacheResourceSummary[]> {
+  return withDatabase(async (db) => {
+    const entries = (await readAllEntries(db)).filter(
+      (entry) =>
+        entry.organizationId === params.organizationId &&
+        entry.workflowId === params.workflowId
+    );
+    const thumbs = await readAllThumbs(db);
+    const thumbsByParent = new Map<string, ThumbRecord[]>();
+
+    for (const thumb of thumbs) {
+      const parentKey = thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
+      if (!parentKey) continue;
+      const bucket = thumbsByParent.get(parentKey) ?? [];
+      bucket.push(thumb);
+      thumbsByParent.set(parentKey, bucket);
+    }
+
+    return entries
+      .map((entry) => {
+        const entryThumbs = thumbsByParent.get(entry.key) ?? [];
+        const tierSummaries: AiMediaCacheTierSummary[] = entryThumbs
+          .map((thumb) => ({
+            tier: thumb.tier ?? maxWidthToTierKind(thumb.maxWidth ?? CANVAS_TIER_SHORT_EDGE.s),
+            maxWidth: thumb.maxWidth ?? CANVAS_TIER_SHORT_EDGE.s,
+            byteSize: thumb.byteSize,
+          }))
+          .sort((a, b) => a.maxWidth - b.maxWidth);
+        const thumbBytes = tierSummaries.reduce((sum, tier) => sum + tier.byteSize, 0);
+
+        return {
+          entryKey: entry.key,
+          mediaId: entry.mediaId,
+          nodeType: entry.nodeType,
+          mimeType: entry.mimeType,
+          originalBytes: entry.byteSize,
+          thumbBytes,
+          totalBytes: entry.byteSize + thumbBytes,
+          tiers: tierSummaries,
+          createdAt: entry.createdAt,
+          lastAccessAt: entry.lastAccessAt,
+        };
+      })
+      .sort((a, b) => b.lastAccessAt.localeCompare(a.lastAccessAt));
+  });
+}
+
+export async function getCacheResourcePreviewUrl(
+  entryKey: string
+): Promise<string | null> {
+  return withDatabase(async (db) => {
+    const entryReadTx = db.transaction(ENTRIES_STORE, "readonly");
+    const entry = await idbRequest<CacheEntryRecord | undefined>(
+      entryReadTx.objectStore(ENTRIES_STORE).get(entryKey)
+    );
+    if (!entry) return null;
+
+    const preview =
+      (await readTierBlob(db, entry, 200)) ??
+      (await readTierBlob(db, entry, 400)) ??
+      entry.blob;
+    const stableKey = `${entryKey}:preview`;
+    return createStableBlobUrl(stableKey, preview);
+  });
+}
+
 export async function clearCacheEntriesByKeys(
   keys: readonly string[]
 ): Promise<void> {
@@ -933,6 +1524,123 @@ export async function downloadCacheEntriesByKeys(
   });
 }
 
+async function migrateEntryThumbs(
+  db: IDBDatabase,
+  fromEntryKey: string,
+  toEntryKey: string
+): Promise<void> {
+  if (!db.objectStoreNames.contains(THUMBS_STORE)) return;
+  if (fromEntryKey === toEntryKey) return;
+
+  const legacyTo = await readThumbBlob(db, toEntryKey);
+  if (!legacyTo) {
+    const legacyFrom = await readThumbBlob(db, fromEntryKey);
+    if (legacyFrom) {
+      await storeThumb(db, {
+        key: toEntryKey,
+        parentEntryKey: toEntryKey,
+        tier: "thumb",
+        maxWidth: LEGACY_CANVAS_S_THUMB_WIDTH,
+        blob: legacyFrom,
+      });
+    }
+  }
+
+  for (const maxWidth of TIER_THUMB_MAX_WIDTHS) {
+    const fromTierKey = tierCacheKey(fromEntryKey, maxWidth);
+    const toTierKey = tierCacheKey(toEntryKey, maxWidth);
+    const existingTo = await readThumbBlob(db, toTierKey);
+    if (existingTo) continue;
+    const fromThumb = await readThumbBlob(db, fromTierKey);
+    if (fromThumb) {
+      await storeThumb(db, {
+        key: toTierKey,
+        parentEntryKey: toEntryKey,
+        tier: maxWidthToTierKind(maxWidth),
+        maxWidth,
+        blob: fromThumb,
+      });
+    }
+  }
+}
+
+/**
+ * Merge duplicate cache rows after cloud upload rekeys a local staging mediaId
+ * to its canonical storageKey id. Keeps the target entry and drops the alias.
+ */
+export async function rekeyCacheEntry(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly fromMediaId: string;
+  readonly toMediaId: string;
+}): Promise<void> {
+  if (params.fromMediaId === params.toMediaId) return;
+
+  return withDatabase(async (db) => {
+    const fromKey = entryKey(
+      params.organizationId,
+      params.workflowId,
+      params.fromMediaId
+    );
+    const toKey = entryKey(
+      params.organizationId,
+      params.workflowId,
+      params.toMediaId
+    );
+
+    const fromReadTx = db.transaction(ENTRIES_STORE, "readonly");
+    const fromEntry = await idbRequest<CacheEntryRecord | undefined>(
+      fromReadTx.objectStore(ENTRIES_STORE).get(fromKey)
+    );
+    if (!fromEntry) return;
+
+    const toReadTx = db.transaction(ENTRIES_STORE, "readonly");
+    const toEntry = await idbRequest<CacheEntryRecord | undefined>(
+      toReadTx.objectStore(ENTRIES_STORE).get(toKey)
+    );
+
+    if (toEntry) {
+      await migrateEntryThumbs(db, fromKey, toKey);
+      await deleteEntry(db, fromKey);
+      recordMediaResourceAlias({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        fromMediaId: params.fromMediaId,
+        toMediaId: params.toMediaId,
+      });
+      return;
+    }
+
+    await migrateEntryThumbs(db, fromKey, toKey);
+
+    const now = new Date().toISOString();
+    const record: CacheEntryRecord = {
+      ...fromEntry,
+      key: toKey,
+      mediaId: params.toMediaId,
+      lastAccessAt: now,
+    };
+
+    await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
+      transaction.objectStore(ENTRIES_STORE).put(record);
+      transaction.objectStore(ENTRIES_STORE).delete(fromKey);
+      if (db.objectStoreNames.contains(THUMBS_STORE)) {
+        deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), fromKey);
+      }
+    });
+
+    await reconcileCacheMeta(db);
+
+    dropStableBlobUrlsForMediaId(params.fromMediaId);
+    recordMediaResourceAlias({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      fromMediaId: params.fromMediaId,
+      toMediaId: params.toMediaId,
+    });
+  });
+}
+
 export async function downloadCacheForWorkflows(params: {
   readonly organizationId: string;
   readonly workflowIds: readonly string[];
@@ -966,5 +1674,116 @@ export async function downloadCacheForWorkflows(params: {
     }
 
     return entries.length;
+  });
+}
+
+async function readAllThumbs(db: IDBDatabase): Promise<ThumbRecord[]> {
+  if (!db.objectStoreNames.contains(THUMBS_STORE)) return [];
+  const transaction = db.transaction(THUMBS_STORE, "readonly");
+  const rows = await idbRequest(transaction.objectStore(THUMBS_STORE).getAll());
+  return (rows as ThumbRecord[]) ?? [];
+}
+
+function parseCacheEntryKeyParts(
+  entryKeyValue: string
+): { readonly organizationId: string; readonly workflowId: string; readonly mediaId: string } | null {
+  const pipeIndex = entryKeyValue.indexOf("|w");
+  const entryPart = pipeIndex >= 0 ? entryKeyValue.slice(0, pipeIndex) : entryKeyValue;
+  const firstColon = entryPart.indexOf(":");
+  const secondColon = entryPart.indexOf(":", firstColon + 1);
+  if (firstColon < 0 || secondColon < 0) {
+    return null;
+  }
+  return {
+    organizationId: entryPart.slice(0, firstColon),
+    workflowId: entryPart.slice(firstColon + 1, secondColon),
+    mediaId: entryPart.slice(secondColon + 1),
+  };
+}
+
+/** Rebuild local UUID → cloud storageKey aliases from orphan thumbs + cache entries. */
+export async function rebuildMediaResourceAliasesFromCache(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly localHints?: readonly {
+    readonly mediaId: string;
+    readonly mimeType: string;
+    readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  }[];
+}): Promise<void> {
+  return withDatabase(async (db) => {
+    const entries = (await readAllEntries(db)).filter(
+      (entry) =>
+        entry.organizationId === params.organizationId &&
+        entry.workflowId === params.workflowId
+    );
+    const entryIds = new Set(entries.map((entry) => entry.mediaId));
+    const cloudEntries = entries.filter((entry) => entry.mediaId.includes("/"));
+
+    const hintIds = new Set(
+      (params.localHints ?? []).map((hint) => hint.mediaId)
+    );
+
+    const orphanLocalIds = new Set<string>();
+    if (params.localHints) {
+      for (const hint of params.localHints) {
+        if (!entryIds.has(hint.mediaId)) {
+          orphanLocalIds.add(hint.mediaId);
+        }
+      }
+    }
+
+    const thumbs = await readAllThumbs(db);
+    for (const thumb of thumbs) {
+      const parts = parseCacheEntryKeyParts(thumb.key);
+      if (
+        !parts ||
+        parts.organizationId !== params.organizationId ||
+        parts.workflowId !== params.workflowId ||
+        parts.mediaId.includes("/") ||
+        entryIds.has(parts.mediaId)
+      ) {
+        continue;
+      }
+      if (hintIds.size === 0 || hintIds.has(parts.mediaId)) {
+        orphanLocalIds.add(parts.mediaId);
+      }
+    }
+
+    for (const localMediaId of orphanLocalIds) {
+      const hint = params.localHints?.find((entry) => entry.mediaId === localMediaId);
+      const candidates = cloudEntries.filter((entry) => {
+        if (hint) {
+          return entry.mimeType === hint.mimeType && entry.nodeType === hint.nodeType;
+        }
+        return true;
+      });
+      if (candidates.length === 0) continue;
+
+      let match = candidates[0]!;
+      if (candidates.length > 1) {
+        const uniqueByteSize = candidates.filter(
+          (entry, index, list) =>
+            list.findIndex((other) => other.byteSize === entry.byteSize) === index
+        );
+        const sized = candidates.filter(
+          (entry) =>
+            uniqueByteSize.filter((other) => other.byteSize === entry.byteSize)
+              .length === 1
+        );
+        if (sized.length === 1) {
+          match = sized[0]!;
+        } else {
+          continue;
+        }
+      }
+
+      recordMediaResourceAlias({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        fromMediaId: localMediaId,
+        toMediaId: match.mediaId,
+      });
+    }
   });
 }

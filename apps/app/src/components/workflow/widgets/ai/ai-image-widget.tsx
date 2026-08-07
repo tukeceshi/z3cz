@@ -12,9 +12,10 @@ import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
+import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
@@ -36,7 +37,6 @@ import {
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
 import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
-import { useAdaptiveMediaCardSize } from "@/hooks/use-adaptive-media-card-size";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -55,9 +55,9 @@ import {
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
-import { GenerativeMediaDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
+import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
 import { useGenerativeCardDoubleClickUpload } from "../../use-generative-card-double-click-upload";
-import { MediaImageField } from "../../fields/media-image-field";
+import { CanvasMediaCover } from "../../canvas-media-cover";
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
@@ -106,20 +106,14 @@ function AiImageWidget({
   const hasImages = images.length > 0;
   const primaryImage = images[0];
   const primaryImageExpired = primaryImage ? isMediaExpired(primaryImage) : false;
-  const { displayUrl: primaryImageUrl, stale: primaryImageStale } =
-    useMediaDisplayUrl({
-      media: primaryImage && !primaryImageExpired ? primaryImage : null,
-      nodeType: "ai-image",
-    });
-  const canDownloadPrimaryImage =
-    Boolean(primaryImage) &&
-    Boolean(primaryImageUrl) &&
-    !primaryImageStale &&
-    !primaryImageExpired;
-  const cardSize = useAdaptiveMediaCardSize({
-    displayUrl: primaryImageUrl,
-    hasMedia: hasImages && !primaryImageExpired && !primaryImageStale,
+  const primaryImageKey = primaryImage
+    ? getMediaReferenceKey(primaryImage)
+    : null;
+  const canDownloadPrimaryImage = Boolean(primaryImage) && !primaryImageExpired;
+  const { cardSize, onNaturalSize } = useCanvasCardSize({
     kind: "image",
+    hasMedia: hasImages,
+    mediaKey: primaryImageKey,
   });
   const cardPlaceholder = t(
     generativeCardProgressKey(
@@ -202,7 +196,7 @@ function AiImageWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId) return;
+      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "image");
       if (!normalized) {
@@ -213,7 +207,7 @@ function AiImageWidget({
       setUploading(true);
       setCardEditing(true);
       try {
-        const value = await stageGenerativeCardUpload({
+        const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
           workflowId,
           file: normalized,
@@ -222,14 +216,22 @@ function AiImageWidget({
           nodeType: "ai-image",
         });
 
+        warmCardUploadPersist({
+          organizationId: orgId,
+          workflowId,
+          staged,
+          nodeType: "ai-image",
+          cloudConfigured,
+        });
+
         const uploadError = resolveGenerativeCardUploadError({
-          value,
+          value: staged,
           cloudConfigured,
           t,
         });
 
         updateNodeData(nodeId, (current) => {
-          const withMedia = withAiImageManualUpload(current, [value]);
+          const withMedia = withAiImageManualUpload(current, [staged]);
           return {
             ...withMedia,
             metadata: withAiImageGenerateError(
@@ -325,11 +327,15 @@ function AiImageWidget({
         ) : hasImages ? (
           <div className={cn("grid h-full w-full gap-0", gridCols)}>
             {images.map((img, idx) => (
-              <MediaImageField
+              <CanvasMediaCover
                 key={getMediaReferenceKey(img) ?? idx}
-                value={img}
-                createObjectUrl={createObjectUrl}
+                media={img}
+                nodeType="ai-image"
+                cardWidthPx={cardSize.width}
+                cardHeightPx={cardSize.height}
+                fitMode="cover"
                 className="h-full w-full min-h-0 rounded-none border-0"
+                onNaturalSize={idx === 0 ? onNaturalSize : undefined}
               />
             ))}
           </div>
@@ -339,9 +345,10 @@ function AiImageWidget({
 
         {!generateError ? (
           <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            {canDownloadPrimaryImage && primaryImage && primaryImageUrl ? (
-              <GenerativeMediaDownloadButton
-                src={primaryImageUrl}
+            {canDownloadPrimaryImage && primaryImage ? (
+              <GenerativeMediaLazyDownloadButton
+                media={primaryImage}
+                nodeType="ai-image"
                 fileName={`image-${getMediaReferenceKey(primaryImage)}.${primaryImage.mimeType.split("/")[1] ?? "png"}`}
                 className={GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME}
               />
@@ -372,6 +379,7 @@ function AiImageWidget({
           open={historyOpen}
           history={historyItems}
           currentImages={images}
+          mediaKind="image"
           createObjectUrl={createObjectUrl}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}

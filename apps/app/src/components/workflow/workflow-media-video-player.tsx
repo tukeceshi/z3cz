@@ -34,6 +34,8 @@ export interface WorkflowMediaVideoPlayerProps {
   readonly videoClassName?: string;
   readonly objectFit?: "contain" | "cover";
   readonly variant?: "card" | "field";
+  /** Card variant: start hovered with controls visible and autoplay (e.g. parent already has pointer inside). */
+  readonly initialHovered?: boolean;
   readonly showFrameCapture?: boolean;
   readonly frameCaptureDisabled?: boolean;
   readonly onFrameCapture?: (mode: VideoFrameCaptureMode) => void;
@@ -51,6 +53,7 @@ export function WorkflowMediaVideoPlayer({
   videoClassName,
   objectFit = "contain",
   variant = "card",
+  initialHovered = false,
   showFrameCapture = false,
   frameCaptureDisabled = false,
   onFrameCapture,
@@ -70,7 +73,9 @@ export function WorkflowMediaVideoPlayer({
   const frameCaptureEnabled =
     showFrameCapture && allowCrossOrigin && !frameCaptureDisabled;
 
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(
+    () => variant === "card" && initialHovered
+  );
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(isCardVariant);
@@ -158,9 +163,7 @@ export function WorkflowMediaVideoPlayer({
     };
   }, [isCardVariant, isDragging, resetVideoToStart, src, syncTimeState, videoRef]);
 
-  const handleCardMouseEnter = useCallback(() => {
-    if (!isCardVariant) return;
-    setIsHovered(true);
+  const tryCardAutoplay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -169,7 +172,19 @@ export function WorkflowMediaVideoPlayer({
       setIsMuted(true);
       void video.play().catch(() => {});
     });
-  }, [isCardVariant, videoRef]);
+  }, [videoRef]);
+
+  const handleCardMouseEnter = useCallback(() => {
+    if (!isCardVariant) return;
+    setIsHovered(true);
+    tryCardAutoplay();
+  }, [isCardVariant, tryCardAutoplay]);
+
+  useEffect(() => {
+    if (!isCardVariant || !initialHovered) return;
+    setIsHovered(true);
+    tryCardAutoplay();
+  }, [initialHovered, isCardVariant, src, tryCardAutoplay]);
 
   const handleCardMouseLeave = useCallback(() => {
     if (!isCardVariant) return;

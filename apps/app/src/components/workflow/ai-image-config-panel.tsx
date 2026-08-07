@@ -27,8 +27,7 @@ import { cn } from "@/utils/utils";
 import { useOrgImageModels, generateAiImage } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
-import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
-import { resolveMediaFetchUrl } from "@/services/media-url-resolver";
+import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import { resolveReferencesForGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
@@ -154,12 +153,6 @@ export function AiImageConfigPanel({
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
 
-  const resolveMediaPreviewUrl = useCallback(
-    (media: MediaReference) =>
-      orgId ? resolveMediaFetchUrl(media, orgId) : null,
-    [createObjectUrl, orgId]
-  );
-
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
   const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
@@ -245,10 +238,8 @@ export function AiImageConfigPanel({
         nodeId,
         edges,
         nodes: typedNodes,
-        createObjectUrl,
-        resolveMediaPreviewUrl,
       }),
-    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
+    [edges, nodeId, typedNodes]
   );
 
   const imageReferenceChips = useMemo(
@@ -258,12 +249,10 @@ export function AiImageConfigPanel({
         targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
         edges,
         nodes: typedNodes,
-        createObjectUrl,
-        resolveMediaPreviewUrl,
         classifyKind: (nodeType) =>
           nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
       }),
-    [createObjectUrl, edges, nodeId, resolveMediaPreviewUrl, typedNodes]
+    [edges, nodeId, typedNodes]
   );
 
   const hasPromptReference = useMemo(
@@ -332,7 +321,8 @@ export function AiImageConfigPanel({
     updateNodeData,
   ]);
 
-  const displayPrompt = hasPromptReference ? referencedPrompt : promptBuffer.value;
+  const displayPrompt =
+    (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
   const promptForGenerate = useMemo(() => {
     if (!hasPromptReference) return displayPrompt;
     return resolveAiImageReferencedPrompt({
@@ -704,6 +694,8 @@ export function AiImageConfigPanel({
 
       const resolved = await resolveReferencesForGenerate({
         organizationId: orgId,
+        workflowId,
+        cloudConfigured,
         references: referenceMedia,
       });
 
@@ -759,20 +751,19 @@ export function AiImageConfigPanel({
       setPersistPhase(null);
       clearProgress();
 
-      if (workflowId && orgId) {
-        for (const image of finalImages) {
-          void ensureGenerativeMediaCached({
-            organizationId: orgId,
-            workflowId,
-            media: image,
-            nodeType: "ai-image",
-          });
-        }
-      }
-
       if (!updateNodeData) return;
 
       const canWriteHistory = tryClaimGenerativeJobFinalize(finalizeJobId ?? "");
+
+      if (workflowId && orgId) {
+        persistMediaForNodeInBackground({
+          organizationId: orgId,
+          workflowId,
+          media: finalImages,
+          nodeType: "ai-image",
+          cloudConfigured,
+        });
+      }
 
       updateNodeData(nodeId, (current) => {
         if (!canWriteHistory) {
@@ -827,17 +818,16 @@ export function AiImageConfigPanel({
           const finalImages = resolvedJob.media;
           setPersistPhase(null);
           clearProgress();
-          if (workflowId) {
-            for (const image of finalImages) {
-              void ensureGenerativeMediaCached({
-                organizationId: orgId,
-                workflowId,
-                media: image,
-                nodeType: "ai-image",
-              });
-            }
-          }
           const canWriteHistory = tryClaimGenerativeJobFinalize(activeJobId);
+          if (workflowId && orgId) {
+            persistMediaForNodeInBackground({
+              organizationId: orgId,
+              workflowId,
+              media: finalImages,
+              nodeType: "ai-image",
+              cloudConfigured,
+            });
+          }
           if (updateNodeData) {
             updateNodeData(nodeId, (current) => {
               if (!canWriteHistory) {
@@ -1031,7 +1021,7 @@ export function AiImageConfigPanel({
             maxLength={promptMaxLength}
             placeholder={
               hasPromptReference
-                ? undefined
+                ? ""
                 : t("workflow.aiImagePanel.promptPlaceholder")
             }
             className={cn(

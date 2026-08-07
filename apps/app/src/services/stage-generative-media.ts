@@ -8,6 +8,8 @@ import {
 
   isObjectReference,
 
+  isEphemeralMediaReference,
+
 } from "@dafthunk/types";
 
 
@@ -17,37 +19,15 @@ import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 
 import {
-
   readGenerativeStagingBlob,
-
   writeGenerativeStaging,
-
   writeGenerativeStagingWithNewId,
-
 } from "@/services/generative-media-staging";
-
-import { makeRequest } from "@/services/utils";
-import { reportCloudStorageError } from "@/services/cloud-storage-error-reporter";
-
-
-
-interface TosPresignUploadResponse {
-
-  readonly uploadUrl: string;
-
-  readonly uploadHeaders: Record<string, string>;
-
-  readonly reference: ObjectReference;
-
-}
-
-
-
-function platformAiEndpoint(organizationId: string): string {
-
-  return `/${organizationId}/platform-ai`;
-
-}
+import {
+  requireStagingWorkflowId,
+  uploadBlobToCloudStorage,
+} from "@/services/upload-generative-media-cloud";
+import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 
 
 
@@ -155,7 +135,7 @@ export async function uploadGenerativeMediaFile(params: {
 
   const mimeType = params.file.type || "application/octet-stream";
 
-  const workflowId = params.workflowId?.trim() || "uploads";
+  const workflowId = requireStagingWorkflowId(params.workflowId);
 
   const nodeType =
 
@@ -197,87 +177,22 @@ export async function uploadGenerativeMediaFile(params: {
 
 
 
-  const presign = await makeRequest<TosPresignUploadResponse>(
-
-    `${platformAiEndpoint(params.organizationId)}/tos/presign-upload`,
-
-    {
-
-      method: "POST",
-
-      body: JSON.stringify({
-
-        mimeType,
-
-        contentLength: params.file.size,
-
-        workflowId: params.workflowId,
-
-        mediaKind: params.mediaKind,
-
-      }),
-
-    }
-
-  );
-
-
-
-  const mediaId = getMediaReferenceKey(presign.reference);
-
-  await writeGenerativeStaging({
+  return uploadBlobToCloudStorage({
 
     organizationId: params.organizationId,
 
     workflowId,
 
-    mediaId,
-
     blob: params.file,
 
     mimeType,
+
+    mediaKind: params.mediaKind,
 
     nodeType,
 
   });
 
-  notifyAiMediaCacheChanged();
-
-  const uploadHeaders: Record<string, string> = {
-    ...presign.uploadHeaders,
-    "Content-Type": mimeType,
-  };
-  delete uploadHeaders.Host;
-  delete uploadHeaders.host;
-
-  let cloudUploadOk = false;
-  let uploadLooksLikeCors = false;
-  try {
-    const uploadResponse = await fetch(presign.uploadUrl, {
-      method: "PUT",
-      headers: uploadHeaders,
-      body: params.file,
-    });
-    cloudUploadOk = uploadResponse.ok;
-  } catch {
-    cloudUploadOk = false;
-    uploadLooksLikeCors = true;
-  }
-
-  if (!cloudUploadOk) {
-    reportCloudStorageError(uploadLooksLikeCors ? "cors_upload" : "api");
-  }
-
-  if (cloudUploadOk) {
-    return presign.reference;
-  }
-
-  const localRef: LocalMediaReference = {
-    kind: "local",
-    mediaId,
-    mimeType,
-  };
-  return localRef;
 }
 
 
@@ -416,6 +331,36 @@ export async function ensureGenerativeMediaCached(params: {
 
       nodeType: params.nodeType,
 
+      requireEnabled: false,
+
+    });
+
+    if (cachedOk) {
+
+      notifyAiMediaCacheChanged();
+
+    }
+
+    return;
+
+  }
+
+  if (isEphemeralMediaReference(params.media)) {
+
+    const cachedOk = await cacheMediaFromUrl({
+
+      organizationId: params.organizationId,
+
+      workflowId: params.workflowId,
+
+      workflowName: params.workflowId,
+
+      media: params.media,
+
+      nodeType: params.nodeType,
+
+      requireEnabled: false,
+
     });
 
     if (cachedOk) {
@@ -425,6 +370,82 @@ export async function ensureGenerativeMediaCached(params: {
     }
 
   }
+
+}
+
+
+
+export async function stageGenerativeMediaFromEphemeralUrl(params: {
+
+  readonly organizationId: string;
+
+  readonly workflowId: string;
+
+  readonly sourceUrl: string;
+
+  readonly mimeType: string;
+
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+
+}): Promise<LocalMediaReference> {
+
+  const workflowId = requireStagingWorkflowId(params.workflowId);
+
+  const fetchUrl = buildMediaProxyEndpoint(
+
+    params.organizationId,
+
+    params.sourceUrl,
+
+    params.mimeType
+
+  );
+
+  const response = await fetch(fetchUrl, { credentials: "include" });
+
+  if (!response.ok) {
+
+    throw new Error(`Failed to download generated media (${response.status})`);
+
+  }
+
+  const blob = await response.blob();
+
+  const mimeType =
+
+    params.mimeType ||
+
+    blob.type ||
+
+    (params.nodeType === "ai-video"
+
+      ? "video/mp4"
+
+      : params.nodeType === "ai-audio"
+
+        ? "audio/mpeg"
+
+        : "image/png");
+
+
+
+  const { mediaId } = await writeGenerativeStagingWithNewId({
+
+    organizationId: params.organizationId,
+
+    workflowId,
+
+    blob,
+
+    mimeType,
+
+    nodeType: params.nodeType,
+
+  });
+
+  notifyAiMediaCacheChanged();
+
+  return { kind: "local", mediaId, mimeType };
 
 }
 
@@ -462,25 +483,33 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
 
 
 
-  const file = new File([entry.blob], `staged-${params.mediaId}`, {
+  const mimeType = params.mimeType || entry.mimeType || "application/octet-stream";
 
-    type: params.mimeType || entry.mimeType || "application/octet-stream",
+  const nodeType = inferNodeTypeFromMediaKind(
 
-  });
+    params.mediaKind ?? "reference",
+
+    mimeType
+
+  );
 
 
 
-  const reference = await uploadGenerativeMediaFile({
+  const reference = await uploadBlobToCloudStorage({
 
     organizationId: params.organizationId,
 
     workflowId: params.workflowId,
 
-    file,
+    blob: entry.blob,
 
-    cloudConfigured: true,
+    mimeType,
 
     mediaKind: params.mediaKind ?? "reference",
+
+    nodeType,
+
+    existingLocalMediaId: params.mediaId,
 
   });
 

@@ -65,6 +65,39 @@ type GenerativeGenerationCancelHandler = () => void | Promise<void>;
 
 const cancelHandlers = new Map<string, GenerativeGenerationCancelHandler>();
 const nodeCancelled = new Map<string, boolean>();
+const cancelledNoticeNodes = new Set<string>();
+const cancelledNoticeListeners = new Set<() => void>();
+
+function notifyCancelledNoticeListeners(): void {
+  for (const listener of cancelledNoticeListeners) {
+    listener();
+  }
+}
+
+export function showGenerativeCancelledNotice(nodeId: string): void {
+  cancelledNoticeNodes.add(nodeId);
+  notifyCancelledNoticeListeners();
+}
+
+export function dismissGenerativeCancelledNotice(nodeId: string): void {
+  if (!cancelledNoticeNodes.delete(nodeId)) {
+    return;
+  }
+  notifyCancelledNoticeListeners();
+}
+
+export function isGenerativeCancelledNoticeVisible(nodeId: string): boolean {
+  return cancelledNoticeNodes.has(nodeId);
+}
+
+export function subscribeGenerativeCancelledNotice(
+  listener: () => void
+): () => void {
+  cancelledNoticeListeners.add(listener);
+  return () => {
+    cancelledNoticeListeners.delete(listener);
+  };
+}
 
 export function resetNodeGenerationCancelled(nodeId: string): void {
   nodeCancelled.set(nodeId, false);
@@ -146,4 +179,5 @@ export async function cancelGenerativeGenerationForNode(params: {
       metadata: withAiVideoGeneratingFlag(cleared, false),
     };
   });
+  showGenerativeCancelledNotice(params.nodeId);
 }

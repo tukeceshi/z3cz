@@ -6,6 +6,7 @@ import { createDatabase } from "../db";
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
 import { decryptSecret } from "../utils/encryption";
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
+import { registerMediaResourcesFromReferences } from "./media-resource-catalog-service";
 import { isTosRequestError } from "../integrations/volcengine/tos-errors";
 import { recordCloudStorageHealthFromError } from "./probe-org-cloud-storage-health";
 
@@ -75,6 +76,10 @@ export async function resolveAiImageStorage(
         storageKey,
         storageBackend: "volcengine_tos",
       };
+      await registerMediaResourcesFromReferences(db, {
+        organizationId: params.organizationId,
+        references: [reference],
+      });
       return reference;
     },
   };

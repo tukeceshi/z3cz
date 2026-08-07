@@ -809,7 +809,6 @@ export function WorkflowCanvas({
           disabled && "cursor-default",
           addNodeMenu && "cursor-default"
         )}
-        onlyRenderVisibleElements
         nodesDraggable={!disabled && showControls}
         nodesConnectable={!disabled && showControls}
         elementsSelectable={showControls}

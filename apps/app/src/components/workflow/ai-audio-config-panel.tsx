@@ -23,7 +23,7 @@ import {
   useOrgAudioModels,
 } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
+import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import {
@@ -249,7 +249,8 @@ export function AiAudioConfigPanel({
     updateNodeData,
   ]);
 
-  const displayPrompt = hasPromptReference ? referencedPrompt : promptBuffer.value;
+  const displayPrompt =
+    (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
   const promptForGenerate = useMemo(() => {
     if (!hasPromptReference) return displayPrompt;
     return resolveAiAudioReferencedPrompt({
@@ -452,18 +453,19 @@ export function AiAudioConfigPanel({
         throw new Error("Audio generation succeeded without a playable reference");
       }
 
-      if (workflowId && orgId) {
-        void ensureGenerativeMediaCached({
-          organizationId: orgId,
-          workflowId,
-          media: audio,
-          nodeType: "ai-audio",
-        });
-      }
-
       if (!updateNodeData) return;
 
       const canWriteHistory = tryClaimGenerativeJobFinalize(finalizeJobId ?? "");
+
+      if (workflowId && orgId) {
+        persistMediaForNodeInBackground({
+          organizationId: orgId,
+          workflowId,
+          media: finalAudios,
+          nodeType: "ai-audio",
+          cloudConfigured,
+        });
+      }
 
       updateNodeData(nodeId, (current) => {
         if (!canWriteHistory) {
@@ -511,16 +513,17 @@ export function AiAudioConfigPanel({
           const audios = resolvedJob.media;
           setPersistPhase(null);
           clearProgress();
+          if (workflowId && orgId) {
+            persistMediaForNodeInBackground({
+              organizationId: orgId,
+              workflowId,
+              media: audios,
+              nodeType: "ai-audio",
+              cloudConfigured,
+            });
+          }
           const audio = audios[0];
           if (audio) {
-            if (workflowId) {
-              void ensureGenerativeMediaCached({
-                organizationId: orgId,
-                workflowId,
-                media: audio,
-                nodeType: "ai-audio",
-              });
-            }
             const canWriteHistory = tryClaimGenerativeJobFinalize(activeJobId);
             updateNodeData(nodeId, (current) => {
               if (!canWriteHistory) {
@@ -658,7 +661,7 @@ export function AiAudioConfigPanel({
             maxLength={promptMaxLength}
             placeholder={
               hasPromptReference
-                ? undefined
+                ? ""
                 : t("workflow.aiAudioPanel.promptPlaceholder")
             }
             className={cn(

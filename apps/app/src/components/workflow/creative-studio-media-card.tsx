@@ -60,17 +60,25 @@ export function CreativeStudioMediaCard({
         node.data.metadata
       )[0];
 
+  const mediaRef =
+    primaryMedia && isMediaReference(primaryMedia) ? primaryMedia : null;
+
   const { displayUrl, stale } = useMediaDisplayUrl({
-    media:
-      primaryMedia && isMediaReference(primaryMedia) ? primaryMedia : null,
+    media: mediaRef,
     nodeType: isVideo ? "ai-video" : "ai-image",
+    size: isVideo ? "full" : "canvas-m",
+  });
+
+  const { displayUrl: fullImageUrl } = useMediaDisplayUrl({
+    media: isVideo ? null : mediaRef,
+    nodeType: "ai-image",
     size: "full",
   });
 
   const mediaUrl =
     hasMedia && displayUrl && !stale ? displayUrl : null;
 
-  const imageSize = useStudioImageFileSize(isVideo ? null : mediaUrl);
+  const imageSize = useStudioImageFileSize(isVideo ? null : fullImageUrl);
   const videoDuration = useStudioVideoFileDuration(isVideo ? mediaUrl : null);
   const modelLabel = readStudioModelLabel(node.data);
   const videoResolution = isVideo
@@ -109,7 +117,7 @@ export function CreativeStudioMediaCard({
     >
       {hasMedia ? (
         <CreativeStudioMediaPreviewFrame
-          media={primaryMedia && isMediaReference(primaryMedia) ? primaryMedia : null}
+          media={mediaRef}
           displayUrl={displayUrl}
           stale={stale}
           isVideo={isVideo}

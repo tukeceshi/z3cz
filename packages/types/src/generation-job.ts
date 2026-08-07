@@ -87,6 +87,8 @@ export interface GenerationJobPendingMedia {
   readonly sourceUrl: string;
   readonly mimeType: string;
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
+  /** Ephemeral media id — used to transition catalog state when cloud persist completes. */
+  readonly resourceId?: string;
 }
 
 export type GenerationJobPersistDispatch = "api" | "worker";

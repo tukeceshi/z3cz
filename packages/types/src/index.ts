@@ -4,6 +4,7 @@ export * from "./ai-interface-channels";
 export * from "./cloud-storage-health";
 export * from "./generation-job";
 export * from "./media-reference";
+export * from "./media-resource-catalog";
 export * from "./ai-model-catalog";
 export * from "./format-text-model-failure-message";
 export * from "./interpret-upstream-text-model-error";
