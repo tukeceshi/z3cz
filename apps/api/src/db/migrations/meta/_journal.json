@@ -393,6 +393,13 @@
       "when": 1787880000000,
       "tag": "0060_seedance_default_parameter_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1787960000000,
+      "tag": "0061_seedance_parameter_rules",
+      "breakpoints": true
     }
   ]
 }
