@@ -178,13 +178,6 @@
       "breakpoints": true
     },
     {
-      "idx": 25,
-      "version": "7",
-      "when": 1785320000000,
-      "tag": "0025_remove_relay_and_workflow_flags",
-      "breakpoints": true
-    },
-    {
       "idx": 26,
       "version": "7",
       "when": 1785400000000,
@@ -231,13 +224,6 @@
       "version": "7",
       "when": 1785880000000,
       "tag": "0032_add_claude_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1785960000000,
-      "tag": "0033_add_minimax_speech_models",
       "breakpoints": true
     },
     {
@@ -355,43 +341,57 @@
     {
       "idx": 50,
       "version": "7",
-      "when": 1787260000000,
-      "tag": "0050_video_audio_reference_limits",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1787280000000,
-      "tag": "0051_repair_video_parameter_rules",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1787300000000,
-      "tag": "0052_seedance_default_parameter_rules",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
       "when": 1787320000000,
       "tag": "0053_api_interface_request_logs",
       "breakpoints": true
     },
     {
-      "idx": 54,
+      "idx": 51,
       "version": "7",
       "when": 1787400000000,
       "tag": "0054_api_interface_request_log_operation",
       "breakpoints": true
     },
     {
-      "idx": 55,
+      "idx": 52,
       "version": "7",
       "when": 1787480000000,
       "tag": "0055_media_resources",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1787560000000,
+      "tag": "0056_remove_relay_and_workflow_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1787640000000,
+      "tag": "0057_add_minimax_speech_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1787720000000,
+      "tag": "0058_video_audio_reference_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1787800000000,
+      "tag": "0059_repair_video_parameter_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1787880000000,
+      "tag": "0060_seedance_default_parameter_rules",
       "breakpoints": true
     }
   ]
