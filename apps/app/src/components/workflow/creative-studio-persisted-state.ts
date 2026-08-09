@@ -6,12 +6,14 @@ export interface CreativeStudioPersistedState {
   readonly viewMode: WorkflowEditorViewMode;
   readonly nodeId: string | null;
   readonly detailNodeId: string | null;
+  readonly detailPaneOpen: boolean;
 }
 
 const DEFAULT_STATE: CreativeStudioPersistedState = {
   viewMode: "canvas",
   nodeId: null,
   detailNodeId: null,
+  detailPaneOpen: false,
 };
 
 export function readCreativeStudioPersistedState(
@@ -32,8 +34,12 @@ export function readCreativeStudioPersistedState(
     const nodeId = typeof parsed.nodeId === "string" ? parsed.nodeId : null;
     const detailNodeId =
       typeof parsed.detailNodeId === "string" ? parsed.detailNodeId : null;
+    const detailPaneOpen =
+      typeof parsed.detailPaneOpen === "boolean"
+        ? parsed.detailPaneOpen
+        : detailNodeId != null;
 
-    return { viewMode, nodeId, detailNodeId };
+    return { viewMode, nodeId, detailNodeId, detailPaneOpen };
   } catch {
     return DEFAULT_STATE;
   }

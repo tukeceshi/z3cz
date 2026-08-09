@@ -270,6 +270,7 @@ export function withAiTextGeneratedResult(
     readonly platformModelId?: string;
     readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
   }
 ): Partial<WorkflowNodeType> {
   const history = readAiTextResultHistory(current.inputs);
@@ -279,6 +280,7 @@ export function withAiTextGeneratedResult(
     platformModelId: meta?.platformModelId,
     aiInterfaceId: meta?.aiInterfaceId,
     providerModelId: meta?.providerModelId,
+    modelDisplayName: meta?.modelDisplayName,
     createdAt: new Date().toISOString(),
   };
   const nextHistory: AiTextResultHistory = {

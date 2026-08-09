@@ -4,6 +4,7 @@ import {
   validateAiTextPromptAssembly,
   type AiTextReferenceInput,
   type GenerateAiTextResponse,
+  isClientCancelledTextModelError,
   type MediaReference,
   type ObjectReference,
   type OrgTextModelOption,
@@ -22,6 +23,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
@@ -29,6 +31,7 @@ import { useObjectService } from "@/services/object-service";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
 import { AiGenerateButton } from "./ai-generate-button";
+import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
@@ -63,7 +66,7 @@ import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
-import { connectGenerativeReferenceEdge } from "./generative-reference-utils";
+import { connectGenerativeReferenceEdge, studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -98,6 +101,7 @@ export function AiTextConfigPanel({
   const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   const [isGenerating, setIsGenerating] = useState(false);
+  useGenerativeMediaWorkSession(isGenerating);
   const generateInFlightRef = useRef(false);
   const generateAbortRef = useRef<AbortController | null>(null);
   const streamPreviewRafRef = useRef<number | null>(null);
@@ -311,27 +315,60 @@ export function AiTextConfigPanel({
     return true;
   };
 
+  const canAcceptStudioReference = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return false;
+      const kind = classifyReferenceFromNodeType(source.data.nodeType);
+      if (!kind) return false;
+      return evaluateAiTextReferenceStructural({
+        targetNodeId: nodeId,
+        sourceNodeId,
+        sourceHandle,
+        sourceNodeType: source.data.nodeType,
+        targetNodeData: data,
+        edges,
+        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+        models: textModelCatalog,
+      }).ok;
+    },
+    [data, edges, nodeId, textModelCatalog, typedNodes]
+  );
+
+  const previewStudioReferenceDrop = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return "rejected" as const;
+      const kind = classifyReferenceFromNodeType(source.data.nodeType);
+      if (!kind) return "rejected" as const;
+      return studioReferenceDropPreviewFromVerdict(
+        evaluateAiTextReferenceStructural({
+          targetNodeId: nodeId,
+          sourceNodeId,
+          sourceHandle,
+          sourceNodeType: source.data.nodeType,
+          targetNodeData: data,
+          edges,
+          nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+          models: textModelCatalog,
+        })
+      );
+    },
+    [data, edges, nodeId, textModelCatalog, typedNodes]
+  );
+
   const handlePickNode = async (sourceNodeId: string, sourceHandle: string) => {
     const source = typedNodes.find((node) => node.id === sourceNodeId);
     if (!source) return;
     const sourceData = source.data;
-    const kind = classifyReferenceFromNodeType(sourceData.nodeType);
-    if (!kind) {
+
+    if (!canAcceptStudioReference(sourceNodeId, sourceHandle)) {
       toast.error("workflow.aiTextPanel.referenceRejected");
       return;
     }
 
-    const verdict = evaluateAiTextReferenceStructural({
-      targetNodeId: nodeId,
-      sourceNodeId,
-      sourceHandle,
-      sourceNodeType: sourceData.nodeType,
-      targetNodeData: data,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      models: textModelCatalog,
-    });
-    if (!verdict.ok) {
+    const kind = classifyReferenceFromNodeType(sourceData.nodeType);
+    if (!kind) {
       toast.error("workflow.aiTextPanel.referenceRejected");
       return;
     }
@@ -409,6 +446,7 @@ export function AiTextConfigPanel({
     generateAbortRef.current = abortController;
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => ({
+      ...withAiTextStreamingPreview(current, ""),
       metadata: withGenerativeCardGenerateError(
         withAiTextGeneratingFlag(current.metadata, true),
         null
@@ -487,6 +525,7 @@ export function AiTextConfigPanel({
         const withResult = withAiTextGeneratedResult(current, response.text, {
           platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
+          modelDisplayName: effectiveModel.alias,
         });
         return {
           ...withResult,
@@ -502,7 +541,13 @@ export function AiTextConfigPanel({
       if (abortController.signal.aborted) {
         return;
       }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       const raw = error instanceof Error ? error.message : String(error);
+      if (isClientCancelledTextModelError(raw)) {
+        return;
+      }
       const cardError = prepareGenerativeCardError(raw, t);
       updateNodeData?.(nodeId, (current) => ({
         metadata: withGenerativeCardGenerateError(
@@ -559,10 +604,26 @@ export function AiTextConfigPanel({
 
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom} layout={layout}>
+      <GenerativeConfigPanelShell
+        nodeId={nodeId}
+        zoom={zoom}
+        layout={layout}
+        dropDisabled={disabled}
+        previewStudioReferenceDrop={
+          layout === "studio-dock" ? previewStudioReferenceDrop : undefined
+        }
+        onStudioReferenceDrop={
+          layout === "studio-dock"
+            ? (sourceNodeId, sourceHandle) => {
+                void handlePickNode(sourceNodeId, sourceHandle);
+              }
+            : undefined
+        }
+      >
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
+          showStudioReferenceHints={layout === "studio-dock"}
           onDisconnect={(edgeId) => deleteEdge?.(edgeId)}
           onPickCanvasNode={() => setPickNodeOpen(true)}
         />
@@ -588,7 +649,7 @@ export function AiTextConfigPanel({
                 ? t("workflow.aiTextPanel.promptOptionalWithRefs")
                 : t("workflow.aiTextPanel.promptPlaceholder")
             }
-            className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0"
+            className="h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0 thin-scrollbar"
           />
           {layout === "attached" ? (
             <AiTextExpandButton
@@ -633,16 +694,24 @@ export function AiTextConfigPanel({
               </p>
             ) : null}
           </div>
-          <AiGenerateButton
-            disabled={!canGenerate}
-            isGenerating={isGenerating}
-            label={
-              isGenerating
-                ? t("workflow.aiTextPanel.generating")
-                : t("workflow.aiTextPanel.generate")
-            }
-            onClick={handleGenerate}
-          />
+          <div className="flex shrink-0 items-end gap-3">
+            {layout === "studio-dock" ? (
+              <StudioDockPromptCharCount
+                count={promptBuffer.value.length}
+                maxLength={promptMaxLength}
+              />
+            ) : null}
+            <AiGenerateButton
+              disabled={!canGenerate}
+              isGenerating={isGenerating}
+              label={
+                isGenerating
+                  ? t("workflow.aiTextPanel.generating")
+                  : t("workflow.aiTextPanel.generate")
+              }
+              onClick={handleGenerate}
+            />
+          </div>
         </div>
       </GenerativeConfigPanelShell>
 

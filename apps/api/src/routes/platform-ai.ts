@@ -1,6 +1,7 @@
 import {
   countGenerateAiTextMediaReferences,
   countSubmitAiVideoMediaReferences,
+  isClientCancelledTextModelError,
   validateAiTextPromptAssembly,
   validateSubmitAiVideoReferences,
   type CompleteGenerationJobUploadRequest,
@@ -747,6 +748,19 @@ platformAiRoutes.post(
           );
         };
 
+        const finalizeCancelled = async (): Promise<void> => {
+          if (finalized) {
+            return;
+          }
+          finalized = true;
+          await finalizeAiModelInvocation(db, {
+            id: invocationId,
+            organizationId,
+            status: "failed",
+            error: "Generation cancelled",
+          });
+        };
+
         try {
           for await (const event of streamPreparedTextModel({
             prepared: prepared.prepared,
@@ -784,6 +798,10 @@ platformAiRoutes.post(
               continue;
             }
 
+            if (clientSignal.aborted) {
+              break;
+            }
+
             const failure = await handleTextModelStreamFailure({
               db,
               organizationId,
@@ -805,37 +823,38 @@ platformAiRoutes.post(
           }
 
           if (clientSignal.aborted && !finalized) {
-            finalized = true;
-            await finalizeAiModelInvocation(db, {
-              id: invocationId,
-              organizationId,
-              status: "failed",
-              error: "Generation cancelled",
-            });
+            await finalizeCancelled();
           }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Stream failed";
           if (!finalized) {
-            finalized = true;
-            const failure = await handleTextModelStreamFailure({
-              db,
-              organizationId,
-              canonicalId: body.modelCanonicalId,
-              candidate: prepared.prepared.candidate,
-              upstreamError: message,
-              displayName: modelOption.displayName,
-            });
-            await finalizeAiModelInvocation(db, {
-              id: invocationId,
-              organizationId,
-              status: "failed",
-              error: failure.invocationError || failure.error,
-            });
-            try {
-              send({ type: "error", error: failure.error });
-            } catch {
-              // stream already closed
+            if (
+              clientSignal.aborted ||
+              isClientCancelledTextModelError(message)
+            ) {
+              await finalizeCancelled();
+            } else {
+              finalized = true;
+              const failure = await handleTextModelStreamFailure({
+                db,
+                organizationId,
+                canonicalId: body.modelCanonicalId,
+                candidate: prepared.prepared.candidate,
+                upstreamError: message,
+                displayName: modelOption.displayName,
+              });
+              await finalizeAiModelInvocation(db, {
+                id: invocationId,
+                organizationId,
+                status: "failed",
+                error: failure.invocationError || failure.error,
+              });
+              try {
+                send({ type: "error", error: failure.error });
+              } catch {
+                // stream already closed
+              }
             }
           }
         } finally {

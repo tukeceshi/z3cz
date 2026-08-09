@@ -54,6 +54,33 @@ export function resolveHistoryModelLabel(item: {
   return label || null;
 }
 
+/** Console model display name snapshot from history (no ID fallback). */
+export function readHistoryModelDisplayName(
+  item: { readonly modelDisplayName?: string } | null | undefined
+): string | null {
+  const label = item?.modelDisplayName?.trim();
+  return label || null;
+}
+
+/** Resolution / size label from history params (e.g. 1080p). */
+export function readHistoryResolutionLabel(
+  params: Readonly<Record<string, unknown>> | undefined
+): string | null {
+  if (!params) {
+    return null;
+  }
+  const size = params.size ?? params.resolution;
+  if (
+    typeof size === "string" &&
+    size.trim() &&
+    size !== "auto" &&
+    size !== "adaptive"
+  ) {
+    return size.trim();
+  }
+  return null;
+}
+
 /** Compact param chips for history detail (order stable). */
 export function collectHistoryParamParts(
   params: Readonly<Record<string, unknown>> | undefined
@@ -62,14 +89,9 @@ export function collectHistoryParamParts(
     return [];
   }
   const parts: string[] = [];
-  const size = params.size ?? params.resolution;
-  if (
-    typeof size === "string" &&
-    size.trim() &&
-    size !== "auto" &&
-    size !== "adaptive"
-  ) {
-    parts.push(size.trim());
+  const resolution = readHistoryResolutionLabel(params);
+  if (resolution) {
+    parts.push(resolution);
   }
   const ratio = params.ratio ?? params.aspect_ratio;
   if (

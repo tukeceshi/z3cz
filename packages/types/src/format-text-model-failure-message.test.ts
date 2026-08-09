@@ -9,6 +9,7 @@ import {
   buildTextModelInvocationError,
   extractUpstreamErrorMessage,
   interpretUpstreamTextModelError,
+  isClientCancelledTextModelError,
   isTransientTextModelUpstreamError,
 } from "./interpret-upstream-text-model-error";
 
@@ -31,6 +32,20 @@ describe("interpretUpstreamTextModelError", () => {
     expect(interpretUpstreamTextModelError("Invalid API key")).toContain(
       "API Key"
     );
+  });
+});
+
+describe("isClientCancelledTextModelError", () => {
+  it("treats refresh/disconnect failures as client cancel", () => {
+    expect(isClientCancelledTextModelError("Generation cancelled")).toBe(true);
+    expect(
+      isClientCancelledTextModelError("Stream ended without completion event")
+    ).toBe(true);
+    expect(isClientCancelledTextModelError("read ECONNRESET")).toBe(true);
+  });
+
+  it("does not treat auth failures as client cancel", () => {
+    expect(isClientCancelledTextModelError("Invalid API key")).toBe(false);
   });
 });
 

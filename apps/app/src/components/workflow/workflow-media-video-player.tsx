@@ -40,6 +40,7 @@ export interface WorkflowMediaVideoPlayerProps {
   readonly frameCaptureDisabled?: boolean;
   readonly onFrameCapture?: (mode: VideoFrameCaptureMode) => void;
   readonly onError?: () => void;
+  readonly onLoadedMetadata?: (video: HTMLVideoElement) => void;
   readonly videoRef?: RefObject<HTMLVideoElement | null>;
 }
 
@@ -58,6 +59,7 @@ export function WorkflowMediaVideoPlayer({
   frameCaptureDisabled = false,
   onFrameCapture,
   onError,
+  onLoadedMetadata,
   videoRef: externalVideoRef,
 }: WorkflowMediaVideoPlayerProps) {
   const { t } = useTranslation();
@@ -127,7 +129,10 @@ export function WorkflowMediaVideoPlayer({
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleLoadedMetadata = () => syncTimeState();
+    const handleLoadedMetadata = () => {
+      syncTimeState();
+      onLoadedMetadata?.(video);
+    };
     const handleTimeUpdate = () => {
       if (!isDragging) {
         syncTimeState();
@@ -161,7 +166,15 @@ export function WorkflowMediaVideoPlayer({
       video.removeEventListener("volumechange", handleVolumeChange);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [isCardVariant, isDragging, resetVideoToStart, src, syncTimeState, videoRef]);
+  }, [
+    isCardVariant,
+    isDragging,
+    onLoadedMetadata,
+    resetVideoToStart,
+    src,
+    syncTimeState,
+    videoRef,
+  ]);
 
   const tryCardAutoplay = useCallback(() => {
     const video = videoRef.current;

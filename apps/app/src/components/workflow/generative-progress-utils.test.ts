@@ -9,6 +9,7 @@ import {
   readGenerativeProgressStartedAt,
   readGenerativeStagingMediaIds,
   withGenerativeProgress,
+  withGenerativeUploadProgress,
 } from "@/components/workflow/generative-progress-utils";
 
 describe("generative-progress-utils", () => {
@@ -59,5 +60,18 @@ describe("generative-progress-utils", () => {
     expect(isGenerativePhaseCancellable("uploading")).toBe(false);
     expect(isGenerativePhaseCancellable("server_persisting")).toBe(false);
     expect(isGenerativePhaseCancellable(null)).toBe(false);
+  });
+
+  it("sets and clears upload progress without touching other phases", () => {
+    const uploading = withGenerativeUploadProgress(undefined, true);
+    expect(readGenerativeProgressPhase(uploading)).toBe("uploading");
+
+    const cleared = withGenerativeUploadProgress(uploading, false);
+    expect(readGenerativeProgressPhase(cleared)).toBeUndefined();
+
+    const generating = withGenerativeProgress(undefined, { phase: "generating" });
+    expect(readGenerativeProgressPhase(
+      withGenerativeUploadProgress(generating, false)
+    )).toBe("generating");
   });
 });

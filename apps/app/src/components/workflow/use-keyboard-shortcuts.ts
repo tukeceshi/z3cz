@@ -17,6 +17,7 @@ interface UseKeyboardShortcutsProps {
   pasteFromClipboard: () => void;
   duplicateSelected: () => void;
   requestDeleteSelected?: () => void;
+  hasStudioNodeSelected?: boolean;
   onAction?: (e: React.MouseEvent) => void;
   nodeCount: number;
 }
@@ -48,6 +49,7 @@ export function useKeyboardShortcuts({
   pasteFromClipboard,
   duplicateSelected,
   requestDeleteSelected,
+  hasStudioNodeSelected = false,
   onAction,
   nodeCount,
 }: UseKeyboardShortcutsProps): void {
@@ -62,7 +64,10 @@ export function useKeyboardShortcuts({
 
       if (isInputField) return;
 
-      const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
+      const hasSelection =
+        selectedNodes.length > 0 ||
+        selectedEdges.length > 0 ||
+        hasStudioNodeSelected;
       const isMac = /mac/i.test(navigator.userAgent);
       const isCtrlOrCmd = isMac ? event.metaKey : event.ctrlKey;
 
@@ -143,6 +148,7 @@ export function useKeyboardShortcuts({
     pasteFromClipboard,
     duplicateSelected,
     requestDeleteSelected,
+    hasStudioNodeSelected,
     onAction,
     nodeCount,
   ]);

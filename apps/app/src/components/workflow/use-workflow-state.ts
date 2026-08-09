@@ -68,7 +68,10 @@ interface UseWorkflowStateReturn {
   connectionValidationState: ConnectionValidationState;
   isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
   handleAddNode: () => void;
-  handleNodeSelect: (template: NodeType) => void;
+  handleNodeSelect: (
+    template: NodeType,
+    options?: { readonly panIntoView?: boolean }
+  ) => string | null;
   setReactFlowInstance: (
     instance: ReactFlowInstance<
       ReactFlowNode<WorkflowNodeType>,

@@ -16,10 +16,12 @@ import {
 } from "./ai-text-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 import { readTextReferenceLimitsFromMetadata } from "./generative-reference-metadata";
+import { isGenerativeReferenceAlreadyConnected } from "./generative-reference-utils";
 
 export type AiTextReferenceRejectReason =
   | "unsupported_source"
   | "self_connection"
+  | "already_connected"
   | "text_limit"
   | "image_limit"
   | "video_limit";
@@ -181,6 +183,17 @@ export function evaluateAiTextReferenceStructural(
 ): AiTextReferenceVerdict {
   if (ctx.sourceNodeId === ctx.targetNodeId) {
     return { ok: false, reason: "self_connection", phase: "structural" };
+  }
+
+  if (
+    isGenerativeReferenceAlreadyConnected(ctx.edges, {
+      source: ctx.sourceNodeId,
+      sourceHandle: ctx.sourceHandle,
+      target: ctx.targetNodeId,
+      targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
+    })
+  ) {
+    return { ok: false, reason: "already_connected", phase: "structural" };
   }
 
   const rules = resolveAiTextReferenceRules({

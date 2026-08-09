@@ -1,4 +1,5 @@
 import type {
+  AiGenerativeNodeType,
   Edge as BackendEdge,
   Node as BackendNode,
   ObjectReference,
@@ -15,11 +16,12 @@ import type {
   ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import { ReactFlowProvider } from "@xyflow/react";
+import { ReactFlowProvider, getConnectedEdges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useGenerativeMediaBeforeUnloadGuard } from "@/hooks/use-generative-media-before-unload";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -288,6 +290,7 @@ export function WorkflowBuilder({
     updateNodeData,
     updateEdgeData,
     deleteEdge,
+    deleteNode,
     deleteSelected,
     deselectAll,
     selectNode,
@@ -374,6 +377,28 @@ export function WorkflowBuilder({
     [appToast, handleNodeSelect, nodeTypes]
   );
 
+  const handleAddGenerativeNode = useCallback(
+    (
+      nodeType: AiGenerativeNodeType,
+      options?: {
+        readonly prompt?: string;
+        readonly precedingText?: string;
+      }
+    ): string | null => {
+      const template = nodeTypes.find((item) => item.type === nodeType);
+      if (!template) {
+        appToast.error("workflow.canvas.nodeTypeUnavailable");
+        return null;
+      }
+      return handleNodeSelect(template, {
+        panIntoView: false,
+        prompt: options?.prompt,
+        precedingText: options?.precedingText,
+      });
+    },
+    [appToast, handleNodeSelect, nodeTypes]
+  );
+
   // Keyboard shortcuts (Cmd+C/X/V/D, Delete/Backspace, Cmd+Enter)
   const handleActionButtonClick =
     !readOnly && executeWorkflow
@@ -381,32 +406,51 @@ export function WorkflowBuilder({
       : undefined;
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{
+    readonly nodeIds: readonly string[];
+    readonly edgeCount: number;
+  } | null>(null);
 
   const requestDeleteSelected = useCallback(() => {
     if (readOnly) return;
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+    setDeleteConfirmTarget(null);
     setDeleteConfirmOpen(true);
   }, [readOnly, selectedEdges.length, selectedNodes.length]);
 
-  const handleConfirmDeleteSelected = useCallback(() => {
-    deleteSelected();
-    setDeleteConfirmOpen(false);
-  }, [deleteSelected]);
+  const requestDeleteStudioNode = useCallback(
+    (nodeId: string) => {
+      if (readOnly) return;
+      const node = nodes.find((item) => item.id === nodeId);
+      if (!node) return;
+      const connectedEdges = getConnectedEdges([node], edges);
+      setDeleteConfirmTarget({
+        nodeIds: [nodeId],
+        edgeCount: connectedEdges.length,
+      });
+      setDeleteConfirmOpen(true);
+    },
+    [edges, nodes, readOnly]
+  );
 
-  useKeyboardShortcuts({
-    disabled: readOnly,
-    clipboardDisabled: readOnly,
-    selectedNodes,
-    selectedEdges,
-    hasClipboardData,
-    copySelected,
-    cutSelected,
-    pasteFromClipboard,
-    duplicateSelected,
-    requestDeleteSelected,
-    onAction: handleActionButtonClick,
-    nodeCount: nodes.length,
-  });
+  const handleDeleteConfirmOpenChange = useCallback((open: boolean) => {
+    setDeleteConfirmOpen(open);
+    if (!open) {
+      setDeleteConfirmTarget(null);
+    }
+  }, []);
+
+  const handleConfirmDeleteSelected = useCallback(() => {
+    if (deleteConfirmTarget && deleteConfirmTarget.nodeIds.length > 0) {
+      for (const nodeId of deleteConfirmTarget.nodeIds) {
+        deleteNode(nodeId);
+      }
+    } else {
+      deleteSelected();
+    }
+    setDeleteConfirmTarget(null);
+    setDeleteConfirmOpen(false);
+  }, [deleteConfirmTarget, deleteNode, deleteSelected]);
 
   const handleFitToScreen = useCallback(() => {
     reactFlowInstance?.fitView({
@@ -741,7 +785,27 @@ export function WorkflowBuilder({
           workflowId={workflowId}
           onReturnToCanvas={handleReturnToCanvas}
           onReturnToCanvasFromDetail={handleReturnToCanvasFromDetail}
+          onAddGenerativeNode={
+            readOnly ? undefined : handleAddGenerativeNode
+          }
+          onRequestDeleteStudioNode={
+            readOnly ? undefined : requestDeleteStudioNode
+          }
         >
+          <WorkflowStudioKeyboardShortcuts
+            readOnly={readOnly}
+            selectedNodes={selectedNodes}
+            selectedEdges={selectedEdges}
+            hasClipboardData={hasClipboardData}
+            copySelected={copySelected}
+            cutSelected={cutSelected}
+            pasteFromClipboard={pasteFromClipboard}
+            duplicateSelected={duplicateSelected}
+            requestDeleteSelected={requestDeleteSelected}
+            requestDeleteStudioNode={requestDeleteStudioNode}
+            onAction={handleActionButtonClick}
+            nodeCount={nodes.length}
+          />
           <CreativeStudioCanvasSync selectNode={selectNode} />
           {workflowsListUrl ? (
             <WorkflowEditorBreadcrumbEffect
@@ -883,9 +947,11 @@ export function WorkflowBuilder({
 
         <DeleteSelectionConfirmDialog
           open={deleteConfirmOpen}
-          onOpenChange={setDeleteConfirmOpen}
-          nodeCount={selectedNodes.length}
-          edgeCount={selectedEdges.length}
+          onOpenChange={handleDeleteConfirmOpenChange}
+          nodeCount={
+            deleteConfirmTarget?.nodeIds.length ?? selectedNodes.length
+          }
+          edgeCount={deleteConfirmTarget?.edgeCount ?? selectedEdges.length}
           onConfirm={handleConfirmDeleteSelected}
         />
 
@@ -933,6 +999,70 @@ export function WorkflowBuilder({
   );
 }
 
+function WorkflowStudioKeyboardShortcuts({
+  readOnly,
+  selectedNodes,
+  selectedEdges,
+  hasClipboardData,
+  copySelected,
+  cutSelected,
+  pasteFromClipboard,
+  duplicateSelected,
+  requestDeleteSelected,
+  requestDeleteStudioNode,
+  onAction,
+  nodeCount,
+}: {
+  readonly readOnly: boolean;
+  readonly selectedNodes: ReactFlowNode<WorkflowNodeType>[];
+  readonly selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
+  readonly hasClipboardData: boolean;
+  readonly copySelected: () => void;
+  readonly cutSelected: () => void;
+  readonly pasteFromClipboard: () => void;
+  readonly duplicateSelected: () => void;
+  readonly requestDeleteSelected: () => void;
+  readonly requestDeleteStudioNode: (nodeId: string) => void;
+  readonly onAction?: (e: React.MouseEvent) => void;
+  readonly nodeCount: number;
+}) {
+  const { viewMode, studioNodeId } = useCreativeStudio();
+
+  const requestDeleteActive = useCallback(() => {
+    if (viewMode === "studio" && studioNodeId) {
+      requestDeleteStudioNode(studioNodeId);
+      return;
+    }
+    requestDeleteSelected();
+  }, [
+    requestDeleteSelected,
+    requestDeleteStudioNode,
+    studioNodeId,
+    viewMode,
+  ]);
+
+  const hasStudioNodeSelected =
+    viewMode === "studio" && studioNodeId != null;
+
+  useKeyboardShortcuts({
+    disabled: readOnly,
+    clipboardDisabled: readOnly,
+    selectedNodes,
+    selectedEdges,
+    hasClipboardData,
+    copySelected,
+    cutSelected,
+    pasteFromClipboard,
+    duplicateSelected,
+    requestDeleteSelected: requestDeleteActive,
+    hasStudioNodeSelected,
+    onAction,
+    nodeCount,
+  });
+
+  return null;
+}
+
 function CreativeStudioCanvasSync({
   selectNode,
 }: {
@@ -951,6 +1081,7 @@ function CreativeStudioCanvasSync({
 type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas>;
 
 function WorkflowEditorMainArea(props: WorkflowEditorMainAreaProps) {
+  useGenerativeMediaBeforeUnloadGuard();
   const { viewMode } = useCreativeStudio();
 
   const isStudio = viewMode === "studio";

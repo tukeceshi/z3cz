@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -18,6 +18,7 @@ export interface CreativeStudioListItemProps {
   readonly focusId?: string;
   readonly className?: string;
   readonly variant?: "default" | "text" | "media" | "mediaPlain";
+  readonly onNodeDoubleClick?: MouseEventHandler<HTMLDivElement>;
   readonly children: ReactNode;
 }
 
@@ -26,6 +27,7 @@ export function CreativeStudioListItem({
   focusId,
   className,
   variant = "default",
+  onNodeDoubleClick,
   children,
 }: CreativeStudioListItemProps) {
   const itemClassName =
@@ -45,7 +47,11 @@ export function CreativeStudioListItem({
   const hoverClassName = variant === "media" ? STUDIO_MEDIA_ITEM_HOVER : null;
 
   return (
-    <div className={itemClassName} data-studio-focus-id={focusId}>
+    <div
+      className={itemClassName}
+      data-studio-focus-id={focusId}
+      onDoubleClick={onNodeDoubleClick}
+    >
       {hoverClassName ? <span className={hoverClassName} aria-hidden="true" /> : null}
       {isActive && activeClassName ? (
         <span className={activeClassName} aria-hidden="true" />

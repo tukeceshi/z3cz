@@ -27,10 +27,12 @@ import {
   type AiVideoReferenceKind,
 } from "./ai-video-node-utils";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import { isGenerativeReferenceAlreadyConnected } from "./generative-reference-utils";
 
 export type AiVideoReferenceRejectReason =
   | "unsupported_source"
   | "self_connection"
+  | "already_connected"
   | "image_limit"
   | "video_limit"
   | "audio_limit";
@@ -176,6 +178,16 @@ export function evaluateAiVideoReferenceStructural(
     !isAiVideoAllowedReferenceNodeType(context.sourceNodeType)
   ) {
     return { ok: false, reason: "unsupported_source", phase: "structural" };
+  }
+
+  if (
+    isGenerativeReferenceAlreadyConnected(context.edges, {
+      source: context.sourceNodeId,
+      target: context.targetNodeId,
+      targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+    })
+  ) {
+    return { ok: false, reason: "already_connected", phase: "structural" };
   }
 
   const rules = resolveAiVideoReferenceRules({

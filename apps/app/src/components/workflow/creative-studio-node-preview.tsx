@@ -11,6 +11,7 @@ import { useNodes, type Node as ReactFlowNode } from "@xyflow/react";
 import Music from "lucide-react/icons/music";
 import Play from "lucide-react/icons/play";
 import Type from "lucide-react/icons/type";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import {
   useEffect,
   useMemo,
@@ -31,6 +32,8 @@ import { readAiTextResult } from "./ai-text-node-utils";
 import { collectAiVideoUnifiedReferenceChips } from "./ai-video-prompt-reference";
 import { readAiVideoCardVideos } from "./ai-video-node-utils";
 import { fitStudioDetailSize } from "./creative-studio-detail-size";
+import { StudioMediaEmptyPreview } from "./creative-studio-media-preview-frame";
+import { readStudioMediaCardState } from "./studio-media-card-state";
 import {
   STUDIO_MEDIA_PREVIEW_MEDIA,
   STUDIO_PREVIEW_MEDIA_FALLBACK,
@@ -400,6 +403,72 @@ function StudioAudioPreview({
   );
 }
 
+function StudioDetailImageContent({
+  media,
+  metadata,
+  className,
+}: {
+  readonly media: MediaReference | undefined;
+  readonly metadata: Record<string, string> | undefined;
+  readonly className?: string;
+}) {
+  const { t } = useTranslation();
+  const cardState = readStudioMediaCardState(metadata, false);
+  const { displayUrl, stale } = useMediaDisplayUrl({
+    media: media ?? null,
+    nodeType: "ai-image",
+    size: "full",
+  });
+  const canPreview = media != null && displayUrl != null && !stale;
+
+  if (!canPreview) {
+    return (
+      <StudioMediaEmptyPreview
+        layout="detail"
+        isVideo={false}
+        message={t(cardState.placeholderKey)}
+        busy={cardState.isBusy}
+        className={className}
+      />
+    );
+  }
+
+  return <StudioDetailImagePreview media={media} className={className} />;
+}
+
+function StudioDetailVideoContent({
+  media,
+  metadata,
+  className,
+}: {
+  readonly media: MediaReference | undefined;
+  readonly metadata: Record<string, string> | undefined;
+  readonly className?: string;
+}) {
+  const { t } = useTranslation();
+  const cardState = readStudioMediaCardState(metadata, true);
+  const { displayUrl, stale } = useMediaDisplayUrl({
+    media: media ?? null,
+    nodeType: "ai-video",
+    size: "full",
+  });
+  const canPreview = media != null && displayUrl != null && !stale;
+
+  if (!canPreview) {
+    return (
+      <StudioMediaEmptyPreview
+        layout="detail"
+        isVideo
+        message={t(cardState.placeholderKey)}
+        busy={cardState.isBusy}
+        className={className}
+      />
+    );
+  }
+
+  return <StudioDetailVideoPreview media={media} className={className} />;
+}
+
 export function CreativeStudioNodePreview({
   data,
   variant = "detail",
@@ -445,18 +514,25 @@ export function CreativeStudioNodePreview({
   }
 
   if (nodeType === AI_IMAGE_NODE_TYPE) {
-    if (!primaryImage) {
+    if (variant === "detail") {
       return (
-        <EmptyPreview
-          variant={variant}
-          message={t("workflow.studio.emptyMedia")}
+        <StudioDetailImageContent
+          media={primaryImage}
+          metadata={data.metadata}
           className={className}
         />
       );
     }
-    if (variant === "detail") {
+    if (!primaryImage) {
+      const cardState = readStudioMediaCardState(data.metadata, false);
       return (
-        <StudioDetailImagePreview media={primaryImage} className={className} />
+        <StudioMediaEmptyPreview
+          layout="list"
+          isVideo={false}
+          message={t(cardState.placeholderKey)}
+          busy={cardState.isBusy}
+          className={className}
+        />
       );
     }
     return (
@@ -477,18 +553,25 @@ export function CreativeStudioNodePreview({
   }
 
   if (nodeType === AI_VIDEO_NODE_TYPE) {
-    if (!primaryVideo) {
+    if (variant === "detail") {
       return (
-        <EmptyPreview
-          variant={variant}
-          message={t("workflow.studio.emptyMedia")}
+        <StudioDetailVideoContent
+          media={primaryVideo}
+          metadata={data.metadata}
           className={className}
         />
       );
     }
-    if (variant === "detail") {
+    if (!primaryVideo) {
+      const cardState = readStudioMediaCardState(data.metadata, true);
       return (
-        <StudioDetailVideoPreview media={primaryVideo} className={className} />
+        <StudioMediaEmptyPreview
+          layout="list"
+          isVideo
+          message={t(cardState.placeholderKey)}
+          busy={cardState.isBusy}
+          className={className}
+        />
       );
     }
     return (
@@ -517,20 +600,25 @@ export function CreativeStudioNodePreview({
 function EmptyPreview({
   variant,
   message,
+  busy = false,
   className,
 }: {
   readonly variant: "card" | "detail";
   readonly message: string;
+  readonly busy?: boolean;
   readonly className?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex h-full w-full items-center justify-center text-muted-foreground/50",
+        "flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground/50",
         variant === "card" ? "text-[11px] italic" : "text-sm",
         className
       )}
     >
+      {busy ? (
+        <LoaderIcon className="size-5 animate-spin text-yellow-500" aria-hidden />
+      ) : null}
       {message}
     </div>
   );

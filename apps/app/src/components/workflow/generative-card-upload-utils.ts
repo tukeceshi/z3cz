@@ -93,6 +93,47 @@ export function normalizeGenerativeCardUploadFile(
 /** File picker accept list for generative image card / studio uploads. */
 export const GENERATIVE_IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,.png,.jpg,.jpeg";
 
+const GENERATIVE_STUDIO_DROP_EXTENSION_SET = new Set<string>([
+  ...IMAGE_EXTENSIONS,
+  ...VIDEO_EXTENSIONS,
+  ...AUDIO_EXTENSIONS,
+]);
+
+/** Supported extensions for studio list file-drop (display + validation). */
+export const GENERATIVE_STUDIO_DROP_EXTENSIONS = [
+  ...GENERATIVE_STUDIO_DROP_EXTENSION_SET,
+].sort() as readonly string[];
+
+export type GenerativeStudioDropKind = "image" | "video" | "audio";
+
+export interface GenerativeStudioDropFile {
+  readonly kind: GenerativeStudioDropKind;
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly file: File;
+}
+
+export function resolveGenerativeStudioDropFile(
+  file: File
+): GenerativeStudioDropFile | null {
+  for (const kind of ["image", "video", "audio"] as const) {
+    const normalized = normalizeGenerativeCardUploadFile(file, kind);
+    if (!normalized) {
+      continue;
+    }
+    return {
+      kind,
+      nodeType:
+        kind === "image"
+          ? "ai-image"
+          : kind === "video"
+            ? "ai-video"
+            : "ai-audio",
+      file: normalized,
+    };
+  }
+  return null;
+}
+
 export function warmGenerativeCardUploadCache(params: {
   readonly organizationId: string;
   readonly workflowId: string | undefined;

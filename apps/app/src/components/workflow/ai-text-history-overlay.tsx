@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 import type { AiTextResultHistory } from "@dafthunk/types";
 
+import { STUDIO_SCROLL } from "./creative-studio-surface";
+
 export interface AiTextHistoryOverlayProps {
   readonly open: boolean;
   readonly history: AiTextResultHistory;
@@ -87,7 +89,7 @@ export function AiTextHistoryOverlay({
               {t("workflow.aiTextPanel.historyCount", { count: total })}
             </p>
           </div>
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
+          <div className={cn("min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2", STUDIO_SCROLL)}>
             {history.items.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">
                 {t("workflow.aiTextPanel.historyEmpty")}
@@ -152,7 +154,7 @@ export function AiTextHistoryOverlay({
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", STUDIO_SCROLL)}>
             {previewItem ? (
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                 {previewItem.text || t("workflow.aiTextPanel.historyEmptyItem")}

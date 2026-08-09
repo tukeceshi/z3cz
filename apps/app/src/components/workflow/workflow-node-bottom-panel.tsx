@@ -247,13 +247,13 @@ function WorkflowNodeBottomPanelInner({
         height: NODE_BOTTOM_PANEL_HEIGHT,
       }}
       onClick={(event) => event.stopPropagation()}
-      onPointerDownCapture={(event) => {
-        event.stopPropagation();
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDownCapture={() => {
         armGenerativePanelPointerGuard(nodeId);
       }}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto thin-scrollbar">
         {data.error ? (
           <div className="border-b border-border">
             <button

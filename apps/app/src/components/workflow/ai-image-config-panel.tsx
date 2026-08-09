@@ -40,10 +40,6 @@ import {
 import { isGenerativeGenerationCancelled } from "./generative-generation-cancel";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
-import {
-  shouldShowStudioPromptBox,
-  studioDockSizeForPanel,
-} from "./generative-studio-dock-layout";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   GenerativePickNodeDialog,
@@ -53,8 +49,10 @@ import {
   collectGenerativeReferenceChips,
   collectImageReferenceMedia,
   connectGenerativeReferenceEdge,
+  studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
 import { AiGenerateButton } from "./ai-generate-button";
+import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
@@ -430,22 +428,78 @@ export function AiImageConfigPanel({
     }
   };
 
+  const canAcceptStudioReference = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return false;
+
+      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
+        return evaluateAiImagePromptReferenceStructural({
+          targetNodeId: nodeId,
+          targetNodeMetadata: data.metadata,
+          sourceNodeId,
+          sourceNodeType: source.data.nodeType,
+          edges,
+        }).ok;
+      }
+
+      return evaluateAiImageReferenceStructural({
+        targetNodeId: nodeId,
+        sourceNodeId,
+        sourceHandle,
+        sourceNodeType: source.data.nodeType,
+        targetNodeData: data,
+        edges,
+        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+        models: imageModelCatalog,
+      }).ok;
+    },
+    [data, edges, imageModelCatalog, nodeId, typedNodes]
+  );
+
+  const previewStudioReferenceDrop = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return "rejected" as const;
+
+      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
+        return studioReferenceDropPreviewFromVerdict(
+          evaluateAiImagePromptReferenceStructural({
+            targetNodeId: nodeId,
+            targetNodeMetadata: data.metadata,
+            sourceNodeId,
+            sourceNodeType: source.data.nodeType,
+            edges,
+          })
+        );
+      }
+
+      return studioReferenceDropPreviewFromVerdict(
+        evaluateAiImageReferenceStructural({
+          targetNodeId: nodeId,
+          sourceNodeId,
+          sourceHandle,
+          sourceNodeType: source.data.nodeType,
+          targetNodeData: data,
+          edges,
+          nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+          models: imageModelCatalog,
+        })
+      );
+    },
+    [data, edges, imageModelCatalog, nodeId, typedNodes]
+  );
+
   const handlePickNode = (sourceNodeId: string, sourceHandle: string) => {
     const source = typedNodes.find((node) => node.id === sourceNodeId);
     if (!source) return;
 
+    if (!canAcceptStudioReference(sourceNodeId, sourceHandle)) {
+      toast.error("workflow.aiImagePanel.referenceRejected");
+      return;
+    }
+
     if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-      const verdict = evaluateAiImagePromptReferenceStructural({
-        targetNodeId: nodeId,
-        targetNodeMetadata: data.metadata,
-        sourceNodeId,
-        sourceNodeType: source.data.nodeType,
-        edges,
-      });
-      if (!verdict.ok) {
-        toast.error("workflow.aiImagePanel.referenceRejected");
-        return;
-      }
       connectReferenceEdge({
         source: sourceNodeId,
         sourceHandle,
@@ -453,21 +507,6 @@ export function AiImageConfigPanel({
         targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
       });
       setPickNodeOpen(false);
-      return;
-    }
-
-    const verdict = evaluateAiImageReferenceStructural({
-      targetNodeId: nodeId,
-      sourceNodeId,
-      sourceHandle,
-      sourceNodeType: source.data.nodeType,
-      targetNodeData: data,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      models: imageModelCatalog,
-    });
-    if (!verdict.ok) {
-      toast.error("workflow.aiImagePanel.referenceRejected");
       return;
     }
 
@@ -784,7 +823,7 @@ export function AiImageConfigPanel({
           platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
           providerModelId: effectiveModel.providerModelId,
-          modelDisplayName: effectiveModel.displayName,
+          modelDisplayName: effectiveModel.alias,
           requestSnapshot:
             response.requestSnapshot ?? jobPersistMeta?.requestSnapshot,
         });
@@ -847,7 +886,7 @@ export function AiImageConfigPanel({
                 platformModelId: effectiveModel.canonicalId,
                 aiInterfaceId: effectiveModel.interfaceId,
                 providerModelId: effectiveModel.providerModelId,
-                modelDisplayName: effectiveModel.displayName,
+                modelDisplayName: effectiveModel.alias,
                 requestSnapshot: resolvedJob.requestSnapshot,
               });
               return {
@@ -955,35 +994,25 @@ export function AiImageConfigPanel({
         currentCount: referenceCount,
       }).ok);
 
-  const showStudioPromptBox = shouldShowStudioPromptBox({
-    layout,
-    hasPromptReference,
-    allowUpload,
-    referenceChips,
-  });
-  const studioDockSize = studioDockSizeForPanel({
-    layout,
-    hasPromptReference,
-    allowUpload,
-    referenceChips,
-  });
-
   return (
     <>
       <GenerativeConfigPanelShell
         nodeId={nodeId}
         zoom={zoom}
         layout={layout}
-        studioDockSize={studioDockSize}
+        dropDisabled={disabled}
+        previewStudioReferenceDrop={
+          layout === "studio-dock" ? previewStudioReferenceDrop : undefined
+        }
+        onStudioReferenceDrop={
+          layout === "studio-dock" ? handlePickNode : undefined
+        }
       >
-        <div
-          className={cn(
-            layout === "studio-dock" && !showStudioPromptBox && "min-h-0 flex-1"
-          )}
-        >
+        <div>
           <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
+          showStudioReferenceHints={layout === "studio-dock"}
           allowUpload={allowUpload && !disabled}
           addReferenceDisabled={!canAddReference}
           canPickCanvasNode={pickableOutputs.length > 0}
@@ -998,7 +1027,6 @@ export function AiImageConfigPanel({
         />
         </div>
 
-        {showStudioPromptBox ? (
         <div
           className={cn(
             "relative mt-2 min-h-0",
@@ -1056,7 +1084,6 @@ export function AiImageConfigPanel({
             />
           ) : null}
         </div>
-        ) : null}
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0">
@@ -1107,14 +1134,22 @@ export function AiImageConfigPanel({
               </p>
             ) : null}
           </div>
-          <AiGenerateButton
-            disabled={!canGenerate}
-            isGenerating={isGenerating}
-            label={t(generativeProgressButtonKey(activeProgressPhase))}
-            onClick={() => {
-              void handleGenerate();
-            }}
-          />
+          <div className="flex shrink-0 items-end gap-3">
+            {layout === "studio-dock" ? (
+              <StudioDockPromptCharCount
+                count={displayPrompt.length}
+                maxLength={promptMaxLength}
+              />
+            ) : null}
+            <AiGenerateButton
+              disabled={!canGenerate}
+              isGenerating={isGenerating}
+              label={t(generativeProgressButtonKey(activeProgressPhase))}
+              onClick={() => {
+                void handleGenerate();
+              }}
+            />
+          </div>
         </div>
       </GenerativeConfigPanelShell>
 

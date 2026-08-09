@@ -1,6 +1,12 @@
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import LoaderIcon from "lucide-react/icons/loader-circle";
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type MouseEvent,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +20,7 @@ import {
   AiTextHistoryButton,
   AiTextHistoryOverlay,
 } from "../../ai-text-history-overlay";
+import { STUDIO_SCROLL } from "../../creative-studio-surface";
 import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
@@ -28,8 +35,10 @@ import {
 import { readGenerativeCardError } from "../../generative-card-error-utils";
 import {
   shouldShowGenerativeHistoryIcon,
-  withGenerativeCardEditing,
+  isGenerativeManualContent,
+  withGenerativeGeneratedContentMode,
 } from "../../generative-card-mode-utils";
+import { useAiTextOutputScroll } from "../../use-ai-text-output-scroll";
 import { useBufferedTextValue } from "../../use-buffered-text-value";
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
@@ -41,6 +50,8 @@ interface AiTextWidgetProps extends BaseWidgetProps {
   historyItems: ReturnType<typeof readAiTextResultHistory>;
   nodeId: string;
   metadata?: Record<string, string>;
+  selected?: boolean;
+  onEmptyOutputEditingChange?: (editing: boolean) => void;
 }
 
 function AiTextWidget({
@@ -52,6 +63,8 @@ function AiTextWidget({
   className,
   nodeId,
   metadata,
+  selected = false,
+  onEmptyOutputEditingChange,
 }: AiTextWidgetProps) {
   const { t } = useTranslation();
   const { updateNodeData } = useWorkflow();
@@ -59,6 +72,7 @@ function AiTextWidget({
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
+  const [holdTailAfterGenerate, setHoldTailAfterGenerate] = useState(false);
   const displayValue = text ?? "";
   const isGenerating = isAiTextGenerating(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
@@ -78,6 +92,33 @@ function AiTextWidget({
   );
 
   const textBuffer = useBufferedTextValue(displayValue, commitText);
+  const isTextEditing = editing && !generateError && !isGenerating;
+
+  const {
+    scrollContainerRef,
+    handleScroll,
+    tailPreview,
+  } = useAiTextOutputScroll({
+    text: isTextEditing ? textBuffer.value : displayValue,
+    isGenerating,
+    contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
+    variant: "canvas-card",
+    isEditing: isTextEditing,
+    holdTailAfterComplete: selected && holdTailAfterGenerate,
+  });
+
+  useEffect(() => {
+    if (isGenerating) {
+      setHoldTailAfterGenerate(true);
+    }
+    if (!selected) {
+      setHoldTailAfterGenerate(false);
+    }
+  }, [isGenerating, selected]);
+
+  useLayoutEffect(() => {
+    setHoldTailAfterGenerate(false);
+  }, [nodeId]);
 
   useEffect(() => {
     if ((generateError || isGenerating) && editing) {
@@ -91,26 +132,32 @@ function AiTextWidget({
     }
   }, [isGenerating, historyOpen]);
 
-  useEffect(() => {
-    if (!updateNodeData) return;
-    updateNodeData(nodeId, (current) => ({
-      metadata: withGenerativeCardEditing(current.metadata, editing),
-    }));
-  }, [editing, nodeId, updateNodeData]);
-
-  useEffect(() => {
-    return () => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, false),
-      }));
-    };
-  }, [nodeId, updateNodeData]);
-
   const stopEditing = () => {
     textBuffer.onBlur();
     setEditing(false);
   };
+
+  const beginOutputEdit = useCallback(() => {
+    textBuffer.onFocus();
+    setEditing(true);
+  }, [textBuffer]);
+
+  useEffect(() => {
+    if (displayValue.trim() || !isGenerativeManualContent(metadata) || !updateNodeData) {
+      return;
+    }
+    updateNodeData(nodeId, (current) => ({
+      metadata: withGenerativeGeneratedContentMode(current.metadata),
+    }));
+  }, [displayValue, metadata, nodeId, updateNodeData]);
+
+  useEffect(() => {
+    onEmptyOutputEditingChange?.(isTextEditing && !textBuffer.value.trim());
+  }, [isTextEditing, onEmptyOutputEditingChange, textBuffer.value]);
+
+  useEffect(() => {
+    return () => onEmptyOutputEditingChange?.(false);
+  }, [onEmptyOutputEditingChange]);
 
   const handleHistorySelect = (id: string) => {
     if (editLocked || !updateNodeData) return;
@@ -137,7 +184,7 @@ function AiTextWidget({
       return;
     }
     if (editing) return;
-    setEditing(true);
+    beginOutputEdit();
   };
 
   return (
@@ -150,7 +197,7 @@ function AiTextWidget({
         )}
         onDoubleClick={handleDoubleClick}
       >
-        {editing && !generateError && !isGenerating ? (
+        {isTextEditing ? (
           <Textarea
             autoFocus
             value={textBuffer.value}
@@ -165,7 +212,16 @@ function AiTextWidget({
             className="nodrag min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
           />
         ) : (
-          <div className="min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80">
+          <div
+            ref={scrollContainerRef}
+            onScroll={tailPreview ? handleScroll : undefined}
+            className={cn(
+              "min-h-0 flex-1 whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80",
+              tailPreview
+                ? cn("nodrag nopan nowheel overflow-y-auto", STUDIO_SCROLL)
+                : "overflow-hidden"
+            )}
+          >
             {textBuffer.value || (
               <span className="text-muted-foreground/50 italic">
                 {cardPlaceholder}

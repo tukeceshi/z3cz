@@ -7,23 +7,23 @@ import {
   type MediaReference,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
+import { useCreativeStudio } from "@/components/workflow/creative-studio-context";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
@@ -46,7 +46,6 @@ import {
 } from "./ai-image-history-overlay";
 import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
 import {
-  isAiImageGenerating,
   readAiImageCardImages,
   readAiImageResultHistory,
   withAiImageGenerateError,
@@ -54,7 +53,6 @@ import {
   withAiImageManualUpload,
 } from "./ai-image-node-utils";
 import {
-  isAiVideoGenerating,
   readAiVideoCardVideos,
   readAiVideoResultHistory,
   withAiVideoGenerateError,
@@ -73,10 +71,12 @@ import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "./generative-card-error-block";
+import { GenerativeCardNoticeBlock } from "./generative-card-notice-block";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import {
   shouldShowGenerativeHistoryIcon,
-  withGenerativeCardEditing,
+  isGenerativeManualContent,
+  withGenerativeGeneratedContentMode,
 } from "./generative-card-mode-utils";
 import {
   normalizeGenerativeCardUploadFile,
@@ -87,11 +87,20 @@ import {
 } from "./generative-card-upload-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import {
+  dismissGenerativeCancelledNotice,
+  isGenerativeCancelledNoticeVisible,
+  subscribeGenerativeCancelledNotice,
+} from "./generative-generation-cancel";
+import { withGenerativeUploadProgress } from "./generative-progress-utils";
+import {
   StudioDownloadActionButton,
   StudioHistoryActionButton,
 } from "./creative-studio-detail-actions";
 import { CreativeStudioNodePreview } from "./creative-studio-node-preview";
-import { STUDIO_SCROLL } from "./creative-studio-surface";
+import { STUDIO_TEXT_DETAIL_EDIT_OVERLAY } from "./creative-studio-surface";
+import { useAiTextOutputScroll } from "./use-ai-text-output-scroll";
+import { StudioTextOutputView } from "./studio-text-output-view";
+import { readStudioMediaCardState } from "./studio-media-card-state";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useGenerativeCardDoubleClickUpload } from "./use-generative-card-double-click-upload";
 import { useWorkflow } from "./workflow-context";
@@ -99,15 +108,22 @@ import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioDetailContentProps {
   readonly node: ReactFlowNode<WorkflowNodeType>;
+  readonly onEmptyTextEditingChange?: (editing: boolean) => void;
 }
 
 export function CreativeStudioDetailContent({
   node,
+  onEmptyTextEditingChange,
 }: CreativeStudioDetailContentProps) {
   const nodeType = node.data.nodeType ?? "";
 
   if (nodeType === AI_TEXT_NODE_TYPE) {
-    return <StudioTextDetail node={node} />;
+    return (
+      <StudioTextDetail
+        node={node}
+        onEmptyTextEditingChange={onEmptyTextEditingChange}
+      />
+    );
   }
   if (nodeType === AI_IMAGE_NODE_TYPE) {
     return <StudioImageDetail node={node} />;
@@ -143,8 +159,10 @@ function StudioToolbar({
 
 function StudioTextDetail({
   node,
+  onEmptyTextEditingChange,
 }: {
   readonly node: ReactFlowNode<WorkflowNodeType>;
+  readonly onEmptyTextEditingChange?: (editing: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { updateNodeData, disabled = false } = useWorkflow();
@@ -163,9 +181,7 @@ function StudioTextDetail({
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
-  const browseScrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const pendingScrollTopRef = useRef(0);
+  const editSurfaceRef = useRef<HTMLDivElement>(null);
 
   const commitText = useCallback(
     (value: string) => {
@@ -181,13 +197,58 @@ function StudioTextDetail({
 
   const textBuffer = useBufferedTextValue(text, commitText);
   const isTextEditing = editing && !generateError && !isGenerating;
+  const showEditHint =
+    !disabled && !isTextEditing && !isGenerating && !generateError;
+  const scrollText = isTextEditing ? textBuffer.value : text;
+
+  const {
+    scrollContainerRef,
+    textareaRef,
+    handleScroll,
+    rememberScrollForEdit,
+    scrollToTailIfAllowed,
+  } = useAiTextOutputScroll({
+    text: scrollText,
+    isGenerating,
+    contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
+    variant: "studio-detail",
+    isEditing: isTextEditing,
+  });
 
   useEffect(() => {
     if ((generateError || isGenerating) && editing) {
-      pendingScrollTopRef.current = textareaRef.current?.scrollTop ?? pendingScrollTopRef.current;
       setEditing(false);
     }
   }, [editing, generateError, isGenerating]);
+
+  const stopEditing = useCallback(() => {
+    rememberScrollForEdit();
+    textBuffer.onBlur();
+    setEditing(false);
+  }, [rememberScrollForEdit, textBuffer]);
+
+  const beginOutputEdit = useCallback(() => {
+    rememberScrollForEdit();
+    textBuffer.onFocus();
+    setEditing(true);
+  }, [rememberScrollForEdit, textBuffer]);
+
+  useEffect(() => {
+    if (text.trim() || !isGenerativeManualContent(metadata) || !updateNodeData) {
+      return;
+    }
+    updateNodeData(nodeId, (current) => ({
+      metadata: withGenerativeGeneratedContentMode(current.metadata),
+    }));
+  }, [metadata, nodeId, text, updateNodeData]);
+
+  useEffect(() => {
+    onEmptyTextEditingChange?.(isTextEditing && !textBuffer.value.trim());
+  }, [isTextEditing, onEmptyTextEditingChange, textBuffer.value]);
+
+  useEffect(() => {
+    return () => onEmptyTextEditingChange?.(false);
+  }, [onEmptyTextEditingChange]);
 
   useEffect(() => {
     if (isGenerating && historyOpen) {
@@ -196,50 +257,41 @@ function StudioTextDetail({
   }, [historyOpen, isGenerating]);
 
   useEffect(() => {
-    if (!updateNodeData) return;
-    updateNodeData(nodeId, (current) => ({
-      metadata: withGenerativeCardEditing(current.metadata, editing),
-    }));
-  }, [editing, nodeId, updateNodeData]);
-
-  useEffect(() => {
-    return () => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, false),
-      }));
-    };
-  }, [nodeId, updateNodeData]);
-
-  useLayoutEffect(() => {
-    if (isTextEditing) {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      const scrollTop = pendingScrollTopRef.current;
-      textarea.focus({ preventScroll: true });
-      textarea.scrollTop = scrollTop;
-      const frame = window.requestAnimationFrame(() => {
-        textarea.scrollTop = scrollTop;
-      });
-      return () => window.cancelAnimationFrame(frame);
+    if (!isTextEditing) {
+      return;
     }
 
-    const browse = browseScrollRef.current;
-    if (!browse) return;
-    browse.scrollTop = pendingScrollTopRef.current;
-  }, [isTextEditing]);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      stopEditing();
+    };
 
-  const stopEditing = () => {
-    pendingScrollTopRef.current = textareaRef.current?.scrollTop ?? 0;
-    textBuffer.onBlur();
-    setEditing(false);
-  };
+    const handlePointerDown = (event: globalThis.MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (editSurfaceRef.current?.contains(target)) {
+        return;
+      }
+      stopEditing();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isTextEditing, stopEditing]);
 
   const handleHistorySelect = (id: string) => {
     if (editLocked || !updateNodeData) return;
     const item = historyItems.items.find((entry) => entry.id === id);
     if (!item) return;
-    pendingScrollTopRef.current = 0;
     setEditing(false);
     textBuffer.reset(item.text);
     updateNodeData(nodeId, (current) =>
@@ -253,10 +305,10 @@ function StudioTextDetail({
       setErrorDetailOpen(true);
       return;
     }
-    if (editLocked || editing) return;
+    if (editLocked) return;
     event.stopPropagation();
-    pendingScrollTopRef.current = browseScrollRef.current?.scrollTop ?? 0;
-    setEditing(true);
+    if (editing) return;
+    beginOutputEdit();
   };
 
   return (
@@ -266,57 +318,64 @@ function StudioTextDetail({
           "relative flex h-full w-full min-h-0 flex-col overflow-hidden",
           !isTextEditing && "cursor-text"
         )}
-        onClick={handleDoubleClick}
+        onDoubleClick={handleDoubleClick}
       >
         <div className="h-full w-full min-h-0 p-4">
-          <div
-            ref={browseScrollRef}
-            className={cn(
-              "h-full min-h-0 rounded-lg",
-              isTextEditing
-                ? "overflow-hidden bg-muted/40 ring-1 ring-inset ring-border/70 dark:bg-neutral-900/50 dark:ring-neutral-600"
-                : cn("overflow-auto", STUDIO_SCROLL)
-            )}
-          >
+          <div ref={editSurfaceRef} className="relative h-full min-h-0 rounded-lg">
+            {showEditHint ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-3">
+                <span className="rounded-md border border-border/30 bg-background/40 px-3 py-1 text-sm text-muted-foreground/50 backdrop-blur-sm dark:bg-neutral-900/40">
+                  {t("workflow.studio.doubleClickEditContent")}
+                </span>
+              </div>
+            ) : null}
+
             {isTextEditing ? (
-              <Textarea
-                ref={textareaRef}
-                value={textBuffer.value}
-                onChange={(event) => textBuffer.onChange(event.target.value)}
-                onFocus={textBuffer.onFocus}
-                onBlur={stopEditing}
-                onCompositionStart={textBuffer.onCompositionStart}
-                onCompositionEnd={textBuffer.onCompositionEnd}
-                readOnly={editLocked}
-                maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
-                placeholder={t("workflow.aiTextPanel.cardInputPlaceholder")}
-                className={cn(
-                  "h-full min-h-0 w-full resize-none rounded-lg border-0 bg-transparent",
-                  "p-3 text-base leading-relaxed text-foreground/90 shadow-none",
-                  "focus-visible:border-0 focus-visible:ring-0",
-                  STUDIO_SCROLL
-                )}
+              <div
+                className={STUDIO_TEXT_DETAIL_EDIT_OVERLAY}
+                aria-hidden="true"
               />
-            ) : textBuffer.value ? (
-              <p className="w-full whitespace-pre-wrap p-3 text-base leading-relaxed text-foreground/90">
-                {textBuffer.value}
-              </p>
-            ) : (
-              <p className="p-3 text-sm italic text-muted-foreground/50">
-                {t("workflow.aiTextPanel.cardInputPlaceholder")}
-              </p>
-            )}
+            ) : null}
+
+            <StudioTextOutputView
+              key={nodeId}
+              value={textBuffer.value}
+              onChange={textBuffer.onChange}
+              onFocus={textBuffer.onFocus}
+              onBlur={stopEditing}
+              onCompositionStart={textBuffer.onCompositionStart}
+              onCompositionEnd={textBuffer.onCompositionEnd}
+              isEditing={editing}
+              isGenerating={isGenerating}
+              editLocked={editLocked}
+              maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
+              placeholder={
+                showEditHint
+                  ? undefined
+                  : t("workflow.aiTextPanel.cardInputPlaceholder")
+              }
+              scrollContainerRef={scrollContainerRef}
+              textareaRef={textareaRef}
+              handleScroll={handleScroll}
+              scrollToTailIfAllowed={scrollToTailIfAllowed}
+              contentKey={`${nodeId}:${historyItems.selectedId ?? ""}`}
+            />
           </div>
         </div>
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
 
-        {!generateError && showHistoryIcon && !isGenerating ? (
+        {!generateError && (isGenerating || showHistoryIcon) ? (
           <StudioToolbar>
-            <StudioHistoryActionButton
-              count={historyItems.items.length}
-              onClick={() => setHistoryOpen(true)}
-            />
+            {isGenerating ? (
+              <LoaderIcon className="size-3.5 animate-spin text-yellow-500" />
+            ) : null}
+            {showHistoryIcon && !isGenerating ? (
+              <StudioHistoryActionButton
+                count={historyItems.items.length}
+                onClick={() => setHistoryOpen(true)}
+              />
+            ) : null}
           </StudioToolbar>
         ) : null}
       </div>
@@ -356,7 +415,7 @@ function useStudioMediaUpload(params: {
   const toast = useAppToast();
   const { organization } = useAuth();
   const { updateNodeData } = useWorkflow();
-  const { workflowId } = useParams<{ workflowId: string }>();
+  const { workflowId } = useCreativeStudio();
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
   const orgId = organization?.id;
@@ -404,22 +463,6 @@ function useStudioMediaUpload(params: {
       i18nPrefix,
     });
 
-  const setCardEditing = useCallback(
-    (editing: boolean) => {
-      if (!updateNodeData) return;
-      updateNodeData(params.nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, editing),
-      }));
-    },
-    [params.nodeId, updateNodeData]
-  );
-
-  useEffect(() => {
-    return () => {
-      setCardEditing(false);
-    };
-  }, [setCardEditing]);
-
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
       if (
@@ -448,7 +491,9 @@ function useStudioMediaUpload(params: {
       }
 
       setUploading(true);
-      setCardEditing(true);
+      updateNodeData(params.nodeId, (current) => ({
+        metadata: withGenerativeUploadProgress(current.metadata, true),
+      }));
       try {
         const value = await stageGenerativeCardUpload({
           organizationId: orgId,
@@ -480,7 +525,7 @@ function useStudioMediaUpload(params: {
                 : withAiAudioGenerateError(withMedia.metadata, uploadError);
           return {
             ...withMedia,
-            metadata: withErrorMeta,
+            metadata: withGenerativeUploadProgress(withErrorMeta, false),
           };
         });
 
@@ -493,17 +538,23 @@ function useStudioMediaUpload(params: {
           t
         );
         updateNodeData(params.nodeId, (current) => ({
-          metadata:
+          metadata: withGenerativeUploadProgress(
             params.kind === "image"
               ? withAiImageGenerateError(current.metadata, formatted)
               : params.kind === "video"
                 ? withAiVideoGenerateError(current.metadata, formatted)
                 : withAiAudioGenerateError(current.metadata, formatted),
+            false
+          ),
         }));
         toast.errorRaw(formatted.summary);
       } finally {
         setUploading(false);
-        setCardEditing(false);
+        if (updateNodeData) {
+          updateNodeData(params.nodeId, (current) => ({
+            metadata: withGenerativeUploadProgress(current.metadata, false),
+          }));
+        }
       }
     },
     [
@@ -514,7 +565,6 @@ function useStudioMediaUpload(params: {
       params.disabled,
       params.kind,
       params.nodeId,
-      setCardEditing,
       t,
       toast,
       updateNodeData,
@@ -592,7 +642,7 @@ function StudioImageDetail({
   );
   const historyItems = readAiImageResultHistory(node.data.inputs);
   const prompt = readGenerativePrompt(node.data.inputs);
-  const isGenerating = isAiImageGenerating(metadata);
+  const isGenerating = readStudioMediaCardState(metadata, false).isBusy;
   const generateError = readGenerativeCardError(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
@@ -711,6 +761,7 @@ function StudioVideoDetail({
 }: {
   readonly node: ReactFlowNode<WorkflowNodeType>;
 }) {
+  const { t } = useTranslation();
   const { updateNodeData, disabled = false } = useWorkflow();
   const nodeId = node.id;
   const metadata = node.data.metadata;
@@ -721,7 +772,7 @@ function StudioVideoDetail({
   );
   const historyItems = readAiVideoResultHistory(node.data.inputs);
   const prompt = readGenerativePrompt(node.data.inputs);
-  const isGenerating = isAiVideoGenerating(metadata);
+  const isGenerating = readStudioMediaCardState(metadata, true).isBusy;
   const generateError = readGenerativeCardError(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
@@ -729,6 +780,14 @@ function StudioVideoDetail({
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
+  const showCancelledNotice = useSyncExternalStore(
+    subscribeGenerativeCancelledNotice,
+    () => isGenerativeCancelledNoticeVisible(nodeId),
+    () => false
+  );
+  const handleDismissCancelledNotice = useCallback(() => {
+    dismissGenerativeCancelledNotice(nodeId);
+  }, [nodeId]);
 
   const { uploading, handleCardDoubleClick, uploadConfirmDialog, fileInput } =
     useStudioMediaUpload({
@@ -799,6 +858,10 @@ function StudioVideoDetail({
             setErrorDetailOpen(true);
             return;
           }
+          if (showCancelledNotice) {
+            event.stopPropagation();
+            return;
+          }
           if (!isGenerating) {
             handleCardDoubleClick(event);
           }
@@ -811,7 +874,14 @@ function StudioVideoDetail({
           className="h-full"
         />
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
-        {!generateError ? (
+        {showCancelledNotice && !generateError ? (
+          <GenerativeCardNoticeBlock
+            message={t("workflow.generativeCancel.success")}
+            dismissLabel={t("workflow.generativeCancel.dismiss")}
+            onDismiss={handleDismissCancelledNotice}
+          />
+        ) : null}
+        {!generateError && !showCancelledNotice ? (
           <StudioToolbar>
             <StudioPrimaryDownload
               media={videos[0]}

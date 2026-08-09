@@ -24,7 +24,10 @@ import {
 } from "../../ai-image-history-overlay";
 import { AiTextExpandButton } from "../../ai-text-expand-overlay";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
-import { readGenerativeProgressPhase } from "../../generative-progress-utils";
+import {
+  readGenerativeProgressPhase,
+  withGenerativeUploadProgress,
+} from "../../generative-progress-utils";
 import {
   AI_AUDIO_CARD_HEIGHT_PX,
   AI_AUDIO_CARD_WIDTH_PX,
@@ -44,7 +47,6 @@ import { readGenerativeCardError } from "../../generative-card-error-utils";
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
-  withGenerativeCardEditing,
 } from "../../generative-card-mode-utils";
 import {
   normalizeGenerativeCardUploadFile,
@@ -133,22 +135,6 @@ function AiAudioWidget({
       i18nPrefix: "workflow.aiAudioPanel",
     });
 
-  const setCardEditing = useCallback(
-    (editing: boolean) => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, editing),
-      }));
-    },
-    [nodeId, updateNodeData]
-  );
-
-  useEffect(() => {
-    return () => {
-      setCardEditing(false);
-    };
-  }, [setCardEditing]);
-
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
@@ -193,7 +179,9 @@ function AiAudioWidget({
       }
 
       setUploading(true);
-      setCardEditing(true);
+      updateNodeData(nodeId, (current) => ({
+        metadata: withGenerativeUploadProgress(current.metadata, true),
+      }));
       try {
         const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
@@ -222,9 +210,9 @@ function AiAudioWidget({
           const withMedia = withAiAudioManualUpload(current, [staged]);
           return {
             ...withMedia,
-            metadata: withAiAudioGenerateError(
-              withMedia.metadata,
-              uploadError
+            metadata: withGenerativeUploadProgress(
+              withAiAudioGenerateError(withMedia.metadata, uploadError),
+              false
             ),
           };
         });
@@ -238,12 +226,17 @@ function AiAudioWidget({
           t
         );
         updateNodeData(nodeId, (current) => ({
-          metadata: withAiAudioGenerateError(current.metadata, formatted),
+          metadata: withGenerativeUploadProgress(
+            withAiAudioGenerateError(current.metadata, formatted),
+            false
+          ),
         }));
         toast.errorRaw(formatted.summary);
       } finally {
         setUploading(false);
-        setCardEditing(false);
+        updateNodeData(nodeId, (current) => ({
+          metadata: withGenerativeUploadProgress(current.metadata, false),
+        }));
       }
     },
     [
@@ -252,7 +245,6 @@ function AiAudioWidget({
       disabled,
       nodeId,
       orgId,
-      setCardEditing,
       t,
       toast,
       updateNodeData,

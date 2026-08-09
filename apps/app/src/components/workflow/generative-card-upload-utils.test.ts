@@ -1,83 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  canGenerativeCardDoubleClickUpload,
-  generativePromptWithinModelLimit,
-  hasGenerativePrompt,
-  normalizeGenerativeCardUploadFile,
-  readGenerativePrompt,
-  withGenerativePromptCleared,
-} from "./generative-card-upload-utils";
+import { resolveGenerativeStudioDropFile } from "./generative-card-upload-utils";
 
-describe("canGenerativeCardDoubleClickUpload", () => {
-  it("allows upload only on an empty idle card", () => {
-    expect(
-      canGenerativeCardDoubleClickUpload({
-        hasMedia: false,
-        isGenerating: false,
-      })
-    ).toBe(true);
-    expect(
-      canGenerativeCardDoubleClickUpload({
-        hasMedia: true,
-        isGenerating: false,
-      })
-    ).toBe(false);
-    expect(
-      canGenerativeCardDoubleClickUpload({
-        hasMedia: false,
-        isGenerating: true,
-      })
-    ).toBe(false);
+describe("resolveGenerativeStudioDropFile", () => {
+  it("resolves image files", () => {
+    const file = new File(["x"], "photo.png", { type: "image/png" });
+    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
+      kind: "image",
+      nodeType: "ai-image",
+    });
   });
-});
 
-describe("generative prompt helpers", () => {
-  it("reads and clears prompt input", () => {
-    const inputs = [
-      { id: "prompt", name: "prompt", type: "string" as const, value: "hello" },
-    ];
-
-    expect(readGenerativePrompt(inputs)).toBe("hello");
-    expect(hasGenerativePrompt("  hi ")).toBe(true);
-    expect(hasGenerativePrompt("   ")).toBe(false);
-    expect(withGenerativePromptCleared(inputs)[0]?.value).toBe("");
+  it("resolves video files", () => {
+    const file = new File(["x"], "clip.mp4", { type: "video/mp4" });
+    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
+      kind: "video",
+      nodeType: "ai-video",
+    });
   });
-});
 
-describe("generativePromptWithinModelLimit", () => {
-  it("ignores surrounding whitespace when comparing length", () => {
-    expect(generativePromptWithinModelLimit("  abc  ", 3)).toBe(true);
-    expect(generativePromptWithinModelLimit("  abcd  ", 3)).toBe(false);
-    expect(generativePromptWithinModelLimit("", 600)).toBe(true);
+  it("resolves audio files", () => {
+    const file = new File(["x"], "track.mp3", { type: "audio/mpeg" });
+    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
+      kind: "audio",
+      nodeType: "ai-audio",
+    });
   });
-});
 
-describe("normalizeGenerativeCardUploadFile image formats", () => {
-  it("accepts png and jpeg only", () => {
-    expect(
-      normalizeGenerativeCardUploadFile(
-        new File([""], "a.png", { type: "image/png" }),
-        "image"
-      )
-    ).not.toBeNull();
-    expect(
-      normalizeGenerativeCardUploadFile(
-        new File([""], "a.jpg", { type: "image/jpeg" }),
-        "image"
-      )
-    ).not.toBeNull();
-    expect(
-      normalizeGenerativeCardUploadFile(
-        new File([""], "a.webp", { type: "image/webp" }),
-        "image"
-      )
-    ).toBeNull();
-    expect(
-      normalizeGenerativeCardUploadFile(
-        new File([""], "a.gif", { type: "image/gif" }),
-        "image"
-      )
-    ).toBeNull();
+  it("rejects unsupported files", () => {
+    const file = new File(["x"], "notes.txt", { type: "text/plain" });
+    expect(resolveGenerativeStudioDropFile(file)).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import Masonry from "react-masonry-css";
+import { useCallback } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
@@ -7,14 +8,17 @@ import { cn } from "@/utils/utils";
 
 import {
   CreativeStudioBoardTabs,
+  studioBoardTabForNodeType,
   type StudioBoardTab,
 } from "./creative-studio-board-tabs";
+import type { StudioListNodeInteractionHandlers } from "./studio-list-node-interaction-handlers";
 import { CreativeStudioAudioTile } from "./creative-studio-audio-tile";
+import { CreativeStudioListInteractionHint } from "./creative-studio-list-interaction-hint";
 import { CreativeStudioListItem } from "./creative-studio-list-item";
 import { CreativeStudioNodeCard } from "./creative-studio-node-card";
 import {
-  STUDIO_AUDIO_GRID,
   STUDIO_BOARD_GAP,
+  STUDIO_BOARD_INSET,
   STUDIO_LIST_BODY,
   STUDIO_PANEL,
   STUDIO_PANEL_COUNT,
@@ -25,6 +29,7 @@ import {
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioNodesByType {
+  readonly all: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly audio: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly text: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly image: readonly ReactFlowNode<WorkflowNodeType>[];
@@ -37,8 +42,10 @@ export interface CreativeStudioBoardProps {
   readonly onOpenDetail: (nodeId: string) => void;
   readonly onExpandList?: () => void;
   readonly compact?: boolean;
+  readonly referenceDragEnabled?: boolean;
   readonly boardTab?: StudioBoardTab;
   readonly onBoardTabChange?: (tab: StudioBoardTab) => void;
+  readonly listInteraction: StudioListNodeInteractionHandlers;
 }
 
 interface SectionHeaderProps {
@@ -97,20 +104,25 @@ function AudioListSection({
         count={nodes.length}
       />
       <div className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}>
-        <div className={STUDIO_AUDIO_GRID}>
-          {nodes.length === 0 ? (
-            <EmptySection className="col-span-full" />
-          ) : (
-            nodes.map((node) => (
-              <CreativeStudioAudioTile
+        {nodes.length === 0 ? (
+          <EmptySection />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {nodes.map((node) => (
+              <CreativeStudioListItem
                 key={node.id}
-                node={node}
+                focusId={node.id}
                 isActive={node.id === focusedNodeId}
-                onOpenDetail={() => onOpenDetail(node.id)}
-              />
-            ))
-          )}
-        </div>
+                variant="media"
+              >
+                <CreativeStudioAudioTile
+                  node={node}
+                  onOpenDetail={() => onOpenDetail(node.id)}
+                />
+              </CreativeStudioListItem>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -191,39 +203,37 @@ export function CreativeStudioBoard({
   onOpenDetail,
   onExpandList,
   compact = false,
-  boardTab = "text",
+  referenceDragEnabled = false,
+  boardTab = "all",
   onBoardTabChange,
+  listInteraction,
 }: CreativeStudioBoardProps) {
-  const { t } = useTranslation();
-
-  const totalCount =
-    nodesByType.audio.length +
-    nodesByType.text.length +
-    nodesByType.image.length +
-    nodesByType.video.length;
-
-  if (totalCount === 0) {
-    return (
-      <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-        {t("workflow.studio.empty")}
-      </div>
-    );
-  }
+  const handleExpandedOpenDetail = useCallback(
+    (nodeId: string) => {
+      const node = nodesByType.all.find((item) => item.id === nodeId);
+      onBoardTabChange?.(studioBoardTabForNodeType(node?.data.nodeType));
+      onOpenDetail(nodeId);
+    },
+    [nodesByType.all, onBoardTabChange, onOpenDetail]
+  );
 
   if (compact) {
     return (
-      <div className={cn("flex h-full min-h-0 flex-col", STUDIO_BOARD_GAP)}>
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <CreativeStudioListInteractionHint />
         <section className={cn(STUDIO_PANEL, "min-h-0 flex-1")}>
           <CreativeStudioBoardTabs
             activeTab={boardTab}
             onTabChange={onBoardTabChange ?? (() => {})}
+            allNodes={nodesByType.all}
             audioNodes={nodesByType.audio}
             textNodes={nodesByType.text}
             imageNodes={nodesByType.image}
             videoNodes={nodesByType.video}
             focusedNodeId={focusedNodeId}
-            onOpenDetail={onOpenDetail}
+            listInteraction={listInteraction}
             onExpandList={onExpandList ?? (() => {})}
+            referenceDragEnabled={referenceDragEnabled}
             className="min-h-0 flex-1"
           />
         </section>
@@ -232,18 +242,18 @@ export function CreativeStudioBoard({
   }
 
   return (
-    <div className={cn("flex h-full min-h-0", STUDIO_BOARD_GAP)}>
+    <div className={cn("flex h-full min-h-0", STUDIO_BOARD_GAP, STUDIO_BOARD_INSET)}>
       <AudioListSection
         nodes={nodesByType.audio}
         focusedNodeId={focusedNodeId}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[1]"
       />
       <NodeListSection
         labelKey="workflow.canvas.aiText"
         nodes={nodesByType.text}
         focusedNodeId={focusedNodeId}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[2]"
         itemVariant="mediaPlain"
         mediaGrid
@@ -252,7 +262,7 @@ export function CreativeStudioBoard({
         labelKey="workflow.canvas.aiImage"
         nodes={nodesByType.image}
         focusedNodeId={focusedNodeId}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[2]"
         mediaGrid
         itemVariant="media"
@@ -261,7 +271,7 @@ export function CreativeStudioBoard({
         labelKey="workflow.canvas.aiVideo"
         nodes={nodesByType.video}
         focusedNodeId={focusedNodeId}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={handleExpandedOpenDetail}
         className="min-h-0 min-w-0 flex-[2]"
         mediaGrid
         itemVariant="media"

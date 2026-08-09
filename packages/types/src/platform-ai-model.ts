@@ -353,6 +353,7 @@ export interface AiTextResultHistoryItem {
   readonly platformModelId?: string;
   readonly aiInterfaceId?: string;
   readonly providerModelId?: string;
+  readonly modelDisplayName?: string;
   readonly createdAt: string;
 }
 
@@ -548,6 +549,7 @@ export interface AiVideoResultHistoryItem {
   readonly platformModelId?: string;
   readonly aiInterfaceId?: string;
   readonly providerModelId?: string;
+  readonly modelDisplayName?: string;
   readonly createdAt: string;
 }
 

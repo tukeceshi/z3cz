@@ -203,6 +203,49 @@ export function collectGenerativeReferenceMedia(params: {
     });
 }
 
+export interface GenerativeReferenceConnectionRef {
+  readonly source: string;
+  readonly sourceHandle?: string | null;
+  readonly target: string;
+  readonly targetHandle: string;
+}
+
+export function isGenerativeReferenceAlreadyConnected(
+  edges: readonly Pick<
+    ReactFlowEdge<WorkflowEdgeType>,
+    "source" | "sourceHandle" | "target" | "targetHandle"
+  >[],
+  connection: GenerativeReferenceConnectionRef
+): boolean {
+  return edges.some((edge) => {
+    if (edge.source !== connection.source) return false;
+    if (edge.target !== connection.target) return false;
+    if (edge.targetHandle !== connection.targetHandle) return false;
+    if (
+      connection.sourceHandle !== undefined &&
+      connection.sourceHandle !== null &&
+      edge.sourceHandle !== connection.sourceHandle
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export type StudioReferenceDropPreview =
+  | "valid"
+  | "already_connected"
+  | "rejected";
+
+export function studioReferenceDropPreviewFromVerdict(verdict: {
+  readonly ok: boolean;
+  readonly reason?: string;
+}): StudioReferenceDropPreview {
+  if (verdict.ok) return "valid";
+  if (verdict.reason === "already_connected") return "already_connected";
+  return "rejected";
+}
+
 export function connectGenerativeReferenceEdge(
   setEdges: (updater: (edges: ReactFlowEdge[]) => ReactFlowEdge[]) => void,
   connection: Connection

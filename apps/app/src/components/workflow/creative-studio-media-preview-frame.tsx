@@ -3,6 +3,7 @@ import {
   type MediaReference,
 } from "@dafthunk/types";
 import Image from "lucide-react/icons/image";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import Play from "lucide-react/icons/play";
 import Video from "lucide-react/icons/video";
 import { useState, type ReactNode } from "react";
@@ -54,6 +55,9 @@ export interface CreativeStudioMediaPreviewFrameProps {
   readonly displayUrl: string | null;
   readonly stale: boolean;
   readonly isVideo: boolean;
+  readonly referenceDragEnabled?: boolean;
+  readonly fallbackMessage?: string;
+  readonly fallbackBusy?: boolean;
 }
 
 function applyMediaAspectRatio(
@@ -87,11 +91,15 @@ export function hasStudioMediaContent(
 export interface CreativeStudioMediaPreviewPlaceholderProps {
   readonly isVideo: boolean;
   readonly message?: string;
+  readonly busy?: boolean;
+  readonly size?: "list" | "detail";
 }
 
 export function CreativeStudioMediaPreviewPlaceholder({
   isVideo,
   message,
+  busy = false,
+  size = "list",
 }: CreativeStudioMediaPreviewPlaceholderProps) {
   const Icon = isVideo ? Video : Image;
 
@@ -100,9 +108,30 @@ export function CreativeStudioMediaPreviewPlaceholder({
       aspectRatio={DEFAULT_ASPECT_RATIO}
       className={STUDIO_MEDIA_PREVIEW_PLACEHOLDER}
     >
-      <Icon className="h-6 w-6 shrink-0 opacity-40" aria-hidden />
+      {busy ? (
+        <LoaderIcon
+          className={cn(
+            "shrink-0 animate-spin text-yellow-500",
+            size === "detail" ? "h-6 w-6" : "h-5 w-5"
+          )}
+          aria-hidden
+        />
+      ) : (
+        <Icon
+          className={cn(
+            "shrink-0 opacity-40",
+            size === "detail" ? "h-8 w-8" : "h-6 w-6"
+          )}
+          aria-hidden
+        />
+      )}
       {message ? (
-        <span className="max-w-full truncate px-2 text-center text-[11px] italic">
+        <span
+          className={cn(
+            "max-w-full truncate px-2 text-center italic",
+            size === "detail" ? "text-sm" : "text-[11px]"
+          )}
+        >
           {message}
         </span>
       ) : null}
@@ -110,16 +139,68 @@ export function CreativeStudioMediaPreviewPlaceholder({
   );
 }
 
+export interface StudioMediaEmptyPreviewProps {
+  readonly isVideo: boolean;
+  readonly message?: string;
+  readonly busy?: boolean;
+  readonly layout?: "list" | "detail";
+  readonly className?: string;
+}
+
+/** Shared empty media slot — list card or detail edit area. */
+export function StudioMediaEmptyPreview({
+  isVideo,
+  message,
+  busy = false,
+  layout = "list",
+  className,
+}: StudioMediaEmptyPreviewProps) {
+  const placeholder = (
+    <CreativeStudioMediaPreviewPlaceholder
+      isVideo={isVideo}
+      message={message}
+      busy={busy}
+      size={layout === "detail" ? "detail" : "list"}
+    />
+  );
+
+  if (layout === "detail") {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full items-center justify-center p-4",
+          className
+        )}
+      >
+        <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800">
+          {placeholder}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className={className}>{placeholder}</div>;
+}
+
 export function CreativeStudioMediaPreviewFrame({
   media,
   displayUrl,
   stale,
   isVideo,
+  referenceDragEnabled = false,
+  fallbackMessage,
+  fallbackBusy = false,
 }: CreativeStudioMediaPreviewFrameProps) {
   const [aspectRatio, setAspectRatio] = useState(DEFAULT_ASPECT_RATIO);
 
   if (!media || stale || !displayUrl) {
-    return <CreativeStudioMediaPreviewPlaceholder isVideo={isVideo} />;
+    return (
+      <CreativeStudioMediaPreviewPlaceholder
+        isVideo={isVideo}
+        message={fallbackMessage}
+        busy={fallbackBusy}
+      />
+    );
   }
 
   return (
@@ -129,6 +210,7 @@ export function CreativeStudioMediaPreviewFrame({
           <video
             src={displayUrl}
             className={STUDIO_MEDIA_PREVIEW_MEDIA}
+            draggable={!referenceDragEnabled}
             muted
             playsInline
             preload="metadata"
@@ -152,6 +234,7 @@ export function CreativeStudioMediaPreviewFrame({
           alt=""
           loading="lazy"
           decoding="async"
+          draggable={!referenceDragEnabled}
           className="size-full select-none object-cover"
           onLoad={(event) => {
             applyMediaAspectRatio(

@@ -6,7 +6,7 @@ import PlusIcon from "lucide-react/icons/plus";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import XIcon from "lucide-react/icons/x";
-import { useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -26,6 +26,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
@@ -178,6 +184,7 @@ export interface AiTextReferenceBarProps {
   readonly onUploadFiles?: (files: FileList) => void;
   /** When omitted, chips are preview-only (AI Text). */
   readonly onInjectChip?: (chip: AiTextReferenceChip) => void;
+  readonly showStudioReferenceHints?: boolean;
 }
 
 export function AiTextReferenceBar({
@@ -190,15 +197,33 @@ export function AiTextReferenceBar({
   onPickCanvasNode,
   onUploadFiles,
   onInjectChip,
+  showStudioReferenceHints = false,
 }: AiTextReferenceBarProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const studioAddButtonRef = useRef<HTMLButtonElement>(null);
+  const [studioAddHintHover, setStudioAddHintHover] = useState(false);
+  const [studioAddHintPinned, setStudioAddHintPinned] = useState(false);
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(
     null
   );
   const [hoverPreview, setHoverPreview] =
     useState<ReferenceHoverPreviewState | null>(null);
+
+  useEffect(() => {
+    if (!showStudioReferenceHints || !studioAddHintPinned) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (studioAddButtonRef.current?.contains(target)) return;
+      setStudioAddHintPinned(false);
+      setStudioAddHintHover(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [showStudioReferenceHints, studioAddHintPinned]);
 
   const handleChipMouseEnter = (
     chip: AiTextReferenceChip,
@@ -231,6 +256,80 @@ export function AiTextReferenceBar({
     }
     setPendingDisconnectId(null);
   };
+
+  const addReferenceButtonClassName = cn(
+    "nodrag flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed",
+    "border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground",
+    disabled && "pointer-events-none opacity-50"
+  );
+
+  const studioAddReferencePlaceholder = (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip open={studioAddHintHover || studioAddHintPinned}>
+        <TooltipTrigger asChild>
+          <button
+            ref={studioAddButtonRef}
+            type="button"
+            className={addReferenceButtonClassName}
+            disabled={disabled || addReferenceDisabled}
+            onMouseEnter={() => {
+              if (disabled || addReferenceDisabled) return;
+              setStudioAddHintHover(true);
+            }}
+            onMouseLeave={() => {
+              if (studioAddHintPinned) return;
+              setStudioAddHintHover(false);
+            }}
+            onClick={() => {
+              if (disabled || addReferenceDisabled) return;
+              setStudioAddHintPinned(true);
+              setStudioAddHintHover(true);
+            }}
+          >
+            <PlusIcon className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {t("workflow.studio.referenceAddHint")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
+  const canvasAddReferenceMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={addReferenceButtonClassName}
+          disabled={disabled || addReferenceDisabled}
+          title={t("workflow.aiTextPanel.addReference")}
+        >
+          <PlusIcon className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="z-[100] w-44">
+        <DropdownMenuItem
+          disabled={!canPickCanvasNode}
+          onClick={() => {
+            if (!canPickCanvasNode) return;
+            onPickCanvasNode();
+          }}
+        >
+          {t("workflow.aiTextPanel.pickCanvasNode")}
+        </DropdownMenuItem>
+        {allowUpload ? (
+          <DropdownMenuItem
+            onClick={() => {
+              fileInputRef.current?.click();
+            }}
+          >
+            {t("workflow.aiTextPanel.uploadLocal")}
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
@@ -281,44 +380,9 @@ export function AiTextReferenceBar({
         </div>
       ))}
 
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "nodrag flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed",
-              "border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground",
-              disabled && "pointer-events-none opacity-50"
-            )}
-            disabled={disabled || addReferenceDisabled}
-            title={t("workflow.aiTextPanel.addReference")}
-          >
-            <PlusIcon className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44">
-          <DropdownMenuItem
-            disabled={!canPickCanvasNode}
-            onClick={() => {
-              if (!canPickCanvasNode) return;
-              setMenuOpen(false);
-              onPickCanvasNode();
-            }}
-          >
-            {t("workflow.aiTextPanel.pickCanvasNode")}
-          </DropdownMenuItem>
-          {allowUpload ? (
-            <DropdownMenuItem
-              onClick={() => {
-                setMenuOpen(false);
-                fileInputRef.current?.click();
-              }}
-            >
-              {t("workflow.aiTextPanel.uploadLocal")}
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {showStudioReferenceHints
+        ? studioAddReferencePlaceholder
+        : canvasAddReferenceMenu}
 
       {allowUpload ? (
         <input

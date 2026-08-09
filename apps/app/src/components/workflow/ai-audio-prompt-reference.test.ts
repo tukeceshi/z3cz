@@ -43,6 +43,23 @@ function mockAudioNode(
 }
 
 describe("ai-audio-prompt-reference", () => {
+  it("rejects duplicate prompt references from the same source", () => {
+    expect(
+      evaluateAiAudioPromptReferenceStructural({
+        targetNodeId: "audio-1",
+        sourceNodeId: "text-1",
+        sourceNodeType: AI_TEXT_NODE_TYPE,
+        edges: [
+          {
+            source: "text-1",
+            target: "audio-1",
+            targetHandle: AI_AUDIO_PROMPT_HANDLE_ID,
+          },
+        ],
+      })
+    ).toEqual({ ok: false, reason: "already_connected" });
+  });
+
   it("rejects prompt references when the card is in manual content mode", () => {
     const metadata = withGenerativeManualContentMode(undefined);
 

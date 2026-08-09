@@ -71,6 +71,7 @@ import {
 import { buildReferenceConnectionToNewNode } from "./workflow-add-node-connection";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
+import { applyGenerativeNodeStudioReference } from "./create-generative-node-from-studio-reference";
 import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
 import {
   generativeModalityForNodeType,
@@ -358,7 +359,14 @@ export interface UseGraphOperationsReturn {
 
   // Actions
   handleAddNode: () => void;
-  handleNodeSelect: (template: NodeType) => void;
+  handleNodeSelect: (
+    template: NodeType,
+    options?: {
+      readonly panIntoView?: boolean;
+      readonly prompt?: string;
+      readonly precedingText?: string;
+    }
+  ) => string | null;
   updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
   batchUpdateNodeExecutions: (
     updates: Readonly<Record<string, NodeExecutionUpdate>>
@@ -1065,8 +1073,15 @@ export function useGraphOperations({
   }, [graphEditBlocked]);
 
   const handleNodeSelect = useCallback(
-    (nodeType: NodeType) => {
-      if (!reactFlowInstance) return;
+    (
+      nodeType: NodeType,
+      options?: {
+        readonly panIntoView?: boolean;
+        readonly prompt?: string;
+        readonly precedingText?: string;
+      }
+    ): string | null => {
+      if (!reactFlowInstance) return null;
 
       const placement = findOpenNodePosition({
         reactFlowInstance,
@@ -1074,7 +1089,7 @@ export function useGraphOperations({
         existingNodes: nodesRef.current,
       });
 
-      const newNode = createReactFlowNode(
+      let newNode = createReactFlowNode(
         nodeType,
         placement.position,
         createObjectUrl,
@@ -1083,6 +1098,22 @@ export function useGraphOperations({
         orgId,
         generativeDefaults
       );
+
+      if (options?.prompt && options.precedingText !== undefined) {
+        newNode = applyGenerativeNodeStudioReference({
+          node: newNode,
+          nodeType: nodeType.type,
+          existingNodes: nodesRef.current,
+          defaultBaseName: resolveGenerativeNodeDefaultBaseName(
+            nodeType.type,
+            nodeType.name,
+            t
+          ),
+          prompt: options.prompt,
+          precedingText: options.precedingText,
+        });
+      }
+
       newNode.selected = true;
 
       setNodes((nds) => [
@@ -1090,7 +1121,8 @@ export function useGraphOperations({
         newNode,
       ]);
 
-      if (placement.shouldPanIntoView) {
+      const shouldPan = options?.panIntoView ?? true;
+      if (shouldPan && placement.shouldPanIntoView) {
         const { width, height } = resolveWorkflowNodeDimensions(nodeType.type);
         const centerX = placement.position.x + width / 2;
         const centerY = placement.position.y + height / 2;
@@ -1110,6 +1142,8 @@ export function useGraphOperations({
 
         reactFlowInstance.setCenter(centerX, centerY, { zoom, duration: 200 });
       }
+
+      return newNode.id;
     },
     [
       reactFlowInstance,

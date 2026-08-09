@@ -18,14 +18,14 @@ describe("generative-card-mode-utils", () => {
     ).toBe(false);
   });
 
-  it("hides bottom panel while editing or in manual content mode", () => {
+  it("hides bottom panel only in manual content mode", () => {
     expect(shouldShowGenerativeBottomPanel(undefined)).toBe(true);
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeManualContentMode(undefined))
     ).toBe(false);
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeCardEditing(undefined, true))
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("clears manual-only metadata to undefined (must not fall back with ??)", () => {

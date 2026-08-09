@@ -8,6 +8,7 @@ import { AI_TEXT_OUTPUT_ID, readAiTextPromptSource } from "./ai-text-node-utils"
 import { AI_AUDIO_PROMPT_HANDLE_ID } from "./ai-audio-node-utils";
 import {
   collectGenerativeReferenceChips,
+  isGenerativeReferenceAlreadyConnected,
   type GenerativeReferenceChip,
 } from "./generative-reference-utils";
 import { isGenerativeManualContent } from "./generative-card-mode-utils";
@@ -153,7 +154,7 @@ export function evaluateAiAudioPromptReferenceStructural(params: {
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "targetHandle"
   >[];
-}): { readonly ok: boolean } {
+}): { readonly ok: boolean; readonly reason?: "already_connected" } {
   if (isGenerativeManualContent(params.targetNodeMetadata)) {
     return { ok: false };
   }
@@ -162,6 +163,16 @@ export function evaluateAiAudioPromptReferenceStructural(params: {
   }
   if (params.sourceNodeType !== AI_TEXT_NODE_TYPE) {
     return { ok: false };
+  }
+  if (
+    params.edges &&
+    isGenerativeReferenceAlreadyConnected(params.edges, {
+      source: params.sourceNodeId,
+      target: params.targetNodeId,
+      targetHandle: AI_AUDIO_PROMPT_HANDLE_ID,
+    })
+  ) {
+    return { ok: false, reason: "already_connected" };
   }
   if (
     params.edges?.some(

@@ -105,6 +105,22 @@ export function clearGenerativeProgress(
   });
 }
 
+/** Card double-click upload — sync list/canvas via metadata. */
+export function withGenerativeUploadProgress(
+  metadata: Record<string, string> | undefined,
+  uploading: boolean
+): Record<string, string> | undefined {
+  if (uploading) {
+    return withGenerativeProgress(metadata, { phase: "uploading" });
+  }
+
+  if (readGenerativeProgressPhase(metadata) === "uploading") {
+    return withGenerativeProgress(metadata, { phase: null });
+  }
+
+  return metadata;
+}
+
 export function isGenerativeProgressActive(
   metadata: Record<string, string> | undefined
 ): boolean {

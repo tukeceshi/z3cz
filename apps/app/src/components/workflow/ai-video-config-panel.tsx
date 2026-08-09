@@ -46,10 +46,6 @@ import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-r
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
-import {
-  shouldShowStudioPromptBox,
-  studioDockSizeForPanel,
-} from "./generative-studio-dock-layout";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
@@ -73,8 +69,10 @@ import {
 import {
   collectGenerativeReferenceMedia,
   connectGenerativeReferenceEdge,
+  studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
 import { AiGenerateButton } from "./ai-generate-button";
+import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
@@ -660,22 +658,78 @@ export function AiVideoConfigPanel({
     }
   };
 
+  const canAcceptStudioReference = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return false;
+
+      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
+        return evaluateAiVideoPromptReferenceStructural({
+          targetNodeId: nodeId,
+          targetNodeMetadata: data.metadata,
+          sourceNodeId,
+          sourceNodeType: source.data.nodeType,
+          edges,
+        }).ok;
+      }
+
+      return evaluateAiVideoReferenceStructural({
+        targetNodeId: nodeId,
+        sourceNodeId,
+        sourceHandle,
+        sourceNodeType: source.data.nodeType,
+        targetNodeData: data,
+        edges,
+        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+        models: videoModelCatalog,
+      }).ok;
+    },
+    [data, edges, nodeId, typedNodes, videoModelCatalog]
+  );
+
+  const previewStudioReferenceDrop = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return "rejected" as const;
+
+      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
+        return studioReferenceDropPreviewFromVerdict(
+          evaluateAiVideoPromptReferenceStructural({
+            targetNodeId: nodeId,
+            targetNodeMetadata: data.metadata,
+            sourceNodeId,
+            sourceNodeType: source.data.nodeType,
+            edges,
+          })
+        );
+      }
+
+      return studioReferenceDropPreviewFromVerdict(
+        evaluateAiVideoReferenceStructural({
+          targetNodeId: nodeId,
+          sourceNodeId,
+          sourceHandle,
+          sourceNodeType: source.data.nodeType,
+          targetNodeData: data,
+          edges,
+          nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+          models: videoModelCatalog,
+        })
+      );
+    },
+    [data, edges, nodeId, typedNodes, videoModelCatalog]
+  );
+
   const handlePickNode = (sourceNodeId: string, sourceHandle: string) => {
     const source = typedNodes.find((node) => node.id === sourceNodeId);
     if (!source) return;
 
+    if (!canAcceptStudioReference(sourceNodeId, sourceHandle)) {
+      toast.error("workflow.aiVideoPanel.referenceRejected");
+      return;
+    }
+
     if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-      const verdict = evaluateAiVideoPromptReferenceStructural({
-        targetNodeId: nodeId,
-        targetNodeMetadata: data.metadata,
-        sourceNodeId,
-        sourceNodeType: source.data.nodeType,
-        edges,
-      });
-      if (!verdict.ok) {
-        toast.error("workflow.aiVideoPanel.referenceRejected");
-        return;
-      }
       connectReferenceEdge({
         source: sourceNodeId,
         sourceHandle,
@@ -683,21 +737,6 @@ export function AiVideoConfigPanel({
         targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
       });
       setPickNodeOpen(false);
-      return;
-    }
-
-    const verdict = evaluateAiVideoReferenceStructural({
-      targetNodeId: nodeId,
-      sourceNodeId,
-      sourceHandle,
-      sourceNodeType: source.data.nodeType,
-      targetNodeData: data,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      models: videoModelCatalog,
-    });
-    if (!verdict.ok) {
-      toast.error("workflow.aiVideoPanel.referenceRejected");
       return;
     }
 
@@ -1105,7 +1144,7 @@ export function AiVideoConfigPanel({
             params: mergedGenerationParams,
             platformModelId: effectiveModel.canonicalId,
             aiInterfaceId: lastAiInterfaceId || effectiveModel.interfaceId,
-            modelDisplayName: effectiveModel.displayName,
+            modelDisplayName: effectiveModel.alias,
           }
         );
         return {
@@ -1187,7 +1226,7 @@ export function AiVideoConfigPanel({
                   params: mergedGenerationParams,
                   platformModelId: effectiveModel.canonicalId,
                   aiInterfaceId: effectiveModel.interfaceId,
-                  modelDisplayName: effectiveModel.displayName,
+                  modelDisplayName: effectiveModel.alias,
                 }
               );
               return {
@@ -1326,7 +1365,7 @@ export function AiVideoConfigPanel({
             params: mergedGenerationParams,
             platformModelId: effectiveModel!.canonicalId,
             aiInterfaceId: effectiveModel!.interfaceId,
-            modelDisplayName: effectiveModel!.displayName,
+            modelDisplayName: effectiveModel!.alias,
           }
         );
         return {
@@ -1432,35 +1471,25 @@ export function AiVideoConfigPanel({
         targetNodeData: data,
       }).ok);
 
-  const showStudioPromptBox = shouldShowStudioPromptBox({
-    layout,
-    hasPromptReference,
-    allowUpload,
-    referenceChips,
-  });
-  const studioDockSize = studioDockSizeForPanel({
-    layout,
-    hasPromptReference,
-    allowUpload,
-    referenceChips,
-  });
-
   return (
     <>
       <GenerativeConfigPanelShell
         nodeId={nodeId}
         zoom={zoom}
         layout={layout}
-        studioDockSize={studioDockSize}
+        dropDisabled={disabled}
+        previewStudioReferenceDrop={
+          layout === "studio-dock" ? previewStudioReferenceDrop : undefined
+        }
+        onStudioReferenceDrop={
+          layout === "studio-dock" ? handlePickNode : undefined
+        }
       >
-        <div
-          className={cn(
-            layout === "studio-dock" && !showStudioPromptBox && "min-h-0 flex-1"
-          )}
-        >
+        <div>
           <AiTextReferenceBar
             chips={referenceChips}
             disabled={disabled}
+            showStudioReferenceHints={layout === "studio-dock"}
             allowUpload={allowUpload && !disabled}
             addReferenceDisabled={!canAddReference}
             canPickCanvasNode={pickableOutputs.length > 0}
@@ -1475,7 +1504,6 @@ export function AiVideoConfigPanel({
           />
         </div>
 
-        {showStudioPromptBox ? (
         <div
           className={cn(
             "relative mt-2 min-h-0",
@@ -1532,7 +1560,6 @@ export function AiVideoConfigPanel({
             />
           ) : null}
         </div>
-        ) : null}
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0">
@@ -1584,20 +1611,28 @@ export function AiVideoConfigPanel({
             ) : null}
           </div>
 
-          <AiGenerateButton
-            disabled={!canGenerate}
-            isGenerating={isBusyForUi}
-            isCancelling={isCancelling || activeProgressPhase === "cancelling"}
-            canCancel={canCancelGeneration && !isCancelling}
-            label={progressButtonLabel}
-            cancelLabel={t("workflow.generativeCancel.action")}
-            onClick={() => {
-              void handleGenerate();
-            }}
-            onCancel={() => {
-              void handleCancelGeneration();
-            }}
-          />
+          <div className="flex shrink-0 items-end gap-3">
+            {layout === "studio-dock" ? (
+              <StudioDockPromptCharCount
+                count={displayPrompt.length}
+                maxLength={promptMaxLength}
+              />
+            ) : null}
+            <AiGenerateButton
+              disabled={!canGenerate}
+              isGenerating={isBusyForUi}
+              isCancelling={isCancelling || activeProgressPhase === "cancelling"}
+              canCancel={canCancelGeneration && !isCancelling}
+              label={progressButtonLabel}
+              cancelLabel={t("workflow.generativeCancel.action")}
+              onClick={() => {
+                void handleGenerate();
+              }}
+              onCancel={() => {
+                void handleCancelGeneration();
+              }}
+            />
+          </div>
         </div>
       </GenerativeConfigPanelShell>
 

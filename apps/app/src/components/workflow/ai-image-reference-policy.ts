@@ -20,10 +20,12 @@ import {
   REF_MAX_IMAGES_META_KEY,
 } from "./generative-reference-metadata";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import { isGenerativeReferenceAlreadyConnected } from "./generative-reference-utils";
 
 export type AiImageReferenceRejectReason =
   | "unsupported_source"
   | "self_connection"
+  | "already_connected"
   | "image_limit";
 
 export interface AiImageReferenceVerdict {
@@ -112,6 +114,16 @@ export function evaluateAiImageReferenceStructural(
     !isAiImageAllowedReferenceNodeType(context.sourceNodeType)
   ) {
     return { ok: false, reason: "unsupported_source", phase: "structural" };
+  }
+
+  if (
+    isGenerativeReferenceAlreadyConnected(context.edges, {
+      source: context.sourceNodeId,
+      target: context.targetNodeId,
+      targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
+    })
+  ) {
+    return { ok: false, reason: "already_connected", phase: "structural" };
   }
 
   const rules = resolveAiImageReferenceRules({

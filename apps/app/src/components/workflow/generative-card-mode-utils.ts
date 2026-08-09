@@ -68,11 +68,5 @@ export function shouldShowGenerativeHistoryIcon(
 export function shouldShowGenerativeBottomPanel(
   metadata: Record<string, string> | undefined
 ): boolean {
-  if (isGenerativeManualContent(metadata)) {
-    return false;
-  }
-  if (isGenerativeCardEditing(metadata)) {
-    return false;
-  }
-  return true;
+  return !isGenerativeManualContent(metadata);
 }

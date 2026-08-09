@@ -111,8 +111,32 @@ export function interpretUpstreamTextModelError(
   return undefined;
 }
 
+/** Client disconnect / refresh — must not auto-disable the org model/interface. */
+export function isClientCancelledTextModelError(raw: string): boolean {
+  const haystack = raw.trim();
+  if (!haystack) {
+    return false;
+  }
+
+  return (
+    /^generation cancelled\.?$/iu.test(haystack) ||
+    /user aborted a request/iu.test(haystack) ||
+    /this operation was aborted/iu.test(haystack) ||
+    /the operation was aborted/iu.test(haystack) ||
+    /request was aborted/iu.test(haystack) ||
+    /stream ended without completion event/iu.test(haystack) ||
+    /stream returned no text/iu.test(haystack) ||
+    /network error when attempting to fetch resource/iu.test(haystack) ||
+    /ECONNRESET|ECONNABORTED|connection reset|broken pipe/iu.test(haystack)
+  );
+}
+
 /** Transient upstream failures must not auto-disable the org model/interface. */
 export function isTransientTextModelUpstreamError(raw: string): boolean {
+  if (isClientCancelledTextModelError(raw)) {
+    return true;
+  }
+
   const extracted = extractUpstreamErrorMessage(raw);
   const haystack = `${raw}\n${extracted}`.trim();
   if (!haystack) {

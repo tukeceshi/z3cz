@@ -364,6 +364,167 @@ html.dark .shiki span {
   @apply italic;
 }
 
+.studio-mdx-editor {
+  --basePageBg: transparent;
+  --baseBg: transparent;
+  --baseBgActive: hsl(var(--border));
+  max-width: 100%;
+}
+
+/* === Studio table (creative view) === */
+
+/* Boundary — table owns the `|` line after `\n\n` without mutating text segments */
+.studio-mdx-table-leading-pipe {
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Edit: pull up one plain-text line to cancel textarea EOF phantom row after `\n\n` */
+.studio-mdx-table-boundary[data-follows-text="true"][data-table-mode="edit"] {
+  margin-top: -1.625rem;
+}
+
+/* 1. Frame */
+.studio-mdx-table-frame {
+  margin-block: 1rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+}
+
+html.dark .studio-mdx-table-frame {
+  border-color: rgb(64 64 64);
+}
+
+.studio-mdx-table-frame .studio-mdx-editor,
+.studio-mdx-table-frame [class*="rootContentEditableWrapper"],
+.studio-mdx-table-frame .studio-text-mdx-body {
+  padding: 0;
+  margin: 0;
+}
+
+/* 2. Grid — shared preview + edit typography */
+.studio-mdx-table-frame table {
+  table-layout: auto !important;
+  width: 100%;
+  max-width: 100%;
+  margin-block: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+
+.studio-mdx-table-frame table :is(th, td) {
+  border-style: solid !important;
+  border-color: hsl(var(--border)) !important;
+  border-width: 0 1px 1px 0 !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  vertical-align: middle;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.studio-mdx-table-frame table tr > :last-child {
+  border-right-width: 0 !important;
+}
+
+.studio-mdx-table-frame table tbody tr:last-child > * {
+  border-bottom-width: 0 !important;
+}
+
+.studio-mdx-table-frame table tbody tr:first-child {
+  background-color: hsl(var(--muted) / 0.4);
+}
+
+html.dark .studio-mdx-table-frame table :is(th, td) {
+  border-color: rgb(64 64 64) !important;
+}
+
+html.dark .studio-mdx-table-frame table tbody tr:first-child {
+  background-color: rgb(64 64 64 / 0.5);
+}
+
+.studio-mdx-table-frame table th {
+  text-align: left;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.studio-mdx-table-frame table td {
+  color: hsl(var(--foreground) / 0.9);
+}
+
+/* Edit-only: flatten MDXEditor td > div > p nesting */
+.studio-mdx-table-frame table :is(th, td) > div,
+.studio-mdx-table-frame table :is(th, td) > div > p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* 3. Active cell — inset ring avoids overflow:hidden clipping MDXEditor outline */
+.studio-mdx-table-frame table :is(th, td)[data-active="true"] {
+  outline: none !important;
+  box-shadow: inset 0 0 0 1px hsl(var(--ring));
+}
+
+html.dark .studio-mdx-table-frame table :is(th, td)[data-active="true"] {
+  box-shadow: inset 0 0 0 1px hsl(var(--foreground) / 0.6);
+}
+
+/* 4. MDXEditor chrome suppression (edit only) */
+.studio-mdx-table-frame table :is(thead, tfoot) {
+  display: none !important;
+}
+
+.studio-mdx-table-frame table :is(
+  [class*="tableToolsColumn"],
+  [class*="toolCell"],
+  [data-tool-cell="true"]
+) {
+  display: none !important;
+}
+
+.studio-mdx-table-frame .studio-mdx-editor :is(
+  [class*="toolbarRoot"],
+  [class*="addRowButton"],
+  [class*="addColumnButton"],
+  [class*="tableColumnEditorTrigger"],
+  [class*="tableRowEditorTrigger"],
+  [class*="iconButton"]
+) {
+  display: none !important;
+}
+
+.studio-mdx-table-frame [contenteditable] > p:last-child:has(> br:only-child) {
+  display: none !important;
+}
+
+.studio-text-segment-edit {
+  field-sizing: content;
+}
+
+.studio-mdx-table-frame [class*="mdxeditor"],
+.studio-mdx-table-frame [class*="editorRoot"],
+.studio-mdx-table-frame [class*="editorWrapper"] {
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+}
+
+.studio-text-table-frame-action {
+  z-index: 20;
+}
+
 /* Markdown */
 .md h2 {
   @apply text-xl font-semibold;
@@ -630,5 +791,10 @@ html.dark .workflow-canvas .react-flow__background pattern circle {
 .thin-scrollbar::-webkit-scrollbar-corner,
 .studio-scrollbar::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+html.studio-reference-dragging,
+html.studio-reference-dragging * {
+  cursor: grabbing !important;
 }
 

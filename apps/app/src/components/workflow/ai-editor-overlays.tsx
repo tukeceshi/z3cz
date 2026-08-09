@@ -8,7 +8,6 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
-import { useGenerativeMediaBeforeUnloadGuard } from "@/hooks/use-generative-media-before-unload";
 
 import { AiCloudStorageBanner } from "./ai-cloud-storage-banner";
 import { AiMediaCacheBar } from "./ai-media-cache-panel";
@@ -20,7 +19,6 @@ interface AiEditorOverlaysProps {
 }
 
 export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
-  useGenerativeMediaBeforeUnloadGuard();
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;

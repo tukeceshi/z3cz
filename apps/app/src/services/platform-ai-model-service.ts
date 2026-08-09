@@ -531,70 +531,84 @@ export async function generateAiTextStream(
   let fullText = "";
   let donePayload: GenerateAiTextResponse | null = null;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  const throwIfAborted = (): void => {
+    if (!handlers.signal?.aborted) {
+      return;
     }
+    throw new DOMException("The user aborted a request.", "AbortError");
+  };
 
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split("\n\n");
-    buffer = chunks.pop() ?? "";
+  try {
+    while (true) {
+      throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
 
-    for (const chunk of chunks) {
-      const lines = chunk.split("\n");
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) {
-          continue;
-        }
-        const data = trimmed.slice(5).trim();
-        if (!data) {
-          continue;
-        }
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
 
-        let event: {
-          type?: string;
-          text?: string;
-          error?: string;
-          invocationId?: string;
-          aiInterfaceId?: string;
-        };
-        try {
-          event = JSON.parse(data) as typeof event;
-        } catch {
-          continue;
-        }
-
-        if (event.type === "delta" && typeof event.text === "string") {
-          fullText += event.text;
-          handlers.onDelta?.(event.text, fullText);
-          continue;
-        }
-
-        if (event.type === "done" && typeof event.text === "string") {
-          fullText = event.text;
-          if (
-            typeof event.invocationId === "string" &&
-            typeof event.aiInterfaceId === "string"
-          ) {
-            donePayload = {
-              text: event.text,
-              invocationId: event.invocationId,
-              aiInterfaceId: event.aiInterfaceId,
-            };
+      for (const chunk of chunks) {
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) {
+            continue;
           }
-          continue;
-        }
+          const data = trimmed.slice(5).trim();
+          if (!data) {
+            continue;
+          }
 
-        if (event.type === "error") {
-          throw new Error(event.error || "Generation failed");
+          let event: {
+            type?: string;
+            text?: string;
+            error?: string;
+            invocationId?: string;
+            aiInterfaceId?: string;
+          };
+          try {
+            event = JSON.parse(data) as typeof event;
+          } catch {
+            continue;
+          }
+
+          if (event.type === "delta" && typeof event.text === "string") {
+            fullText += event.text;
+            handlers.onDelta?.(event.text, fullText);
+            continue;
+          }
+
+          if (event.type === "done" && typeof event.text === "string") {
+            fullText = event.text;
+            if (
+              typeof event.invocationId === "string" &&
+              typeof event.aiInterfaceId === "string"
+            ) {
+              donePayload = {
+                text: event.text,
+                invocationId: event.invocationId,
+                aiInterfaceId: event.aiInterfaceId,
+              };
+            }
+            continue;
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.error || "Generation failed");
+          }
         }
       }
     }
+  } catch (error) {
+    throwIfAborted();
+    throw error;
   }
 
   if (!donePayload) {
+    throwIfAborted();
     throw new Error(
       fullText.trim()
         ? "Stream ended without completion event"

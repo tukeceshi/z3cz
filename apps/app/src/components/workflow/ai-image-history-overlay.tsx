@@ -18,6 +18,7 @@ import {
   formatHistoryCreatedAt,
   resolveHistoryModelLabel,
 } from "./generative-history-utils";
+import { STUDIO_SCROLL } from "./creative-studio-surface";
 import {
   GenerativeHistoryMediaPreview,
   type GenerativeHistoryMediaKind,
@@ -176,7 +177,7 @@ export function AiImageHistoryOverlay({
           </div>
           <div
             ref={listScrollRef}
-            className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2"
+            className={cn("min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2", STUDIO_SCROLL)}
           >
             {history.items.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">
@@ -251,7 +252,7 @@ export function AiImageHistoryOverlay({
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", STUDIO_SCROLL)}>
             {previewMedia ? (
               <div className="mb-3">
                 <GenerativeHistoryMediaPreview
@@ -259,8 +260,6 @@ export function AiImageHistoryOverlay({
                   mediaKind={mediaKind}
                   value={previewMedia}
                   createObjectUrl={createObjectUrl}
-                  className="w-full"
-                  imageClassName="max-h-[min(48vh,440px)] object-contain"
                 />
               </div>
             ) : (

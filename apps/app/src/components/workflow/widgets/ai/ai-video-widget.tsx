@@ -27,7 +27,7 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
-import { isGenerativeProgressBusyPhase, readGenerativeProgressPhase } from "../../generative-progress-utils";
+import { isGenerativeProgressBusyPhase, readGenerativeProgressPhase, withGenerativeUploadProgress } from "../../generative-progress-utils";
 import {
   isAiVideoGenerating,
   readAiVideoCardVideos,
@@ -51,7 +51,6 @@ import { readGenerativeCardError } from "../../generative-card-error-utils";
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
-  withGenerativeCardEditing,
 } from "../../generative-card-mode-utils";
 import {
   normalizeGenerativeCardUploadFile,
@@ -157,22 +156,6 @@ function AiVideoWidget({
       i18nPrefix: "workflow.aiVideoPanel",
     });
 
-  const setCardEditing = useCallback(
-    (editing: boolean) => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, editing),
-      }));
-    },
-    [nodeId, updateNodeData]
-  );
-
-  useEffect(() => {
-    return () => {
-      setCardEditing(false);
-    };
-  }, [setCardEditing]);
-
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
@@ -217,7 +200,9 @@ function AiVideoWidget({
       }
 
       setUploading(true);
-      setCardEditing(true);
+      updateNodeData(nodeId, (current) => ({
+        metadata: withGenerativeUploadProgress(current.metadata, true),
+      }));
       try {
         const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
@@ -246,9 +231,9 @@ function AiVideoWidget({
           const withMedia = withAiVideoManualUpload(current, [staged]);
           return {
             ...withMedia,
-            metadata: withAiVideoGenerateError(
-              withMedia.metadata,
-              uploadError
+            metadata: withGenerativeUploadProgress(
+              withAiVideoGenerateError(withMedia.metadata, uploadError),
+              false
             ),
           };
         });
@@ -262,12 +247,17 @@ function AiVideoWidget({
           t
         );
         updateNodeData(nodeId, (current) => ({
-          metadata: withAiVideoGenerateError(current.metadata, formatted),
+          metadata: withGenerativeUploadProgress(
+            withAiVideoGenerateError(current.metadata, formatted),
+            false
+          ),
         }));
         toast.errorRaw(formatted.summary);
       } finally {
         setUploading(false);
-        setCardEditing(false);
+        updateNodeData(nodeId, (current) => ({
+          metadata: withGenerativeUploadProgress(current.metadata, false),
+        }));
       }
     },
     [
@@ -276,7 +266,6 @@ function AiVideoWidget({
       disabled,
       nodeId,
       orgId,
-      setCardEditing,
       t,
       toast,
       updateNodeData,

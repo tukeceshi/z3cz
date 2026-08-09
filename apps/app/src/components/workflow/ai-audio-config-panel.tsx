@@ -41,8 +41,9 @@ import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
-import { connectGenerativeReferenceEdge } from "./generative-reference-utils";
+import { connectGenerativeReferenceEdge, studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
 import { AiGenerateButton } from "./ai-generate-button";
+import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
   AiTextExpandButton,
 } from "./ai-text-expand-overlay";
@@ -349,18 +350,43 @@ export function AiAudioConfigPanel({
     }
   };
 
+  const canAcceptStudioReference = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return false;
+      return evaluateAiAudioPromptReferenceStructural({
+        targetNodeId: nodeId,
+        targetNodeMetadata: data.metadata,
+        sourceNodeId,
+        sourceNodeType: source.data.nodeType,
+        edges,
+      }).ok;
+    },
+    [data.metadata, edges, nodeId, typedNodes]
+  );
+
+  const previewStudioReferenceDrop = useCallback(
+    (sourceNodeId: string, sourceHandle: string) => {
+      const source = typedNodes.find((node) => node.id === sourceNodeId);
+      if (!source) return "rejected" as const;
+      return studioReferenceDropPreviewFromVerdict(
+        evaluateAiAudioPromptReferenceStructural({
+          targetNodeId: nodeId,
+          targetNodeMetadata: data.metadata,
+          sourceNodeId,
+          sourceNodeType: source.data.nodeType,
+          edges,
+        })
+      );
+    },
+    [data.metadata, edges, nodeId, typedNodes]
+  );
+
   const handlePickNode = (sourceNodeId: string, sourceHandle: string) => {
     const source = typedNodes.find((node) => node.id === sourceNodeId);
     if (!source) return;
 
-    const verdict = evaluateAiAudioPromptReferenceStructural({
-      targetNodeId: nodeId,
-      targetNodeMetadata: data.metadata,
-      sourceNodeId,
-      sourceNodeType: source.data.nodeType,
-      edges,
-    });
-    if (!verdict.ok) {
+    if (!canAcceptStudioReference(sourceNodeId, sourceHandle)) {
       toast.error("workflow.aiAudioPanel.referenceRejected");
       return;
     }
@@ -484,7 +510,7 @@ export function AiAudioConfigPanel({
           params: generationValues,
           platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
-          modelDisplayName: effectiveModel.displayName,
+          modelDisplayName: effectiveModel.alias,
         });
         return {
           ...withResult,
@@ -545,7 +571,7 @@ export function AiAudioConfigPanel({
                   params: generationValues,
                   platformModelId: effectiveModel.canonicalId,
                   aiInterfaceId: effectiveModel.interfaceId,
-                  modelDisplayName: effectiveModel.displayName,
+                  modelDisplayName: effectiveModel.alias,
                 }
               );
               return {
@@ -628,10 +654,22 @@ export function AiAudioConfigPanel({
 
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom} layout={layout}>
+      <GenerativeConfigPanelShell
+        nodeId={nodeId}
+        zoom={zoom}
+        layout={layout}
+        dropDisabled={disabled}
+        previewStudioReferenceDrop={
+          layout === "studio-dock" ? previewStudioReferenceDrop : undefined
+        }
+        onStudioReferenceDrop={
+          layout === "studio-dock" ? handlePickNode : undefined
+        }
+      >
         <AiTextReferenceBar
           chips={referenceChips}
           disabled={disabled}
+          showStudioReferenceHints={layout === "studio-dock"}
           allowUpload={false}
           addReferenceDisabled={!canAddReference}
           canPickCanvasNode={pickableOutputs.length > 0}
@@ -739,14 +777,22 @@ export function AiAudioConfigPanel({
             </div>
           </div>
 
-          <AiGenerateButton
-            disabled={!canGenerate}
-            isGenerating={isGenerating}
-            label={t(generativeAudioProgressButtonKey(activeProgressPhase))}
-            onClick={() => {
-              void handleGenerate();
-            }}
-          />
+          <div className="flex shrink-0 items-end gap-3">
+            {layout === "studio-dock" ? (
+              <StudioDockPromptCharCount
+                count={displayPrompt.length}
+                maxLength={promptMaxLength}
+              />
+            ) : null}
+            <AiGenerateButton
+              disabled={!canGenerate}
+              isGenerating={isGenerating}
+              label={t(generativeAudioProgressButtonKey(activeProgressPhase))}
+              onClick={() => {
+                void handleGenerate();
+              }}
+            />
+          </div>
         </div>
       </GenerativeConfigPanelShell>
 

@@ -12,6 +12,7 @@ import {
 } from "./ai-video-node-utils";
 import {
   collectGenerativeReferenceChips,
+  isGenerativeReferenceAlreadyConnected,
   type GenerativeReferenceChip,
 } from "./generative-reference-utils";
 import { classifyAiVideoReferenceFromNodeType } from "./ai-video-node-utils";
@@ -158,7 +159,7 @@ export function evaluateAiVideoPromptReferenceStructural(params: {
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "targetHandle"
   >[];
-}): { readonly ok: boolean } {
+}): { readonly ok: boolean; readonly reason?: "already_connected" } {
   if (isGenerativeManualContent(params.targetNodeMetadata)) {
     return { ok: false };
   }
@@ -167,6 +168,16 @@ export function evaluateAiVideoPromptReferenceStructural(params: {
   }
   if (params.sourceNodeType !== AI_TEXT_NODE_TYPE) {
     return { ok: false };
+  }
+  if (
+    params.edges &&
+    isGenerativeReferenceAlreadyConnected(params.edges, {
+      source: params.sourceNodeId,
+      target: params.targetNodeId,
+      targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
+    })
+  ) {
+    return { ok: false, reason: "already_connected" };
   }
   if (
     params.edges?.some(

@@ -15,12 +15,16 @@ export interface CreativeStudioNodeCardProps {
   readonly node: ReactFlowNode<WorkflowNodeType>;
   readonly isActive: boolean;
   readonly onOpenDetail: () => void;
+  readonly onCancelPendingListClick?: () => void;
+  readonly referenceDragEnabled?: boolean;
 }
 
 export function CreativeStudioNodeCard({
   node,
   isActive,
   onOpenDetail,
+  onCancelPendingListClick,
+  referenceDragEnabled = false,
 }: CreativeStudioNodeCardProps) {
   const nodeType = node.data.nodeType ?? "";
 
@@ -28,8 +32,9 @@ export function CreativeStudioNodeCard({
     return (
       <CreativeStudioAudioTile
         node={node}
-        isActive={isActive}
         onOpenDetail={onOpenDetail}
+        onCancelPendingListClick={onCancelPendingListClick}
+        referenceDragEnabled={referenceDragEnabled}
       />
     );
   }
@@ -40,6 +45,8 @@ export function CreativeStudioNodeCard({
         node={node}
         isActive={isActive}
         onOpenDetail={onOpenDetail}
+        onCancelPendingListClick={onCancelPendingListClick}
+        referenceDragEnabled={referenceDragEnabled}
       />
     );
   }
@@ -49,6 +56,8 @@ export function CreativeStudioNodeCard({
       <CreativeStudioMediaCard
         node={node}
         onOpenDetail={onOpenDetail}
+        onCancelPendingListClick={onCancelPendingListClick}
+        referenceDragEnabled={referenceDragEnabled}
       />
     );
   }

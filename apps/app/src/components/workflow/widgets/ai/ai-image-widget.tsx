@@ -27,7 +27,10 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
-import { readGenerativeProgressPhase } from "../../generative-progress-utils";
+import {
+  readGenerativeProgressPhase,
+  withGenerativeUploadProgress,
+} from "../../generative-progress-utils";
 import {
   isAiImageGenerating,
   readAiImageCardImages,
@@ -45,7 +48,6 @@ import { readGenerativeCardError } from "../../generative-card-error-utils";
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
-  withGenerativeCardEditing,
 } from "../../generative-card-mode-utils";
 import {
   GENERATIVE_IMAGE_UPLOAD_ACCEPT,
@@ -145,22 +147,6 @@ function AiImageWidget({
       i18nPrefix: "workflow.aiImagePanel",
     });
 
-  const setCardEditing = useCallback(
-    (editing: boolean) => {
-      if (!updateNodeData) return;
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardEditing(current.metadata, editing),
-      }));
-    },
-    [nodeId, updateNodeData]
-  );
-
-  useEffect(() => {
-    return () => {
-      setCardEditing(false);
-    };
-  }, [setCardEditing]);
-
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
@@ -205,7 +191,9 @@ function AiImageWidget({
       }
 
       setUploading(true);
-      setCardEditing(true);
+      updateNodeData(nodeId, (current) => ({
+        metadata: withGenerativeUploadProgress(current.metadata, true),
+      }));
       try {
         const staged = await stageGenerativeCardUpload({
           organizationId: orgId,
@@ -234,9 +222,9 @@ function AiImageWidget({
           const withMedia = withAiImageManualUpload(current, [staged]);
           return {
             ...withMedia,
-            metadata: withAiImageGenerateError(
-              withMedia.metadata,
-              uploadError
+            metadata: withGenerativeUploadProgress(
+              withAiImageGenerateError(withMedia.metadata, uploadError),
+              false
             ),
           };
         });
@@ -250,12 +238,17 @@ function AiImageWidget({
           t
         );
         updateNodeData(nodeId, (current) => ({
-          metadata: withAiImageGenerateError(current.metadata, formatted),
+          metadata: withGenerativeUploadProgress(
+            withAiImageGenerateError(current.metadata, formatted),
+            false
+          ),
         }));
         toast.errorRaw(formatted.summary);
       } finally {
         setUploading(false);
-        setCardEditing(false);
+        updateNodeData(nodeId, (current) => ({
+          metadata: withGenerativeUploadProgress(current.metadata, false),
+        }));
       }
     },
     [
@@ -264,7 +257,6 @@ function AiImageWidget({
       blocksGenerativeMedia,
       nodeId,
       orgId,
-      setCardEditing,
       t,
       toast,
       updateNodeData,

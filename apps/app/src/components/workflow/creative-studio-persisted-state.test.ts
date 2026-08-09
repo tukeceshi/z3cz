@@ -17,6 +17,7 @@ describe("creative-studio-persisted-state", () => {
       viewMode: "canvas",
       nodeId: null,
       detailNodeId: null,
+      detailPaneOpen: false,
     });
   });
 
@@ -25,12 +26,14 @@ describe("creative-studio-persisted-state", () => {
       viewMode: "studio",
       nodeId: "node-1",
       detailNodeId: "node-1",
+      detailPaneOpen: true,
     });
 
     expect(readCreativeStudioPersistedState(WORKFLOW_ID)).toEqual({
       viewMode: "studio",
       nodeId: "node-1",
       detailNodeId: "node-1",
+      detailPaneOpen: true,
     });
   });
 
@@ -39,12 +42,32 @@ describe("creative-studio-persisted-state", () => {
       viewMode: "canvas",
       nodeId: "node-1",
       detailNodeId: "node-1",
+      detailPaneOpen: true,
     });
 
     expect(readCreativeStudioPersistedState(WORKFLOW_ID)).toEqual({
       viewMode: "canvas",
       nodeId: null,
       detailNodeId: null,
+      detailPaneOpen: false,
+    });
+  });
+
+  it("infers detail pane open from detail node id when field is missing", () => {
+    localStorage.setItem(
+      `dafthunk.workflow-editor.studio-state:${WORKFLOW_ID}`,
+      JSON.stringify({
+        viewMode: "studio",
+        nodeId: "node-1",
+        detailNodeId: "node-1",
+      })
+    );
+
+    expect(readCreativeStudioPersistedState(WORKFLOW_ID)).toEqual({
+      viewMode: "studio",
+      nodeId: "node-1",
+      detailNodeId: "node-1",
+      detailPaneOpen: true,
     });
   });
 });

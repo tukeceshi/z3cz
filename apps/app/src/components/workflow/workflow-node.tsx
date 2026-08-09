@@ -356,6 +356,7 @@ export const WorkflowNode = memo(
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [activeOutputId, setActiveOutputId] = useState<string | null>(null);
     const [configToolId, setConfigToolId] = useState<string | null>(null);
+    const [emptyTextEditing, setEmptyTextEditing] = useState(false);
 
     const nodeType = data.nodeType || "";
     const isAiTextNode = nodeType === AI_TEXT_NODE_TYPE;
@@ -377,7 +378,8 @@ export const WorkflowNode = memo(
       isWorkflowBottomPanelVisible(viewportZoom) &&
       (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
-        : shouldShowGenerativeBottomPanel(data.metadata));
+        : shouldShowGenerativeBottomPanel(data.metadata)) &&
+      !(isAiTextNode && emptyTextEditing);
     const bottomPanelData = useWorkflowNodeBottomPanelData(
       data as unknown as CanvasWorkflowNodeType
     );
@@ -877,6 +879,12 @@ export const WorkflowNode = memo(
                 onChange: !disabled ? handleWidgetChange : () => {},
                 disabled,
                 createObjectUrl: data.createObjectUrl,
+                ...(isAiTextNode
+                  ? {
+                      selected: selected ?? false,
+                      onEmptyOutputEditingChange: setEmptyTextEditing,
+                    }
+                  : {}),
               })}
             </div>
           )}
