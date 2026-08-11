@@ -17,6 +17,20 @@ function computeManifestVersion(files: BootstrapManifestFile[]): string {
   return createHash("sha256").update(payload).digest("hex").slice(0, 16);
 }
 
+function isWsViaProxy(): boolean {
+  const flag = process.env.VITE_WS_VIA_PROXY;
+  return flag === "1" || flag === "true";
+}
+
+function buildBootstrapWsConfigScript(): string {
+  const payload = JSON.stringify({
+    viaProxy: isWsViaProxy(),
+    wsHost: process.env.VITE_WS_HOST ?? "",
+    apiBase: process.env.VITE_API_HOST ?? "/api",
+  });
+  return `<script>window.__Z3CZ_WS__=${payload};</script>`;
+}
+
 export function bootstrapManifestPlugin(): Plugin {
   let capturedEntry: string | undefined;
   let capturedCss: string[] = [];
@@ -94,7 +108,7 @@ export function bootstrapManifestPlugin(): Plugin {
         if (!next.includes("/bootstrap/launcher.js")) {
           next = next.replace(
             "</body>",
-            '    <script src="/bootstrap/launcher.js"></script>\n  </body>'
+            `    ${buildBootstrapWsConfigScript()}\n    <script src="/bootstrap/launcher.js"></script>\n  </body>`
           );
         }
 

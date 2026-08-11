@@ -150,9 +150,34 @@
     });
   }
 
+  function getWebSocketBaseUrl() {
+    var cfg = window.__Z3CZ_WS__ || {};
+    var viaProxy = cfg.viaProxy === true;
+    var wsHost = typeof cfg.wsHost === "string" ? cfg.wsHost : "";
+    var apiBase =
+      typeof cfg.apiBase === "string" && cfg.apiBase.length > 0
+        ? cfg.apiBase
+        : API_BASE;
+
+    if (!viaProxy && wsHost.length > 0) {
+      return wsHost.replace(/\/$/, "");
+    }
+
+    if (apiBase.indexOf("http://") === 0 || apiBase.indexOf("https://") === 0) {
+      return apiBase.replace(/^http/, "ws").replace(/\/$/, "");
+    }
+
+    // Vite /api proxy cannot upgrade @hono/node-ws; connect to API directly in dev.
+    if (!viaProxy && apiBase.charAt(0) === "/") {
+      return "ws://localhost:3102";
+    }
+
+    var origin = location.origin.replace(/^http/, "ws");
+    return origin + apiBase.replace(/\/$/, "");
+  }
+
   function wsUrl() {
-    var protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    return protocol + "//" + location.host + API_BASE + "/bootstrap/ws";
+    return getWebSocketBaseUrl() + "/bootstrap/ws";
   }
 
   function fetchAllOverWs(files) {
