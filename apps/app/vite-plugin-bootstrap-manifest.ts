@@ -18,6 +18,9 @@ function computeManifestVersion(files: BootstrapManifestFile[]): string {
 }
 
 export function bootstrapManifestPlugin(): Plugin {
+  let capturedEntry: string | undefined;
+  let capturedCss: string[] = [];
+
   return {
     name: "bootstrap-manifest",
     apply: "build",
@@ -25,28 +28,15 @@ export function bootstrapManifestPlugin(): Plugin {
       const outDir = path.resolve(process.cwd(), "dist");
       const assetsDir = path.join(outDir, "assets");
       if (!fs.existsSync(assetsDir)) {
-        return;
+        throw new Error("[bootstrap-manifest] dist/assets missing after build");
       }
 
-      const indexHtmlPath = path.join(outDir, "index.html");
-      if (!fs.existsSync(indexHtmlPath)) {
-        return;
+      const entry = capturedEntry;
+      if (!entry) {
+        throw new Error(
+          "[bootstrap-manifest] Could not determine JS entry from index.html"
+        );
       }
-
-      const indexHtml = fs.readFileSync(indexHtmlPath, "utf8");
-      const scriptMatch = indexHtml.match(
-        /<script[^>]+src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/i
-      );
-      const cssMatches = [
-        ...indexHtml.matchAll(/<link[^>]+href="(\/assets\/[^"]+\.css)"[^>]*>/gi),
-      ];
-
-      if (!scriptMatch) {
-        return;
-      }
-
-      const entry = scriptMatch[1];
-      const css = cssMatches.map((match) => match[1]);
 
       const files: BootstrapManifestFile[] = fs
         .readdirSync(assetsDir)
@@ -63,7 +53,7 @@ export function bootstrapManifestPlugin(): Plugin {
       const manifest: BootstrapManifest = {
         version: 1,
         entry,
-        css,
+        css: capturedCss,
         files,
         manifestVersion: computeManifestVersion(files),
       };
@@ -77,6 +67,16 @@ export function bootstrapManifestPlugin(): Plugin {
     transformIndexHtml: {
       order: "post",
       handler(html) {
+        const scriptMatch = html.match(
+          /<script[^>]+src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/i
+        );
+        if (scriptMatch) {
+          capturedEntry = scriptMatch[1];
+        }
+        capturedCss = [
+          ...html.matchAll(/<link[^>]+href="(\/assets\/[^"]+\.css)"[^>]*>/gi),
+        ].map((match) => match[1]);
+
         let next = html.replace(
           /<link rel="preconnect" href="https:\/\/rsms\.me" \/>[\s\S]*?<link rel="stylesheet" href="https:\/\/rsms\.me\/inter\/inter\.css" \/>[\s\n]*/i,
           ""
