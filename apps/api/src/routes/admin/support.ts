@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+﻿import { zValidator } from "@hono/zod-validator";
 import {
   and,
   asc,
@@ -29,7 +29,7 @@ import {
   users,
 } from "../../db";
 import { sendOutboundSupportMessage } from "../../support-send";
-import { inboxKeys, SUPPORT_INBOX_ALIAS } from "../../support-storage";
+import { SUPPORT_INBOX_ALIAS } from "../../support-storage";
 
 const adminSupportRoutes = new Hono<ApiContext>();
 
@@ -49,7 +49,7 @@ const threadSummaryColumns = {
   organizationName: organizations.name,
 } as const;
 
-/** GET /admin/support/threads �?paginated. `unread` projected per row. */
+/** GET /admin/support/threads 锟?paginated. `unread` projected per row. */
 adminSupportRoutes.get(
   "/threads",
   zValidator(
@@ -127,7 +127,7 @@ adminSupportRoutes.get(
   }
 );
 
-/** GET /admin/support/unread-count �?drives the sidebar badge. */
+/** GET /admin/support/unread-count 锟?drives the sidebar badge. */
 adminSupportRoutes.get("/unread-count", async (c) => {
   const db = createDatabase(c.env);
   const adminUserId = c.get("jwtPayload")?.sub;
@@ -156,7 +156,7 @@ adminSupportRoutes.get("/unread-count", async (c) => {
   return c.json({ count: row?.count ?? 0 });
 });
 
-/** GET /admin/support/threads/:id �?thread + messages + attachment metadata. */
+/** GET /admin/support/threads/:id 锟?thread + messages + attachment metadata. */
 adminSupportRoutes.get("/threads/:id", async (c) => {
   const db = createDatabase(c.env);
   const id = c.req.param("id");
@@ -206,7 +206,7 @@ adminSupportRoutes.get("/threads/:id", async (c) => {
           set: { lastReadAt: now },
         });
     } catch (error) {
-      // Read tracking is best-effort �?never fail the request because the
+      // Read tracking is best-effort 锟?never fail the request because the
       // badge couldn't update.
       console.error("[support] failed to mark thread as read", error);
     }
@@ -227,103 +227,8 @@ adminSupportRoutes.get("/threads/:id", async (c) => {
   });
 });
 
-/** GET /admin/support/messages/:id/body?part=text|html �?streams from R2. */
-adminSupportRoutes.get(
-  "/messages/:id/body",
-  zValidator(
-    "query",
-    z.object({
-      part: z.enum(["text", "html"]).default("text"),
-    })
-  ),
-  async (c) => {
-    const db = createDatabase(c.env);
-    const id = c.req.param("id");
-    const { part } = c.req.valid("query");
-
-    const [row] = await db
-      .select({ inboxId: threads.inboxId })
-      .from(messages)
-      .innerJoin(threads, eq(threads.id, messages.threadId))
-      .where(eq(messages.id, id))
-      .limit(1);
-    if (!row) {
-      return c.json({ error: "Message not found" }, 404);
-    }
-
-    const keys = inboxKeys(row.inboxId, id);
-    const bodyPart =
-      part === "html"
-        ? {
-            key: keys.htmlBody,
-            filename: "body.html",
-            contentType: "text/html; charset=utf-8",
-          }
-        : {
-            key: keys.textBody,
-            filename: "body.txt",
-            contentType: "text/plain; charset=utf-8",
-          };
-    const obj = await c.env.INBOXES.get(bodyPart.key);
-    if (!obj) {
-      return c.json({ error: "Body part not stored" }, 404);
-    }
-
-    // Defense-in-depth: attacker-controlled HTML must never run same-origin.
-    // Content-Disposition + CSP sandbox neutralise top-level navigation;
-    // our `fetch()` call ignores these headers, so the iframe rendering
-    // path keeps working.
-    return new Response(obj.body, {
-      status: 200,
-      headers: {
-        "Content-Type": bodyPart.contentType,
-        "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "sandbox",
-        "Content-Disposition": `attachment; filename="${bodyPart.filename}"`,
-      },
-    });
-  }
-);
-
-/** GET /admin/support/attachments/:id �?streams from R2 with download disposition. */
-adminSupportRoutes.get("/attachments/:id", async (c) => {
-  const db = createDatabase(c.env);
-  const id = c.req.param("id");
-
-  const [att] = await db
-    .select()
-    .from(attachments)
-    .where(eq(attachments.id, id))
-    .limit(1);
-  if (!att) {
-    return c.json({ error: "Attachment not found" }, 404);
-  }
-
-  const obj = await c.env.INBOXES.get(att.r2Key);
-  if (!obj) {
-    return c.json({ error: "Attachment blob missing" }, 404);
-  }
-
-  // Strip every byte that could break out of the quoted filename value.
-  // Workers' `Headers` already rejects CR/LF, but nosniff + CSP sandbox +
-  // the forced `attachment` disposition together guarantee the attacker
-  // cannot get the response rendered same-origin even with a polyglot
-  // Content-Type they picked at upload time.
-  const safeFilename = att.filename.replace(/["\r\n]/g, "");
-  return new Response(obj.body, {
-    status: 200,
-    headers: {
-      "Content-Type": att.contentType,
-      "Content-Length": String(att.sizeBytes),
-      "Content-Disposition": `attachment; filename="${safeFilename}"`,
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "sandbox",
-    },
-  });
-});
-
 /**
- * POST /admin/support/threads �?admin-initiated outbound thread. Creates a
+ * POST /admin/support/threads — admin-initiated outbound thread. Creates a
  * new thread addressed to an arbitrary email and sends the first message
  * via the shared outbound path. Auto-links to a registered user when the
  * recipient's address matches `users.email`.
@@ -391,7 +296,7 @@ adminSupportRoutes.post(
   }
 );
 
-/** POST /admin/support/threads/:id/reply �?threaded reply via SUPPORT_EMAIL_FROM. */
+/** POST /admin/support/threads/:id/reply 锟?threaded reply via SUPPORT_EMAIL_FROM. */
 adminSupportRoutes.post(
   "/threads/:id/reply",
   zValidator(
@@ -451,7 +356,7 @@ adminSupportRoutes.post(
   }
 );
 
-/** PATCH /admin/support/threads/:id �?archive / unarchive. */
+/** PATCH /admin/support/threads/:id 锟?archive / unarchive. */
 adminSupportRoutes.patch(
   "/threads/:id",
   zValidator("json", z.object({ archived: z.boolean() })),

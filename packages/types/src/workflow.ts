@@ -630,6 +630,14 @@ export interface WorkflowUpdateMessage {
   state: WorkflowState;
 }
 
+export type {
+  WorkflowEdgePatch,
+  WorkflowGraphPatchBroadcast,
+  WorkflowGraphPatchMessage,
+  WorkflowGraphPatchPayload,
+  WorkflowNodePatch,
+} from "./workflow-graph-patch";
+
 /**
  * Message sent from client to server to start workflow execution
  * or register for execution updates
@@ -665,7 +673,10 @@ export interface WorkflowErrorMessage {
 /**
  * Messages sent from client to server
  */
-export type ClientMessage = WorkflowUpdateMessage | WorkflowExecuteMessage;
+export type ClientMessage =
+  | WorkflowUpdateMessage
+  | WorkflowExecuteMessage
+  | WorkflowGraphPatchMessage;
 
 /**
  * Messages sent from server to client
@@ -673,6 +684,7 @@ export type ClientMessage = WorkflowUpdateMessage | WorkflowExecuteMessage;
 export type ServerMessage =
   | WorkflowInitMessage
   | WorkflowUpdateMessage
+  | WorkflowGraphPatchBroadcast
   | WorkflowExecutionUpdateMessage
   | WorkflowErrorMessage;
 

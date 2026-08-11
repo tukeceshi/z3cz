@@ -1,6 +1,11 @@
 import type { AiGenerativeNodeType } from "@dafthunk/types";
 import Plus from "lucide-react/icons/plus";
-import type { DragEvent, ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import {
@@ -64,61 +69,63 @@ function DropZoneShell({
   );
 }
 
-interface AddNodeSlotButtonProps {
+interface AddNodeSlotButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   readonly fileDragOver: boolean;
   readonly uploading: boolean;
-  readonly onClick?: () => void;
   readonly children?: ReactNode;
 }
 
-function AddNodeSlotButton({
-  fileDragOver,
-  uploading,
-  onClick,
-  children,
-}: AddNodeSlotButtonProps) {
-  const { t } = useTranslation();
+const AddNodeSlotButton = forwardRef<HTMLButtonElement, AddNodeSlotButtonProps>(
+  function AddNodeSlotButton(
+    { fileDragOver, uploading, children, className, disabled, ...props },
+    ref
+  ) {
+    const { t } = useTranslation();
 
-  const slotClassName = cn(
-    STUDIO_ADD_NODE_SLOT,
-    "h-auto w-full flex-col py-2 transition-[min-height,background-color,border-color]",
-    fileDragOver
-      ? "min-h-[72px] border-primary/40 bg-primary/10"
-      : "min-h-10",
-    uploading && "opacity-80"
-  );
+    const slotClassName = cn(
+      STUDIO_ADD_NODE_SLOT,
+      "h-auto w-full flex-col py-2 transition-[min-height,background-color,border-color]",
+      fileDragOver
+        ? "min-h-[72px] border-primary/40 bg-primary/10"
+        : "min-h-10",
+      uploading && "opacity-80",
+      className
+    );
 
-  const content = fileDragOver ? (
-    <>
-      <span className="text-xs font-medium text-foreground/90">
-        {t("workflow.studio.addNodeDrop.release")}
-      </span>
-      <DropExtensionList />
-    </>
-  ) : (
-    <>
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <Plus className="size-4 shrink-0" strokeWidth={2} />
-        <span>{t("workflow.studio.addNewNode")}</span>
-      </span>
-      <span className="text-xs text-muted-foreground/80">
-        {t("workflow.studio.addNodeDrop.hint")}
-      </span>
-    </>
-  );
+    const content = fileDragOver ? (
+      <>
+        <span className="text-xs font-medium text-foreground/90">
+          {t("workflow.studio.addNodeDrop.release")}
+        </span>
+        <DropExtensionList />
+      </>
+    ) : (
+      <>
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <Plus className="size-4 shrink-0" strokeWidth={2} />
+          <span>{t("workflow.studio.addNewNode")}</span>
+        </span>
+        <span className="text-xs text-muted-foreground/80">
+          {t("workflow.studio.addNodeDrop.hint")}
+        </span>
+      </>
+    );
 
-  return (
-    <button
-      type="button"
-      className={slotClassName}
-      aria-label={t("workflow.studio.addNewNode")}
-      disabled={uploading}
-      onClick={onClick}
-    >
-      {children ?? content}
-    </button>
-  );
-}
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={slotClassName}
+        aria-label={t("workflow.studio.addNewNode")}
+        disabled={disabled ?? uploading}
+        {...props}
+      >
+        {children ?? content}
+      </button>
+    );
+  }
+);
 
 export function CreativeStudioAddNodeSlot({
   mode,

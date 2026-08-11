@@ -1,15 +1,15 @@
 import {
-  getMediaReferenceKey,
+  getResourceIdFromValue,
   isLocalMediaReference,
-  isMediaReference,
-  type MediaReference,
+  type LocalMediaReference,
+  type ResourceIdReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { rebuildMediaResourceAliasesFromCache } from "@/services/ai-media-cache-service";
 import {
-  objectReferenceFromStorageKey,
   recordMediaResourceAlias,
   resolveMediaResourceAlias,
 } from "@/services/media-resource-alias-service";
@@ -36,13 +36,13 @@ const MEDIA_ARRAY_INPUTS = new Set([
 
 function collectLocalMediaReferences(
   data: WorkflowNodeType
-): readonly MediaReference[] {
-  const refs: MediaReference[] = [];
+): readonly LocalMediaReference[] {
+  const refs: LocalMediaReference[] = [];
 
   for (const input of data.inputs) {
     if (MEDIA_ARRAY_INPUTS.has(input.id) && Array.isArray(input.value)) {
       for (const item of input.value) {
-        if (isMediaReference(item) && isLocalMediaReference(item)) {
+        if (isLocalMediaReference(item)) {
           refs.push(item);
         }
       }
@@ -59,7 +59,7 @@ function collectLocalMediaReferences(
         const media = (entry as Record<string, unknown>)[history.field];
         if (!Array.isArray(media)) continue;
         for (const item of media) {
-          if (isMediaReference(item) && isLocalMediaReference(item)) {
+          if (isLocalMediaReference(item)) {
             refs.push(item);
           }
         }
@@ -70,7 +70,7 @@ function collectLocalMediaReferences(
   for (const output of data.outputs) {
     if (output.id !== "output" || !Array.isArray(output.value)) continue;
     for (const item of output.value) {
-      if (isMediaReference(item) && isLocalMediaReference(item)) {
+      if (isLocalMediaReference(item)) {
         refs.push(item);
       }
     }
@@ -115,14 +115,10 @@ function collectAllLocalHints(
 }
 
 async function upgradeLocalReference(params: {
-  readonly media: MediaReference;
+  readonly media: LocalMediaReference;
   readonly organizationId: string;
   readonly workflowId: string;
-}): Promise<MediaReference | null> {
-  if (!isLocalMediaReference(params.media)) {
-    return null;
-  }
-
+}): Promise<ResourceIdReference | null> {
   const alias = resolveMediaResourceAlias({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
@@ -133,10 +129,10 @@ async function upgradeLocalReference(params: {
     return null;
   }
 
-  return objectReferenceFromStorageKey({
-    storageKey: alias,
+  return {
+    resourceId: alias,
     mimeType: params.media.mimeType,
-  });
+  };
 }
 
 export async function reconcileWorkflowMediaReferencesInNodes(
@@ -172,7 +168,7 @@ export async function reconcileWorkflowMediaReferencesInNodes(
         organizationId,
         workflowId,
         fromMediaId: localRef.mediaId,
-        toMediaId: getMediaReferenceKey(upgraded),
+        toMediaId: getResourceIdFromValue(upgraded) ?? upgraded.resourceId,
       });
 
       const patched = rekeyMediaReferencesInNodeData(
@@ -195,7 +191,7 @@ export async function reconcileWorkflowMediaReferencesInNodes(
 export function applyMediaResourceRekeyToNodes(
   nodes: readonly ReactFlowNode<WorkflowNodeType>[],
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): ReactFlowNode<WorkflowNodeType>[] | null {
-  return rekeyMediaReferencesInNodes(nodes, fromMediaId, toMediaReference);
+  return rekeyMediaReferencesInNodes(nodes, fromMediaId, toMedia);
 }

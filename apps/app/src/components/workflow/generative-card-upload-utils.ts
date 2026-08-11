@@ -172,7 +172,23 @@ export function withGenerativePromptCleared(
   );
 }
 
-export function canGenerativeCardDoubleClickUpload(params: {
+export type GenerativeCardUploadKind = "image" | "video" | "audio";
+
+const GENERATIVE_UPLOAD_DISPLAY_TYPES: Readonly<
+  Record<GenerativeCardUploadKind, readonly string[]>
+> = {
+  image: ["PNG", "JPG"],
+  video: ["MP4", "WebM", "MOV", "MKV", "M4V"],
+  audio: ["MP3", "WAV", "M4A", "AAC", "OGG", "FLAC"],
+};
+
+export function formatGenerativeCardUploadFileTypes(
+  kind: GenerativeCardUploadKind
+): string {
+  return GENERATIVE_UPLOAD_DISPLAY_TYPES[kind].join("、");
+}
+
+export function canGenerativeCardUpload(params: {
   readonly hasMedia: boolean;
   readonly isGenerating: boolean;
   readonly disabled?: boolean;

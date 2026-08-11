@@ -29,9 +29,15 @@ import type {
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
+  WorkflowGraphPatchBroadcast,
+  WorkflowGraphPatchMessage,
   WorkflowInitMessage,
   WorkflowState,
   WorkflowUpdateMessage,
+} from "@dafthunk/types";
+import {
+  applyWorkflowGraphPatch,
+  isEmptyWorkflowGraphPatch,
 } from "@dafthunk/types";
 import { Agent } from "agents";
 import type { Connection, ConnectionContext } from "partyserver";
@@ -132,6 +138,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
   private executionManager: ExecutionManager | null = null;
   private workflowState: WorkflowState | null = null;
   private organizationId: string | null = null;
+  private graphRev = 0;
 
   // ── Agent SDK method wrappers ─────────────────────────────────────────
   // Each wraps the cast once. Call sites use these instead of agentSelf().
@@ -186,6 +193,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
     this.setApiHost(new URL(ctx.request.url).origin);
 
+    this.workflowState = undefined;
     if (!(await this.tryLoadState(workflowId, userId))) {
       connection.close(1008, "Failed to load workflow state");
       return;
@@ -224,6 +232,12 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
       }
 
       switch (parsed.type) {
+        case "patch_graph":
+          await this.handlePatchGraphMessage(
+            connection,
+            parsed as WorkflowGraphPatchMessage
+          );
+          break;
         case "update":
           await this.handleUpdateMessage(
             connection,
@@ -436,6 +450,41 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     }
   }
 
+  private async handlePatchGraphMessage(
+    connection: Connection,
+    message: WorkflowGraphPatchMessage
+  ): Promise<void> {
+    const membership = getConnectionMembership(connection);
+    if (
+      !membership ||
+      !canEditWorkflows(membership.role, membership.permissions)
+    ) {
+      denyConnection(connection, "Permission denied");
+      return;
+    }
+
+    if (!this.workflowState || isEmptyWorkflowGraphPatch(message)) {
+      return;
+    }
+
+    this.workflowState = {
+      ...applyWorkflowGraphPatch(this.workflowState, message),
+      timestamp: Date.now(),
+    };
+    this.graphRev += 1;
+
+    await this.schedulePersist();
+
+    const patchMsg: WorkflowGraphPatchBroadcast = {
+      type: "patch_graph",
+      rev: this.graphRev,
+      nodePatches: message.nodePatches,
+      edgePatches: message.edgePatches,
+      timestamp: this.workflowState.timestamp,
+    };
+    this.broadcastMessage(JSON.stringify(patchMsg), [connection.id]);
+  }
+
   private async handleUpdateMessage(
     connection: Connection,
     message: WorkflowUpdateMessage
@@ -470,25 +519,10 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
         message.state.editorViewport ?? this.workflowState.editorViewport,
       generativeDefaults:
         message.state.generativeDefaults ?? this.workflowState.generativeDefaults,
+      timestamp: message.state.timestamp ?? Date.now(),
     };
 
-    const graphUnchanged =
-      JSON.stringify(this.workflowState.nodes) ===
-        JSON.stringify(message.state.nodes) &&
-      JSON.stringify(this.workflowState.edges) ===
-        JSON.stringify(filteredEdges);
-    const viewportChanged =
-      JSON.stringify(this.workflowState.editorViewport ?? null) !==
-      JSON.stringify(message.state.editorViewport ?? null);
-    const generativeDefaultsChanged =
-      JSON.stringify(this.workflowState.generativeDefaults ?? null) !==
-      JSON.stringify(message.state.generativeDefaults ?? null);
-
-    if (graphUnchanged && (viewportChanged || generativeDefaultsChanged)) {
-      await this.flushPersist();
-    } else {
-      await this.schedulePersist();
-    }
+    await this.schedulePersist();
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
@@ -804,6 +838,20 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
   }
 
   // ── Persistence ───────────────────────────────────────────────────────
+
+  private async persistNow(): Promise<void> {
+    if (!this.workflowState || !this.organizationId) {
+      return;
+    }
+
+    this.cancelPersistSchedules();
+    await this.storage.delete(WorkflowAgent.STORAGE_KEY_DIRTY);
+    await this.persistToDatabaseFrom({
+      workflowState: this.workflowState,
+      organizationId: this.organizationId,
+      apiHost: this.state?.apiHost,
+    });
+  }
 
   /**
    * Schedule a debounced persist to D1/R2 via the Agent SDK schedule system.

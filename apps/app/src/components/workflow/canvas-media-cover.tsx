@@ -1,20 +1,67 @@
 import {
   type MediaReference,
+  getResourceIdFromValue,
 } from "@dafthunk/types";
 import MusicIcon from "lucide-react/icons/music";
 import PlayIcon from "lucide-react/icons/play";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useCanvasMediaCoverUrl } from "@/hooks/use-canvas-media-cover-url";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { deleteCachedMediaEntry } from "@/services/ai-media-cache-service";
+import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 const UNAVAILABLE_DEBOUNCE_MS = 300;
+const BROKEN_MEDIA_RETRY_BEFORE_PURGE = 2;
 
 const decodedDisplayUrlCache = new Set<string>();
+
+function useBrokenMediaRecovery(params: {
+  readonly media: MediaReference;
+  readonly displayUrl: string | null;
+  readonly retry: () => void;
+}): () => void {
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
+  const orgId = organization?.id ?? "";
+  const brokenAttemptsRef = useRef(0);
+  const { media, displayUrl, retry } = params;
+
+  return useCallback(() => {
+    if (displayUrl) {
+      decodedDisplayUrlCache.delete(displayUrl);
+    }
+
+    brokenAttemptsRef.current += 1;
+    const mediaId = getResourceIdFromValue(media);
+    if (
+      brokenAttemptsRef.current >= BROKEN_MEDIA_RETRY_BEFORE_PURGE &&
+      mediaId &&
+      orgId &&
+      workflowId
+    ) {
+      brokenAttemptsRef.current = 0;
+      void deleteCachedMediaEntry({
+        organizationId: orgId,
+        workflowId,
+        mediaId,
+      });
+      resetMediaIngestState({
+        organizationId: orgId,
+        workflowId,
+        mediaId,
+      });
+    }
+
+    retry();
+  }, [displayUrl, media, orgId, retry, workflowId]);
+}
 
 function useDecodedDisplayUrl(params: {
   readonly displayUrl: string | null;
@@ -97,6 +144,7 @@ interface CanvasMediaCoverBaseProps {
   readonly onNaturalSize?: (width: number, height: number) => void;
   /** When true, video shows s-tier poster only (no hover playback). */
   readonly staticCover?: boolean;
+  readonly onExpandView?: () => void;
 }
 
 function CanvasImageCover({
@@ -114,12 +162,7 @@ function CanvasImageCover({
     cardWidthPx,
     cardHeightPx,
   });
-  const handleBroken = useCallback(() => {
-    if (displayUrl) {
-      decodedDisplayUrlCache.delete(displayUrl);
-    }
-    retry();
-  }, [displayUrl, retry]);
+  const handleBroken = useBrokenMediaRecovery({ media, displayUrl, retry });
   const { imgSrc, imageReady } = useDecodedDisplayUrl({
     displayUrl,
     onBroken: handleBroken,
@@ -171,6 +214,7 @@ function CanvasVideoCover({
   className,
   onNaturalSize,
   staticCover = false,
+  onExpandView,
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
@@ -196,12 +240,7 @@ function CanvasVideoCover({
     }
   }, [isCanvasOnScreen, staticCover]);
 
-  const handleBroken = useCallback(() => {
-    if (displayUrl) {
-      decodedDisplayUrlCache.delete(displayUrl);
-    }
-    retry();
-  }, [displayUrl, retry]);
+  const handleBroken = useBrokenMediaRecovery({ media, displayUrl, retry });
   const { imgSrc, imageReady } = useDecodedDisplayUrl({
     displayUrl,
     onBroken: handleBroken,
@@ -260,6 +299,7 @@ function CanvasVideoCover({
           objectFit={objectFit}
           initialHovered
           className="absolute inset-0 z-10"
+          onExpandView={onExpandView}
         />
       ) : null}
 
@@ -297,6 +337,7 @@ export function CanvasMediaCover({
   className,
   onNaturalSize,
   staticCover = false,
+  onExpandView,
 }: CanvasMediaCoverProps) {
   if (nodeType === "ai-video") {
     return (
@@ -308,6 +349,7 @@ export function CanvasMediaCover({
         className={className}
         onNaturalSize={onNaturalSize}
         staticCover={staticCover}
+        onExpandView={onExpandView}
       />
     );
   }

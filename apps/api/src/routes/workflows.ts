@@ -501,9 +501,21 @@ workflowRoutes.put(
         : {}),
     };
 
+    invalidateWorkflowLiveSession(c.env, existingWorkflow.id);
+
     return c.json(response);
   }
 );
+
+function invalidateWorkflowLiveSession(env: Bindings, workflowId: string): void {
+  if (env.RUNTIME === "node") {
+    void import("../runtime/node-workflow-session-hub").then(
+      ({ nodeWorkflowSessionHub }) => {
+        nodeWorkflowSessionHub.invalidateSession(workflowId);
+      }
+    );
+  }
+}
 
 /**
  * Delete a workflow by ID

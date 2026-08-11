@@ -34,10 +34,8 @@ function mockTextModel(
     parameterRules: rules,
     selectable: true,
     description: "",
-    groupId: null,
-    groupName: null,
-    groupDescription: null,
-    groupIcon: null,
+    sortOrder: 0,
+    brandIcon: null,
   };
 }
 

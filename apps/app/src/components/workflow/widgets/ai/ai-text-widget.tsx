@@ -4,17 +4,20 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type MouseEvent,
 } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Textarea } from "@/components/ui/textarea";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
-import {
-  AiTextExpandButton,
-} from "../../ai-text-expand-overlay";
+import { AiTextExpandButton } from "../../ai-text-expand-overlay";
+import { useCloudStorageCanvasContext } from "../../cloud-storage-canvas-provider";
+import { commitAiTextHistorySelection } from "../../commit-ai-text-value";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
 import {
   AiTextHistoryButton,
@@ -24,86 +27,113 @@ import { STUDIO_SCROLL } from "../../creative-studio-surface";
 import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
-  readAiTextResult,
   readAiTextResultHistory,
-  withAiTextHistorySelection,
 } from "../../ai-text-node-utils";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
+import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import {
   shouldShowGenerativeHistoryIcon,
   isGenerativeManualContent,
   withGenerativeGeneratedContentMode,
 } from "../../generative-card-mode-utils";
+import { readGenerativePrompt } from "../../generative-card-upload-utils";
 import { useAiTextOutputScroll } from "../../use-ai-text-output-scroll";
-import { useBufferedTextValue } from "../../use-buffered-text-value";
+import { useTextCardFileUpload } from "../../use-text-card-file-upload";
 import { useWorkflow } from "../../workflow-context";
+import type { WorkflowNodeType } from "../../workflow-types";
+import {
+  useGenerativeHistoryModels,
+  useHistoryModelUnavailableToast,
+} from "../../use-generative-history-models";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
 interface AiTextWidgetProps extends BaseWidgetProps {
-  text: string | undefined;
   outputMaxChars: number;
   historyItems: ReturnType<typeof readAiTextResultHistory>;
   nodeId: string;
+  nodeData: WorkflowNodeType;
+  prompt: string;
   metadata?: Record<string, string>;
   selected?: boolean;
   onEmptyOutputEditingChange?: (editing: boolean) => void;
 }
 
 function AiTextWidget({
-  text,
-  outputMaxChars,
   historyItems,
   onChange,
   disabled = false,
   className,
   nodeId,
+  nodeData,
+  prompt,
   metadata,
   selected = false,
   onEmptyOutputEditingChange,
 }: AiTextWidgetProps) {
   const { t } = useTranslation();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { id: workflowId } = useParams<{ id: string }>();
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
-  const [editing, setEditing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const [holdTailAfterGenerate, setHoldTailAfterGenerate] = useState(false);
-  const displayValue = text ?? "";
+  const resolvedText = useResolvedAiText({
+    organizationId: orgId,
+    workflowId,
+    inputs: nodeData.inputs,
+    outputs: nodeData.outputs,
+  });
   const isGenerating = isAiTextGenerating(metadata);
+  const displayValue = isGenerating
+    ? resolvedText.text
+    : (resolvedText.excerpt ?? resolvedText.text);
+  const hasOutput = resolvedText.text.trim().length > 0;
+  const showTextLoading =
+    resolvedText.loading && !hasOutput && !isGenerating;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
   );
   const generateError = readGenerativeCardError(metadata);
-  const cardPlaceholder = t("workflow.aiTextPanel.cardInputPlaceholder");
+  const generatingMessage = t("workflow.aiTextPanel.generating");
   const editLocked = disabled || isGenerating;
 
-  const commitText = useCallback(
-    (value: string) => {
-      if (editLocked) return;
-      onChange(value);
-    },
-    [editLocked, onChange]
-  );
-
-  const textBuffer = useBufferedTextValue(displayValue, commitText);
-  const isTextEditing = editing && !generateError && !isGenerating;
+  const {
+    uploading,
+    canUpload,
+    handleUploadClick,
+    uploadConfirmDialog,
+    fileInput,
+  } = useTextCardFileUpload({
+    nodeId,
+    prompt,
+    hasOutput,
+    isGenerating,
+    disabled,
+    fileInputRef,
+    updateNodeData,
+    onApplyText: onChange,
+  });
 
   const {
     scrollContainerRef,
     handleScroll,
     tailPreview,
   } = useAiTextOutputScroll({
-    text: isTextEditing ? textBuffer.value : displayValue,
+    text: displayValue,
     isGenerating,
     contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
     variant: "canvas-card",
-    isEditing: isTextEditing,
+    isEditing: false,
     holdTailAfterComplete: selected && holdTailAfterGenerate,
   });
 
@@ -121,55 +151,61 @@ function AiTextWidget({
   }, [nodeId]);
 
   useEffect(() => {
-    if ((generateError || isGenerating) && editing) {
-      setEditing(false);
-    }
-  }, [generateError, isGenerating, editing]);
-
-  useEffect(() => {
     if (isGenerating && historyOpen) {
       setHistoryOpen(false);
     }
   }, [isGenerating, historyOpen]);
 
-  const stopEditing = () => {
-    textBuffer.onBlur();
-    setEditing(false);
-  };
-
-  const beginOutputEdit = useCallback(() => {
-    textBuffer.onFocus();
-    setEditing(true);
-  }, [textBuffer]);
-
   useEffect(() => {
-    if (displayValue.trim() || !isGenerativeManualContent(metadata) || !updateNodeData) {
+    if (hasOutput || !isGenerativeManualContent(metadata) || !updateNodeData) {
       return;
     }
     updateNodeData(nodeId, (current) => ({
       metadata: withGenerativeGeneratedContentMode(current.metadata),
     }));
-  }, [displayValue, metadata, nodeId, updateNodeData]);
+  }, [hasOutput, metadata, nodeId, updateNodeData]);
 
   useEffect(() => {
-    onEmptyOutputEditingChange?.(isTextEditing && !textBuffer.value.trim());
-  }, [isTextEditing, onEmptyOutputEditingChange, textBuffer.value]);
+    onEmptyOutputEditingChange?.(false);
+  }, [onEmptyOutputEditingChange]);
 
   useEffect(() => {
     return () => onEmptyOutputEditingChange?.(false);
   }, [onEmptyOutputEditingChange]);
 
-  const handleHistorySelect = (id: string) => {
-    if (editLocked || !updateNodeData) return;
-    const item = historyItems.items.find((entry) => entry.id === id);
-    if (!item) return;
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
 
-    setEditing(false);
-    textBuffer.reset(item.text);
-    updateNodeData(nodeId, (current) =>
-      withAiTextHistorySelection(current, id)
-    );
-  };
+  const handleHistorySelect = useCallback(
+    (id: string) => {
+      if (editLocked || !updateNodeData || !orgId || !workflowId) return;
+
+      void (async () => {
+        const committed = await commitAiTextHistorySelection({
+          organizationId: orgId,
+          workflowId,
+          cloudConfigured,
+          nodeId,
+          selectedId: id,
+          updateNodeData,
+          current: nodeData,
+          models: historyModels.text,
+        });
+        notifyHistoryModelUnavailable(committed.modelUnavailable);
+      })();
+    },
+    [
+      cloudConfigured,
+      editLocked,
+      historyModels.text,
+      nodeData,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      orgId,
+      updateNodeData,
+      workflowId,
+    ]
+  );
 
   const handleDoubleClick = (event: MouseEvent) => {
     if (generateError) {
@@ -179,54 +215,68 @@ function AiTextWidget({
     }
     if (editLocked) return;
     event.stopPropagation();
-    if (textBuffer.value.trim()) {
-      openCreativeStudio();
-      return;
-    }
-    if (editing) return;
-    beginOutputEdit();
+    openCreativeStudio();
   };
+
+  const showEmptyUpload =
+    !hasOutput &&
+    !showTextLoading &&
+    !generateError &&
+    !isGenerating &&
+    !uploading;
+  const showEmptyBusy =
+    !hasOutput &&
+    !showTextLoading &&
+    !generateError &&
+    (isGenerating || uploading);
 
   return (
     <>
+      {uploadConfirmDialog}
+      {fileInput}
       <div
         className={cn(
-          "relative flex h-full min-h-0 flex-col overflow-hidden p-3",
-          !editing && "cursor-grab select-none",
+          "relative flex h-full min-h-0 flex-col overflow-hidden",
+          "cursor-grab select-none",
           className
         )}
         onDoubleClick={handleDoubleClick}
       >
-        {isTextEditing ? (
-          <Textarea
-            autoFocus
-            value={textBuffer.value}
-            onChange={(event) => textBuffer.onChange(event.target.value)}
-            onFocus={textBuffer.onFocus}
-            onBlur={stopEditing}
-            onCompositionStart={textBuffer.onCompositionStart}
-            onCompositionEnd={textBuffer.onCompositionEnd}
-            readOnly={editLocked}
-            maxLength={outputMaxChars}
-            placeholder={cardPlaceholder}
-            className="nodrag min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-4 shadow-none focus-visible:ring-0 cursor-text select-text"
+        {showEmptyUpload ? (
+          <GenerativeCardEmptyUploadSlot
+            kind="text"
+            size="canvas"
+            doubleClickHintKey="workflow.aiTextPanel.cardDoubleClickInput"
+            canUpload={canUpload}
+            onUploadClick={handleUploadClick}
+            className="min-h-0 flex-1"
           />
+        ) : showEmptyBusy ? (
+          <GenerativeCardEmptyUploadSlot
+            kind="text"
+            size="canvas"
+            canUpload={false}
+            onUploadClick={handleUploadClick}
+            busy
+            busyMessage={uploading ? t("workflow.aiTextPanel.cardUploading") : generatingMessage}
+            className="min-h-0 flex-1"
+          />
+        ) : showTextLoading ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <LoaderIcon className="h-4 w-4 animate-spin text-muted-foreground/50" />
+          </div>
         ) : (
           <div
             ref={scrollContainerRef}
             onScroll={tailPreview ? handleScroll : undefined}
             className={cn(
-              "min-h-0 flex-1 whitespace-pre-wrap break-words text-sm leading-4 text-foreground/80",
+              "min-h-0 flex-1 whitespace-pre-wrap break-words p-3 text-sm leading-4 text-foreground/80",
               tailPreview
                 ? cn("nodrag nopan nowheel overflow-y-auto", STUDIO_SCROLL)
                 : "overflow-hidden"
             )}
           >
-            {textBuffer.value || (
-              <span className="text-muted-foreground/50 italic">
-                {cardPlaceholder}
-              </span>
-            )}
+            {displayValue}
           </div>
         )}
 
@@ -264,7 +314,7 @@ function AiTextWidget({
         <AiTextHistoryOverlay
           open={historyOpen}
           history={historyItems}
-          currentOutput={textBuffer.value}
+          currentOutput={resolvedText.text}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
         />
@@ -286,10 +336,20 @@ export const aiTextWidget = createWidget({
     "result_history",
   ],
   extractConfig: (nodeId, inputs, outputs, metadata) => ({
-    text: readAiTextResult(inputs, outputs),
     outputMaxChars: AI_TEXT_HARD_OUTPUT_MAX_CHARS,
     historyItems: readAiTextResultHistory(inputs),
     nodeId,
+    nodeData: {
+      id: nodeId,
+      type: "workflowNode",
+      name: "AI Text",
+      nodeType: AI_TEXT_NODE_TYPE,
+      position: { x: 0, y: 0 },
+      inputs: [...inputs],
+      outputs: [...outputs],
+      metadata,
+    },
+    prompt: readGenerativePrompt(inputs),
     metadata,
   }),
 });

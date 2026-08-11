@@ -4,7 +4,8 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   getMediaReferenceKey,
-  isMediaReference,
+  isWorkflowMediaValue,
+  type GenerativeCardError,
   type MediaReference,
 } from "@dafthunk/types";
 import { useNodes, type Node as ReactFlowNode } from "@xyflow/react";
@@ -12,30 +13,29 @@ import Music from "lucide-react/icons/music";
 import Play from "lucide-react/icons/play";
 import Type from "lucide-react/icons/type";
 import LoaderIcon from "lucide-react/icons/loader-circle";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useMemo } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { useAuth } from "@/components/auth-context";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
-import { readAiAudioCardAudios } from "./ai-audio-node-utils";
+import { readAiAudioCardAudios, isAiAudioGenerating } from "./ai-audio-node-utils";
 import { collectAiImageUnifiedReferenceChips } from "./ai-image-prompt-reference";
-import { readAiImageCardImages } from "./ai-image-node-utils";
-import { readAiTextResult } from "./ai-text-node-utils";
+import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
 import { collectAiVideoUnifiedReferenceChips } from "./ai-video-prompt-reference";
-import { readAiVideoCardVideos } from "./ai-video-node-utils";
-import { fitStudioDetailSize } from "./creative-studio-detail-size";
+import { readAiVideoCardPrimaryVideo } from "./ai-video-node-utils";
+import { GenerativeBusyOverlay } from "./generative-busy-overlay";
+import { GenerativeCardErrorBlock } from "./generative-card-error-block";
+import { GenerativeCardEmptyUploadSlot } from "./generative-card-empty-upload-slot";
+import type { GenerativeCardUploadKind } from "./generative-card-upload-utils";
 import { StudioMediaEmptyPreview } from "./creative-studio-media-preview-frame";
 import { readStudioMediaCardState } from "./studio-media-card-state";
+import { StudioMediaFullPreview } from "./studio-media-full-preview";
+import { useCreativeStudio } from "./creative-studio-context";
 import {
-  STUDIO_MEDIA_PREVIEW_MEDIA,
   STUDIO_PREVIEW_MEDIA_FALLBACK,
   STUDIO_REFERENCE_THUMB,
   STUDIO_REFERENCE_THUMB_FALLBACK,
@@ -44,254 +44,29 @@ import {
 } from "./creative-studio-surface";
 import { MediaImageField } from "./fields/media-image-field";
 import { WorkflowMediaAudioPlayer } from "./workflow-media-audio-player";
-import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
+import {
+  WorkflowMediaVideoPlayer,
+} from "./workflow-media-video-player";
 import type { WorkflowNodeType } from "./workflow-types";
 import { useWorkflow } from "./workflow-context";
+
+export interface CreativeStudioEmptyUploadConfig {
+  readonly kind: GenerativeCardUploadKind;
+  readonly canUpload: boolean;
+  readonly onUploadClick: () => void;
+}
 
 export interface CreativeStudioNodePreviewProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly variant?: "card" | "detail";
   readonly className?: string;
-}
-
-const DEFAULT_DETAIL_ASPECT_RATIO = 16 / 9;
-
-const STUDIO_DETAIL_MEDIA_FRAME =
-  "relative shrink-0 overflow-hidden rounded-xl border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800";
-
-interface StudioDetailBounds {
-  readonly width: number;
-  readonly height: number;
-}
-
-interface StudioMediaIntrinsicSize {
-  readonly width: number;
-  readonly height: number;
-}
-
-function applyDetailMediaSize(
-  width: number,
-  height: number,
-  setAspectRatio: (ratio: number) => void,
-  setNaturalSize: (size: StudioMediaIntrinsicSize) => void
-) {
-  if (width > 0 && height > 0) {
-    setAspectRatio(width / height);
-    setNaturalSize({ width, height });
-  }
-}
-
-function readStudioDetailContentBounds(element: HTMLDivElement): StudioDetailBounds {
-  const style = getComputedStyle(element);
-  const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-  const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-
-  return {
-    width: Math.max(0, element.clientWidth - padX),
-    height: Math.max(0, element.clientHeight - padY),
-  };
-}
-
-function useStudioDetailPreviewBounds() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [bounds, setBounds] = useState<StudioDetailBounds>({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) {
-      return;
-    }
-
-    const updateBounds = (width: number, height: number) => {
-      setBounds({ width, height });
-    };
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) {
-        return;
-      }
-      updateBounds(entry.contentRect.width, entry.contentRect.height);
-    });
-
-    observer.observe(element);
-    const initialBounds = readStudioDetailContentBounds(element);
-    updateBounds(initialBounds.width, initialBounds.height);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  return { containerRef, bounds };
-}
-
-function StudioDetailMediaFrame({
-  aspectRatio,
-  naturalSize,
-  isVideo,
-  className,
-  children,
-}: {
-  readonly aspectRatio: number;
-  readonly naturalSize: StudioMediaIntrinsicSize | null;
-  readonly isVideo: boolean;
-  readonly className?: string;
-  readonly children: ReactNode;
-}) {
-  const { containerRef, bounds } = useStudioDetailPreviewBounds();
-
-  const displaySize = useMemo(
-    () =>
-      fitStudioDetailSize(
-        bounds.width,
-        bounds.height,
-        aspectRatio,
-        naturalSize?.width,
-        naturalSize?.height
-      ),
-    [aspectRatio, bounds.height, bounds.width, naturalSize]
-  );
-
-  return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "box-border flex h-full w-full min-h-0 items-center justify-center overflow-hidden p-4",
-        className
-      )}
-    >
-      {displaySize ? (
-        <div
-          className={cn(
-            STUDIO_DETAIL_MEDIA_FRAME,
-            isVideo ? "dark:bg-black" : undefined
-          )}
-          style={{
-            width: displaySize.width,
-            height: displaySize.height,
-          }}
-        >
-          {children}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function StudioDetailImagePreview({
-  media,
-  className,
-}: {
-  readonly media: MediaReference;
-  readonly className?: string;
-}) {
-  const [aspectRatio, setAspectRatio] = useState(DEFAULT_DETAIL_ASPECT_RATIO);
-  const [naturalSize, setNaturalSize] = useState<StudioMediaIntrinsicSize | null>(
-    null
-  );
-
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media,
-    nodeType: "ai-image",
-    size: "full",
-  });
-
-  if (stale || !displayUrl) {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center",
-          STUDIO_PREVIEW_MEDIA_FALLBACK,
-          className
-        )}
-      />
-    );
-  }
-
-  return (
-    <StudioDetailMediaFrame
-      aspectRatio={aspectRatio}
-      naturalSize={naturalSize}
-      isVideo={false}
-      className={className}
-    >
-      <img
-        src={displayUrl}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        className={STUDIO_MEDIA_PREVIEW_MEDIA}
-        onLoad={(event) => {
-          applyDetailMediaSize(
-            event.currentTarget.naturalWidth,
-            event.currentTarget.naturalHeight,
-            setAspectRatio,
-            setNaturalSize
-          );
-        }}
-      />
-    </StudioDetailMediaFrame>
-  );
-}
-
-function StudioDetailVideoPreview({
-  media,
-  className,
-}: {
-  readonly media: MediaReference;
-  readonly className?: string;
-}) {
-  const [aspectRatio, setAspectRatio] = useState(DEFAULT_DETAIL_ASPECT_RATIO);
-  const [naturalSize, setNaturalSize] = useState<StudioMediaIntrinsicSize | null>(
-    null
-  );
-
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media,
-    nodeType: "ai-video",
-    size: "full",
-  });
-
-  if (stale || !displayUrl) {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center",
-          STUDIO_PREVIEW_MEDIA_FALLBACK,
-          className
-        )}
-      >
-        <Play className="h-8 w-8 opacity-40" />
-      </div>
-    );
-  }
-
-  return (
-    <StudioDetailMediaFrame
-      aspectRatio={aspectRatio}
-      naturalSize={naturalSize}
-      isVideo
-      className={className}
-    >
-      <video
-        src={displayUrl}
-        className={STUDIO_MEDIA_PREVIEW_MEDIA}
-        controls
-        playsInline
-        preload="metadata"
-        onLoadedMetadata={(event) => {
-          applyDetailMediaSize(
-            event.currentTarget.videoWidth,
-            event.currentTarget.videoHeight,
-            setAspectRatio,
-            setNaturalSize
-          );
-        }}
-      />
-    </StudioDetailMediaFrame>
-  );
+  readonly uploading?: boolean;
+  readonly generateError?: GenerativeCardError;
+  readonly onVideoExpandView?: () => void;
+  readonly emptyUpload?: CreativeStudioEmptyUploadConfig;
+  readonly detailDisplayUrl?: string | null;
+  readonly detailDisplayStale?: boolean;
 }
 
 function StudioVideoPreview({
@@ -354,16 +129,22 @@ function StudioAudioPreview({
   media,
   variant,
   className,
+  displayUrl: displayUrlOverride,
+  stale: staleOverride,
 }: {
   readonly media: MediaReference;
   readonly variant: "card" | "detail";
   readonly className?: string;
+  readonly displayUrl?: string | null;
+  readonly stale?: boolean;
 }) {
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media,
+  const resolved = useMediaDisplayUrl({
+    media: displayUrlOverride === undefined ? media : null,
     nodeType: "ai-audio",
     size: variant === "card" ? "thumb" : "full",
   });
+  const displayUrl = displayUrlOverride ?? resolved.displayUrl;
+  const stale = staleOverride ?? resolved.stale;
 
   if (stale || !displayUrl) {
     return (
@@ -403,87 +184,153 @@ function StudioAudioPreview({
   );
 }
 
-function StudioDetailImageContent({
-  media,
-  metadata,
-  className,
-}: {
+interface StudioDetailMediaPreviewProps {
   readonly media: MediaReference | undefined;
+  readonly isVideo: boolean;
   readonly metadata: Record<string, string> | undefined;
+  readonly nodeId: string;
+  readonly uploading?: boolean;
+  readonly generateError?: GenerativeCardError;
   readonly className?: string;
-}) {
-  const { t } = useTranslation();
-  const cardState = readStudioMediaCardState(metadata, false);
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media: media ?? null,
-    nodeType: "ai-image",
-    size: "full",
-  });
-  const canPreview = media != null && displayUrl != null && !stale;
-
-  if (!canPreview) {
-    return (
-      <StudioMediaEmptyPreview
-        layout="detail"
-        isVideo={false}
-        message={t(cardState.placeholderKey)}
-        busy={cardState.isBusy}
-        className={className}
-      />
-    );
-  }
-
-  return <StudioDetailImagePreview media={media} className={className} />;
+  readonly onVideoExpandView?: () => void;
+  readonly emptyUpload?: CreativeStudioEmptyUploadConfig;
+  readonly detailDisplayUrl?: string | null;
+  readonly detailDisplayStale?: boolean;
 }
 
-function StudioDetailVideoContent({
+function StudioDetailMediaPreview({
   media,
+  isVideo,
   metadata,
+  nodeId,
+  uploading = false,
+  generateError,
   className,
-}: {
-  readonly media: MediaReference | undefined;
-  readonly metadata: Record<string, string> | undefined;
-  readonly className?: string;
-}) {
+  onVideoExpandView,
+  emptyUpload,
+  detailDisplayUrl,
+  detailDisplayStale,
+}: StudioDetailMediaPreviewProps) {
   const { t } = useTranslation();
-  const cardState = readStudioMediaCardState(metadata, true);
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media: media ?? null,
-    nodeType: "ai-video",
+  const cardState = readStudioMediaCardState(metadata, isVideo);
+  const modality = isVideo ? "video" : "image";
+  const resolved = useMediaDisplayUrl({
+    media: detailDisplayUrl === undefined ? (media ?? null) : null,
+    nodeType: isVideo ? "ai-video" : "ai-image",
     size: "full",
   });
+  const displayUrl = detailDisplayUrl ?? resolved.displayUrl;
+  const stale = detailDisplayStale ?? resolved.stale;
   const canPreview = media != null && displayUrl != null && !stale;
+  const isBusy = cardState.isBusy || uploading;
 
-  if (!canPreview) {
+  const busyOverlay = (
+    <GenerativeBusyOverlay
+      visible={isBusy}
+      modality={modality}
+      metadata={metadata}
+      nodeId={nodeId}
+      uploading={uploading}
+      roundedClass="rounded-xl"
+    />
+  );
+
+  if (media == null || !canPreview) {
+    if (emptyUpload && !isBusy) {
+      return (
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center p-4",
+            className
+          )}
+        >
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800">
+            <GenerativeCardEmptyUploadSlot
+              kind={emptyUpload.kind}
+              size="studio-detail"
+              canUpload={emptyUpload.canUpload}
+              onUploadClick={emptyUpload.onUploadClick}
+              className="py-8"
+            />
+            {generateError ? (
+              <GenerativeCardErrorBlock error={generateError} />
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <StudioMediaEmptyPreview
         layout="detail"
-        isVideo
+        isVideo={isVideo}
         message={t(cardState.placeholderKey)}
         busy={cardState.isBusy}
         className={className}
+        busyOverlay={
+          <>
+            {busyOverlay}
+            {generateError ? (
+              <GenerativeCardErrorBlock error={generateError} />
+            ) : null}
+          </>
+        }
       />
     );
   }
 
-  return <StudioDetailVideoPreview media={media} className={className} />;
+  return (
+    <StudioMediaFullPreview
+      media={media}
+      nodeType={isVideo ? "ai-video" : "ai-image"}
+      className={className}
+      nodeId={nodeId}
+      metadata={metadata}
+      uploading={uploading}
+      isBusy={cardState.isBusy}
+      generateError={generateError}
+      onVideoExpandView={isVideo ? onVideoExpandView : undefined}
+      displayUrl={displayUrl}
+    />
+  );
 }
 
 export function CreativeStudioNodePreview({
   data,
   variant = "detail",
   className,
+  nodeId,
+  uploading = false,
+  generateError,
+  onVideoExpandView,
+  emptyUpload,
+  detailDisplayUrl,
+  detailDisplayStale,
 }: CreativeStudioNodePreviewProps) {
   const { t } = useTranslation();
+  const { organization } = useAuth();
+  const { workflowId } = useCreativeStudio();
   const nodeType = data.nodeType ?? "";
+  const resolvedText = useResolvedAiText({
+    organizationId: organization?.id,
+    workflowId,
+    inputs: data.inputs,
+    outputs: data.outputs,
+  });
+  const textPreview = (resolvedText.excerpt ?? resolvedText.text).trim();
 
-  const text = readAiTextResult(data.inputs, data.outputs)?.trim() ?? "";
-  const images = readAiImageCardImages(data.inputs, data.outputs, data.metadata);
-  const videos = readAiVideoCardVideos(data.inputs, data.outputs, data.metadata);
+  const primaryImage = readAiImageCardPrimaryImage(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
+  const primaryVideo = readAiVideoCardPrimaryVideo(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
   const audios = readAiAudioCardAudios(data.inputs, data.outputs, data.metadata);
 
-  const primaryImage = images[0];
-  const primaryVideo = videos[0];
   const primaryAudio = audios[0];
 
   if (nodeType === AI_TEXT_NODE_TYPE) {
@@ -495,7 +342,7 @@ export function CreativeStudioNodePreview({
           className
         )}
       >
-        {text ? (
+        {textPreview ? (
           <p
             className={cn(
               "w-full whitespace-pre-wrap text-foreground/90",
@@ -504,8 +351,12 @@ export function CreativeStudioNodePreview({
                 : "line-clamp-4 text-xs leading-relaxed"
             )}
           >
-            {text}
+            {textPreview}
           </p>
+        ) : resolvedText.loading ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <LoaderIcon className="size-5 animate-spin text-muted-foreground/50" />
+          </div>
         ) : (
           <EmptyPreview variant={variant} message={t("workflow.studio.emptyMedia")} />
         )}
@@ -516,10 +367,17 @@ export function CreativeStudioNodePreview({
   if (nodeType === AI_IMAGE_NODE_TYPE) {
     if (variant === "detail") {
       return (
-        <StudioDetailImageContent
+        <StudioDetailMediaPreview
           media={primaryImage}
+          isVideo={false}
           metadata={data.metadata}
+          nodeId={nodeId}
+          uploading={uploading}
+          generateError={generateError}
           className={className}
+          emptyUpload={emptyUpload?.kind === "image" ? emptyUpload : undefined}
+          detailDisplayUrl={detailDisplayUrl}
+          detailDisplayStale={detailDisplayStale}
         />
       );
     }
@@ -555,10 +413,18 @@ export function CreativeStudioNodePreview({
   if (nodeType === AI_VIDEO_NODE_TYPE) {
     if (variant === "detail") {
       return (
-        <StudioDetailVideoContent
+        <StudioDetailMediaPreview
           media={primaryVideo}
+          isVideo
           metadata={data.metadata}
+          nodeId={nodeId}
+          uploading={uploading}
+          generateError={generateError}
           className={className}
+          onVideoExpandView={onVideoExpandView}
+          emptyUpload={emptyUpload?.kind === "video" ? emptyUpload : undefined}
+          detailDisplayUrl={detailDisplayUrl}
+          detailDisplayStale={detailDisplayStale}
         />
       );
     }
@@ -581,16 +447,46 @@ export function CreativeStudioNodePreview({
 
   if (nodeType === AI_AUDIO_NODE_TYPE) {
     if (!primaryAudio) {
+      const audioBusy = isAiAudioGenerating(data.metadata) || uploading;
+      if (
+        variant === "detail" &&
+        emptyUpload?.kind === "audio" &&
+        !audioBusy
+      ) {
+        return (
+          <div
+            className={cn(
+              "flex h-full w-full items-center justify-center p-4",
+              className
+            )}
+          >
+            <GenerativeCardEmptyUploadSlot
+              kind="audio"
+              size="studio-detail"
+              canUpload={emptyUpload.canUpload}
+              onUploadClick={emptyUpload.onUploadClick}
+              className="py-8"
+            />
+          </div>
+        );
+      }
       return (
         <EmptyPreview
           variant={variant}
           message={t("workflow.studio.emptyMedia")}
+          busy={audioBusy}
           className={className}
         />
       );
     }
     return (
-      <StudioAudioPreview media={primaryAudio} variant={variant} className={className} />
+      <StudioAudioPreview
+        media={primaryAudio}
+        variant={variant}
+        className={className}
+        displayUrl={variant === "detail" ? detailDisplayUrl : undefined}
+        stale={variant === "detail" ? detailDisplayStale : undefined}
+      />
     );
   }
 
@@ -679,7 +575,7 @@ function ReferenceThumb({
   readonly chip: { readonly media?: MediaReference };
 }) {
   const media =
-    chip.media && isMediaReference(chip.media) ? chip.media : null;
+    chip.media && isWorkflowMediaValue(chip.media) ? chip.media : null;
   const thumbUrl = useReferenceThumbUrl({
     media,
     nodeType: "ai-image",

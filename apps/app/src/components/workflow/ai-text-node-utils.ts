@@ -6,6 +6,7 @@ import {
   normalizeTextModelParameterRules,
   type AiTextResultHistory,
   type AiTextResultHistoryItem,
+  type OrgTextModelOption,
   type TextModelParameterRules,
 } from "@dafthunk/types";
 
@@ -14,6 +15,10 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import {
+  applyHistoryItemSettingsToNode,
+  type GenerativeHistorySelectionResult,
+} from "./apply-history-item-settings";
 
 export const AI_TEXT_RESULT_INPUT_ID = "result" as const;
 export const AI_TEXT_RESULT_HISTORY_INPUT_ID = "result_history" as const;
@@ -63,6 +68,17 @@ export function mergeAiTextNodeCatalogInputs(
     return [...inputs];
   }
 
+  const extraInputs: WorkflowParameter[] = [
+    {
+      id: AI_TEXT_KEYWORDS_HANDLE_ID,
+      name: AI_TEXT_KEYWORDS_HANDLE_ID,
+      type: "any",
+      hidden: true,
+      repeated: true,
+      description: "Upstream references (text / image / video per model limits).",
+    },
+  ];
+
   const merged = [...inputs];
   for (const templateInput of catalog.inputs) {
     const id = templateInput.name;
@@ -70,6 +86,12 @@ export function mergeAiTextNodeCatalogInputs(
       continue;
     }
     merged.push({ ...templateInput, id });
+  }
+  for (const extra of extraInputs) {
+    if (merged.some((input) => input.id === extra.id)) {
+      continue;
+    }
+    merged.push(extra);
   }
   return merged;
 }
@@ -226,7 +248,10 @@ export function readAiTextResultHistory(
           !!entry &&
           typeof entry === "object" &&
           typeof (entry as AiTextResultHistoryItem).id === "string" &&
-          typeof (entry as AiTextResultHistoryItem).text === "string"
+          (typeof (entry as AiTextResultHistoryItem).text === "string" ||
+            typeof (entry as AiTextResultHistoryItem).resourceId === "string" ||
+            typeof (entry as AiTextResultHistoryItem).contentSha256 === "string" ||
+            typeof (entry as AiTextResultHistoryItem).excerpt === "string")
       )
     : [];
 
@@ -325,15 +350,33 @@ export function withAiTextHistorySelectedId(
 /** @deprecated Prefer buffer.commit after withAiTextHistorySelectedId. */
 export function withAiTextHistorySelection(
   current: WorkflowNodeType,
-  selectedId: string
-): Partial<WorkflowNodeType> {
+  selectedId: string,
+  options?: {
+    readonly models?: readonly OrgTextModelOption[];
+  }
+): GenerativeHistorySelectionResult {
   const history = readAiTextResultHistory(current.inputs);
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  const result = withAiTextResult(current, selected.text, {
+  const settings = options?.models
+    ? applyHistoryItemSettingsToNode({
+        current,
+        modality: "text",
+        models: options.models,
+        historyBinding: selected,
+      })
+    : { patch: {}, modelUnavailable: false };
+
+  const working: WorkflowNodeType = {
+    ...current,
+    inputs: settings.patch.inputs ?? current.inputs,
+    metadata: settings.patch.metadata ?? current.metadata,
+  };
+
+  const result = withAiTextResult(working, selected.text, {
     inputs: upsertInputValue(
-      current.inputs,
+      working.inputs,
       AI_TEXT_RESULT_HISTORY_INPUT_ID,
       { items: history.items, selectedId },
       "json"
@@ -341,7 +384,10 @@ export function withAiTextHistorySelection(
   });
   return {
     ...result,
-    metadata: withGenerativeGeneratedContentMode(current.metadata),
+    metadata: withGenerativeGeneratedContentMode({
+      ...(settings.patch.metadata ?? current.metadata),
+    }),
+    modelUnavailable: settings.modelUnavailable,
   };
 }
 

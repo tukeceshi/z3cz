@@ -26,7 +26,7 @@ describe("ensure-direct-upload-cors", () => {
     const rules: TosCorsRule[] = [
       {
         allowedOrigins: ["*"],
-        allowedMethods: ["PUT"],
+        allowedMethods: ["PUT", "GET"],
         allowedHeaders: ["*"],
         exposeHeaders: ["ETag"],
         maxAgeSeconds: 3600,
@@ -36,5 +36,21 @@ describe("ensure-direct-upload-cors", () => {
     expect(
       corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])
     ).toBe(true);
+  });
+
+  it("rejects rules missing GET for browser download", () => {
+    const rules: TosCorsRule[] = [
+      {
+        allowedOrigins: ["http://localhost:3101"],
+        allowedMethods: ["PUT"],
+        allowedHeaders: ["*"],
+        exposeHeaders: ["ETag"],
+        maxAgeSeconds: 3600,
+      },
+    ];
+
+    expect(
+      corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])
+    ).toBe(false);
   });
 });

@@ -7,7 +7,6 @@ import type {
 import type { Database } from "../db";
 import {
   getImageParameterRules,
-  listPlatformAiModelGroups,
   listPlatformAiModels,
 } from "../db/platform-ai-model-queries";
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
@@ -27,9 +26,8 @@ export async function listOrgImageModelOptions(
   db: Database,
   organizationId: string
 ): Promise<readonly OrgImageModelOption[]> {
-  const [platformModels, groups, interfaces] = await Promise.all([
+  const [platformModels, interfaces] = await Promise.all([
     listPlatformAiModels(db, "image"),
-    listPlatformAiModelGroups(db, "image"),
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
@@ -38,7 +36,6 @@ export async function listOrgImageModelOptions(
 
   return buildOrgModelBindings({
     platformModels,
-    groups,
     volcanoInterfaces,
     singleModelInterfaces,
   }).map((binding) => ({

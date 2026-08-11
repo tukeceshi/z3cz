@@ -2,7 +2,6 @@ import type {
   AiModelModality,
   OrgTextModelUnavailableReason,
   PlatformAiModel,
-  PlatformAiModelGroup,
   SingleModelModelConfig,
   VolcanoModelConfig,
 } from "@dafthunk/types";
@@ -34,10 +33,8 @@ export interface OrgModelBindingBase {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgTextModelUnavailableReason;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
   readonly providerModelId: string;
 }
 
@@ -47,7 +44,6 @@ function bindingFromConfig(params: {
   readonly channelKind: OrgModelChannelKind;
   readonly config: VolcanoModelConfig | SingleModelModelConfig;
   readonly providerModelId: string;
-  readonly group: PlatformAiModelGroup | undefined;
 }): OrgModelBindingBase {
   const alias = resolveInterfaceModelAlias({
     alias: params.config.alias,
@@ -71,27 +67,21 @@ function bindingFromConfig(params: {
         ? undefined
         : "model_disabled_on_interface",
     description: params.model.description,
-    groupId: params.model.groupId,
-    groupName: params.group?.name ?? null,
-    groupDescription: params.group?.description ?? null,
-    groupIcon: params.group?.icon ?? null,
+    sortOrder: params.model.sortOrder,
+    brandIcon: params.model.brandIcon,
     providerModelId: params.providerModelId,
   };
 }
 
 export function buildOrgModelBindings(params: {
   readonly platformModels: readonly PlatformAiModel[];
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly volcanoInterfaces: readonly VolcanoBindingInterface[];
   readonly singleModelInterfaces: readonly SingleModelBindingInterface[];
 }): OrgModelBindingBase[] {
-  const groupById = new Map(params.groups.map((group) => [group.id, group]));
   const visibleModels = params.platformModels.filter((model) => model.platformEnabled);
   const bindings: OrgModelBindingBase[] = [];
 
   for (const model of visibleModels) {
-    const group = model.groupId ? groupById.get(model.groupId) : undefined;
-
     for (const iface of params.volcanoInterfaces) {
       const config = iface.models[model.canonicalId];
       if (!config) {
@@ -108,7 +98,6 @@ export function buildOrgModelBindings(params: {
           channelKind: "aggregate",
           config,
           providerModelId,
-          group,
         })
       );
     }
@@ -129,7 +118,6 @@ export function buildOrgModelBindings(params: {
           channelKind: "api",
           config,
           providerModelId: upstreamModelId,
-          group,
         })
       );
     }

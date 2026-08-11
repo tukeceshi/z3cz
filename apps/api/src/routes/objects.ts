@@ -21,6 +21,15 @@ const objectRoutes = new Hono<ApiContext>();
 
 const STORAGE_KEY_PATTERN = /^[a-zA-Z0-9_\-/.]+$/;
 
+function storageKeyBelongsToOrgPrefix(
+  storageKey: string,
+  prefix: string
+): boolean {
+  const normalized = prefix.trim().replace(/\/$/, "");
+  if (normalized.length === 0) return true;
+  return storageKey === normalized || storageKey.startsWith(`${normalized}/`);
+}
+
 objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, requireOrganizationOwner(), async (c) => {
   const storageKey = c.req.query("storageKey");
   const mimeType = c.req.query("mimeType");
@@ -43,6 +52,10 @@ objectRoutes.get("/cloud", apiKeyOrJwtMiddleware, requireOrganizationOwner(), as
     const cloud = await resolveOrgCloudStorage(db, organizationId);
     if (!cloud) {
       return c.json({ error: "Cloud storage is not configured" }, 404);
+    }
+
+    if (!storageKeyBelongsToOrgPrefix(storageKey, cloud.tosStorage.prefix)) {
+      return c.json({ error: "Forbidden: invalid storage key" }, 403);
     }
 
     const secretAccessKey = await decryptSecret(

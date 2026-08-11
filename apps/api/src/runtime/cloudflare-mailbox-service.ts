@@ -3,7 +3,7 @@
  *
  * Routes thread/message storage through the per-organization Mailbox Durable
  * Object and sends outbound mail via the Cloudflare Email Service. Sending
- * follows the support inbox's pre-insert â†?send â†?rollback pattern so the DB
+ * follows the support inbox's pre-insert ï¿½?send ï¿½?rollback pattern so the DB
  * record never gets out of sync with the wire, and threads outbound replies so
  * the recipient's answer returns to the same conversation.
  */
@@ -21,8 +21,9 @@ import type { Bindings } from "../context";
 import { createDatabase, getEmail } from "../db";
 import { createEmailService } from "../services/email-service";
 import { buildReplyAddress } from "../support-reply-token";
-import { inboxKeys } from "../support-storage";
 import { buildSnippet, stripHtml } from "../support-utils";
+
+const DEPRECATED_BLOB_KEY = "deprecated";
 
 export class CloudflareMailboxService implements MailboxService {
   constructor(private env: Bindings) {}
@@ -68,7 +69,7 @@ export class CloudflareMailboxService implements MailboxService {
       references,
       args.inReplyTo ?? null
     );
-    const keys = inboxKeys(args.emailId, messageId);
+    const keys = { raw: DEPRECATED_BLOB_KEY };
 
     // Pre-insert so a send-then-DB-failure can't leave the recipient with a
     // message we have no record of.
@@ -116,45 +117,7 @@ export class CloudflareMailboxService implements MailboxService {
       throw new Error(sendResult.error ?? "Failed to send email");
     }
 
-    // Archive the on-wire MIME + bodies. Awaited inline because the workflow
-    // runtime has no ExecutionContext.waitUntil here; failures are non-fatal.
-    const r2Puts: Promise<unknown>[] = [];
-    if (sendResult.rawMime) {
-      r2Puts.push(
-        this.env.INBOXES.put(keys.raw, sendResult.rawMime, {
-          httpMetadata: { contentType: "message/rfc822" },
-        })
-      );
-    }
-    if (args.text) {
-      r2Puts.push(
-        this.env.INBOXES.put(
-          keys.textBody,
-          new TextEncoder().encode(args.text),
-          {
-            httpMetadata: { contentType: "text/plain; charset=utf-8" },
-          }
-        )
-      );
-    }
-    if (args.html) {
-      r2Puts.push(
-        this.env.INBOXES.put(
-          keys.htmlBody,
-          new TextEncoder().encode(args.html),
-          {
-            httpMetadata: { contentType: "text/html; charset=utf-8" },
-          }
-        )
-      );
-    }
-    const results = await Promise.allSettled(r2Puts);
-    results.forEach((r) => {
-      if (r.status === "rejected") {
-        console.error("[mailbox send] R2 archive failed", r.reason);
-      }
-    });
-
+    // Message bodies and attachments are metadata-only; blob storage removed.
     await stub.touchThread(threadId).catch((error) => {
       console.error("[mailbox send] touchThread failed", error);
     });

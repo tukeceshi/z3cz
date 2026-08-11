@@ -6,9 +6,15 @@ import type {
   WorkflowExecution,
   WorkflowEditorViewport,
   WorkflowGenerativeDefaults,
+  WorkflowGraphPatchBroadcast,
   WorkflowRuntime,
   WorkflowState,
   WorkflowTrigger,
+} from "@dafthunk/types";
+import {
+  applyWorkflowGraphPatch,
+  diffWorkflowGraph,
+  isEmptyWorkflowGraphPatch,
 } from "@dafthunk/types";
 
 import { buildApiUrl, getApiBaseUrl } from "@/config/api";
@@ -64,6 +70,7 @@ export interface WorkflowWSOptions {
   // Message-level callbacks (happy path only)
   onInit?: (state: WorkflowState) => void;
   onUpdate?: (state: WorkflowState) => void;
+  onPatchGraph?: (patch: WorkflowGraphPatchBroadcast) => void;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
   onWorkflowError?: (error: { code: string; message: string }) => void;
 
@@ -106,6 +113,7 @@ export class WorkflowWebSocket {
   private accessToken: string | undefined;
   private currentState: WorkflowState | null = null;
   private activeExecutionId: string | null = null;
+  private lastGraphRev = 0;
 
   constructor(
     private orgId: string,
@@ -187,6 +195,7 @@ export class WorkflowWebSocket {
       switch (message.type) {
         case "init":
           this.currentState = message.state;
+          this.lastGraphRev = 0;
           this.options.onInit?.(message.state);
           // Re-subscribe to active execution after reconnection
           if (this.activeExecutionId) {
@@ -197,6 +206,20 @@ export class WorkflowWebSocket {
         case "update":
           this.currentState = message.state;
           this.options.onUpdate?.(message.state);
+          break;
+
+        case "patch_graph":
+          if (message.rev <= this.lastGraphRev) {
+            break;
+          }
+          this.lastGraphRev = message.rev;
+          if (this.currentState) {
+            this.currentState = {
+              ...applyWorkflowGraphPatch(this.currentState, message),
+              timestamp: message.timestamp,
+            };
+          }
+          this.options.onPatchGraph?.(message);
           break;
 
         case "execution_update":
@@ -263,31 +286,40 @@ export class WorkflowWebSocket {
   }
 
   /**
-   * Send workflow state update (nodes and edges)
+   * Send incremental graph patch (nodes/edges diff).
    */
-  sendStateUpdate(nodes: Node[], edges: Edge[]): void {
+  sendGraphPatch(
+    previous: { nodes: Node[]; edges: Edge[] },
+    next: { nodes: Node[]; edges: Edge[] }
+  ): boolean {
     if (!this.currentState) {
-      console.warn(
-        "[WorkflowWS] No current state available, cannot send update"
-      );
-      return;
+      console.warn("[WorkflowWS] No current state available, cannot send patch");
+      return false;
     }
 
-    const updatedState: WorkflowState = {
-      ...this.currentState,
-      nodes,
-      edges,
-      timestamp: Date.now(),
-    };
+    const patch = diffWorkflowGraph(previous, next);
+    if (isEmptyWorkflowGraphPatch(patch)) {
+      return true;
+    }
 
     const success = this.sendMessage(
-      { type: "update", state: updatedState },
-      "send state update"
+      {
+        type: "patch_graph",
+        baseRev: this.lastGraphRev,
+        nodePatches: patch.nodePatches,
+        edgePatches: patch.edgePatches,
+      },
+      "send graph patch"
     );
 
-    if (success) {
-      this.currentState = updatedState;
+    if (success && this.currentState) {
+      this.currentState = {
+        ...applyWorkflowGraphPatch(this.currentState, patch),
+        timestamp: Date.now(),
+      };
     }
+
+    return success;
   }
 
   /**

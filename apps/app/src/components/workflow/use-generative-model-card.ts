@@ -2,26 +2,22 @@ import { useNodes } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
-  PlatformAiModelGroup,
   UpstreamParamProfileField,
-  WorkflowGenerativeDefaultEntry,
 } from "@dafthunk/types";
 
 import { useAppToast } from "@/hooks/use-app-toast";
 
 import {
-  readNodeGenerationParams,
   resolveCardGenerationParams,
-  sanitizeCardGenerationParams,
   type CardGenerationParams,
 } from "./generative-card-params";
 import { applyModelBindingToNodeData } from "./generative-model-binding";
+import { generativeReferenceMetadataForModel } from "./generative-reference-metadata";
 import {
   readWorkflowGenerativeDefault,
 } from "./generative-workflow-defaults";
 import {
   buildModelBindingOptionId,
-  persistGenerativeBindingWithParams,
   readModelSelectionRecord,
   resolveEffectiveGenerativeModel,
   resolveModelCardState,
@@ -35,7 +31,6 @@ import type { WorkflowNodeType } from "./workflow-types";
 
 export interface OrgModelsQueryResult<T extends OrgModelBindingRef> {
   readonly models: readonly T[];
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly isLoading: boolean;
   readonly modelsError: unknown;
   readonly refreshModels: () => Promise<unknown>;
@@ -75,7 +70,6 @@ export interface UseGenerativeModelCardResult<T extends OrgModelBindingRef> {
   readonly selectedOptionId: string;
   readonly nodeInputs: WorkflowNodeType["inputs"];
   readonly models: readonly T[];
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly isLoading: boolean;
   readonly modelsError: unknown;
   readonly canGenerate: boolean;
@@ -121,7 +115,7 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     materializedRef.current = "";
   }, [nodeId]);
 
-  const { models, groups, isLoading, modelsError, refreshModels } = useModels(
+  const { models, isLoading, modelsError, refreshModels } = useModels(
     orgId,
     { enabled: listFetchEnabled && Boolean(orgId) }
   );
@@ -199,32 +193,6 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     [effectiveModel, generationFields, liveData.inputs]
   );
 
-  const resolveMaterializeParams = useCallback(
-    (
-      model: T,
-      inputs: WorkflowNodeType["inputs"],
-      defaultEntry: WorkflowGenerativeDefaultEntry | undefined
-    ): Record<string, unknown> => {
-      const stored = readNodeGenerationParams(inputs);
-      if (Object.keys(stored).length > 0) {
-        return stored;
-      }
-      if (
-        defaultEntry &&
-        defaultEntry.canonicalId === model.canonicalId &&
-        defaultEntry.interfaceId === model.interfaceId &&
-        defaultEntry.params !== undefined
-      ) {
-        return { ...defaultEntry.params };
-      }
-      if (!readGenerationFields || !buildDefaultParams) {
-        return {};
-      }
-      return buildDefaultParams(readGenerationFields(model));
-    },
-    [buildDefaultParams, readGenerationFields]
-  );
-
   useEffect(() => {
     if (disabled || !updateNodeData || modelsPending || !resolution) {
       return;
@@ -239,6 +207,31 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       : undefined;
 
     if (matched?.selectable) {
+      const expectedMetadata = generativeReferenceMetadataForModel(
+        modality,
+        matched
+      );
+      const metadataStale =
+        expectedMetadata !== undefined &&
+        Object.entries(expectedMetadata).some(
+          ([key, value]) => liveData.metadata?.[key] !== value
+        );
+      if (!metadataStale) {
+        return;
+      }
+
+      const syncKey = `${nodeId}:${matched.optionId}:meta`;
+      if (materializedRef.current === syncKey) {
+        return;
+      }
+      materializedRef.current = syncKey;
+
+      updateNodeData(nodeId, (current) => ({
+        metadata: {
+          ...(current.metadata ?? {}),
+          ...expectedMetadata,
+        },
+      }));
       return;
     }
 
@@ -248,40 +241,36 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     }
     materializedRef.current = materializeKey;
 
-    updateNodeData(nodeId, (current) => {
-      const params = resolveMaterializeParams(
-        resolution.model,
-        current.inputs,
-        workflowDefault
-      );
-      const sanitized =
-        readGenerationFields && buildDefaultParams
-          ? sanitizeCardGenerationParams(
-              readGenerationFields(resolution.model),
-              params
-            )
-          : params;
-      return {
-        inputs: persistGenerativeBindingWithParams(
-          current.inputs,
-          {
-            canonicalId: resolution.model.canonicalId,
-            interfaceId: resolution.model.interfaceId,
-          },
-          sanitized
-        ),
-      };
-    });
+    updateNodeData(nodeId, (current) =>
+      applyModelBindingToNodeData({
+        model: resolution.model,
+        current,
+        modality,
+        updateWorkflowDefault: false,
+        generativeDefaults,
+        workflowDefaultEntry: workflowDefault,
+        handlers: {
+          readGenerationFields,
+          buildDefaultParams,
+          onModelSelected,
+        },
+        onGenerativeDefaultChange,
+      })
+    );
   }, [
     buildDefaultParams,
     disabled,
+    generativeDefaults,
+    liveData.metadata,
+    modality,
     models,
     modelsPending,
     nodeBinding,
     nodeId,
+    onGenerativeDefaultChange,
+    onModelSelected,
     readGenerationFields,
     resolution,
-    resolveMaterializeParams,
     updateNodeData,
     workflowDefault,
   ]);
@@ -404,7 +393,6 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     selectedOptionId,
     nodeInputs: liveData.inputs,
     models,
-    groups,
     isLoading: modelsPending,
     modelsError,
     canGenerate,

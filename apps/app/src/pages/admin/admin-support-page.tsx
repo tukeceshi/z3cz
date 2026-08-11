@@ -43,9 +43,7 @@ import {
   type AdminThreadSummary,
   type AdminThreadView,
   type AdminUser,
-  adminSupportAttachmentUrl,
   createAdminSupportThread,
-  fetchAdminSupportMessageBody,
   sendAdminSupportReply,
   updateAdminSupportThreadArchived,
   useAdminSupportThread,
@@ -643,38 +641,6 @@ function ThreadDetail({
 function MessageCard({ message }: { message: AdminThreadMessage }) {
   const { t } = useTranslation();
   const isInbound = message.direction === AdminMessageDirection.INBOUND;
-  const [body, setBody] = useState<string | null>(null);
-  const [bodyError, setBodyError] = useState<string | null>(null);
-
-  const preferredPart = useMemo<"text" | "html" | null>(() => {
-    if (message.hasText) return "text";
-    if (message.hasHtml) return "html";
-    return null;
-  }, [message.hasText, message.hasHtml]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setBody(null);
-    setBodyError(null);
-    if (!preferredPart) return;
-    fetchAdminSupportMessageBody(message.id, preferredPart)
-      .then((text) => {
-        if (!cancelled) setBody(text);
-      })
-      .catch((e) => {
-        if (!cancelled)
-          setBodyError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [message.id, preferredPart]);
-
-  const { visible, quoted } =
-    body && preferredPart === "text"
-      ? splitQuotedText(body)
-      : { visible: body ?? "", quoted: "" };
-  const [showQuoted, setShowQuoted] = useState(false);
 
   return (
     <div className={cn("pl-4", !isInbound && "border-l-2 border-l-primary")}>
@@ -688,83 +654,29 @@ function MessageCard({ message }: { message: AdminThreadMessage }) {
       </div>
 
       <div className="text-sm">
-        {bodyError && (
-          <p className="text-muted-foreground italic text-xs" title={bodyError}>
-            {t("admin.support.bodyUnavailable")}
-          </p>
-        )}
-        {!bodyError && !preferredPart && (
+        {message.snippet ? (
+          <pre className="whitespace-pre-wrap font-sans">{message.snippet}</pre>
+        ) : (
           <p className="text-muted-foreground italic text-xs">
             {t("admin.support.noBody")}
           </p>
-        )}
-        {!bodyError && preferredPart === "text" && (
-          <>
-            <pre className="whitespace-pre-wrap font-sans">
-              {body === null ? t("common.loading") : visible}
-            </pre>
-            {quoted && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowQuoted((v) => !v)}
-                  className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showQuoted
-                    ? t("admin.support.hideTrimmed")
-                    : t("admin.support.showTrimmed")}
-                </button>
-                {showQuoted && (
-                  <pre className="whitespace-pre-wrap font-sans text-muted-foreground mt-2 border-l-2 border-l-neutral-200 dark:border-l-neutral-700 pl-3">
-                    {quoted}
-                  </pre>
-                )}
-              </>
-            )}
-          </>
-        )}
-        {!bodyError && preferredPart === "html" && (
-          // Inbound HTML can be untrusted; render in a sandboxed iframe so it
-          // cannot execute scripts or escape into the admin app.
-          <HtmlBodyFrame html={body} />
         )}
       </div>
 
       {message.attachments.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {message.attachments.map((a) => (
-            <a
+            <span
               key={a.id}
-              href={adminSupportAttachmentUrl(a.id)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs border rounded px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground border rounded px-2 py-1"
             >
               <Paperclip className="h-3 w-3" />
-              <span>{a.filename}</span>
-              <span className="text-muted-foreground">
-                ({formatBytes(a.sizeBytes)})
-              </span>
-            </a>
+              {a.filename}
+            </span>
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-function HtmlBodyFrame({ html }: { html: string | null }) {
-  const { t } = useTranslation();
-  if (html === null) {
-    return <p className="text-muted-foreground text-xs">{t("common.loading")}</p>;
-  }
-  return (
-    <iframe
-      title="Email HTML body"
-      sandbox=""
-      srcDoc={html}
-      className="w-full min-h-[200px] border-0"
-    />
   );
 }
 
@@ -1038,40 +950,4 @@ function EmptyState() {
       <p className="text-sm">{t("admin.support.selectThread")}</p>
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-// Matches Gmail-style attribution lines across the common locales we see.
-const ATTRIBUTION_RE =
-  /^On .+ (wrote|écrivait|schrieb|escribió|skrev|scrisse|napisał|napisał\(a\)):\s*$/m;
-
-/**
- * Split an email body into the new content and the quoted tail so the UI can
- * collapse the latter behind a "Show trimmed content" toggle. Falls back to
- * locating the first run of two or more consecutive lines beginning with `>`
- * for messages that omit an attribution line.
- */
-function splitQuotedText(body: string): { visible: string; quoted: string } {
-  const attribution = body.match(ATTRIBUTION_RE);
-  if (attribution && attribution.index !== undefined) {
-    return {
-      visible: body.slice(0, attribution.index).trimEnd(),
-      quoted: body.slice(attribution.index),
-    };
-  }
-  const lines = body.split("\n");
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (lines[i].startsWith(">") && lines[i + 1].startsWith(">")) {
-      return {
-        visible: lines.slice(0, i).join("\n").trimEnd(),
-        quoted: lines.slice(i).join("\n"),
-      };
-    }
-  }
-  return { visible: body, quoted: "" };
 }

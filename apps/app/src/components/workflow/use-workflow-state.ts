@@ -53,8 +53,6 @@ interface UseWorkflowStateReturn {
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
   > | null;
-  isNodeSelectorOpen: boolean;
-  setIsNodeSelectorOpen: (open: boolean) => void;
   onNodesChange: OnNodesChange<ReactFlowNode<WorkflowNodeType>>;
   onEdgesChange: OnEdgesChange<ReactFlowEdge<WorkflowEdgeType>>;
   onConnect: OnConnect;
@@ -67,7 +65,6 @@ interface UseWorkflowStateReturn {
   ) => void;
   connectionValidationState: ConnectionValidationState;
   isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
-  handleAddNode: () => void;
   handleNodeSelect: (
     template: NodeType,
     options?: { readonly panIntoView?: boolean }

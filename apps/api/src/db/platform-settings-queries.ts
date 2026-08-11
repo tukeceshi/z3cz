@@ -53,6 +53,7 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   supportEmail: null,
   newUserTourEnabled: false,
   homepageMode: "console",
+  wsBootstrapEnabled: false,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 
@@ -88,6 +89,7 @@ function rowToPublicSettings(
     supportEmail: row.supportEmail,
     newUserTourEnabled: row.newUserTourEnabled,
     homepageMode: parseHomepageMode(row.homepageMode),
+    wsBootstrapEnabled: row.wsBootstrapEnabled,
     featureConfig: parseFeatureConfig(row.featureConfig),
   };
 }
@@ -166,6 +168,10 @@ export async function updateSiteSettings(
       (existing
         ? parseHomepageMode(existing.homepageMode)
         : DEFAULT_PUBLIC_SETTINGS.homepageMode),
+    wsBootstrapEnabled:
+      input.wsBootstrapEnabled ??
+      existing?.wsBootstrapEnabled ??
+      DEFAULT_PUBLIC_SETTINGS.wsBootstrapEnabled,
     updatedBy,
     updatedAt: new Date(),
   };

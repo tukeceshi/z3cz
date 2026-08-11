@@ -32,6 +32,8 @@ const registerMediaResourceSchema = z
     kind: mediaResourceKindSchema,
     mimeType: z.string().min(1),
     storageKey: z.string().min(1).optional(),
+    upstreamUrl: z.string().url().optional(),
+    expiresAt: z.string().datetime().optional(),
     replacesResourceId: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
@@ -40,6 +42,13 @@ const registerMediaResourceSchema = z
         code: z.ZodIssueCode.custom,
         message: "storageKey is required for cloud resources",
         path: ["storageKey"],
+      });
+    }
+    if (value.kind === "ephemeral" && !value.upstreamUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "upstreamUrl is required for ephemeral resources",
+        path: ["upstreamUrl"],
       });
     }
   });

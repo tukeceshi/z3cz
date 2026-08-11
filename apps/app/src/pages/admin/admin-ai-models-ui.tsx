@@ -1,8 +1,28 @@
-import type { PlatformAiModel, PlatformAiModelGroup } from "@dafthunk/types";
+import type { PlatformAiModel } from "@dafthunk/types";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import GripVerticalIcon from "lucide-react/icons/grip-vertical";
 import PencilIcon from "lucide-react/icons/pencil";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { ModelBrandIcon } from "@/components/model-brand-icon";
+import { ModelBrandIconPicker, DEFAULT_BRAND_ICON } from "@/components/model-brand-icon-picker";
 import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,13 +35,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   SURFACE_BORDER,
@@ -29,8 +42,6 @@ import {
   SURFACE_ROW_HOVER,
 } from "@/components/ui/surface";
 import { cn } from "@/utils/utils";
-
-export const ADMIN_NO_GROUP_VALUE = "__none__";
 
 /** Param field labels inside a settings section (not section titles). */
 export const ADMIN_PARAM_LABEL_CLASS = "text-[11px] text-muted-foreground";
@@ -70,32 +81,60 @@ const ADMIN_MODEL_SETTINGS_DIALOG_800_CLASS =
 
 export function AdminModelList({
   models,
-  groups,
   emptyLabel,
   isLoading,
   savingId,
+  reordering,
   onToggle,
   onOpenSettings,
+  onReorderModels,
 }: {
   readonly models: readonly PlatformAiModel[];
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly emptyLabel: string;
   readonly isLoading: boolean;
   readonly savingId: string | null;
+  readonly reordering: boolean;
   readonly onToggle: (model: PlatformAiModel, enabled: boolean) => void;
   readonly onOpenSettings: (model: PlatformAiModel) => void;
+  readonly onReorderModels: (orderedIds: readonly string[]) => void;
 }) {
   const { t } = useTranslation();
 
-  const groupNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const group of groups) {
-      map.set(group.id, group.name);
-    }
-    return map;
-  }, [groups]);
+  const orderedModels = useMemo(
+    () =>
+      [...models].sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName)
+      ),
+    [models]
+  );
 
-  const ungroupedLabel = t("pages.adminAiModels.ungroupedModels");
+  const [items, setItems] = useState(orderedModels);
+
+  useEffect(() => {
+    setItems(orderedModels);
+  }, [orderedModels]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = items.findIndex((model) => model.canonicalId === active.id);
+    const newIndex = items.findIndex((model) => model.canonicalId === over.id);
+    if (oldIndex < 0 || newIndex < 0) {
+      return;
+    }
+
+    const next = arrayMove(items, oldIndex, newIndex);
+    setItems(next);
+    onReorderModels(next.map((model) => model.canonicalId));
+  };
 
   if (isLoading) {
     return (
@@ -105,7 +144,7 @@ export function AdminModelList({
     );
   }
 
-  if (models.length === 0) {
+  if (orderedModels.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
         {emptyLabel}
@@ -114,63 +153,112 @@ export function AdminModelList({
   }
 
   return (
-    <div className="space-y-2">
-      {models.map((model) => (
-        <AdminModelListRow
-          key={model.canonicalId}
-          model={model}
-          groupLabel={
-            model.groupId
-              ? (groupNameById.get(model.groupId) ?? ungroupedLabel)
-              : ungroupedLabel
-          }
-          saving={savingId === model.canonicalId}
-          onToggle={onToggle}
-          onOpenSettings={onOpenSettings}
-        />
-      ))}
-    </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={items.map((model) => model.canonicalId)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="space-y-2">
+          {items.map((model) => (
+            <SortableAdminModelListRow
+              key={model.canonicalId}
+              model={model}
+              saving={savingId === model.canonicalId}
+              reordering={reordering}
+              onToggle={onToggle}
+              onOpenSettings={onOpenSettings}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 }
 
-function AdminModelListRow({
+function SortableAdminModelListRow({
   model,
-  groupLabel,
   saving,
+  reordering,
   onToggle,
   onOpenSettings,
 }: {
   readonly model: PlatformAiModel;
-  readonly groupLabel: string;
   readonly saving: boolean;
+  readonly reordering: boolean;
   readonly onToggle: (model: PlatformAiModel, enabled: boolean) => void;
   readonly onOpenSettings: (model: PlatformAiModel) => void;
 }) {
   const { t } = useTranslation();
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: model.canonicalId,
+    disabled: reordering || saving,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={cn(
         "flex items-center gap-2 rounded-lg border px-2 py-2 sm:gap-3 sm:px-3",
         SURFACE_BORDER,
         SURFACE_ROW_HOVER,
-        !model.platformEnabled && "opacity-60"
+        !model.platformEnabled && "opacity-60",
+        isDragging && "z-10 shadow-md"
       )}
     >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        className={cn(
+          "flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 active:cursor-grabbing",
+          (reordering || saving) && "cursor-not-allowed opacity-50"
+        )}
+        disabled={reordering || saving}
+        title={t("pages.adminAiModels.dragToReorder")}
+        aria-label={t("pages.adminAiModels.dragToReorder")}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVerticalIcon className="h-4 w-4" />
+      </button>
+
+      <ModelBrandIcon
+        icon={model.brandIcon ?? DEFAULT_BRAND_ICON}
+        className="size-5 shrink-0"
+      />
+
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{model.displayName}</p>
         <p
           className="truncate text-xs text-muted-foreground"
-          title={`${groupLabel} · ${model.canonicalId}`}
+          title={model.canonicalId}
         >
-          {groupLabel} · {model.canonicalId}
+          {model.canonicalId}
         </p>
       </div>
 
       <Switch
         id={`enable-${model.canonicalId}`}
         checked={model.platformEnabled}
-        disabled={saving}
+        disabled={saving || reordering}
         onCheckedChange={(enabled) => onToggle(model, enabled)}
         aria-label={t("pages.adminAiModels.platformEnabled")}
       />
@@ -179,7 +267,7 @@ function AdminModelListRow({
         type="button"
         variant="outline"
         size="sm"
-        disabled={saving}
+        disabled={saving || reordering}
         onClick={() => onOpenSettings(model)}
       >
         {t("pages.adminAiModels.settings")}
@@ -349,20 +437,18 @@ export function AdminFieldRow({
   );
 }
 
-export function ImageModelBasicFields({
+export function AdminModelBasicFields({
   canonicalId,
   displayName,
   onDisplayNameChange,
-  groupId,
-  onGroupIdChange,
-  groups,
+  brandIcon,
+  onBrandIconChange,
 }: {
   readonly canonicalId: string;
   readonly displayName: string;
   readonly onDisplayNameChange: (value: string) => void;
-  readonly groupId: string;
-  readonly onGroupIdChange: (value: string) => void;
-  readonly groups: readonly PlatformAiModelGroup[];
+  readonly brandIcon: string;
+  readonly onBrandIconChange: (value: string) => void;
 }) {
   const { t } = useTranslation();
 
@@ -384,23 +470,13 @@ export function ImageModelBasicFields({
           onChange={(event) => onDisplayNameChange(event.target.value)}
         />
       </AdminFieldRow>
-      <AdminFieldRow label={t("pages.adminAiModels.modelGroup")}>
-        <Select value={groupId} onValueChange={onGroupIdChange}>
-          <SelectTrigger className={ADMIN_CONTROL_CLASS}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ADMIN_NO_GROUP_VALUE}>
-              {t("pages.adminAiModels.noGroup")}
-            </SelectItem>
-            {groups.map((group) => (
-              <SelectItem key={group.id} value={group.id}>
-                {group.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </AdminFieldRow>
+      <ModelBrandIconPicker
+        label={t("pages.adminAiModels.brandIcon")}
+        value={brandIcon}
+        onChange={onBrandIconChange}
+        controlClassName={ADMIN_CONTROL_CLASS}
+        popoverWidthClassName={ADMIN_CONTROL_WIDTH_CLASS}
+      />
     </>
   );
 }

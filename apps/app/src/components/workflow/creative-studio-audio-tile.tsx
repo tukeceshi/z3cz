@@ -2,7 +2,6 @@ import type { Node as ReactFlowNode } from "@xyflow/react";
 import Music from "lucide-react/icons/music";
 import { useRef, useState } from "react";
 
-import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { cn } from "@/utils/utils";
 
@@ -15,14 +14,9 @@ import { readStudioModelLabel } from "./creative-studio-media-meta";
 import {
   STUDIO_AUDIO_TILE_PREVIEW,
   STUDIO_MEDIA_CARD,
-  STUDIO_MEDIA_CARD_FOOTER,
-  STUDIO_META_ROW,
-  STUDIO_META_TAG,
-  STUDIO_NODE_LABEL,
-  STUDIO_NODE_LABEL_ROW,
 } from "./creative-studio-surface";
-import { CreativeStudioListItemMenu } from "./creative-studio-list-item-menu";
-import { resolveStudioNodeLabel } from "./creative-studio-utils";
+import { CreativeStudioListItemFooter } from "./creative-studio-list-item-footer";
+import { useCreativeStudio } from "./creative-studio-context";
 import { studioReferenceDragSourceProps } from "./studio-reference-drag";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -39,8 +33,6 @@ export function CreativeStudioAudioTile({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioAudioTileProps) {
-  const { t } = useTranslation();
-  const label = resolveStudioNodeLabel(node, t);
   const modelLabel = readStudioModelLabel(node.data);
   const audios = readAiAudioCardAudios(
     node.data.inputs,
@@ -58,13 +50,19 @@ export function CreativeStudioAudioTile({
   const duration = useStudioAudioDuration(displayUrl);
   const durationLabel =
     duration != null ? formatStudioDuration(duration) : "--:--";
+  const { isListNodeRenaming } = useCreativeStudio();
+  const isRenaming = isListNodeRenaming(node.id);
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragProps = studioReferenceDragSourceProps(node, referenceDragEnabled, {
-    dragImageRootRef: cardRef,
-    onDragStateChange: setIsDragging,
-    onDragStart: onCancelPendingListClick,
-  });
+  const dragProps = studioReferenceDragSourceProps(
+    node,
+    referenceDragEnabled && !isRenaming,
+    {
+      dragImageRootRef: cardRef,
+      onDragStateChange: setIsDragging,
+      onDragStart: onCancelPendingListClick,
+    }
+  );
 
   return (
     <div
@@ -72,7 +70,7 @@ export function CreativeStudioAudioTile({
       className={cn(
         STUDIO_MEDIA_CARD,
         "w-full",
-        referenceDragEnabled && "cursor-grab",
+        referenceDragEnabled && !isRenaming && "cursor-grab",
         isDragging && "opacity-50"
       )}
       {...dragProps}
@@ -92,28 +90,11 @@ export function CreativeStudioAudioTile({
         </div>
       </button>
 
-      <div className={STUDIO_MEDIA_CARD_FOOTER}>
-        <div className={STUDIO_NODE_LABEL_ROW}>
-          <button
-            type="button"
-            className={cn(
-              STUDIO_NODE_LABEL,
-              "min-w-0 flex-1 truncate text-left text-[13px] leading-none text-foreground/90"
-            )}
-            onClick={onOpenDetail}
-          >
-            {label}
-          </button>
-          <CreativeStudioListItemMenu nodeId={node.id} />
-        </div>
-        {modelLabel ? (
-          <button type="button" className="w-full text-left" onClick={onOpenDetail}>
-            <div className={STUDIO_META_ROW}>
-              <span className={cn(STUDIO_META_TAG, "truncate")}>{modelLabel}</span>
-            </div>
-          </button>
-        ) : null}
-      </div>
+      <CreativeStudioListItemFooter
+        node={node}
+        onOpenDetail={onOpenDetail}
+        metaTags={modelLabel ? [modelLabel] : []}
+      />
     </div>
   );
 }

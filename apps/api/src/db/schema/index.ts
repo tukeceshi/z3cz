@@ -250,6 +250,7 @@ export const platformSettings = pgTable("platform_settings", {
     .$type<"console" | "marketing">()
     .notNull()
     .default("console"),
+  wsBootstrapEnabled: boolean("ws_bootstrap_enabled").notNull().default(false),
   legalConfig: text("legal_config"),
   persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
     .notNull()
@@ -378,17 +379,6 @@ export const aiInterfaceCreateIdempotency = pgTable(
   ]
 );
 
-export const platformAiModelGroups = pgTable("platform_ai_model_groups", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description").notNull().default(""),
-  icon: text("icon").notNull().default("sparkles"),
-  modality: text("modality").notNull().default("text"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: createCreatedAt(),
-  updatedAt: createUpdatedAt(),
-});
-
 export const platformAiModels = pgTable("platform_ai_models", {
   canonicalId: text("canonical_id").primaryKey(),
   displayName: text("display_name").notNull(),
@@ -398,13 +388,29 @@ export const platformAiModels = pgTable("platform_ai_models", {
     .$type<PlatformAiModelParameterRules>()
     .notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-  groupId: text("group_id").references(() => platformAiModelGroups.id, {
-    onDelete: "set null",
-  }),
+  brandIcon: text("brand_icon"),
   description: text("description").notNull().default(""),
   createdAt: createCreatedAt(),
   updatedAt: createUpdatedAt(),
 });
+
+export const platformAiModelChannels = pgTable(
+  "platform_ai_model_channels",
+  {
+    canonicalId: text("canonical_id")
+      .notNull()
+      .references(() => platformAiModels.canonicalId, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    presetId: text("preset_id").notNull(),
+    upstreamModelId: text("upstream_model_id").notNull(),
+    channelEnabled: boolean("channel_enabled").notNull().default(true),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.canonicalId, table.channel] }),
+  })
+);
 
 export const aiModelInvocations = pgTable(
   "ai_model_invocations",
@@ -570,6 +576,9 @@ export const mediaResources = pgTable(
     kind: text("kind").notNull().$type<"cloud" | "local" | "ephemeral">(),
     mimeType: text("mime_type").notNull(),
     storageKey: text("storage_key"),
+    upstreamUrl: text("upstream_url"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    contentSha256: text("content_sha256"),
     createdAt: createCreatedAt(),
   },
   (table) => [index("media_resources_organization_id_idx").on(table.organizationId)]

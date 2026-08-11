@@ -1,5 +1,4 @@
 import {
-  VOLCANO_AGGREGATE_MODEL_CATALOG,
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
   resolveInterfaceModelAlias,
@@ -10,6 +9,7 @@ import {
 
 import type { Bindings } from "../../context";
 import { createDatabase } from "../../db";
+import { listAggregateVolcanoCatalogEntries } from "../../db/platform-ai-model-channel-queries";
 import {
   getOrganizationAiInterfaceRow,
   updateOrganizationAiInterface,
@@ -21,10 +21,8 @@ import {
   maskApiKey,
 } from "./ensure-api-key";
 import { isVolcanoArkApiKeyPending } from "./deferred-api-key";
-import { listPlatformAiModels } from "../../db/platform-ai-model-queries";
 import {
   ensureVolcanoModelsIncludePlatformCatalog,
-  toVolcanoCatalogEntriesFromPlatform,
 } from "../../services/resolve-text-model-interface";
 import {
   isVolcanoMetadata,
@@ -40,6 +38,7 @@ import {
   resolveVolcanoPackageRows,
 } from "./resolve-package-rows";
 import { resolveVolcanoEffectiveActivationStatus } from "./resolve-volcano-activation";
+import { queryTosBucketStorageGiB } from "./query-tos-bucket-storage";
 import { buildVolcanoTosStorageSnapshot } from "./tos-storage-snapshot";
 
 function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
@@ -112,14 +111,13 @@ export async function buildVolcanoSnapshot(params: {
     throw new Error("Volcano metadata not configured");
   }
 
-  const platformModels = await listPlatformAiModels(db);
-  const platformCatalog = toVolcanoCatalogEntriesFromPlatform(platformModels);
+  const aggregateCatalog = await listAggregateVolcanoCatalogEntries(db);
   const alignedMetadata = pruneVolcanoMetadataToCatalog(
     ensureVolcanoModelsIncludePlatformCatalog(
       refreshedMetadata,
-      platformCatalog
+      aggregateCatalog
     ),
-    platformCatalog
+    aggregateCatalog
   );
   if (
     JSON.stringify(alignedMetadata.models) !==
@@ -181,10 +179,7 @@ export async function buildVolcanoSnapshot(params: {
   const activationCache = refreshedMetadata.modelActivationCache ?? {};
 
   const modelCatalogById = new Map(
-    [...VOLCANO_AGGREGATE_MODEL_CATALOG, ...platformCatalog].map((entry) => [
-      entry.canonicalId,
-      entry,
-    ])
+    aggregateCatalog.map((entry) => [entry.canonicalId, entry])
   );
   const modelRows = [...modelCatalogById.values()].map((entry) => {
     const config = refreshedMetadata.models[entry.canonicalId];
@@ -244,12 +239,41 @@ export async function buildVolcanoSnapshot(params: {
 
   let balance: VolcanoSnapshotResponse["balance"] = null;
   let balanceError: string | undefined;
+  let bucketStorageGiB: number | undefined;
+  let bucketStorageError: string | undefined;
+  const tosConfig = refreshedMetadata.tosStorage;
+  const tosEnabled =
+    tosConfig?.enabled === true &&
+    Boolean(tosConfig.region?.trim() && tosConfig.bucket?.trim());
+
   if (!refreshLimited) {
     try {
       balance = await queryVolcanoBalance({ credentials });
     } catch (error) {
       balanceError =
         error instanceof Error ? error.message : "Failed to fetch balance";
+    }
+
+    if (tosEnabled) {
+      try {
+        const bucketStorage = await queryTosBucketStorageGiB({
+          credentials,
+          bucket: tosConfig!.bucket,
+          region: tosConfig!.region,
+        });
+        if (bucketStorage) {
+          bucketStorageGiB = bucketStorage.storageGiB;
+        } else {
+          bucketStorageError = "Bucket storage metrics unavailable";
+        }
+      } catch (error) {
+        bucketStorageError =
+          error instanceof VolcengineApiRequestError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Failed to fetch bucket storage metrics";
+      }
     }
   }
 
@@ -279,6 +303,8 @@ export async function buildVolcanoSnapshot(params: {
         metadata: refreshedMetadata,
         packageRows,
         usageError: usageFetchError,
+        bucketStorageGiB,
+        bucketStorageError,
       }),
     },
     ...(refreshLimited ? { refreshLimited: true } : {}),

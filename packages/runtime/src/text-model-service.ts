@@ -33,11 +33,6 @@ export interface TextModelService {
     }[];
     referenceVideoUrls?: readonly string[];
   }): Promise<ExecuteRuntimeTextModelResult>;
-  disableTextModelOnInterface(params: {
-    organizationId: string;
-    interfaceId: string;
-    canonicalId: string;
-  }): Promise<boolean>;
   /** Re-read volcano metadata after API key ensure to pick endpoint vs ModelId. */
   resolveTextModelInferenceId(params: {
     organizationId: string;

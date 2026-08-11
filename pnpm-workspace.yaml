@@ -1,3 +1,5 @@
+# pnpm workspace roots — one shared pnpm-lock.yaml at repo root.
+# After changing any package.json here, run: pnpm install (root) and commit pnpm-lock.yaml.
 packages:
   - apps/app
   - apps/api

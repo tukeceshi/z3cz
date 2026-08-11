@@ -36,7 +36,6 @@ import {
   getCreateIdempotencyRecord,
   insertCreateIdempotencyRecord,
 } from "../db/ai-interface-idempotency-queries";
-import { listPlatformAiModels } from "../db/platform-ai-model-queries";
 import { encryptSecret } from "../utils/encryption";
 import {
   CREDENTIALS_DECRYPT_FAILED,
@@ -54,7 +53,7 @@ import {
 } from "../integrations/volcengine/errors";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
 import { encryptDeferredVolcanoArkApiKey } from "../integrations/volcengine/deferred-api-key";
-import { toVolcanoCatalogEntriesFromPlatform } from "../services/resolve-text-model-interface";
+import { listAggregateVolcanoCatalogEntries } from "../db/platform-ai-model-channel-queries";
 import {
   createVolcanoMetadata,
   isVolcanoMetadata,
@@ -400,9 +399,7 @@ aiInterfaceRoutes.post(
         secretAccessKey: body.secretAccessKey,
         region: "cn-beijing" as const,
       };
-      const platformModels = await listPlatformAiModels(db);
-      const catalogEntries =
-        toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
       const entries = resolveVolcanoCatalogEntries(
         body.canonicalIds,
         catalogEntries
@@ -530,9 +527,7 @@ aiInterfaceRoutes.post(
         });
       }
 
-      const platformModels = await listPlatformAiModels(db);
-      const catalogEntries =
-        toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
       const entries = resolveVolcanoCatalogEntries(
         body.canonicalIds,
         catalogEntries
@@ -822,8 +817,7 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
         c.env,
         organizationId
       );
-      const platformModels = await listPlatformAiModels(db);
-      const catalogEntries = toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
       const metadata = createVolcanoMetadata({
         accessKeyId: body.accessKeyId!,
         secretAccessKeyEncrypted,
@@ -1033,9 +1027,7 @@ aiInterfaceRoutes.patch(
           : undefined;
 
       let metadataUpdate: Record<string, unknown> | undefined = body.metadata;
-      const platformModels = await listPlatformAiModels(db);
-      const catalogEntries =
-        toVolcanoCatalogEntriesFromPlatform(platformModels);
+      const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
 
       if (body.accessKeyId !== undefined || body.secretAccessKey !== undefined) {
         return c.json({ error: "Credentials cannot be reconfigured" }, 400);

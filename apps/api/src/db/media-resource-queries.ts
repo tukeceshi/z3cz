@@ -2,7 +2,7 @@ import type { MediaResourceKind, MediaResourceRecord } from "@dafthunk/types";
 
 import type { Database } from "../db";
 import { mediaResources } from "../db/schema";
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 export interface UpsertMediaResourceParams {
   readonly id: string;
@@ -10,6 +10,9 @@ export interface UpsertMediaResourceParams {
   readonly kind: MediaResourceKind;
   readonly mimeType: string;
   readonly storageKey?: string | null;
+  readonly upstreamUrl?: string | null;
+  readonly expiresAt?: string | Date | null;
+  readonly contentSha256?: string | null;
 }
 
 function mapMediaResourceRow(
@@ -21,6 +24,9 @@ function mapMediaResourceRow(
     kind: row.kind,
     mimeType: row.mimeType,
     storageKey: row.storageKey,
+    upstreamUrl: row.upstreamUrl,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    contentSha256: row.contentSha256 ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -42,6 +48,13 @@ export async function upsertMediaResources(
         kind: resource.kind,
         mimeType: resource.mimeType,
         storageKey: resource.storageKey ?? null,
+        upstreamUrl: resource.upstreamUrl ?? null,
+        expiresAt: resource.expiresAt
+          ? resource.expiresAt instanceof Date
+            ? resource.expiresAt
+            : new Date(resource.expiresAt)
+          : null,
+        contentSha256: resource.contentSha256 ?? null,
       }))
     )
     .onConflictDoUpdate({
@@ -50,6 +63,9 @@ export async function upsertMediaResources(
         kind: sql`excluded.kind`,
         mimeType: sql`excluded.mime_type`,
         storageKey: sql`excluded.storage_key`,
+        upstreamUrl: sql`excluded.upstream_url`,
+        expiresAt: sql`excluded.expires_at`,
+        contentSha256: sql`excluded.content_sha256`,
       },
     });
 }
@@ -79,6 +95,8 @@ export async function rekeyMediaResource(
         kind: params.kind,
         mimeType: params.mimeType,
         storageKey: params.storageKey ?? null,
+        upstreamUrl: null,
+        expiresAt: null,
       },
     ]);
     return;
@@ -112,6 +130,8 @@ export async function rekeyMediaResource(
         kind: params.kind,
         mimeType: params.mimeType,
         storageKey: params.storageKey ?? null,
+        upstreamUrl: null,
+        expiresAt: null,
       })
       .where(
         and(
@@ -151,10 +171,7 @@ export async function getMediaResourcesByIds(
     .where(
       and(
         eq(mediaResources.organizationId, params.organizationId),
-        or(
-          inArray(mediaResources.id, ids),
-          inArray(mediaResources.storageKey, ids)
-        )
+        inArray(mediaResources.id, ids)
       )
     );
 

@@ -18,7 +18,6 @@ import HashIcon from "lucide-react/icons/hash";
 import ImageIcon from "lucide-react/icons/image";
 import LayersIcon from "lucide-react/icons/layers";
 import LinkIcon from "lucide-react/icons/link";
-import LoaderIcon from "lucide-react/icons/loader-circle";
 import LockIcon from "lucide-react/icons/lock";
 import MailIcon from "lucide-react/icons/mail";
 import MusicIcon from "lucide-react/icons/music";
@@ -29,6 +28,7 @@ import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import WrenchIcon from "lucide-react/icons/wrench";
 import { createElement, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router";
 
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { useTranslation } from "@/components/locale-provider";
@@ -40,11 +40,10 @@ import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
   AI_TEXT_CARD_HEIGHT_PX,
-  hasAiTextGeneratedHistory,
   isAiTextGenerating,
-  withAiTextEditedResult,
-  withAiTextManualResult,
 } from "./ai-text-node-utils";
+import { commitAiTextValue } from "./commit-ai-text-value";
+import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import {
   AI_AUDIO_CARD_WIDTH_PX,
   isAiAudioGenerating,
@@ -59,23 +58,15 @@ import { readGenerativeCardError } from "./generative-card-error-utils";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
-  GENERATIVE_CARD_STATE_LABEL_CLASS,
   GENERATIVE_NODE_CARD_CLASS,
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
 import {
-  formatGenerativeBusyOverlayLabel,
-  isGenerativePhaseCancellable,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
 } from "./generative-progress-utils";
-import { cancelGenerativeGenerationForNode } from "./generative-generation-cancel";
 import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
-import {
-  generativeAudioProgressButtonKey,
-  generativeProgressButtonKey,
-  generativeVideoProgressButtonKey,
-} from "@/hooks/use-generative-cloud-job";
+import { WorkflowNodeGenerativeBusyOverlay } from "./generative-busy-overlay";
 import {
   WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
   WORKFLOW_NODE_SELECTED_BORDER_CLASS,
@@ -344,6 +335,8 @@ export const WorkflowNode = memo(
     const { t } = useTranslation();
     const { organization } = useAuth();
     const orgId = organization?.id;
+    const { id: workflowId } = useParams<{ id: string }>();
+    const { configured: cloudConfigured } = useCloudStorageCanvasContext();
     const connectedHandleKeys =
       (data.connectedHandleKeys as readonly string[] | undefined) ?? [];
     const showBottomPanelHost = data.showBottomPanelHost === true;
@@ -425,11 +418,16 @@ export const WorkflowNode = memo(
       if (disabled || !updateNodeData || !widget) return;
 
       if (nodeType === AI_TEXT_NODE_TYPE) {
-        updateNodeData(id, (current) =>
-          hasAiTextGeneratedHistory(current.inputs)
-            ? withAiTextEditedResult(current, value)
-            : withAiTextManualResult(current, value)
-        );
+        if (!orgId || !workflowId) return;
+        void commitAiTextValue({
+          organizationId: orgId,
+          workflowId,
+          cloudConfigured,
+          nodeId: id,
+          value,
+          updateNodeData,
+          current: data,
+        });
         return;
       }
 
@@ -610,102 +608,6 @@ export const WorkflowNode = memo(
       (data.executionState === "error" && !!data.error) ||
       Boolean(generativeCardError);
 
-    const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
-    useEffect(() => {
-      if (!showBusyOverlay || !progressPhase) {
-        return;
-      }
-      setProgressNowMs(Date.now());
-      const timerId = window.setInterval(() => {
-        setProgressNowMs(Date.now());
-      }, 1000);
-      return () => {
-        window.clearInterval(timerId);
-      };
-    }, [progressPhase, showBusyOverlay]);
-
-    const busyOverlayLabel = useMemo(() => {
-      if (
-        !isAiImageNode &&
-        !isAiVideoNode &&
-        !isAiAudioNode
-      ) {
-        return null;
-      }
-      if (!isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy && !progressPhase) {
-        return null;
-      }
-
-      const phase = progressPhase ?? "generating";
-      if (isAiImageNode) {
-        return formatGenerativeBusyOverlayLabel({
-          phase,
-          progressButtonKey: generativeProgressButtonKey,
-          i18nPrefix: "workflow.aiImagePanel",
-          metadata: data.metadata,
-          progressNowMs,
-          t,
-        });
-      }
-      if (isAiVideoNode) {
-        return formatGenerativeBusyOverlayLabel({
-          phase,
-          progressButtonKey: generativeVideoProgressButtonKey,
-          i18nPrefix: "workflow.aiVideoPanel",
-          metadata: data.metadata,
-          progressNowMs,
-          t,
-        });
-      }
-      return formatGenerativeBusyOverlayLabel({
-        phase,
-        progressButtonKey: generativeAudioProgressButtonKey,
-        i18nPrefix: "workflow.aiAudioPanel",
-        metadata: data.metadata,
-        progressNowMs,
-        t,
-      });
-    }, [
-      data.metadata,
-      isAiAudioBusy,
-      isAiAudioNode,
-      isAiImageBusy,
-      isAiImageNode,
-      isAiVideoBusy,
-      isAiVideoNode,
-      progressNowMs,
-      progressPhase,
-      t,
-    ]);
-
-    const overlayProgressPhase =
-      progressPhase ??
-      (isAiImageBusy || isAiVideoBusy ? ("generating" as const) : null);
-    const showOverlayCancel =
-      isAiVideoNode &&
-      showBusyOverlay &&
-      progressPhase !== "cancelling" &&
-      isGenerativePhaseCancellable(overlayProgressPhase);
-
-    const handleOverlayCancel = useCallback(() => {
-      if (!showOverlayCancel) {
-        return;
-      }
-      void cancelGenerativeGenerationForNode({
-        nodeId: id,
-        orgId,
-        metadata: data.metadata,
-        modality: "video",
-        updateNodeData,
-      });
-    }, [
-      data.metadata,
-      id,
-      orgId,
-      showOverlayCancel,
-      updateNodeData,
-    ]);
-
     const nodeDisplayName = data.name;
 
     const headerIconName =
@@ -803,41 +705,22 @@ export const WorkflowNode = memo(
           }
         >
           {/* Execution / generate overlay */}
-          {showProgressOverlay ? (
-            <div
-              className={cn(
-                "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
-                isGenerativeCanvasNode
-                  ? GENERATIVE_NODE_CARD_RADIUS_CLASS
-                  : "rounded-md"
-              )}
-            >
-              <>
-                <LoaderIcon className="h-5 w-5 text-yellow-500 animate-spin" />
-                {busyOverlayLabel ? (
-                  <p className={cn("max-w-[90%] px-3", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
-                    {busyOverlayLabel}
-                  </p>
-                ) : null}
-                {showOverlayCancel ? (
-                  <button
-                    type="button"
-                    className={cn(
-                      "nodrag rounded-md px-3 py-1 text-[11px] font-medium",
-                      "bg-red-600 text-white hover:bg-red-500",
-                      "dark:bg-red-500 dark:hover:bg-red-400"
-                    )}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleOverlayCancel();
-                    }}
-                  >
-                    {t("workflow.generativeCancel.action")}
-                  </button>
-                ) : null}
-              </>
-            </div>
-          ) : null}
+          <WorkflowNodeGenerativeBusyOverlay
+            visible={showProgressOverlay}
+            isAiImageNode={isAiImageNode}
+            isAiVideoNode={isAiVideoNode}
+            isAiAudioNode={isAiAudioNode}
+            isAiImageBusy={isAiImageBusy}
+            isAiVideoBusy={isAiVideoBusy}
+            isAiAudioBusy={isAiAudioBusy}
+            metadata={data.metadata}
+            nodeId={id}
+            roundedClass={
+              isGenerativeCanvasNode
+                ? GENERATIVE_NODE_CARD_RADIUS_CLASS
+                : "rounded-md"
+            }
+          />
 
           {(isAiImageNode || isAiVideoNode || isAiAudioNode) && !disabled ? (
             <GenerativeCloudJobResumeHost

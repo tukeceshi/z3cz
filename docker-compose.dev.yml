@@ -73,6 +73,7 @@ services:
       # Windows bind mounts often miss inotify events; tsx watch uses chokidar.
       CHOKIDAR_USEPOLLING: "1"
       CHOKIDAR_INTERVAL: "300"
+      BOOTSTRAP_ASSETS_DIR: /app/apps/app/dist
     networks:
       - dafthunk-network
     healthcheck:

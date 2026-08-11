@@ -46,6 +46,10 @@ interface VolcanoStorageRowProps {
 
 }
 
+function formatGiB(value: number, locale: string): string {
+  return `${value.toLocaleString(locale, { maximumFractionDigits: 2 })} GiB`;
+}
+
 
 
 export function VolcanoStorageRow({
@@ -96,6 +100,11 @@ export function VolcanoStorageRow({
 
   const hasUsageMeters =
     snapshot.storageUsage !== null || snapshot.trafficUsage !== null;
+
+  const showBucketStorage =
+    snapshot.configured &&
+    snapshot.enabled &&
+    (snapshot.bucketStorageGiB !== undefined || snapshot.bucketStorageError);
 
   const storageEnableBlocked =
     tosServiceStatus === "not_opened" || tosServiceStatus === "auth_error";
@@ -335,6 +344,15 @@ export function VolcanoStorageRow({
                 {t("pages.aiInterfaces.tosStorage.notConfigured")}
               </p>
             )}
+            {showBucketStorage ? (
+              <p className="text-muted-foreground text-xs">
+                {snapshot.bucketStorageGiB !== undefined
+                  ? t("pages.aiInterfaces.tosStorage.bucketStorageUsed", {
+                      size: formatGiB(snapshot.bucketStorageGiB, locale),
+                    })
+                  : t("pages.aiInterfaces.tosStorage.bucketStorageUnavailable")}
+              </p>
+            ) : null}
             {hasUsageMeters ? (
               <div className="space-y-2 pt-1">
                 <VolcanoTosUsageMeter

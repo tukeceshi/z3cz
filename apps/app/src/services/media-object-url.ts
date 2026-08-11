@@ -10,6 +10,7 @@ import { buildApiUrl } from "@/config/api";
 
 import { findStableBlobUrlForMediaId } from "./media-display-blob-url-registry";
 
+/** Fallback same-origin URL when a full ObjectReference is available (not resourceId resolve path). */
 export function createCloudObjectUrl(
   ref: ObjectReference,
   organizationId: string

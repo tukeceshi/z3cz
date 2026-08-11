@@ -1,18 +1,26 @@
-import { getMediaReferenceKey, type MediaReference } from "@dafthunk/types";
+import { getMediaReferenceKey, isLocalMediaReference, type MediaReference, type WorkflowMediaValue } from "@dafthunk/types";
 
 
 
 import {
 
-  getCachedMediaBlobUrl,
-
   getCanvasTierUrlSet,
+
+  getMediaDisplayUrlSet,
 
   getStableCanvasTierUrlSet,
 
+  getStableMediaDisplayUrlSet,
+
+  isMediaDisplayUrlSetEmpty,
+
   pickCanvasTierUrl,
 
+  pickMediaDisplayUrl,
+
   type CanvasTierUrlSet,
+
+  type MediaDisplayUrlSet,
 
 } from "@/services/ai-media-cache-service";
 
@@ -23,6 +31,16 @@ import type { MediaDisplaySize } from "@/services/media-display-size";
 import { inferMediaNodeType } from "@/services/media-url-resolver";
 
 import { ingestCanvasMediaInBackground } from "@/services/ingest-canvas-media";
+
+import {
+
+  createStableBlobUrl,
+
+  stagingBlobUrlKey,
+
+} from "@/services/media-display-blob-url-registry";
+
+import { readGenerativeStagingBlob } from "@/services/generative-media-staging";
 
 import {
 
@@ -70,7 +88,7 @@ function resolveCanvasResourceId(params: {
 
 export function resolveStableCanvasTierUrlSet(params: {
 
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
 
   readonly organizationId: string;
 
@@ -96,7 +114,7 @@ export function resolveStableCanvasTierUrlSet(params: {
 
 export async function resolveCanvasTierUrlSet(params: {
 
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
 
   readonly organizationId: string;
 
@@ -120,11 +138,111 @@ export async function resolveCanvasTierUrlSet(params: {
 
 
 
-/** @deprecated Use resolveStableCanvasTierUrlSet and pickCanvasTierUrl. */
+export function resolveStableMediaDisplayUrlSet(params: {
+
+  readonly media: WorkflowMediaValue;
+
+  readonly organizationId: string;
+
+  readonly workflowId: string;
+
+}): MediaDisplayUrlSet {
+
+  const resourceId = resolveCanvasResourceId(params);
+
+  return getStableMediaDisplayUrlSet({
+
+    organizationId: params.organizationId,
+
+    workflowId: params.workflowId,
+
+    mediaId: resourceId,
+
+  });
+
+}
+
+
+
+export async function resolveMediaDisplayUrlSet(params: {
+
+  readonly media: WorkflowMediaValue;
+
+  readonly organizationId: string;
+
+  readonly workflowId: string;
+
+  readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
+
+}): Promise<MediaDisplayUrlSet> {
+
+  const resourceId = resolveCanvasResourceId(params);
+
+  const resolved = await getMediaDisplayUrlSet({
+
+    organizationId: params.organizationId,
+
+    workflowId: params.workflowId,
+
+    mediaId: resourceId,
+
+  });
+
+  if (!isMediaDisplayUrlSetEmpty(resolved)) {
+
+    return resolved;
+
+  }
+
+
+
+  if (isLocalMediaReference(params.media)) {
+
+    const entry = await readGenerativeStagingBlob({
+
+      mediaId: params.media.mediaId,
+
+      organizationId: params.organizationId,
+
+      workflowId: params.workflowId,
+
+    });
+
+    if (entry) {
+
+      const full = createStableBlobUrl(
+
+        stagingBlobUrlKey({
+
+          organizationId: params.organizationId,
+
+          workflowId: params.workflowId,
+
+          mediaId: params.media.mediaId,
+
+        }),
+
+        entry.blob
+
+      );
+
+      return { full, s: null, m: null, l: null };
+
+    }
+
+  }
+
+
+
+  return resolved;
+
+}
+
+
 
 export function resolveStableResourceDisplayUrl(params: {
 
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
 
   readonly organizationId: string;
 
@@ -134,7 +252,7 @@ export function resolveStableResourceDisplayUrl(params: {
 
 }): string | null {
 
-  if (!params.size || !isCanvasDisplaySize(params.size)) {
+  if (!params.size) {
 
     return null;
 
@@ -142,29 +260,9 @@ export function resolveStableResourceDisplayUrl(params: {
 
 
 
-  const set = resolveStableCanvasTierUrlSet(params);
+  const set = resolveStableMediaDisplayUrlSet(params);
 
-  if (!set) {
-
-    return null;
-
-  }
-
-
-
-  if (params.size === "canvas-s" || params.size === "thumb") {
-
-    return set.s;
-
-  }
-
-  if (params.size === "canvas-m") {
-
-    return set.m;
-
-  }
-
-  return set.l;
+  return pickMediaDisplayUrl(set, params.size);
 
 }
 
@@ -174,7 +272,7 @@ export function resolveStableResourceDisplayUrl(params: {
 
 export async function resolveResourceDisplayUrl(params: {
 
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
 
   readonly organizationId: string;
 
@@ -196,29 +294,17 @@ export async function resolveResourceDisplayUrl(params: {
 
   });
 
-  const resourceId = resolveCanvasResourceId(params);
-
 
 
   if (params.size && isCanvasDisplaySize(params.size)) {
 
-    const set = await resolveCanvasTierUrlSet(params);
+    const set = await resolveMediaDisplayUrlSet(params);
 
-    if (set) {
+    const url = pickMediaDisplayUrl(set, params.size);
 
-      if (params.size === "canvas-s" || params.size === "thumb") {
+    if (url) {
 
-        return set.s;
-
-      }
-
-      if (params.size === "canvas-m") {
-
-        return set.m;
-
-      }
-
-      return set.l;
+      return url;
 
     }
 
@@ -248,17 +334,13 @@ export async function resolveResourceDisplayUrl(params: {
 
 
 
-  const local = await getCachedMediaBlobUrl({
+  const set = await resolveMediaDisplayUrlSet(params);
 
-    organizationId: params.organizationId,
+  const local = params.size
 
-    workflowId: params.workflowId,
+    ? pickMediaDisplayUrl(set, params.size)
 
-    mediaId: resourceId,
-
-    size: params.size,
-
-  });
+    : set.full;
 
   if (local) return local;
 
@@ -290,5 +372,15 @@ export async function resolveResourceDisplayUrl(params: {
 
 
 
-export { pickCanvasTierUrl, type CanvasTierUrlSet };
+export {
+
+  pickCanvasTierUrl,
+
+  pickMediaDisplayUrl,
+
+  type CanvasTierUrlSet,
+
+  type MediaDisplayUrlSet,
+
+};
 

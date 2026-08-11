@@ -209,6 +209,9 @@ export const en = {
     homepageModeMarketing: "Marketing site",
     homepageModeHelp:
       "Controls where visitors land at /. Marketing opens /m/ on the same domain; console opens login or the dashboard.",
+    wsBootstrapToggle: "WebSocket accelerated loading (experimental)",
+    wsBootstrapHint:
+      "When enabled, first visits download app JavaScript over WebSocket instead of regular script tags. No HTTP fallback.",
   },
   legalDocuments: {
     title: "Terms & Privacy",
@@ -1756,6 +1759,8 @@ export const en = {
         storagePack: "Storage pack",
         trafficPack: "Traffic pack",
         usageRemaining: "{{remaining}} / {{total}} remaining",
+        bucketStorageUsed: "Bucket used {{size}}",
+        bucketStorageUnavailable: "Bucket storage unavailable",
         saved: "Cloud storage settings saved",
         saveFailed: "Failed to save cloud storage settings",
         loadFailed: "Failed to load bucket list",
@@ -1818,15 +1823,19 @@ export const en = {
       textModels: "Text models",
       imageModels: "Image models",
       videoModels: "Video models",
+      audioModels: "Audio models",
       description:
         "Enable, reorder, and configure platform text models. Reference limits apply when connecting inputs to AI Text nodes.",
       imageDescription:
         "Enable, reorder, and configure platform image models. Reference and generation defaults apply in AI image nodes.",
       videoDescription:
         "Enable, reorder, and configure platform video models. Reference and generation defaults apply in AI video nodes.",
+      audioDescription:
+        "Enable, reorder, and configure platform audio models. Generation defaults apply in AI audio nodes.",
       empty: "No text models configured.",
       imageEmpty: "No image models configured.",
       videoEmpty: "No video models configured.",
+      audioEmpty: "No audio models configured.",
       platformEnabled: "Enabled",
       settings: "Settings",
       settingsTitle: "Settings — {{name}}",
@@ -1835,6 +1844,8 @@ export const en = {
       imageSettingsDescription:
         "Master switch: whether this model exposes each parameter. ✓ means available to users; outline marks the default.",
       videoSettingsDescription:
+        "Master switch: whether this model exposes each parameter. ✓ means available to users; outline marks the default.",
+      audioSettingsDescription:
         "Master switch: whether this model exposes each parameter. ✓ means available to users; outline marks the default.",
       sectionGrouping: "Grouping",
       sectionPrompt: "Prompt",
@@ -1866,6 +1877,7 @@ export const en = {
       allowPromptInjectVideo: "Allow inserting video references into the prompt",
       modelDisplayName: "Model name",
       modelCanonicalId: "Model ID",
+      brandIcon: "Logo",
       modelDescription: "Model description",
       modelGroup: "Model group",
       noGroup: "No group",
@@ -1894,8 +1906,7 @@ export const en = {
       groupUpdateFailed: "Failed to update group",
       groupDeleted: "Group deleted",
       groupDeleteFailed: "Failed to delete group",
-      moveUp: "Move up",
-      moveDown: "Move down",
+      dragToReorder: "Drag to reorder",
       reorderSaved: "Model order saved",
       reorderFailed: "Failed to save model order",
       saved: "Model settings saved",
@@ -1936,6 +1947,13 @@ export const en = {
         virtual_avatar_library: "Virtual avatar library",
         return_last_frame: "Return last frame",
         execution_expires_after: "Task timeout (seconds)",
+      },
+      audioFieldLabels: {
+        speed: "Speech speed",
+        vol: "Volume",
+        pitch: "Pitch",
+        emotion: "Emotion",
+        voice_id: "Default voice",
       },
     },
     modelCalls: {
@@ -2645,6 +2663,8 @@ export const en = {
         "Model selection is unavailable in read-only mode",
       modelUnavailable:
         "This model is unavailable. Check your AI interface settings",
+      historyModelUnavailable:
+        "This history entry's model is no longer available. Prompt and preview were restored with your current model settings",
       interfaceUnavailable:
         "No AI interface is configured. Set one up in organization settings",
       upstreamFailed: "The upstream service is unavailable. Try again later",
@@ -2659,6 +2679,10 @@ export const en = {
         "Cloud upload failed. The file was saved locally in this browser",
       cloudStorageUnavailable:
         "Cloud storage is unavailable. Check AI interface storage settings",
+      realPersonInReferenceRejected:
+        "Reference [{{label}}] contains a real-person image. Generation was rejected.",
+      realPersonInReferenceHint:
+        "Try converting the image to a painted or hand-drawn style before generating.",
       generic: "Generation failed: {{detail}}",
       viewDetails: "Details",
       detailTitle: "Error details",
@@ -2790,11 +2814,17 @@ export const en = {
       pickNode: "Select a node on the left",
       history: "History",
       download: "Download",
+      viewImage: "View full size",
+      zoomOut: "Zoom out",
+      zoomIn: "Zoom in",
+      zoomAdaptive: "Fit to screen",
+      zoomOneToOne: "1:1",
       renameNode: "Rename",
       dropReferenceOk: "Release to add reference",
       dropReferenceRejected: "Cannot add this reference",
       dropReferenceAlreadyConnected: "Already referenced",
       referenceAddHint: "Drag a reference from the list on the left",
+      referenceChipHoverTitle: "Double-click to preview · {{label}}",
       listInteractionHint: {
         doubleClickAction: "Double-click",
         doubleClickRest: ": open in the edit pane",
@@ -2814,11 +2844,12 @@ export const en = {
       tabAll: "All",
       addNewNode: "Add node",
       doubleClickEditContent: "Double-click to edit",
+      cardDoubleClickOpenStudio: "Double-click to open Creative Studio",
       textViewFormatted: "Formatted",
       textViewRaw: "Raw",
       textCharCountAria: "{{count}} / {{max}} characters",
-      tableCreateNode: "Create node from table content",
-      tableCreateNodeAria: "Create node from table content",
+      sectionCreateNode: "Create node from section",
+      sectionCreateNodeAria: "Create node from section content",
     },
     status: {
       idle: "Idle",
@@ -3116,6 +3147,21 @@ export const en = {
       outputTitle: "Output",
       outputPlaceholder: "Generated text appears here…",
       cardInputPlaceholder: "Double-click to enter text…",
+      cardDoubleClickInput: "Double-click to enter text",
+      cardUploadAction: "Upload file",
+      cardUploadFileTypes: "Supports {{types}}",
+      cardUploadReplaceNotAllowed:
+        "Clear the current output before uploading a replacement.",
+      cardUploadClearPromptTitle: "Upload will clear the prompt",
+      cardUploadClearPromptDescription:
+        "Uploading a file writes to the output and clears the current prompt. Continue?",
+      cardUploadClearPromptConfirm: "Upload anyway",
+      cardUploading: "Uploading…",
+      uploadUnsupportedDoc:
+        "Legacy .doc files are not supported. Save as .docx and try again.",
+      uploadUnsupportedFile: "Unsupported file type. Upload TXT, MD, or DOCX.",
+      uploadEmptyFile: "The file has no readable text content.",
+      uploadTextTooLong: "File content exceeds the output length limit.",
       modelDisabled: "disabled",
       modelNoInterface: "unavailable",
       modelNoOrgInterface: "no AI interface",
@@ -3205,11 +3251,9 @@ export const en = {
       barLabel: "AI cache",
       barUsage: "{{used}} / {{limit}}",
       loading: "…",
-      disabled: "Off",
       panelTitle: "AI local cache",
       panelHint:
-        "Cached files stay in this browser and load first for preview, reducing repeat downloads from cloud storage. Without cloud storage, cache also helps after temporary links expire.",
-      enabledLabel: "Local cache",
+        "Local cache is always kept in this browser for canvas and studio preview, reducing repeat downloads. Cloud-persisted files are unaffected.",
       limitLabel: "Size limit",
       limitRange: "Range {{min}}–{{max}} MB",
       currentUsage: "Using {{used}} / {{limit}}",
@@ -3265,6 +3309,8 @@ export const en = {
       progressElapsedMinutes: "{{minutes}}m {{seconds}}s",
       progressElapsedSeconds: "{{seconds}}s",
       generated: "Images generated",
+      generatedBatch:
+        "Generated {{count}} images. Switch in history for the rest.",
       generateFailed: "Generation failed",
       promptRequired: "Enter a prompt to generate",
       referencedPromptEmpty:
@@ -3276,6 +3322,8 @@ export const en = {
       outputTitle: "Output",
       outputPlaceholder: "Generated images appear here…",
       cardUploadPlaceholder: "Double-click to upload an image…",
+      cardUploadAction: "Upload file",
+      cardUploadFileTypes: "Supports {{types}}",
       cardQueued: "Queued…",
       cardGenerating: "Generating…",
       cardDownloading: "Downloading…",
@@ -3332,7 +3380,11 @@ export const en = {
     },
     aiVideoPanel: {
       promptTitle: "Prompt",
-      promptPlaceholder: "Describe the video you want to generate…",
+      promptPlaceholder: "Describe the video you want to generate… Type @ to reference an image",
+      promptMentionEmpty: "Add an image reference first",
+      promptMentionNoMatch: "No matching images",
+      promptMentionBroken:
+        "Remove broken reference tokens or reconnect the reference before generating",
       selectModel: "Select model…",
       generate: "Generate",
       generating: "Generating…",
@@ -3355,6 +3407,8 @@ export const en = {
       outputTitle: "Output",
       outputPlaceholder: "Generated videos appear here…",
       cardUploadPlaceholder: "Double-click to upload a video…",
+      cardUploadAction: "Upload file",
+      cardUploadFileTypes: "Supports {{types}}",
       cardQueued: "Queued…",
       cardGenerating: "Generating…",
       cardCancelling: "Cancelling…",
@@ -3406,6 +3460,7 @@ export const en = {
       historyPrompt: "Prompt used",
       play: "Play",
       pause: "Pause",
+      fullscreen: "Fullscreen",
       mute: "Mute",
       unmute: "Unmute",
       captureFrame: "Capture frame",
@@ -3437,6 +3492,8 @@ export const en = {
         "The linked prompt exceeds this model's {{max}}-character limit. Shorten the upstream text node",
       outputTitle: "Output",
       cardUploadPlaceholder: "Double-click to upload audio…",
+      cardUploadAction: "Upload file",
+      cardUploadFileTypes: "Supports {{types}}",
       cardQueued: "Queued…",
       cardGenerating: "Generating…",
       cardDownloading: "Downloading…",

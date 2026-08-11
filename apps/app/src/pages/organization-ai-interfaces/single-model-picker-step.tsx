@@ -4,7 +4,6 @@ import type {
   SingleModelWizardSelection,
 } from "@dafthunk/types";
 import {
-  CLAUDE_CANONICAL_IDS,
   CLAUDE_PROVIDER_CARD_ID,
   createDefaultClaudeSelection,
   createDefaultDeepSeekSelection,
@@ -22,41 +21,26 @@ import {
   createDefaultSeedreamSelection,
   createDefaultSeedSelection,
   createDefaultVeoSelection,
-  DEEPSEEK_CANONICAL_IDS,
   DEEPSEEK_PROVIDER_CARD_ID,
-  GLM_CANONICAL_IDS,
   GLM_PROVIDER_CARD_ID,
-  GEMINI_CANONICAL_IDS,
   GEMINI_PROVIDER_CARD_ID,
-  GROK_CANONICAL_IDS,
-  GROK_IMAGINE_IMAGE_CANONICAL_IDS,
   GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID,
-  GROK_IMAGINE_VIDEO_CANONICAL_IDS,
   GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
   GROK_PROVIDER_CARD_ID,
-  KIMI_CANONICAL_IDS,
   KIMI_PROVIDER_CARD_ID,
-  MINIMAX_SPEECH_CANONICAL_IDS,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
-  NANO_BANANA_CANONICAL_IDS,
   NANO_BANANA_PROVIDER_CARD_ID,
-  OPENAI_CANONICAL_IDS,
-  OPENAI_IMAGE_CANONICAL_IDS,
   OPENAI_IMAGE_PROVIDER_CARD_ID,
   OPENAI_PROVIDER_CARD_ID,
-  SEEDANCE_CANONICAL_IDS,
   SEEDANCE_PROVIDER_CARD_ID,
-  SEED_CANONICAL_IDS,
   SEED_PROVIDER_CARD_ID,
-  SEEDREAM_CANONICAL_IDS,
   SEEDREAM_PROVIDER_CARD_ID,
-  VEO_CANONICAL_IDS,
   VEO_PROVIDER_CARD_ID,
   getSingleModelPresetById,
   getSingleModelPresetsByCategory,
   SINGLE_MODEL_PRESET_CATEGORIES,
 } from "@dafthunk/types";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
@@ -72,6 +56,10 @@ import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 
 import { ModelBrandIcon } from "./model-brand-icon";
 import { resolveSingleModelPresetCardName } from "./single-model-display-name";
+import {
+  listPresetEnabledModelIds,
+  useApiPresetChannelIdMap,
+} from "./use-preset-channel-model-ids";
 
 type SingleModelPickerFilter = "all" | SingleModelPresetCategory;
 
@@ -234,335 +222,124 @@ export function SingleModelPickerStep({
     return new Set(models.map((model) => model.canonicalId));
   }, [activeFilter, audioModels, imageModels, textModels, videoModels]);
 
-  const showDeepSeekCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (DEEPSEEK_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const apiPresetChannelIds = useApiPresetChannelIdMap(organizationId);
+  const enabledIdsForPreset = useCallback(
+    (presetId: string, models: readonly { readonly canonicalId: string }[]) =>
+      listPresetEnabledModelIds(apiPresetChannelIds, presetId, models),
+    [apiPresetChannelIds]
+  );
 
   const deepSeekEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (DEEPSEEK_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(DEEPSEEK_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showSeedCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (SEED_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showDeepSeekCard =
+    matchesTextFilter(activeFilter) && deepSeekEnabledIds.length > 0;
 
   const seedEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (SEED_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(SEED_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showGlmCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (GLM_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showSeedCard =
+    matchesTextFilter(activeFilter) && seedEnabledIds.length > 0;
 
   const glmEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (GLM_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(GLM_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showKimiCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (KIMI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showGlmCard =
+    matchesTextFilter(activeFilter) && glmEnabledIds.length > 0;
 
   const kimiEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (KIMI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(KIMI_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showOpenAiCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (OPENAI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showKimiCard =
+    matchesTextFilter(activeFilter) && kimiEnabledIds.length > 0;
 
   const openAiEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (OPENAI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(OPENAI_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showGeminiCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (GEMINI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showOpenAiCard =
+    matchesTextFilter(activeFilter) && openAiEnabledIds.length > 0;
 
   const geminiEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (GEMINI_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(GEMINI_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showSeedanceCard = useMemo(() => {
-    if (!matchesVideoFilter(activeFilter)) {
-      return false;
-    }
-    return videoModels.some((model) =>
-      (SEEDANCE_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, videoModels]);
+  const showGeminiCard =
+    matchesTextFilter(activeFilter) && geminiEnabledIds.length > 0;
 
   const seedanceEnabledIds = useMemo(
-    () =>
-      videoModels
-        .filter((model) =>
-          (SEEDANCE_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [videoModels]
+    () => enabledIdsForPreset(SEEDANCE_PROVIDER_CARD_ID, videoModels),
+    [enabledIdsForPreset, videoModels]
   );
-
-  const showSeedreamCard = useMemo(() => {
-    if (!matchesImageFilter(activeFilter)) {
-      return false;
-    }
-    return imageModels.some((model) =>
-      (SEEDREAM_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, imageModels]);
+  const showSeedanceCard =
+    matchesVideoFilter(activeFilter) && seedanceEnabledIds.length > 0;
 
   const seedreamEnabledIds = useMemo(
-    () =>
-      imageModels
-        .filter((model) =>
-          (SEEDREAM_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [imageModels]
+    () => enabledIdsForPreset(SEEDREAM_PROVIDER_CARD_ID, imageModels),
+    [enabledIdsForPreset, imageModels]
   );
-
-  const showOpenAiImageCard = useMemo(() => {
-    if (!matchesImageFilter(activeFilter)) {
-      return false;
-    }
-    return imageModels.some((model) =>
-      (OPENAI_IMAGE_CANONICAL_IDS as readonly string[]).includes(
-        model.canonicalId
-      )
-    );
-  }, [activeFilter, imageModels]);
+  const showSeedreamCard =
+    matchesImageFilter(activeFilter) && seedreamEnabledIds.length > 0;
 
   const openAiImageEnabledIds = useMemo(
-    () =>
-      imageModels
-        .filter((model) =>
-          (OPENAI_IMAGE_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [imageModels]
+    () => enabledIdsForPreset(OPENAI_IMAGE_PROVIDER_CARD_ID, imageModels),
+    [enabledIdsForPreset, imageModels]
   );
-
-  const showNanoBananaCard = useMemo(() => {
-    if (!matchesImageFilter(activeFilter)) {
-      return false;
-    }
-    return imageModels.some((model) =>
-      (NANO_BANANA_CANONICAL_IDS as readonly string[]).includes(
-        model.canonicalId
-      )
-    );
-  }, [activeFilter, imageModels]);
+  const showOpenAiImageCard =
+    matchesImageFilter(activeFilter) && openAiImageEnabledIds.length > 0;
 
   const nanoBananaEnabledIds = useMemo(
-    () =>
-      imageModels
-        .filter((model) =>
-          (NANO_BANANA_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [imageModels]
+    () => enabledIdsForPreset(NANO_BANANA_PROVIDER_CARD_ID, imageModels),
+    [enabledIdsForPreset, imageModels]
   );
-
-  const showVeoCard = useMemo(() => {
-    if (!matchesVideoFilter(activeFilter)) {
-      return false;
-    }
-    return videoModels.some((model) =>
-      (VEO_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, videoModels]);
+  const showNanoBananaCard =
+    matchesImageFilter(activeFilter) && nanoBananaEnabledIds.length > 0;
 
   const veoEnabledIds = useMemo(
-    () =>
-      videoModels
-        .filter((model) =>
-          (VEO_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [videoModels]
+    () => enabledIdsForPreset(VEO_PROVIDER_CARD_ID, videoModels),
+    [enabledIdsForPreset, videoModels]
   );
-
-  const showGrokCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (GROK_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showVeoCard =
+    matchesVideoFilter(activeFilter) && veoEnabledIds.length > 0;
 
   const grokEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (GROK_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(GROK_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showClaudeCard = useMemo(() => {
-    if (!matchesTextFilter(activeFilter)) {
-      return false;
-    }
-    return textModels.some((model) =>
-      (CLAUDE_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-    );
-  }, [activeFilter, textModels]);
+  const showGrokCard =
+    matchesTextFilter(activeFilter) && grokEnabledIds.length > 0;
 
   const claudeEnabledIds = useMemo(
-    () =>
-      textModels
-        .filter((model) =>
-          (CLAUDE_CANONICAL_IDS as readonly string[]).includes(model.canonicalId)
-        )
-        .map((model) => model.canonicalId),
-    [textModels]
+    () => enabledIdsForPreset(CLAUDE_PROVIDER_CARD_ID, textModels),
+    [enabledIdsForPreset, textModels]
   );
-
-  const showGrokImagineImageCard = useMemo(() => {
-    if (!matchesImageFilter(activeFilter)) {
-      return false;
-    }
-    return imageModels.some((model) =>
-      (GROK_IMAGINE_IMAGE_CANONICAL_IDS as readonly string[]).includes(
-        model.canonicalId
-      )
-    );
-  }, [activeFilter, imageModels]);
+  const showClaudeCard =
+    matchesTextFilter(activeFilter) && claudeEnabledIds.length > 0;
 
   const grokImagineImageEnabledIds = useMemo(
-    () =>
-      imageModels
-        .filter((model) =>
-          (GROK_IMAGINE_IMAGE_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [imageModels]
+    () => enabledIdsForPreset(GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID, imageModels),
+    [enabledIdsForPreset, imageModels]
   );
-
-  const showGrokImagineVideoCard = useMemo(() => {
-    if (!matchesVideoFilter(activeFilter)) {
-      return false;
-    }
-    return videoModels.some((model) =>
-      (GROK_IMAGINE_VIDEO_CANONICAL_IDS as readonly string[]).includes(
-        model.canonicalId
-      )
-    );
-  }, [activeFilter, videoModels]);
+  const showGrokImagineImageCard =
+    matchesImageFilter(activeFilter) && grokImagineImageEnabledIds.length > 0;
 
   const grokImagineVideoEnabledIds = useMemo(
-    () =>
-      videoModels
-        .filter((model) =>
-          (GROK_IMAGINE_VIDEO_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [videoModels]
+    () => enabledIdsForPreset(GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID, videoModels),
+    [enabledIdsForPreset, videoModels]
   );
-
-  const showMinimaxSpeechCard = useMemo(() => {
-    if (!matchesAudioFilter(activeFilter)) {
-      return false;
-    }
-    return audioModels.some((model) =>
-      (MINIMAX_SPEECH_CANONICAL_IDS as readonly string[]).includes(
-        model.canonicalId
-      )
-    );
-  }, [activeFilter, audioModels]);
+  const showGrokImagineVideoCard =
+    matchesVideoFilter(activeFilter) && grokImagineVideoEnabledIds.length > 0;
 
   const minimaxSpeechEnabledIds = useMemo(
-    () =>
-      audioModels
-        .filter((model) =>
-          (MINIMAX_SPEECH_CANONICAL_IDS as readonly string[]).includes(
-            model.canonicalId
-          )
-        )
-        .map((model) => model.canonicalId),
-    [audioModels]
+    () => enabledIdsForPreset(MINIMAX_SPEECH_PROVIDER_CARD_ID, audioModels),
+    [enabledIdsForPreset, audioModels]
   );
+  const showMinimaxSpeechCard =
+    matchesAudioFilter(activeFilter) && minimaxSpeechEnabledIds.length > 0;
 
   const visiblePresets = useMemo(() => {
     const categories: SingleModelPresetCategory[] =

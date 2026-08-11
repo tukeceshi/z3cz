@@ -3,54 +3,38 @@ import {
   buildSingleModelProviderMetadata,
   createEmptyPresetSelection,
   defaultUpstreamModelIdForCanonical,
-  DEEPSEEK_CANONICAL_IDS,
   DEEPSEEK_DEFAULT_ENDPOINT_URL,
   DEEPSEEK_PROVIDER_CARD_ID,
   getSingleModelPresetById,
-  GLM_CANONICAL_IDS,
   GLM_DEFAULT_ENDPOINT_URL,
   GLM_PROVIDER_CARD_ID,
-  GEMINI_CANONICAL_IDS,
   GEMINI_DEFAULT_ENDPOINT_URL,
   GEMINI_PROVIDER_CARD_ID,
-  CLAUDE_CANONICAL_IDS,
   CLAUDE_DEFAULT_ENDPOINT_URL,
   CLAUDE_PROVIDER_CARD_ID,
-  GROK_CANONICAL_IDS,
   GROK_DEFAULT_ENDPOINT_URL,
-  GROK_IMAGINE_IMAGE_CANONICAL_IDS,
   GROK_IMAGINE_IMAGE_DEFAULT_ENDPOINT_URL,
   GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID,
-  GROK_IMAGINE_VIDEO_CANONICAL_IDS,
   GROK_IMAGINE_VIDEO_DEFAULT_ENDPOINT_URL,
   GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
   GROK_PROVIDER_CARD_ID,
   isMultiModelProviderSelection,
-  KIMI_CANONICAL_IDS,
   KIMI_DEFAULT_ENDPOINT_URL,
   KIMI_PROVIDER_CARD_ID,
-  MINIMAX_SPEECH_CANONICAL_IDS,
   MINIMAX_SPEECH_DEFAULT_ENDPOINT_URL,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
-  NANO_BANANA_CANONICAL_IDS,
   NANO_BANANA_DEFAULT_ENDPOINT_URL,
   NANO_BANANA_PROVIDER_CARD_ID,
-  VEO_CANONICAL_IDS,
   VEO_DEFAULT_ENDPOINT_URL,
   VEO_PROVIDER_CARD_ID,
-  OPENAI_CANONICAL_IDS,
   OPENAI_DEFAULT_ENDPOINT_URL,
-  OPENAI_IMAGE_CANONICAL_IDS,
   OPENAI_IMAGE_DEFAULT_ENDPOINT_URL,
   OPENAI_IMAGE_PROVIDER_CARD_ID,
   OPENAI_PROVIDER_CARD_ID,
-  SEEDANCE_CANONICAL_IDS,
   SEEDANCE_DEFAULT_ENDPOINT_URL,
   SEEDANCE_PROVIDER_CARD_ID,
-  SEED_CANONICAL_IDS,
   SEED_DEFAULT_ENDPOINT_URL,
   SEED_PROVIDER_CARD_ID,
-  SEEDREAM_CANONICAL_IDS,
   SEEDREAM_DEFAULT_ENDPOINT_URL,
   SEEDREAM_PROVIDER_CARD_ID,
   type SingleModelPresetEntry,
@@ -82,6 +66,10 @@ import {
   isSingleModelStep2Valid,
   SingleModelPickerStep,
 } from "./single-model-picker-step";
+import {
+  listPresetAvailableModels,
+  useApiPresetChannelIdMap,
+} from "./use-preset-channel-model-ids";
 
 interface SingleModelWizardContentProps {
   organizationId: string;
@@ -121,181 +109,166 @@ export function SingleModelWizardContent({
   const { models: imagePlatformModels } = usePlatformCatalogImageModels(organizationId);
   const { models: videoPlatformModels } = usePlatformCatalogVideoModels(organizationId);
   const { models: audioPlatformModels } = usePlatformCatalogAudioModels(organizationId);
+  const apiPresetChannelIds = useApiPresetChannelIdMap(organizationId);
 
   const deepSeekAvailableModels = useMemo(
     () =>
-      DEEPSEEK_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        DEEPSEEK_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const seedanceAvailableModels = useMemo(
     () =>
-      SEEDANCE_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = videoPlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [videoPlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        SEEDANCE_PROVIDER_CARD_ID,
+        videoPlatformModels
+      ),
+    [apiPresetChannelIds, videoPlatformModels]
   );
 
   const veoAvailableModels = useMemo(
     () =>
-      VEO_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = videoPlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [videoPlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        VEO_PROVIDER_CARD_ID,
+        videoPlatformModels
+      ),
+    [apiPresetChannelIds, videoPlatformModels]
   );
 
   const seedreamAvailableModels = useMemo(
     () =>
-      SEEDREAM_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = imagePlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [imagePlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        SEEDREAM_PROVIDER_CARD_ID,
+        imagePlatformModels
+      ),
+    [apiPresetChannelIds, imagePlatformModels]
   );
 
   const seedAvailableModels = useMemo(
     () =>
-      SEED_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        SEED_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const glmAvailableModels = useMemo(
     () =>
-      GLM_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        GLM_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const kimiAvailableModels = useMemo(
     () =>
-      KIMI_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        KIMI_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const openAiAvailableModels = useMemo(
     () =>
-      OPENAI_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        OPENAI_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const geminiAvailableModels = useMemo(
     () =>
-      GEMINI_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        GEMINI_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const grokAvailableModels = useMemo(
     () =>
-      GROK_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        GROK_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const claudeAvailableModels = useMemo(
     () =>
-      CLAUDE_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = platformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [platformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        CLAUDE_PROVIDER_CARD_ID,
+        platformModels
+      ),
+    [apiPresetChannelIds, platformModels]
   );
 
   const grokImagineImageAvailableModels = useMemo(
     () =>
-      GROK_IMAGINE_IMAGE_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = imagePlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [imagePlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID,
+        imagePlatformModels
+      ),
+    [apiPresetChannelIds, imagePlatformModels]
   );
 
   const grokImagineVideoAvailableModels = useMemo(
     () =>
-      GROK_IMAGINE_VIDEO_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = videoPlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [videoPlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
+        videoPlatformModels
+      ),
+    [apiPresetChannelIds, videoPlatformModels]
   );
 
   const minimaxSpeechAvailableModels = useMemo(
     () =>
-      MINIMAX_SPEECH_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = audioPlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [audioPlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        MINIMAX_SPEECH_PROVIDER_CARD_ID,
+        audioPlatformModels
+      ),
+    [apiPresetChannelIds, audioPlatformModels]
   );
 
   const openAiImageAvailableModels = useMemo(
     () =>
-      OPENAI_IMAGE_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = imagePlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [imagePlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        OPENAI_IMAGE_PROVIDER_CARD_ID,
+        imagePlatformModels
+      ),
+    [apiPresetChannelIds, imagePlatformModels]
   );
 
   const nanoBananaAvailableModels = useMemo(
     () =>
-      NANO_BANANA_CANONICAL_IDS.flatMap((canonicalId) => {
-        const model = imagePlatformModels.find(
-          (entry) => entry.canonicalId === canonicalId
-        );
-        return model ? [model] : [];
-      }),
-    [imagePlatformModels]
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        NANO_BANANA_PROVIDER_CARD_ID,
+        imagePlatformModels
+      ),
+    [apiPresetChannelIds, imagePlatformModels]
   );
 
   const [selection, setSelection] = useState<SingleModelWizardSelection>(

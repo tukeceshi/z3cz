@@ -20,7 +20,7 @@ import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
-import type { ImageGenerationRequestSnapshot, LocalMediaReference, MediaReference } from "@dafthunk/types";
+import type { ImageGenerationRequestSnapshot, LocalMediaReference, WorkflowMediaValue } from "@dafthunk/types";
 import { VIDEO_JOB_CLIENT_POLL_INTERVAL_MS } from "@dafthunk/types";
 
 const JOB_POLL_INTERVAL_MS = VIDEO_JOB_CLIENT_POLL_INTERVAL_MS;
@@ -78,7 +78,7 @@ async function readJobPersistMeta(
 }
 
 export interface ResolveGenerativeJobMediaResult {
-  readonly media: readonly MediaReference[];
+  readonly media: readonly WorkflowMediaValue[];
   /** True only for the caller that claimed resume and ran local persist. */
   readonly owned: boolean;
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;

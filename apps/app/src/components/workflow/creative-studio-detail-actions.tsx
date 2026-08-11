@@ -1,5 +1,6 @@
 import DownloadIcon from "lucide-react/icons/download";
 import HistoryIcon from "lucide-react/icons/history";
+import Maximize2Icon from "lucide-react/icons/maximize-2";
 import { useCallback, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -88,6 +89,32 @@ export function StudioDownloadActionButton({
     >
       <DownloadIcon className="h-3 w-3 opacity-80" strokeWidth={2} />
       <span>{t("workflow.studio.download")}</span>
+    </button>
+  );
+}
+
+export function StudioViewToolbarButton({
+  onClick,
+  className,
+}: {
+  readonly onClick: () => void;
+  readonly className?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className={cn(STUDIO_ACTION_BUTTON_CLASSNAME, className)}
+      title={t("workflow.studio.viewImage")}
+      onPointerDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <Maximize2Icon className="h-3 w-3 opacity-80" strokeWidth={2} />
+      <span>{t("workflow.studio.viewImage")}</span>
     </button>
   );
 }

@@ -25,11 +25,12 @@ import {
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
-import { applyHistoryItemModelBinding } from "./org-model-selection-utils";
+import { applyHistoryItemSettingsToNode } from "./apply-history-item-settings";
 import {
   resolveGenerativeNodeDefaultBaseName,
   resolveGenerativeNodeDisplayName,
 } from "./generative-node-naming";
+import type { OrgModelBindingRef } from "./org-model-selection-utils";
 import { withGenerativeGeneratedContentMode } from "./generative-card-mode-utils";
 import { WORKFLOW_NODE_ADD_GAP_PX } from "./workflow-node-placement";
 import type { NodeType, WorkflowNodeType } from "./workflow-types";
@@ -84,6 +85,7 @@ export function buildSiblingNodeFromHistoryItem(params: {
   readonly aiInterfaceId?: string;
   readonly modelDisplayName?: string;
   readonly createdAt: string;
+  readonly models: readonly OrgModelBindingRef[];
   readonly existingNodes: ReadonlyArray<ReactFlowNode<WorkflowNodeType>>;
   readonly createObjectUrl: (
     objectReference: import("@dafthunk/types").ObjectReference
@@ -133,13 +135,6 @@ export function buildSiblingNodeFromHistoryItem(params: {
   }
 
   inputs = upsertParam(inputs, "prompt", params.prompt, "string");
-  if (params.params !== undefined) {
-    inputs = upsertParam(inputs, "params", params.params, "json");
-  }
-  inputs = applyHistoryItemModelBinding(inputs, {
-    platformModelId: params.platformModelId,
-    aiInterfaceId: params.aiInterfaceId,
-  });
 
   if (params.kind === "image") {
     inputs = upsertParam(inputs, AI_IMAGE_RESULT_INPUT_ID, [params.media], "json");
@@ -219,11 +214,30 @@ export function buildSiblingNodeFromHistoryItem(params: {
         ? AI_VIDEO_OUTPUT_ID
         : AI_AUDIO_OUTPUT_ID;
 
-  const outputs = params.catalog.outputs.map((param) => ({
-    ...param,
-    id: param.name,
-    value: param.name === outputId ? [params.media] : param.value,
-  }));
+  const baseData: WorkflowNodeType = {
+    name: nodeName,
+    nodeType: params.catalog.type,
+    icon: params.catalog.icon,
+    inputs,
+    outputs: params.catalog.outputs.map((param) => ({
+      ...param,
+      id: param.name,
+      value: param.name === outputId ? [params.media] : param.value,
+    })),
+    executionState: "idle",
+    createObjectUrl: params.createObjectUrl,
+  };
+
+  const settings = applyHistoryItemSettingsToNode({
+    current: baseData,
+    modality: params.kind,
+    models: params.models,
+    historyBinding: {
+      platformModelId: params.platformModelId,
+      aiInterfaceId: params.aiInterfaceId,
+    },
+    historyParams: params.params,
+  });
 
   return {
     id: nodeId,
@@ -231,14 +245,9 @@ export function buildSiblingNodeFromHistoryItem(params: {
     position,
     selected: true,
     data: {
-      name: nodeName,
-      nodeType: params.catalog.type,
-      icon: params.catalog.icon,
-      inputs,
-      outputs,
-      executionState: "idle",
-      createObjectUrl: params.createObjectUrl,
-      metadata: withGenerativeGeneratedContentMode(undefined),
+      ...baseData,
+      inputs: settings.patch.inputs ?? baseData.inputs,
+      metadata: withGenerativeGeneratedContentMode(settings.patch.metadata),
     },
   };
 }

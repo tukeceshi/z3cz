@@ -66,9 +66,9 @@ export const STUDIO_MEDIA_ITEM_ACTIVE = `pointer-events-none absolute -inset-1.5
 
 export const STUDIO_LIST_ITEM_CONTENT = "relative";
 
-/** LibTV list node subtitle above preview. */
+/** LibTV list node name in card footer. */
 export const STUDIO_NODE_LABEL =
-  "truncate text-xs font-normal text-muted-foreground";
+  "min-w-0 flex-1 truncate text-left text-[13px] leading-none font-normal text-foreground/90";
 
 /** LibTV list selection: full row height to dividers, rounded-lg overlay. */
 export const STUDIO_ROW_ACTIVE = `pointer-events-none absolute -inset-x-2 inset-y-0 rounded-lg ${SURFACE_ROW_ACTIVE_STRONG} transition-colors`;
@@ -87,6 +87,10 @@ export const STUDIO_LIST_ITEM_MENU_TRIGGER =
 
 /** Name + ⋯ on one line without extra row height. */
 export const STUDIO_NODE_LABEL_ROW = "flex h-4 min-h-0 items-center gap-0.5";
+
+/** Expanded label row while inline rename is active. */
+export const STUDIO_NODE_LABEL_ROW_EDITING =
+  "flex min-h-7 -mx-1 items-start gap-0.5 px-1 py-0.5";
 
 /** Compact row action menu — canvas card surfaces, not default popover black. */
 export const STUDIO_LIST_ITEM_MENU_CONTENT = `w-auto min-w-0 overflow-hidden rounded-md p-0.5 shadow-md ${SURFACE_CARD_SOFT}`;
@@ -121,10 +125,19 @@ export const STUDIO_PREVIEW_MEDIA_FALLBACK = `${SURFACE_MUTED_FILL} text-muted-f
 
 export const STUDIO_DOCK = `border-t ${SURFACE_BORDER} bg-background/95 dark:bg-[var(--workflow-canvas-bg-dark)]`;
 
-/** Fixed list preview height — audio preview slot; shared constraint pattern with text cards. */
+/** Fixed list preview height — audio preview slot. */
 export const STUDIO_LIST_PREVIEW_HEIGHT = "h-[66px]";
 
-export const STUDIO_AUDIO_TILE_PREVIEW = `relative w-full overflow-hidden rounded-lg ${STUDIO_LIST_PREVIEW_HEIGHT} ${SURFACE_MUTED_FILL} transition-colors`;
+/** Fixed list preview height — text preview slot. */
+export const STUDIO_TEXT_LIST_PREVIEW_HEIGHT = "h-[120px]";
+
+/** List preview frame — border only, no fill (matches media card outline). */
+export const STUDIO_LIST_PREVIEW_FRAME =
+  "border border-border/50 bg-transparent dark:border-neutral-700";
+
+export const STUDIO_AUDIO_TILE_PREVIEW = `relative w-full overflow-hidden rounded-lg ${STUDIO_LIST_PREVIEW_HEIGHT} ${STUDIO_LIST_PREVIEW_FRAME} transition-colors`;
+
+export const STUDIO_TEXT_LIST_PREVIEW = `relative w-full overflow-hidden rounded-lg ${STUDIO_TEXT_LIST_PREVIEW_HEIGHT} ${STUDIO_LIST_PREVIEW_FRAME} px-1 py-1 text-left transition-colors`;
 
 /** LibTV text list: compact icon + label row (~44px). */
 export const STUDIO_TEXT_ROW =
@@ -145,9 +158,6 @@ export const STUDIO_MEDIA_CARD =
 
 /** Name + meta tags below media preview. */
 export const STUDIO_MEDIA_CARD_FOOTER = "flex flex-col gap-0.5";
-
-/** Vertical spacing inside text list cards (name / body / tags). */
-export const STUDIO_TEXT_CARD_GAP = "gap-1.5";
 
 /** Studio text detail body — shared by browse and edit (single textarea). */
 export const STUDIO_TEXT_DETAIL_BODY =

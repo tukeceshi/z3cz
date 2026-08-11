@@ -18,8 +18,6 @@ interface UseKeyboardShortcutsProps {
   duplicateSelected: () => void;
   requestDeleteSelected?: () => void;
   hasStudioNodeSelected?: boolean;
-  onAction?: (e: React.MouseEvent) => void;
-  nodeCount: number;
 }
 
 /** True when the user has a non-empty DOM text selection (browser copy/cut should win). */
@@ -36,7 +34,7 @@ export function hasDomTextSelection(
 
 /**
  * Side-effect-only hook that registers global keyboard shortcuts
- * for clipboard (Cmd+C/X/V/D), delete (Delete/Backspace), and run (Cmd+Enter).
+ * for clipboard (Cmd+C/X/V/D) and delete (Delete).
  */
 export function useKeyboardShortcuts({
   disabled,
@@ -50,8 +48,6 @@ export function useKeyboardShortcuts({
   duplicateSelected,
   requestDeleteSelected,
   hasStudioNodeSelected = false,
-  onAction,
-  nodeCount,
 }: UseKeyboardShortcutsProps): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -76,7 +72,7 @@ export function useKeyboardShortcuts({
         !disabled &&
         requestDeleteSelected &&
         hasSelection &&
-        (event.key === "Delete" || event.key === "Backspace")
+        event.key === "Delete"
       ) {
         event.preventDefault();
         requestDeleteSelected();
@@ -84,19 +80,6 @@ export function useKeyboardShortcuts({
       }
 
       if (!isCtrlOrCmd) return;
-
-      // Cmd+Enter — execute workflow
-      if (event.key === "Enter") {
-        event.preventDefault();
-        if (onAction && !disabled && nodeCount > 0) {
-          const syntheticEvent = new MouseEvent("click", {
-            bubbles: true,
-            cancelable: true,
-          }) as unknown as React.MouseEvent;
-          onAction(syntheticEvent);
-        }
-        return;
-      }
 
       // Prefer native copy/cut when the user selected text in browse mode.
       const preferNativeTextClipboard =
@@ -149,7 +132,5 @@ export function useKeyboardShortcuts({
     duplicateSelected,
     requestDeleteSelected,
     hasStudioNodeSelected,
-    onAction,
-    nodeCount,
   ]);
 }

@@ -108,14 +108,9 @@ export function parseTextModelFailureMessageToCardError(
   }
 
   const isTextModelFailure =
-    (firstLine.endsWith("调用失败") ||
-      firstLine.endsWith(" request failed") ||
-      firstLine.endsWith(" request failed.")) &&
-    lines.some(
-      (line) =>
-        line.startsWith("已自动关闭错误接口") ||
-        line.startsWith('Disabled interface "')
-    );
+    firstLine.endsWith("调用失败") ||
+    firstLine.endsWith(" request failed") ||
+    firstLine.endsWith(" request failed.");
 
   if (!isTextModelFailure) {
     return undefined;

@@ -1,5 +1,5 @@
-import type { MediaReference } from "@dafthunk/types";
-import { isMediaReference } from "@dafthunk/types";
+import type { WorkflowMediaValue } from "@dafthunk/types";
+import { isWorkflowMediaValue } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 import ImageIcon from "lucide-react/icons/image";
 import PlusIcon from "lucide-react/icons/plus";
@@ -35,6 +35,9 @@ import {
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
+import { useCreativeStudioOptional } from "./creative-studio-context";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
+
 import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   classifyReferenceFromNodeType,
@@ -63,11 +66,11 @@ function mediaNodeTypeForChip(
   return undefined;
 }
 
-function chipMedia(chip: AiTextReferenceChip): MediaReference | null {
-  return chip.media && isMediaReference(chip.media) ? chip.media : null;
+function chipMedia(chip: AiTextReferenceChip): WorkflowMediaValue | null {
+  return chip.media && isWorkflowMediaValue(chip.media) ? chip.media : null;
 }
 
-function ReferenceChipMediaThumb({
+export function ReferenceChipMediaThumb({
   chip,
   fallbackIcon,
 }: {
@@ -103,7 +106,7 @@ function ReferenceChipMediaThumb({
   );
 }
 
-function ReferenceHoverPreview({
+export function ReferenceHoverPreview({
   chip,
   anchor,
 }: {
@@ -125,13 +128,13 @@ function ReferenceHoverPreview({
   if ((chip.kind === "image" || chip.kind === "video") && thumbUrl) {
     return createPortal(
       <div
-        className="pointer-events-none fixed z-[300] rounded-lg border border-border bg-popover p-1 shadow-lg"
+        className="pointer-events-none fixed z-[300] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
         style={style}
       >
         <img
           src={thumbUrl}
           alt=""
-          className="max-h-[150px] max-w-[150px] object-contain"
+          className="block max-h-[150px] max-w-[150px] object-contain"
           style={{
             maxHeight: REFERENCE_HOVER_PREVIEW_MAX_PX,
             maxWidth: REFERENCE_HOVER_PREVIEW_MAX_PX,
@@ -185,6 +188,7 @@ export interface AiTextReferenceBarProps {
   /** When omitted, chips are preview-only (AI Text). */
   readonly onInjectChip?: (chip: AiTextReferenceChip) => void;
   readonly showStudioReferenceHints?: boolean;
+  readonly detailRole?: CreativeStudioDetailViewRole;
 }
 
 export function AiTextReferenceBar({
@@ -198,8 +202,12 @@ export function AiTextReferenceBar({
   onUploadFiles,
   onInjectChip,
   showStudioReferenceHints = false,
+  detailRole,
 }: AiTextReferenceBarProps) {
   const { t } = useTranslation();
+  const studio = useCreativeStudioOptional();
+  const canOpenReferenceInSecondary =
+    detailRole === "primary" && studio !== null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studioAddButtonRef = useRef<HTMLButtonElement>(null);
   const [studioAddHintHover, setStudioAddHintHover] = useState(false);
@@ -234,6 +242,29 @@ export function AiTextReferenceBar({
       anchor: event.currentTarget.getBoundingClientRect(),
     });
   };
+
+  const handleChipDoubleClick = (
+    chip: AiTextReferenceChip,
+    event: MouseEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canOpenReferenceInSecondary || !studio) return;
+    const { sourceNodeId } = chip;
+    if (!sourceNodeId) return;
+    if (
+      sourceNodeId === studio.detailNodeId ||
+      sourceNodeId === studio.secondaryNodeId
+    ) {
+      return;
+    }
+    studio.openSecondaryDetail(sourceNodeId);
+  };
+
+  const chipTitle = (chip: AiTextReferenceChip) =>
+    canOpenReferenceInSecondary
+      ? t("workflow.studio.referenceChipHoverTitle", { label: chip.label })
+      : chip.label;
 
   const handleChipMouseLeave = (chip: AiTextReferenceChip) => {
     setHoverPreview((current) =>
@@ -336,9 +367,13 @@ export function AiTextReferenceBar({
       {chips.map((chip) => (
         <div
           key={chip.edgeId}
-          className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
+          className={cn(
+            "group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background",
+            canOpenReferenceInSecondary && "cursor-pointer"
+          )}
           onMouseEnter={(event) => handleChipMouseEnter(chip, event)}
           onMouseLeave={() => handleChipMouseLeave(chip)}
+          onDoubleClick={(event) => handleChipDoubleClick(chip, event)}
         >
           {onInjectChip ? (
             <button
@@ -346,7 +381,7 @@ export function AiTextReferenceBar({
               className="nodrag relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
               disabled={disabled}
               onClick={() => onInjectChip(chip)}
-              title={chip.label}
+              title={chipTitle(chip)}
             >
               <ReferenceChipMediaThumb
                 chip={chip}
@@ -356,7 +391,7 @@ export function AiTextReferenceBar({
           ) : (
             <div
               className="nodrag relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg"
-              title={chip.label}
+              title={chipTitle(chip)}
             >
               <ReferenceChipMediaThumb
                 chip={chip}

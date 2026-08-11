@@ -1,7 +1,10 @@
 import {
-  getMediaReferenceKey,
-  isMediaReference,
-  type MediaReference,
+  getResourceIdFromValue,
+  isLocalMediaReference,
+  isWorkflowMediaValue,
+  type LocalMediaReference,
+  type ResourceIdReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 
@@ -23,10 +26,13 @@ const MEDIA_INPUT_IDS = new Set([
 function rekeyMediaValue(
   value: unknown,
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): unknown {
-  if (isMediaReference(value) && getMediaReferenceKey(value) === fromMediaId) {
-    return toMediaReference;
+  if (
+    isWorkflowMediaValue(value) &&
+    getResourceIdFromValue(value) === fromMediaId
+  ) {
+    return toMedia;
   }
 
   if (!Array.isArray(value)) {
@@ -35,9 +41,12 @@ function rekeyMediaValue(
 
   let changed = false;
   const next = value.map((item) => {
-    if (isMediaReference(item) && getMediaReferenceKey(item) === fromMediaId) {
+    if (
+      isWorkflowMediaValue(item) &&
+      getResourceIdFromValue(item) === fromMediaId
+    ) {
       changed = true;
-      return toMediaReference;
+      return toMedia;
     }
     return item;
   });
@@ -47,7 +56,7 @@ function rekeyMediaValue(
 function rekeyHistoryValue(
   value: unknown,
   fromMediaId: string,
-  toMediaReference: MediaReference,
+  toMedia: WorkflowMediaValue,
   mediaField: "images" | "videos" | "audios"
 ): unknown {
   if (!value || typeof value !== "object") {
@@ -69,7 +78,7 @@ function rekeyHistoryValue(
     }
     const entry = item as Record<string, unknown>;
     const media = entry[mediaField];
-    const nextMedia = rekeyMediaValue(media, fromMediaId, toMediaReference);
+    const nextMedia = rekeyMediaValue(media, fromMediaId, toMedia);
     if (nextMedia !== media) {
       changed = true;
       return { ...entry, [mediaField]: nextMedia };
@@ -83,7 +92,7 @@ function rekeyHistoryValue(
 function rekeyInputs(
   inputs: readonly WorkflowParameter[],
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): readonly WorkflowParameter[] {
   let changed = false;
   const next = inputs.map((input) => {
@@ -103,9 +112,9 @@ function rekeyInputs(
           : input.id === "videos_history"
             ? "videos"
             : "audios";
-      value = rekeyHistoryValue(value, fromMediaId, toMediaReference, mediaField);
+      value = rekeyHistoryValue(value, fromMediaId, toMedia, mediaField);
     } else {
-      value = rekeyMediaValue(value, fromMediaId, toMediaReference);
+      value = rekeyMediaValue(value, fromMediaId, toMedia);
     }
 
     if (value !== input.value) {
@@ -121,14 +130,14 @@ function rekeyInputs(
 function rekeyOutputs(
   outputs: readonly WorkflowParameter[],
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): readonly WorkflowParameter[] {
   let changed = false;
   const next = outputs.map((output) => {
     if (output.id !== "output") {
       return output;
     }
-    const value = rekeyMediaValue(output.value, fromMediaId, toMediaReference);
+    const value = rekeyMediaValue(output.value, fromMediaId, toMedia);
     if (value !== output.value) {
       changed = true;
       return { ...output, value };
@@ -141,10 +150,10 @@ function rekeyOutputs(
 export function rekeyMediaReferencesInNodeData(
   data: WorkflowNodeType,
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): WorkflowNodeType | null {
-  const inputs = rekeyInputs(data.inputs, fromMediaId, toMediaReference);
-  const outputs = rekeyOutputs(data.outputs, fromMediaId, toMediaReference);
+  const inputs = rekeyInputs(data.inputs, fromMediaId, toMedia);
+  const outputs = rekeyOutputs(data.outputs, fromMediaId, toMedia);
   if (inputs === data.inputs && outputs === data.outputs) {
     return null;
   }
@@ -154,14 +163,14 @@ export function rekeyMediaReferencesInNodeData(
 export function rekeyMediaReferencesInNodes(
   nodes: readonly ReactFlowNode<WorkflowNodeType>[],
   fromMediaId: string,
-  toMediaReference: MediaReference
+  toMedia: WorkflowMediaValue
 ): ReactFlowNode<WorkflowNodeType>[] | null {
   let changed = false;
   const next = nodes.map((node) => {
     const patched = rekeyMediaReferencesInNodeData(
       node.data,
       fromMediaId,
-      toMediaReference
+      toMedia
     );
     if (!patched) {
       return node;
@@ -171,3 +180,5 @@ export function rekeyMediaReferencesInNodes(
   });
   return changed ? next : null;
 }
+
+export type { LocalMediaReference, ResourceIdReference, WorkflowMediaValue };

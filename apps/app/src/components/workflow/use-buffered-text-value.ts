@@ -139,12 +139,9 @@ export function useBufferedTextValue(
   }, [clearScheduled]);
 
   const onCompositionEnd = useCallback(
-    (event: CompositionEvent<HTMLTextAreaElement>) => {
+    (_event: CompositionEvent<HTMLTextAreaElement>) => {
       composingRef.current = false;
-      const value = event.currentTarget.value;
-      setLocalValue(value);
-      localValueRef.current = value;
-      schedulePersist(value);
+      schedulePersist(localValueRef.current);
     },
     [schedulePersist]
   );

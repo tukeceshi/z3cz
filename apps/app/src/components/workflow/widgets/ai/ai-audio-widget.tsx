@@ -38,13 +38,17 @@ import {
   withAiAudioGenerateError,
   withAiAudioManualUpload,
 } from "../../ai-audio-node-utils";
+import { commitGenerativeHistorySelection } from "../../commit-generative-history-selection";
 import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
+import {
+  useGenerativeHistoryModels,
+  useHistoryModelUnavailableToast,
+} from "../../use-generative-history-models";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
-import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
 } from "../../generative-card-mode-utils";
@@ -56,7 +60,8 @@ import {
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { GenerativeMediaLazyDownloadButton } from "../../generative-media-download-button";
-import { useGenerativeCardDoubleClickUpload } from "../../use-generative-card-double-click-upload";
+import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
+import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasAudioCover } from "../../canvas-media-cover";
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
@@ -120,10 +125,8 @@ function AiAudioWidget({
     }));
   }, [nodeId, updateNodeData]);
 
-  const isUploadBlocked = disabled || blocksGenerativeMedia;
-
-  const { handleCardDoubleClick, uploadConfirmDialog } =
-    useGenerativeCardDoubleClickUpload({
+  const { canUpload, handleUploadClick, uploadConfirmDialog } =
+    useGenerativeCardUpload({
       prompt,
       hasMedia: Boolean(activeAudio),
       isGenerating,
@@ -135,17 +138,34 @@ function AiAudioWidget({
       i18nPrefix: "workflow.aiAudioPanel",
     });
 
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
+
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
       const item = historyItems.items.find((entry) => entry.id === id);
       if (!item) return;
 
-      updateNodeData(nodeId, (current) =>
-        withAiAudioHistorySelection(current, id)
-      );
+      let modelUnavailable = false;
+      updateNodeData(nodeId, (current) => {
+        const result = withAiAudioHistorySelection(current, id, {
+          models: historyModels.audio,
+        });
+        const committed = commitGenerativeHistorySelection(result);
+        modelUnavailable = committed.modelUnavailable;
+        return committed.patch;
+      });
+      notifyHistoryModelUnavailable(modelUnavailable);
     },
-    [disabled, historyItems.items, nodeId, updateNodeData]
+    [
+      disabled,
+      historyItems.items,
+      historyModels.audio,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      updateNodeData,
+    ]
   );
 
   const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "audio");
@@ -223,7 +243,8 @@ function AiAudioWidget({
       } catch (error) {
         const formatted = prepareGenerativeCardError(
           error instanceof Error ? error.message : String(error),
-          t
+          t,
+          "audio"
         );
         updateNodeData(nodeId, (current) => ({
           metadata: withGenerativeUploadProgress(
@@ -295,22 +316,22 @@ function AiAudioWidget({
             setErrorDetailOpen(true);
             return;
           }
-          if (activeAudio && !isGenerating) {
+          if (!isGenerating) {
             event.stopPropagation();
             openCreativeStudio();
-            return;
-          }
-          if (!isGenerating) {
-            handleCardDoubleClick(event);
           }
         }}
       >
         {!activeAudio && !generateError ? (
-          <div className="flex h-full items-center justify-center px-3">
-            <p className={GENERATIVE_CARD_STATE_LABEL_CLASS}>
-              {cardPlaceholder}
-            </p>
-          </div>
+          <GenerativeCardEmptyUploadSlot
+            kind="audio"
+            size="canvas"
+            doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
+            busy={isGenerating || uploading}
+            busyMessage={cardPlaceholder}
+            canUpload={canUpload}
+            onUploadClick={handleUploadClick}
+          />
         ) : activeAudio ? (
           <CanvasAudioCover className="h-full w-full" />
         ) : null}

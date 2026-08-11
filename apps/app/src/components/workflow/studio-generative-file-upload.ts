@@ -95,7 +95,8 @@ export function useStudioGenerativeFileDrop() {
       } catch (error) {
         const formatted = prepareGenerativeCardError(
           error instanceof Error ? error.message : String(error),
-          t
+          t,
+          drop.kind
         );
         updateNodeData(nodeId, (current) => ({
           metadata: withGenerativeUploadProgress(

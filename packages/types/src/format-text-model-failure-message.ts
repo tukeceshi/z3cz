@@ -19,8 +19,6 @@ export interface TextModelFailureMessageParams {
   readonly modelDisplayLabel: string;
   readonly upstreamError?: string;
   readonly locale?: "zh" | "en";
-  /** When false, do not claim the interface was auto-disabled. Default true. */
-  readonly disabledInterface?: boolean;
 }
 
 function buildTextModelFailureCardLines(
@@ -28,37 +26,18 @@ function buildTextModelFailureCardLines(
 ): readonly string[] {
   const locale = params.locale ?? "zh";
   const failedTag = channelTag(params.channelKind, locale);
-  const disabledInterface = params.disabledInterface !== false;
 
   if (locale === "zh") {
-    const lines = [`${params.modelDisplayLabel}调用失败`];
-    if (disabledInterface) {
-      lines.push(
-        `已自动关闭错误接口 「${failedTag}」${params.failedInterfaceName}。`,
-        "请检查配置，可在「AI/资源 接口」重新启用接口。"
-      );
-    } else {
-      lines.push(
-        `接口 「${failedTag}」${params.failedInterfaceName} 暂时失败，模型未关闭。`,
-        "请稍后重试。"
-      );
-    }
-    return lines;
+    return [
+      `${params.modelDisplayLabel}调用失败`,
+      `接口 「${failedTag}」${params.failedInterfaceName} 请求失败，请检查配置或稍后重试。`,
+    ];
   }
 
-  const lines = [`${params.modelDisplayLabel} request failed`];
-  if (disabledInterface) {
-    lines.push(
-      `Disabled interface "${failedTag}" ${params.failedInterfaceName}.`,
-      "Check settings and re-enable the interface under AI / Resource Interfaces."
-    );
-  } else {
-    lines.push(
-      `Interface "${failedTag}" ${params.failedInterfaceName} failed temporarily; the model was not disabled.`,
-      "Please try again later."
-    );
-  }
-  return lines;
+  return [
+    `${params.modelDisplayLabel} request failed`,
+    `Interface "${failedTag}" ${params.failedInterfaceName} request failed. Check settings or try again later.`,
+  ];
 }
 
 export function buildTextModelFailureCardParts(

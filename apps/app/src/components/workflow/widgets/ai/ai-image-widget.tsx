@@ -4,8 +4,9 @@ import {
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useParams } from "react-router";
+import ZoomInIcon from "lucide-react/icons/zoom-in";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -13,6 +14,7 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
+import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
@@ -33,19 +35,23 @@ import {
 } from "../../generative-progress-utils";
 import {
   isAiImageGenerating,
-  readAiImageCardImages,
+  readAiImageCardPrimaryImage,
   readAiImageResultHistory,
   withAiImageHistorySelection,
   withAiImageGenerateError,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
+import { commitGenerativeHistorySelection } from "../../commit-generative-history-selection";
 import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
+import {
+  useGenerativeHistoryModels,
+  useHistoryModelUnavailableToast,
+} from "../../use-generative-history-models";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
-import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "../../generative-card-styles";
 import {
   shouldShowGenerativeHistoryIcon,
 } from "../../generative-card-mode-utils";
@@ -58,14 +64,19 @@ import {
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
-import { useGenerativeCardDoubleClickUpload } from "../../use-generative-card-double-click-upload";
+import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
+import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasMediaCover } from "../../canvas-media-cover";
+import {
+  StudioImagePhotoProvider,
+  StudioImageZoomHiddenTrigger,
+} from "../../studio-image-lightbox";
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
 interface AiImageWidgetProps extends BaseWidgetProps {
-  images: MediaReference[];
+  primaryImage: MediaReference | undefined;
   historyItems: ReturnType<typeof readAiImageResultHistory>;
   nodeId: string;
   prompt: string;
@@ -74,7 +85,7 @@ interface AiImageWidgetProps extends BaseWidgetProps {
 }
 
 function AiImageWidget({
-  images,
+  primaryImage,
   historyItems,
   disabled = false,
   className,
@@ -92,6 +103,7 @@ function AiImageWidget({
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageZoomTriggerRef = useRef<HTMLButtonElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -105,16 +117,21 @@ function AiImageWidget({
     isAiImageGenerating(metadata) || progressPhase !== undefined;
   useGenerativeMediaWorkSession(uploading || progressPhase !== undefined);
   const generateError = readGenerativeCardError(metadata);
-  const hasImages = images.length > 0;
-  const primaryImage = images[0];
+  const hasImage = primaryImage != null;
   const primaryImageExpired = primaryImage ? isMediaExpired(primaryImage) : false;
   const primaryImageKey = primaryImage
     ? getMediaReferenceKey(primaryImage)
     : null;
   const canDownloadPrimaryImage = Boolean(primaryImage) && !primaryImageExpired;
+  const { displayUrl: imageDisplayUrl } = useMediaDisplayUrl({
+    media: canDownloadPrimaryImage && primaryImage ? primaryImage : null,
+    nodeType: "ai-image",
+    size: "full",
+    localOnly: true,
+  });
   const { cardSize, onNaturalSize } = useCanvasCardSize({
     kind: "image",
-    hasMedia: hasImages,
+    hasMedia: hasImage,
     mediaKey: primaryImageKey,
   });
   const cardPlaceholder = t(
@@ -132,12 +149,10 @@ function AiImageWidget({
     }));
   }, [nodeId, updateNodeData]);
 
-  const isUploadBlocked = disabled || blocksGenerativeMedia;
-
-  const { handleCardDoubleClick, uploadConfirmDialog } =
-    useGenerativeCardDoubleClickUpload({
+  const { canUpload, handleUploadClick, uploadConfirmDialog } =
+    useGenerativeCardUpload({
       prompt,
-      hasMedia: images.length > 0,
+      hasMedia: hasImage,
       isGenerating,
       disabled,
       blocksGenerativeMedia,
@@ -147,17 +162,34 @@ function AiImageWidget({
       i18nPrefix: "workflow.aiImagePanel",
     });
 
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
+
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
       const item = historyItems.items.find((entry) => entry.id === id);
       if (!item) return;
 
-      updateNodeData(nodeId, (current) =>
-        withAiImageHistorySelection(current, id)
-      );
+      let modelUnavailable = false;
+      updateNodeData(nodeId, (current) => {
+        const result = withAiImageHistorySelection(current, id, {
+          models: historyModels.image,
+        });
+        const committed = commitGenerativeHistorySelection(result);
+        modelUnavailable = committed.modelUnavailable;
+        return committed.patch;
+      });
+      notifyHistoryModelUnavailable(modelUnavailable);
     },
-    [disabled, historyItems.items, nodeId, updateNodeData]
+    [
+      disabled,
+      historyItems.items,
+      historyModels.image,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      updateNodeData,
+    ]
   );
 
   const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "image");
@@ -179,6 +211,10 @@ function AiImageWidget({
     },
     [expandHistoryItem, historyItems.items]
   );
+
+  const handleOpenImageZoom = useCallback(() => {
+    imageZoomTriggerRef.current?.click();
+  }, []);
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
@@ -235,7 +271,8 @@ function AiImageWidget({
       } catch (error) {
         const formatted = prepareGenerativeCardError(
           error instanceof Error ? error.message : String(error),
-          t
+          t,
+          "image"
         );
         updateNodeData(nodeId, (current) => ({
           metadata: withGenerativeUploadProgress(
@@ -264,13 +301,6 @@ function AiImageWidget({
     ]
   );
 
-  const gridCols =
-    images.length === 1
-      ? "grid-cols-1"
-      : images.length <= 4
-        ? "grid-cols-2"
-        : "grid-cols-3";
-
   return (
     <>
       {uploadConfirmDialog}
@@ -284,79 +314,105 @@ function AiImageWidget({
           event.target.value = "";
         }}
       />
-      <div
-        className={cn(
-          "relative h-full w-full overflow-hidden cursor-grab select-none",
-          uploading && "opacity-70",
-          className
-        )}
-        style={{
-          width: cardSize.width,
-          height: cardSize.height,
-        }}
-        onDoubleClick={(event) => {
-          if (generateError) {
-            event.stopPropagation();
-            setErrorDetailOpen(true);
-            return;
-          }
-          if (hasImages && !isGenerating) {
-            event.stopPropagation();
-            openCreativeStudio();
-            return;
-          }
-          if (!isGenerating) {
-            handleCardDoubleClick(event);
-          }
-        }}
-      >
-        {!hasImages && !generateError ? (
-          <div className="flex h-full items-center justify-center px-3">
-            <p className={GENERATIVE_CARD_STATE_LABEL_CLASS}>
-              {cardPlaceholder}
-            </p>
-          </div>
-        ) : hasImages ? (
-          <div className={cn("grid h-full w-full gap-0", gridCols)}>
-            {images.map((img, idx) => (
-              <CanvasMediaCover
-                key={getMediaReferenceKey(img) ?? idx}
-                media={img}
-                nodeType="ai-image"
-                cardWidthPx={cardSize.width}
-                cardHeightPx={cardSize.height}
-                fitMode="cover"
-                className="h-full w-full min-h-0 rounded-none border-0"
-                onNaturalSize={idx === 0 ? onNaturalSize : undefined}
-              />
-            ))}
-          </div>
+      <StudioImagePhotoProvider>
+        {canDownloadPrimaryImage && primaryImage && imageDisplayUrl ? (
+          <StudioImageZoomHiddenTrigger
+            src={imageDisplayUrl}
+            triggerRef={imageZoomTriggerRef}
+          />
         ) : null}
+        <div
+          className={cn(
+            "relative h-full w-full overflow-hidden cursor-grab select-none",
+            uploading && "opacity-70",
+            className
+          )}
+          style={{
+            width: cardSize.width,
+            height: cardSize.height,
+          }}
+          onDoubleClick={(event) => {
+            if (generateError) {
+              event.stopPropagation();
+              setErrorDetailOpen(true);
+              return;
+            }
+            if (!isGenerating) {
+              event.stopPropagation();
+              openCreativeStudio();
+            }
+          }}
+        >
+          {!hasImage && !generateError ? (
+            <GenerativeCardEmptyUploadSlot
+              kind="image"
+              size="canvas"
+              doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
+              busy={isGenerating || uploading}
+              busyMessage={cardPlaceholder}
+              canUpload={canUpload}
+              onUploadClick={handleUploadClick}
+            />
+          ) : primaryImage ? (
+            <CanvasMediaCover
+              media={primaryImage}
+              nodeType="ai-image"
+              cardWidthPx={cardSize.width}
+              cardHeightPx={cardSize.height}
+              fitMode="cover"
+              className="h-full w-full rounded-none border-0"
+              onNaturalSize={onNaturalSize}
+            />
+          ) : null}
 
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+          {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
 
-        {!generateError ? (
-          <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            {canDownloadPrimaryImage && primaryImage ? (
-              <GenerativeMediaLazyDownloadButton
-                media={primaryImage}
-                nodeType="ai-image"
-                fileName={`image-${getMediaReferenceKey(primaryImage)}.${primaryImage.mimeType.split("/")[1] ?? "png"}`}
-                className={GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME}
-              />
-            ) : null}
-            {showHistoryIcon ? (
-              <AiImageHistoryButton
-                count={historyItems.items.length}
-                onClick={() => setHistoryOpen(true)}
-              />
-            ) : null}
-            {hasImages ? (
-              <AiImageExpandButton onClick={openCreativeStudio} />
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+          {!generateError ? (
+            <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
+              {canDownloadPrimaryImage && primaryImage ? (
+                <GenerativeMediaLazyDownloadButton
+                  media={primaryImage}
+                  nodeType="ai-image"
+                  fileName={`image-${getMediaReferenceKey(primaryImage)}.${primaryImage.mimeType.split("/")[1] ?? "png"}`}
+                  className={GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME}
+                />
+              ) : null}
+              {showHistoryIcon ? (
+                <AiImageHistoryButton
+                  count={historyItems.items.length}
+                  onClick={() => setHistoryOpen(true)}
+                />
+              ) : null}
+              {hasImage ? (
+                <AiImageExpandButton onClick={openCreativeStudio} />
+              ) : null}
+            </div>
+          ) : null}
+
+          {!generateError && canDownloadPrimaryImage && primaryImage ? (
+            <div className="nodrag nopan nowheel absolute bottom-2 right-2 z-50">
+              <button
+                type="button"
+                className="nodrag nopan nowheel flex h-6 w-6 shrink-0 items-center justify-center text-white/75 transition-colors hover:text-white"
+                title={t("workflow.studio.viewImage")}
+                aria-label={t("workflow.studio.viewImage")}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+                onMouseDown={(event) => {
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleOpenImageZoom();
+                }}
+              >
+                <ZoomInIcon className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </StudioImagePhotoProvider>
 
       {generateError ? (
         <GenerativeCardErrorDetailDialog
@@ -370,7 +426,7 @@ function AiImageWidget({
         <AiImageHistoryOverlay
           open={historyOpen}
           history={historyItems}
-          currentImages={images}
+          currentImages={primaryImage ? [primaryImage] : []}
           mediaKind="image"
           createObjectUrl={createObjectUrl}
           onClose={() => setHistoryOpen(false)}
@@ -398,7 +454,7 @@ export const aiImageWidget = createWidget({
     "ai_interface_id",
   ],
   extractConfig: (nodeId, inputs, outputs, metadata) => ({
-    images: readAiImageCardImages(inputs, outputs, metadata),
+    primaryImage: readAiImageCardPrimaryImage(inputs, outputs, metadata),
     historyItems: readAiImageResultHistory(inputs),
     nodeId,
     prompt: readGenerativePrompt(inputs),

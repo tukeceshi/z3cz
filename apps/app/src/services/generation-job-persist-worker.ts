@@ -2,8 +2,9 @@ import type {
   GenerationJobPendingMedia,
   GenerationJobRecord,
   LocalMediaReference,
-  MediaReference,
   ObjectReference,
+  ResourceIdReference,
+  WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
   isGenerationJobReadyAtExpired,
@@ -24,7 +25,7 @@ import {
   completeGenerationJobUpload,
   getGenerationJob,
 } from "@/services/platform-ai-model-service";
-import { uploadGenerativeMediaFromLocalStaging } from "@/services/upload-generative-media";
+import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
 
 export type PersistGenerativeMediaPhase = "downloading" | "uploading";
 
@@ -204,7 +205,7 @@ export async function runGenerationJobPersistWorker(params: {
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
-}): Promise<readonly MediaReference[]> {
+}): Promise<readonly WorkflowMediaValue[]> {
   const notify = params.onProgressPhase;
 
   const ready = await waitForJobReadyToPersist({
@@ -345,6 +346,12 @@ export async function runGenerationJobPersistWorker(params: {
       objectRefs
     );
 
-    return objectRefs;
+    return objectRefs.map((object) => ({
+      resourceId:
+        object.storageKey && object.storageKey.length > 0
+          ? object.storageKey
+          : object.id,
+      mimeType: object.mimeType,
+    }));
   }
 }

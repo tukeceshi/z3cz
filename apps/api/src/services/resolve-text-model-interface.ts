@@ -13,16 +13,15 @@ import {
   isVolcanoAiInterfaceProvider,
   pickLegacyOrgModelInterfaceId,
   resolveVolcanoInferenceModelId,
-  VOLCANO_AI_MODEL_CATALOG,
 } from "@dafthunk/types";
 import { parseSingleModelMetadata } from "../integrations/single-model/metadata";
 
 import type { Database } from "../db";
 import {
   getTextParameterRules,
-  listPlatformAiModelGroups,
   listPlatformAiModels,
 } from "../db/platform-ai-model-queries";
+import { listAggregateVolcanoCatalogEntries } from "../db/platform-ai-model-channel-queries";
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
 import {
   isVolcanoMetadata,
@@ -67,35 +66,50 @@ export interface SingleModelInterfaceCandidate {
   readonly models: Readonly<Record<string, SingleModelModelConfig>>;
 }
 
-const volcanoProviderByCanonicalId = new Map(
-  VOLCANO_AI_MODEL_CATALOG.map((entry) => [
-    entry.canonicalId,
-    entry.providerModelId,
-  ])
-);
-
-/** Seed volcano interface rows from static catalog — never from platform defaults. */
-export function toVolcanoCatalogEntriesFromPlatform(
-  models: readonly PlatformAiModel[]
+export function buildVolcanoCatalogEntriesFromPlatformModels(
+  platformModels: readonly PlatformAiModel[],
+  aggregateCatalog: readonly AiModelCatalogEntry[]
 ): readonly AiModelCatalogEntry[] {
-  return models
-    .filter((model) => !isExternalBrandOnlyCanonicalId(model.canonicalId))
-    .flatMap((model) => {
-      const providerModelId = volcanoProviderByCanonicalId.get(
-        model.canonicalId
-      );
-      if (!providerModelId) {
-        return [];
-      }
-      return [
-        {
-          canonicalId: model.canonicalId,
-          alias: model.displayName,
-          modality: model.modality,
-          providerModelId,
-        },
-      ];
-    });
+  const catalogById = new Map(
+    aggregateCatalog.map((entry) => [entry.canonicalId, entry])
+  );
+
+  return platformModels.flatMap((model) => {
+    if (isExternalBrandOnlyCanonicalId(model.canonicalId)) {
+      return [];
+    }
+    const catalogEntry = catalogById.get(model.canonicalId);
+    if (!catalogEntry) {
+      return [];
+    }
+    return [
+      {
+        canonicalId: model.canonicalId,
+        alias: model.displayName,
+        modality: model.modality as AiModelModality,
+        providerModelId: catalogEntry.providerModelId,
+      },
+    ];
+  });
+}
+
+export async function listVolcanoCatalogEntriesFromPlatform(
+  db: Database,
+  platformModels: readonly PlatformAiModel[]
+): Promise<readonly AiModelCatalogEntry[]> {
+  const aggregateCatalog = await listAggregateVolcanoCatalogEntries(db);
+  return buildVolcanoCatalogEntriesFromPlatformModels(
+    platformModels,
+    aggregateCatalog
+  );
+}
+
+/** @deprecated Use listVolcanoCatalogEntriesFromPlatform(db, models). */
+export function toVolcanoCatalogEntriesFromPlatform(
+  models: readonly PlatformAiModel[],
+  aggregateCatalog: readonly AiModelCatalogEntry[]
+): readonly AiModelCatalogEntry[] {
+  return buildVolcanoCatalogEntriesFromPlatformModels(models, aggregateCatalog);
 }
 
 export function collectVolcanoInterfaces(
@@ -147,9 +161,8 @@ export async function listOrgTextModelOptions(
   db: Database,
   organizationId: string
 ): Promise<readonly OrgTextModelOption[]> {
-  const [platformModels, groups, interfaces] = await Promise.all([
+  const [platformModels, interfaces] = await Promise.all([
     listPlatformAiModels(db, "text"),
-    listPlatformAiModelGroups(db, "text"),
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
@@ -158,7 +171,6 @@ export async function listOrgTextModelOptions(
 
   return buildOrgModelBindings({
     platformModels,
-    groups,
     volcanoInterfaces,
     singleModelInterfaces,
   }).map((binding) => ({

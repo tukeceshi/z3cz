@@ -1,8 +1,7 @@
 import {
-  getMediaReferenceKey,
-  isMediaReference,
-  type MediaReference,
-  type ObjectReference,
+  getResourceIdFromValue,
+  isWorkflowMediaValue,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 
@@ -15,8 +14,7 @@ import type { MediaDisplaySize } from "@/services/media-display-size";
 import { cn } from "@/utils/utils";
 
 export interface MediaImageFieldProps {
-  readonly value: MediaReference | unknown;
-  readonly createObjectUrl?: (ref: ObjectReference) => string;
+  readonly value: WorkflowMediaValue | unknown;
   readonly className?: string;
   readonly size?: MediaDisplaySize;
   readonly imageClassName?: string;
@@ -24,14 +22,13 @@ export interface MediaImageFieldProps {
 
 export function MediaImageField({
   value,
-  createObjectUrl,
   className,
   size = "full",
   imageClassName,
 }: MediaImageFieldProps) {
   const { t } = useTranslation();
   const media = resolveMediaFromValue(value);
-  const mediaKey = media ? getMediaReferenceKey(media) : null;
+  const mediaKey = media ? getResourceIdFromValue(media) : null;
   const [useFullFallback, setUseFullFallback] = useState(false);
   const effectiveSize = size === "thumb" && useFullFallback ? "full" : size;
   const { displayUrl, stale } = useMediaDisplayUrl({
@@ -50,7 +47,7 @@ export function MediaImageField({
     setImgError(false);
   }, [displayUrl]);
 
-  if (!media || !isMediaReference(media)) {
+  if (!media || !isWorkflowMediaValue(media)) {
     return null;
   }
 
@@ -93,4 +90,4 @@ export function MediaImageField({
   );
 }
 
-export { isMediaReference };
+export { isWorkflowMediaValue };

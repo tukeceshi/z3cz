@@ -25,6 +25,9 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
+
+# 重置安装（清 DB / 上传，保留 app.yml 与证书）
+sudo bash /var/dafthunk/scripts/host/update.sh --reset
 ```
 
 ## 应急

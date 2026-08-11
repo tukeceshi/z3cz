@@ -1,27 +1,38 @@
-import {
-  createCosStorageBuckets,
-  readCosStorageConfig,
-} from "./cos-storage-provider";
-import { createLocalStorageBuckets } from "./local-storage-provider";
+import path from "node:path";
 
-export type { LocalStorageBuckets as StorageBuckets } from "./local-storage-provider";
-export type StorageProvider = "local" | "cos";
+import type { BlobStore } from "./blob-store";
+import { createR2BucketFromBlobStore } from "./blob-store-r2-adapter";
+import {
+  ensureLocalStorageRoot,
+  LocalFileBlobStore,
+} from "./local-file-blob-store";
+
+export type StorageProvider = "local";
 
 export interface ResolvedStorage {
-  RESSOURCES: R2Bucket;
-  DATASETS: R2Bucket;
-  INBOXES: R2Bucket;
-  provider: StorageProvider;
-  rootPath: string;
+  readonly resourcesStore: BlobStore;
+  /** R2-shaped adapter for legacy call sites (workflow-store, object-store). */
+  readonly RESSOURCES: R2Bucket;
+  readonly provider: StorageProvider;
+  readonly rootPath: string;
 }
 
 export async function createStorageBuckets(
   env: Record<string, string>
 ): Promise<ResolvedStorage> {
-  const cosConfig = readCosStorageConfig(env);
-  if (cosConfig) {
-    return createCosStorageBuckets(cosConfig);
-  }
+  const rootPath = path.resolve(
+    env.LOCAL_STORAGE_PATH ?? path.join(process.cwd(), "data", "storage")
+  );
+  await ensureLocalStorageRoot(rootPath);
 
-  return createLocalStorageBuckets(env);
+  const resourcesStore = new LocalFileBlobStore(
+    path.join(rootPath, "ressources")
+  );
+
+  return {
+    provider: "local",
+    rootPath,
+    resourcesStore,
+    RESSOURCES: createR2BucketFromBlobStore(resourcesStore),
+  };
 }

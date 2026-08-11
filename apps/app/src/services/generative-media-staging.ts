@@ -1,14 +1,14 @@
+import type { AiMediaCacheNodeType } from "@/services/ai-media-cache-service";
 import {
   getCachedMediaBlob,
   readCachedMediaBlobByMediaId,
-  writeGenerativeMediaCacheBlob,
+  cacheMediaFromBlob,
 } from "@/services/ai-media-cache-service";
 import {
   createStableBlobUrl,
   findStableBlobUrlForMediaId,
   stagingBlobUrlKey,
 } from "@/services/media-display-blob-url-registry";
-import { registerLocalMediaResource } from "@/services/media-resource-service";
 
 const LEGACY_DB_NAME = "dafthunk-local-media-staging";
 const LEGACY_DB_VERSION = 1;
@@ -23,10 +23,9 @@ interface LegacyLocalMediaRecord {
 
 let legacyMigrationPromise: Promise<void> | null = null;
 
-function inferNodeTypeFromMime(
-  mimeType: string
-): "ai-image" | "ai-video" | "ai-audio" {
+function inferNodeTypeFromMime(mimeType: string): AiMediaCacheNodeType {
   const mime = mimeType.toLowerCase();
+  if (mime.startsWith("text/")) return "ai-text";
   if (mime.startsWith("video/")) return "ai-video";
   if (mime.startsWith("audio/")) return "ai-audio";
   return "ai-image";
@@ -66,9 +65,9 @@ export async function writeGenerativeStaging(params: {
   readonly mediaId: string;
   readonly blob: Blob;
   readonly mimeType: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly nodeType: AiMediaCacheNodeType;
 }): Promise<boolean> {
-  const stored = await writeGenerativeMediaCacheBlob({
+  const stored = await cacheMediaFromBlob({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     workflowName: params.workflowName ?? params.workflowId,
@@ -86,11 +85,6 @@ export async function writeGenerativeStaging(params: {
     workflowId: params.workflowId,
     mediaId: params.mediaId,
   });
-  void registerLocalMediaResource({
-    organizationId: params.organizationId,
-    mediaId: params.mediaId,
-    mimeType: params.mimeType,
-  });
   return true;
 }
 
@@ -100,7 +94,7 @@ export async function writeGenerativeStagingWithNewId(params: {
   readonly workflowName?: string;
   readonly blob: Blob;
   readonly mimeType: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly nodeType: AiMediaCacheNodeType;
 }): Promise<{ readonly mediaId: string; readonly mimeType: string }> {
   const mediaId = crypto.randomUUID();
   await writeGenerativeStaging({

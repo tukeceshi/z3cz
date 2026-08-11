@@ -1,6 +1,6 @@
 /**
  * Integration test for the inbound mailbox pipeline: real MIME parsing
- * (PostalMime) + real R2 (INBOXES) staging feeding the MailboxDO, mirroring
+ * (PostalMime) staging feeding the MailboxDO, mirroring what
  * what `handleIncomingEmail` does after the D1 address lookup. The D1 lookup +
  * trigger dispatch are thin glue and are intentionally not covered here (the
  * test pool has no D1 migration/seeding infrastructure).
@@ -45,7 +45,7 @@ function rawEmail(opts: {
 }
 
 describe("mailbox inbound pipeline (staging + DO)", () => {
-  it("parses real MIME, stages to R2, and indexes the message in the DO", async () => {
+  it("parses real MIME and indexes the message in the DO", async () => {
     const mailbox = freshMailbox();
     const messageId = uuidv7();
     const rfcId = "<first@example.com>";
@@ -73,10 +73,6 @@ describe("mailbox inbound pipeline (staging + DO)", () => {
     expect(staged.subject).toBe("Need help with billing");
     expect(staged.rfc822MessageId).toBe(rfcId);
     expect(staged.hasText).toBe(true);
-
-    // Raw MIME really landed in R2.
-    const stored = await bindings.INBOXES.get(staged.rawR2Key);
-    expect(stored).not.toBeNull();
 
     // The DO indexed it into a thread.
     const { threadId } = await mailbox.ingestInbound({

@@ -4,7 +4,9 @@ import {
   DEFAULT_AUDIO_MODEL_PARAMETER_RULES,
   normalizeAudioModelParameterRules,
   type AudioModelParameterRules,
-  isMediaReference,
+  type OrgAudioModelOption,
+  isWorkflowMediaValue,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -18,6 +20,10 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import {
+  applyHistoryItemSettingsToNode,
+  type GenerativeHistorySelectionResult,
+} from "./apply-history-item-settings";
 import { splitHistoryMediaRows } from "./generative-history-utils";
 
 export const AI_AUDIO_PROMPT_HANDLE_ID = "prompt_reference" as const;
@@ -62,9 +68,9 @@ export interface AiAudioResultHistory {
   readonly selectedId: string | null;
 }
 
-function parseMediaReferences(value: unknown): MediaReference[] {
+function parseWorkflowMediaValues(value: unknown): WorkflowMediaValue[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isMediaReference);
+  return value.filter(isWorkflowMediaValue);
 }
 
 function upsertInputValue(
@@ -154,17 +160,17 @@ export function mergeAiAudioNodeCatalogInputs(
 export function readAiAudioResult(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[]
-): MediaReference[] {
+): WorkflowMediaValue[] {
   const fromInput = inputs.find(
     (input) => input.id === AI_AUDIO_RESULT_INPUT_ID
   );
-  const fromInputAudios = parseMediaReferences(fromInput?.value);
+  const fromInputAudios = parseWorkflowMediaValues(fromInput?.value);
   if (fromInputAudios.length > 0) {
     return fromInputAudios;
   }
 
   const fromOutput = outputs?.find((output) => output.id === AI_AUDIO_OUTPUT_ID);
-  return parseMediaReferences(fromOutput?.value);
+  return parseWorkflowMediaValues(fromOutput?.value);
 }
 
 export function readAiAudioResultHistory(
@@ -278,8 +284,8 @@ export function readAiAudioCardAudios(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
   _metadata?: Record<string, string>
-): MediaReference[] {
-  const manual = parseMediaReferences(
+): WorkflowMediaValue[] {
+  const manual = parseWorkflowMediaValues(
     inputs.find((input) => input.id === "manual_audios")?.value
   );
   if (manual.length > 0) {
@@ -367,23 +373,39 @@ export function appendAiAudioGeneratedHistoryItems(
 
 export function withAiAudioHistorySelection(
   current: WorkflowNodeType,
-  selectedId: string
-): Partial<WorkflowNodeType> {
+  selectedId: string,
+  options?: {
+    readonly models?: readonly OrgAudioModelOption[];
+  }
+): GenerativeHistorySelectionResult {
   const history = readAiAudioResultHistory(current.inputs);
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  let nextInputs = upsertInputValue(
-    current.inputs,
+  const settings = options?.models
+    ? applyHistoryItemSettingsToNode({
+        current,
+        modality: "audio",
+        models: options.models,
+        historyBinding: selected,
+        historyParams: selected.params,
+      })
+    : { patch: {}, modelUnavailable: false };
+
+  const working: WorkflowNodeType = {
+    ...current,
+    inputs: settings.patch.inputs ?? current.inputs,
+    metadata: settings.patch.metadata ?? current.metadata,
+  };
+
+  const nextInputs = upsertInputValue(
+    working.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  if (selected.params !== undefined) {
-    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
-  }
 
-  const result = withAiAudioResult(current, selected.audios.slice(0, 1), {
+  const result = withAiAudioResult(working, selected.audios.slice(0, 1), {
     inputs: upsertInputValue(
       nextInputs,
       AI_AUDIO_HISTORY_INPUT_ID,
@@ -393,7 +415,10 @@ export function withAiAudioHistorySelection(
   });
   return {
     ...result,
-    metadata: withGenerativeGeneratedContentMode(current.metadata),
+    metadata: withGenerativeGeneratedContentMode({
+      ...(settings.patch.metadata ?? current.metadata),
+    }),
+    modelUnavailable: settings.modelUnavailable,
   };
 }
 

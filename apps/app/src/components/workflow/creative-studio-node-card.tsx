@@ -13,7 +13,6 @@ import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioNodeCardProps {
   readonly node: ReactFlowNode<WorkflowNodeType>;
-  readonly isActive: boolean;
   readonly onOpenDetail: () => void;
   readonly onCancelPendingListClick?: () => void;
   readonly referenceDragEnabled?: boolean;
@@ -21,7 +20,6 @@ export interface CreativeStudioNodeCardProps {
 
 export function CreativeStudioNodeCard({
   node,
-  isActive,
   onOpenDetail,
   onCancelPendingListClick,
   referenceDragEnabled = false,
@@ -43,7 +41,6 @@ export function CreativeStudioNodeCard({
     return (
       <CreativeStudioTextRow
         node={node}
-        isActive={isActive}
         onOpenDetail={onOpenDetail}
         onCancelPendingListClick={onCancelPendingListClick}
         referenceDragEnabled={referenceDragEnabled}

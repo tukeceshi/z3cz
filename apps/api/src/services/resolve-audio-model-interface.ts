@@ -7,7 +7,6 @@ import type {
 import type { Database } from "../db";
 import {
   getAudioParameterRules,
-  listPlatformAiModelGroups,
   listPlatformAiModels,
 } from "../db/platform-ai-model-queries";
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
@@ -26,9 +25,8 @@ export async function listOrgAudioModelOptions(
   db: Database,
   organizationId: string
 ): Promise<readonly OrgAudioModelOption[]> {
-  const [platformModels, groups, interfaces] = await Promise.all([
+  const [platformModels, interfaces] = await Promise.all([
     listPlatformAiModels(db, "audio"),
-    listPlatformAiModelGroups(db, "audio"),
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
@@ -36,7 +34,6 @@ export async function listOrgAudioModelOptions(
 
   return buildOrgModelBindings({
     platformModels,
-    groups,
     volcanoInterfaces: [],
     singleModelInterfaces,
   }).map((binding) => ({

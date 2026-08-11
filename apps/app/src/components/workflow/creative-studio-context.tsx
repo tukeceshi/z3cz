@@ -32,7 +32,7 @@ interface CreativeStudioContextValue {
   readonly openDetail: (nodeId: string) => void;
   readonly openSecondaryDetail: (nodeId: string) => void;
   readonly closeSecondaryDetail: () => void;
-  readonly replacePrimaryFromList: (nodeId: string) => void;
+  readonly promoteSecondaryToPrimary: (nodeId: string) => void;
   readonly clearDetailNode: () => void;
   readonly selectStudioNode: (nodeId: string | null) => void;
   readonly expandStudioList: () => void;
@@ -46,6 +46,12 @@ interface CreativeStudioContextValue {
     }
   ) => string | null;
   readonly requestDeleteStudioNode?: (nodeId: string) => void;
+  readonly renamingListNodeId: string | null;
+  readonly requestListNodeRename: (nodeId: string) => void;
+  readonly finishListNodeRename: () => void;
+  readonly commitActiveListNodeRename: () => void;
+  readonly registerListNodeRenameCommit: (commit: (() => void) | null) => void;
+  readonly isListNodeRenaming: (nodeId: string) => boolean;
   readonly isPendingStudioNode: (nodeId: string) => boolean;
   readonly resolvePendingStudioNode: (nodeId: string) => void;
 }
@@ -175,13 +181,13 @@ export function CreativeStudioProvider({
     setSecondaryNodeId(null);
   }, []);
 
-  const replacePrimaryFromList = useCallback(
-    (nodeId: string) => {
-      setSecondaryNodeId(null);
-      openDetail(nodeId);
-    },
-    [openDetail]
-  );
+  const promoteSecondaryToPrimary = useCallback((nodeId: string) => {
+    setStudioNodeId(nodeId);
+    setDetailNodeId(nodeId);
+    setDetailPaneOpen(true);
+    setSecondaryNodeId(null);
+    setViewMode("studio");
+  }, []);
 
   const clearDetailNode = useCallback(() => {
     setDetailNodeId(null);
@@ -236,6 +242,44 @@ export function CreativeStudioProvider({
     [onAddGenerativeNode, openDetail]
   );
 
+  const [renamingListNodeId, setRenamingListNodeId] = useState<string | null>(
+    null
+  );
+  const listNodeRenameCommitRef = useRef<(() => void) | null>(null);
+
+  const registerListNodeRenameCommit = useCallback(
+    (commit: (() => void) | null) => {
+      listNodeRenameCommitRef.current = commit;
+    },
+    []
+  );
+
+  const finishListNodeRename = useCallback(() => {
+    setRenamingListNodeId(null);
+  }, []);
+
+  const commitActiveListNodeRename = useCallback(() => {
+    if (renamingListNodeId === null) {
+      return;
+    }
+    listNodeRenameCommitRef.current?.();
+  }, [renamingListNodeId]);
+
+  const requestListNodeRename = useCallback(
+    (nodeId: string) => {
+      if (renamingListNodeId !== null && renamingListNodeId !== nodeId) {
+        listNodeRenameCommitRef.current?.();
+      }
+      setRenamingListNodeId(nodeId);
+    },
+    [renamingListNodeId]
+  );
+
+  const isListNodeRenaming = useCallback(
+    (nodeId: string) => renamingListNodeId === nodeId,
+    [renamingListNodeId]
+  );
+
   const secondaryPaneOpen = secondaryNodeId != null;
 
   const value = useMemo(
@@ -253,7 +297,7 @@ export function CreativeStudioProvider({
       openDetail,
       openSecondaryDetail,
       closeSecondaryDetail,
-      replacePrimaryFromList,
+      promoteSecondaryToPrimary,
       clearDetailNode,
       selectStudioNode,
       expandStudioList,
@@ -261,6 +305,12 @@ export function CreativeStudioProvider({
       returnToCanvasFromDetail,
       addGenerativeNode: onAddGenerativeNode ? addGenerativeNode : undefined,
       requestDeleteStudioNode: onRequestDeleteStudioNode,
+      renamingListNodeId,
+      requestListNodeRename,
+      finishListNodeRename,
+      commitActiveListNodeRename,
+      registerListNodeRenameCommit,
+      isListNodeRenaming,
       isPendingStudioNode,
       resolvePendingStudioNode,
     }),
@@ -277,7 +327,7 @@ export function CreativeStudioProvider({
       openDetail,
       openSecondaryDetail,
       closeSecondaryDetail,
-      replacePrimaryFromList,
+      promoteSecondaryToPrimary,
       clearDetailNode,
       selectStudioNode,
       expandStudioList,
@@ -286,6 +336,12 @@ export function CreativeStudioProvider({
       onAddGenerativeNode,
       addGenerativeNode,
       onRequestDeleteStudioNode,
+      renamingListNodeId,
+      requestListNodeRename,
+      finishListNodeRename,
+      commitActiveListNodeRename,
+      registerListNodeRenameCommit,
+      isListNodeRenaming,
       isPendingStudioNode,
       resolvePendingStudioNode,
     ]

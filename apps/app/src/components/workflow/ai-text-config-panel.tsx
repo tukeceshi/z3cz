@@ -26,7 +26,8 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
+import { inferAiTextMimeType } from "@dafthunk/types";
+import { stageAiTextContent } from "@/services/ai-text-storage-service";
 import { useObjectService } from "@/services/object-service";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
@@ -54,13 +55,17 @@ import {
   probeVideoUrlDurationSeconds,
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
-  withAiTextGeneratedResult,
   withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
+import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
+import { sha256HexFromText } from "@/utils/text-content-utils";
+import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
+import { buildResourceIdReference } from "./ai-text-persist-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   GenerativePickNodeDialog,
@@ -75,12 +80,14 @@ export interface AiTextConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly layout?: GenerativeConfigPanelLayout;
+  readonly detailRole?: CreativeStudioDetailViewRole;
 }
 
 export function AiTextConfigPanel({
   nodeId,
   data,
   layout = "attached",
+  detailRole,
 }: AiTextConfigPanelProps) {
   const {
     updateNodeData,
@@ -146,7 +153,6 @@ export function AiTextConfigPanel({
     effectiveModel,
     selectedOptionId,
     models,
-    groups,
     isLoading,
     modelsError,
     canGenerate: modelReady,
@@ -164,16 +170,6 @@ export function AiTextConfigPanel({
     readInterfaceId: (nodeData) => getInputString(nodeData, "ai_interface_id"),
     useModels: useOrgTextModels,
     modelFitsCurrentRefs,
-    onModelSelected: (model) => {
-      const rules = normalizeTextModelParameterRules(model.parameterRules);
-      return {
-        metadata: {
-          refMaxText: String(rules.maxTextReferences),
-          refMaxImage: String(rules.maxImageReferences),
-          refMaxVideo: String(rules.maxVideoReferences),
-        },
-      };
-    },
   });
 
   const textModelCatalog = useMemo(
@@ -519,10 +515,33 @@ export function AiTextConfigPanel({
       }
       streamPreviewPendingRef.current = null;
 
-      if (!updateNodeData) return;
+      if (!updateNodeData || !orgId || !workflowId) return;
+
+      const mimeType = inferAiTextMimeType(response.text);
+      const contentSha256 =
+        response.contentSha256 ?? (await sha256HexFromText(response.text));
+
+      const reference =
+        response.resourceId && response.contentSha256
+          ? buildResourceIdReference({
+              resourceId: response.resourceId,
+              contentSha256: response.contentSha256,
+              mimeType,
+            })
+          : await stageAiTextContent({
+              organizationId: orgId,
+              workflowId,
+              text: response.text,
+            });
+
+      const staged = {
+        reference,
+        contentSha256,
+        sessionText: response.text,
+      };
 
       updateNodeData(nodeId, (current) => {
-        const withResult = withAiTextGeneratedResult(current, response.text, {
+        const withResult = withAiTextStagedGeneratedResult(current, staged, {
           platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
           modelDisplayName: effectiveModel.alias,
@@ -548,7 +567,7 @@ export function AiTextConfigPanel({
       if (isClientCancelledTextModelError(raw)) {
         return;
       }
-      const cardError = prepareGenerativeCardError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t, "text");
       updateNodeData?.(nodeId, (current) => ({
         metadata: withGenerativeCardGenerateError(
           withAiTextGeneratingFlag(current.metadata, false),
@@ -624,6 +643,7 @@ export function AiTextConfigPanel({
           chips={referenceChips}
           disabled={disabled}
           showStudioReferenceHints={layout === "studio-dock"}
+          detailRole={detailRole}
           onDisconnect={(edgeId) => deleteEdge?.(edgeId)}
           onPickCanvasNode={() => setPickNodeOpen(true)}
         />
@@ -664,7 +684,6 @@ export function AiTextConfigPanel({
             <AiTextModelPicker
               orgId={orgId}
               models={models}
-              groups={groups}
               selectedOptionId={selectedOptionId}
               chipModel={effectiveModel}
               disabled={disabled || isLoading}

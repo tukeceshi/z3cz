@@ -8,8 +8,11 @@ import {
   referencesFitVideoModelReferenceLimits,
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
-  isMediaReference,
+  type OrgVideoModelOption,
+  isWorkflowMediaValue,
+  mediaReferenceToWorkflowValue,
   type MediaReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -23,6 +26,10 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import {
+  applyHistoryItemSettingsToNode,
+  type GenerativeHistorySelectionResult,
+} from "./apply-history-item-settings";
 import { splitHistoryMediaRows } from "./generative-history-utils";
 
 import {
@@ -85,9 +92,17 @@ export function isAiVideoAllowedReferenceNodeType(
   );
 }
 
-function parseMediaReferences(value: unknown): MediaReference[] {
+function parseWorkflowMediaValues(value: unknown): WorkflowMediaValue[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isMediaReference);
+  return value.filter(isWorkflowMediaValue);
+}
+
+function toStoredWorkflowMedia(
+  values: readonly (WorkflowMediaValue | MediaReference)[]
+): WorkflowMediaValue[] {
+  return values.map((value) =>
+    isWorkflowMediaValue(value) ? value : mediaReferenceToWorkflowValue(value)
+  );
 }
 
 function upsertInputValue(
@@ -185,17 +200,17 @@ export function mergeAiVideoNodeCatalogInputs(
 export function readAiVideoResult(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[]
-): MediaReference[] {
+): WorkflowMediaValue[] {
   const fromInput = inputs.find(
     (input) => input.id === AI_VIDEO_RESULT_INPUT_ID
   );
-  const fromInputVideos = parseMediaReferences(fromInput?.value);
+  const fromInputVideos = parseWorkflowMediaValues(fromInput?.value);
   if (fromInputVideos.length > 0) {
     return fromInputVideos;
   }
 
   const fromOutput = outputs?.find((output) => output.id === AI_VIDEO_OUTPUT_ID);
-  return parseMediaReferences(fromOutput?.value);
+  return parseWorkflowMediaValues(fromOutput?.value);
 }
 
 export function readAiVideoResultHistory(
@@ -245,16 +260,17 @@ export function readAiVideoResultHistory(
 
 export function withAiVideoResult(
   current: WorkflowNodeType,
-  videos: readonly MediaReference[],
+  videos: readonly WorkflowMediaValue[],
   extras?: {
     readonly inputs?: readonly WorkflowParameter[];
   }
 ): Partial<WorkflowNodeType> {
+  const storedVideos = toStoredWorkflowMedia(videos);
   const baseInputs = extras?.inputs ?? current.inputs;
   let inputs = upsertInputValue(
     baseInputs,
     AI_VIDEO_RESULT_INPUT_ID,
-    [...videos],
+    [...storedVideos],
     "json"
   );
 
@@ -263,7 +279,9 @@ export function withAiVideoResult(
     const nextHistory: AiVideoResultHistory = {
       selectedId: history.selectedId,
       items: history.items.map((item) =>
-        item.id === history.selectedId ? { ...item, videos: [...videos] } : item
+        item.id === history.selectedId
+          ? { ...item, videos: [...storedVideos] }
+          : item
       ),
     };
     inputs = upsertInputValue(
@@ -276,7 +294,7 @@ export function withAiVideoResult(
 
   const outputs = current.outputs.map((output) =>
     output.id === AI_VIDEO_OUTPUT_ID
-      ? ({ ...output, value: [...videos] } as WorkflowParameter)
+      ? ({ ...output, value: [...storedVideos] } as WorkflowParameter)
       : output
   );
 
@@ -309,9 +327,9 @@ export function readAiVideoCardVideos(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
-): MediaReference[] {
+): WorkflowMediaValue[] {
   if (isGenerativeManualContent(metadata)) {
-    const manual = parseMediaReferences(
+    const manual = parseWorkflowMediaValues(
       inputs.find((input) => input.id === "manual_videos")?.value
     );
     if (manual.length > 0) {
@@ -320,6 +338,15 @@ export function readAiVideoCardVideos(
   }
 
   return readAiVideoResult(inputs, outputs);
+}
+
+/** Current card output — at most one video. */
+export function readAiVideoCardPrimaryVideo(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): WorkflowMediaValue | undefined {
+  return readAiVideoCardVideos(inputs, outputs, metadata)[0];
 }
 
 export function withAiVideoManualUpload(
@@ -360,7 +387,8 @@ export function withAiVideoGeneratedResult(
     readonly modelDisplayName?: string;
   }
 ): Partial<WorkflowNodeType> {
-  const primary = videos[0];
+  const storedVideos = toStoredWorkflowMedia(videos);
+  const primary = storedVideos[0];
   if (!primary) return {};
 
   return appendAiVideoGeneratedHistoryItems(current, [primary], meta);
@@ -369,7 +397,7 @@ export function withAiVideoGeneratedResult(
 /** Append one history row per video; card shows the first. */
 export function appendAiVideoGeneratedHistoryItems(
   current: WorkflowNodeType,
-  videos: readonly MediaReference[],
+  videos: readonly WorkflowMediaValue[],
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
@@ -381,10 +409,11 @@ export function appendAiVideoGeneratedHistoryItems(
 ): Partial<WorkflowNodeType> {
   if (videos.length === 0) return {};
 
+  const storedVideos = toStoredWorkflowMedia(videos);
   const history = readAiVideoResultHistory(current.inputs);
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
-  const newItems: AiVideoResultHistoryItem[] = videos.map((video, index) => ({
+  const newItems: AiVideoResultHistoryItem[] = storedVideos.map((video, index) => ({
     id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
     videos: [video],
     prompt: meta?.prompt ?? "",
@@ -410,7 +439,7 @@ export function appendAiVideoGeneratedHistoryItems(
   );
   inputs = upsertInputValue(inputs, "manual_videos", [], "json");
 
-  const result = withAiVideoResult(current, [videos[0]!], { inputs });
+  const result = withAiVideoResult(current, [storedVideos[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -419,23 +448,39 @@ export function appendAiVideoGeneratedHistoryItems(
 
 export function withAiVideoHistorySelection(
   current: WorkflowNodeType,
-  selectedId: string
-): Partial<WorkflowNodeType> {
+  selectedId: string,
+  options?: {
+    readonly models?: readonly OrgVideoModelOption[];
+  }
+): GenerativeHistorySelectionResult {
   const history = readAiVideoResultHistory(current.inputs);
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  let nextInputs = upsertInputValue(
-    current.inputs,
+  const settings = options?.models
+    ? applyHistoryItemSettingsToNode({
+        current,
+        modality: "video",
+        models: options.models,
+        historyBinding: selected,
+        historyParams: selected.params,
+      })
+    : { patch: {}, modelUnavailable: false };
+
+  const working: WorkflowNodeType = {
+    ...current,
+    inputs: settings.patch.inputs ?? current.inputs,
+    metadata: settings.patch.metadata ?? current.metadata,
+  };
+
+  const nextInputs = upsertInputValue(
+    working.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  if (selected.params !== undefined) {
-    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
-  }
 
-  const result = withAiVideoResult(current, selected.videos.slice(0, 1), {
+  const result = withAiVideoResult(working, selected.videos.slice(0, 1), {
     inputs: upsertInputValue(
       nextInputs,
       AI_VIDEO_HISTORY_INPUT_ID,
@@ -445,7 +490,10 @@ export function withAiVideoHistorySelection(
   });
   return {
     ...result,
-    metadata: withGenerativeGeneratedContentMode(current.metadata),
+    metadata: withGenerativeGeneratedContentMode({
+      ...(settings.patch.metadata ?? current.metadata),
+    }),
+    modelUnavailable: settings.modelUnavailable,
   };
 }
 

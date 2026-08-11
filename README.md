@@ -58,6 +58,9 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```bash
 # pull → 预检/按序迁移 → rebuild
 sudo bash /var/dafthunk/scripts/host/update.sh
+
+# 重置安装：清 DB 与上传，保留域名配置与证书
+sudo bash /var/dafthunk/scripts/host/update.sh --reset
 ```
 
 #### HTTPS 模式
@@ -120,6 +123,14 @@ git clone https://github.com/tukeceshi/dafthunk.git
 cd dafthunk
 docker compose up -d --build --wait   # 或 pnpm dev
 ```
+
+国内访问 Docker Hub 容易超时（报错含 `registry-1.docker.io`）。可在 Docker Desktop → **Settings → Docker Engine** 配置镜像加速，一次生效、无需改项目里的镜像名：
+
+```json
+"registry-mirrors": ["你的加速地址"]
+```
+
+加速地址从 [阿里云](https://cr.console.aliyun.com/cn-hangzhou/instances/mirrors) 或 [腾讯云](https://cloud.tencent.com/document/product/1207/45596) 控制台获取（登录后复制，每人不同）。保存并重启 Docker 后，再执行 `docker compose up -d --build --wait`。
 
 默认不必复制环境文件；容器会生成 `apps/api/.dev.vars`。改端口或 Cloudflare 等时，再从对应 `.example` 复制后编辑。
 

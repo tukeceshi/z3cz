@@ -10,7 +10,10 @@ import type {
   PlatformAiModelParameterRules,
   VolcanoInterfaceMetadata,
 } from "@dafthunk/types";
-import { DEFAULT_TEXT_MODEL_PARAMETER_RULES } from "@dafthunk/types";
+import {
+  DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  VOLCANO_AGGREGATE_MODEL_CATALOG,
+} from "@dafthunk/types";
 
 const testTextRules =
   DEFAULT_TEXT_MODEL_PARAMETER_RULES as PlatformAiModelParameterRules;
@@ -24,13 +27,18 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
         modality: "text",
         platformEnabled: true,
         sortOrder: 0,
-        groupId: null,
+        brandIcon: null,
         description: "",
         parameterRules: testTextRules,
       },
     ];
 
-    expect(toVolcanoCatalogEntriesFromPlatform(models)).toEqual([
+    expect(
+      toVolcanoCatalogEntriesFromPlatform(
+        models,
+        VOLCANO_AGGREGATE_MODEL_CATALOG
+      )
+    ).toEqual([
       {
         canonicalId: "deepseek-v4-flash",
         alias: "DeepSeek V4 Flash",
@@ -48,7 +56,7 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
         modality: "text",
         platformEnabled: true,
         sortOrder: 41,
-        groupId: null,
+        brandIcon: null,
         description: "",
         parameterRules: testTextRules,
       },
@@ -58,13 +66,18 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
         modality: "text",
         platformEnabled: true,
         sortOrder: 0,
-        groupId: null,
+        brandIcon: null,
         description: "",
         parameterRules: testTextRules,
       },
     ];
 
-    expect(toVolcanoCatalogEntriesFromPlatform(models)).toEqual([
+    expect(
+      toVolcanoCatalogEntriesFromPlatform(
+        models,
+        VOLCANO_AGGREGATE_MODEL_CATALOG
+      )
+    ).toEqual([
       {
         canonicalId: "deepseek-v4-pro",
         alias: "DeepSeek V4 Pro",

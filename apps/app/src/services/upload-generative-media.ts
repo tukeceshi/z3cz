@@ -1,4 +1,4 @@
-import type { MediaReference } from "@dafthunk/types";
+import type { WorkflowMediaValue } from "@dafthunk/types";
 
 
 
@@ -28,7 +28,7 @@ export async function uploadGenerativeMedia(params: {
 
   readonly mediaKind?: "ai-image" | "ai-video" | "ai-audio" | "reference";
 
-}): Promise<MediaReference> {
+}): Promise<WorkflowMediaValue> {
 
   return uploadGenerativeMediaFile({
 

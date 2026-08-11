@@ -16,6 +16,8 @@ import type {
   ListOrgTextModelsResponse,
   ListOrgVideoModelsResponse,
   ListPlatformCatalogModelsResponse,
+  ListPlatformAiModelChannelsResponse,
+  AiModelCatalogEntry,
   OrgCloudStorageConfiguredStatus,
   OrgCloudStorageStatus,
   PollAiVideoTaskResponse,
@@ -55,7 +57,6 @@ function usePlatformCatalogModels(
 
   return {
     models: data?.models ?? [],
-    groups: data?.groups ?? [],
     modelsError: error,
     isLoading: !data && isLoading,
     refreshModels: mutate,
@@ -88,6 +89,50 @@ export function usePlatformCatalogAudioModels(
   options?: { readonly enabled?: boolean }
 ) {
   return usePlatformCatalogModels(orgId, "audio", options);
+}
+
+export function usePlatformModelChannels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/model-channels` : null;
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListPlatformAiModelChannelsResponse>(`${key}`),
+    ORG_MODELS_SWR_OPTIONS
+  );
+
+  return {
+    channels: data?.channels ?? [],
+    channelsError: error,
+    isLoading: !data && isLoading,
+    refreshChannels: mutate,
+  };
+}
+
+export function useVolcanoAggregateCatalog(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false;
+  const key =
+    orgId && enabled ? `${platformAiEndpoint(orgId)}/volcano-catalog` : null;
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<{ readonly models: readonly AiModelCatalogEntry[] }>(
+      `${key}`
+    ),
+    ORG_MODELS_SWR_OPTIONS
+  );
+
+  return {
+    catalog: data?.models ?? [],
+    catalogError: error,
+    isLoading: !data && isLoading,
+    refreshCatalog: mutate,
+  };
 }
 
 export async function fetchOrgTextModels(
@@ -137,7 +182,6 @@ export function useOrgTextModels(
 
   return {
     models: data?.models ?? [],
-    groups: data?.groups ?? [],
     modelsError: error,
     isLoading: !data && isLoading,
     refreshModels: mutate,
@@ -159,7 +203,6 @@ export function useOrgImageModels(
 
   return {
     models: data?.models ?? [],
-    groups: data?.groups ?? [],
     modelsError: error,
     isLoading: !data && isLoading,
     refreshModels: mutate,
@@ -181,7 +224,6 @@ export function useOrgVideoModels(
 
   return {
     models: data?.models ?? [],
-    groups: data?.groups ?? [],
     modelsError: error,
     isLoading: !data && isLoading,
     refreshModels: mutate,
@@ -203,7 +245,6 @@ export function useOrgAudioModels(
 
   return {
     models: data?.models ?? [],
-    groups: data?.groups ?? [],
     modelsError: error,
     isLoading: !data && isLoading,
     refreshModels: mutate,
@@ -568,6 +609,8 @@ export async function generateAiTextStream(
             error?: string;
             invocationId?: string;
             aiInterfaceId?: string;
+            resourceId?: string;
+            contentSha256?: string;
           };
           try {
             event = JSON.parse(data) as typeof event;
@@ -591,6 +634,8 @@ export async function generateAiTextStream(
                 text: event.text,
                 invocationId: event.invocationId,
                 aiInterfaceId: event.aiInterfaceId,
+                resourceId: event.resourceId,
+                contentSha256: event.contentSha256,
               };
             }
             continue;

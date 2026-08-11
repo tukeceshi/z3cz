@@ -1,14 +1,16 @@
-import type { MediaReference } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
-import { useEffect, useRef } from "react";
+import { getResourceIdFromValue } from "@dafthunk/types";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import {
   applyMediaResourceRekeyToNodes,
   reconcileWorkflowMediaReferencesInNodes,
 } from "@/services/reconcile-workflow-media-references";
-import { ingestWorkflowCanvasMediaInBackground } from "@/services/ingest-canvas-media";
-import { syncWorkflowMediaResourcesToCatalog } from "@/services/sync-workflow-media-catalog";
+import {
+  collectWorkflowCanvasMedia,
+  ingestWorkflowCanvasMediaInBackground,
+} from "@/services/ingest-canvas-media";
 import {
   MEDIA_RESOURCE_REKEYED_EVENT,
   type MediaResourceRekeyedDetail,
@@ -17,64 +19,110 @@ import {
 interface UseWorkflowMediaReconcileParams {
   readonly organizationId: string | undefined;
   readonly workflowId: string | undefined;
+  readonly graphReady: boolean;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly setNodes: React.Dispatch<
     React.SetStateAction<ReactFlowNode<WorkflowNodeType>[]>
   >;
 }
 
+function buildWorkflowMediaFingerprint(
+  nodes: readonly ReactFlowNode<WorkflowNodeType>[]
+): string {
+  const resourceIds = collectWorkflowCanvasMedia(nodes)
+    .map((item) => getResourceIdFromValue(item.media))
+    .filter((id): id is string => Boolean(id))
+    .sort();
+  return resourceIds.join("|");
+}
+
 export function useWorkflowMediaReconcile({
   organizationId,
   workflowId,
+  graphReady,
   nodes,
   setNodes,
 }: UseWorkflowMediaReconcileParams): void {
-  const reconciledForRef = useRef<string | null>(null);
+  const ingestedFingerprintRef = useRef<string | null>(null);
+  const ingestedResourceIdsRef = useRef<Set<string>>(new Set());
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+  const mediaFingerprint = useMemo(
+    () => buildWorkflowMediaFingerprint(nodes),
+    [nodes]
+  );
 
   useEffect(() => {
-    reconciledForRef.current = null;
+    ingestedFingerprintRef.current = null;
+    ingestedResourceIdsRef.current = new Set();
   }, [organizationId, workflowId]);
 
   useEffect(() => {
-    if (!organizationId || !workflowId || nodes.length === 0) {
+    if (
+      !graphReady ||
+      !organizationId ||
+      !workflowId ||
+      nodesRef.current.length === 0
+    ) {
       return;
     }
 
-    const reconcileKey = `${organizationId}:${workflowId}`;
-    if (reconciledForRef.current === reconcileKey) {
+    if (ingestedFingerprintRef.current === mediaFingerprint) {
       return;
     }
-    reconciledForRef.current = reconcileKey;
 
     let cancelled = false;
+    const snapshotNodes = nodesRef.current;
 
     void reconcileWorkflowMediaReferencesInNodes(
-      nodes,
+      snapshotNodes,
       organizationId,
       workflowId
     ).then((patched) => {
       if (cancelled) {
         return;
       }
+
+      const activeNodes = patched ?? snapshotNodes;
+      ingestedFingerprintRef.current =
+        buildWorkflowMediaFingerprint(activeNodes);
+
       if (patched) {
         setNodes(patched);
       }
-      const activeNodes = patched ?? nodes;
-      syncWorkflowMediaResourcesToCatalog({
-        organizationId,
-        nodes: activeNodes,
-      });
-      ingestWorkflowCanvasMediaInBackground({
-        organizationId,
-        workflowId,
-        nodes: activeNodes,
-      });
+
+      const items = collectWorkflowCanvasMedia(activeNodes);
+      const newResourceIds = new Set<string>();
+      for (const item of items) {
+        const resourceId = getResourceIdFromValue(item.media);
+        if (!resourceId || ingestedResourceIdsRef.current.has(resourceId)) {
+          continue;
+        }
+        ingestedResourceIdsRef.current.add(resourceId);
+        newResourceIds.add(resourceId);
+      }
+
+      if (newResourceIds.size > 0) {
+        ingestWorkflowCanvasMediaInBackground({
+          organizationId,
+          workflowId,
+          nodes: activeNodes,
+          onlyResourceIds: newResourceIds,
+        });
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [organizationId, workflowId, nodes.length, nodes, setNodes]);
+  }, [
+    graphReady,
+    organizationId,
+    workflowId,
+    mediaFingerprint,
+    setNodes,
+  ]);
 
   useEffect(() => {
     if (!organizationId || !workflowId) {
@@ -95,7 +143,7 @@ export function useWorkflowMediaReconcile({
         const patched = applyMediaResourceRekeyToNodes(
           current,
           detail.fromMediaId,
-          detail.toMediaReference as MediaReference
+          detail.toMediaReference
         );
         return patched ?? current;
       });

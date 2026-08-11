@@ -9,6 +9,7 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { createApp } from "./app";
 import type { Bindings } from "./context";
 import { createNodeBindings } from "./env/create-node-bindings";
+import { registerNodeBootstrapWsRoutes } from "./routes/bootstrap-ws-node";
 import { registerNodeWsRoutes } from "./routes/ws-node";
 import { handleScheduledEvent } from "./scheduled";
 
@@ -73,6 +74,7 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
   });
 
   registerNodeWsRoutes(app, upgradeWebSocket);
+  registerNodeBootstrapWsRoutes(app, upgradeWebSocket);
 
   writeBootPhase("starting_server");
   const server = serve(
@@ -111,4 +113,13 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
     runScheduled();
     setInterval(runScheduled, 60_000);
   }
+
+  const { runDueTextContentMerges } = await import(
+    "./services/text-content-service"
+  );
+  setInterval(() => {
+    void runDueTextContentMerges(bindings).catch((error) => {
+      console.error("[api] Text content merge worker failed:", error);
+    });
+  }, 30_000);
 }

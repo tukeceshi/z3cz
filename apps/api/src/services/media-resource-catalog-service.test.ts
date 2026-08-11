@@ -21,10 +21,32 @@ describe("mediaReferenceToCatalogInsert", () => {
       kind: "local",
       mimeType: "image/png",
       storageKey: null,
+      upstreamUrl: null,
+      expiresAt: null,
     });
   });
 
-  it("maps cloud object to storage key id", () => {
+  it("maps ephemeral media to catalog row with upstream url", () => {
+    expect(
+      mediaReferenceToCatalogInsert("org-1", {
+        kind: "ephemeral",
+        mediaId: "eph-1",
+        mimeType: "image/png",
+        url: "https://example.com/image.png",
+        expiresAt: "2026-01-01T00:00:00.000Z",
+      })
+    ).toEqual({
+      id: "eph-1",
+      organizationId: "org-1",
+      kind: "ephemeral",
+      mimeType: "image/png",
+      storageKey: null,
+      upstreamUrl: "https://example.com/image.png",
+      expiresAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("maps cloud object to uuid id", () => {
     expect(
       mediaReferenceToCatalogInsert("org-1", {
         id: "obj-1",
@@ -33,11 +55,13 @@ describe("mediaReferenceToCatalogInsert", () => {
         storageBackend: "volcengine_tos",
       })
     ).toEqual({
-      id: "org/wf/image/obj-1.jpg",
+      id: "obj-1",
       organizationId: "org-1",
       kind: "cloud",
       mimeType: "image/jpeg",
       storageKey: "org/wf/image/obj-1.jpg",
+      upstreamUrl: null,
+      expiresAt: null,
     });
   });
 });
@@ -57,6 +81,9 @@ describe("registerRequestToCatalogInsert", () => {
       kind: "local",
       mimeType: "image/png",
       storageKey: null,
+      upstreamUrl: null,
+      expiresAt: null,
+      contentSha256: null,
     });
   });
 });
@@ -65,7 +92,7 @@ describe("partitionResolvedResourceUrls", () => {
   it("partitions resolved urls by mime type", () => {
     const result = partitionResolvedResourceUrls([
       {
-        resourceId: "org/wf/image/a.png",
+        resourceId: "019fe101-6f88-736b-bdc5-49882eed0689",
         url: "https://example.com/a.png",
         mimeType: "image/png",
       },

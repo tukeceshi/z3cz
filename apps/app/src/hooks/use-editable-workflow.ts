@@ -5,16 +5,19 @@ import type {
   WorkflowEditorViewport,
   WorkflowExecution,
   WorkflowGenerativeDefaults,
+  WorkflowGraphPatchBroadcast,
   WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
+import { applyWorkflowGraphPatch } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { stripTransientGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
+import { normalizeAiTextNodeDataForPersist } from "@/components/workflow/ai-text-persist-utils";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -39,6 +42,7 @@ interface ApplyEditorViewportOptions {
 
 const VIEWPORT_PERSIST_DEBOUNCE_MS = 300;
 const GENERATIVE_DEFAULTS_PERSIST_DEBOUNCE_MS = 300;
+const GRAPH_PATCH_DEBOUNCE_MS = 150;
 
 interface UseEditableWorkflowProps {
   workflowId: string | undefined;
@@ -64,18 +68,19 @@ function buildWorkflowPayload(
 ): { nodes: WorkflowBackendNode[]; edges: WorkflowBackendEdge[] } {
   const workflowNodes = nodes.map((node) => {
     const incomingEdges = edges.filter((edge) => edge.target === node.id);
+    const persistableData = normalizeAiTextNodeDataForPersist(node.data);
     return {
       id: node.id,
-      name: node.data.name,
-      type: node.data.nodeType || "default",
+      name: persistableData.name,
+      type: persistableData.nodeType || "default",
       position: node.position,
-      icon: node.data.icon,
-      functionCalling: node.data.functionCalling,
+      icon: persistableData.icon,
+      functionCalling: persistableData.functionCalling,
       ...(() => {
-        const metadata = stripTransientGenerativeMetadata(node.data.metadata);
+        const metadata = stripTransientGenerativeMetadata(persistableData.metadata);
         return metadata ? { metadata } : {};
       })(),
-      inputs: node.data.inputs.map((input) => {
+      inputs: persistableData.inputs.map((input) => {
         const isConnected = incomingEdges.some(
           (edge) => edge.targetHandle === input.id
         );
@@ -161,7 +166,12 @@ export function useEditableWorkflow({
   // or received from it). A save is a no-op when the current graph matches
   // this, which suppresses echo-saves of remote updates and redundant resends.
   const lastSavedSerializedRef = useRef<string>("");
+  const lastSentGraphRef = useRef<{
+    nodes: WorkflowBackendNode[];
+    edges: WorkflowBackendEdge[];
+  }>({ nodes: [], edges: [] });
   const saveScheduledRef = useRef(false);
+  const graphPatchTimerRef = useRef<number | null>(null);
   const editorViewportRef = useRef<WorkflowEditorViewport | undefined>(
     undefined
   );
@@ -170,8 +180,18 @@ export function useEditableWorkflow({
   );
   const lastPersistedViewportRef = useRef<string>("");
   const lastPersistedGenerativeDefaultsRef = useRef<string>("");
+  const lastRemoteTimestampRef = useRef(0);
   const viewportPersistTimerRef = useRef<number | null>(null);
   const generativeDefaultsPersistTimerRef = useRef<number | null>(null);
+  const workflowMetadataRef = useRef<{
+    id: string;
+    name: string;
+    description?: string;
+    schemeId: string;
+    trigger: string;
+    runtime?: WorkflowRuntime;
+  } | null>(null);
+  const [isGraphReady, setIsGraphReady] = useState(false);
 
   // Send the current local graph if it differs from what the server last had.
   // Synchronous (the underlying WS send is synchronous) so it can run from
@@ -184,18 +204,18 @@ export function useEditableWorkflow({
     const payload = buildWorkflowPayload(nodesRef.current, edgesRef.current);
     const serialized = JSON.stringify(payload);
 
-    // Unchanged since the last accepted state — nothing to do. This is what
-    // swallows the persistence "echo" that follows applying a remote update.
     if (serialized === lastSavedSerializedRef.current) return;
 
-    // Not connected: keep the edit pending (don't advance the fingerprint).
-    // It will be resent on reconnect via onInit.
     if (!wsRef.current?.isConnected()) return;
 
     try {
-      wsRef.current.sendStateUpdate(payload.nodes, payload.edges);
-      lastSavedSerializedRef.current = serialized;
-      setSavingError(null);
+      const sent = wsRef.current.sendGraphPatch(lastSentGraphRef.current, payload);
+      if (sent) {
+        lastSentGraphRef.current = payload;
+        lastSavedSerializedRef.current = serialized;
+        lastRemoteTimestampRef.current = Date.now();
+        setSavingError(null);
+      }
     } catch (error) {
       console.error("Error saving via WebSocket:", error);
     }
@@ -249,16 +269,61 @@ export function useEditableWorkflow({
   const flushGenerativeDefaultsSaveRef = useRef(flushGenerativeDefaultsSave);
   flushGenerativeDefaultsSaveRef.current = flushGenerativeDefaultsSave;
 
-  // Coalesce the separate node and edge change callbacks (which fire in the
-  // same commit) into a single save once both refs are up to date.
   const scheduleSave = useCallback(() => {
     if (saveScheduledRef.current) return;
     saveScheduledRef.current = true;
-    queueMicrotask(() => flushSaveRef.current());
+
+    if (graphPatchTimerRef.current !== null) {
+      window.clearTimeout(graphPatchTimerRef.current);
+    }
+
+    graphPatchTimerRef.current = window.setTimeout(() => {
+      graphPatchTimerRef.current = null;
+      flushSaveRef.current();
+    }, GRAPH_PATCH_DEBOUNCE_MS);
   }, []);
 
   const fallbackWorkflowRef = useRef(fallbackWorkflow);
   fallbackWorkflowRef.current = fallbackWorkflow;
+
+  const applyBackendGraphToEditor = useCallback(
+    (
+      backendNodes: WorkflowBackendNode[],
+      backendEdges: WorkflowBackendEdge[],
+      timestamp: number
+    ) => {
+      const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+        backendNodes,
+        nodeTypes
+      );
+      const reactFlowEdges = backendEdges.map((edge) => ({
+        id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceOutput,
+        targetHandle: edge.targetInput,
+        type: "workflowEdge" as const,
+        data: {
+          isValid: true,
+          sourceType: edge.sourceOutput,
+          targetType: edge.targetInput,
+        },
+      }));
+
+      nodesRef.current = reactFlowNodes;
+      edgesRef.current = reactFlowEdges;
+      const payload = buildWorkflowPayload(reactFlowNodes, reactFlowEdges);
+      lastSavedSerializedRef.current = JSON.stringify(payload);
+      lastSentGraphRef.current = payload;
+      lastRemoteTimestampRef.current = timestamp;
+      setNodes(reactFlowNodes);
+      setEdges(reactFlowEdges);
+    },
+    [nodeTypes]
+  );
+
+  const applyBackendGraphToEditorRef = useRef(applyBackendGraphToEditor);
+  applyBackendGraphToEditorRef.current = applyBackendGraphToEditor;
 
   const applyEditorViewportFromState = useCallback(
     (
@@ -331,11 +396,19 @@ export function useEditableWorkflow({
         trigger: fallback.trigger || "manual",
         runtime: fallback.runtime as WorkflowRuntime | undefined,
       });
+      workflowMetadataRef.current = {
+        id: fallback.id,
+        name: fallback.name || "",
+        description: fallback.description,
+        schemeId: fallback.schemeId,
+        trigger: fallback.trigger || "manual",
+        runtime: fallback.runtime as WorkflowRuntime | undefined,
+      };
       nodesRef.current = reactFlowNodes;
       edgesRef.current = reactFlowEdges;
-      lastSavedSerializedRef.current = JSON.stringify(
-        buildWorkflowPayload(reactFlowNodes, reactFlowEdges)
-      );
+      const payload = buildWorkflowPayload(reactFlowNodes, reactFlowEdges);
+      lastSavedSerializedRef.current = JSON.stringify(payload);
+      lastSentGraphRef.current = payload;
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
       generativeDefaultsRef.current = fallback.generativeDefaults;
@@ -343,7 +416,12 @@ export function useEditableWorkflow({
         fallback.generativeDefaults ?? null
       );
       setGenerativeDefaults(fallback.generativeDefaults);
+      lastRemoteTimestampRef.current =
+        fallback.updatedAt instanceof Date
+          ? fallback.updatedAt.getTime()
+          : new Date(fallback.updatedAt).getTime();
       hasInitializedRef.current = true;
+      setIsGraphReady(true);
       setIsInitializing(false);
       return true;
     },
@@ -359,6 +437,8 @@ export function useEditableWorkflow({
     setEditorViewportSyncRevision(0);
     setIsEditorViewportReady(false);
     hasInitializedRef.current = false;
+    setIsGraphReady(false);
+    lastRemoteTimestampRef.current = 0;
   }, [workflowId]);
 
   // HTTP is authoritative for saved viewport on editor open.
@@ -417,42 +497,23 @@ export function useEditableWorkflow({
         options?: ApplyEditorViewportOptions
       ) => {
         if (state.id && state.trigger) {
-          setWorkflowMetadata({
+          const metadata = {
             id: state.id,
             name: state.name || "",
             description: state.description,
             schemeId: state.schemeId,
             trigger: state.trigger,
             runtime: state.runtime as WorkflowRuntime | undefined,
-          });
+          };
+          setWorkflowMetadata(metadata);
+          workflowMetadataRef.current = metadata;
         }
 
-        const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+        applyBackendGraphToEditorRef.current(
           state.nodes,
-          nodeTypes
+          state.edges,
+          state.timestamp ?? Date.now()
         );
-        const reactFlowEdges = state.edges.map((edge) => ({
-          id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceOutput,
-          targetHandle: edge.targetInput,
-          type: "workflowEdge",
-          data: {
-            isValid: true,
-            sourceType: edge.sourceOutput,
-            targetType: edge.targetInput,
-          },
-        }));
-
-        nodesRef.current = reactFlowNodes;
-        edgesRef.current = reactFlowEdges;
-        lastSavedSerializedRef.current = JSON.stringify(
-          buildWorkflowPayload(reactFlowNodes, reactFlowEdges)
-        );
-
-        setNodes(reactFlowNodes);
-        setEdges(reactFlowEdges);
 
         applyEditorViewportFromState(state, options);
 
@@ -461,6 +522,13 @@ export function useEditableWorkflow({
           state.generativeDefaults ?? null
         );
         setGenerativeDefaults(state.generativeDefaults);
+      };
+
+      const isLocalGraphDirty = (): boolean => {
+        const serialized = JSON.stringify(
+          buildWorkflowPayload(nodesRef.current, edgesRef.current)
+        );
+        return serialized !== lastSavedSerializedRef.current;
       };
 
       const handleStateUpdate = (
@@ -479,25 +547,81 @@ export function useEditableWorkflow({
         const ws = await connectWorkflowWS(organization.id, workflowId, {
           onInit: (state: WorkflowState) => {
             if (!hasInitializedRef.current) {
-              handleStateUpdate(state);
+              handleStateUpdate(state, { syncToCanvas: true });
               hasInitializedRef.current = true;
+              setIsGraphReady(true);
               setIsInitializing(false);
               return;
             }
 
             applyEditorViewportFromState(state, { syncToCanvas: true });
 
-            const localSerialized = JSON.stringify(
-              buildWorkflowPayload(nodesRef.current, edgesRef.current)
-            );
-            if (localSerialized !== lastSavedSerializedRef.current) {
+            if (isLocalGraphDirty()) {
               flushSaveRef.current();
-            } else {
-              handleStateUpdate(state);
+              return;
+            }
+
+            if (
+              state.timestamp != null &&
+              state.timestamp > lastRemoteTimestampRef.current
+            ) {
+              handleStateUpdate(state, { syncToCanvas: true });
             }
           },
           onUpdate: (state: WorkflowState) => {
+            if (
+              state.timestamp == null ||
+              state.timestamp <= lastRemoteTimestampRef.current
+            ) {
+              return;
+            }
+            if (isLocalGraphDirty()) {
+              return;
+            }
             handleStateUpdate(state, { syncToCanvas: true });
+          },
+          onPatchGraph: (patch: WorkflowGraphPatchBroadcast) => {
+            if (
+              patch.timestamp == null ||
+              patch.timestamp <= lastRemoteTimestampRef.current
+            ) {
+              return;
+            }
+            if (isLocalGraphDirty()) {
+              return;
+            }
+
+            const meta = workflowMetadataRef.current;
+            if (!meta) {
+              return;
+            }
+
+            try {
+              const patched = applyWorkflowGraphPatch(
+                {
+                  id: meta.id,
+                  name: meta.name,
+                  schemeId: meta.schemeId,
+                  trigger: meta.trigger as WorkflowTrigger,
+                  nodes: lastSentGraphRef.current.nodes,
+                  edges: lastSentGraphRef.current.edges,
+                  timestamp: patch.timestamp,
+                },
+                patch
+              );
+              applyRemoteState(
+                {
+                  ...patched,
+                  description: meta.description,
+                  runtime: meta.runtime,
+                  editorViewport: editorViewportRef.current,
+                  generativeDefaults: generativeDefaultsRef.current,
+                },
+                { syncToCanvas: true }
+              );
+            } catch (error) {
+              console.error("Error applying remote graph patch:", error);
+            }
           },
           onExecutionUpdate: (execution: WorkflowExecution) => {
             onExecutionUpdate?.(execution);
@@ -568,11 +692,13 @@ export function useEditableWorkflow({
       if (generativeDefaultsPersistTimerRef.current !== null) {
         window.clearTimeout(generativeDefaultsPersistTimerRef.current);
       }
+      if (graphPatchTimerRef.current !== null) {
+        window.clearTimeout(graphPatchTimerRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.disconnect();
         wsRef.current = null;
       }
-      hasInitializedRef.current = false;
     };
   }, [workflowId, organization?.id, applyEditorViewportFromState]);
 
@@ -702,7 +828,7 @@ export function useEditableWorkflow({
       // Also update local metadata state for immediate UI feedback
       setWorkflowMetadata((prev) => {
         if (!prev) return prev;
-        return {
+        const next = {
           ...prev,
           ...(metadata.name !== undefined && { name: metadata.name }),
           ...(metadata.description !== undefined && {
@@ -711,6 +837,8 @@ export function useEditableWorkflow({
           ...(metadata.trigger !== undefined && { trigger: metadata.trigger }),
           ...(metadata.runtime !== undefined && { runtime: metadata.runtime }),
         };
+        workflowMetadataRef.current = next;
+        return next;
       });
     },
     []
@@ -720,6 +848,7 @@ export function useEditableWorkflow({
     nodes,
     edges,
     isInitializing,
+    isGraphReady,
     savingError,
     connectionError,
     isWSConnected,

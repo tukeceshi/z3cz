@@ -1,4 +1,5 @@
 import { VOLCANO_AGGREGATE_MODEL_CATALOG } from "./ai-model-catalog";
+import type { AiModelCatalogEntry } from "./ai-model-catalog";
 import type { OrganizationAiInterface } from "./ai-interface";
 import { resolveInterfaceModelAlias } from "./org-model-label";
 import {
@@ -51,10 +52,10 @@ function getVolcanoApiKeyStatus(
   return "active";
 }
 
-function buildPricingSection(): VolcanoSnapshotResponse["pricing"] {
-  const aggregateIds = new Set(
-    VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => entry.canonicalId)
-  );
+function buildPricingSection(
+  catalog: readonly AiModelCatalogEntry[]
+): VolcanoSnapshotResponse["pricing"] {
+  const aggregateIds = new Set(catalog.map((entry) => entry.canonicalId));
   return {
     docUrl: VOLCANO_PRICING_DOC_URL,
     effectiveDate: VOLCANO_PRICING_EFFECTIVE_DATE,
@@ -109,7 +110,8 @@ export function hasVolcanoPackageListCache(
 }
 
 export function buildVolcanoSnapshotFromMetadata(
-  iface: OrganizationAiInterface
+  iface: OrganizationAiInterface,
+  catalog: readonly AiModelCatalogEntry[] = VOLCANO_AGGREGATE_MODEL_CATALOG
 ): VolcanoSnapshotResponse | null {
   if (!isVolcanoMetadata(iface.metadata)) {
     return null;
@@ -121,11 +123,11 @@ export function buildVolcanoSnapshotFromMetadata(
   const packageListCachedAt = cache?.fetchedAt;
   const { usageByModel, packageByModel } = buildUsageMapsFromPackageRows(
     packageRows,
-    VOLCANO_AGGREGATE_MODEL_CATALOG
+    catalog
   );
   const activationCache = metadata.modelActivationCache ?? {};
 
-  const models = VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => {
+  const models = catalog.map((entry) => {
     const config = metadata.models[entry.canonicalId];
     const enabled = config?.enabled ?? false;
     const packageSnapshot = packageByModel.get(entry.canonicalId) ?? null;
@@ -177,7 +179,7 @@ export function buildVolcanoSnapshotFromMetadata(
     },
     balance: null,
     ...(packageListCachedAt ? { packageListCachedAt } : {}),
-    pricing: buildPricingSection(),
+    pricing: buildPricingSection(catalog),
     models,
     tosStorage: buildTosStorageSnapshot({ metadata, packageRows }),
   };

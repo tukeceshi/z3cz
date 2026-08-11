@@ -88,6 +88,9 @@ export interface VolcanoTosStorageSnapshot {
   readonly prefix: string;
   readonly storageUsage: VolcanoTosPackageUsage | null;
   readonly trafficUsage: VolcanoTosPackageUsage | null;
+  /** Whole-bucket stored object size from cloud monitor (GiB). */
+  readonly bucketStorageGiB?: number;
+  readonly bucketStorageError?: string;
   readonly pricing?: VolcanoTosRegionPricingSnapshot;
   readonly usageError?: string;
 }

@@ -1,88 +1,29 @@
-import {
-  getSingleModelPresetsByCategory,
-  isExternalBrandOnlyCanonicalId,
-} from "@dafthunk/types";
 import { useMemo } from "react";
 
-import {
-  usePlatformCatalogAudioModels,
-  usePlatformCatalogImageModels,
-  usePlatformCatalogTextModels,
-  usePlatformCatalogVideoModels,
-} from "@/services/platform-ai-model-service";
+import { usePlatformModelChannels } from "@/services/platform-ai-model-service";
 
-interface PlatformModelLike {
-  readonly canonicalId: string;
-  readonly displayName: string;
-}
-
-function collectIndependentPresetCanonicalIds(): ReadonlySet<string> {
-  const grouped = getSingleModelPresetsByCategory();
-  const ids = new Set<string>();
-  for (const category of ["text", "image", "video", "audio"] as const) {
-    for (const preset of grouped[category]) {
-      if (preset.canonicalId) {
-        ids.add(preset.canonicalId);
-      }
-    }
-  }
-  return ids;
-}
-
-const INDEPENDENT_PRESET_CANONICAL_IDS = collectIndependentPresetCanonicalIds();
-
-function mergePlatformModels(
-  lists: readonly (readonly PlatformModelLike[])[]
-): readonly PlatformModelLike[] {
-  const byCanonicalId = new Map<string, PlatformModelLike>();
-  for (const list of lists) {
-    for (const model of list) {
-      byCanonicalId.set(model.canonicalId, model);
-    }
-  }
-  return [...byCanonicalId.values()].sort((a, b) =>
-    a.displayName.localeCompare(b.displayName)
-  );
-}
-
-function displayNamesFor(
-  models: readonly PlatformModelLike[],
-  predicate: (canonicalId: string) => boolean
+function channelDisplayNames(
+  channels: readonly { readonly channel: string; readonly displayName: string; readonly sortOrder: number }[],
+  kind: "aggregate" | "api"
 ): readonly string[] {
-  return models.filter((model) => predicate(model.canonicalId)).map(
-    (model) => model.displayName
-  );
+  return [...channels]
+    .filter((channel) => channel.channel === kind)
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder ||
+        a.displayName.localeCompare(b.displayName)
+    )
+    .map((channel) => channel.displayName);
 }
 
 export function useChannelSupportedModels(organizationId: string | undefined) {
-  const { models: textModels } = usePlatformCatalogTextModels(organizationId);
-  const { models: imageModels } = usePlatformCatalogImageModels(organizationId);
-  const { models: videoModels } = usePlatformCatalogVideoModels(organizationId);
-  const { models: audioModels } = usePlatformCatalogAudioModels(organizationId);
+  const { channels } = usePlatformModelChannels(organizationId);
 
-  return useMemo(() => {
-    const allModels = mergePlatformModels([
-      textModels,
-      imageModels,
-      videoModels,
-      audioModels,
-    ]);
-
-    const volcanoModelNames = displayNamesFor(
-      allModels,
-      (canonicalId) => !isExternalBrandOnlyCanonicalId(canonicalId)
-    );
-
-    const singleModelNames = displayNamesFor(allModels, (canonicalId) => {
-      if (isExternalBrandOnlyCanonicalId(canonicalId)) {
-        return true;
-      }
-      return INDEPENDENT_PRESET_CANONICAL_IDS.has(canonicalId);
-    });
-
-    return {
-      volcanoModelNames,
-      singleModelNames,
-    };
-  }, [audioModels, imageModels, textModels, videoModels]);
+  return useMemo(
+    () => ({
+      volcanoModelNames: channelDisplayNames(channels, "aggregate"),
+      singleModelNames: channelDisplayNames(channels, "api"),
+    }),
+    [channels]
+  );
 }

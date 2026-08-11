@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import type { NodeType } from "./workflow-types";
 import {
+  AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_OUTPUT_ID,
   AI_TEXT_RESULT_HISTORY_INPUT_ID,
   AI_TEXT_RESULT_INPUT_ID,
   hasAiTextGeneratedHistory,
+  mergeAiTextNodeCatalogInputs,
   readAiTextResultHistory,
   withAiTextEditedResult,
   withAiTextGeneratedResult,
@@ -25,6 +28,45 @@ function createTextNode(): WorkflowNodeType {
     metadata: undefined,
   };
 }
+
+describe("mergeAiTextNodeCatalogInputs", () => {
+  const catalog = {
+    type: "ai-text",
+    inputs: [
+      { name: "prompt", type: "string", hidden: true },
+      { name: "result", type: "string", hidden: true },
+    ],
+  } as NodeType;
+
+  it("always includes keywords input for new ai-text nodes", () => {
+    const merged = mergeAiTextNodeCatalogInputs("ai-text", [], catalog);
+    const keywords = merged.find((input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID);
+    expect(keywords).toMatchObject({
+      id: AI_TEXT_KEYWORDS_HANDLE_ID,
+      type: "any",
+      hidden: true,
+      repeated: true,
+    });
+    expect(keywords?.value).toBeUndefined();
+  });
+
+  it("does not duplicate keywords when catalog already defines it", () => {
+    const merged = mergeAiTextNodeCatalogInputs(
+      "ai-text",
+      [{ id: AI_TEXT_KEYWORDS_HANDLE_ID, name: AI_TEXT_KEYWORDS_HANDLE_ID, type: "any" }],
+      {
+        ...catalog,
+        inputs: [
+          ...catalog.inputs,
+          { name: AI_TEXT_KEYWORDS_HANDLE_ID, type: "any", hidden: true, repeated: true },
+        ],
+      }
+    );
+    expect(
+      merged.filter((input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID)
+    ).toHaveLength(1);
+  });
+});
 
 describe("ai-text-node-utils editing behavior", () => {
   it("marks direct manual text as manual content", () => {

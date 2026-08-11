@@ -12,6 +12,8 @@ export function buildVolcanoTosStorageSnapshot(params: {
   readonly metadata: VolcanoInterfaceMetadata;
   readonly packageRows: readonly VolcanoResourcePackageRow[];
   readonly usageError?: string;
+  readonly bucketStorageGiB?: number;
+  readonly bucketStorageError?: string;
 }): VolcanoTosStorageSnapshot {
   const config = params.metadata.tosStorage;
   const region = config?.region?.trim() ?? "";
@@ -38,5 +40,11 @@ export function buildVolcanoTosStorageSnapshot(params: {
     trafficUsage,
     pricing: pricing ?? undefined,
     ...(params.usageError ? { usageError: params.usageError } : {}),
+    ...(params.bucketStorageGiB !== undefined
+      ? { bucketStorageGiB: params.bucketStorageGiB }
+      : {}),
+    ...(params.bucketStorageError
+      ? { bucketStorageError: params.bucketStorageError }
+      : {}),
   };
 }

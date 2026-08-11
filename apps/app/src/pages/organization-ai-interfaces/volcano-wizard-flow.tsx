@@ -1,8 +1,8 @@
 import {
 
-  VOLCANO_AGGREGATE_MODEL_CATALOG,
-
   VOLCANO_PRODUCT_DISPLAY_NAME_ZH,
+
+  type AiModelCatalogEntry,
 
   type VolcanoActivationProbeResult,
 
@@ -47,6 +47,7 @@ import type { TranslationKey } from "@/i18n";
 import { useAppToast } from "@/hooks/use-app-toast";
 
 import { authService } from "@/services/auth-service";
+import { useVolcanoAggregateCatalog } from "@/services/platform-ai-model-service";
 
 import {
 
@@ -136,30 +137,22 @@ function waitForNextFrame(): Promise<void> {
 
 
 
-function WizardStep2CardSkeletons() {
-
+function WizardStep2CardSkeletons({
+  count,
+}: {
+  readonly count: number;
+}) {
   return (
-
     <div className="columns-1 gap-3 md:columns-2">
-
       <Skeleton className="mb-3 h-24 w-full rounded-lg break-inside-avoid" />
-
-      {VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => (
-
+      {Array.from({ length: count }, (_, index) => (
         <Skeleton
-
-          key={entry.canonicalId}
-
+          key={index}
           className="mb-3 h-28 w-full rounded-lg break-inside-avoid"
-
         />
-
       ))}
-
     </div>
-
   );
-
 }
 
 
@@ -204,27 +197,20 @@ function activationByCanonicalId(
 
 
 
-function emptyEnabledModels(): Record<string, boolean> {
-
+function emptyEnabledModels(
+  catalog: readonly AiModelCatalogEntry[]
+): Record<string, boolean> {
   return Object.fromEntries(
-
-    VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => [entry.canonicalId, false])
-
+    catalog.map((entry) => [entry.canonicalId, false])
   );
-
 }
 
-
-
 function enabledModelsFromProbeResults(
-
-  results: readonly VolcanoActivationProbeResult[]
-
+  results: readonly VolcanoActivationProbeResult[],
+  catalog: readonly AiModelCatalogEntry[]
 ): Record<string, boolean> {
-
   return Object.fromEntries(
-
-    VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => {
+    catalog.map((entry) => {
 
       const probe = results.find((result) => result.canonicalId === entry.canonicalId);
 
@@ -297,6 +283,9 @@ export function VolcanoWizardFlow({
   const { t, locale } = useTranslation();
 
   const appToast = useAppToast();
+  const { catalog: aggregateCatalog } = useVolcanoAggregateCatalog(organizationId, {
+    enabled: open,
+  });
 
   const [step, setStep] = useState(1);
 
@@ -306,7 +295,9 @@ export function VolcanoWizardFlow({
 
   const [name, setName] = useState<string>(VOLCANO_PRODUCT_DISPLAY_NAME_ZH);
 
-  const [enabledModels, setEnabledModels] = useState(emptyEnabledModels);
+  const [enabledModels, setEnabledModels] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const [activationResults, setActivationResults] = useState<
 
@@ -351,6 +342,18 @@ export function VolcanoWizardFlow({
     null
   );
 
+  useEffect(() => {
+    if (!open || aggregateCatalog.length === 0) {
+      return;
+    }
+    setEnabledModels((previous) => {
+      if (Object.keys(previous).length > 0) {
+        return previous;
+      }
+      return emptyEnabledModels(aggregateCatalog);
+    });
+  }, [aggregateCatalog, open]);
+
 
 
 
@@ -390,7 +393,7 @@ export function VolcanoWizardFlow({
 
     setName(VOLCANO_PRODUCT_DISPLAY_NAME_ZH);
 
-    setEnabledModels(emptyEnabledModels());
+    setEnabledModels(emptyEnabledModels(aggregateCatalog));
 
     setActivationResults({});
 
@@ -606,7 +609,7 @@ export function VolcanoWizardFlow({
 
     setActivationResults({});
 
-    setEnabledModels(emptyEnabledModels());
+    setEnabledModels(emptyEnabledModels(aggregateCatalog));
 
 
 
@@ -642,7 +645,9 @@ export function VolcanoWizardFlow({
 
       setActivationResults(activationByCanonicalId(normalizedResults));
 
-      setEnabledModels(enabledModelsFromProbeResults(normalizedResults));
+      setEnabledModels(
+        enabledModelsFromProbeResults(normalizedResults, aggregateCatalog)
+      );
 
       await waitForNextFrame();
 
@@ -1038,7 +1043,7 @@ export function VolcanoWizardFlow({
 
                 </div>
 
-                <WizardStep2CardSkeletons />
+                <WizardStep2CardSkeletons count={aggregateCatalog.length || 8} />
 
               </div>
 
@@ -1072,7 +1077,7 @@ export function VolcanoWizardFlow({
 
                 {probePhase === "probing_tos" && tosServiceStatus === null ? (
 
-                  <WizardStep2CardSkeletons />
+                  <WizardStep2CardSkeletons count={aggregateCatalog.length || 8} />
 
                 ) : null}
 
@@ -1114,7 +1119,7 @@ export function VolcanoWizardFlow({
 
                   </div>
 
-                  {VOLCANO_AGGREGATE_MODEL_CATALOG.map((entry) => {
+                  {aggregateCatalog.map((entry) => {
 
                     const probe = activationResults[entry.canonicalId];
 

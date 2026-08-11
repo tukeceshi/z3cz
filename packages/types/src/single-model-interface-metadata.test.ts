@@ -164,10 +164,14 @@ describe("single-model-interface-metadata", () => {
     );
   });
 
-  it("returns Volcano catalog providerModelId for non-DeepSeek models", () => {
-    expect(defaultUpstreamModelIdForCanonical("doubao-seedance-2")).toBe(
-      "doubao-seedance-2-0-260128"
+  it("returns Seedance brand defaults instead of Volcano catalog providerModelId", () => {
+    expect(defaultUpstreamModelIdForCanonical("doubao-seedance-2-5")).toBe(
+      "doubao-seedance-2-5-260628"
     );
+  });
+
+  it("returns Volcano catalog providerModelId for non-brand models", () => {
+    expect(defaultUpstreamModelIdForCanonical("glm-5-2")).toBe("glm-5-2-260617");
   });
 });
 

@@ -14,6 +14,8 @@ export interface PublicSiteSettings {
   supportEmail: string | null;
   newUserTourEnabled: boolean;
   homepageMode: HomepageMode;
+  /** Experimental: load app JS over WebSocket instead of HTTP script tags. */
+  wsBootstrapEnabled: boolean;
   featureConfig: PlatformFeatureConfig;
 }
 
@@ -28,6 +30,7 @@ export interface UpdateSiteSettingsRequest {
   supportEmail?: string | null;
   newUserTourEnabled?: boolean;
   homepageMode?: HomepageMode;
+  wsBootstrapEnabled?: boolean;
 }
 
 export interface UpdateFeatureConfigRequest {

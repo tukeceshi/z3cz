@@ -42,9 +42,20 @@ export const SEEDANCE_CANONICAL_IDS = [
   "doubao-seedance-2",
   "doubao-seedance-2-fast",
   "doubao-seedance-2-mini",
+  "doubao-seedance-2-5",
 ] as const;
 
 export type SeedanceCanonicalId = (typeof SEEDANCE_CANONICAL_IDS)[number];
+
+/** 单 API Seedance 上游 Model ID；不进火山聚合 catalog。 */
+export const SEEDANCE_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
+  Record<SeedanceCanonicalId, string>
+> = {
+  "doubao-seedance-2": "doubao-seedance-2-0-260128",
+  "doubao-seedance-2-fast": "doubao-seedance-2-0-fast-260128",
+  "doubao-seedance-2-mini": "doubao-seedance-2-0-mini-260615",
+  "doubao-seedance-2-5": "doubao-seedance-2-5-260628",
+} as const;
 
 export const SEEDANCE_DEFAULT_ENDPOINT_URL =
   "https://ark.cn-beijing.volces.com/api/v3" as const;
@@ -445,6 +456,9 @@ export function readSingleModelCanonicalId(
 }
 
 function catalogModalityFor(canonicalId: string): AiModelModality {
+  if (isSeedanceCanonicalId(canonicalId)) {
+    return "video";
+  }
   return (
     VOLCANO_AI_MODEL_CATALOG.find((entry) => entry.canonicalId === canonicalId)
       ?.modality ?? "text"
@@ -597,6 +611,9 @@ export function defaultUpstreamModelIdForCanonical(
   }
   if (isMinimaxSpeechCanonicalId(canonicalId)) {
     return MINIMAX_SPEECH_DEFAULT_UPSTREAM_MODEL_IDS[canonicalId];
+  }
+  if (isSeedanceCanonicalId(canonicalId)) {
+    return SEEDANCE_DEFAULT_UPSTREAM_MODEL_IDS[canonicalId];
   }
   const catalogEntry = VOLCANO_AI_MODEL_CATALOG.find(
     (entry) => entry.canonicalId === canonicalId

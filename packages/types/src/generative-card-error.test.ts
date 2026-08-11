@@ -11,16 +11,15 @@ describe("generative-card-error", () => {
   it("parses text model failure copy into card lines", () => {
     const raw = [
       "DeepSeek V4 Flash（文字）调用失败",
-      "已自动关闭错误接口 「API」DeepSeek。",
-      "请检查配置，可在「AI/资源 接口」重新启用接口。",
-      "重试将使用接口「聚合」火山方舟。",
+      "接口 「API」DeepSeek 请求失败，请检查配置或稍后重试。",
+      "解读：API Key 无效或已失效，请检查接口配置。",
       "Invalid API key",
     ].join("\n");
 
     const parsed = parseTextModelFailureMessageToCardError(raw);
 
-    expect(parsed?.cardLines).toHaveLength(5);
-    expect(parsed?.cardLines?.[4]).toBe("Invalid API key");
+    expect(parsed?.cardLines).toHaveLength(4);
+    expect(parsed?.cardLines?.[3]).toBe("Invalid API key");
     expect(getGenerativeCardLines(parsed!)[0]).toBe(
       "DeepSeek V4 Flash（文字）调用失败"
     );
@@ -31,7 +30,7 @@ describe("generative-card-error", () => {
       summary: "DeepSeek V4 Flash（文字）调用失败",
       cardLines: [
         "DeepSeek V4 Flash（文字）调用失败",
-        "已自动关闭错误接口 「API」DeepSeek。",
+        "接口 「API」DeepSeek 请求失败，请检查配置或稍后重试。",
       ],
       detail: "完整错误信息",
     });

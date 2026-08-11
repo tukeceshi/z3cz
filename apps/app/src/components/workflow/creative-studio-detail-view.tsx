@@ -95,6 +95,7 @@ export function CreativeStudioDetailView({
             nodeId={node.id}
             data={node.data}
             layout="studio-dock"
+            detailRole={role}
           />
         ) : null}
       </div>

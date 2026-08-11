@@ -1,21 +1,17 @@
 /**
- * Shared inbound-email staging: parse a raw MIME message and persist its raw
- * bytes, bodies, and attachments to the `INBOXES` R2 bucket, returning the
- * structured metadata needed to index the message (in D1 for the support
- * inbox, or in the Mailbox Durable Object for per-org addresses).
- *
- * Keeping the parse + R2 layout here means the support and per-org paths agree
- * on exactly what gets stored and where, with the persistence backend being
- * the only difference between them.
+ * Parse a raw MIME message and return structured metadata for indexing
+ * (support inbox D1 or per-org Mailbox DO). Blob storage for bodies and
+ * attachments has been removed; only snippet and flags are persisted.
  */
 
 import PostalMime from "postal-mime";
 import { v7 as uuidv7 } from "uuid";
 
-import type { Bindings } from "./context";
 import type { MailboxAttachmentInput } from "./durable-objects/mailbox-do";
-import { inboxKeys } from "./support-storage";
 import { buildSnippet, stripHtml } from "./support-utils";
+
+/** Placeholder for legacy raw_r2_key / r2_key columns (blob storage removed). */
+const DEPRECATED_BLOB_KEY = "deprecated";
 
 export interface StagedEmail {
   fromEmail: string;
@@ -50,24 +46,16 @@ function toUint8Array(content: ArrayBuffer | Uint8Array | string): Uint8Array {
 }
 
 /**
- * Parse `rawBytes` and write all blobs to R2 under `keyPrefix` (the inbox id
- * for support, the email id for per-org mailboxes). The raw MIME is written
- * first so the message survives even if parsing fails. Falls back to envelope
- * `from`/`to` when the parsed headers are missing.
+ * Parse `rawBytes` and return metadata for indexing. Falls back to envelope
+ * `from`/`to` when parsed headers are missing.
  */
 export async function parseAndStageEmail(
-  env: Bindings,
+  _env: unknown,
   rawBytes: Uint8Array,
-  keyPrefix: string,
+  _keyPrefix: string,
   messageId: string,
   envelope: { from: string; to: string }
 ): Promise<StagedEmail> {
-  const keys = inboxKeys(keyPrefix, messageId);
-
-  await env.INBOXES.put(keys.raw, rawBytes, {
-    httpMetadata: { contentType: "message/rfc822" },
-  });
-
   const parsed = await new PostalMime().parse(rawBytes);
 
   const fromEmail = parsed.from?.address ?? envelope.from;
@@ -92,39 +80,11 @@ export async function parseAndStageEmail(
         filename,
         contentType: att.mimeType || "application/octet-stream",
         sizeBytes: toUint8Array(att.content).byteLength,
-        r2Key: keys.attachment(i, filename),
+        r2Key: DEPRECATED_BLOB_KEY,
         contentId: att.contentId ?? null,
       };
     }
   );
-
-  // Bodies + attachments are independent puts; run them concurrently. Raw MIME
-  // (above) is the only ordering constraint.
-  const r2Puts: Promise<unknown>[] = [];
-  if (textBody) {
-    r2Puts.push(
-      env.INBOXES.put(keys.textBody, new TextEncoder().encode(textBody), {
-        httpMetadata: { contentType: "text/plain; charset=utf-8" },
-      })
-    );
-  }
-  if (htmlBody) {
-    r2Puts.push(
-      env.INBOXES.put(keys.htmlBody, new TextEncoder().encode(htmlBody), {
-        httpMetadata: { contentType: "text/html; charset=utf-8" },
-      })
-    );
-  }
-  parsedAttachments.forEach((att, i) => {
-    r2Puts.push(
-      env.INBOXES.put(attachments[i].r2Key, toUint8Array(att.content), {
-        httpMetadata: {
-          contentType: att.mimeType || "application/octet-stream",
-        },
-      })
-    );
-  });
-  await Promise.all(r2Puts);
 
   return {
     fromEmail,
@@ -139,7 +99,7 @@ export async function parseAndStageEmail(
     text: textBody ?? (htmlBody ? stripHtml(htmlBody) : undefined),
     hasHtml: Boolean(htmlBody),
     hasText: Boolean(textBody),
-    rawR2Key: keys.raw,
+    rawR2Key: DEPRECATED_BLOB_KEY,
     attachments,
   };
 }

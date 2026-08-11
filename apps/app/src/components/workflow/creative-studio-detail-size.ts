@@ -3,11 +3,14 @@ export interface StudioDetailSize {
   readonly height: number;
 }
 
+/** Matches `STUDIO_DETAIL_MEDIA_FRAME` border width (1px each side). */
+export const STUDIO_DETAIL_MEDIA_BORDER_PX = 1;
+
 /**
- * Fit media into the container without upscaling past intrinsic pixels.
+ * Fit media content into the container without upscaling past intrinsic pixels.
  * When natural size is omitted, only container fitting applies (placeholders).
  */
-export function fitStudioDetailSize(
+export function fitStudioDetailContentSize(
   containerWidth: number,
   containerHeight: number,
   aspectRatio: number,
@@ -49,4 +52,35 @@ export function fitStudioDetailSize(
   }
 
   return { width, height };
+}
+
+/**
+ * Fits a bordered media frame into the container. Outer size includes the border so
+ * the inner content box keeps the media aspect ratio (avoids object-contain letterbox).
+ */
+export function fitStudioDetailSize(
+  containerWidth: number,
+  containerHeight: number,
+  aspectRatio: number,
+  naturalWidth?: number,
+  naturalHeight?: number,
+  borderWidth: number = STUDIO_DETAIL_MEDIA_BORDER_PX
+): StudioDetailSize | null {
+  const innerContainerWidth = Math.max(0, containerWidth - 2 * borderWidth);
+  const innerContainerHeight = Math.max(0, containerHeight - 2 * borderWidth);
+  const content = fitStudioDetailContentSize(
+    innerContainerWidth,
+    innerContainerHeight,
+    aspectRatio,
+    naturalWidth,
+    naturalHeight
+  );
+  if (!content) {
+    return null;
+  }
+
+  return {
+    width: content.width + 2 * borderWidth,
+    height: content.height + 2 * borderWidth,
+  };
 }

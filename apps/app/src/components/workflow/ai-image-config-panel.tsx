@@ -40,6 +40,7 @@ import {
 import { isGenerativeGenerationCancelled } from "./generative-generation-cancel";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   GenerativePickNodeDialog,
@@ -119,6 +120,7 @@ export interface AiImageConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly layout?: GenerativeConfigPanelLayout;
+  readonly detailRole?: CreativeStudioDetailViewRole;
 }
 
 function getInputString(data: WorkflowNodeType, id: string): string {
@@ -130,6 +132,7 @@ export function AiImageConfigPanel({
   nodeId,
   data,
   layout = "attached",
+  detailRole,
 }: AiImageConfigPanelProps) {
   const {
     updateNodeData,
@@ -177,7 +180,6 @@ export function AiImageConfigPanel({
     effectiveModel,
     selectedOptionId,
     models,
-    groups,
     isLoading,
     modelsError,
     canGenerate: modelReady,
@@ -840,7 +842,13 @@ export function AiImageConfigPanel({
       });
 
       if (canWriteHistory) {
-        toast.success("workflow.aiImagePanel.generated");
+        if (finalImages.length > 1) {
+          toast.success("workflow.aiImagePanel.generatedBatch", {
+            count: finalImages.length,
+          });
+        } else {
+          toast.success("workflow.aiImagePanel.generated");
+        }
       }
     } catch (error) {
       if (isGenerativeGenerationCancelled(error)) {
@@ -902,7 +910,13 @@ export function AiImageConfigPanel({
             });
           }
           if (canWriteHistory) {
-            toast.success("workflow.aiImagePanel.generated");
+            if (finalImages.length > 1) {
+              toast.success("workflow.aiImagePanel.generatedBatch", {
+                count: finalImages.length,
+              });
+            } else {
+              toast.success("workflow.aiImagePanel.generated");
+            }
           }
           return;
         } catch {
@@ -911,7 +925,7 @@ export function AiImageConfigPanel({
       }
 
       const raw = error instanceof Error ? error.message : String(error);
-      const cardError = prepareGenerativeCardError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t, "image");
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiImageGenerateError(
           withAiImageGeneratingFlag(current.metadata, false),
@@ -1013,6 +1027,7 @@ export function AiImageConfigPanel({
           chips={referenceChips}
           disabled={disabled}
           showStudioReferenceHints={layout === "studio-dock"}
+          detailRole={detailRole}
           allowUpload={allowUpload && !disabled}
           addReferenceDisabled={!canAddReference}
           canPickCanvasNode={pickableOutputs.length > 0}
@@ -1091,7 +1106,6 @@ export function AiImageConfigPanel({
               <AiTextModelPicker
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
-                groups={groups}
                 selectedOptionId={selectedOptionId}
                 chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
                 disabled={disabled || isLoading}

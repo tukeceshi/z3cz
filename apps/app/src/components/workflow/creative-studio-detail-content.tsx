@@ -22,6 +22,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useCreativeStudio } from "@/components/workflow/creative-studio-context";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
@@ -32,28 +33,31 @@ import {
   AiTextHistoryOverlay,
 } from "./ai-text-history-overlay";
 import {
+  commitAiTextHistorySelection,
+  commitAiTextValue,
+} from "./commit-ai-text-value";
+import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
-  hasAiTextGeneratedHistory,
   isAiTextGenerating,
-  readAiTextResult,
   readAiTextResultHistory,
-  withAiTextEditedResult,
-  withAiTextHistorySelection,
-  withAiTextManualResult,
 } from "./ai-text-node-utils";
 import {
   AiImageHistoryOverlay,
 } from "./ai-image-history-overlay";
 import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
 import {
-  readAiImageCardImages,
+  useGenerativeHistoryModels,
+  useHistoryModelUnavailableToast,
+} from "./use-generative-history-models";
+import {
+  readAiImageCardPrimaryImage,
   readAiImageResultHistory,
   withAiImageGenerateError,
   withAiImageHistorySelection,
   withAiImageManualUpload,
 } from "./ai-image-node-utils";
 import {
-  readAiVideoCardVideos,
+  readAiVideoCardPrimaryVideo,
   readAiVideoResultHistory,
   withAiVideoGenerateError,
   withAiVideoHistorySelection,
@@ -67,6 +71,7 @@ import {
   withAiAudioHistorySelection,
   withAiAudioManualUpload,
 } from "./ai-audio-node-utils";
+import { commitGenerativeHistorySelection } from "./commit-generative-history-selection";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -95,15 +100,26 @@ import { withGenerativeUploadProgress } from "./generative-progress-utils";
 import {
   StudioDownloadActionButton,
   StudioHistoryActionButton,
+  StudioViewToolbarButton,
 } from "./creative-studio-detail-actions";
 import { CreativeStudioNodePreview } from "./creative-studio-node-preview";
+import {
+  StudioImagePhotoProvider,
+  StudioImageZoomHiddenTrigger,
+  StudioImageZoomToolbarButton,
+  studioImagePreviewZoomClassName,
+  useStudioImageZoomTrigger,
+} from "./studio-image-lightbox";
 import { STUDIO_TEXT_DETAIL_EDIT_OVERLAY } from "./creative-studio-surface";
 import { useAiTextOutputScroll } from "./use-ai-text-output-scroll";
 import { StudioTextOutputView } from "./studio-text-output-view";
 import { readStudioMediaCardState } from "./studio-media-card-state";
 import { useBufferedTextValue } from "./use-buffered-text-value";
-import { useGenerativeCardDoubleClickUpload } from "./use-generative-card-double-click-upload";
+import { GenerativeCardEmptyUploadSlot } from "./generative-card-empty-upload-slot";
+import { useGenerativeCardUpload } from "./use-generative-card-upload";
+import { useTextCardFileUpload } from "./use-text-card-file-upload";
 import { useWorkflow } from "./workflow-context";
+import { StudioVideoLightbox } from "./studio-video-lightbox";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioDetailContentProps {
@@ -165,10 +181,22 @@ function StudioTextDetail({
   readonly onEmptyTextEditingChange?: (editing: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const { organization } = useAuth();
+  const { workflowId } = useCreativeStudio();
+  const { cloudConfigured } = useCloudStorageCanvasContext();
   const { updateNodeData, disabled = false } = useWorkflow();
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
   const nodeId = node.id;
   const metadata = node.data.metadata;
-  const text = readAiTextResult(node.data.inputs, node.data.outputs) ?? "";
+  const orgId = organization?.id;
+  const resolvedText = useResolvedAiText({
+    organizationId: orgId,
+    workflowId,
+    inputs: node.data.inputs,
+    outputs: node.data.outputs,
+  });
+  const text = resolvedText.text;
   const historyItems = readAiTextResultHistory(node.data.inputs);
   const isGenerating = isAiTextGenerating(metadata);
   const generateError = readGenerativeCardError(metadata);
@@ -177,6 +205,9 @@ function StudioTextDetail({
     metadata
   );
   const editLocked = disabled || isGenerating;
+  const hasOutput = text.trim().length > 0;
+  const prompt = readGenerativePrompt(node.data.inputs);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -185,21 +216,61 @@ function StudioTextDetail({
 
   const commitText = useCallback(
     (value: string) => {
-      if (editLocked || !updateNodeData) return;
-      updateNodeData(nodeId, (current) =>
-        hasAiTextGeneratedHistory(current.inputs)
-          ? withAiTextEditedResult(current, value)
-          : withAiTextManualResult(current, value)
-      );
+      if (editLocked || !updateNodeData || !orgId || !workflowId) return;
+
+      void commitAiTextValue({
+        organizationId: orgId,
+        workflowId,
+        cloudConfigured,
+        nodeId,
+        value,
+        updateNodeData,
+        current: node.data,
+      });
     },
-    [editLocked, nodeId, updateNodeData]
+    [
+      cloudConfigured,
+      editLocked,
+      nodeId,
+      orgId,
+      updateNodeData,
+      workflowId,
+    ]
   );
 
   const textBuffer = useBufferedTextValue(text, commitText);
   const isTextEditing = editing && !generateError && !isGenerating;
+
+  const {
+    uploading,
+    canUpload,
+    handleUploadClick,
+    uploadConfirmDialog,
+    fileInput,
+  } = useTextCardFileUpload({
+    nodeId,
+    prompt,
+    hasOutput,
+    isGenerating,
+    disabled,
+    fileInputRef,
+    updateNodeData,
+    onApplyText: (value) => {
+      textBuffer.commit(value);
+    },
+  });
+
   const showEditHint =
-    !disabled && !isTextEditing && !isGenerating && !generateError;
+    !disabled &&
+    !isTextEditing &&
+    !isGenerating &&
+    !generateError &&
+    (hasOutput || !uploading);
   const scrollText = isTextEditing ? textBuffer.value : text;
+  const showEmptyUpload =
+    !hasOutput && !isTextEditing && !isGenerating && !generateError && !uploading;
+  const showEmptyBusy =
+    !hasOutput && !isTextEditing && !generateError && (uploading || isGenerating);
 
   const {
     scrollContainerRef,
@@ -289,14 +360,25 @@ function StudioTextDetail({
   }, [isTextEditing, stopEditing]);
 
   const handleHistorySelect = (id: string) => {
-    if (editLocked || !updateNodeData) return;
+    if (editLocked || !updateNodeData || !orgId || !workflowId) return;
     const item = historyItems.items.find((entry) => entry.id === id);
     if (!item) return;
     setEditing(false);
-    textBuffer.reset(item.text);
-    updateNodeData(nodeId, (current) =>
-      withAiTextHistorySelection(current, id)
-    );
+
+    void (async () => {
+      const committed = await commitAiTextHistorySelection({
+        organizationId: orgId,
+        workflowId,
+        cloudConfigured,
+        nodeId,
+        selectedId: id,
+        updateNodeData,
+        current: node.data,
+        models: historyModels.text,
+      });
+      textBuffer.reset(committed.resolvedText);
+      notifyHistoryModelUnavailable(committed.modelUnavailable);
+    })();
   };
 
   const handleDoubleClick = (event: MouseEvent) => {
@@ -313,6 +395,8 @@ function StudioTextDetail({
 
   return (
     <>
+      {uploadConfirmDialog}
+      {fileInput}
       <div
         className={cn(
           "relative flex h-full w-full min-h-0 flex-col overflow-hidden",
@@ -325,7 +409,7 @@ function StudioTextDetail({
             {showEditHint ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-3">
                 <span className="rounded-md border border-border/30 bg-background/40 px-3 py-1 text-sm text-muted-foreground/50 backdrop-blur-sm dark:bg-neutral-900/40">
-                  {t("workflow.studio.doubleClickEditContent")}
+                  {t("workflow.aiTextPanel.cardDoubleClickInput")}
                 </span>
               </div>
             ) : null}
@@ -337,29 +421,53 @@ function StudioTextDetail({
               />
             ) : null}
 
-            <StudioTextOutputView
-              key={nodeId}
-              value={textBuffer.value}
-              onChange={textBuffer.onChange}
-              onFocus={textBuffer.onFocus}
-              onBlur={stopEditing}
-              onCompositionStart={textBuffer.onCompositionStart}
-              onCompositionEnd={textBuffer.onCompositionEnd}
-              isEditing={editing}
-              isGenerating={isGenerating}
-              editLocked={editLocked}
-              maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
-              placeholder={
-                showEditHint
-                  ? undefined
-                  : t("workflow.aiTextPanel.cardInputPlaceholder")
-              }
-              scrollContainerRef={scrollContainerRef}
-              textareaRef={textareaRef}
-              handleScroll={handleScroll}
-              scrollToTailIfAllowed={scrollToTailIfAllowed}
-              contentKey={`${nodeId}:${historyItems.selectedId ?? ""}`}
-            />
+            {showEmptyUpload ? (
+              <GenerativeCardEmptyUploadSlot
+                kind="text"
+                size="studio-detail"
+                canUpload={canUpload}
+                onUploadClick={handleUploadClick}
+                className="h-full"
+              />
+            ) : showEmptyBusy ? (
+              <GenerativeCardEmptyUploadSlot
+                kind="text"
+                size="studio-detail"
+                canUpload={false}
+                onUploadClick={handleUploadClick}
+                busy
+                busyMessage={
+                  uploading
+                    ? t("workflow.aiTextPanel.cardUploading")
+                    : t("workflow.aiTextPanel.generating")
+                }
+                className="h-full"
+              />
+            ) : (
+              <StudioTextOutputView
+                key={nodeId}
+                value={textBuffer.value}
+                onChange={textBuffer.onChange}
+                onFocus={textBuffer.onFocus}
+                onBlur={stopEditing}
+                onCompositionStart={textBuffer.onCompositionStart}
+                onCompositionEnd={textBuffer.onCompositionEnd}
+                isEditing={editing}
+                isGenerating={isGenerating}
+                editLocked={editLocked}
+                maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
+                placeholder={
+                  showEditHint
+                    ? undefined
+                    : t("workflow.aiTextPanel.cardInputPlaceholder")
+                }
+                scrollContainerRef={scrollContainerRef}
+                textareaRef={textareaRef}
+                handleScroll={handleScroll}
+                scrollToTailIfAllowed={scrollToTailIfAllowed}
+                contentKey={`${nodeId}:${historyItems.selectedId ?? ""}`}
+              />
+            )}
           </div>
         </div>
 
@@ -450,8 +558,8 @@ function useStudioMediaUpload(params: {
     }));
   }, [params.nodeId, updateNodeData]);
 
-  const { handleCardDoubleClick, uploadConfirmDialog } =
-    useGenerativeCardDoubleClickUpload({
+  const { canUpload, handleUploadClick, uploadConfirmDialog } =
+    useGenerativeCardUpload({
       prompt: params.prompt,
       hasMedia: params.hasMedia,
       isGenerating: params.isGenerating,
@@ -535,7 +643,8 @@ function useStudioMediaUpload(params: {
       } catch (error) {
         const formatted = prepareGenerativeCardError(
           error instanceof Error ? error.message : String(error),
-          t
+          t,
+          params.kind
         );
         updateNodeData(params.nodeId, (current) => ({
           metadata: withGenerativeUploadProgress(
@@ -587,7 +696,8 @@ function useStudioMediaUpload(params: {
 
   return {
     uploading,
-    handleCardDoubleClick,
+    canUpload,
+    handleUploadClick,
     uploadConfirmDialog,
     fileInput,
   };
@@ -597,17 +707,16 @@ function StudioPrimaryDownload({
   media,
   nodeType,
   filePrefix,
+  displayUrl,
+  stale = false,
 }: {
   readonly media: MediaReference | undefined;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly filePrefix: string;
+  readonly displayUrl: string | null;
+  readonly stale?: boolean;
 }) {
   const expired = media ? isMediaExpired(media) : false;
-  const { displayUrl, stale } = useMediaDisplayUrl({
-    media: media && !expired ? media : null,
-    nodeType,
-    size: "full",
-  });
 
   if (!media || !displayUrl || stale || expired) {
     return null;
@@ -633,9 +742,11 @@ function StudioImageDetail({
   readonly node: ReactFlowNode<WorkflowNodeType>;
 }) {
   const { updateNodeData, disabled = false } = useWorkflow();
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
   const nodeId = node.id;
   const metadata = node.data.metadata;
-  const images = readAiImageCardImages(
+  const primaryImage = readAiImageCardPrimaryImage(
     node.data.inputs,
     node.data.outputs,
     metadata
@@ -650,25 +761,60 @@ function StudioImageDetail({
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
+  const imageExpired = primaryImage ? isMediaExpired(primaryImage) : false;
+  const { displayUrl: imageDisplayUrl, stale: imageDisplayStale } =
+    useMediaDisplayUrl({
+      media: primaryImage && !imageExpired ? primaryImage : null,
+      nodeType: "ai-image",
+      size: "full",
+    });
 
-  const { uploading, handleCardDoubleClick, uploadConfirmDialog, fileInput } =
+  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
     useStudioMediaUpload({
       nodeId,
       kind: "image",
       prompt,
-      hasMedia: images.length > 0,
+      hasMedia: primaryImage != null,
       isGenerating,
       disabled,
     });
 
+  const canZoomImage =
+    primaryImage != null &&
+    imageDisplayUrl != null &&
+    !imageDisplayStale &&
+    !imageExpired &&
+    !generateError &&
+    !isGenerating &&
+    !uploading;
+
+  const {
+    triggerRef: imageZoomTriggerRef,
+    handlePreviewClick,
+    handlePreviewDoubleClick: cancelPreviewZoom,
+  } = useStudioImageZoomTrigger();
+
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
-      updateNodeData(nodeId, (current) =>
-        withAiImageHistorySelection(current, id)
-      );
+      let modelUnavailable = false;
+      updateNodeData(nodeId, (current) => {
+        const result = withAiImageHistorySelection(current, id, {
+          models: historyModels.image,
+        });
+        const committed = commitGenerativeHistorySelection(result);
+        modelUnavailable = committed.modelUnavailable;
+        return committed.patch;
+      });
+      notifyHistoryModelUnavailable(modelUnavailable);
     },
-    [disabled, nodeId, updateNodeData]
+    [
+      disabled,
+      historyModels.image,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      updateNodeData,
+    ]
   );
 
   const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "image");
@@ -695,45 +841,65 @@ function StudioImageDetail({
     <>
       {uploadConfirmDialog}
       {fileInput}
-      <div
-        className={cn(
-          "relative h-full w-full min-h-0 overflow-hidden",
-          uploading && "opacity-70"
-        )}
-        onDoubleClick={(event) => {
-          if (generateError) {
-            event.stopPropagation();
-            setErrorDetailOpen(true);
-            return;
-          }
-          if (!isGenerating) {
-            handleCardDoubleClick(event);
-          }
-        }}
-      >
-        <CreativeStudioNodePreview
-          nodeId={nodeId}
-          data={node.data}
-          variant="detail"
-          className="h-full"
-        />
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
-        {!generateError ? (
-          <StudioToolbar>
-            <StudioPrimaryDownload
-              media={images[0]}
-              nodeType="ai-image"
-              filePrefix="image"
-            />
-            {showHistoryIcon ? (
-              <StudioHistoryActionButton
-                count={historyItems.items.length}
-                onClick={() => setHistoryOpen(true)}
-              />
-            ) : null}
-          </StudioToolbar>
+      <StudioImagePhotoProvider>
+        {canZoomImage && imageDisplayUrl ? (
+          <StudioImageZoomHiddenTrigger
+            src={imageDisplayUrl}
+            triggerRef={imageZoomTriggerRef}
+          />
         ) : null}
-      </div>
+        <div
+          className={cn(
+            "relative h-full w-full min-h-0 overflow-hidden",
+            studioImagePreviewZoomClassName(canZoomImage)
+          )}
+          onClick={(event) => handlePreviewClick(event, canZoomImage)}
+          onDoubleClick={(event) => {
+            cancelPreviewZoom(event);
+            if (generateError) {
+              setErrorDetailOpen(true);
+            }
+          }}
+        >
+          <CreativeStudioNodePreview
+            nodeId={nodeId}
+            data={node.data}
+            variant="detail"
+            className="h-full"
+            uploading={uploading}
+            generateError={generateError}
+            detailDisplayUrl={imageDisplayUrl}
+            detailDisplayStale={imageDisplayStale}
+            emptyUpload={
+              primaryImage == null && !generateError
+                ? { kind: "image", canUpload, onUploadClick: handleUploadClick }
+                : undefined
+            }
+          />
+          {!generateError ? (
+            <StudioToolbar>
+              <StudioPrimaryDownload
+                media={primaryImage}
+                nodeType="ai-image"
+                filePrefix="image"
+                displayUrl={imageDisplayUrl}
+                stale={imageDisplayStale}
+              />
+              {canZoomImage ? (
+                <StudioImageZoomToolbarButton
+                  onOpen={() => imageZoomTriggerRef.current?.click()}
+                />
+              ) : null}
+              {showHistoryIcon ? (
+                <StudioHistoryActionButton
+                  count={historyItems.items.length}
+                  onClick={() => setHistoryOpen(true)}
+                />
+              ) : null}
+            </StudioToolbar>
+          ) : null}
+        </div>
+      </StudioImagePhotoProvider>
       {generateError ? (
         <GenerativeCardErrorDetailDialog
           error={generateError}
@@ -745,7 +911,7 @@ function StudioImageDetail({
         <AiImageHistoryOverlay
           open={historyOpen}
           history={historyItems}
-          currentImages={images}
+          currentImages={primaryImage ? [primaryImage] : []}
           mediaKind="image"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
@@ -763,9 +929,11 @@ function StudioVideoDetail({
 }) {
   const { t } = useTranslation();
   const { updateNodeData, disabled = false } = useWorkflow();
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
   const nodeId = node.id;
   const metadata = node.data.metadata;
-  const videos = readAiVideoCardVideos(
+  const primaryVideo = readAiVideoCardPrimaryVideo(
     node.data.inputs,
     node.data.outputs,
     metadata
@@ -780,6 +948,14 @@ function StudioVideoDetail({
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
+  const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
+  const videoExpired = primaryVideo ? isMediaExpired(primaryVideo) : false;
+  const { displayUrl: videoDisplayUrl, stale: videoDisplayStale } =
+    useMediaDisplayUrl({
+      media: primaryVideo && !videoExpired ? primaryVideo : null,
+      nodeType: "ai-video",
+      size: "full",
+    });
   const showCancelledNotice = useSyncExternalStore(
     subscribeGenerativeCancelledNotice,
     () => isGenerativeCancelledNoticeVisible(nodeId),
@@ -789,24 +965,46 @@ function StudioVideoDetail({
     dismissGenerativeCancelledNotice(nodeId);
   }, [nodeId]);
 
-  const { uploading, handleCardDoubleClick, uploadConfirmDialog, fileInput } =
+  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
     useStudioMediaUpload({
       nodeId,
       kind: "video",
       prompt,
-      hasMedia: videos.length > 0,
+      hasMedia: primaryVideo != null,
       isGenerating,
       disabled,
     });
 
+  const canViewVideo =
+    primaryVideo != null &&
+    videoDisplayUrl != null &&
+    !videoDisplayStale &&
+    !videoExpired &&
+    !generateError &&
+    !isGenerating &&
+    !uploading;
+
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
-      updateNodeData(nodeId, (current) =>
-        withAiVideoHistorySelection(current, id)
-      );
+      let modelUnavailable = false;
+      updateNodeData(nodeId, (current) => {
+        const result = withAiVideoHistorySelection(current, id, {
+          models: historyModels.video,
+        });
+        const committed = commitGenerativeHistorySelection(result);
+        modelUnavailable = committed.modelUnavailable;
+        return committed.patch;
+      });
+      notifyHistoryModelUnavailable(modelUnavailable);
     },
-    [disabled, nodeId, updateNodeData]
+    [
+      disabled,
+      historyModels.video,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      updateNodeData,
+    ]
   );
 
   const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "video");
@@ -848,22 +1046,11 @@ function StudioVideoDetail({
       {uploadConfirmDialog}
       {fileInput}
       <div
-        className={cn(
-          "relative h-full w-full min-h-0 overflow-hidden",
-          uploading && "opacity-70"
-        )}
+        className="relative h-full w-full min-h-0 overflow-hidden"
         onDoubleClick={(event) => {
           if (generateError) {
             event.stopPropagation();
             setErrorDetailOpen(true);
-            return;
-          }
-          if (showCancelledNotice) {
-            event.stopPropagation();
-            return;
-          }
-          if (!isGenerating) {
-            handleCardDoubleClick(event);
           }
         }}
       >
@@ -872,8 +1059,17 @@ function StudioVideoDetail({
           data={node.data}
           variant="detail"
           className="h-full"
+          uploading={uploading}
+          generateError={generateError}
+          onVideoExpandView={() => setVideoLightboxOpen(true)}
+          detailDisplayUrl={videoDisplayUrl}
+          detailDisplayStale={videoDisplayStale}
+          emptyUpload={
+            primaryVideo == null && !generateError && !showCancelledNotice
+              ? { kind: "video", canUpload, onUploadClick: handleUploadClick }
+              : undefined
+          }
         />
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
         {showCancelledNotice && !generateError ? (
           <GenerativeCardNoticeBlock
             message={t("workflow.generativeCancel.success")}
@@ -884,10 +1080,17 @@ function StudioVideoDetail({
         {!generateError && !showCancelledNotice ? (
           <StudioToolbar>
             <StudioPrimaryDownload
-              media={videos[0]}
+              media={primaryVideo}
               nodeType="ai-video"
               filePrefix="video"
+              displayUrl={videoDisplayUrl}
+              stale={videoDisplayStale}
             />
+            {canViewVideo ? (
+              <StudioViewToolbarButton
+                onClick={() => setVideoLightboxOpen(true)}
+              />
+            ) : null}
             {showHistoryIcon ? (
               <StudioHistoryActionButton
                 count={historyItems.items.length}
@@ -908,11 +1111,18 @@ function StudioVideoDetail({
         <AiImageHistoryOverlay
           open={historyOpen}
           history={historyAsImageHistory}
-          currentImages={videos}
+          currentImages={primaryVideo ? [primaryVideo] : []}
           mediaKind="video"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
           onExpandToNode={handleHistoryExpand}
+        />
+      ) : null}
+      {canViewVideo && videoDisplayUrl ? (
+        <StudioVideoLightbox
+          open={videoLightboxOpen}
+          src={videoDisplayUrl}
+          onClose={() => setVideoLightboxOpen(false)}
         />
       ) : null}
     </>
@@ -925,6 +1135,8 @@ function StudioAudioDetail({
   readonly node: ReactFlowNode<WorkflowNodeType>;
 }) {
   const { updateNodeData, disabled = false } = useWorkflow();
+  const historyModels = useGenerativeHistoryModels();
+  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
   const nodeId = node.id;
   const metadata = node.data.metadata;
   const audios = readAiAudioCardAudios(
@@ -942,8 +1154,16 @@ function StudioAudioDetail({
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
+  const primaryAudio = audios[0];
+  const audioExpired = primaryAudio ? isMediaExpired(primaryAudio) : false;
+  const { displayUrl: audioDisplayUrl, stale: audioDisplayStale } =
+    useMediaDisplayUrl({
+      media: primaryAudio && !audioExpired ? primaryAudio : null,
+      nodeType: "ai-audio",
+      size: "full",
+    });
 
-  const { uploading, handleCardDoubleClick, uploadConfirmDialog, fileInput } =
+  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
     useStudioMediaUpload({
       nodeId,
       kind: "audio",
@@ -956,11 +1176,24 @@ function StudioAudioDetail({
   const handleHistorySelect = useCallback(
     (id: string) => {
       if (disabled || !updateNodeData) return;
-      updateNodeData(nodeId, (current) =>
-        withAiAudioHistorySelection(current, id)
-      );
+      let modelUnavailable = false;
+      updateNodeData(nodeId, (current) => {
+        const result = withAiAudioHistorySelection(current, id, {
+          models: historyModels.audio,
+        });
+        const committed = commitGenerativeHistorySelection(result);
+        modelUnavailable = committed.modelUnavailable;
+        return committed.patch;
+      });
+      notifyHistoryModelUnavailable(modelUnavailable);
     },
-    [disabled, nodeId, updateNodeData]
+    [
+      disabled,
+      historyModels.audio,
+      nodeId,
+      notifyHistoryModelUnavailable,
+      updateNodeData,
+    ]
   );
 
   const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "audio");
@@ -1010,10 +1243,6 @@ function StudioAudioDetail({
           if (generateError) {
             event.stopPropagation();
             setErrorDetailOpen(true);
-            return;
-          }
-          if (!isGenerating) {
-            handleCardDoubleClick(event);
           }
         }}
       >
@@ -1022,14 +1251,25 @@ function StudioAudioDetail({
           data={node.data}
           variant="detail"
           className="h-full"
+          uploading={uploading}
+          generateError={generateError}
+          detailDisplayUrl={audioDisplayUrl}
+          detailDisplayStale={audioDisplayStale}
+          emptyUpload={
+            audios.length === 0 && !generateError
+              ? { kind: "audio", canUpload, onUploadClick: handleUploadClick }
+              : undefined
+          }
         />
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
         {!generateError ? (
           <StudioToolbar>
             <StudioPrimaryDownload
-              media={audios[0]}
+              media={primaryAudio}
               nodeType="ai-audio"
               filePrefix="audio"
+              displayUrl={audioDisplayUrl}
+              stale={audioDisplayStale}
             />
             {showHistoryIcon ? (
               <StudioHistoryActionButton

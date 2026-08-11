@@ -1268,14 +1268,6 @@ export abstract class Runtime<Env = unknown> {
                 canonicalId,
               })
           : undefined,
-        disableTextModelOnInterface: this.textModelService
-          ? (params) =>
-              this.textModelService!.disableTextModelOnInterface({
-                organizationId: context.organizationId,
-                interfaceId: params.interfaceId,
-                canonicalId: params.canonicalId,
-              })
-          : undefined,
         resolveTextModelInferenceId: this.textModelService
           ? (params) =>
               this.textModelService!.resolveTextModelInferenceId({

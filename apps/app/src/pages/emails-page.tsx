@@ -2,7 +2,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
@@ -69,7 +68,6 @@ function downloadVCard(email: EmailRow, t: TranslateFn) {
 }
 
 function createColumns(
-  orgId: string,
   openEditDialog: (email: EmailRow) => void,
   openDeleteDialog: (email: EmailRow) => void,
   t: TranslateFn
@@ -81,14 +79,7 @@ function createColumns(
       cell: ({ row }) => {
         const email = row.original;
         const name = email.name || t("pages.emails.untitled");
-        return (
-          <Link
-            to={`/org/${orgId}/emails/${email.id}`}
-            className="font-medium hover:underline"
-          >
-            {name}
-          </Link>
-        );
+        return <span className="font-medium">{name}</span>;
       },
     },
     {
@@ -120,11 +111,6 @@ function createColumns(
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link to={`/org/${orgId}/emails/${email.id}`}>
-                    {t("pages.emails.viewMessages")}
-                  </Link>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => downloadVCard(email, t)}>
                   {t("pages.emails.saveToAddressBook")}
                 </DropdownMenuItem>
@@ -213,8 +199,8 @@ function EmailsPageContent() {
   };
 
   const columns = useMemo(
-    () => createColumns(orgId, openEditDialog, openDeleteDialog, t),
-    [orgId, openEditDialog, openDeleteDialog, t]
+    () => createColumns(openEditDialog, openDeleteDialog, t),
+    [openEditDialog, openDeleteDialog, t]
   );
 
   if (isEmailsLoading) {

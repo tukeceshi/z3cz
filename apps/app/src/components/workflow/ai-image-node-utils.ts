@@ -5,8 +5,12 @@ import {
   type ImageGenerationRequestSnapshot,
   normalizeImageModelParameterRules,
   type ImageModelParameterRules,
-  isMediaReference,
+  type OrgImageModelOption,
+  isWorkflowMediaValue,
+  mediaReferenceToWorkflowValue,
   type MediaReference,
+  type ResourceIdReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -20,6 +24,10 @@ import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
+import {
+  applyHistoryItemSettingsToNode,
+  type GenerativeHistorySelectionResult,
+} from "./apply-history-item-settings";
 import { splitHistoryMediaRows } from "./generative-history-utils";
 
 import {
@@ -66,9 +74,9 @@ export function isAiImageAllowedReferenceNodeType(
   return nodeType === AI_IMAGE_NODE_TYPE;
 }
 
-function parseMediaReferences(value: unknown): MediaReference[] {
+function parseWorkflowMediaValues(value: unknown): WorkflowMediaValue[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isMediaReference);
+  return value.filter(isWorkflowMediaValue);
 }
 
 function upsertInputValue(
@@ -167,17 +175,17 @@ export function mergeAiImageNodeCatalogInputs(
 export function readAiImageResult(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[]
-): MediaReference[] {
+): WorkflowMediaValue[] {
   const fromInput = inputs.find(
     (input) => input.id === AI_IMAGE_RESULT_INPUT_ID
   );
-  const fromInputImages = parseMediaReferences(fromInput?.value);
+  const fromInputImages = parseWorkflowMediaValues(fromInput?.value);
   if (fromInputImages.length > 0) {
     return fromInputImages;
   }
 
   const fromOutput = outputs?.find((output) => output.id === AI_IMAGE_OUTPUT_ID);
-  return parseMediaReferences(fromOutput?.value);
+  return parseWorkflowMediaValues(fromOutput?.value);
 }
 
 export function readAiImageResultHistory(
@@ -225,18 +233,29 @@ export function readAiImageResultHistory(
   };
 }
 
+function toStoredWorkflowMedia(
+  images: readonly (WorkflowMediaValue | MediaReference)[]
+): WorkflowMediaValue[] {
+  return images.map((image) =>
+    isWorkflowMediaValue(image)
+      ? image
+      : mediaReferenceToWorkflowValue(image)
+  );
+}
+
 export function withAiImageResult(
   current: WorkflowNodeType,
-  images: readonly MediaReference[],
+  images: readonly WorkflowMediaValue[],
   extras?: {
     readonly inputs?: readonly WorkflowParameter[];
   }
 ): Partial<WorkflowNodeType> {
+  const storedImages = toStoredWorkflowMedia(images);
   const baseInputs = extras?.inputs ?? current.inputs;
   let inputs = upsertInputValue(
     baseInputs,
     AI_IMAGE_RESULT_INPUT_ID,
-    [...images],
+    [...storedImages],
     "json"
   );
 
@@ -245,7 +264,7 @@ export function withAiImageResult(
     const nextHistory: AiImageResultHistory = {
       selectedId: history.selectedId,
       items: history.items.map((item) =>
-        item.id === history.selectedId ? { ...item, images: [...images] } : item
+        item.id === history.selectedId ? { ...item, images: [...storedImages] } : item
       ),
     };
     inputs = upsertInputValue(
@@ -258,7 +277,7 @@ export function withAiImageResult(
 
   const outputs = current.outputs.map((output) =>
     output.id === AI_IMAGE_OUTPUT_ID
-      ? ({ ...output, value: [...images] } as WorkflowParameter)
+      ? ({ ...output, value: [...storedImages] } as WorkflowParameter)
       : output
   );
 
@@ -291,9 +310,9 @@ export function readAiImageCardImages(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
-): MediaReference[] {
+): WorkflowMediaValue[] {
   if (isGenerativeManualContent(metadata)) {
-    const manual = parseMediaReferences(
+    const manual = parseWorkflowMediaValues(
       inputs.find((input) => input.id === "manual_images")?.value
     );
     if (manual.length > 0) {
@@ -302,6 +321,15 @@ export function readAiImageCardImages(
   }
 
   return readAiImageResult(inputs, outputs);
+}
+
+/** Current card output — at most one image. */
+export function readAiImageCardPrimaryImage(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): WorkflowMediaValue | undefined {
+  return readAiImageCardImages(inputs, outputs, metadata)[0];
 }
 
 export function withAiImageManualUpload(
@@ -332,7 +360,7 @@ export function withAiImageManualUpload(
 
 export function withAiImageGeneratedResult(
   current: WorkflowNodeType,
-  images: readonly MediaReference[],
+  images: readonly (WorkflowMediaValue | MediaReference | ResourceIdReference)[],
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
@@ -343,12 +371,13 @@ export function withAiImageGeneratedResult(
     readonly requestSnapshot?: ImageGenerationRequestSnapshot;
   }
 ): Partial<WorkflowNodeType> {
-  if (images.length === 0) return {};
+  const storedImages = toStoredWorkflowMedia(images);
+  if (storedImages.length === 0) return {};
 
   const history = readAiImageResultHistory(current.inputs);
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
-  const newItems: AiImageResultHistoryItem[] = images.map((image, index) => ({
+  const newItems: AiImageResultHistoryItem[] = storedImages.map((image, index) => ({
     id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
     images: [image],
     prompt: meta?.prompt ?? "",
@@ -374,7 +403,7 @@ export function withAiImageGeneratedResult(
   );
   inputs = upsertInputValue(inputs, "manual_images", [], "json");
 
-  const result = withAiImageResult(current, [images[0]!], { inputs });
+  const result = withAiImageResult(current, [storedImages[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
@@ -383,23 +412,39 @@ export function withAiImageGeneratedResult(
 
 export function withAiImageHistorySelection(
   current: WorkflowNodeType,
-  selectedId: string
-): Partial<WorkflowNodeType> {
+  selectedId: string,
+  options?: {
+    readonly models?: readonly OrgImageModelOption[];
+  }
+): GenerativeHistorySelectionResult {
   const history = readAiImageResultHistory(current.inputs);
   const selected = history.items.find((entry) => entry.id === selectedId);
   if (!selected) return {};
 
-  let nextInputs = upsertInputValue(
-    current.inputs,
+  const settings = options?.models
+    ? applyHistoryItemSettingsToNode({
+        current,
+        modality: "image",
+        models: options.models,
+        historyBinding: selected,
+        historyParams: selected.params,
+      })
+    : { patch: {}, modelUnavailable: false };
+
+  const working: WorkflowNodeType = {
+    ...current,
+    inputs: settings.patch.inputs ?? current.inputs,
+    metadata: settings.patch.metadata ?? current.metadata,
+  };
+
+  const nextInputs = upsertInputValue(
+    working.inputs,
     "prompt",
     selected.prompt,
     "string"
   );
-  if (selected.params !== undefined) {
-    nextInputs = upsertInputValue(nextInputs, "params", selected.params, "json");
-  }
 
-  const result = withAiImageResult(current, selected.images.slice(0, 1), {
+  const result = withAiImageResult(working, selected.images.slice(0, 1), {
     inputs: upsertInputValue(
       nextInputs,
       AI_IMAGE_HISTORY_INPUT_ID,
@@ -409,7 +454,10 @@ export function withAiImageHistorySelection(
   });
   return {
     ...result,
-    metadata: withGenerativeGeneratedContentMode(current.metadata),
+    metadata: withGenerativeGeneratedContentMode({
+      ...(settings.patch.metadata ?? current.metadata),
+    }),
+    modelUnavailable: settings.modelUnavailable,
   };
 }
 

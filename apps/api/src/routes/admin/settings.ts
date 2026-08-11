@@ -20,6 +20,7 @@ const updateSiteSettingsSchema = z.object({
     .optional(),
   newUserTourEnabled: z.boolean().optional(),
   homepageMode: z.enum(["console", "marketing"]).optional(),
+  wsBootstrapEnabled: z.boolean().optional(),
 });
 adminSettingsRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
@@ -59,6 +60,9 @@ adminSettingsRoutes.patch(
         : {}),
       ...(body.homepageMode !== undefined
         ? { homepageMode: body.homepageMode }
+        : {}),
+      ...(body.wsBootstrapEnabled !== undefined
+        ? { wsBootstrapEnabled: body.wsBootstrapEnabled }
         : {}),
     };
 

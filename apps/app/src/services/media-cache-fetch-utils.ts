@@ -1,6 +1,6 @@
 import { buildApiUrl } from "@/config/api";
 
-function isAuthenticatedApiMediaUrl(url: string): boolean {
+export function isAuthenticatedApiMediaUrl(url: string): boolean {
   try {
     if (typeof window === "undefined") return false;
     const target = new URL(url, window.location.href);
@@ -16,9 +16,25 @@ function isAuthenticatedApiMediaUrl(url: string): boolean {
   }
 }
 
-/** Browser fetch + IndexedDB cache only works for same-origin API media URLs. */
+function isPresignedTosMediaUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    return target.hostname.endsWith(".volces.com");
+  } catch {
+    return false;
+  }
+}
+
+/** URLs the browser can fetch into IndexedDB (same-origin API or presigned TOS). */
 export function mediaUrlSupportsBrowserCache(url: string): boolean {
-  return isAuthenticatedApiMediaUrl(url);
+  return isAuthenticatedApiMediaUrl(url) || isPresignedTosMediaUrl(url);
+}
+
+export function mediaFetchInitForCacheUrl(url: string): RequestInit {
+  if (isPresignedTosMediaUrl(url)) {
+    return { credentials: "omit" };
+  }
+  return { credentials: "include" };
 }
 
 export function buildMediaProxyEndpoint(

@@ -1,67 +1,40 @@
 import {
+  DEFAULT_AUDIO_MODEL_PARAMETER_RULES,
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
   DEFAULT_VIDEO_GENERATION_FIELDS,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  isAudioModelParameterRules,
   isImageModelParameterRules,
   isTextModelParameterRules,
   isVideoModelParameterRules,
+  normalizeAudioModelParameterRules,
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
 } from "@dafthunk/types";
 import type {
+  AudioModelParameterRules,
   GenerationCountPolicy,
   GenerationSizePolicy,
   ImageModelParameterRules,
   PlatformAiModel,
-  PlatformAiModelGroup,
   TextModelParameterRules,
   UpstreamParamProfileField,
   VideoModelParameterRules,
 } from "@dafthunk/types";
-import ChevronDownIcon from "lucide-react/icons/chevron-down";
-import ChevronUpIcon from "lucide-react/icons/chevron-up";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { parseNonNegativeInt } from "@/components/workflow/generative-reference-metadata";
 import { InsetLayout } from "@/components/layouts/inset-layout";
-import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { useTranslation } from "@/components/locale-provider";
-import {
-  GROUP_ICON_OPTIONS,
-  ModelBrandIcon,
-} from "@/components/model-brand-icon";
 import { useBreadcrumbsSetter } from "@/components/page-context";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  SURFACE_BORDER,
-  SURFACE_ROW_HOVER,
-} from "@/components/ui/surface";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  createAdminPlatformAiModelGroup,
-  deleteAdminPlatformAiModelGroup,
-  reorderAdminPlatformAiModelGroups,
+  reorderAdminPlatformAiModels,
   updateAdminPlatformAiModel,
-  updateAdminPlatformAiModelGroup,
   useAdminPlatformAiModels,
 } from "@/services/admin-ai-model-service";
 import { cn } from "@/utils/utils";
@@ -74,21 +47,19 @@ import {
   useGenerationOptionLabels,
 } from "./admin-generation-field-editors";
 import {
-  ADMIN_CONTROL_CLASS,
-  ADMIN_CONTROL_WIDTH_CLASS,
-  ADMIN_NO_GROUP_VALUE,
   ADMIN_PARAM_HINT_CLASS,
+  AdminModelBasicFields,
   AdminModelList,
-  ImageModelBasicFields,
   MbField,
   ModelSettingsDialogShell,
   NumberField,
   SettingsSection,
   useAdminParamApiNameAddon,
 } from "./admin-ai-models-ui";
+import { DEFAULT_BRAND_ICON } from "@/components/model-brand-icon-picker";
 const BYTES_PER_MB = 1024 * 1024;
 
-type AdminModelModality = "text" | "image" | "video";
+type AdminModelModality = "text" | "image" | "video" | "audio";
 
 function ensureVideoGenerationFieldsForSave(
   fields: readonly UpstreamParamProfileField[]
@@ -123,30 +94,11 @@ export function AdminAiModelsPage() {
   const { t } = useTranslation();
   const setBreadcrumbs = useBreadcrumbsSetter();
   const [modality, setModality] = useState<AdminModelModality>("text");
-  const { models, groups, isLoading, refreshModels } =
-    useAdminPlatformAiModels(modality);
+  const { models, isLoading, refreshModels } = useAdminPlatformAiModels(modality);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [reorderingGroups, setReorderingGroups] = useState(false);
+  const [reorderingModels, setReorderingModels] = useState(false);
   const [settingsModel, setSettingsModel] = useState<PlatformAiModel | null>(
     null
-  );
-  const [groupsOpen, setGroupsOpen] = useState(false);
-  const [groupFormOpen, setGroupFormOpen] = useState(false);
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
-  const [groupDraft, setGroupDraft] = useState<{
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-  }>({ id: "", name: "", description: "", icon: "sparkles" });
-  const [savingGroup, setSavingGroup] = useState(false);
-
-  const orderedGroups = useMemo(
-    () =>
-      [...groups].sort(
-        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
-      ),
-    [groups]
   );
 
   useEffect(() => {
@@ -179,8 +131,9 @@ export function AdminAiModelsPage() {
       readonly rules:
         | TextModelParameterRules
         | ImageModelParameterRules
-        | VideoModelParameterRules;
-      readonly groupId: string | null;
+        | VideoModelParameterRules
+        | AudioModelParameterRules;
+      readonly brandIcon: string;
       readonly description: string;
     }
   ) => {
@@ -191,7 +144,7 @@ export function AdminAiModelsPage() {
           ? { displayName: patch.displayName }
           : {}),
         parameterRules: patch.rules,
-        groupId: patch.groupId,
+        brandIcon: patch.brandIcon,
         description: patch.description,
       });
       await refreshModels();
@@ -204,135 +157,37 @@ export function AdminAiModelsPage() {
     }
   };
 
-  const resetGroupForm = () => {
-    setGroupDraft({ id: "", name: "", description: "", icon: "sparkles" });
-    setEditingGroupId(null);
-    setGroupFormOpen(false);
-  };
-
-  const handleOpenCreateGroup = () => {
-    setEditingGroupId(null);
-    setGroupDraft({ id: "", name: "", description: "", icon: "sparkles" });
-    setGroupFormOpen(true);
-  };
-
-  const handleOpenEditGroup = (group: PlatformAiModelGroup) => {
-    setEditingGroupId(group.id);
-    setGroupDraft({
-      id: group.id,
-      name: group.name,
-      description: group.description,
-      icon: group.icon,
-    });
-    setGroupFormOpen(true);
-  };
-
-  const handleSaveGroup = async () => {
-    if (!groupDraft.name.trim()) return;
-    if (!editingGroupId && !groupDraft.id.trim()) return;
-
-    setSavingGroup(true);
+  const handleReorderModels = async (orderedIds: readonly string[]) => {
+    setReorderingModels(true);
     try {
-      if (editingGroupId) {
-        await updateAdminPlatformAiModelGroup(editingGroupId, {
-          name: groupDraft.name.trim(),
-          description: groupDraft.description.trim(),
-          icon: groupDraft.icon.trim() || "sparkles",
-        });
-        toast.success(t("pages.adminAiModels.groupUpdated"));
-      } else {
-        await createAdminPlatformAiModelGroup({
-          id: groupDraft.id.trim(),
-          name: groupDraft.name.trim(),
-          description: groupDraft.description.trim(),
-          icon: groupDraft.icon.trim() || "sparkles",
-          modality,
-          sortOrder: (orderedGroups.length + 1) * 10,
-        });
-        toast.success(t("pages.adminAiModels.groupSaved"));
-      }
-      await refreshModels();
-      resetGroupForm();
-    } catch {
-      toast.error(
-        editingGroupId
-          ? t("pages.adminAiModels.groupUpdateFailed")
-          : t("pages.adminAiModels.groupSaveFailed")
-      );
-    } finally {
-      setSavingGroup(false);
-    }
-  };
-
-  const handleDeleteGroup = async (group: PlatformAiModelGroup) => {
-    setSavingGroup(true);
-    try {
-      await deleteAdminPlatformAiModelGroup(group.id);
-      await refreshModels();
-      if (editingGroupId === group.id) {
-        resetGroupForm();
-      }
-      toast.success(t("pages.adminAiModels.groupDeleted"));
-    } catch {
-      toast.error(t("pages.adminAiModels.groupDeleteFailed"));
-    } finally {
-      setSavingGroup(false);
-    }
-  };
-
-  const handleMoveGroup = async (groupId: string, direction: -1 | 1) => {
-    const index = orderedGroups.findIndex((group) => group.id === groupId);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= orderedGroups.length) {
-      return;
-    }
-
-    const nextOrder = [...orderedGroups];
-    const [removed] = nextOrder.splice(index, 1);
-    if (!removed) return;
-    nextOrder.splice(nextIndex, 0, removed);
-
-    setReorderingGroups(true);
-    try {
-      await reorderAdminPlatformAiModelGroups(
-        nextOrder.map((group) => group.id)
-      );
+      await reorderAdminPlatformAiModels([...orderedIds], modality);
       await refreshModels();
       toast.success(t("pages.adminAiModels.reorderSaved"));
     } catch {
       toast.error(t("pages.adminAiModels.reorderFailed"));
+      await refreshModels();
     } finally {
-      setReorderingGroups(false);
+      setReorderingModels(false);
     }
   };
 
   const textTabDescription = t("pages.adminAiModels.description");
   const imageTabDescription = t("pages.adminAiModels.imageDescription");
   const videoTabDescription = t("pages.adminAiModels.videoDescription");
-
-  const modalityTitle =
-    modality === "image"
-      ? t("pages.adminAiModels.imageModels")
-      : modality === "video"
-        ? t("pages.adminAiModels.videoModels")
-        : t("pages.adminAiModels.textModels");
-
-  const groupIconLabels = {
-    defaultLabel: t("pages.adminAiModels.groupIconDefault"),
-    doubaoLabel: t("pages.adminAiModels.groupIconDoubao"),
-  };
+  const audioTabDescription = t("pages.adminAiModels.audioDescription");
 
   const renderModelPanel = (emptyLabel: string, description: string) => (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{description}</p>
       <AdminModelList
         models={models}
-        groups={orderedGroups}
         emptyLabel={emptyLabel}
         isLoading={isLoading}
         savingId={savingId}
+        reordering={reorderingModels}
         onToggle={handleToggle}
         onOpenSettings={setSettingsModel}
+        onReorderModels={handleReorderModels}
       />
     </div>
   );
@@ -344,27 +199,20 @@ export function AdminAiModelsPage() {
         onValueChange={(value) => setModality(value as AdminModelModality)}
         className="space-y-4"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <TabsList>
-            <TabsTrigger value="text">
-              {t("pages.adminAiModels.textModels")}
-            </TabsTrigger>
-            <TabsTrigger value="image">
-              {t("pages.adminAiModels.imageModels")}
-            </TabsTrigger>
-            <TabsTrigger value="video">
-              {t("pages.adminAiModels.videoModels")}
-            </TabsTrigger>
-          </TabsList>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setGroupsOpen(true)}
-          >
-            {t("pages.adminAiModels.manageGroups")}
-          </Button>
-        </div>
+        <TabsList>
+          <TabsTrigger value="text">
+            {t("pages.adminAiModels.textModels")}
+          </TabsTrigger>
+          <TabsTrigger value="image">
+            {t("pages.adminAiModels.imageModels")}
+          </TabsTrigger>
+          <TabsTrigger value="video">
+            {t("pages.adminAiModels.videoModels")}
+          </TabsTrigger>
+          <TabsTrigger value="audio">
+            {t("pages.adminAiModels.audioModels")}
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value="text" className="mt-0">
           {renderModelPanel(t("pages.adminAiModels.empty"), textTabDescription)}
@@ -381,282 +229,17 @@ export function AdminAiModelsPage() {
             videoTabDescription
           )}
         </TabsContent>
+        <TabsContent value="audio" className="mt-0">
+          {renderModelPanel(
+            t("pages.adminAiModels.audioEmpty"),
+            audioTabDescription
+          )}
+        </TabsContent>
       </Tabs>
-
-      <Dialog
-        open={groupsOpen}
-        onOpenChange={(open) => {
-          setGroupsOpen(open);
-          if (!open) resetGroupForm();
-        }}
-      >
-        <DialogContent className={cn(LIST_SCROLL_CLASS, "max-h-[85vh] sm:max-w-lg")}>
-          <DialogHeader className="space-y-1.5 text-left">
-            <DialogTitle>
-              {t("pages.adminAiModels.groupsTitleFor", {
-                type: modalityTitle,
-              })}
-            </DialogTitle>
-            <DialogDescription>
-              {t("pages.adminAiModels.groupsDescriptionScoped")}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            {orderedGroups.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("pages.adminAiModels.groupsEmpty")}
-              </p>
-            ) : (
-              orderedGroups.map((group, index) => (
-                <div
-                  key={group.id}
-                  className={cn(
-                    "flex items-start gap-3 rounded-md border px-3 py-2.5",
-                    SURFACE_BORDER,
-                    SURFACE_ROW_HOVER
-                  )}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      disabled={
-                        reorderingGroups || savingGroup || index === 0
-                      }
-                      onClick={() => {
-                        void handleMoveGroup(group.id, -1);
-                      }}
-                      title={t("pages.adminAiModels.moveUp")}
-                    >
-                      <ChevronUpIcon className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      disabled={
-                        reorderingGroups ||
-                        savingGroup ||
-                        index === orderedGroups.length - 1
-                      }
-                      onClick={() => {
-                        void handleMoveGroup(group.id, 1);
-                      }}
-                      title={t("pages.adminAiModels.moveDown")}
-                    >
-                      <ChevronDownIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <ModelBrandIcon
-                    icon={group.icon}
-                    groupId={group.id}
-                    className="mt-0.5 size-5"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{group.name}</p>
-                    {group.description ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {group.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={savingGroup || reorderingGroups}
-                      onClick={() => handleOpenEditGroup(group)}
-                    >
-                      {t("common.edit")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={savingGroup || reorderingGroups}
-                      onClick={() => {
-                        void handleDeleteGroup(group);
-                      }}
-                    >
-                      {t("common.delete")}
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  if (groupFormOpen) {
-                    resetGroupForm();
-                    return;
-                  }
-                  handleOpenCreateGroup();
-                }}
-              >
-                {groupFormOpen
-                  ? t("pages.adminAiModels.hideCreateGroup")
-                  : t("pages.adminAiModels.showCreateGroup")}
-              </Button>
-            </div>
-
-            {groupFormOpen ? (
-              <div className="grid gap-2 rounded-md border border-dashed p-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">
-                    {t("pages.adminAiModels.groupId")}
-                  </Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={groupDraft.id}
-                    disabled={Boolean(editingGroupId)}
-                    onChange={(event) =>
-                      setGroupDraft((current) => ({
-                        ...current,
-                        id: event.target.value,
-                      }))
-                    }
-                    placeholder="deepseek"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">
-                    {t("pages.adminAiModels.groupName")}
-                  </Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={groupDraft.name}
-                    onChange={(event) =>
-                      setGroupDraft((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs">
-                    {t("pages.adminAiModels.groupDescription")}
-                  </Label>
-                  <Textarea
-                    className="min-h-16 text-xs"
-                    value={groupDraft.description}
-                    onChange={(event) =>
-                      setGroupDraft((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-xs">
-                    {t("pages.adminAiModels.groupIcon")}
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={savingGroup}
-                        className={cn(
-                          ADMIN_CONTROL_CLASS,
-                          "justify-start gap-2 px-2"
-                        )}
-                      >
-                        <ModelBrandIcon
-                          icon={groupDraft.icon}
-                          className="size-5"
-                        />
-                        <span className="truncate text-xs">
-                          {formatGroupIconLabel(
-                            groupDraft.icon,
-                            groupIconLabels
-                          )}
-                        </span>
-                        <ChevronDownIcon className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      className={cn(
-                        LIST_SCROLL_CLASS,
-                        "max-h-64 p-2 pr-3",
-                        ADMIN_CONTROL_WIDTH_CLASS
-                      )}
-                    >
-                      <div className="grid gap-0.5">
-                        {GROUP_ICON_OPTIONS.map((option) => {
-                          const selected = groupDraft.icon === option;
-                          return (
-                            <button
-                              key={option}
-                              type="button"
-                              className={cn(
-                                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                                selected
-                                  ? "bg-primary/10 text-foreground"
-                                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                              )}
-                              onClick={() =>
-                                setGroupDraft((current) => ({
-                                  ...current,
-                                  icon: option,
-                                }))
-                              }
-                            >
-                              <ModelBrandIcon
-                                icon={option}
-                                className="size-4"
-                              />
-                              <span className="truncate">
-                                {formatGroupIconLabel(option, groupIconLabels)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-end sm:col-span-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={
-                      savingGroup ||
-                      !groupDraft.name.trim() ||
-                      (!editingGroupId && !groupDraft.id.trim())
-                    }
-                    onClick={() => {
-                      void handleSaveGroup();
-                    }}
-                  >
-                    {editingGroupId
-                      ? t("common.save")
-                      : t("pages.adminAiModels.createGroup")}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {settingsModel && settingsModel.modality === "text" ? (
         <TextModelSettingsDialog
           model={settingsModel}
-          groups={orderedGroups}
           saving={savingId === settingsModel.canonicalId}
           onClose={() => setSettingsModel(null)}
           onSave={(patch) => handleSaveModel(settingsModel, patch)}
@@ -665,7 +248,6 @@ export function AdminAiModelsPage() {
       {settingsModel && settingsModel.modality === "image" ? (
         <ImageModelSettingsDialog
           model={settingsModel}
-          groups={orderedGroups}
           saving={savingId === settingsModel.canonicalId}
           onClose={() => setSettingsModel(null)}
           onSave={(patch) => handleSaveModel(settingsModel, patch)}
@@ -674,7 +256,14 @@ export function AdminAiModelsPage() {
       {settingsModel && settingsModel.modality === "video" ? (
         <VideoModelSettingsDialog
           model={settingsModel}
-          groups={orderedGroups}
+          saving={savingId === settingsModel.canonicalId}
+          onClose={() => setSettingsModel(null)}
+          onSave={(patch) => handleSaveModel(settingsModel, patch)}
+        />
+      ) : null}
+      {settingsModel && settingsModel.modality === "audio" ? (
+        <AudioModelSettingsDialog
+          model={settingsModel}
           saving={savingId === settingsModel.canonicalId}
           onClose={() => setSettingsModel(null)}
           onSave={(patch) => handleSaveModel(settingsModel, patch)}
@@ -686,19 +275,17 @@ export function AdminAiModelsPage() {
 
 function TextModelSettingsDialog({
   model,
-  groups,
   saving,
   onClose,
   onSave,
 }: {
   readonly model: PlatformAiModel;
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly saving: boolean;
   readonly onClose: () => void;
   readonly onSave: (patch: {
     readonly displayName: string;
     readonly rules: TextModelParameterRules;
-    readonly groupId: string | null;
+    readonly brandIcon: string;
     readonly description: string;
   }) => void;
 }) {
@@ -708,7 +295,9 @@ function TextModelSettingsDialog({
     : DEFAULT_TEXT_MODEL_PARAMETER_RULES;
 
   const [displayName, setDisplayName] = useState(model.displayName);
-  const [groupId, setGroupId] = useState(model.groupId ?? ADMIN_NO_GROUP_VALUE);
+  const [brandIcon, setBrandIcon] = useState(
+    model.brandIcon ?? DEFAULT_BRAND_ICON
+  );
   const [promptMaxChars, setPromptMaxChars] = useState(
     String(baseRules.promptMaxChars)
   );
@@ -757,7 +346,7 @@ function TextModelSettingsDialog({
 
     onSave({
       displayName: displayName.trim() || model.displayName,
-      groupId: groupId === ADMIN_NO_GROUP_VALUE ? null : groupId,
+      brandIcon,
       description: model.description ?? "",
       rules: {
         ...baseRules,
@@ -818,13 +407,12 @@ function TextModelSettingsDialog({
         columns={3}
         title={t("pages.adminAiModels.sectionBasic")}
       >
-        <ImageModelBasicFields
+        <AdminModelBasicFields
           canonicalId={model.canonicalId}
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
-          groupId={groupId}
-          onGroupIdChange={setGroupId}
-          groups={groups}
+          brandIcon={brandIcon}
+          onBrandIconChange={setBrandIcon}
         />
       </SettingsSection>
 
@@ -942,19 +530,17 @@ function TextModelSettingsDialog({
 
 function ImageModelSettingsDialog({
   model,
-  groups,
   saving,
   onClose,
   onSave,
 }: {
   readonly model: PlatformAiModel;
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly saving: boolean;
   readonly onClose: () => void;
   readonly onSave: (patch: {
     readonly displayName: string;
     readonly rules: ImageModelParameterRules;
-    readonly groupId: string | null;
+    readonly brandIcon: string;
     readonly description: string;
   }) => void;
 }) {
@@ -965,7 +551,9 @@ function ImageModelSettingsDialog({
     : DEFAULT_IMAGE_MODEL_PARAMETER_RULES;
 
   const [displayName, setDisplayName] = useState(model.displayName);
-  const [groupId, setGroupId] = useState(model.groupId ?? ADMIN_NO_GROUP_VALUE);
+  const [brandIcon, setBrandIcon] = useState(
+    model.brandIcon ?? DEFAULT_BRAND_ICON
+  );
   const [maxReferenceImages, setMaxReferenceImages] = useState(
     String(baseRules.maxReferenceImages)
   );
@@ -1020,7 +608,7 @@ function ImageModelSettingsDialog({
   const handleSave = () => {
     onSave({
       displayName: displayName.trim() || model.displayName,
-      groupId: groupId === ADMIN_NO_GROUP_VALUE ? null : groupId,
+      brandIcon,
       description: model.description ?? "",
       rules: {
         ...baseRules,
@@ -1056,13 +644,12 @@ function ImageModelSettingsDialog({
         columns={3}
         title={t("pages.adminAiModels.sectionBasic")}
       >
-        <ImageModelBasicFields
+        <AdminModelBasicFields
           canonicalId={model.canonicalId}
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
-          groupId={groupId}
-          onGroupIdChange={setGroupId}
-          groups={groups}
+          brandIcon={brandIcon}
+          onBrandIconChange={setBrandIcon}
         />
       </SettingsSection>
 
@@ -1149,19 +736,17 @@ function ImageModelSettingsDialog({
 
 function VideoModelSettingsDialog({
   model,
-  groups,
   saving,
   onClose,
   onSave,
 }: {
   readonly model: PlatformAiModel;
-  readonly groups: readonly PlatformAiModelGroup[];
   readonly saving: boolean;
   readonly onClose: () => void;
   readonly onSave: (patch: {
     readonly displayName: string;
     readonly rules: VideoModelParameterRules;
-    readonly groupId: string | null;
+    readonly brandIcon: string;
     readonly description: string;
   }) => void;
 }) {
@@ -1172,7 +757,9 @@ function VideoModelSettingsDialog({
     : DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
 
   const [displayName, setDisplayName] = useState(model.displayName);
-  const [groupId, setGroupId] = useState(model.groupId ?? ADMIN_NO_GROUP_VALUE);
+  const [brandIcon, setBrandIcon] = useState(
+    model.brandIcon ?? DEFAULT_BRAND_ICON
+  );
   const [maxReferenceImages, setMaxReferenceImages] = useState(
     String(baseRules.maxReferenceImages)
   );
@@ -1220,7 +807,7 @@ function VideoModelSettingsDialog({
   const handleSave = () => {
     onSave({
       displayName: displayName.trim() || model.displayName,
-      groupId: groupId === ADMIN_NO_GROUP_VALUE ? null : groupId,
+      brandIcon,
       description: model.description ?? "",
       rules: {
         ...baseRules,
@@ -1276,13 +863,12 @@ function VideoModelSettingsDialog({
         columns={3}
         title={t("pages.adminAiModels.sectionBasic")}
       >
-        <ImageModelBasicFields
+        <AdminModelBasicFields
           canonicalId={model.canonicalId}
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
-          groupId={groupId}
-          onGroupIdChange={setGroupId}
-          groups={groups}
+          brandIcon={brandIcon}
+          onBrandIconChange={setBrandIcon}
         />
       </SettingsSection>
 
@@ -1370,15 +956,97 @@ function VideoModelSettingsDialog({
   );
 }
 
-function formatGroupIconLabel(
-  icon: string,
-  labels: { readonly defaultLabel: string; readonly doubaoLabel: string }
-): string {
-  if (icon === "sparkles") {
-    return labels.defaultLabel;
-  }
-  if (icon === "doubao") {
-    return labels.doubaoLabel;
-  }
-  return icon;
+function AudioModelSettingsDialog({
+  model,
+  saving,
+  onClose,
+  onSave,
+}: {
+  readonly model: PlatformAiModel;
+  readonly saving: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (patch: {
+    readonly displayName: string;
+    readonly rules: AudioModelParameterRules;
+    readonly brandIcon: string;
+    readonly description: string;
+  }) => void;
+}) {
+  const { t } = useTranslation();
+  const optionLabels = useGenerationOptionLabels();
+  const baseRules = isAudioModelParameterRules(model.parameterRules)
+    ? normalizeAudioModelParameterRules(model.parameterRules)
+    : DEFAULT_AUDIO_MODEL_PARAMETER_RULES;
+
+  const [displayName, setDisplayName] = useState(model.displayName);
+  const [brandIcon, setBrandIcon] = useState(
+    model.brandIcon ?? DEFAULT_BRAND_ICON
+  );
+  const [promptMaxChars, setPromptMaxChars] = useState(
+    String(baseRules.promptMaxChars)
+  );
+  const [generationFields, setGenerationFields] = useState<
+    UpstreamParamProfileField[]
+  >(baseRules.generationFields.map((field) => ({ ...field })));
+
+  const handleSave = () => {
+    onSave({
+      displayName: displayName.trim() || model.displayName,
+      brandIcon,
+      description: model.description ?? "",
+      rules: {
+        ...baseRules,
+        promptMaxChars:
+          Number(promptMaxChars) ||
+          DEFAULT_AUDIO_MODEL_PARAMETER_RULES.promptMaxChars,
+        generationFields,
+      },
+    });
+  };
+
+  return (
+    <ModelSettingsDialogShell
+      dialogWidth="800"
+      title={t("pages.adminAiModels.settingsTitle", { name: model.displayName })}
+      description={t("pages.adminAiModels.audioSettingsDescription")}
+      saving={saving}
+      onClose={onClose}
+      onSave={handleSave}
+    >
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionBasic")}
+      >
+        <AdminModelBasicFields
+          canonicalId={model.canonicalId}
+          displayName={displayName}
+          onDisplayNameChange={setDisplayName}
+          brandIcon={brandIcon}
+          onBrandIconChange={setBrandIcon}
+        />
+      </SettingsSection>
+
+      <SettingsSection
+        compact
+        columns={3}
+        title={t("pages.adminAiModels.sectionPrompt")}
+      >
+        <NumberField
+          paramLabel
+          label={t("pages.adminAiModels.promptMaxChars")}
+          value={promptMaxChars}
+          onChange={setPromptMaxChars}
+        />
+      </SettingsSection>
+
+      <GenerationFeaturesEditor
+        fields={generationFields}
+        modality="audio"
+        layout="flat"
+        optionLabels={optionLabels}
+        onChange={setGenerationFields}
+      />
+    </ModelSettingsDialogShell>
+  );
 }

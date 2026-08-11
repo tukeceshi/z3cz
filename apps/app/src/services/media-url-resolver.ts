@@ -3,6 +3,8 @@ import {
   isEphemeralMediaReference,
   isLocalMediaReference,
   type MediaReference,
+  type WorkflowMediaValue,
+  workflowMediaMimeType as readWorkflowMediaMimeType,
 } from "@dafthunk/types";
 
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
@@ -29,9 +31,9 @@ export {
 export { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 
 export function inferMediaNodeType(
-  media: MediaReference
+  media: WorkflowMediaValue
 ): "ai-image" | "ai-video" | "ai-audio" | null {
-  const mime = media.mimeType.toLowerCase();
+  const mime = (readWorkflowMediaMimeType(media) ?? "").toLowerCase();
   if (mime.startsWith("video/")) return "ai-video";
   if (mime.startsWith("audio/")) return "ai-audio";
   if (mime.startsWith("image/")) return "ai-image";

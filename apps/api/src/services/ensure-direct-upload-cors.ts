@@ -11,7 +11,7 @@ import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
 
 export type { TosCorsRule } from "../integrations/volcengine/tos-sdk-cors";
 
-const DIRECT_UPLOAD_METHODS = ["PUT", "HEAD"] as const;
+const DIRECT_ACCESS_METHODS = ["PUT", "HEAD", "GET"] as const;
 const DIRECT_UPLOAD_HEADERS = ["*"] as const;
 const DIRECT_UPLOAD_EXPOSE_HEADERS = ["ETag", "x-tos-request-id"] as const;
 
@@ -74,6 +74,7 @@ export function corsRulesAllowDirectUpload(
     rules.some(
       (rule) =>
         rule.allowedMethods.includes("PUT") &&
+        rule.allowedMethods.includes("GET") &&
         originMatchesRule(origin, rule.allowedOrigins)
     )
   );
@@ -135,7 +136,7 @@ export async function ensureDirectUploadCors(params: {
 }): Promise<{ readonly applied: boolean }> {
   const directUploadRule: TosCorsRule = {
     allowedOrigins: params.allowedOrigins,
-    allowedMethods: [...DIRECT_UPLOAD_METHODS],
+    allowedMethods: [...DIRECT_ACCESS_METHODS],
     allowedHeaders: [...DIRECT_UPLOAD_HEADERS],
     exposeHeaders: [...DIRECT_UPLOAD_EXPOSE_HEADERS],
     maxAgeSeconds: 3600,

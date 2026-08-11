@@ -182,11 +182,13 @@ describe("annotateVideoReferenceChips", () => {
     const chips: GenerativeReferenceChip[] = [
       {
         edgeId: "e1",
+        sourceNodeId: "n1",
         kind: "image",
         label: "A",
       },
       {
         edgeId: "e2",
+        sourceNodeId: "n2",
         kind: "image",
         label: "B",
       },

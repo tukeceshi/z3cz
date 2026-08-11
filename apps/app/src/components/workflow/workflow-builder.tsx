@@ -42,6 +42,7 @@ import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
 import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
+import { InlineAiTextMigrationHost } from "./inline-ai-text-migration-host";
 import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import { WorkflowCanvas } from "./workflow-canvas";
 import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
@@ -51,7 +52,6 @@ import {
 } from "./creative-studio-context";
 import { CreativeStudioView } from "./creative-studio-view";
 import { WorkflowProvider } from "./workflow-context";
-import { WorkflowNodeSelector } from "./workflow-node-selector";
 import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
@@ -208,6 +208,8 @@ export interface WorkflowBuilderProps {
   onGenerativeDefaultsChange?: (
     defaults: WorkflowGenerativeDefaults
   ) => void;
+  /** True after HTTP has loaded the workflow graph (Persist-First). */
+  graphReady?: boolean;
   workflowSettingsOpen?: boolean;
   onWorkflowSettingsOpenChange?: (open: boolean) => void;
   workflowsListUrl?: string;
@@ -246,6 +248,7 @@ export function WorkflowBuilder({
   onCommitEditorViewport,
   generativeDefaults,
   onGenerativeDefaultsChange,
+  graphReady = false,
   workflowSettingsOpen = false,
   onWorkflowSettingsOpenChange,
   workflowsListUrl,
@@ -272,14 +275,11 @@ export function WorkflowBuilder({
     selectedNodes,
     selectedEdges,
     soleSelectedNodeId,
-    isNodeSelectorOpen,
-    setIsNodeSelectorOpen,
     onNodesChange,
     onEdgesChange,
     onConnect,
     onConnectStart,
     onConnectEnd,
-    handleAddNode,
     handleNodeSelect,
     updateNodeExecution,
     batchUpdateNodeExecutions,
@@ -328,6 +328,7 @@ export function WorkflowBuilder({
   useWorkflowMediaReconcile({
     organizationId: orgId,
     workflowId,
+    graphReady,
     nodes,
     setNodes,
   });
@@ -399,7 +400,7 @@ export function WorkflowBuilder({
     [appToast, handleNodeSelect, nodeTypes]
   );
 
-  // Keyboard shortcuts (Cmd+C/X/V/D, Delete/Backspace, Cmd+Enter)
+  // Keyboard shortcuts (Cmd+C/X/V/D, Delete)
   const handleActionButtonClick =
     !readOnly && executeWorkflow
       ? execution.handleActionButtonClick
@@ -803,8 +804,6 @@ export function WorkflowBuilder({
             duplicateSelected={duplicateSelected}
             requestDeleteSelected={requestDeleteSelected}
             requestDeleteStudioNode={requestDeleteStudioNode}
-            onAction={handleActionButtonClick}
-            nodeCount={nodes.length}
           />
           <CreativeStudioCanvasSync selectNode={selectNode} />
           {workflowsListUrl ? (
@@ -818,6 +817,13 @@ export function WorkflowBuilder({
           ) : null}
           <div className="w-full h-full min-h-0 flex flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly}>
+            <InlineAiTextMigrationHost
+              organizationId={orgId}
+              workflowId={workflowId}
+              graphReady={graphReady}
+              nodes={nodes}
+              setNodes={setNodes}
+            />
             <div className="flex min-h-0 flex-1">
               <div
                 className={cn(
@@ -845,7 +851,6 @@ export function WorkflowBuilder({
                   onMoveStart={handleViewportMoveStart}
                   onMoveEnd={handleViewportMoveEnd}
                   onInit={handleReactFlowInit}
-                  onAddNode={readOnly ? undefined : handleAddNode}
                   onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
                   onAction={handleActionButtonClick}
                   workflowStatus={execution.workflowStatus}
@@ -922,16 +927,6 @@ export function WorkflowBuilder({
               )}
             </div>
           </CloudStorageCanvasProvider>
-
-          <WorkflowNodeSelector
-            open={readOnly ? false : isNodeSelectorOpen}
-            onSelect={handleNodeSelect}
-            onClose={() => setIsNodeSelectorOpen(false)}
-            templates={nodeTypes}
-            workflowName={workflowName}
-            workflowDescription={workflowDescription}
-            hasTriggerNode={false}
-          />
 
           <WorkflowSettingsDialog
             open={workflowSettingsOpen}
@@ -1010,8 +1005,6 @@ function WorkflowStudioKeyboardShortcuts({
   duplicateSelected,
   requestDeleteSelected,
   requestDeleteStudioNode,
-  onAction,
-  nodeCount,
 }: {
   readonly readOnly: boolean;
   readonly selectedNodes: ReactFlowNode<WorkflowNodeType>[];
@@ -1023,8 +1016,6 @@ function WorkflowStudioKeyboardShortcuts({
   readonly duplicateSelected: () => void;
   readonly requestDeleteSelected: () => void;
   readonly requestDeleteStudioNode: (nodeId: string) => void;
-  readonly onAction?: (e: React.MouseEvent) => void;
-  readonly nodeCount: number;
 }) {
   const { viewMode, studioNodeId } = useCreativeStudio();
 
@@ -1056,8 +1047,6 @@ function WorkflowStudioKeyboardShortcuts({
     duplicateSelected,
     requestDeleteSelected: requestDeleteActive,
     hasStudioNodeSelected,
-    onAction,
-    nodeCount,
   });
 
   return null;

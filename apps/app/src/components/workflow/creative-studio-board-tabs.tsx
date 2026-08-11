@@ -30,6 +30,7 @@ import {
 } from "./creative-studio-surface";
 import type { StudioListNodeInteractionHandlers } from "./studio-list-node-interaction-handlers";
 import type { WorkflowNodeType } from "./workflow-types";
+import { isStudioListNodeActive } from "./creative-studio-utils";
 
 export type StudioBoardTab = "all" | "audio" | "text" | "image" | "video";
 
@@ -81,7 +82,8 @@ export interface CreativeStudioBoardTabsProps {
   readonly textNodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly imageNodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly videoNodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly listInteraction: StudioListNodeInteractionHandlers;
   readonly onExpandList: () => void;
   readonly referenceDragEnabled?: boolean;
@@ -107,24 +109,26 @@ function isAudioNode(node: ReactFlowNode<WorkflowNodeType>): boolean {
   return node.data.nodeType === AI_AUDIO_NODE_TYPE;
 }
 
-function isTextNode(node: ReactFlowNode<WorkflowNodeType>): boolean {
-  return node.data.nodeType === AI_TEXT_NODE_TYPE;
-}
-
 interface StudioNodeListItemProps {
   readonly node: ReactFlowNode<WorkflowNodeType>;
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly listInteraction: StudioListNodeInteractionHandlers;
   readonly referenceDragEnabled: boolean;
 }
 
 function StudioNodeListItem({
   node,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   listInteraction,
   referenceDragEnabled,
 }: StudioNodeListItemProps) {
-  const isActive = node.id === focusedNodeId;
+  const isActive = isStudioListNodeActive(
+    node.id,
+    primaryNodeId,
+    secondaryNodeId
+  );
   const handleListNodeDoubleClick = () => {
     listInteraction.onListNodeDoubleClick(node.id);
   };
@@ -151,12 +155,11 @@ function StudioNodeListItem({
     <CreativeStudioListItem
       focusId={node.id}
       isActive={isActive}
-      variant={isTextNode(node) ? "mediaPlain" : "media"}
+      variant="media"
       onNodeDoubleClick={handleListNodeDoubleClick}
     >
       <CreativeStudioNodeCard
         node={node}
-        isActive={isActive}
         onOpenDetail={() => listInteraction.onListNodeClick(node.id)}
         onCancelPendingListClick={listInteraction.cancelPendingListClick}
         referenceDragEnabled={referenceDragEnabled}
@@ -167,17 +170,20 @@ function StudioNodeListItem({
 
 function StudioMediaMasonryList({
   nodes,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   listInteraction,
   referenceDragEnabled,
-  textPlain,
 }: {
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly listInteraction: StudioListNodeInteractionHandlers;
   readonly referenceDragEnabled: boolean;
-  readonly textPlain: boolean;
 }) {
+  const isActive = (nodeId: string) =>
+    isStudioListNodeActive(nodeId, primaryNodeId, secondaryNodeId);
+
   return (
     <Masonry
       breakpointCols={STUDIO_MEDIA_MASONRY_BREAKPOINTS}
@@ -188,13 +194,12 @@ function StudioMediaMasonryList({
         <CreativeStudioListItem
           key={node.id}
           focusId={node.id}
-          isActive={node.id === focusedNodeId}
-          variant={textPlain ? "mediaPlain" : "media"}
+          isActive={isActive(node.id)}
+          variant="media"
           onNodeDoubleClick={() => listInteraction.onListNodeDoubleClick(node.id)}
         >
           <CreativeStudioNodeCard
             node={node}
-            isActive={node.id === focusedNodeId}
             onOpenDetail={() => listInteraction.onListNodeClick(node.id)}
             onCancelPendingListClick={listInteraction.cancelPendingListClick}
             referenceDragEnabled={referenceDragEnabled}
@@ -213,7 +218,8 @@ export function CreativeStudioBoardTabs({
   textNodes,
   imageNodes,
   videoNodes,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   listInteraction,
   onExpandList,
   referenceDragEnabled = false,
@@ -239,6 +245,9 @@ export function CreativeStudioBoardTabs({
     },
     [addGenerativeNode]
   );
+
+  const isActive = (nodeId: string) =>
+    isStudioListNodeActive(nodeId, primaryNodeId, secondaryNodeId);
 
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
@@ -304,7 +313,7 @@ export function CreativeStudioBoardTabs({
                 <CreativeStudioListItem
                   key={node.id}
                   focusId={node.id}
-                  isActive={node.id === focusedNodeId}
+                  isActive={isActive(node.id)}
                   variant="media"
                   onNodeDoubleClick={() =>
                     listInteraction.onListNodeDoubleClick(node.id)
@@ -331,7 +340,8 @@ export function CreativeStudioBoardTabs({
                 <StudioNodeListItem
                   key={node.id}
                   node={node}
-                  focusedNodeId={focusedNodeId}
+                  primaryNodeId={primaryNodeId}
+                  secondaryNodeId={secondaryNodeId}
                   listInteraction={listInteraction}
                   referenceDragEnabled={referenceDragEnabled}
                 />
@@ -342,10 +352,10 @@ export function CreativeStudioBoardTabs({
           <div className="min-w-0">
             <StudioMediaMasonryList
               nodes={activeNodes}
-              focusedNodeId={focusedNodeId}
+              primaryNodeId={primaryNodeId}
+              secondaryNodeId={secondaryNodeId}
               listInteraction={listInteraction}
               referenceDragEnabled={referenceDragEnabled}
-              textPlain={activeTab === "text"}
             />
           </div>
         )}

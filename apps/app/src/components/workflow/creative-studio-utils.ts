@@ -24,3 +24,11 @@ export function getStudioInputString(
   const value = data.inputs.find((input) => input.id === id)?.value;
   return typeof value === "string" ? value : "";
 }
+
+export function isStudioListNodeActive(
+  nodeId: string,
+  primaryNodeId: string | null,
+  secondaryNodeId: string | null
+): boolean {
+  return nodeId === primaryNodeId || nodeId === secondaryNodeId;
+}

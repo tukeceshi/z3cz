@@ -29,7 +29,7 @@ describe("applyGenerativeNodeStudioReference", () => {
       nodeType: AI_IMAGE_NODE_TYPE,
       existingNodes,
       defaultBaseName: "图片",
-      prompt: "| A | B |\n|---|---|",
+      prompt: "第一场景描述",
       precedingText: "Notes\n\n## 场景列表\n",
     });
 
@@ -42,15 +42,15 @@ describe("applyGenerativeNodeStudioReference", () => {
       nodeType: AI_IMAGE_NODE_TYPE,
       existingNodes,
       defaultBaseName: "图片",
-      prompt: "| A | B |\n|---|---|",
+      prompt: "Some paragraph body",
       precedingText: "Plain text only\n",
     });
 
     expect(result.data.name).toBe("图片 2");
   });
 
-  it("writes the table markdown into prompt", () => {
-    const prompt = "| Name | Value |\n|---|---|";
+  it("writes the section body into prompt", () => {
+    const prompt = "Row details and notes";
     const result = applyGenerativeNodeStudioReference({
       node: createNode(),
       nodeType: AI_IMAGE_NODE_TYPE,

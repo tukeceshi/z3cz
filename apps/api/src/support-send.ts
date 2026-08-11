@@ -11,19 +11,20 @@ import {
 } from "./db";
 import { createEmailService } from "./services/email-service";
 import { buildReplyToAddress } from "./support-reply-token";
-import { inboxKeys } from "./support-storage";
 import { buildSnippet, stripHtml } from "./support-utils";
+
+/** Placeholder for legacy raw_r2_key column (blob storage removed). */
+const DEPRECATED_RAW_KEY = "deprecated";
 
 /**
  * Send an outbound message on a support thread (reply or first message),
- * persist the DB row before send, archive the raw MIME and body parts to
- * R2 after send, and bump the thread's `lastMessageAt`.
+ * persist the DB row before send, and bump the thread's `lastMessageAt`.
  *
  * The pre-insert + post-send rollback pattern closes the gap where send
  * succeeds but the DB doesn't, which would leave the recipient with a
- * message we have no record of. The R2 puts and the lastMessageAt update
- * are best-effort and deferred via `executionCtx.waitUntil` so the admin
- * client returns immediately.
+ * message we have no record of. The lastMessageAt update is best-effort
+ * and deferred via `executionCtx.waitUntil` so the admin client returns
+ * immediately.
  */
 export async function sendOutboundSupportMessage(
   db: Database,
@@ -61,7 +62,6 @@ export async function sendOutboundSupportMessage(
   const messageRowId = uuidv7();
   const fromDomain = from.includes("@") ? from.split("@")[1] : "mail.local";
   const rfc822MessageId = `<${messageRowId}@${fromDomain}>`;
-  const keys = inboxKeys(args.inboxId, messageRowId);
   const references = args.references ?? [];
   const referencesChain = buildReferencesChain(
     references,
@@ -83,7 +83,7 @@ export async function sendOutboundSupportMessage(
       hasHtml: Boolean(args.html),
       hasText: Boolean(args.text),
       attachmentCount: 0,
-      rawR2Key: keys.raw,
+      rawR2Key: DEPRECATED_RAW_KEY,
       authorAdminUserId: args.adminUserId,
     });
   } catch (error) {
@@ -126,42 +126,15 @@ export async function sendOutboundSupportMessage(
   }
 
   const now = new Date();
-  const outboundMime = sendResult.rawMime;
-  const deferred: Promise<unknown>[] = [
+  executionCtx.waitUntil(
     db
       .update(threads)
       .set({ lastMessageAt: now, updatedAt: now })
-      .where(eq(threads.id, args.threadId)),
-  ];
-  if (outboundMime) {
-    deferred.push(
-      env.INBOXES.put(keys.raw, outboundMime, {
-        httpMetadata: { contentType: "message/rfc822" },
+      .where(eq(threads.id, args.threadId))
+      .then(() => undefined)
+      .catch((error) => {
+        console.error("[support send] thread touch failed", error);
       })
-    );
-  }
-  if (args.text) {
-    deferred.push(
-      env.INBOXES.put(keys.textBody, new TextEncoder().encode(args.text), {
-        httpMetadata: { contentType: "text/plain; charset=utf-8" },
-      })
-    );
-  }
-  if (args.html) {
-    deferred.push(
-      env.INBOXES.put(keys.htmlBody, new TextEncoder().encode(args.html), {
-        httpMetadata: { contentType: "text/html; charset=utf-8" },
-      })
-    );
-  }
-  executionCtx.waitUntil(
-    Promise.allSettled(deferred).then((results) => {
-      results.forEach((r, i) => {
-        if (r.status === "rejected") {
-          console.error(`[support send] deferred task ${i} failed`, r.reason);
-        }
-      });
-    })
   );
 
   return { ok: true, messageId: messageRowId };

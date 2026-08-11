@@ -14,6 +14,13 @@ This repository uses the following technologies and tools:
 - **Vitest** for unit and integration testing.
 - **Cloudflare** for edge-optimized deployment and performance.
 
+### Adding or changing dependencies
+
+This monorepo shares a single root **`pnpm-lock.yaml`**. After editing **any** workspace `package.json` (`apps/*`, `packages/*`):
+
+1. Run **`pnpm install`** at the repository root and commit the updated **`pnpm-lock.yaml`** with the `package.json` change.
+2. Do not commit `package.json` alone — Docker dev entrypoints run **`pnpm install --frozen-lockfile`**; a stale lockfile causes install failure and leaves the **api** container unhealthy (app/www then fail with `dependency failed to start` even when only app deps changed).
+
 ## Backend
 
 - **Hono** for lightweight, expressive REST API development.

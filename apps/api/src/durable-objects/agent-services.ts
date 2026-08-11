@@ -14,7 +14,7 @@ import type { Schema } from "@dafthunk/types";
 import type { Bindings } from "../context";
 import { CloudflareCredentialService } from "../runtime/cloudflare-credential-service";
 import { PostgresDatabaseService } from "../runtime/postgres-database-service";
-import { CloudflareDatasetService } from "../runtime/cloudflare-dataset-service";
+import { MockDatasetService } from "../mocks/dataset-service";
 import { createCloudflareNodeRegistry } from "../runtime/cloudflare-node-registry";
 import {
   buildPresignedUrlConfig,
@@ -37,7 +37,7 @@ export async function buildNodeToolProvider(
   const credentialService = new CloudflareCredentialService(env);
   await credentialService.initialize(organizationId);
   const databaseService = new PostgresDatabaseService(env);
-  const datasetService = new CloudflareDatasetService(env);
+  const datasetService = new MockDatasetService();
   const queueService = new CloudflareQueueService(env);
 
   return new NodeToolProvider(nodeRegistry, (nodeId, inputs) =>

@@ -1,12 +1,6 @@
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import Pencil from "lucide-react/icons/pencil";
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Input } from "@/components/ui/input";
@@ -14,7 +8,8 @@ import { cn } from "@/utils/utils";
 
 import { resolveStudioNodeLabel } from "./creative-studio-utils";
 import { STUDIO_PANEL_TITLE } from "./creative-studio-surface";
-import { updateNodeName, useWorkflow } from "./workflow-context";
+import { useStudioNodeRename } from "./use-studio-node-rename";
+import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
 const TITLE_INPUT_MIN_WIDTH_PX = 72;
@@ -34,24 +29,18 @@ export function CreativeStudioEditableTitle({
   const { updateNodeData, disabled = false } = useWorkflow();
   const label = resolveStudioNodeLabel(node, t);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(label);
   const [inputWidthPx, setInputWidthPx] = useState(TITLE_INPUT_MIN_WIDTH_PX);
-  const inputRef = useRef<HTMLInputElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!editing) {
-      setDraft(label);
+  const { draft, setDraft, inputRef, commit, handleKeyDown } = useStudioNodeRename(
+    {
+      nodeId: node.id,
+      label,
+      editing,
+      onFinishEditing: () => setEditing(false),
+      updateNodeData,
+      disabled,
     }
-  }, [editing, label]);
-
-  useEffect(() => {
-    if (!editing) return;
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    input.select();
-  }, [editing]);
+  );
 
   useLayoutEffect(() => {
     if (!editing) return;
@@ -67,33 +56,6 @@ export function CreativeStudioEditableTitle({
     );
     setInputWidthPx(nextWidth);
   }, [draft, editing]);
-
-  const commit = () => {
-    const next = draft.trim();
-    setEditing(false);
-    if (!next || next === label || !updateNodeData || disabled) {
-      setDraft(label);
-      return;
-    }
-    updateNodeName(node.id, next, updateNodeData);
-  };
-
-  const cancel = () => {
-    setDraft(label);
-    setEditing(false);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      commit();
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancel();
-    }
-  };
 
   return (
     <div

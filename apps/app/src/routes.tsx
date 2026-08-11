@@ -40,10 +40,7 @@ import {
   DatabaseConsolePage,
   DatabaseExplorerPage,
   DatabasesPage,
-  DatasetDetailPage,
-  DatasetsPage,
   EditorPage,
-  EmailInboxPage,
   EmailsPage,
   ExecutionDetailPage,
   ExecutionsPage,
@@ -435,19 +432,6 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.modelCalls") },
   },
   {
-    path: "/datasets",
-    element: <OrgRedirect to="/org/:organizationId/datasets" />,
-  },
-  {
-    path: "/org/:organizationId/datasets",
-    element: (
-      <OrgFeatureRoute feature="datasets" title="Datasets">
-        <DatasetsPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.datasets") },
-  },
-  {
     path: "/api-keys",
     element: <OrgRedirect to="/org/:organizationId/api-keys" />,
   },
@@ -528,15 +512,6 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.integrations") },
   },
   {
-    path: "/org/:organizationId/datasets/:datasetId",
-    element: (
-      <OrgFeatureRoute feature="datasets" title="Datasets">
-        <DatasetDetailPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.datasetDetail") },
-  },
-  {
     path: "/databases",
     element: <OrgRedirect to="/org/:organizationId/databases" />,
   },
@@ -605,15 +580,6 @@ export const routes: AppRouteObject[] = [
       </OrgFeatureRoute>
     ),
     handle: { head: createRouteHead("seo.routes.emails") },
-  },
-  {
-    path: "/org/:organizationId/emails/:emailId",
-    element: (
-      <OrgFeatureRoute feature="emails" title="Emails">
-        <EmailInboxPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.emailInbox") },
   },
   {
     path: "/bots",

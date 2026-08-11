@@ -44,6 +44,7 @@ const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   supportEmail: null,
   newUserTourEnabled: false,
   homepageMode: "console",
+  wsBootstrapEnabled: false,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 

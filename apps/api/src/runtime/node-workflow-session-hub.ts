@@ -4,9 +4,15 @@ import type {
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
+  WorkflowGraphPatchBroadcast,
+  WorkflowGraphPatchMessage,
   WorkflowInitMessage,
   WorkflowState,
   WorkflowUpdateMessage,
+} from "@dafthunk/types";
+import {
+  applyWorkflowGraphPatch,
+  isEmptyWorkflowGraphPatch,
 } from "@dafthunk/types";
 import type { WSContext } from "hono/ws";
 
@@ -19,8 +25,6 @@ import {
 } from "../utils/sub-account-permissions";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
-
-const PERSIST_DEBOUNCE_MS = 500;
 
 interface NodeWsClient {
   readonly id: string;
@@ -37,13 +41,29 @@ interface NodeWorkflowSession {
   clients: Map<string, NodeWsClient>;
   persistTimer: ReturnType<typeof setTimeout> | null;
   pendingPersist: WorkflowState | null;
+  rev: number;
 }
+
+const PERSIST_DEBOUNCE_MS = 500;
 
 class NodeWorkflowSessionHub {
   private readonly sessions = new Map<string, NodeWorkflowSession>();
 
   private sessionKey(workflowId: string): string {
     return workflowId;
+  }
+
+  /** Drop in-memory session so the next connect reloads from persisted storage. */
+  invalidateSession(workflowId: string): void {
+    const key = this.sessionKey(workflowId);
+    const session = this.sessions.get(key);
+    if (!session) {
+      return;
+    }
+    if (session.persistTimer) {
+      clearTimeout(session.persistTimer);
+    }
+    this.sessions.delete(key);
   }
 
   async handleOpen(
@@ -55,13 +75,14 @@ class NodeWorkflowSessionHub {
   ): Promise<void> {
     const clientId = crypto.randomUUID();
     const session = await this.loadSession(workflowId, userId, env);
+    await this.reloadSessionFromStore(session);
 
     const client: NodeWsClient = { id: clientId, ws, membership };
     session.clients.set(clientId, client);
 
     const initMessage: WorkflowInitMessage = {
       type: "init",
-      state: session.workflowState,
+      state: { ...session.workflowState, timestamp: session.workflowState.timestamp },
     };
     ws.send(JSON.stringify(initMessage));
   }
@@ -100,6 +121,9 @@ class NodeWorkflowSessionHub {
     }
 
     switch (parsed.type) {
+      case "patch_graph":
+        await this.handlePatchGraph(session, client, parsed);
+        break;
       case "update":
         await this.handleUpdate(session, client, parsed);
         break;
@@ -212,6 +236,7 @@ class NodeWorkflowSessionHub {
       clients: new Map(),
       persistTimer: null,
       pendingPersist: null,
+      rev: 0,
       workflowState: {
         id: workflowId,
         name: workflowData.name,
@@ -230,6 +255,77 @@ class NodeWorkflowSessionHub {
 
     this.sessions.set(key, session);
     return session;
+  }
+
+  private async reloadSessionFromStore(
+    session: NodeWorkflowSession
+  ): Promise<void> {
+    const workflowStore = new WorkflowStore(session.env);
+    const workflowWithData = await workflowStore.getWithData(
+      session.workflowState.id,
+      session.organizationId
+    );
+    if (!workflowWithData) {
+      return;
+    }
+
+    const workflowData = workflowWithData.data;
+    session.workflowState = {
+      id: session.workflowState.id,
+      name: workflowData.name,
+      description: workflowData.description,
+      schemeId: workflowData.schemeId,
+      trigger: workflowData.trigger as WorkflowState["trigger"],
+      runtime: workflowData.runtime,
+      nodes: workflowData.nodes,
+      edges: workflowData.edges,
+      ...(workflowData.editorViewport
+        ? { editorViewport: workflowData.editorViewport }
+        : {}),
+      ...(workflowData.generativeDefaults
+        ? { generativeDefaults: workflowData.generativeDefaults }
+        : {}),
+      timestamp: workflowWithData.updatedAt?.getTime() ?? Date.now(),
+    };
+  }
+
+  private async handlePatchGraph(
+    session: NodeWorkflowSession,
+    source: NodeWsClient,
+    message: WorkflowGraphPatchMessage
+  ): Promise<void> {
+    if (
+      !canEditWorkflows(source.membership.role, source.membership.permissions)
+    ) {
+      source.ws.close(1008, "Permission denied");
+      return;
+    }
+
+    if (isEmptyWorkflowGraphPatch(message)) {
+      return;
+    }
+
+    session.workflowState = {
+      ...applyWorkflowGraphPatch(session.workflowState, message),
+      timestamp: Date.now(),
+    };
+    session.rev += 1;
+
+    this.schedulePersist(session);
+
+    const patchMsg: WorkflowGraphPatchBroadcast = {
+      type: "patch_graph",
+      rev: session.rev,
+      nodePatches: message.nodePatches,
+      edgePatches: message.edgePatches,
+      timestamp: session.workflowState.timestamp,
+    };
+    const payload = JSON.stringify(patchMsg);
+    for (const client of session.clients.values()) {
+      if (client.id !== source.id) {
+        client.ws.send(payload);
+      }
+    }
   }
 
   private async handleUpdate(
@@ -267,22 +363,10 @@ class NodeWorkflowSessionHub {
       edges: filteredEdges,
       editorViewport:
         message.state.editorViewport ?? session.workflowState.editorViewport,
+      timestamp: message.state.timestamp ?? Date.now(),
     };
 
-    const graphUnchanged =
-      JSON.stringify(session.workflowState.nodes) ===
-        JSON.stringify(message.state.nodes) &&
-      JSON.stringify(session.workflowState.edges) ===
-        JSON.stringify(filteredEdges);
-    const viewportChanged =
-      JSON.stringify(session.workflowState.editorViewport ?? null) !==
-      JSON.stringify(message.state.editorViewport ?? null);
-
-    if (graphUnchanged && viewportChanged) {
-      void this.flushPersist(session);
-    } else {
-      this.schedulePersist(session);
-    }
+    this.schedulePersist(session);
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
@@ -355,8 +439,18 @@ class NodeWorkflowSessionHub {
       clearTimeout(session.persistTimer);
     }
     session.persistTimer = setTimeout(() => {
-      void this.flushPersist(session);
+      session.persistTimer = null;
+      void this.writeSessionToStore(session);
     }, PERSIST_DEBOUNCE_MS);
+  }
+
+  private async persistNow(session: NodeWorkflowSession): Promise<void> {
+    if (session.persistTimer) {
+      clearTimeout(session.persistTimer);
+      session.persistTimer = null;
+    }
+    session.pendingPersist = null;
+    await this.writeSessionToStore(session);
   }
 
   private async flushPersist(session: NodeWorkflowSession): Promise<void> {
@@ -365,8 +459,14 @@ class NodeWorkflowSessionHub {
       session.persistTimer = null;
     }
 
-    const state = session.pendingPersist ?? session.workflowState;
     session.pendingPersist = null;
+    await this.writeSessionToStore(session);
+  }
+
+  private async writeSessionToStore(
+    session: NodeWorkflowSession
+  ): Promise<void> {
+    const state = session.workflowState;
     if (!state) {
       return;
     }
@@ -385,6 +485,9 @@ class NodeWorkflowSessionHub {
         edges: state.edges,
         ...(state.editorViewport
           ? { editorViewport: state.editorViewport }
+          : {}),
+        ...(state.generativeDefaults
+          ? { generativeDefaults: state.generativeDefaults }
           : {}),
       };
 

@@ -2,12 +2,14 @@ export interface StudioListEditorState {
   readonly hasPrimary: boolean;
   readonly hasSecondary: boolean;
   readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
 }
 
 export interface StudioListNodeActions {
   readonly openPrimary: (nodeId: string) => void;
   readonly openSecondary: (nodeId: string) => void;
-  readonly replacePrimaryAndCloseSecondary: (nodeId: string) => void;
+  readonly replacePrimary: (nodeId: string) => void;
+  readonly promoteSecondaryToPrimary: (nodeId: string) => void;
 }
 
 export function handleStudioListNodeClick(
@@ -21,6 +23,13 @@ export function handleStudioListNodeClick(
   }
 
   if (state.hasSecondary) {
+    if (
+      nodeId === state.primaryNodeId ||
+      nodeId === state.secondaryNodeId
+    ) {
+      return;
+    }
+    actions.openSecondary(nodeId);
     return;
   }
 
@@ -41,10 +50,10 @@ export function handleStudioListNodeDoubleClick(
     return;
   }
 
-  if (state.hasSecondary) {
-    actions.replacePrimaryAndCloseSecondary(nodeId);
+  if (state.hasSecondary && nodeId === state.secondaryNodeId) {
+    actions.promoteSecondaryToPrimary(nodeId);
     return;
   }
 
-  actions.openPrimary(nodeId);
+  actions.replacePrimary(nodeId);
 }

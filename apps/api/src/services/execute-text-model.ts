@@ -1,7 +1,6 @@
 import {
   buildTextModelFailureCardParts,
   buildTextModelInvocationErrorFromFailure,
-  isTransientTextModelUpstreamError,
   withSelectedModel,
   type ReferenceImageInline,
 } from "@dafthunk/types";
@@ -12,7 +11,6 @@ import type { Bindings } from "../context";
 import type { Database } from "../db";
 import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
-import { disableTextModelOnInterface } from "./disable-text-model-on-interface";
 import {
   listOrgTextModelOptions,
   resolveOrgModelInterfaceCandidate,
@@ -160,16 +158,6 @@ export async function executeTextModel(params: {
     };
   }
 
-  const transient = isTransientTextModelUpstreamError(result.error);
-  if (!transient) {
-    await disableTextModelOnInterface(
-      params.db,
-      params.organizationId,
-      candidate.interfaceId,
-      params.canonicalId
-    );
-  }
-
   const modelDisplayLabel = modelOption?.displayName ?? params.canonicalId;
 
   const failure = buildTextModelFailureCardParts({
@@ -177,7 +165,6 @@ export async function executeTextModel(params: {
     channelKind: candidate.channelKind,
     modelDisplayLabel,
     upstreamError: result.error,
-    disabledInterface: !transient,
   });
 
   const invocationError = buildTextModelInvocationErrorFromFailure({

@@ -49,10 +49,6 @@ export const AdminQueuesPage = lazyRoutePage(
   () => import("@/pages/admin/admin-queues-page"),
   "AdminQueuesPage"
 );
-export const AdminDatasetsPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-datasets-page"),
-  "AdminDatasetsPage"
-);
 export const AdminAiModelsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-ai-models-page"),
   "AdminAiModelsPage"
@@ -127,10 +123,6 @@ export const ModelCallsPage = lazyRoutePage(
   () => import("@/pages/model-calls-page"),
   "ModelCallsPage"
 );
-export const DatasetsPage = lazyRoutePage(
-  () => import("@/pages/datasets-page"),
-  "DatasetsPage"
-);
 export const ApiKeysPage = lazyRoutePage(
   () => import("@/pages/api-keys-page"),
   "ApiKeysPage"
@@ -155,10 +147,6 @@ export const IntegrationsPage = lazyRoutePage(
   () => import("@/pages/integrations-page"),
   "IntegrationsPage"
 );
-export const DatasetDetailPage = lazyRoutePage(
-  () => import("@/pages/dataset-detail-page"),
-  "DatasetDetailPage"
-);
 export const DatabasesPage = lazyRoutePage(
   () => import("@/pages/databases-page"),
   "DatabasesPage"
@@ -182,10 +170,6 @@ export const QueuesPage = lazyRoutePage(
 export const EmailsPage = lazyRoutePage(
   () => import("@/pages/emails-page"),
   "EmailsPage"
-);
-export const EmailInboxPage = lazyRoutePage(
-  () => import("@/pages/email-inbox-page"),
-  "EmailInboxPage"
 );
 export const BotsPage = lazyRoutePage(
   () => import("@/pages/bots-page"),

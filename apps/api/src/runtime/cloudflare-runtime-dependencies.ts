@@ -18,7 +18,7 @@ import { creditChecksEnabled } from "../utils/credits";
 import { CloudflareCredentialService } from "./cloudflare-credential-service";
 import { CloudflareCreditService } from "./cloudflare-credit-service";
 import { PostgresDatabaseService } from "./postgres-database-service";
-import { CloudflareDatasetService } from "./cloudflare-dataset-service";
+import { MockDatasetService } from "../mocks/dataset-service";
 import { CloudflareExecutionStore } from "./cloudflare-execution-store";
 import { CloudflareMailboxService } from "./cloudflare-mailbox-service";
 import { createCloudflareNodeRegistry } from "./cloudflare-node-registry";
@@ -55,7 +55,7 @@ export async function buildDependencies(
   );
   const credentialProvider = new CloudflareCredentialService(env);
   const databaseService = new PostgresDatabaseService(env);
-  const datasetService = new CloudflareDatasetService(env);
+  const datasetService = new MockDatasetService();
   const queueService = new CloudflareQueueService(env);
   const schemaService = new CloudflareSchemaService(env);
   const mailboxService = new CloudflareMailboxService(env);

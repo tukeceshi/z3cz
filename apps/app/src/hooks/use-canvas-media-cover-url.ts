@@ -1,6 +1,5 @@
 import {
-  getMediaReferenceKey,
-  type MediaReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
   useInternalNode,
@@ -8,10 +7,8 @@ import {
   useStore,
   useViewport,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useMemo, useRef } from "react";
 
-import { useAuth } from "@/components/auth-context";
 import {
   canvasTierToDisplaySize,
   computeCanvasScreenShortEdge,
@@ -19,15 +16,9 @@ import {
   type CanvasMediaTier,
 } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
-import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
-import { dropStableBlobUrlsForMediaId } from "@/services/media-display-blob-url-registry";
-import { ingestCanvasMediaInBackground } from "@/services/ingest-canvas-media";
-import {
-  pickCanvasTierUrl,
-  resolveCanvasTierUrlSet,
-  resolveStableCanvasTierUrlSet,
-  type CanvasTierUrlSet,
-} from "@/services/resolve-resource-display-url";
+import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
+
+import { useMediaDisplayUrlSet } from "./use-media-display-url-set";
 
 function useCanvasNodeOnScreen(
   fallbackWidthPx: number,
@@ -115,7 +106,7 @@ function useCanvasMediaTier(): {
 }
 
 export function useCanvasMediaCoverUrl(params: {
-  readonly media: MediaReference | null;
+  readonly media: WorkflowMediaValue | null;
   readonly nodeType: "ai-image" | "ai-video";
   readonly cardWidthPx: number;
   readonly cardHeightPx?: number;
@@ -126,13 +117,6 @@ export function useCanvasMediaCoverUrl(params: {
   readonly isCanvasOnScreen: boolean;
   readonly retry: () => void;
 } {
-  const { organization } = useAuth();
-  const { id: workflowId } = useParams<{ id: string }>();
-  const orgId = organization?.id ?? "";
-  const mediaKey = useMemo(
-    () => (params.media ? getMediaReferenceKey(params.media) : null),
-    [params.media]
-  );
   const cardHeightPx = params.cardHeightPx ?? params.cardWidthPx;
   const nodeId = useNodeId();
   const isOffCanvasContext = !nodeId;
@@ -141,102 +125,34 @@ export function useCanvasMediaCoverUrl(params: {
     cardHeightPx
   );
   const { tierSize } = useCanvasMediaTier();
-
-  const [tierUrlSet, setTierUrlSet] = useState<CanvasTierUrlSet | null>(() => {
-    if (!params.media || !orgId || !workflowId) {
-      return null;
-    }
-    return resolveStableCanvasTierUrlSet({
-      media: params.media,
-      organizationId: orgId,
-      workflowId,
-    });
+  const { urlSet, stale, retry } = useMediaDisplayUrlSet({
+    media: params.media,
+    nodeType: params.nodeType,
   });
-  const [cacheRevision, setCacheRevision] = useState(0);
-
-  useEffect(() => {
-    const handler = () => {
-      setCacheRevision((value) => value + 1);
-    };
-    window.addEventListener(CACHE_STATS_EVENT, handler);
-    return () => window.removeEventListener(CACHE_STATS_EVENT, handler);
-  }, []);
-
-  useEffect(() => {
-    if (!params.media || !orgId || !workflowId || !mediaKey) {
-      setTierUrlSet(null);
-      return;
-    }
-
-    const stable = resolveStableCanvasTierUrlSet({
-      media: params.media,
-      organizationId: orgId,
-      workflowId,
-    });
-    if (stable) {
-      setTierUrlSet(stable);
-      return;
-    }
-
-    let cancelled = false;
-
-    void resolveCanvasTierUrlSet({
-      media: params.media,
-      organizationId: orgId,
-      workflowId,
-    }).then((set) => {
-      if (cancelled) {
-        return;
-      }
-      if (set) {
-        setTierUrlSet(set);
-        return;
-      }
-
-      ingestCanvasMediaInBackground({
-        organizationId: orgId,
-        workflowId,
-        media: params.media!,
-        nodeType: params.nodeType,
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    cacheRevision,
-    mediaKey,
-    orgId,
-    params.media,
-    params.nodeType,
-    workflowId,
-  ]);
 
   const displayUrl = useMemo(() => {
-    if (!tierUrlSet) {
+    if (!params.media) {
       return null;
     }
-    if (isOffCanvasContext || !isCanvasOnScreen) {
-      return tierUrlSet.s;
-    }
-    return pickCanvasTierUrl(
-      tierUrlSet,
-      tierSize as "canvas-s" | "canvas-m" | "canvas-l"
-    );
-  }, [isCanvasOnScreen, isOffCanvasContext, tierSize, tierUrlSet]);
 
-  const retry = useCallback(() => {
-    if (mediaKey) {
-      dropStableBlobUrlsForMediaId(mediaKey);
-    }
-    setTierUrlSet(null);
-    setCacheRevision((value) => value + 1);
-  }, [mediaKey]);
+    const pickSize = (
+      isOffCanvasContext || !isCanvasOnScreen
+        ? "canvas-s"
+        : tierSize
+    ) as MediaDisplaySize;
+
+    return pickMediaDisplayUrl(urlSet, pickSize);
+  }, [
+    isCanvasOnScreen,
+    isOffCanvasContext,
+    params.media,
+    tierSize,
+    urlSet,
+  ]);
 
   return {
     displayUrl,
-    stale: Boolean(params.media && !tierUrlSet),
+    stale,
     tierSize,
     isCanvasOnScreen,
     retry,

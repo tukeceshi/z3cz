@@ -1,6 +1,4 @@
 import CameraIcon from "lucide-react/icons/camera";
-import PauseIcon from "lucide-react/icons/pause";
-import PlayIcon from "lucide-react/icons/play";
 import Volume1Icon from "lucide-react/icons/volume-1";
 import Volume2Icon from "lucide-react/icons/volume-2";
 import VolumeXIcon from "lucide-react/icons/volume-x";
@@ -42,7 +40,41 @@ export interface WorkflowMediaVideoPlayerProps {
   readonly onError?: () => void;
   readonly onLoadedMetadata?: (video: HTMLVideoElement) => void;
   readonly videoRef?: RefObject<HTMLVideoElement | null>;
+  readonly onExpandView?: () => void;
 }
+
+function NativeStylePlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+      <path d="M8 5.14v13.72L19 12 8 5.14z" />
+    </svg>
+  );
+}
+
+function NativeStylePauseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+      <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+    </svg>
+  );
+}
+
+function NativeStyleExpandIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+    </svg>
+  );
+}
+
+const DEFAULT_VOLUME = 0.5;
 
 function stopPointerPropagation(event: ReactPointerEvent) {
   event.stopPropagation();
@@ -61,12 +93,13 @@ export function WorkflowMediaVideoPlayer({
   onError,
   onLoadedMetadata,
   videoRef: externalVideoRef,
+  onExpandView,
 }: WorkflowMediaVideoPlayerProps) {
   const { t } = useTranslation();
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const progressTrackRef = useRef<HTMLDivElement>(null);
   const volumeTrackRef = useRef<HTMLDivElement>(null);
-  const lastVolumeBeforeMuteRef = useRef(1);
+  const lastVolumeBeforeMuteRef = useRef(DEFAULT_VOLUME);
   const videoRef = externalVideoRef ?? internalVideoRef;
 
   const isCardVariant = variant === "card";
@@ -80,8 +113,8 @@ export function WorkflowMediaVideoPlayer({
   );
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(isCardVariant);
-  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -115,16 +148,13 @@ export function WorkflowMediaVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    if (isCardVariant) {
-      video.muted = true;
-    }
+    video.volume = DEFAULT_VOLUME;
+    video.muted = false;
 
     setIsPlaying(!video.paused);
-    setIsMuted(video.muted);
-    setVolume(video.volume);
-    if (video.volume > 0) {
-      lastVolumeBeforeMuteRef.current = video.volume;
-    }
+    setIsMuted(false);
+    setVolume(DEFAULT_VOLUME);
+    lastVolumeBeforeMuteRef.current = DEFAULT_VOLUME;
     syncTimeState();
 
     const handlePlay = () => setIsPlaying(true);
@@ -179,6 +209,11 @@ export function WorkflowMediaVideoPlayer({
   const tryCardAutoplay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    video.volume = DEFAULT_VOLUME;
+    video.muted = false;
+    setVolume(DEFAULT_VOLUME);
+    setIsMuted(false);
 
     void video.play().catch(() => {
       video.muted = true;
@@ -239,7 +274,7 @@ export function WorkflowMediaVideoPlayer({
     if (!video) return;
 
     if (video.muted || video.volume === 0) {
-      applyVolume(lastVolumeBeforeMuteRef.current || 1);
+      applyVolume(lastVolumeBeforeMuteRef.current || DEFAULT_VOLUME);
       video.muted = false;
       setIsMuted(false);
       return;
@@ -283,8 +318,15 @@ export function WorkflowMediaVideoPlayer({
         Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1))
       );
       applyVolume(ratio);
+      if (ratio > 0) {
+        const video = videoRef.current;
+        if (video) {
+          video.muted = false;
+          setIsMuted(false);
+        }
+      }
     },
-    [applyVolume]
+    [applyVolume, videoRef]
   );
 
   const handleVerticalVolumePointerDown = useCallback(
@@ -369,14 +411,13 @@ export function WorkflowMediaVideoPlayer({
 
   const progressRatio =
     duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
-  const effectiveVolume = isMuted ? 0 : volume;
-  const volumePercent = Math.round(effectiveVolume * 100);
+  const volumePercent = Math.round(volume * 100);
   const fieldVolumeSliderWidth = 72;
 
   const volumeIcon =
-    isMuted || effectiveVolume === 0 ? (
+    isMuted || volume === 0 ? (
       <VolumeXIcon className="h-3.5 w-3.5" strokeWidth={2} />
-    ) : effectiveVolume < 0.5 ? (
+    ) : volume < 0.5 ? (
       <Volume1Icon className="h-3.5 w-3.5" strokeWidth={2} />
     ) : (
       <Volume2Icon className="h-3.5 w-3.5" strokeWidth={2} />
@@ -419,11 +460,11 @@ export function WorkflowMediaVideoPlayer({
             <div className="absolute h-full w-0.5 rounded-full bg-white/30" />
             <div
               className="absolute bottom-0 w-0.5 rounded-full bg-white"
-              style={{ height: `${effectiveVolume * 100}%` }}
+              style={{ height: `${volume * 100}%` }}
             />
             <div
               className="absolute h-2 w-2 rounded-full bg-white"
-              style={{ bottom: `calc(${effectiveVolume * 100}% - 4px)` }}
+              style={{ bottom: `calc(${volume * 100}% - 4px)` }}
             />
           </div>
         </div>
@@ -470,11 +511,11 @@ export function WorkflowMediaVideoPlayer({
         <div className="h-0.5 w-full rounded-full bg-white/30" />
         <div
           className="absolute left-0 h-0.5 rounded-full bg-white"
-          style={{ width: `${effectiveVolume * 100}%` }}
+          style={{ width: `${volume * 100}%` }}
         />
         <div
           className="absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-white"
-          style={{ left: `calc(${effectiveVolume * 100}% - 4px)` }}
+          style={{ left: `calc(${volume * 100}% - 4px)` }}
         />
       </div>
     </div>
@@ -497,7 +538,7 @@ export function WorkflowMediaVideoPlayer({
         crossOrigin={allowCrossOrigin ? "anonymous" : undefined}
         disablePictureInPicture
         disableRemotePlayback
-        muted={isCardVariant ? isMuted : undefined}
+        muted={isMuted}
         className={cn(
           "h-full w-full",
           isCardVariant && "pointer-events-none",
@@ -555,11 +596,7 @@ export function WorkflowMediaVideoPlayer({
             handleTogglePlay();
           }}
         >
-          {isPlaying ? (
-            <PauseIcon className="h-4 w-4" strokeWidth={2} />
-          ) : (
-            <PlayIcon className="h-4 w-4 pl-0.5" strokeWidth={2} />
-          )}
+          {isPlaying ? <NativeStylePauseIcon /> : <NativeStylePlayIcon />}
         </button>
 
         <span className="shrink-0 text-xs tabular-nums text-white">
@@ -587,6 +624,20 @@ export function WorkflowMediaVideoPlayer({
         </span>
 
         {volumeControl}
+
+        {onExpandView ? (
+          <button
+            type="button"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-black/50"
+            aria-label={t("workflow.studio.viewImage")}
+            onClick={(event) => {
+              event.stopPropagation();
+              onExpandView();
+            }}
+          >
+            <NativeStyleExpandIcon />
+          </button>
+        ) : null}
 
         {frameCaptureEnabled ? (
           <DropdownMenu>

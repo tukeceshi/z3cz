@@ -16,7 +16,7 @@ describe("generative-card-error-utils", () => {
           summary: "DeepSeek V4 Flash（文字）调用失败",
           cardLines: [
             "DeepSeek V4 Flash（文字）调用失败",
-            "已自动关闭错误接口 「API」DeepSeek。",
+            "接口 「API」DeepSeek 请求失败，请检查配置或稍后重试。",
           ],
           detail: "完整错误",
         }),
@@ -29,7 +29,7 @@ describe("generative-card-error-utils", () => {
       readGenerativeCardError({
         [GENERATIVE_CARD_GENERATE_ERROR_META_KEY]: [
           "DeepSeek V4 Flash（文字）调用失败",
-          "已自动关闭错误接口 「API」DeepSeek。",
+          "接口 「API」DeepSeek 请求失败，请检查配置或稍后重试。",
         ].join("\n"),
       })?.cardLines?.length
     ).toBeGreaterThan(0);

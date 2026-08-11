@@ -1,7 +1,10 @@
 import {
   getGenerativeCardLines,
+  matchGenerativeErrorRule,
   normalizeGenerativeCardError,
   type GenerativeCardError,
+  type GenerativeErrorLocale,
+  type GenerativeModelKind,
   parseTextModelFailureMessageToCardError,
 } from "@dafthunk/types";
 
@@ -10,6 +13,7 @@ import type { TranslateFn } from "@/i18n";
 import {
   extractGenerativeApiErrorMessage,
   formatGenerativeApiError,
+  formatGenerativeApiErrorCardLines,
 } from "./format-generative-api-error";
 
 function withCardLines(error: GenerativeCardError): GenerativeCardError {
@@ -23,7 +27,9 @@ function withCardLines(error: GenerativeCardError): GenerativeCardError {
 
 export function prepareGenerativeCardError(
   raw: string,
-  t?: TranslateFn
+  t?: TranslateFn,
+  modelKind: GenerativeModelKind = "text",
+  locale: GenerativeErrorLocale = "zh"
 ): GenerativeCardError {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -46,7 +52,24 @@ export function prepareGenerativeCardError(
 
   if (t) {
     const message = extractGenerativeApiErrorMessage(trimmed);
-    const formatted = formatGenerativeApiError(message, t);
+    const formattedCardLines = formatGenerativeApiErrorCardLines(
+      trimmed,
+      t,
+      modelKind,
+      locale
+    );
+    if (formattedCardLines?.length) {
+      const cardLines = message.trim()
+        ? [...formattedCardLines, message.trim()]
+        : formattedCardLines;
+      return withCardLines({
+        summary: formattedCardLines[0] ?? message,
+        cardLines,
+        detail: cardLines.join("\n"),
+      });
+    }
+
+    const formatted = formatGenerativeApiError(message, t, modelKind, locale);
     if (formatted && formatted !== message) {
       return {
         summary: formatted,
@@ -54,6 +77,17 @@ export function prepareGenerativeCardError(
         detail: message.trim() ? `${formatted}\n${message.trim()}` : formatted,
       };
     }
+  }
+
+  const matched = matchGenerativeErrorRule({ raw: trimmed, modelKind, locale });
+  if (matched?.cardLines?.length) {
+    const message = extractGenerativeApiErrorMessage(trimmed).trim();
+    const cardLines = message ? [...matched.cardLines, message] : matched.cardLines;
+    return withCardLines({
+      summary: matched.cardLines[0] ?? matched.message,
+      cardLines,
+      detail: cardLines.join("\n"),
+    });
   }
 
   return withCardLines(normalized);

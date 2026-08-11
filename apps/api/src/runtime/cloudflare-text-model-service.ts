@@ -6,7 +6,6 @@ import type {
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
 import { executeTextModel } from "../services/execute-text-model";
-import { disableTextModelOnInterface } from "../services/disable-text-model-on-interface";
 import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
 import {
   inferOrgModelInterfaceId,
@@ -77,20 +76,6 @@ export class CloudflareTextModelService {
       referenceImageInline: params.referenceImageInline,
       referenceVideoUrls: params.referenceVideoUrls,
     });
-  }
-
-  async disableTextModelOnInterface(params: {
-    organizationId: string;
-    interfaceId: string;
-    canonicalId: string;
-  }): Promise<boolean> {
-    const db = createDatabase(this.env);
-    return disableTextModelOnInterface(
-      db,
-      params.organizationId,
-      params.interfaceId,
-      params.canonicalId
-    );
   }
 
   async resolveTextModelInferenceId(params: {

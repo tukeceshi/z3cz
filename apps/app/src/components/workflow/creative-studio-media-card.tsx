@@ -1,16 +1,16 @@
 import {
   AI_VIDEO_NODE_TYPE,
-  isMediaReference,
+  isWorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useRef, useState } from "react";
 
-import { useTranslation } from "@/components/locale-provider";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useMediaDisplayUrlSet } from "@/hooks/use-media-display-url-set";
+import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
 import { cn } from "@/utils/utils";
 
-import { readAiImageCardImages } from "./ai-image-node-utils";
-import { readAiVideoCardVideos } from "./ai-video-node-utils";
+import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
+import { readAiVideoCardPrimaryVideo } from "./ai-video-node-utils";
 import {
   readStudioModelLabel,
   readStudioVideoResolution,
@@ -21,15 +21,10 @@ import {
 } from "./creative-studio-media-preview-frame";
 import {
   STUDIO_MEDIA_CARD,
-  STUDIO_MEDIA_CARD_FOOTER,
-  STUDIO_META_ROW,
-  STUDIO_META_TAG,
-  STUDIO_NODE_LABEL,
-  STUDIO_NODE_LABEL_ROW,
 } from "./creative-studio-surface";
 import { GenerativeCardErrorBlock } from "./generative-card-error-block";
-import { CreativeStudioListItemMenu } from "./creative-studio-list-item-menu";
-import { resolveStudioNodeLabel } from "./creative-studio-utils";
+import { CreativeStudioListItemFooter } from "./creative-studio-list-item-footer";
+import { useCreativeStudio } from "./creative-studio-context";
 import { readStudioMediaCardState } from "./studio-media-card-state";
 import {
   useStudioImageFileSize,
@@ -51,38 +46,32 @@ export function CreativeStudioMediaCard({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioMediaCardProps) {
-  const { t } = useTranslation();
-  const label = resolveStudioNodeLabel(node, t);
   const nodeType = node.data.nodeType ?? "";
   const isVideo = nodeType === AI_VIDEO_NODE_TYPE;
   const cardState = readStudioMediaCardState(node.data.metadata, isVideo);
 
   const primaryMedia = isVideo
-    ? readAiVideoCardVideos(
+    ? readAiVideoCardPrimaryVideo(
         node.data.inputs,
         node.data.outputs,
         node.data.metadata
-      )[0]
-    : readAiImageCardImages(
+      )
+    : readAiImageCardPrimaryImage(
         node.data.inputs,
         node.data.outputs,
         node.data.metadata
-      )[0];
+      );
 
   const mediaRef =
-    primaryMedia && isMediaReference(primaryMedia) ? primaryMedia : null;
+    primaryMedia && isWorkflowMediaValue(primaryMedia) ? primaryMedia : null;
 
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { urlSet, stale } = useMediaDisplayUrlSet({
     media: mediaRef,
     nodeType: isVideo ? "ai-video" : "ai-image",
-    size: isVideo ? "full" : "canvas-m",
   });
 
-  const { displayUrl: fullImageUrl } = useMediaDisplayUrl({
-    media: isVideo ? null : mediaRef,
-    nodeType: "ai-image",
-    size: "full",
-  });
+  const displayUrl = pickMediaDisplayUrl(urlSet, "full");
+  const fullImageUrl = displayUrl;
 
   const canPreview =
     mediaRef != null && displayUrl != null && !stale;
@@ -120,13 +109,19 @@ export function CreativeStudioMediaCard({
     videoResolution,
   ]);
 
+  const { isListNodeRenaming } = useCreativeStudio();
+  const isRenaming = isListNodeRenaming(node.id);
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragProps = studioReferenceDragSourceProps(node, referenceDragEnabled, {
-    dragImageRootRef: cardRef,
-    onDragStateChange: setIsDragging,
-    onDragStart: onCancelPendingListClick,
-  });
+  const dragProps = studioReferenceDragSourceProps(
+    node,
+    referenceDragEnabled && !isRenaming,
+    {
+      dragImageRootRef: cardRef,
+      onDragStateChange: setIsDragging,
+      onDragStart: onCancelPendingListClick,
+    }
+  );
 
   return (
     <div
@@ -134,7 +129,7 @@ export function CreativeStudioMediaCard({
       className={cn(
         STUDIO_MEDIA_CARD,
         "w-full",
-        referenceDragEnabled && "cursor-grab",
+        referenceDragEnabled && !isRenaming && "cursor-grab",
         isDragging && "opacity-50"
       )}
       {...dragProps}
@@ -156,7 +151,7 @@ export function CreativeStudioMediaCard({
         ) : (
           <CreativeStudioMediaPreviewPlaceholder
             isVideo={isVideo}
-            busy={cardState.isBusy}
+            busy={cardState.isBusy || (mediaRef != null && stale)}
           />
         )}
         {cardState.generateError ? (
@@ -164,35 +159,11 @@ export function CreativeStudioMediaCard({
         ) : null}
       </button>
 
-      <div className={STUDIO_MEDIA_CARD_FOOTER}>
-        <div className={STUDIO_NODE_LABEL_ROW}>
-          <button
-            type="button"
-            className={cn(
-              STUDIO_NODE_LABEL,
-              "min-w-0 flex-1 truncate text-left text-[13px] leading-none text-foreground/90"
-            )}
-            onClick={onOpenDetail}
-          >
-            {label}
-          </button>
-          <CreativeStudioListItemMenu nodeId={node.id} />
-        </div>
-        {metaTags.length > 0 ? (
-          <button type="button" className="w-full text-left" onClick={onOpenDetail}>
-            <div className={STUDIO_META_ROW}>
-              {metaTags.map((tag, index) => (
-                <span
-                  key={`${tag}-${index}`}
-                  className={cn(STUDIO_META_TAG, "truncate")}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </button>
-        ) : null}
-      </div>
+      <CreativeStudioListItemFooter
+        node={node}
+        onOpenDetail={onOpenDetail}
+        metaTags={metaTags}
+      />
     </div>
   );
 }

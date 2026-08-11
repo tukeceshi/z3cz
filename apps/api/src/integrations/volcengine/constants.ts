@@ -18,3 +18,7 @@ export const VOLCANO_BILLING_SERVICE = "billing" as const;
 export const VOLCANO_BILLING_API_VERSION = "2022-01-01" as const;
 export const VOLCANO_BILLING_HOST = "billing.volcengineapi.com" as const;
 export const VOLCANO_BILLING_PAGE_DELAY_MS = 350;
+
+export const VOLCANO_MONITOR_SERVICE = "Volc_Observe" as const;
+export const VOLCANO_MONITOR_API_VERSION = "2018-01-01" as const;
+export const VOLCANO_MONITOR_HOST = "open.volcengineapi.com" as const;

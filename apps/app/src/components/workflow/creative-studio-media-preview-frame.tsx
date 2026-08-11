@@ -1,5 +1,5 @@
 import {
-  isMediaReference,
+  isWorkflowMediaValue,
   type MediaReference,
 } from "@dafthunk/types";
 import Image from "lucide-react/icons/image";
@@ -10,8 +10,9 @@ import { useState, type ReactNode } from "react";
 
 import { cn } from "@/utils/utils";
 
-import { readAiImageCardImages } from "./ai-image-node-utils";
-import { readAiVideoCardVideos } from "./ai-video-node-utils";
+import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
+import { readAiVideoCardPrimaryVideo } from "./ai-video-node-utils";
+import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "./generative-card-styles";
 import {
   STUDIO_MEDIA_PREVIEW,
   STUDIO_MEDIA_PREVIEW_MEDIA,
@@ -75,9 +76,9 @@ function readPrimaryStudioMedia(
   isVideo: boolean
 ): MediaReference | undefined {
   if (isVideo) {
-    return readAiVideoCardVideos(data.inputs, data.outputs, data.metadata)[0];
+    return readAiVideoCardPrimaryVideo(data.inputs, data.outputs, data.metadata);
   }
-  return readAiImageCardImages(data.inputs, data.outputs, data.metadata)[0];
+  return readAiImageCardPrimaryImage(data.inputs, data.outputs, data.metadata);
 }
 
 export function hasStudioMediaContent(
@@ -85,7 +86,7 @@ export function hasStudioMediaContent(
   isVideo: boolean
 ): boolean {
   const media = readPrimaryStudioMedia(data, isVideo);
-  return media != null && isMediaReference(media);
+  return media != null && isWorkflowMediaValue(media);
 }
 
 export interface CreativeStudioMediaPreviewPlaceholderProps {
@@ -102,34 +103,34 @@ export function CreativeStudioMediaPreviewPlaceholder({
   size = "list",
 }: CreativeStudioMediaPreviewPlaceholderProps) {
   const Icon = isVideo ? Video : Image;
+  const isDetail = size === "detail";
 
   return (
     <CreativeStudioMediaPreviewSlot
       aspectRatio={DEFAULT_ASPECT_RATIO}
       className={STUDIO_MEDIA_PREVIEW_PLACEHOLDER}
     >
-      {busy ? (
+      {busy && !isDetail ? (
         <LoaderIcon
-          className={cn(
-            "shrink-0 animate-spin text-yellow-500",
-            size === "detail" ? "h-6 w-6" : "h-5 w-5"
-          )}
+          className="h-5 w-5 shrink-0 animate-spin text-yellow-500"
           aria-hidden
         />
-      ) : (
+      ) : !busy ? (
         <Icon
           className={cn(
             "shrink-0 opacity-40",
-            size === "detail" ? "h-8 w-8" : "h-6 w-6"
+            isDetail ? "h-8 w-8" : "h-6 w-6"
           )}
           aria-hidden
         />
-      )}
+      ) : null}
       {message ? (
         <span
           className={cn(
-            "max-w-full truncate px-2 text-center italic",
-            size === "detail" ? "text-sm" : "text-[11px]"
+            "max-w-full px-2 text-center",
+            isDetail
+              ? GENERATIVE_CARD_STATE_LABEL_CLASS
+              : "truncate text-[11px] italic text-muted-foreground/50"
           )}
         >
           {message}
@@ -145,6 +146,7 @@ export interface StudioMediaEmptyPreviewProps {
   readonly busy?: boolean;
   readonly layout?: "list" | "detail";
   readonly className?: string;
+  readonly busyOverlay?: ReactNode;
 }
 
 /** Shared empty media slot — list card or detail edit area. */
@@ -154,6 +156,7 @@ export function StudioMediaEmptyPreview({
   busy = false,
   layout = "list",
   className,
+  busyOverlay,
 }: StudioMediaEmptyPreviewProps) {
   const placeholder = (
     <CreativeStudioMediaPreviewPlaceholder
@@ -172,8 +175,9 @@ export function StudioMediaEmptyPreview({
           className
         )}
       >
-        <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800">
           {placeholder}
+          {busyOverlay}
         </div>
       </div>
     );

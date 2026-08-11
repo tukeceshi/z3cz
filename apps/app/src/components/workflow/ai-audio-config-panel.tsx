@@ -32,6 +32,7 @@ import {
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
@@ -89,6 +90,7 @@ export interface AiAudioConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly layout?: GenerativeConfigPanelLayout;
+  readonly detailRole?: CreativeStudioDetailViewRole;
 }
 
 function getInputString(data: WorkflowNodeType, id: string): string {
@@ -100,6 +102,7 @@ export function AiAudioConfigPanel({
   nodeId,
   data,
   layout = "attached",
+  detailRole,
 }: AiAudioConfigPanelProps) {
   const {
     updateNodeData,
@@ -164,7 +167,6 @@ export function AiAudioConfigPanel({
     effectiveModel,
     selectedOptionId,
     models,
-    groups,
     isLoading,
     modelsError,
     canGenerate: modelReady,
@@ -596,7 +598,7 @@ export function AiAudioConfigPanel({
       }
 
       const raw = error instanceof Error ? error.message : String(error);
-      const cardError = prepareGenerativeCardError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t, "audio");
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiAudioGenerateError(
           withAiAudioGeneratingFlag(
@@ -670,6 +672,7 @@ export function AiAudioConfigPanel({
           chips={referenceChips}
           disabled={disabled}
           showStudioReferenceHints={layout === "studio-dock"}
+          detailRole={detailRole}
           allowUpload={false}
           addReferenceDisabled={!canAddReference}
           canPickCanvasNode={pickableOutputs.length > 0}
@@ -739,7 +742,6 @@ export function AiAudioConfigPanel({
             <AiTextModelPicker
               orgId={orgId}
               models={models as unknown as readonly OrgTextModelOption[]}
-              groups={groups}
               selectedOptionId={selectedOptionId}
               chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
               disabled={disabled || isLoading}

@@ -1,4 +1,4 @@
-import type { MediaReference } from "./media-reference";
+import type { MediaReference, ResourceIdReference } from "./media-reference";
 import type { ImageGenerationRequestSnapshot } from "./platform-ai-model";
 
 export type GenerationJobModality = "image" | "video" | "audio";
@@ -163,7 +163,7 @@ export interface GenerationJobRecord {
 export interface GetGenerationJobResponse {
   readonly job: GenerationJobRecord;
   readonly pendingMedia?: readonly GenerationJobPendingMedia[];
-  readonly finalMedia?: readonly MediaReference[];
+  readonly finalMedia?: readonly ResourceIdReference[];
   readonly displayPhase?: GenerationJobDisplayPhase;
   /** True when server is persisting or job succeeded — client must not upload locally. */
   readonly deferClientPersistToServer?: boolean;
@@ -193,7 +193,7 @@ export interface ClaimGenerationJobClientUploadResponse {
 export interface RequestGenerationJobServerPersistResponse {
   readonly job: GenerationJobRecord;
   readonly displayPhase: GenerationJobDisplayPhase;
-  readonly finalMedia?: readonly MediaReference[];
+  readonly finalMedia?: readonly ResourceIdReference[];
 }
 
 export interface CompleteGenerationJobUploadRequest {
@@ -202,5 +202,5 @@ export interface CompleteGenerationJobUploadRequest {
 
 export interface CompleteGenerationJobUploadResponse {
   readonly job: GenerationJobRecord;
-  readonly finalMedia: readonly MediaReference[];
+  readonly finalMedia: readonly ResourceIdReference[];
 }

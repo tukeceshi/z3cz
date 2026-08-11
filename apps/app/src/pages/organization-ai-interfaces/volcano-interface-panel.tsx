@@ -57,6 +57,7 @@ import {
 } from "@/services/organization-ai-interface-service";
 
 import { ApiRequestError } from "@/services/utils";
+import { useVolcanoAggregateCatalog } from "@/services/platform-ai-model-service";
 
 import {
   getVolcanoEffectiveActivationStatus,
@@ -234,6 +235,7 @@ export function VolcanoInterfacePanel({
   const { t, locale } = useTranslation();
 
   const appToast = useAppToast();
+  const { catalog: aggregateCatalog } = useVolcanoAggregateCatalog(organizationId);
 
   const [snapshot, setSnapshot] = useState<VolcanoSnapshotResponse | null>(null);
 
@@ -364,7 +366,7 @@ export function VolcanoInterfacePanel({
 
           }
 
-          const local = buildVolcanoSnapshotFromMetadata(iface);
+          const local = buildVolcanoSnapshotFromMetadata(iface, aggregateCatalog);
 
           if (local) {
 
@@ -518,7 +520,7 @@ export function VolcanoInterfacePanel({
 
     },
 
-    [appToast, iface, locale, onUpdated, organizationId, probeTosService, t]
+    [aggregateCatalog, appToast, iface, locale, onUpdated, organizationId, probeTosService, t]
 
   );
 
@@ -538,7 +540,7 @@ export function VolcanoInterfacePanel({
 
     }
 
-    const local = buildVolcanoSnapshotFromMetadata(iface);
+    const local = buildVolcanoSnapshotFromMetadata(iface, aggregateCatalog);
 
     if (!local) {
 
@@ -566,7 +568,7 @@ export function VolcanoInterfacePanel({
 
     });
 
-  }, [expanded, iface]);
+  }, [aggregateCatalog, expanded, iface]);
 
 
 
@@ -604,7 +606,7 @@ export function VolcanoInterfacePanel({
 
 
   const enabledModelChips = useMemo(() => {
-    const source = snapshot ?? buildVolcanoSnapshotFromMetadata(iface);
+    const source = snapshot ?? buildVolcanoSnapshotFromMetadata(iface, aggregateCatalog);
     if (!source) {
       return [];
     }
@@ -615,7 +617,7 @@ export function VolcanoInterfacePanel({
         alias: row.alias,
         modality: row.modality,
       }));
-  }, [iface, snapshot]);
+  }, [aggregateCatalog, iface, snapshot]);
 
   const panelBannerProps = {
     arkNotOpened,
@@ -672,7 +674,7 @@ export function VolcanoInterfacePanel({
 
       }
 
-      const local = buildVolcanoSnapshotFromMetadata(iface);
+      const local = buildVolcanoSnapshotFromMetadata(iface, aggregateCatalog);
 
       if (local) {
 

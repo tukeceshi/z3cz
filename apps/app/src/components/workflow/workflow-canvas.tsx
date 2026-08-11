@@ -23,7 +23,6 @@ import {
   ReactFlow,
   useViewport,
 } from "@xyflow/react";
-import { Plus } from "lucide-react";
 import Bot from "lucide-react/icons/bot";
 import ClipboardPaste from "lucide-react/icons/clipboard-paste";
 import Clock from "lucide-react/icons/clock";
@@ -46,7 +45,7 @@ import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
-import { cn, getModifierKey, getModifierSymbol } from "@/utils/utils";
+import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
 import {
@@ -185,7 +184,6 @@ export interface WorkflowCanvasProps {
       ReactFlowEdge<WorkflowEdgeType>
     >
   ) => void;
-  onAddNode?: () => void;
   onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => void;
   onAction?: (e: React.MouseEvent) => void;
   workflowStatus?: WorkflowExecutionStatus;
@@ -246,8 +244,6 @@ export function ActionButton({
   showTooltip = true,
 }: ActionButtonProps) {
   const { t } = useTranslation();
-  const modifierSymbol = getModifierSymbol();
-  const shortcut = `${modifierSymbol}⏎`;
 
   const statusConfig = {
     idle: {
@@ -303,23 +299,7 @@ export function ActionButton({
       disabled={disabled}
       className={cn(config.className, className)}
       tooltipSide="bottom"
-      tooltip={
-        showTooltip && (
-          <div className="flex items-center gap-2">
-            <span>{t(config.titleKey)}</span>
-            <div className="flex items-center gap-1">
-              {shortcut.split("").map((key, index) => (
-                <kbd
-                  key={index}
-                  className="px-1 py-0.25 text-xs rounded border font-mono"
-                >
-                  {key}
-                </kbd>
-              ))}
-            </div>
-          </div>
-        )
-      }
+      tooltip={showTooltip ? t(config.titleKey) : undefined}
     >
       {config.icon}
       {text}
@@ -470,30 +450,6 @@ function ApplyLayoutButton({
       tooltip={<p>{t("workflow.canvas.reorganizeLayout")}</p>}
     >
       <Network className="size-4!" />
-    </ActionBarButton>
-  );
-}
-
-function AddNodeButton({
-  onClick,
-  disabled,
-}: {
-  onClick: (e: React.MouseEvent) => void;
-  disabled?: boolean;
-}) {
-  const { t } = useTranslation();
-  return (
-    <ActionBarButton
-      onClick={onClick}
-      disabled={disabled}
-      tooltip={t("workflow.canvas.addNode")}
-      className={cn(
-        actionBarButtonOutlineClassName,
-        "size-10 p-0! text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
-      )}
-      tooltipSide="top"
-    >
-      <Plus className="size-5!" />
     </ActionBarButton>
   );
 }
@@ -668,7 +624,6 @@ export function WorkflowCanvas({
   onMoveStart,
   onMoveEnd,
   onInit,
-  onAddNode,
   onQuickAddAiNode,
   onAction,
   workflowStatus = "idle",
@@ -897,7 +852,6 @@ export function WorkflowCanvas({
             className="m-4 flex flex-row items-center gap-2"
           >
             <ActionBarGroup>
-              {onAddNode && <AddNodeButton onClick={onAddNode} disabled={disabled} />}
               {onQuickAddAiNode && (
                 <>
                   <QuickAddAiNodeButton

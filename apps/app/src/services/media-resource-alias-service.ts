@@ -1,8 +1,7 @@
 import {
-  getMediaReferenceKey,
+  getResourceIdFromValue,
   isLocalMediaReference,
-  type MediaReference,
-  type ObjectReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 const memoryAliases = new Map<string, string>();
@@ -114,11 +113,14 @@ export function objectReferenceFromStorageKey(params: {
 }
 
 export function resolveCanonicalResourceId(params: {
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
   readonly organizationId: string;
   readonly workflowId: string;
 }): string {
-  const key = getMediaReferenceKey(params.media);
+  const key = getResourceIdFromValue(params.media);
+  if (!key) {
+    return "";
+  }
   if (!isLocalMediaReference(params.media)) {
     return key;
   }
@@ -132,10 +134,10 @@ export function resolveCanonicalResourceId(params: {
 }
 
 export function resolveCanonicalMediaReference(params: {
-  readonly media: MediaReference;
+  readonly media: WorkflowMediaValue;
   readonly organizationId: string;
   readonly workflowId: string;
-}): MediaReference {
+}): WorkflowMediaValue {
   if (!isLocalMediaReference(params.media)) {
     return params.media;
   }
@@ -149,8 +151,8 @@ export function resolveCanonicalMediaReference(params: {
     return params.media;
   }
 
-  return objectReferenceFromStorageKey({
-    storageKey: alias,
+  return {
+    resourceId: alias,
     mimeType: params.media.mimeType,
-  });
+  };
 }

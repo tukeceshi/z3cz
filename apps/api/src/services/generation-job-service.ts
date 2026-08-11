@@ -13,8 +13,10 @@ import {
   isEphemeralMediaReference,
   isGenerationJobReadyAtExpired,
   isVideoUpstreamPollDue,
+  mediaReferenceToWorkflowValue,
   nextVideoUpstreamPollAt,
   shouldDeferClientPersistToServer,
+  type ResourceIdReference,
 } from "@dafthunk/types";
 import { pollOrgVideoTask } from "./org-video-task";
 import { createJobUpstreamRequestLogger } from "./job-upstream-request-logger";
@@ -147,13 +149,28 @@ export async function markVideoGenerationJobReadyToPersist(
   );
 }
 
+function toWorkflowFinalMedia(
+  media: readonly MediaReference[] | undefined
+): readonly ResourceIdReference[] | undefined {
+  if (!media || media.length === 0) {
+    return undefined;
+  }
+  return media.map((ref) => {
+    const value = mediaReferenceToWorkflowValue(ref);
+    if ("kind" in value && value.kind === "local") {
+      return { resourceId: value.mediaId, mimeType: value.mimeType };
+    }
+    return value;
+  });
+}
+
 function toGetGenerationJobResponse(
   job: GenerationJobRecord
 ): GetGenerationJobResponse {
   return {
     job,
     pendingMedia: extractPendingMediaFromJob(job),
-    finalMedia: extractFinalMediaFromJob(job),
+    finalMedia: toWorkflowFinalMedia(extractFinalMediaFromJob(job)),
     displayPhase: resolveGenerationJobDisplayPhase(job),
     deferClientPersistToServer: shouldDeferClientPersistToServer(job),
   };

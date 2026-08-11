@@ -23,7 +23,6 @@ import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
@@ -46,6 +45,7 @@ import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-r
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
@@ -136,6 +136,14 @@ import {
   collectAiVideoUnifiedReferenceChips,
 } from "./ai-video-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
+import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
+import {
+  appendVideoPromptRefToken,
+  buildVideoPromptImageEdgeIndexMap,
+  compileVideoPromptForSubmit,
+  compiledVideoPromptLength,
+  hasBrokenVideoPromptRefs,
+} from "./video-prompt-compile";
 import {
   useGenerativeCloudJobProgress,
   generativeVideoProgressButtonKey,
@@ -151,6 +159,7 @@ export interface AiVideoConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly layout?: GenerativeConfigPanelLayout;
+  readonly detailRole?: CreativeStudioDetailViewRole;
 }
 
 function getInputString(data: WorkflowNodeType, id: string): string {
@@ -221,6 +230,7 @@ export function AiVideoConfigPanel({
   nodeId,
   data,
   layout = "attached",
+  detailRole,
 }: AiVideoConfigPanelProps) {
   const {
     updateNodeData,
@@ -293,7 +303,6 @@ export function AiVideoConfigPanel({
     effectiveModel,
     selectedOptionId,
     models,
-    groups,
     isLoading,
     modelsError,
     canGenerate: modelReady,
@@ -447,6 +456,16 @@ export function AiVideoConfigPanel({
     [data.inputs, disabled, nodeId, updateNodeData]
   );
 
+  const imageReferenceChips = useMemo(
+    () => referenceChips.filter((chip) => chip.kind === "image"),
+    [referenceChips]
+  );
+
+  const imageEdgeIndexMap = useMemo(
+    () => buildVideoPromptImageEdgeIndexMap(imageReferenceChips),
+    [imageReferenceChips]
+  );
+
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
   useEffect(() => {
@@ -465,17 +484,27 @@ export function AiVideoConfigPanel({
 
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
-  const promptForGenerate = useMemo(() => {
-    if (!hasPromptReference) return displayPrompt;
-    return resolveAiVideoReferencedPrompt({
-      nodeId,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-    });
-  }, [displayPrompt, edges, hasPromptReference, nodeId, typedNodes]);
+
+  const storedPromptCompile = useMemo(() => {
+    if (hasPromptReference) {
+      return { ok: true as const, prompt: referencedPrompt };
+    }
+    return compileVideoPromptForSubmit(displayPrompt, imageEdgeIndexMap);
+  }, [displayPrompt, hasPromptReference, imageEdgeIndexMap, referencedPrompt]);
+
+  const hasBrokenPromptRefs =
+    !hasPromptReference && hasBrokenVideoPromptRefs(displayPrompt, imageEdgeIndexMap);
+
+  const promptForGenerate = storedPromptCompile.ok
+    ? storedPromptCompile.prompt.trim()
+    : "";
+
+  const promptCompiledLength = hasPromptReference
+    ? referencedPrompt.length
+    : compiledVideoPromptLength(displayPrompt, imageEdgeIndexMap) ?? displayPrompt.length;
+
   const promptMaxLength = modelRules.promptMaxChars;
-  const promptOverLimit =
-    promptForGenerate.trim().length > promptMaxLength;
+  const promptOverLimit = promptCompiledLength > promptMaxLength;
 
   const handleStaged = useCallback(
     (localMedia: readonly LocalMediaReference[]) => {
@@ -874,18 +903,24 @@ export function AiVideoConfigPanel({
 
   const handleInjectChip = (chip: AiTextReferenceChip) => {
     if (disabled || hasPromptReference || chip.kind !== "image") return;
-    const insertion = `[image:${chip.label}]`;
-    const current = promptBuffer.value;
-    const needsSpace =
-      current.length > 0 && !/\s$/.test(current) && !/^\s/.test(insertion);
-    promptBuffer.commit(`${current}${needsSpace ? " " : ""}${insertion}`);
+    promptBuffer.commit(appendVideoPromptRefToken(promptBuffer.value, chip.edgeId));
   };
 
   const handleGenerate = async () => {
     if (disabled || !orgId || !effectiveModel) return;
     if (!modelReady || generateInFlightRef.current) return;
 
-    const prompt = promptForGenerate.trim();
+    const prompt = promptForGenerate;
+
+    if (hasBrokenPromptRefs) {
+      toast.error("workflow.aiVideoPanel.promptMentionBroken");
+      return;
+    }
+
+    if (!storedPromptCompile.ok) {
+      toast.error("workflow.aiVideoPanel.promptMentionBroken");
+      return;
+    }
 
     if (hasPromptReference && !prompt) {
       toast.error("workflow.aiVideoPanel.referencedPromptEmpty");
@@ -1254,7 +1289,7 @@ export function AiVideoConfigPanel({
       if (isCancelling || isCancelConfirmed()) {
         return;
       }
-      const cardError = prepareGenerativeCardError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t, "video");
       updateNodeData?.(nodeId, (current) => ({
         metadata: withAiVideoGenerateError(
           withAiVideoGeneratingFlag(
@@ -1406,6 +1441,8 @@ export function AiVideoConfigPanel({
     modelReady &&
     !disabled &&
     !isBusyForUi &&
+    !hasBrokenPromptRefs &&
+    storedPromptCompile.ok &&
     generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
     canGenerateAiVideo({
       prompt: promptForGenerate,
@@ -1490,6 +1527,7 @@ export function AiVideoConfigPanel({
             chips={referenceChips}
             disabled={disabled}
             showStudioReferenceHints={layout === "studio-dock"}
+            detailRole={detailRole}
             allowUpload={allowUpload && !disabled}
             addReferenceDisabled={!canAddReference}
             canPickCanvasNode={pickableOutputs.length > 0}
@@ -1515,22 +1553,23 @@ export function AiVideoConfigPanel({
               : { minHeight: AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX }
           }
         >
-          <Textarea
+          <VideoPromptMentionEditor
             value={displayPrompt}
             readOnly={hasPromptReference || disabled}
-            onChange={(event) => promptBuffer.onChange(event.target.value)}
+            disabled={disabled}
+            imageChips={imageReferenceChips}
+            onChange={promptBuffer.onChange}
             onFocus={promptBuffer.onFocus}
             onBlur={promptBuffer.onBlur}
             onCompositionStart={promptBuffer.onCompositionStart}
             onCompositionEnd={promptBuffer.onCompositionEnd}
-            maxLength={promptMaxLength}
             placeholder={
               hasPromptReference
                 ? ""
                 : t("workflow.aiVideoPanel.promptPlaceholder")
             }
             className={cn(
-              "h-full min-h-0 resize-none border-0 bg-transparent pr-7 text-sm leading-4 shadow-none focus-visible:ring-0",
+              "pr-7",
               hasPromptReference &&
                 "read-only:cursor-default read-only:text-foreground"
             )}
@@ -1553,6 +1592,11 @@ export function AiVideoConfigPanel({
               </div>
             </div>
           ) : null}
+          {hasBrokenPromptRefs ? (
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 px-0 pb-0 text-[11px] text-destructive">
+              {t("workflow.aiVideoPanel.promptMentionBroken")}
+            </p>
+          ) : null}
           {layout === "attached" ? (
             <AiTextExpandButton
               className="absolute right-1 top-1"
@@ -1567,7 +1611,6 @@ export function AiVideoConfigPanel({
               <AiTextModelPicker
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
-                groups={groups}
                 selectedOptionId={selectedOptionId}
                 chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
                 disabled={disabled || isLoading}
@@ -1614,7 +1657,7 @@ export function AiVideoConfigPanel({
           <div className="flex shrink-0 items-end gap-3">
             {layout === "studio-dock" ? (
               <StudioDockPromptCharCount
-                count={displayPrompt.length}
+                count={promptCompiledLength}
                 maxLength={promptMaxLength}
               />
             ) : null}

@@ -1,4 +1,4 @@
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, type AiGenerativeNodeType, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, generativeModelKindFromNodeType, type AiGenerativeNodeType, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -174,7 +174,13 @@ function updateNodesWithExecutionError(
             metadata: isGenerativeAiNodeType(node.data.nodeType)
               ? withGenerativeCardGenerateError(
                   node.data.metadata,
-                  error ? prepareGenerativeCardError(error) : null
+                  error
+                    ? prepareGenerativeCardError(
+                        error,
+                        undefined,
+                        generativeModelKindFromNodeType(node.data.nodeType)
+                      )
+                    : null
                 )
               : node.data.metadata,
           },
@@ -323,7 +329,6 @@ export interface UseGraphOperationsReturn {
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
   > | null;
-  isNodeSelectorOpen: boolean;
   connectionValidationState: ConnectionValidationState;
 
   // Setters (needed by sub-hooks and composition)
@@ -333,7 +338,6 @@ export interface UseGraphOperationsReturn {
   setEdges: React.Dispatch<
     React.SetStateAction<ReactFlowEdge<WorkflowEdgeType>[]>
   >;
-  setIsNodeSelectorOpen: (open: boolean) => void;
   setReactFlowInstance: (
     instance: ReactFlowInstance<
       ReactFlowNode<WorkflowNodeType>,
@@ -358,7 +362,6 @@ export interface UseGraphOperationsReturn {
   isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
 
   // Actions
-  handleAddNode: () => void;
   handleNodeSelect: (
     template: NodeType,
     options?: {
@@ -440,7 +443,6 @@ export function useGraphOperations({
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
   > | null>(null);
-  const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
   const [connectionValidationState, setConnectionValidationState] =
     useState<ConnectionValidationState>("default");
   const [addNodeMenu, setAddNodeMenu] =
@@ -1067,11 +1069,6 @@ export function useGraphOperations({
   );
 
   // Node management
-  const handleAddNode = useCallback(() => {
-    if (graphEditBlocked) return;
-    setIsNodeSelectorOpen(true);
-  }, [graphEditBlocked]);
-
   const handleNodeSelect = useCallback(
     (
       nodeType: NodeType,
@@ -1416,11 +1413,9 @@ export function useGraphOperations({
     selectedEdges,
     soleSelectedNodeId,
     reactFlowInstance,
-    isNodeSelectorOpen,
     connectionValidationState,
     setNodes,
     setEdges,
-    setIsNodeSelectorOpen,
     setReactFlowInstance,
     nodesRef,
     edgesRef,
@@ -1450,7 +1445,6 @@ export function useGraphOperations({
     }, [reactFlowInstance, setNodes, nodesRef]),
     isDraggingRef,
     isValidConnection,
-    handleAddNode,
     handleNodeSelect,
     updateNodeExecution,
     batchUpdateNodeExecutions,

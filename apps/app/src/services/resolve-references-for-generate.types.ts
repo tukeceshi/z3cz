@@ -1,6 +1,6 @@
 import type {
-  MediaReference,
   ReferenceImageInline,
+  WorkflowMediaValue,
 } from "@dafthunk/types";
 
 export interface ResolvedReferencesForGenerate {
@@ -25,5 +25,5 @@ export interface ResolveReferencesParams {
   readonly organizationId: string;
   readonly workflowId?: string;
   readonly cloudConfigured?: boolean;
-  readonly references: readonly MediaReference[];
+  readonly references: readonly WorkflowMediaValue[];
 }

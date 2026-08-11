@@ -58,6 +58,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/auth/config", publicAuthConfigRoutes);
   app.route("/legal-documents", legalDocumentsRoutes);
   app.route("/site-settings", siteSettingsRoutes);
+  app.route("/bootstrap", lazyRoute(() => import("./routes/bootstrap")));
   if (options.runtime === "node") {
     app.route(
       "/inbound-email",
@@ -126,10 +127,6 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     "/:organizationId/databases",
     lazyRoute(() => import("./routes/databases"))
   );
-  app.route(
-    "/:organizationId/datasets",
-    lazyRoute(() => import("./routes/datasets"))
-  );
   app.route("/:organizationId/bots", lazyRoute(() => import("./routes/bots")));
   app.route(
     "/:organizationId/emails",
@@ -170,6 +167,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route(
     "/:organizationId/resources",
     lazyRoute(() => import("./routes/resources"))
+  );
+  app.route(
+    "/:organizationId/text-content",
+    lazyRoute(() => import("./routes/text-content"))
   );
   app.route(
     "/:organizationId/workflows",

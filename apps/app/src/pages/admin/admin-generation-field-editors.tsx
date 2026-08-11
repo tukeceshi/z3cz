@@ -1,6 +1,7 @@
 import {
   buildDurationOptions,
   buildGenerateCountOptions,
+  DEFAULT_AUDIO_GENERATION_FIELDS,
   DEFAULT_IMAGE_GENERATION_FIELDS,
   DEFAULT_VIDEO_GENERATION_FIELDS,
   formatImageGenerationOptionLabel,
@@ -96,12 +97,30 @@ const SIZE_POLICY_FIELD_NAMES = new Set(["size", "ratio"]);
 const COUNT_FIELD_NAMES = new Set(["generate_count"]);
 const VIDEO_DURATION_FIELD_NAMES = new Set(["duration"]);
 
+type AdminGenerationModality = "image" | "video" | "audio";
+
 function imageGenerationFieldCatalog(): readonly UpstreamParamProfileField[] {
   return IMAGE_GENERATION_FIELD_CATALOG;
 }
 
 function videoGenerationFieldCatalog(): readonly UpstreamParamProfileField[] {
   return VIDEO_GENERATION_FIELD_CATALOG;
+}
+
+function audioGenerationFieldCatalog(): readonly UpstreamParamProfileField[] {
+  return DEFAULT_AUDIO_GENERATION_FIELDS;
+}
+
+function generationFieldCatalog(
+  modality: AdminGenerationModality
+): readonly UpstreamParamProfileField[] {
+  if (modality === "image") {
+    return imageGenerationFieldCatalog();
+  }
+  if (modality === "video") {
+    return videoGenerationFieldCatalog();
+  }
+  return audioGenerationFieldCatalog();
 }
 
 function normalizeSizeEffectMode(
@@ -173,12 +192,9 @@ function formatAdminVideoGenerationOptionLabel(
 
 function catalogEnumOptions(
   field: UpstreamParamProfileField,
-  modality: "image" | "video"
+  modality: AdminGenerationModality
 ): readonly string[] {
-  const catalog =
-    modality === "image"
-      ? imageGenerationFieldCatalog()
-      : videoGenerationFieldCatalog();
+  const catalog = generationFieldCatalog(modality);
   const catalogValues =
     catalog.find((entry) => entry.name === field.name)?.enumValues ?? [];
   const current = field.enumValues ?? [];
@@ -195,7 +211,7 @@ function catalogEnumOptions(
 function orderEnabledEnumValues(
   field: UpstreamParamProfileField,
   enabledValues: readonly string[],
-  modality: "image" | "video"
+  modality: AdminGenerationModality
 ): string[] {
   const enabled = new Set(enabledValues);
   return catalogEnumOptions(field, modality).filter((option) =>
@@ -210,7 +226,7 @@ export function GenerationEnumChips({
   onChange,
 }: {
   readonly field: UpstreamParamProfileField;
-  readonly modality: "image" | "video";
+  readonly modality: AdminGenerationModality;
   readonly optionLabels: GenerationOptionLabels;
   readonly onChange: (next: UpstreamParamProfileField) => void;
 }) {
@@ -678,12 +694,9 @@ export function VideoDurationEditor({
 
 function getGenerationFeatureRows(
   fields: readonly UpstreamParamProfileField[],
-  modality: "image" | "video"
+  modality: AdminGenerationModality
 ): readonly UpstreamParamProfileField[] {
-  const catalog =
-    modality === "image"
-      ? imageGenerationFieldCatalog()
-      : videoGenerationFieldCatalog();
+  const catalog = generationFieldCatalog(modality);
   const catalogVisible = catalog.filter((field) => {
     if (field.hidden) return false;
     if (modality === "image") {
@@ -692,7 +705,10 @@ function getGenerationFeatureRows(
         !COUNT_FIELD_NAMES.has(field.name)
       );
     }
-    return !VIDEO_DURATION_FIELD_NAMES.has(field.name);
+    if (modality === "video") {
+      return !VIDEO_DURATION_FIELD_NAMES.has(field.name);
+    }
+    return true;
   });
   const catalogNames = new Set(catalog.map((field) => field.name));
   const extraVisible = fields.filter(
@@ -717,7 +733,7 @@ function GenerationFeatureRowContent({
   readonly template: UpstreamParamProfileField;
   readonly active: UpstreamParamProfileField | undefined;
   readonly catalog: readonly UpstreamParamProfileField[];
-  readonly modality: "image" | "video";
+  readonly modality: AdminGenerationModality;
   readonly optionLabels: GenerationOptionLabels;
   readonly onFieldChange: (next: UpstreamParamProfileField) => void;
 }) {
@@ -804,12 +820,28 @@ function GenerationFeatureRowContent({
   );
 }
 
-function useGenerationFieldTitleResolver(modality: "image" | "video") {
+function useGenerationFieldTitleResolver(modality: AdminGenerationModality) {
   const { t } = useTranslation();
 
   return useCallback(
     (template: UpstreamParamProfileField): string => {
       const fallback = template.description || template.name;
+      if (modality === "audio") {
+        switch (template.name) {
+          case "speed":
+            return t("pages.adminAiModels.audioFieldLabels.speed");
+          case "vol":
+            return t("pages.adminAiModels.audioFieldLabels.vol");
+          case "pitch":
+            return t("pages.adminAiModels.audioFieldLabels.pitch");
+          case "emotion":
+            return t("pages.adminAiModels.audioFieldLabels.emotion");
+          case "voice_id":
+            return t("pages.adminAiModels.audioFieldLabels.voice_id");
+          default:
+            return fallback;
+        }
+      }
       if (modality !== "video") {
         return fallback;
       }
@@ -858,7 +890,7 @@ function FlatFeatureParamSection({
   readonly template: UpstreamParamProfileField;
   readonly active: UpstreamParamProfileField | undefined;
   readonly catalog: readonly UpstreamParamProfileField[];
-  readonly modality: "image" | "video";
+  readonly modality: AdminGenerationModality;
   readonly optionLabels: GenerationOptionLabels;
   readonly enabled: boolean;
   readonly onEnableChange: (enabled: boolean) => void;
@@ -918,16 +950,13 @@ export function GenerationFeaturesEditor({
   onChange,
 }: {
   readonly fields: readonly UpstreamParamProfileField[];
-  readonly modality: "image" | "video";
+  readonly modality: AdminGenerationModality;
   readonly optionLabels: GenerationOptionLabels;
   readonly layout?: "grouped" | "flat";
   readonly onChange: (fields: UpstreamParamProfileField[]) => void;
 }) {
   const resolveFieldTitle = useGenerationFieldTitleResolver(modality);
-  const catalog =
-    modality === "image"
-      ? imageGenerationFieldCatalog()
-      : videoGenerationFieldCatalog();
+  const catalog = generationFieldCatalog(modality);
   const rows = getGenerationFeatureRows(fields, modality);
   const fieldByName = new Map(fields.map((field) => [field.name, field]));
 

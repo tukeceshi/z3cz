@@ -4,7 +4,9 @@ import {
   AI_MEDIA_CACHE_MIN_LIMIT_MB,
   type AiMediaCacheSettings,
   getMediaReferenceKey,
-  type MediaReference,
+  getResourceIdFromValue,
+  isResourceIdReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 import {
@@ -20,9 +22,21 @@ import {
 import { generateVideoPoster } from "@/services/generate-video-poster";
 import { displaySizeToMaxWidth, CANVAS_TIER_SHORT_EDGE, LEGACY_CANVAS_S_THUMB_WIDTH } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
-import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
-import { resolveMediaCacheFetchUrl } from "@/services/media-object-url";
+import {
+  mediaFetchInitForCacheUrl,
+  mediaUrlSupportsBrowserCache,
+} from "@/services/media-cache-fetch-utils";
+import {
+  resolveMediaResourceFetchUrl,
+  workflowMediaMimeType,
+} from "@/services/resolve-media-resource-fetch-url";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+
+export type AiMediaCacheNodeType =
+  | "ai-image"
+  | "ai-video"
+  | "ai-audio"
+  | "ai-text";
 
 const DB_NAME = "dafthunk-ai-media-cache";
 const DB_VERSION = 4;
@@ -38,7 +52,7 @@ export interface AiMediaCacheEntry {
   readonly workflowId: string;
   readonly workflowName: string;
   readonly mediaId: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly nodeType: AiMediaCacheNodeType;
   readonly mimeType: string;
   readonly byteSize: number;
   readonly naturalWidth?: number;
@@ -66,7 +80,7 @@ export interface AiMediaCacheEntrySummary {
   readonly workflowId: string;
   readonly workflowName: string;
   readonly mediaId: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly nodeType: AiMediaCacheNodeType;
   readonly mimeType: string;
   readonly byteSize: number;
   readonly naturalWidth?: number;
@@ -80,7 +94,6 @@ export interface AiMediaCacheStats {
   readonly originalBytes: number;
   readonly thumbBytes: number;
   readonly limitBytes: number;
-  readonly enabled: boolean;
   readonly browserQuotaBytes: number | null;
   readonly browserUsageBytes: number | null;
   readonly workflows: readonly AiMediaWorkflowSummary[];
@@ -123,7 +136,6 @@ interface ThumbRecord {
 
 interface MetaRecord {
   readonly key: typeof META_KEY;
-  enabled: boolean;
   limitMb: number;
   totalBytes: number;
 }
@@ -168,7 +180,6 @@ function clampLimitMb(value: number): number {
 function defaultMeta(): MetaRecord {
   return {
     key: META_KEY,
-    enabled: true,
     limitMb: AI_MEDIA_CACHE_DEFAULT_LIMIT_MB,
     totalBytes: 0,
   };
@@ -314,10 +325,17 @@ async function dedupeAliasCacheEntriesOnce(db: IDBDatabase): Promise<void> {
 
 async function readMeta(db: IDBDatabase): Promise<MetaRecord> {
   const transaction = db.transaction(META_STORE, "readonly");
-  const result = await idbRequest<MetaRecord | undefined>(
-    transaction.objectStore(META_STORE).get(META_KEY)
-  );
-  return result ?? defaultMeta();
+  const result = await idbRequest<
+    (MetaRecord & { readonly enabled?: boolean }) | undefined
+  >(transaction.objectStore(META_STORE).get(META_KEY));
+  if (!result) {
+    return defaultMeta();
+  }
+  return {
+    key: META_KEY,
+    limitMb: result.limitMb,
+    totalBytes: result.totalBytes,
+  };
 }
 
 async function writeMeta(db: IDBDatabase, meta: MetaRecord): Promise<void> {
@@ -746,7 +764,7 @@ export async function deleteCacheResourceTiers(
 export async function getAiMediaCacheSettings(): Promise<AiMediaCacheSettings> {
   return withDatabase(async (db) => {
     const meta = await readMeta(db);
-    return { enabled: meta.enabled, limitMb: meta.limitMb };
+    return { limitMb: meta.limitMb };
   });
 }
 
@@ -757,7 +775,6 @@ export async function setAiMediaCacheSettings(
     const meta = await readMeta(db);
     const next: MetaRecord = {
       ...meta,
-      enabled: settings.enabled ?? meta.enabled,
       limitMb:
         settings.limitMb !== undefined
           ? clampLimitMb(settings.limitMb)
@@ -765,7 +782,7 @@ export async function setAiMediaCacheSettings(
     };
     await writeMeta(db, next);
     await evictLruUntilUnderLimit(db, next.limitMb * 1024 * 1024);
-    return { enabled: next.enabled, limitMb: next.limitMb };
+    return { limitMb: next.limitMb };
   });
 }
 
@@ -801,7 +818,6 @@ export async function getAiMediaCacheStats(
       originalBytes,
       thumbBytes,
       limitBytes: meta.limitMb * 1024 * 1024,
-      enabled: meta.enabled,
       browserQuotaBytes,
       browserUsageBytes,
       workflows,
@@ -817,11 +833,7 @@ async function putCacheBlobRecord(params: {
   readonly nodeType: AiMediaCacheEntry["nodeType"];
   readonly mimeType: string;
   readonly blob: Blob;
-  readonly requireEnabled?: boolean;
 }): Promise<boolean> {
-  const settings = await getAiMediaCacheSettings();
-  if (params.requireEnabled !== false && !settings.enabled) return false;
-
   const storedBlob =
     params.blob.type === params.mimeType
       ? params.blob
@@ -934,46 +946,35 @@ export async function cacheMediaFromBlob(params: {
   readonly mediaId: string;
   readonly blob: Blob;
   readonly mimeType: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly nodeType: AiMediaCacheNodeType;
 }): Promise<boolean> {
   return putCacheBlobRecord(params);
-}
-
-/** Writes blob storage even when AI media cache is disabled (generative staging). */
-export async function writeGenerativeMediaCacheBlob(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly workflowName?: string;
-  readonly mediaId: string;
-  readonly blob: Blob;
-  readonly mimeType: string;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
-}): Promise<boolean> {
-  return putCacheBlobRecord({
-    ...params,
-    workflowName: params.workflowName ?? params.workflowId,
-    requireEnabled: false,
-  });
 }
 
 export async function cacheMediaFromUrl(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly workflowName: string;
-  readonly media: MediaReference;
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly media: WorkflowMediaValue;
+  readonly nodeType: AiMediaCacheNodeType;
   readonly fetchUrl?: string;
-  /** When false, always write staging even if AI media cache is disabled. */
-  readonly requireEnabled?: boolean;
 }): Promise<boolean> {
-  const settings = await getAiMediaCacheSettings();
-  if (params.requireEnabled !== false && !settings.enabled) return false;
+  const mediaId = getResourceIdFromValue(params.media);
+  if (!mediaId) {
+    return false;
+  }
 
-  const mediaId = getMediaReferenceKey(params.media);
-  const fetchUrl =
+  let fetchUrl =
     params.fetchUrl && mediaUrlSupportsBrowserCache(params.fetchUrl)
       ? params.fetchUrl
-      : resolveMediaCacheFetchUrl(params.media, params.organizationId);
+      : null;
+
+  if (!fetchUrl) {
+    fetchUrl = await resolveMediaResourceFetchUrl({
+      organizationId: params.organizationId,
+      media: params.media,
+    });
+  }
 
   if (!fetchUrl || !mediaUrlSupportsBrowserCache(fetchUrl)) {
     return false;
@@ -981,7 +982,7 @@ export async function cacheMediaFromUrl(params: {
 
   let response: Response;
   try {
-    response = await fetch(fetchUrl, { credentials: "include" });
+    response = await fetch(fetchUrl, mediaFetchInitForCacheUrl(fetchUrl));
   } catch {
     return false;
   }
@@ -989,7 +990,7 @@ export async function cacheMediaFromUrl(params: {
 
   const blob = await response.blob();
   const mimeType =
-    params.media.mimeType ||
+    workflowMediaMimeType(params.media) ||
     blob.type ||
     (params.nodeType === "ai-video"
       ? "video/mp4"
@@ -1005,7 +1006,6 @@ export async function cacheMediaFromUrl(params: {
     nodeType: params.nodeType,
     mimeType,
     blob,
-    requireEnabled: params.requireEnabled,
   });
 }
 
@@ -1103,6 +1103,148 @@ export interface CanvasTierUrlSet {
   readonly s: string;
   readonly m: string;
   readonly l: string;
+}
+
+export interface MediaDisplayUrlSet {
+  readonly full: string | null;
+  readonly s: string | null;
+  readonly m: string | null;
+  readonly l: string | null;
+}
+
+export const EMPTY_MEDIA_DISPLAY_URL_SET: MediaDisplayUrlSet = {
+  full: null,
+  s: null,
+  m: null,
+  l: null,
+};
+
+export function isMediaDisplayUrlSetEmpty(set: MediaDisplayUrlSet): boolean {
+  return !set.full && !set.s && !set.m && !set.l;
+}
+
+export function getStableMediaDisplayUrlSet(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): MediaDisplayUrlSet {
+  return {
+    full: getStableBlobUrl(
+      stableBlobUrlKey({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tierLabel: "full",
+      })
+    ),
+    s: stableUrlForCanvasTierWidth({
+      ...params,
+      width: CANVAS_TIER_SHORT_EDGE.s,
+    }),
+    m: stableUrlForCanvasTierWidth({
+      ...params,
+      width: CANVAS_TIER_SHORT_EDGE.m,
+    }),
+    l: stableUrlForCanvasTierWidth({
+      ...params,
+      width: CANVAS_TIER_SHORT_EDGE.l,
+    }),
+  };
+}
+
+export async function getMediaDisplayUrlSet(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<MediaDisplayUrlSet> {
+  const stable = getStableMediaDisplayUrlSet(params);
+  if (stable.full && stable.s && stable.m && stable.l) {
+    return stable;
+  }
+
+  return withDatabase(async (db) => {
+    const entry = await readCachedMediaEntry(db, params);
+    if (!entry) {
+      return stable;
+    }
+
+    const next = {
+      full: stable.full,
+      s: stable.s,
+      m: stable.m,
+      l: stable.l,
+    };
+
+    if (!next.full) {
+      const fullKey = stableBlobUrlKey({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tierLabel: "full",
+      });
+      next.full = createStableBlobUrl(fullKey, entry.blob);
+    }
+
+    if (entry.nodeType !== "ai-image" && entry.nodeType !== "ai-video") {
+      return next;
+    }
+
+    const widths = {
+      s: CANVAS_TIER_SHORT_EDGE.s,
+      m: CANVAS_TIER_SHORT_EDGE.m,
+      l: CANVAS_TIER_SHORT_EDGE.l,
+    } as const;
+
+    for (const [tier, width] of Object.entries(widths) as Array<
+      [keyof Pick<MediaDisplayUrlSet, "s" | "m" | "l">, number]
+    >) {
+      if (next[tier]) {
+        continue;
+      }
+
+      const tierKey = stableBlobUrlKey({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tierLabel: `w${width}`,
+      });
+      const tierBlob = await readTierBlob(db, entry, width);
+      if (!tierBlob) {
+        continue;
+      }
+      next[tier] = createStableBlobUrl(tierKey, tierBlob);
+    }
+
+    return next;
+  });
+}
+
+export function pickMediaDisplayUrl(
+  set: MediaDisplayUrlSet,
+  size: MediaDisplaySize
+): string | null {
+  if (size === "full") {
+    return set.full;
+  }
+  if (size === "canvas-s" || size === "thumb") {
+    return set.s ?? set.full;
+  }
+  if (size === "canvas-m") {
+    return set.m ?? set.full ?? set.l ?? set.s;
+  }
+  if (size === "canvas-l") {
+    return set.l ?? set.full ?? set.m ?? set.s;
+  }
+  return set.full;
+}
+
+export function toCanvasTierUrlSet(
+  set: MediaDisplayUrlSet
+): CanvasTierUrlSet | null {
+  if (!set.s || !set.m || !set.l) {
+    return null;
+  }
+  return { s: set.s, m: set.m, l: set.l };
 }
 
 function stableUrlForCanvasTierWidth(params: {
@@ -1362,9 +1504,13 @@ function toEntrySummary(entry: AiMediaCacheEntry): AiMediaCacheEntrySummary {
 
 function mimeToExtension(
   mimeType: string,
-  nodeType: "ai-image" | "ai-video" | "ai-audio"
+  nodeType: AiMediaCacheNodeType
 ): string {
   const base = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (nodeType === "ai-text") {
+    if (base.includes("markdown")) return "md";
+    return "txt";
+  }
   const map: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
@@ -1490,6 +1636,16 @@ export async function clearCacheEntriesByKeys(
     }
     await reconcileCacheMeta(db);
   });
+}
+
+export async function deleteCachedMediaEntry(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+}): Promise<void> {
+  await clearCacheEntriesByKeys([
+    entryKey(params.organizationId, params.workflowId, params.mediaId),
+  ]);
 }
 
 export async function downloadCacheEntriesByKeys(
@@ -1708,7 +1864,7 @@ export async function rebuildMediaResourceAliasesFromCache(params: {
   readonly localHints?: readonly {
     readonly mediaId: string;
     readonly mimeType: string;
-    readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+    readonly nodeType: AiMediaCacheNodeType;
   }[];
 }): Promise<void> {
   return withDatabase(async (db) => {

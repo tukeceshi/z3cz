@@ -1,7 +1,6 @@
 import {
   buildTextModelFailureCardParts,
   buildTextModelInvocationErrorFromFailure,
-  isTransientTextModelUpstreamError,
   withSelectedModel,
   type ReferenceImageInline,
   type ResolvedOrgAiInterface,
@@ -17,7 +16,6 @@ import type { Bindings } from "../context";
 import type { Database } from "../db";
 import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
-import { disableTextModelOnInterface } from "./disable-text-model-on-interface";
 import {
   resolveOrgModelInterfaceCandidate,
   type TextModelInterfaceCandidate,
@@ -129,24 +127,11 @@ export async function* streamPreparedTextModel(params: {
   });
 }
 
-export async function handleTextModelStreamFailure(params: {
-  readonly db: Database;
-  readonly organizationId: string;
-  readonly canonicalId: string;
+export function handleTextModelStreamFailure(params: {
   readonly candidate: TextModelInterfaceCandidate;
   readonly upstreamError: string;
   readonly displayName: string;
-}): Promise<{ readonly error: string; readonly invocationError: string }> {
-  const transient = isTransientTextModelUpstreamError(params.upstreamError);
-  if (!transient) {
-    await disableTextModelOnInterface(
-      params.db,
-      params.organizationId,
-      params.candidate.interfaceId,
-      params.canonicalId
-    );
-  }
-
+}): { readonly error: string; readonly invocationError: string } {
   const modelDisplayLabel = params.displayName;
 
   const failure = buildTextModelFailureCardParts({
@@ -154,7 +139,6 @@ export async function handleTextModelStreamFailure(params: {
     channelKind: params.candidate.channelKind,
     modelDisplayLabel,
     upstreamError: params.upstreamError,
-    disabledInterface: !transient,
   });
 
   return {

@@ -94,7 +94,7 @@ export function CreativeStudioView() {
 
     closeSecondaryDetail,
 
-    replacePrimaryFromList,
+    promoteSecondaryToPrimary,
 
     clearDetailNode,
 
@@ -198,9 +198,11 @@ export function CreativeStudioView() {
 
       primaryNodeId: detailNodeId,
 
+      secondaryNodeId,
+
     }),
 
-    [detailNodeId, hasPrimary, hasSecondary]
+    [detailNodeId, hasPrimary, hasSecondary, secondaryNodeId]
 
   );
 
@@ -212,7 +214,9 @@ export function CreativeStudioView() {
 
     openSecondary: openSecondaryDetail,
 
-    replacePrimaryAndCloseSecondary: replacePrimaryFromList,
+    replacePrimary: openDetail,
+
+    promoteSecondaryToPrimary,
 
   });
 
@@ -402,7 +406,9 @@ export function CreativeStudioView() {
 
             nodesByType={nodesByType}
 
-            focusedNodeId={studioNodeId}
+            primaryNodeId={detailNodeId}
+
+            secondaryNodeId={secondaryNodeId}
 
             onOpenDetail={handleExpandedOpenDetail}
 

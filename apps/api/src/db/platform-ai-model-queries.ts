@@ -3,13 +3,10 @@ import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 import type {
   AiModelInvocation,
   AiModelModality,
-  CreatePlatformAiModelGroupRequest,
   ListAiModelInvocationsResponse,
   PlatformAiModel,
-  PlatformAiModelGroup,
   PlatformAiModelParameterRules,
   TextModelParameterRules,
-  UpdatePlatformAiModelGroupRequest,
   UpdatePlatformAiModelRequest,
 } from "@dafthunk/types";
 import {
@@ -34,7 +31,6 @@ import type { Database } from "./index";
 import { parseJsonColumn } from "./parse-json-column";
 import {
   aiModelInvocations,
-  platformAiModelGroups,
   platformAiModels,
 } from "./schema";
 
@@ -50,22 +46,8 @@ function mapPlatformModelRow(
       row.parameterRules
     ),
     sortOrder: row.sortOrder,
-    groupId: row.groupId ?? null,
+    brandIcon: row.brandIcon ?? null,
     description: row.description ?? "",
-    updatedAt: row.updatedAt?.toISOString(),
-  };
-}
-
-function mapPlatformGroupRow(
-  row: typeof platformAiModelGroups.$inferSelect
-): PlatformAiModelGroup {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    icon: row.icon,
-    modality: (row.modality as PlatformAiModelGroup["modality"]) || "text",
-    sortOrder: row.sortOrder,
     updatedAt: row.updatedAt?.toISOString(),
   };
 }
@@ -171,8 +153,8 @@ export async function updatePlatformAiModel(
       displayName: patch.displayName ?? existing.displayName,
       platformEnabled: patch.platformEnabled ?? existing.platformEnabled,
       parameterRules: nextRules,
-      groupId:
-        patch.groupId !== undefined ? patch.groupId : existing.groupId,
+      brandIcon:
+        patch.brandIcon !== undefined ? patch.brandIcon : existing.brandIcon,
       description: patch.description ?? existing.description,
       sortOrder: patch.sortOrder ?? existing.sortOrder,
       updatedAt: new Date(),
@@ -180,95 +162,6 @@ export async function updatePlatformAiModel(
     .where(eq(platformAiModels.canonicalId, canonicalId));
 
   return getPlatformAiModel(db, canonicalId);
-}
-
-export async function listPlatformAiModelGroups(
-  db: Database,
-  modality?: AiModelModality
-): Promise<readonly PlatformAiModelGroup[]> {
-  const rows = await db
-    .select()
-    .from(platformAiModelGroups)
-    .where(
-      modality ? eq(platformAiModelGroups.modality, modality) : undefined
-    )
-    .orderBy(asc(platformAiModelGroups.sortOrder));
-
-  return rows.map(mapPlatformGroupRow);
-}
-
-export async function getPlatformAiModelGroup(
-  db: Database,
-  id: string
-): Promise<PlatformAiModelGroup | null> {
-  const rows = await db
-    .select()
-    .from(platformAiModelGroups)
-    .where(eq(platformAiModelGroups.id, id))
-    .limit(1);
-  const row = rows[0];
-  return row ? mapPlatformGroupRow(row) : null;
-}
-
-export async function createPlatformAiModelGroup(
-  db: Database,
-  body: CreatePlatformAiModelGroupRequest
-): Promise<PlatformAiModelGroup> {
-  await db.insert(platformAiModelGroups).values({
-    id: body.id,
-    name: body.name,
-    description: body.description ?? "",
-    icon: body.icon ?? "sparkles",
-    modality: body.modality,
-    sortOrder: body.sortOrder ?? 0,
-  });
-  const created = await getPlatformAiModelGroup(db, body.id);
-  if (!created) {
-    throw new Error(`Failed to create platform AI model group ${body.id}`);
-  }
-  return created;
-}
-
-export async function updatePlatformAiModelGroup(
-  db: Database,
-  id: string,
-  patch: UpdatePlatformAiModelGroupRequest
-): Promise<PlatformAiModelGroup | null> {
-  const existing = await getPlatformAiModelGroup(db, id);
-  if (!existing) return null;
-
-  await db
-    .update(platformAiModelGroups)
-    .set({
-      name: patch.name ?? existing.name,
-      description: patch.description ?? existing.description,
-      icon: patch.icon ?? existing.icon,
-      modality: patch.modality ?? existing.modality,
-      sortOrder: patch.sortOrder ?? existing.sortOrder,
-      updatedAt: new Date(),
-    })
-    .where(eq(platformAiModelGroups.id, id));
-
-  return getPlatformAiModelGroup(db, id);
-}
-
-export async function deletePlatformAiModelGroup(
-  db: Database,
-  id: string
-): Promise<boolean> {
-  const existing = await getPlatformAiModelGroup(db, id);
-  if (!existing) return false;
-
-  await db
-    .update(platformAiModels)
-    .set({ groupId: null, updatedAt: new Date() })
-    .where(eq(platformAiModels.groupId, id));
-
-  await db
-    .delete(platformAiModelGroups)
-    .where(eq(platformAiModelGroups.id, id));
-
-  return true;
 }
 
 export async function createAiModelInvocation(

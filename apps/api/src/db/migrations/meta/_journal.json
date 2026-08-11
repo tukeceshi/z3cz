@@ -400,6 +400,48 @@
       "when": 1787960000000,
       "tag": "0061_seedance_parameter_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788040000000,
+      "tag": "0062_media_resource_upstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788120000000,
+      "tag": "0063_drop_model_groups_add_brand_icon",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788200000000,
+      "tag": "0064_add_seedance_2_5",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788280000000,
+      "tag": "0065_ws_bootstrap_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788360000000,
+      "tag": "0066_platform_ai_model_channels",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788440000000,
+      "tag": "0067_media_resource_content_sha256",
+      "breakpoints": true
     }
   ]
 }

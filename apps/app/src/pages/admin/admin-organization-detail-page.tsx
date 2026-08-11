@@ -324,19 +324,6 @@ export function AdminOrganizationDetailPage() {
           </Card>
         </Link>
         <Link
-          to={`/admin/datasets?organizationId=${organizationId}`}
-          className="block"
-        >
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="pb-2">
-              <CardDescription>{t("sidebar.datasets")}</CardDescription>
-              <CardTitle className="text-2xl">
-                {entityCounts?.datasetCount ?? "-"}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link
           to={`/admin/databases?organizationId=${organizationId}`}
           className="block"
         >

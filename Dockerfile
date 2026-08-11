@@ -172,6 +172,9 @@ FROM deps AS prod-api
 # Workflow create/validate reads apps/www/data/nodes.json at runtime.
 RUN pnpm --filter '@dafthunk/www' extract-nodes
 
+COPY --from=build-app-prod /app/apps/app/dist/bootstrap-manifest.json /app/data/bootstrap/bootstrap-manifest.json
+COPY --from=build-app-prod /app/apps/app/dist/assets /app/data/bootstrap/assets
+
 COPY docker/prod-api-entrypoint.sh /usr/local/bin/prod-api-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/prod-api-entrypoint.sh \
   && chmod +x /usr/local/bin/prod-api-entrypoint.sh
@@ -181,6 +184,7 @@ WORKDIR /app/apps/api
 ENV HOST=0.0.0.0
 ENV PORT=3102
 ENV NODE_ENV=production
+ENV BOOTSTRAP_ASSETS_DIR=/app/data/bootstrap
 
 EXPOSE 3102
 

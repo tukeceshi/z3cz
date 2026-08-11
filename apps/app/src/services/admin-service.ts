@@ -264,16 +264,7 @@ export interface AdminQueue {
   updatedAt: Date;
 }
 
-export interface AdminDataset {
-  id: string;
-  name: string;
-  organizationId: string;
-  organizationName: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface AdminDatabase {
+export interface AdminQueue {
   id: string;
   name: string;
   organizationId: string;
@@ -932,40 +923,6 @@ export const useAdminQueues = (
     queuesError: error || null,
     isQueuesLoading: isLoading,
     mutateQueues: mutate,
-  };
-};
-
-/**
- * Hook to fetch admin datasets list
- */
-export const useAdminDatasets = (
-  page = 1,
-  limit = 20,
-  search?: string,
-  organizationId?: string
-) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-    ...(search && { search }),
-    ...(organizationId && { organizationId }),
-  });
-
-  const { data, error, isLoading, mutate } = useSWR<{
-    datasets: AdminDataset[];
-    pagination: PaginationInfo;
-  }>(`${ADMIN_API_ENDPOINT}/datasets?${params}`, async () =>
-    makeRequest<{ datasets: AdminDataset[]; pagination: PaginationInfo }>(
-      `${ADMIN_API_ENDPOINT}/datasets?${params}`
-    )
-  );
-
-  return {
-    datasets: data?.datasets || [],
-    pagination: data?.pagination || null,
-    datasetsError: error || null,
-    isDatasetsLoading: isLoading,
-    mutateDatasets: mutate,
   };
 };
 

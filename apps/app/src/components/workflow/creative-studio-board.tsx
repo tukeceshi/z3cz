@@ -27,6 +27,7 @@ import {
   STUDIO_SCROLL,
 } from "./creative-studio-surface";
 import type { WorkflowNodeType } from "./workflow-types";
+import { isStudioListNodeActive } from "./creative-studio-utils";
 
 export interface CreativeStudioNodesByType {
   readonly all: readonly ReactFlowNode<WorkflowNodeType>[];
@@ -38,7 +39,8 @@ export interface CreativeStudioNodesByType {
 
 export interface CreativeStudioBoardProps {
   readonly nodesByType: CreativeStudioNodesByType;
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly onOpenDetail: (nodeId: string) => void;
   readonly onExpandList?: () => void;
   readonly compact?: boolean;
@@ -88,12 +90,14 @@ function EmptySection({ className }: { readonly className?: string }) {
 
 function AudioListSection({
   nodes,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   onOpenDetail,
   className,
 }: {
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly onOpenDetail: (nodeId: string) => void;
   readonly className?: string;
 }) {
@@ -112,7 +116,11 @@ function AudioListSection({
               <CreativeStudioListItem
                 key={node.id}
                 focusId={node.id}
-                isActive={node.id === focusedNodeId}
+                isActive={isStudioListNodeActive(
+                  node.id,
+                  primaryNodeId,
+                  secondaryNodeId
+                )}
                 variant="media"
               >
                 <CreativeStudioAudioTile
@@ -131,7 +139,8 @@ function AudioListSection({
 function NodeListSection({
   labelKey,
   nodes,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   onOpenDetail,
   className,
   itemVariant = "default",
@@ -139,12 +148,16 @@ function NodeListSection({
 }: {
   readonly labelKey: TranslationKey;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly focusedNodeId: string | null;
+  readonly primaryNodeId: string | null;
+  readonly secondaryNodeId: string | null;
   readonly onOpenDetail: (nodeId: string) => void;
   readonly className?: string;
   readonly itemVariant?: "default" | "text" | "media" | "mediaPlain";
   readonly mediaGrid?: boolean;
 }) {
+  const isActive = (nodeId: string) =>
+    isStudioListNodeActive(nodeId, primaryNodeId, secondaryNodeId);
+
   return (
     <section className={cn(STUDIO_PANEL, "min-h-0 flex-1", className)}>
       <SectionHeader labelKey={labelKey} count={nodes.length} />
@@ -163,12 +176,11 @@ function NodeListSection({
                   <CreativeStudioListItem
                     key={node.id}
                     focusId={node.id}
-                    isActive={node.id === focusedNodeId}
+                    isActive={isActive(node.id)}
                     variant={itemVariant}
                   >
                     <CreativeStudioNodeCard
                       node={node}
-                      isActive={node.id === focusedNodeId}
                       onOpenDetail={() => onOpenDetail(node.id)}
                     />
                   </CreativeStudioListItem>
@@ -179,12 +191,11 @@ function NodeListSection({
                 <CreativeStudioListItem
                   key={node.id}
                   focusId={node.id}
-                  isActive={node.id === focusedNodeId}
+                  isActive={isActive(node.id)}
                   variant={itemVariant}
                 >
                   <CreativeStudioNodeCard
                     node={node}
-                    isActive={node.id === focusedNodeId}
                     onOpenDetail={() => onOpenDetail(node.id)}
                   />
                 </CreativeStudioListItem>
@@ -199,7 +210,8 @@ function NodeListSection({
 
 export function CreativeStudioBoard({
   nodesByType,
-  focusedNodeId,
+  primaryNodeId,
+  secondaryNodeId,
   onOpenDetail,
   onExpandList,
   compact = false,
@@ -230,7 +242,8 @@ export function CreativeStudioBoard({
             textNodes={nodesByType.text}
             imageNodes={nodesByType.image}
             videoNodes={nodesByType.video}
-            focusedNodeId={focusedNodeId}
+            primaryNodeId={primaryNodeId}
+            secondaryNodeId={secondaryNodeId}
             listInteraction={listInteraction}
             onExpandList={onExpandList ?? (() => {})}
             referenceDragEnabled={referenceDragEnabled}
@@ -245,23 +258,26 @@ export function CreativeStudioBoard({
     <div className={cn("flex h-full min-h-0", STUDIO_BOARD_GAP, STUDIO_BOARD_INSET)}>
       <AudioListSection
         nodes={nodesByType.audio}
-        focusedNodeId={focusedNodeId}
+        primaryNodeId={primaryNodeId}
+        secondaryNodeId={secondaryNodeId}
         onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[1]"
       />
       <NodeListSection
         labelKey="workflow.canvas.aiText"
         nodes={nodesByType.text}
-        focusedNodeId={focusedNodeId}
+        primaryNodeId={primaryNodeId}
+        secondaryNodeId={secondaryNodeId}
         onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[2]"
-        itemVariant="mediaPlain"
+        itemVariant="media"
         mediaGrid
       />
       <NodeListSection
         labelKey="workflow.canvas.aiImage"
         nodes={nodesByType.image}
-        focusedNodeId={focusedNodeId}
+        primaryNodeId={primaryNodeId}
+        secondaryNodeId={secondaryNodeId}
         onOpenDetail={handleExpandedOpenDetail}
         className="min-w-0 flex-[2]"
         mediaGrid
@@ -270,7 +286,8 @@ export function CreativeStudioBoard({
       <NodeListSection
         labelKey="workflow.canvas.aiVideo"
         nodes={nodesByType.video}
-        focusedNodeId={focusedNodeId}
+        primaryNodeId={primaryNodeId}
+        secondaryNodeId={secondaryNodeId}
         onOpenDetail={handleExpandedOpenDetail}
         className="min-h-0 min-w-0 flex-[2]"
         mediaGrid

@@ -39,7 +39,6 @@ const NAV_ITEM_TOUR_MAP: Record<string, string> = {
   playground: "playground-nav",
   emails: "emails-nav",
   queues: "queues-nav",
-  datasets: "datasets-nav",
   databases: "databases-nav",
   integrations: "integrations-nav",
   secrets: "secrets-nav",

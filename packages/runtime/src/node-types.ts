@@ -329,10 +329,6 @@ export interface NodeContext {
   inferTextModelInterfaceId?: (
     canonicalId: string
   ) => Promise<string | undefined>;
-  disableTextModelOnInterface?: (params: {
-    readonly interfaceId: string;
-    readonly canonicalId: string;
-  }) => Promise<boolean>;
   /** Resolve a platform image model to interface + provider model id. */
   resolveImageModel?: (
     canonicalId: string,

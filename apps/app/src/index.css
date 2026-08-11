@@ -373,22 +373,6 @@ html.dark .shiki span {
 
 /* === Studio table (creative view) === */
 
-/* Boundary — table owns the `|` line after `\n\n` without mutating text segments */
-.studio-mdx-table-leading-pipe {
-  visibility: hidden;
-  height: 0;
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
-/* Edit: pull up one plain-text line to cancel textarea EOF phantom row after `\n\n` */
-.studio-mdx-table-boundary[data-follows-text="true"][data-table-mode="edit"] {
-  margin-top: -1.625rem;
-}
-
 /* 1. Frame */
 .studio-mdx-table-frame {
   margin-block: 1rem;
@@ -521,7 +505,8 @@ html.dark .studio-mdx-table-frame table :is(th, td)[data-active="true"] {
   min-height: 0;
 }
 
-.studio-text-table-frame-action {
+.studio-text-table-frame-action,
+.studio-text-section-frame-action {
   z-index: 20;
 }
 

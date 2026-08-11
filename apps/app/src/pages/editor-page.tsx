@@ -90,6 +90,7 @@ function EditorPageContent() {
     nodes: initialNodesForUI,
     edges: initialEdgesForUI,
     isInitializing: isWorkflowInitializing,
+    isGraphReady,
     savingError: workflowSavingError,
     connectionError: workflowConnectionError,
     isWSConnected: _isWSConnected,
@@ -302,6 +303,7 @@ function EditorPageContent() {
           onCommitEditorViewport={commitEditorViewport}
           generativeDefaults={generativeDefaults}
           onGenerativeDefaultsChange={handleGenerativeDefaultsChange}
+          graphReady={isGraphReady}
         />
       </div>
       {!workflowReadOnly ? <CanvasThemeTip /> : null}

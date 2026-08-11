@@ -1,4 +1,4 @@
-import type { MediaReference } from "@dafthunk/types";
+import type { ResourceIdReference } from "@dafthunk/types";
 
 export const MEDIA_RESOURCE_REKEYED_EVENT = "dafthunk:media-resource-rekeyed";
 
@@ -6,7 +6,7 @@ export interface MediaResourceRekeyedDetail {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly fromMediaId: string;
-  readonly toMediaReference: MediaReference;
+  readonly toMediaReference: ResourceIdReference;
 }
 
 export function dispatchMediaResourceRekeyed(

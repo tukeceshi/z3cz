@@ -1,20 +1,19 @@
 import { useCallback, useMemo, useRef } from "react";
 
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/utils/utils";
 import {
-  STUDIO_TEXT_PLAIN_SEGMENT,
-  STUDIO_TEXT_PLAIN_SEGMENT_EDIT,
-} from "./creative-studio-surface";
+  sectionBodyMarkdown,
+  sectionPrecedingText,
+  splitMarkdownSections,
+} from "./split-markdown-sections";
 import {
   mergeMarkdownSegmentEdits,
   splitMarkdownTables,
-  textSegmentKey,
 } from "./split-markdown-tables";
 import { patchMarkdownTableEdit } from "./patch-markdown-table-edit";
 import { useStudioTextEditLeave } from "./studio-text-edit-leave";
-import { StudioTextMdxEditor } from "./studio-text-mdx-editor";
-import { StudioTextTablePreview } from "./studio-text-table-preview";
+import { StudioTextMarkdownRange } from "./studio-text-markdown-range";
+import { StudioTextSectionFrameActions } from "./studio-text-section-frame-actions";
 
 export interface StudioTextFormattedViewProps {
   readonly value: string;
@@ -38,6 +37,7 @@ export function StudioTextFormattedView({
   className,
 }: StudioTextFormattedViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const sections = useMemo(() => splitMarkdownSections(value), [value]);
   const segments = useMemo(() => splitMarkdownTables(value), [value]);
 
   const { handleFocusOut, scheduleLeaveCheck } = useStudioTextEditLeave({
@@ -83,90 +83,73 @@ export function StudioTextFormattedView({
     scheduleLeaveCheck();
   }, [scheduleLeaveCheck]);
 
+  const rangeProps = {
+    value,
+    segments,
+    readOnly,
+    onFocus,
+    onTextChange: handleTextChange,
+    onTableChange: handleTableChange,
+    onContainerBlur: handleContainerBlur,
+    onLayoutUpdated,
+  };
+
   return (
     <div
       ref={containerRef}
       className={cn("min-h-full p-3", className)}
       onFocusOut={handleFocusOut}
     >
-      {segments.map((segment, segmentIndex) => {
-        if (segment.type === "text") {
-          const text = value.slice(segment.start, segment.end);
-          if (!text && readOnly) {
+      {sections.map((part) => {
+        if (part.type === "preamble") {
+          const preamble = value.slice(part.start, part.end);
+          if (!preamble && readOnly) {
             return null;
           }
 
-          const segmentKey = textSegmentKey(segment);
-          const anchorKey = `${contentKey}-${segmentKey}`;
-
-          if (readOnly) {
-            if (!text) {
-              return null;
-            }
-            return (
-              <div
-                key={segmentKey}
-                data-studio-scroll-anchor={anchorKey}
-                className={STUDIO_TEXT_PLAIN_SEGMENT}
-              >
-                {text}
-              </div>
-            );
-          }
-
           return (
-            <Textarea
-              key={segmentKey}
-              data-studio-scroll-anchor={anchorKey}
-              value={text}
-              onChange={(event) =>
-                handleTextChange(segmentKey, event.target.value)
-              }
-              onFocus={onFocus}
-              className={cn(
-                STUDIO_TEXT_PLAIN_SEGMENT,
-                STUDIO_TEXT_PLAIN_SEGMENT_EDIT
-              )}
+            <StudioTextMarkdownRange
+              key={`${contentKey}-preamble-${part.start}`}
+              {...rangeProps}
+              contentKey={`${contentKey}-preamble-${part.start}`}
+              rangeStart={part.start}
+              rangeEnd={part.end}
             />
           );
         }
 
-        const tableMarkdown = value.slice(segment.start, segment.end);
-        const tableAnchorKey = `${contentKey}-table-${segment.index}`;
-        const prevSegment = segments[segmentIndex - 1];
-        const followsText =
-          prevSegment?.type === "text" &&
-          value.slice(prevSegment.start, prevSegment.end).length > 0;
-        const precedingText =
-          prevSegment?.type === "text"
-            ? value.slice(prevSegment.start, prevSegment.end)
-            : "";
-
-        if (readOnly) {
-          return (
-            <div key={tableAnchorKey} data-studio-scroll-anchor={tableAnchorKey}>
-              <StudioTextTablePreview
-                markdown={tableMarkdown}
-                precedingText={precedingText}
-                followsText={followsText}
-              />
-            </div>
-          );
-        }
+        const sectionBody = sectionBodyMarkdown(value, part);
+        const precedingText = sectionPrecedingText(value, part);
+        const sectionAnchorKey = `${contentKey}-section-${part.index}`;
+        const hasHeadingRange = part.bodyStart > part.headingStart;
 
         return (
-          <div key={tableAnchorKey} data-studio-scroll-anchor={tableAnchorKey}>
-            <StudioTextMdxEditor
-              value={tableMarkdown}
-              onChange={(markdown) =>
-                handleTableChange(segment.index, markdown, tableMarkdown)
-              }
-              onBlur={handleContainerBlur}
-              readOnly={false}
-              precedingText={precedingText}
-              followsText={followsText}
-              contentKey={`${contentKey}-table-${segment.index}`}
-              onLayoutUpdated={onLayoutUpdated}
+          <div
+            key={sectionAnchorKey}
+            data-studio-scroll-anchor={sectionAnchorKey}
+            className="group/section w-full"
+          >
+            {hasHeadingRange ? (
+              <div className="relative w-full">
+                <StudioTextMarkdownRange
+                  {...rangeProps}
+                  contentKey={`${sectionAnchorKey}-heading`}
+                  rangeStart={part.headingStart}
+                  rangeEnd={part.bodyStart}
+                  trimTrailingNewlines
+                />
+                <StudioTextSectionFrameActions
+                  sectionBody={sectionBody}
+                  precedingText={precedingText}
+                  showEditHint={!readOnly}
+                />
+              </div>
+            ) : null}
+            <StudioTextMarkdownRange
+              {...rangeProps}
+              contentKey={`${sectionAnchorKey}-body`}
+              rangeStart={part.bodyStart}
+              rangeEnd={part.bodyEnd}
             />
           </div>
         );

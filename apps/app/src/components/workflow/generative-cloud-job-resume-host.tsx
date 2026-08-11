@@ -221,7 +221,13 @@ export function GenerativeCloudJobResumeHost({
         });
 
         if (modality === "image") {
-          toast.success("workflow.aiImagePanel.generated");
+          if (result.media.length > 1) {
+            toast.success("workflow.aiImagePanel.generatedBatch", {
+              count: result.media.length,
+            });
+          } else {
+            toast.success("workflow.aiImagePanel.generated");
+          }
         } else if (modality === "video") {
           toast.success("workflow.aiVideoPanel.generated");
         } else {
@@ -251,7 +257,7 @@ export function GenerativeCloudJobResumeHost({
         return;
       }
       const raw = error instanceof Error ? error.message : String(error);
-      const cardError = prepareGenerativeCardError(raw, t);
+      const cardError = prepareGenerativeCardError(raw, t, modality);
       updateNodeData?.(nodeId, (current) => {
         const cleared = clearGenerativeProgress(current.metadata);
         const withBusy = applyBusyMetadata(cleared, false);

@@ -1,5 +1,4 @@
 import type { MediaReference, ObjectReference } from "@dafthunk/types";
-import { getMediaReferenceKey } from "@dafthunk/types";
 import { createPortal } from "react-dom";
 import Maximize2Icon from "lucide-react/icons/maximize-2";
 import XIcon from "lucide-react/icons/x";
@@ -89,7 +88,7 @@ export function AiImageExpandOverlay({
   onClose,
 }: AiImageExpandOverlayProps) {
   const { t } = useTranslation();
-  const items = media ?? images ?? [];
+  const item = (media ?? images ?? [])[0];
 
   useEffect(() => {
     if (!open) return;
@@ -105,13 +104,6 @@ export function AiImageExpandOverlay({
   if (!open || typeof document === "undefined") {
     return null;
   }
-
-  const gridCols =
-    items.length === 1
-      ? "grid-cols-1"
-      : items.length <= 4
-        ? "grid-cols-2"
-        : "grid-cols-3";
 
   return createPortal(
     <div
@@ -141,16 +133,11 @@ export function AiImageExpandOverlay({
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {items.length > 0 ? (
-            <div className={cn("grid gap-3", gridCols)}>
-              {items.map((item, idx) => (
-                <ExpandMediaPreview
-                  key={getMediaReferenceKey(item) ?? idx}
-                  media={item}
-                  createObjectUrl={createObjectUrl}
-                />
-              ))}
-            </div>
+          {item ? (
+            <ExpandMediaPreview
+              media={item}
+              createObjectUrl={createObjectUrl}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
               {t("workflow.aiImagePanel.outputPlaceholder")}

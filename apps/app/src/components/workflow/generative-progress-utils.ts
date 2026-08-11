@@ -105,7 +105,7 @@ export function clearGenerativeProgress(
   });
 }
 
-/** Card double-click upload — sync list/canvas via metadata. */
+/** Card upload progress — sync list/canvas via metadata. */
 export function withGenerativeUploadProgress(
   metadata: Record<string, string> | undefined,
   uploading: boolean

@@ -4,7 +4,6 @@ import { jwtMiddleware } from "../../auth";
 import { ApiContext } from "../../context";
 import { adminMiddleware } from "../../middleware/admin";
 import adminDatabasesRoutes from "./databases";
-import adminDatasetsRoutes from "./datasets";
 import adminEmailsRoutes from "./emails";
 import adminExecutionsRoutes from "./executions";
 import adminObjectsRoutes from "./objects";
@@ -53,7 +52,6 @@ adminRoutes.route("/objects", adminObjectsRoutes);
 adminRoutes.route("/emails", adminEmailsRoutes);
 adminRoutes.route("/support", adminSupportRoutes);
 adminRoutes.route("/queues", adminQueuesRoutes);
-adminRoutes.route("/datasets", adminDatasetsRoutes);
 adminRoutes.route("/databases", adminDatabasesRoutes);
 
 export default adminRoutes;

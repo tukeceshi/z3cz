@@ -1,6 +1,7 @@
 import {
   countGenerateAiTextMediaReferences,
   countSubmitAiVideoMediaReferences,
+  inferAiTextMimeType,
   isClientCancelledTextModelError,
   validateAiTextPromptAssembly,
   validateSubmitAiVideoReferences,
@@ -29,8 +30,8 @@ import {
   finalizeAiModelInvocation,
   getAiModelInvocation,
   listAiModelInvocations,
-  listPlatformAiModelGroups,
 } from "../db/platform-ai-model-queries";
+import { persistGeneratedTextContent } from "../services/text-content-service";
 import { createUpstreamRequestLogger } from "../services/create-upstream-request-logger";
 import { createJobUpstreamRequestLogger } from "../services/job-upstream-request-logger";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
@@ -45,6 +46,10 @@ import {
   resolveTextModelInterface,
 } from "../services/resolve-text-model-interface";
 import { listPlatformCatalogModelOptions } from "../services/list-platform-catalog-model-options";
+import {
+  listAggregateVolcanoCatalogEntries,
+  listPlatformAiModelChannels,
+} from "../db/platform-ai-model-channel-queries";
 import { executeTextModel } from "../services/execute-text-model";
 import {
   handleTextModelStreamFailure,
@@ -304,17 +309,11 @@ platformAiRoutes.get("/text-models", async (c) => {
   const db = createDatabase(c.env);
   const scope = c.req.query("scope");
   if (scope === "catalog") {
-    const [models, groups] = await Promise.all([
-      listPlatformCatalogModelOptions(db, "text"),
-      listPlatformAiModelGroups(db, "text"),
-    ]);
-    return c.json({ models, groups });
+    const models = await listPlatformCatalogModelOptions(db, "text");
+    return c.json({ models });
   }
-  const [models, groups] = await Promise.all([
-    listOrgTextModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db, "text"),
-  ]);
-  return c.json({ models, groups });
+  const models = await listOrgTextModelOptions(db, organizationId);
+  return c.json({ models });
 });
 
 platformAiRoutes.get("/image-models", async (c) => {
@@ -322,17 +321,11 @@ platformAiRoutes.get("/image-models", async (c) => {
   const db = createDatabase(c.env);
   const scope = c.req.query("scope");
   if (scope === "catalog") {
-    const [models, groups] = await Promise.all([
-      listPlatformCatalogModelOptions(db, "image"),
-      listPlatformAiModelGroups(db, "image"),
-    ]);
-    return c.json({ models, groups });
+    const models = await listPlatformCatalogModelOptions(db, "image");
+    return c.json({ models });
   }
-  const [models, groups] = await Promise.all([
-    listOrgImageModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db, "image"),
-  ]);
-  return c.json({ models, groups });
+  const models = await listOrgImageModelOptions(db, organizationId);
+  return c.json({ models });
 });
 
 platformAiRoutes.get("/video-models", async (c) => {
@@ -340,17 +333,11 @@ platformAiRoutes.get("/video-models", async (c) => {
   const db = createDatabase(c.env);
   const scope = c.req.query("scope");
   if (scope === "catalog") {
-    const [models, groups] = await Promise.all([
-      listPlatformCatalogModelOptions(db, "video"),
-      listPlatformAiModelGroups(db, "video"),
-    ]);
-    return c.json({ models, groups });
+    const models = await listPlatformCatalogModelOptions(db, "video");
+    return c.json({ models });
   }
-  const [models, groups] = await Promise.all([
-    listOrgVideoModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db, "video"),
-  ]);
-  return c.json({ models, groups });
+  const models = await listOrgVideoModelOptions(db, organizationId);
+  return c.json({ models });
 });
 
 platformAiRoutes.get("/audio-models", async (c) => {
@@ -358,17 +345,50 @@ platformAiRoutes.get("/audio-models", async (c) => {
   const db = createDatabase(c.env);
   const scope = c.req.query("scope");
   if (scope === "catalog") {
-    const [models, groups] = await Promise.all([
-      listPlatformCatalogModelOptions(db, "audio"),
-      listPlatformAiModelGroups(db, "audio"),
-    ]);
-    return c.json({ models, groups });
+    const models = await listPlatformCatalogModelOptions(db, "audio");
+    return c.json({ models });
   }
-  const [models, groups] = await Promise.all([
-    listOrgAudioModelOptions(db, organizationId),
-    listPlatformAiModelGroups(db, "audio"),
-  ]);
-  return c.json({ models, groups });
+  const models = await listOrgAudioModelOptions(db, organizationId);
+  return c.json({ models });
+});
+
+function parseModelChannelKind(
+  value: string | undefined
+): "aggregate" | "api" | undefined {
+  if (value === "aggregate" || value === "api") {
+    return value;
+  }
+  return undefined;
+}
+
+function parseModelModality(
+  value: string | undefined
+): "text" | "image" | "video" | "audio" | undefined {
+  if (
+    value === "text" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+platformAiRoutes.get("/model-channels", async (c) => {
+  const db = createDatabase(c.env);
+  const channels = await listPlatformAiModelChannels(db, {
+    channel: parseModelChannelKind(c.req.query("channel")),
+    presetId: c.req.query("presetId")?.trim() || undefined,
+    modality: parseModelModality(c.req.query("modality")),
+  });
+  return c.json({ channels });
+});
+
+platformAiRoutes.get("/volcano-catalog", async (c) => {
+  const db = createDatabase(c.env);
+  const models = await listAggregateVolcanoCatalogEntries(db);
+  return c.json({ models });
 });
 
 platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
@@ -789,11 +809,26 @@ platformAiRoutes.post(
                   error: null,
                 });
               }
+
+              const mimeType = inferAiTextMimeType(event.text);
+              const persisted = await persistGeneratedTextContent(c.env, {
+                organizationId,
+                workflowId: body.workflowId,
+                text: event.text,
+                mimeType,
+              });
+
               send({
                 type: "done",
                 text: event.text,
                 invocationId,
                 aiInterfaceId: prepared.prepared.candidate.interfaceId,
+                ...(persisted
+                  ? {
+                      resourceId: persisted.resourceId,
+                      contentSha256: persisted.contentSha256,
+                    }
+                  : {}),
               });
               continue;
             }
@@ -802,10 +837,7 @@ platformAiRoutes.post(
               break;
             }
 
-            const failure = await handleTextModelStreamFailure({
-              db,
-              organizationId,
-              canonicalId: body.modelCanonicalId,
+            const failure = handleTextModelStreamFailure({
               candidate: prepared.prepared.candidate,
               upstreamError: event.error,
               displayName: modelOption.displayName,
@@ -836,10 +868,7 @@ platformAiRoutes.post(
               await finalizeCancelled();
             } else {
               finalized = true;
-              const failure = await handleTextModelStreamFailure({
-                db,
-                organizationId,
-                canonicalId: body.modelCanonicalId,
+              const failure = handleTextModelStreamFailure({
                 candidate: prepared.prepared.candidate,
                 upstreamError: message,
                 displayName: modelOption.displayName,

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+ï»¿import { eq } from "drizzle-orm";
 import PostalMime from "postal-mime";
 import { v7 as uuidv7 } from "uuid";
 
@@ -17,14 +17,17 @@ import {
   touchThreadOnInbound,
 } from "./db";
 import { verifyReplyToken } from "./support-reply-token";
-import { inboxKeys, SUPPORT_INBOX_ALIAS } from "./support-storage";
+import { SUPPORT_INBOX_ALIAS } from "./support-storage";
 import { buildSnippet, stripHtml } from "./support-utils";
+
+/** Placeholder for legacy raw_r2_key / r2_key columns (blob storage removed). */
+const DEPRECATED_BLOB_KEY = "deprecated";
 
 /**
  * Cheap spam gate: trust Cloudflare's Authentication-Results header. We
  * accept the message if either SPF or DKIM passed (mirroring how DMARC
- * evaluates alignment). If both verdicts are present and both failed â€?
- * almost always a spoof â€?we drop without persisting. If the header is
+ * evaluates alignment). If both verdicts are present and both failed ?
+ * almost always a spoof ?we drop without persisting. If the header is
  * absent (local dev, unusual relays) we let the message through.
  */
 export function isAuthenticated(headers: Headers): boolean {
@@ -78,7 +81,7 @@ function parseReferences(value: string | undefined | null): string[] {
  *
  * `replySubaddress` is the RFC 5233 plus-tag from the inbound address. When
  * it verifies as a reply token we trust it alone and skip the subject/From
- * heuristics â€?see `support-reply-token.ts`.
+ * heuristics ?see `support-reply-token.ts`.
  */
 export async function handleSupportEmail(
   message: ForwardableEmailMessage,
@@ -98,7 +101,7 @@ export async function handleSupportEmail(
 
   // Today the support handler always targets the "support" inbox. When
   // multi-inbox routing arrives, the alias will come from the routing layer.
-  // The lookup and the (potentially slow) stream read are independent â€?run
+  // The lookup and the (potentially slow) stream read are independent ?run
   // them in parallel so a cold-cache lookup doesn't add latency. Use
   // allSettled so we can distinguish which side failed when one rejects.
   const [inboxResult, rawResult] = await Promise.allSettled([
@@ -126,23 +129,10 @@ export async function handleSupportEmail(
     return;
   }
 
-  const keys = inboxKeys(inbox.id, messageRowId);
-
-  try {
-    await env.INBOXES.put(keys.raw, rawBytes, {
-      httpMetadata: { contentType: "message/rfc822" },
-    });
-  } catch (error) {
-    console.error("[support-email] failed to persist raw MIME to R2", error);
-    return;
-  }
-
   let parsed: Awaited<ReturnType<PostalMime["parse"]>>;
   try {
     parsed = await new PostalMime().parse(rawBytes);
   } catch (error) {
-    // Raw MIME is already in R2 so the message isn't lost â€?only the DB row
-    // is. Log loudly so we notice.
     console.error("[support-email] postal-mime parse failed", error);
     return;
   }
@@ -170,40 +160,11 @@ export async function handleSupportEmail(
         filename,
         contentType: att.mimeType || "application/octet-stream",
         sizeBytes: toUint8Array(att.content).byteLength,
-        r2Key: keys.attachment(i, filename),
+        r2Key: DEPRECATED_BLOB_KEY,
         contentId: att.contentId ?? null,
       };
     }
   );
-
-  // Bodies + all attachments are independent puts; run them concurrently so
-  // the email-routing handler returns quickly. Raw MIME is the only ordering
-  // constraint (already written above so we have an archive on parse failure).
-  const r2Puts: Promise<unknown>[] = [];
-  if (textBody) {
-    r2Puts.push(
-      env.INBOXES.put(keys.textBody, new TextEncoder().encode(textBody), {
-        httpMetadata: { contentType: "text/plain; charset=utf-8" },
-      })
-    );
-  }
-  if (htmlBody) {
-    r2Puts.push(
-      env.INBOXES.put(keys.htmlBody, new TextEncoder().encode(htmlBody), {
-        httpMetadata: { contentType: "text/html; charset=utf-8" },
-      })
-    );
-  }
-  parsedAttachments.forEach((att, i) => {
-    r2Puts.push(
-      env.INBOXES.put(attachmentInserts[i].r2Key, toUint8Array(att.content), {
-        httpMetadata: {
-          contentType: att.mimeType || "application/octet-stream",
-        },
-      })
-    );
-  });
-  await Promise.all(r2Puts);
 
   const now = new Date();
   let threadId: string;
@@ -220,7 +181,7 @@ export async function handleSupportEmail(
       .where(eq(threads.id, verifiedThreadId))
       .limit(1);
     if (!existing) {
-      // Drop rather than silently creating a thread under a forged id â€?
+      // Drop rather than silently creating a thread under a forged id ?
       // when the token verifies, the From: is intentionally untrusted.
       console.warn(
         `[support-email] tokenized reply for missing thread ${verifiedThreadId} from ${fromAddress}; dropping`
@@ -273,7 +234,7 @@ export async function handleSupportEmail(
     hasHtml: Boolean(htmlBody),
     hasText: Boolean(textBody),
     attachmentCount: attachmentInserts.length,
-    rawR2Key: keys.raw,
+    rawR2Key: DEPRECATED_BLOB_KEY,
     authorAdminUserId: null,
   });
 

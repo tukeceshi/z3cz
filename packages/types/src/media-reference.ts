@@ -16,6 +16,16 @@ export interface LocalMediaReference {
   readonly mimeType: string;
 }
 
+/** Workflow JSON — cloud/ephemeral resolved via media_resources catalog. */
+export interface ResourceIdReference {
+  readonly resourceId: string;
+  readonly mimeType?: string;
+  /** Full-text SHA-256 (hex) — pending or stable. */
+  readonly contentSha256?: string;
+}
+
+export type WorkflowMediaValue = ResourceIdReference | LocalMediaReference;
+
 export type MediaReference =
   | ObjectReference
   | EphemeralMediaReference
@@ -35,7 +45,6 @@ export const AI_MEDIA_CACHE_MIN_LIMIT_MB = 500 as const;
 export const AI_MEDIA_CACHE_MAX_LIMIT_MB = 4096 as const;
 
 export interface AiMediaCacheSettings {
-  readonly enabled: boolean;
   readonly limitMb: number;
 }
 
@@ -119,6 +128,54 @@ export function isObjectReference(value: unknown): value is ObjectReference {
   );
 }
 
+export function isResourceIdReference(
+  value: unknown
+): value is ResourceIdReference {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as ResourceIdReference).resourceId === "string" &&
+    (value as ResourceIdReference).resourceId.length > 0 &&
+    !("kind" in value)
+  );
+}
+
+export function isWorkflowMediaValue(
+  value: unknown
+): value is WorkflowMediaValue {
+  return isResourceIdReference(value) || isLocalMediaReference(value);
+}
+
+/** Canvas JSON — only resourceId or local staging id. */
+export function getResourceIdFromValue(value: unknown): string | null {
+  if (isResourceIdReference(value)) {
+    return value.resourceId;
+  }
+  if (isLocalMediaReference(value)) {
+    return value.mediaId;
+  }
+  return null;
+}
+
+/** API/job MediaReference → workflow JSON (resourceId only). */
+export function mediaReferenceToWorkflowValue(
+  ref: MediaReference
+): WorkflowMediaValue {
+  if (isLocalMediaReference(ref)) {
+    return ref;
+  }
+  return {
+    resourceId: getResourceId(ref),
+    mimeType: ref.mimeType,
+  };
+}
+
+export function workflowMediaMimeType(
+  value: WorkflowMediaValue
+): string | undefined {
+  return value.mimeType;
+}
+
 export function isMediaReference(value: unknown): value is MediaReference {
   return (
     isObjectReference(value) ||
@@ -144,7 +201,7 @@ export function getMediaReferenceKey(ref: MediaReference): string {
   if (isEphemeralMediaReference(ref) || isLocalMediaReference(ref)) {
     return ref.mediaId;
   }
-  return ref.storageKey ?? ref.id;
+  return ref.id;
 }
 
 /** Stable resource identifier for display, cache, and server-side link resolution. */

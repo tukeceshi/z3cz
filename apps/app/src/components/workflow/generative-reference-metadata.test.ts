@@ -55,10 +55,8 @@ describe("generativeReferenceMetadataForModel", () => {
       },
       selectable: true,
       description: "",
-      groupId: null,
-      groupName: null,
-      groupDescription: null,
-      groupIcon: null,
+      sortOrder: 0,
+      brandIcon: null,
     };
 
     expect(generativeReferenceMetadataForModel("image", imageModel)).toEqual({
@@ -91,10 +89,8 @@ describe("generativeReferenceMetadataForModel", () => {
       },
       selectable: true,
       description: "",
-      groupId: null,
-      groupName: null,
-      groupDescription: null,
-      groupIcon: null,
+      sortOrder: 0,
+      brandIcon: null,
     };
 
     expect(generativeReferenceMetadataForModel("video", videoModel)).toMatchObject(
@@ -178,10 +174,8 @@ describe("applyModelBindingToNodeData", () => {
       },
       selectable: true,
       description: "",
-      groupId: null,
-      groupName: null,
-      groupDescription: null,
-      groupIcon: null,
+      sortOrder: 0,
+      brandIcon: null,
     };
 
     const patch = applyModelBindingToNodeData({

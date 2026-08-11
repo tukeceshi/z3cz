@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   notifyAiMediaCacheChanged,
   useAiMediaCacheStats,
@@ -283,7 +282,6 @@ export function AiMediaCacheBar({
 
   const label = useMemo(() => {
     if (!stats) return t("workflow.aiMediaCache.loading");
-    if (!stats.enabled) return t("workflow.aiMediaCache.disabled");
     return t("workflow.aiMediaCache.barUsage", {
       used: formatBytes(stats.totalBytes),
       limit: formatBytes(stats.limitBytes),
@@ -317,7 +315,6 @@ export function AiMediaCachePanel({
 }: AiMediaCachePanelProps) {
   const { t } = useTranslation();
   const { stats, refresh } = useAiMediaCacheStats(organizationId);
-  const [enabled, setEnabled] = useState(true);
   const [limitMb, setLimitMb] = useState(1024);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(
@@ -330,7 +327,6 @@ export function AiMediaCachePanel({
 
   useEffect(() => {
     if (!stats) return;
-    setEnabled(stats.enabled);
     setLimitMb(Math.round(stats.limitBytes / (1024 * 1024)));
   }, [stats]);
 
@@ -342,12 +338,11 @@ export function AiMediaCachePanel({
 
   const handleSaveSettings = useCallback(async () => {
     await setAiMediaCacheSettings({
-      enabled,
       limitMb,
     });
     notifyAiMediaCacheChanged();
     await refresh();
-  }, [enabled, limitMb, refresh]);
+  }, [limitMb, refresh]);
 
   const handleToggleWorkflow = (workflowId: string, checked: boolean) => {
     setSelected((prev) => {
@@ -407,23 +402,6 @@ export function AiMediaCachePanel({
           </p>
 
           <div className="space-y-4 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="ai-cache-enabled">
-                {t("workflow.aiMediaCache.enabledLabel")}
-              </Label>
-              <Switch
-                id="ai-cache-enabled"
-                checked={enabled}
-                onCheckedChange={(value) => {
-                  setEnabled(value);
-                  void setAiMediaCacheSettings({ enabled: value }).then(() => {
-                    notifyAiMediaCacheChanged();
-                    void refresh();
-                  });
-                }}
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="ai-cache-limit">
                 {t("workflow.aiMediaCache.limitLabel")}

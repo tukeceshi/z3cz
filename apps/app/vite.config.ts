@@ -4,6 +4,8 @@ import path from "path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { defineConfig } from "vite";
 
+import { bootstrapManifestPlugin } from "./vite-plugin-bootstrap-manifest";
+
 const ReactCompilerConfig = {};
 
 const apiProxyTarget =
@@ -18,6 +20,7 @@ export default defineConfig({
         plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
       },
     }),
+    bootstrapManifestPlugin(),
   ],
   server: {
     host: true,

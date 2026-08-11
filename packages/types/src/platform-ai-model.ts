@@ -6,8 +6,8 @@ import {
   mergeReferenceImageValues,
   type ReferenceImageInline,
 } from "./reference-image-input";
-import type { MediaReference } from "./media-reference";
-import { isMediaReference } from "./media-reference";
+import type { MediaReference, WorkflowMediaValue } from "./media-reference";
+import { isMediaReference, isWorkflowMediaValue } from "./media-reference";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 
@@ -140,18 +140,8 @@ export interface PlatformAiModel {
   readonly platformEnabled: boolean;
   readonly parameterRules: PlatformAiModelParameterRules;
   readonly sortOrder: number;
-  readonly groupId: string | null;
+  readonly brandIcon: string | null;
   readonly description: string;
-  readonly updatedAt?: string;
-}
-
-export interface PlatformAiModelGroup {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly icon: string;
-  readonly modality: AiModelModality;
-  readonly sortOrder: number;
   readonly updatedAt?: string;
 }
 
@@ -160,29 +150,8 @@ export interface UpdatePlatformAiModelRequest {
   readonly platformEnabled?: boolean;
   readonly parameterRules?: PlatformAiModelParameterRules;
   readonly sortOrder?: number;
-  readonly groupId?: string | null;
+  readonly brandIcon?: string | null;
   readonly description?: string;
-}
-
-export interface CreatePlatformAiModelGroupRequest {
-  readonly id: string;
-  readonly name: string;
-  readonly description?: string;
-  readonly icon?: string;
-  readonly modality: AiModelModality;
-  readonly sortOrder?: number;
-}
-
-export interface UpdatePlatformAiModelGroupRequest {
-  readonly name?: string;
-  readonly description?: string;
-  readonly icon?: string;
-  readonly modality?: AiModelModality;
-  readonly sortOrder?: number;
-}
-
-export interface ListPlatformAiModelGroupsResponse {
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 export interface ReorderPlatformAiModelsRequest {
@@ -191,7 +160,6 @@ export interface ReorderPlatformAiModelsRequest {
 
 export interface ListPlatformAiModelsResponse {
   readonly models: readonly PlatformAiModel[];
-  readonly groups?: readonly PlatformAiModelGroup[];
 }
 
 export type OrgTextModelUnavailableReason =
@@ -212,15 +180,12 @@ export interface OrgTextModelOption {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgTextModelUnavailableReason;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
 }
 
 export interface ListOrgTextModelsResponse {
   readonly models: readonly OrgTextModelOption[];
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 /** Platform-enabled models for add-interface wizards — not org interface bindings. */
@@ -229,15 +194,12 @@ export interface PlatformCatalogModelOption {
   readonly displayName: string;
   readonly modality: AiModelModality;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
 }
 
 export interface ListPlatformCatalogModelsResponse {
   readonly models: readonly PlatformCatalogModelOption[];
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 export type AiModelInvocationStatus =
@@ -334,6 +296,8 @@ export interface GenerateAiTextResponse {
   readonly text: string;
   readonly invocationId: string;
   readonly aiInterfaceId: string;
+  readonly resourceId?: string;
+  readonly contentSha256?: string;
 }
 
 /** SSE payload for `/ai-text/generate-stream`. */
@@ -344,12 +308,19 @@ export type GenerateAiTextStreamEvent =
       readonly text: string;
       readonly invocationId: string;
       readonly aiInterfaceId: string;
+      readonly resourceId?: string;
+      readonly contentSha256?: string;
     }
   | { readonly type: "error"; readonly error: string };
 
 export interface AiTextResultHistoryItem {
   readonly id: string;
-  readonly text: string;
+  /** Legacy inline body — omitted after resourceId migration. */
+  readonly text?: string;
+  readonly resourceId?: string;
+  readonly contentSha256?: string;
+  /** Legacy preview excerpt — omitted from workflow JSON. */
+  readonly excerpt?: string;
   readonly platformModelId?: string;
   readonly aiInterfaceId?: string;
   readonly providerModelId?: string;
@@ -377,15 +348,12 @@ export interface OrgImageModelOption {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgImageModelUnavailableReason;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
 }
 
 export interface ListOrgImageModelsResponse {
   readonly models: readonly OrgImageModelOption[];
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 export interface GenerateAiImageRequest {
@@ -426,15 +394,12 @@ export interface OrgVideoModelOption {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgVideoModelUnavailableReason;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
 }
 
 export interface ListOrgVideoModelsResponse {
   readonly models: readonly OrgVideoModelOption[];
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 export interface SubmitAiVideoRequest {
@@ -493,15 +458,12 @@ export interface OrgAudioModelOption {
   readonly selectable: boolean;
   readonly unavailableReason?: OrgAudioModelUnavailableReason;
   readonly description: string;
-  readonly groupId: string | null;
-  readonly groupName: string | null;
-  readonly groupDescription: string | null;
-  readonly groupIcon: string | null;
+  readonly sortOrder: number;
+  readonly brandIcon: string | null;
 }
 
 export interface ListOrgAudioModelsResponse {
   readonly models: readonly OrgAudioModelOption[];
-  readonly groups: readonly PlatformAiModelGroup[];
 }
 
 export interface GenerateAiAudioRequest {
@@ -525,7 +487,7 @@ export interface GenerateAiAudioResponse {
 
 export interface AiImageResultHistoryItem {
   readonly id: string;
-  readonly images: readonly MediaReference[];
+  readonly images: readonly WorkflowMediaValue[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly platformModelId?: string;
@@ -543,7 +505,7 @@ export interface AiImageResultHistory {
 
 export interface AiVideoResultHistoryItem {
   readonly id: string;
-  readonly videos: readonly MediaReference[];
+  readonly videos: readonly WorkflowMediaValue[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly platformModelId?: string;
