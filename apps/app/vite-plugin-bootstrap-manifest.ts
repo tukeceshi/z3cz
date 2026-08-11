@@ -304,8 +304,6 @@ export function bootstrapManifestPlugin(): Plugin {
 
         });
 
-        const preloadTag = `<link rel="preload" href="${shell}" as="fetch" crossorigin="anonymous" />`;
-
         const inlineTag = `<script type="application/json" id="z3cz-bootstrap-inline">${inlinePayload}</script>`;
 
         if (!html.includes('id="z3cz-bootstrap-inline"')) {
@@ -314,7 +312,7 @@ export function bootstrapManifestPlugin(): Plugin {
 
             "</head>",
 
-            `    ${preloadTag}\n    ${inlineTag}\n  </head>`
+            `    ${inlineTag}\n  </head>`
 
           );
 

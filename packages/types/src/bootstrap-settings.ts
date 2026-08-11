@@ -3,23 +3,18 @@ import { AUTH_CONFIG_SECRET_MASK } from "./auth-config";
 export { AUTH_CONFIG_SECRET_MASK as BOOTSTRAP_SECRET_MASK };
 
 export interface BootstrapSettings {
-  shellEnabled: boolean;
-  multiSourceRaceEnabled: boolean;
   r2Enabled: boolean;
   accountId: string;
   accessKeyId: string;
   secretAccessKeyEncrypted: string;
   bucketName: string;
   publicBaseUrl: string;
-  originBaseUrl: string;
   lastSyncAt: string | null;
   lastSyncShellHash: string | null;
   lastSyncError: string | null;
 }
 
 export interface AdminBootstrapSettings {
-  shellEnabled: boolean;
-  multiSourceRaceEnabled: boolean;
   r2Enabled: boolean;
   accountId: string;
   accessKeyId: string;
@@ -27,7 +22,6 @@ export interface AdminBootstrapSettings {
   secretAccessKeyConfigured: boolean;
   bucketName: string;
   publicBaseUrl: string;
-  originBaseUrl: string;
   lastSyncAt: string | null;
   lastSyncShellHash: string | null;
   lastSyncError: string | null;
@@ -36,15 +30,12 @@ export interface AdminBootstrapSettings {
 }
 
 export interface UpdateBootstrapSettingsRequest {
-  shellEnabled?: boolean;
-  multiSourceRaceEnabled?: boolean;
   r2Enabled?: boolean;
   accountId?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
   bucketName?: string;
   publicBaseUrl?: string;
-  originBaseUrl?: string;
 }
 
 export interface BootstrapShellSource {
@@ -68,15 +59,12 @@ export interface BootstrapConnectionTestResult {
 }
 
 export const DEFAULT_BOOTSTRAP_SETTINGS: BootstrapSettings = {
-  shellEnabled: true,
-  multiSourceRaceEnabled: true,
   r2Enabled: false,
   accountId: "",
   accessKeyId: "",
   secretAccessKeyEncrypted: "",
   bucketName: "",
   publicBaseUrl: "",
-  originBaseUrl: "",
   lastSyncAt: null,
   lastSyncShellHash: null,
   lastSyncError: null,
@@ -85,8 +73,21 @@ export const DEFAULT_BOOTSTRAP_SETTINGS: BootstrapSettings = {
 export function mergeBootstrapSettings(
   partial: Partial<BootstrapSettings> | null | undefined
 ): BootstrapSettings {
+  const {
+    shellEnabled: _legacyShellEnabled,
+    multiSourceRaceEnabled: _legacyMultiSourceRaceEnabled,
+    originBaseUrl: _legacyOriginBaseUrl,
+    ...rest
+  } = {
+    ...(partial ?? {}),
+  } as Partial<BootstrapSettings> & {
+    shellEnabled?: boolean;
+    multiSourceRaceEnabled?: boolean;
+    originBaseUrl?: string;
+  };
+
   return {
     ...DEFAULT_BOOTSTRAP_SETTINGS,
-    ...(partial ?? {}),
+    ...rest,
   };
 }

@@ -41,15 +41,12 @@ export function AdminBootstrapPage() {
     refreshBootstrapConfig,
   } = useAdminBootstrapConfig();
 
-  const [shellEnabled, setShellEnabled] = useState(true);
-  const [multiSourceRaceEnabled, setMultiSourceRaceEnabled] = useState(true);
   const [r2Enabled, setR2Enabled] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
   const [bucketName, setBucketName] = useState("");
   const [publicBaseUrl, setPublicBaseUrl] = useState("");
-  const [originBaseUrl, setOriginBaseUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -63,8 +60,6 @@ export function AdminBootstrapPage() {
     if (!bootstrapConfig) {
       return;
     }
-    setShellEnabled(bootstrapConfig.shellEnabled);
-    setMultiSourceRaceEnabled(bootstrapConfig.multiSourceRaceEnabled);
     setR2Enabled(bootstrapConfig.r2Enabled);
     setAccountId(bootstrapConfig.accountId);
     setAccessKeyId(bootstrapConfig.accessKeyId);
@@ -75,12 +70,9 @@ export function AdminBootstrapPage() {
     );
     setBucketName(bootstrapConfig.bucketName);
     setPublicBaseUrl(bootstrapConfig.publicBaseUrl);
-    setOriginBaseUrl(bootstrapConfig.originBaseUrl);
   }, [bootstrapConfig]);
 
   const buildPayload = (): UpdateBootstrapSettingsRequest => ({
-    shellEnabled,
-    multiSourceRaceEnabled,
     r2Enabled,
     accountId,
     accessKeyId,
@@ -88,7 +80,6 @@ export function AdminBootstrapPage() {
       secretAccessKey === AUTH_CONFIG_SECRET_MASK ? undefined : secretAccessKey,
     bucketName,
     publicBaseUrl,
-    originBaseUrl,
   });
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -171,49 +162,6 @@ export function AdminBootstrapPage() {
               <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.shellEnabled")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("bootstrapAdmin.shellEnabledHint")}
-                  </p>
-                </div>
-                <Switch checked={shellEnabled} onCheckedChange={setShellEnabled} />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.multiSourceRaceEnabled")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("bootstrapAdmin.multiSourceRaceEnabledHint")}
-                  </p>
-                </div>
-                <Switch
-                  checked={multiSourceRaceEnabled}
-                  onCheckedChange={setMultiSourceRaceEnabled}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="bootstrap_origin_base_url">
-                  {t("bootstrapAdmin.originBaseUrl")}
-                </Label>
-                <CredentialPlainInput
-                  id="bootstrap_origin_base_url"
-                  name="bootstrap_origin_base_url"
-                  value={originBaseUrl}
-                  onChange={(event) => setOriginBaseUrl(event.target.value)}
-                  placeholder="https://origin.example.com"
-                />
-                <p className="text-sm text-muted-foreground">
-                  {t("bootstrapAdmin.originBaseUrlHint")}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">
                     {t("bootstrapAdmin.r2Enabled")}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -278,7 +226,7 @@ export function AdminBootstrapPage() {
                     name="bootstrap_r2_public_base_url"
                     value={publicBaseUrl}
                     onChange={(event) => setPublicBaseUrl(event.target.value)}
-                    placeholder="https://cdn.example.com/bootstrap"
+                    placeholder="https://cdn.example.com"
                   />
                 </div>
               </div>

@@ -7,7 +7,7 @@ export interface BootstrapR2Credentials {
   bucketName: string;
 }
 
-function buildR2Endpoint(credentials: BootstrapR2Credentials): string {
+export function buildR2Endpoint(credentials: BootstrapR2Credentials): string {
   return `https://${credentials.accountId.trim()}.r2.cloudflarestorage.com`;
 }
 
@@ -22,7 +22,7 @@ function buildR2ObjectUrl(
   return `${buildR2Endpoint(credentials)}/${credentials.bucketName.trim()}/${encodedKey}`;
 }
 
-function createAwsClient(credentials: BootstrapR2Credentials): AwsClient {
+export function createAwsClient(credentials: BootstrapR2Credentials): AwsClient {
   return new AwsClient({
     accessKeyId: credentials.accessKeyId.trim(),
     secretAccessKey: credentials.secretAccessKey,

@@ -2,7 +2,6 @@
   "use strict";
 
   var CACHE_NAME = "z3cz-bootstrap-shell:v1";
-  var SESSION_DONE_KEY = "z3cz-bootstrap:session-done";
   var APP_READY_EVENT = "z3cz-app-ready";
   var API_BASE = "/api";
   var FETCH_TIMEOUT_MS = 30000;
@@ -148,6 +147,16 @@
     });
   }
 
+  function resolveShellSources(config) {
+    if (config.shellSources && config.shellSources.length > 0) {
+      return config.shellSources;
+    }
+    if (config.shell) {
+      return [{ url: config.shell, kind: "origin" }];
+    }
+    return [];
+  }
+
   function fetchShellFromSources(sources, expectedHash) {
     if (!sources || sources.length === 0) {
       return Promise.reject(new Error("No shell sources configured"));
@@ -235,34 +244,6 @@
       };
       document.body.appendChild(script);
     });
-  }
-
-  function getBootstrapDoneVersion() {
-    try {
-      var value = sessionStorage.getItem(SESSION_DONE_KEY);
-      return typeof value === "string" ? value : "";
-    } catch (_error) {
-      return "";
-    }
-  }
-
-  function markBootstrapDone(manifestVersion) {
-    if (!manifestVersion) {
-      return;
-    }
-    try {
-      sessionStorage.setItem(SESSION_DONE_KEY, manifestVersion);
-    } catch (_error) {
-      return;
-    }
-  }
-
-  function shouldSkipShell(manifestVersion) {
-    return (
-      typeof manifestVersion === "string" &&
-      manifestVersion.length > 0 &&
-      getBootstrapDoneVersion() === manifestVersion
-    );
   }
 
   function installImportMap(blobUrls) {
@@ -381,7 +362,11 @@
     });
   }
 
-  function loadShellBytes(shellUrl, sources, expectedHash) {
+  function loadShellBytes(config) {
+    var sources = resolveShellSources(config);
+    var shellUrl = config.shell || (sources[0] && sources[0].url) || "";
+    var expectedHash = config.shellHash || "";
+
     return readCachedShell(shellUrl).then(function (cached) {
       if (cached) {
         setStatus("Starting from cache…");
@@ -396,15 +381,11 @@
   }
 
   function loadViaShell(config) {
-    if (!config.shell) {
+    if (!config.shell && resolveShellSources(config).length === 0) {
       return loadViaHttp(config.entry, config.css || []);
     }
 
-    return loadShellBytes(
-      config.shell,
-      config.shellSources || [],
-      config.shellHash || ""
-    )
+    return loadShellBytes(config)
       .then(gunzipBytes)
       .then(parseShellArchive)
       .then(function (archive) {
@@ -414,10 +395,7 @@
       });
   }
 
-  function loadApp(config, skipShell) {
-    if (skipShell || config.shellEnabled === false) {
-      return loadViaHttp(config.entry, config.css || []);
-    }
+  function loadApp(config) {
     return loadViaShell(config).catch(function () {
       return loadViaHttp(config.entry, config.css || []);
     });
@@ -440,14 +418,6 @@
       return remote;
     }
     return {
-      shellEnabled:
-        typeof remote.shellEnabled === "boolean"
-          ? remote.shellEnabled
-          : true,
-      multiSourceRaceEnabled:
-        typeof remote.multiSourceRaceEnabled === "boolean"
-          ? remote.multiSourceRaceEnabled
-          : true,
       shell: remote.shell || inline.shell || "",
       shellHash: remote.shellHash || inline.shellHash || "",
       entry: remote.entry || inline.entry || "",
@@ -463,12 +433,9 @@
     };
   }
 
-  function finishBootstrap(manifestVersion) {
+  function finishBootstrap() {
     dismissLauncherOverlay();
     return waitForAppReady().then(function () {
-      if (manifestVersion) {
-        markBootstrapDone(manifestVersion);
-      }
       teardownLauncher();
     });
   }
@@ -483,12 +450,7 @@
         if (!config || !config.entry) {
           throw new Error("Bootstrap config unavailable");
         }
-
-        var manifestVersion = config.manifestVersion || "";
-        var skipShell = shouldSkipShell(manifestVersion);
-        return loadApp(config, skipShell).then(function () {
-          return manifestVersion;
-        });
+        return loadApp(config);
       })
       .then(finishBootstrap)
       .catch(function (error) {

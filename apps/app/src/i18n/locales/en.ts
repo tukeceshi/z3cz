@@ -215,16 +215,9 @@ export const en = {
     title: "Bootstrap",
     description:
       "Control first-load shell acceleration, R2 mirror credentials, and one-click sync after each build.",
-    shellEnabled: "Shell acceleration",
-    shellEnabledHint: "When off, the app loads entry JS over normal HTTP.",
-    multiSourceRaceEnabled: "Multi-source race",
-    multiSourceRaceEnabledHint:
-      "Download shell from origin and R2 at the same time; use whichever finishes first.",
-    originBaseUrl: "Origin base URL",
-    originBaseUrlHint:
-      "Optional direct origin for shell race. Leave empty to use /assets on this site.",
     r2Enabled: "R2 acceleration",
-    r2EnabledHint: "Include the R2 public URL in shell sources when racing.",
+    r2EnabledHint:
+      "Sync shell to R2 and race it against this site's /assets downloads.",
     r2Credentials: "R2 credentials",
     accountId: "Account ID",
     accessKeyId: "Access key ID",

@@ -10,8 +10,6 @@ export interface BootstrapManifest {
 import type { BootstrapShellSource } from "./bootstrap-settings";
 
 export interface BootstrapConfigResponse {
-  readonly shellEnabled: boolean;
-  readonly multiSourceRaceEnabled: boolean;
   readonly shell: string;
   readonly shellHash: string;
   readonly entry: string;

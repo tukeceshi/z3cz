@@ -85,8 +85,6 @@ export function toAdminBootstrapSettings(
   updatedBy: string | null
 ): AdminBootstrapSettings {
   return {
-    shellEnabled: settings.shellEnabled,
-    multiSourceRaceEnabled: settings.multiSourceRaceEnabled,
     r2Enabled: settings.r2Enabled,
     accountId: settings.accountId,
     accessKeyId: settings.accessKeyId,
@@ -97,7 +95,6 @@ export function toAdminBootstrapSettings(
       settings.secretAccessKeyEncrypted.trim().length > 0,
     bucketName: settings.bucketName,
     publicBaseUrl: settings.publicBaseUrl,
-    originBaseUrl: settings.originBaseUrl,
     lastSyncAt: settings.lastSyncAt,
     lastSyncShellHash: settings.lastSyncShellHash,
     lastSyncError: settings.lastSyncError,
@@ -112,12 +109,6 @@ export function mergeBootstrapSettingsUpdate(
 ): BootstrapSettings {
   const next = mergeBootstrapSettings(existing);
 
-  if (input.shellEnabled !== undefined) {
-    next.shellEnabled = input.shellEnabled;
-  }
-  if (input.multiSourceRaceEnabled !== undefined) {
-    next.multiSourceRaceEnabled = input.multiSourceRaceEnabled;
-  }
   if (input.r2Enabled !== undefined) {
     next.r2Enabled = input.r2Enabled;
   }
@@ -132,9 +123,6 @@ export function mergeBootstrapSettingsUpdate(
   }
   if (input.publicBaseUrl !== undefined) {
     next.publicBaseUrl = input.publicBaseUrl.trim();
-  }
-  if (input.originBaseUrl !== undefined) {
-    next.originBaseUrl = input.originBaseUrl.trim();
   }
 
   return next;
@@ -175,10 +163,9 @@ export function buildBootstrapShellSources(
   shellPath: string,
   settings: BootstrapSettings
 ): BootstrapShellSource[] {
-  const sources: BootstrapShellSource[] = [];
-  const originBase = settings.originBaseUrl.trim().replace(/\/$/, "");
-  const originUrl = originBase ? `${originBase}${shellPath}` : shellPath;
-  sources.push({ url: originUrl, kind: "origin" });
+  const sources: BootstrapShellSource[] = [
+    { url: shellPath, kind: "origin" },
+  ];
 
   if (settings.r2Enabled && isBootstrapR2Configured(settings)) {
     const fileName = shellPath.replace(/^\/assets\//, "");
@@ -187,10 +174,6 @@ export function buildBootstrapShellSources(
       url: `${publicBase}/${fileName}`,
       kind: "r2",
     });
-  }
-
-  if (!settings.multiSourceRaceEnabled || sources.length <= 1) {
-    return [sources[0]!];
   }
 
   return sources;

@@ -15,8 +15,6 @@ bootstrapRoutes.get("/config", async (c) => {
 
   if (!manifest) {
     const response: BootstrapConfigResponse = {
-      shellEnabled: settings.shellEnabled,
-      multiSourceRaceEnabled: settings.multiSourceRaceEnabled,
       shell: "",
       shellHash: "",
       entry: "",
@@ -28,8 +26,6 @@ bootstrapRoutes.get("/config", async (c) => {
   }
 
   const response: BootstrapConfigResponse = {
-    shellEnabled: settings.shellEnabled,
-    multiSourceRaceEnabled: settings.multiSourceRaceEnabled,
     shell: manifest.shell,
     shellHash: manifest.shellHash,
     entry: manifest.entry,

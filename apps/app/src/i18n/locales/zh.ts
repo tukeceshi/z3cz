@@ -210,14 +210,9 @@ export const zh: TranslationDictionary = {
   bootstrapAdmin: {
     title: "首屏加速",
     description: "配置 shell 加速、R2 凭证，以及每次构建后的一键同步。",
-    shellEnabled: "启用 shell 加速",
-    shellEnabledHint: "关闭后改为普通 HTTP 加载 entry JS。",
-    multiSourceRaceEnabled: "多源竞速",
-    multiSourceRaceEnabledHint: "同时从源站与 R2 下载 shell，谁先完成用谁。",
-    originBaseUrl: "源站地址",
-    originBaseUrlHint: "可选，用于竞速的直连源站。留空则使用本站 /assets。",
     r2Enabled: "启用 R2 加速",
-    r2EnabledHint: "竞速时加入 R2 公开 URL。",
+    r2EnabledHint:
+      "开启后同步 shell 到 R2，并与本站 /assets 同时竞速下载。",
     r2Credentials: "R2 凭证",
     accountId: "Account ID",
     accessKeyId: "Access Key ID",
