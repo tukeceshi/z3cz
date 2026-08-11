@@ -7,7 +7,7 @@ import {
   type ReferenceImageInline,
 } from "./reference-image-input";
 import type { MediaReference, WorkflowMediaValue } from "./media-reference";
-import { isMediaReference, isWorkflowMediaValue } from "./media-reference";
+import { isMediaReference } from "./media-reference";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 

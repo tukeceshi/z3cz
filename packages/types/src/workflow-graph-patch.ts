@@ -42,7 +42,7 @@ export function diffWorkflowGraph(
   const prevNodes = new Map(previous.nodes.map((node) => [node.id, node]));
   const nextNodes = new Map(next.nodes.map((node) => [node.id, node]));
 
-  for (const [id, prevNode] of prevNodes) {
+  for (const id of prevNodes.keys()) {
     if (!nextNodes.has(id)) {
       nodePatches.push({ type: "remove", id });
     }

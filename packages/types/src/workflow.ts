@@ -630,6 +630,11 @@ export interface WorkflowUpdateMessage {
   state: WorkflowState;
 }
 
+import type {
+  WorkflowGraphPatchBroadcast,
+  WorkflowGraphPatchMessage,
+} from "./workflow-graph-patch";
+
 export type {
   WorkflowEdgePatch,
   WorkflowGraphPatchBroadcast,
