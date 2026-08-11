@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { BootstrapManifest } from "@dafthunk/types";
+import type {
+  BootstrapManifest,
+  BootstrapManifestFile,
+} from "@dafthunk/types";
+
+const PRELOAD_FILE_COUNT = 20;
 
 const MANIFEST_FILE = "bootstrap-manifest.json";
 
@@ -97,6 +102,25 @@ export function readBootstrapAsset(assetPath: string): Buffer | null {
 export function invalidateBootstrapAssetCache(): void {
   cachedManifest = null;
   cachedRoot = null;
+}
+
+export function getBootstrapPreloadFiles(
+  manifest: BootstrapManifest
+): BootstrapManifestFile[] {
+  if (manifest.preloadFiles && manifest.preloadFiles.length > 0) {
+    return manifest.preloadFiles.map((file) => ({
+      path: file.path,
+      size: file.size,
+    }));
+  }
+
+  return [...manifest.files]
+    .sort((left, right) => right.size - left.size)
+    .slice(0, PRELOAD_FILE_COUNT)
+    .map((file) => ({
+      path: file.path,
+      size: file.size,
+    }));
 }
 
 export function computeManifestVersion(manifest: BootstrapManifest): string {

@@ -8,6 +8,7 @@ export interface BootstrapManifest {
   readonly entry: string;
   readonly css: readonly string[];
   readonly files: readonly BootstrapManifestFile[];
+  readonly preloadFiles?: readonly BootstrapManifestFile[];
   readonly manifestVersion: string;
 }
 
@@ -16,5 +17,6 @@ export interface BootstrapConfigResponse {
   readonly entry: string;
   readonly css: readonly string[];
   readonly files: readonly BootstrapManifestFile[];
+  readonly preloadFiles: readonly BootstrapManifestFile[];
   readonly manifestVersion: string;
 }

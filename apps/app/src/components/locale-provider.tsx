@@ -55,13 +55,13 @@ async function fetchPublicSiteSettings(): Promise<PublicSiteSettings> {
 }
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const { data, mutate } = useSWR("/site-settings", fetchPublicSiteSettings, {
+  const { data, error, mutate } = useSWR("/site-settings", fetchPublicSiteSettings, {
     revalidateOnFocus: true,
     shouldRetryOnError: true,
   });
 
   const siteSettings = data ?? DEFAULT_SITE_SETTINGS;
-  const isSiteSettingsReady = data !== undefined;
+  const isSiteSettingsReady = data !== undefined || error !== undefined;
 
   const [locale, setLocaleState] = useState<AppLocale>(() =>
     resolveInitialLocale(readStoredLocale() ?? detectBrowserLocale())

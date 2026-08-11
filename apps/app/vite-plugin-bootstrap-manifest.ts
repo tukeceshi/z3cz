@@ -9,6 +9,36 @@ function toAssetPath(fileName: string): string {
   return `/assets/${fileName}`;
 }
 
+const PRELOAD_FILE_COUNT = 20;
+
+function buildPreloadFiles(
+  files: readonly BootstrapManifestFile[],
+  entry: string
+): BootstrapManifestFile[] {
+  const selected = new Map<string, BootstrapManifestFile>();
+  for (const file of [...files].sort((left, right) => right.size - left.size)) {
+    if (selected.size >= PRELOAD_FILE_COUNT) {
+      break;
+    }
+    selected.set(file.path, file);
+  }
+
+  const entryFile = files.find((file) => file.path === entry);
+  if (entryFile && !selected.has(entry)) {
+    if (selected.size >= PRELOAD_FILE_COUNT) {
+      const smallest = [...selected.values()].sort(
+        (left, right) => left.size - right.size
+      )[0];
+      if (smallest) {
+        selected.delete(smallest.path);
+      }
+    }
+    selected.set(entry, entryFile);
+  }
+
+  return [...selected.values()].sort((left, right) => right.size - left.size);
+}
+
 function computeManifestVersion(files: BootstrapManifestFile[]): string {
   const payload = files
     .map((file) => `${file.path}:${file.size}`)
@@ -64,11 +94,14 @@ export function bootstrapManifestPlugin(): Plugin {
         })
         .sort((left, right) => left.path.localeCompare(right.path));
 
+      const preloadFiles = buildPreloadFiles(files, entry);
+
       const manifest: BootstrapManifest = {
         version: 1,
         entry,
         css: capturedCss,
         files,
+        preloadFiles,
         manifestVersion: computeManifestVersion(files),
       };
 

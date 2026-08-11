@@ -6,6 +6,7 @@ import { createDatabase, getPublicSiteSettings } from "../db";
 import {
   computeManifestVersion,
   getBootstrapManifest,
+  getBootstrapPreloadFiles,
 } from "../services/bootstrap-asset-store";
 
 const bootstrapRoutes = new Hono<ApiContext>();
@@ -21,6 +22,7 @@ bootstrapRoutes.get("/config", async (c) => {
       entry: "",
       css: [],
       files: [],
+      preloadFiles: [],
       manifestVersion: "",
     };
     return c.json(response);
@@ -37,6 +39,7 @@ bootstrapRoutes.get("/config", async (c) => {
       path: file.path,
       size: file.size,
     })),
+    preloadFiles: getBootstrapPreloadFiles(manifest),
     manifestVersion,
   };
 

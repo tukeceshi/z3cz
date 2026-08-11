@@ -2,6 +2,7 @@
   "use strict";
 
   var CACHE_PREFIX = "z3cz-bootstrap:v1:";
+  var SESSION_DONE_KEY = "z3cz-bootstrap:session-done";
   var API_BASE = "/api";
 
   var launcher = document.getElementById("z3cz-launcher");
@@ -112,6 +113,13 @@
       if (!parsed || typeof parsed !== "object" || !parsed.files) {
         return null;
       }
+      var paths = Object.keys(parsed.files);
+      for (var index = 0; index < paths.length; index += 1) {
+        var encoded = parsed.files[paths[index]];
+        if (typeof encoded !== "string" || encoded.length === 0) {
+          return null;
+        }
+      }
       return parsed.files;
     } catch (_error) {
       return null;
@@ -119,7 +127,43 @@
   }
 
   function writeCache(cacheKey, files) {
-    sessionStorage.setItem(cacheKey, JSON.stringify({ files: files }));
+    try {
+      var payload = JSON.stringify({ files: files });
+      if (payload.length > 4 * 1024 * 1024) {
+        return;
+      }
+      sessionStorage.setItem(cacheKey, payload);
+    } catch (_error) {
+      return;
+    }
+  }
+
+  function getBootstrapDoneVersion() {
+    try {
+      var value = sessionStorage.getItem(SESSION_DONE_KEY);
+      return typeof value === "string" ? value : "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function markBootstrapDone(manifestVersion) {
+    if (!manifestVersion) {
+      return;
+    }
+    try {
+      sessionStorage.setItem(SESSION_DONE_KEY, manifestVersion);
+    } catch (_error) {
+      return;
+    }
+  }
+
+  function shouldSkipPreload(manifestVersion) {
+    return (
+      typeof manifestVersion === "string" &&
+      manifestVersion.length > 0 &&
+      getBootstrapDoneVersion() === manifestVersion
+    );
   }
 
   function installImportMap(blobUrls) {
@@ -143,10 +187,18 @@
     });
     installImportMap(blobUrls);
     loadStylesheets(cssFiles);
-    return import(entry).then(function () {
-      Object.keys(blobUrls).forEach(function (path) {
-        URL.revokeObjectURL(blobUrls[path]);
-      });
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.type = "module";
+      script.src = entry;
+      script.crossOrigin = "anonymous";
+      script.onload = function () {
+        resolve();
+      };
+      script.onerror = function () {
+        reject(new Error("Failed to load application"));
+      };
+      document.body.appendChild(script);
     });
   }
 
@@ -177,7 +229,7 @@
   }
 
   function wsUrl() {
-    return getWebSocketBaseUrl() + "/bootstrap/ws";
+    return getWebSocketBaseUrl() + "/bootstrap-ws";
   }
 
   function fetchAllOverWs(files) {
@@ -241,7 +293,11 @@
       socket.onopen = function () {
         files.forEach(function (file, index) {
           socket.send(
-            JSON.stringify({ op: "fetch", id: index + 1, path: file.path })
+            JSON.stringify({
+              op: "fetch",
+              id: index + 1,
+              path: file.path,
+            })
           );
         });
       };
@@ -258,7 +314,23 @@
             updateProgress();
             return;
           }
+          if (message.op === "chunk") {
+            var chunk = base64ToBytes(message.data);
+            transfer.chunks.push(chunk);
+            transfer.receivedSize += chunk.byteLength;
+            updateProgress();
+            return;
+          }
           if (message.op === "done") {
+            if (
+              transfer.expectedSize > 0 &&
+              transfer.receivedSize !== transfer.expectedSize
+            ) {
+              reject(
+                new Error("Incomplete download for " + transfer.path)
+              );
+              return;
+            }
             transfer.done = true;
             completed += 1;
             updateProgress();
@@ -302,7 +374,25 @@
     });
   }
 
+  function getPreloadFiles(config) {
+    if (config.preloadFiles && config.preloadFiles.length > 0) {
+      return config.preloadFiles;
+    }
+    return config.files
+      .slice()
+      .sort(function (left, right) {
+        return right.size - left.size;
+      })
+      .slice(0, 20);
+  }
+
+  function mountDownloaded(config, fileBytes) {
+    return mountFromBytes(fileBytes, config.entry, config.css || []);
+  }
+
   function loadViaWs(config) {
+    var preloadFiles = getPreloadFiles(config);
+
     var cacheKey = CACHE_PREFIX + config.manifestVersion;
     var cached = readCache(cacheKey);
     if (cached) {
@@ -311,23 +401,33 @@
       Object.keys(cached).forEach(function (path) {
         cachedBytes[path] = base64ToBytes(cached[path]);
       });
-      return mountFromBytes(cachedBytes, config.entry, config.css);
+      return mountDownloaded(config, cachedBytes);
     }
 
     setStatus("Connecting…");
-    return fetchAllOverWs(config.files).then(function (fileBytes) {
+    return fetchAllOverWs(preloadFiles).then(function (fileBytes) {
       var encoded = {};
       Object.keys(fileBytes).forEach(function (path) {
         encoded[path] = bytesToBase64(fileBytes[path]);
       });
       writeCache(cacheKey, encoded);
-      return mountFromBytes(fileBytes, config.entry, config.css);
+      return mountDownloaded(config, fileBytes);
     });
+  }
+
+  function loadApp(config, skipPreload) {
+    if (skipPreload || !config.enabled) {
+      return loadViaHttp(config.entry, config.css || []);
+    }
+    return loadViaWs(config);
   }
 
   function start() {
     clearError();
-    setStatus("Loading…");
+
+    if (getBootstrapDoneVersion() && launcher) {
+      launcher.style.display = "none";
+    }
 
     fetchJson(API_BASE + "/bootstrap/config")
       .then(function (config) {
@@ -335,13 +435,28 @@
           throw new Error("Bootstrap config unavailable");
         }
 
-        if (!config.enabled) {
-          return loadViaHttp(config.entry, config.css || []);
+        var manifestVersion = config.manifestVersion || "";
+        var skipPreload = shouldSkipPreload(manifestVersion);
+
+        if (skipPreload) {
+          teardownLauncher();
+          return loadApp(config, true).then(function () {
+            return manifestVersion;
+          });
         }
 
-        return loadViaWs(config);
+        if (launcher) {
+          launcher.style.display = "";
+        }
+        setStatus("Loading…");
+        return loadApp(config, false).then(function () {
+          return manifestVersion;
+        });
       })
-      .then(function () {
+      .then(function (manifestVersion) {
+        if (manifestVersion) {
+          markBootstrapDone(manifestVersion);
+        }
         teardownLauncher();
       })
       .catch(function (error) {

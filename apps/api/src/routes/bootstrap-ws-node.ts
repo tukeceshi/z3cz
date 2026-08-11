@@ -72,10 +72,11 @@ async function streamAsset(
 
   for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
     const slice = buffer.subarray(offset, offset + CHUNK_SIZE);
-    const frame = Buffer.alloc(4 + slice.byteLength);
-    frame.writeUInt32BE(id >>> 0, 0);
-    slice.copy(frame, 4);
-    ws.send(frame);
+    sendJson(ws, {
+      op: "chunk",
+      id,
+      data: Buffer.from(slice).toString("base64"),
+    });
   }
 
   sendJson(ws, { op: "done", id });
@@ -91,7 +92,7 @@ export function registerNodeBootstrapWsRoutes(
   upgradeWebSocket: UpgradeWebSocket
 ): void {
   app.get(
-    "/bootstrap/ws",
+    "/bootstrap-ws",
     upgradeWebSocket(() => ({
       onMessage(event, ws) {
         const message = parseClientMessage(event.data);

@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error: swrError,
     isLoading: isUserLoading,
+    isValidating,
     mutate: mutateUser,
   } = useSWR<JWTTokenPayload | null>(
     AUTH_USER_KEY,
@@ -68,11 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [loginError, setLoginError] = useState<Error | null>(null);
 
-  // A transient request/refresh failure is not proof that the session ended.
-  // Keep route guards pending while SWR retries instead of showing /login.
+  // Keep route guards pending while SWR retries; stop once retries finish.
   const isLoading =
     isUserLoading ||
-    (!user && !!swrError && !(swrError instanceof AuthError));
+    (!user &&
+      !!swrError &&
+      !(swrError instanceof AuthError) &&
+      isValidating);
   const isAuthenticated = !!user?.sub && !(swrError instanceof AuthError);
 
   const organization = useMemo<OrganizationInfo | null>(() => {

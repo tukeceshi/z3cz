@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   computeManifestVersion,
   getBootstrapManifest,
+  getBootstrapPreloadFiles,
   invalidateBootstrapAssetCache,
   isBootstrapAssetPath,
   readBootstrapAsset,
@@ -35,6 +36,7 @@ describe("bootstrap-asset-store", () => {
         entry: "/assets/entry.js",
         css: [],
         files: [{ path: "/assets/entry.js", size: 21 }],
+        preloadFiles: [{ path: "/assets/entry.js", size: 21 }],
         manifestVersion: "test",
       })
     );
@@ -56,5 +58,32 @@ describe("bootstrap-asset-store", () => {
       { path: "/assets/b.js", size: 20 },
     ]);
     expect(version).toHaveLength(16);
+  });
+
+  it("returns explicit preload files or falls back to largest assets", () => {
+    const manifest = {
+      version: 1 as const,
+      entry: "/assets/entry.js",
+      css: [],
+      files: [
+        { path: "/assets/small.js", size: 1 },
+        { path: "/assets/large.js", size: 100 },
+        { path: "/assets/entry.js", size: 21 },
+      ],
+      manifestVersion: "test",
+    };
+
+    expect(getBootstrapPreloadFiles(manifest).map((file) => file.path)).toEqual([
+      "/assets/large.js",
+      "/assets/entry.js",
+      "/assets/small.js",
+    ]);
+
+    expect(
+      getBootstrapPreloadFiles({
+        ...manifest,
+        preloadFiles: [{ path: "/assets/entry.js", size: 21 }],
+      }).map((file) => file.path)
+    ).toEqual(["/assets/entry.js"]);
   });
 });

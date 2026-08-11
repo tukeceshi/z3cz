@@ -11,6 +11,15 @@ const ReactCompilerConfig = {};
 const apiProxyTarget =
   process.env.API_PROXY_TARGET ?? "http://127.0.0.1:3102";
 
+const apiProxyConfig = {
+  "/api": {
+    target: apiProxyTarget,
+    changeOrigin: true,
+    ws: true,
+    rewrite: (requestPath: string) => requestPath.replace(/^\/api/, ""),
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -30,11 +39,9 @@ export default defineConfig({
       interval: 300,
     },
     proxy: {
+      ...apiProxyConfig,
       "/api": {
-        target: apiProxyTarget,
-        changeOrigin: true,
-        ws: true,
-        rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
+        ...apiProxyConfig["/api"],
         configure: (proxy) => {
           proxy.on(
             "error",
@@ -63,6 +70,10 @@ export default defineConfig({
         },
       },
     },
+  },
+  preview: {
+    host: true,
+    proxy: apiProxyConfig,
   },
   resolve: {
     alias: {
