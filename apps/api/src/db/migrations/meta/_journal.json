@@ -442,6 +442,13 @@
       "when": 1788440000000,
       "tag": "0067_media_resource_content_sha256",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1788520000000,
+      "tag": "0068_bootstrap_config",
+      "breakpoints": true
     }
   ]
 }

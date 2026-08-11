@@ -2,6 +2,7 @@ import FileText from "lucide-react/icons/file-text";
 import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
 import KeyRound from "lucide-react/icons/key-round";
+import Rocket from "lucide-react/icons/rocket";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
 import Play from "lucide-react/icons/play";
 import Settings from "lucide-react/icons/settings";
@@ -97,6 +98,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.loginMethods"),
           url: "/admin/login-methods",
           icon: KeyRound,
+        },
+        {
+          id: "bootstrap",
+          title: t("sidebar.bootstrap"),
+          url: "/admin/bootstrap",
+          icon: Rocket,
         },
         {
           id: "legal-documents",

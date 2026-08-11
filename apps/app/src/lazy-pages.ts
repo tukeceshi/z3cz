@@ -69,6 +69,10 @@ export const AdminLoginMethodsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-login-methods-page"),
   "AdminLoginMethodsPage"
 );
+export const AdminBootstrapPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-bootstrap-page"),
+  "AdminBootstrapPage"
+);
 export const AdminLegalDocumentsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-legal-documents-page"),
   "AdminLegalDocumentsPage"

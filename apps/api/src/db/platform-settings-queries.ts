@@ -1,8 +1,10 @@
 import type {
   AdminAuthConfig,
+  AdminBootstrapSettings,
   AdminLegalDocumentsConfig,
   AppLocale,
   AuthConfig,
+  BootstrapSettings,
   HomepageMode,
   LegalDocumentType,
   LegalDocumentsConfig,
@@ -12,6 +14,7 @@ import type {
   PublicSiteSettings,
   SiteSettings,
   UpdateAuthConfigRequest,
+  UpdateBootstrapSettingsRequest,
   UpdateFeatureConfigRequest,
   UpdateLegalDocumentsRequest,
   UpdateSiteSettingsRequest,
@@ -46,6 +49,13 @@ import {
   serializeLegalConfig,
   toAdminLegalDocumentsConfig,
 } from "../services/legal-documents";
+import {
+  applyBootstrapSecretUpdate,
+  parseBootstrapSettings,
+  serializeBootstrapSettings,
+  toAdminBootstrapSettings,
+  validateBootstrapSettingsUpdate,
+} from "../services/bootstrap-settings";
 
 const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   siteName: "z3cz.com",
@@ -421,4 +431,118 @@ export async function updateLegalDocumentsConfig(
     row.updatedAt.toISOString(),
     row.updatedBy
   );
+}
+
+export async function getBootstrapSettingsRow(
+  db: Database
+): Promise<BootstrapSettings> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  return parseBootstrapSettings(row?.bootstrapConfig ?? null);
+}
+
+export async function getAdminBootstrapSettings(
+  db: Database
+): Promise<AdminBootstrapSettings> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const settings = parseBootstrapSettings(row?.bootstrapConfig ?? null);
+  return toAdminBootstrapSettings(
+    settings,
+    row?.updatedAt.toISOString() ?? new Date(0).toISOString(),
+    row?.updatedBy ?? null
+  );
+}
+
+export async function updateBootstrapSettings(
+  db: Database,
+  env: Bindings,
+  input: UpdateBootstrapSettingsRequest,
+  updatedBy: string
+): Promise<AdminBootstrapSettings> {
+  const [existing] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const current = parseBootstrapSettings(existing?.bootstrapConfig ?? null);
+  const next = await applyBootstrapSecretUpdate(current, input, env);
+  validateBootstrapSettingsUpdate(next);
+
+  const values = {
+    bootstrapConfig: serializeBootstrapSettings(next),
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    const [row] = await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+      .returning();
+    return toAdminBootstrapSettings(
+      parseBootstrapSettings(row.bootstrapConfig),
+      row.updatedAt.toISOString(),
+      row.updatedBy
+    );
+  }
+
+  const [row] = await db
+    .insert(platformSettings)
+    .values({
+      id: PLATFORM_SETTINGS_ID,
+      bootstrapConfig: values.bootstrapConfig,
+      updatedBy,
+      updatedAt: values.updatedAt,
+    })
+    .returning();
+
+  return toAdminBootstrapSettings(
+    parseBootstrapSettings(row.bootstrapConfig),
+    row.updatedAt.toISOString(),
+    row.updatedBy
+  );
+}
+
+export async function saveBootstrapSettingsState(
+  db: Database,
+  settings: BootstrapSettings,
+  updatedBy: string | null
+): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const values = {
+    bootstrapConfig: serializeBootstrapSettings(settings),
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID));
+    return;
+  }
+
+  await db.insert(platformSettings).values({
+    id: PLATFORM_SETTINGS_ID,
+    bootstrapConfig: values.bootstrapConfig,
+    updatedBy,
+    updatedAt: values.updatedAt,
+  });
 }

@@ -104,33 +104,101 @@
     });
   }
 
-  function fetchShell(url) {
+  function fetchShellBuffer(url, signal) {
+    return fetchWithTimeout(
+      url,
+      {
+        credentials: url.indexOf("http") === 0 ? "omit" : "same-origin",
+        cache: "no-store",
+        mode: url.indexOf("http") === 0 ? "cors" : "same-origin",
+        signal: signal,
+      },
+      FETCH_TIMEOUT_MS
+    ).then(function (response) {
+      if (!response.ok) {
+        throw new Error("Shell download failed");
+      }
+      return response.arrayBuffer();
+    });
+  }
+
+  function digestShellHash(buffer) {
+    if (typeof crypto === "undefined" || !crypto.subtle) {
+      return Promise.resolve("");
+    }
+    return crypto.subtle.digest("SHA-256", buffer).then(function (hash) {
+      return Array.from(new Uint8Array(hash))
+        .map(function (byte) {
+          return byte.toString(16).padStart(2, "0");
+        })
+        .join("")
+        .slice(0, 16);
+    });
+  }
+
+  function verifyShellHash(buffer, expectedHash) {
+    if (!expectedHash) {
+      return Promise.resolve(buffer);
+    }
+    return digestShellHash(buffer).then(function (hash) {
+      if (hash !== expectedHash) {
+        throw new Error("Shell hash mismatch");
+      }
+      return buffer;
+    });
+  }
+
+  function fetchShellFromSources(sources, expectedHash) {
+    if (!sources || sources.length === 0) {
+      return Promise.reject(new Error("No shell sources configured"));
+    }
+
+    if (sources.length === 1) {
+      var single = sources[0];
+      return fetchShellBuffer(single.url).then(function (buffer) {
+        return verifyShellHash(buffer, expectedHash);
+      });
+    }
+
+    var controllers = sources.map(function () {
+      return new AbortController();
+    });
+
+    var attempts = sources.map(function (source, index) {
+      return fetchShellBuffer(source.url, controllers[index].signal)
+        .then(function (buffer) {
+          return verifyShellHash(buffer, expectedHash).then(function (verified) {
+            controllers.forEach(function (controller, controllerIndex) {
+              if (controllerIndex !== index) {
+                controller.abort();
+              }
+            });
+            return verified;
+          });
+        });
+    });
+
+    return Promise.any(attempts);
+  }
+
+  function fetchShell(url, sources, expectedHash) {
+    var resolvedSources =
+      sources && sources.length > 0 ? sources : [{ url: url, kind: "origin" }];
     var attempt = 0;
 
-    function tryFetch() {
+    function run() {
       attempt += 1;
       setStatus(
         attempt > 1 ? "Retrying download…" : "Downloading application…"
       );
-      return fetchWithTimeout(
-        url,
-        { credentials: "same-origin", cache: "no-store" },
-        FETCH_TIMEOUT_MS
-      ).then(function (response) {
-        if (!response.ok) {
-          throw new Error("Shell download failed");
+      return fetchShellFromSources(resolvedSources, expectedHash).catch(
+        function (error) {
+          if (attempt >= MAX_RETRIES) {
+            throw error;
+          }
+          return run();
         }
-        return response.arrayBuffer();
-      });
-    }
-
-    function run() {
-      return tryFetch().catch(function (error) {
-        if (attempt >= MAX_RETRIES) {
-          throw error;
-        }
-        return run();
-      });
+      );
     }
 
     return run();
@@ -221,10 +289,11 @@
     });
     installImportMap(blobUrls);
     loadStylesheets(cssFiles, fileBytes);
+    var entryUrl = blobUrls[entry] || entry;
     return new Promise(function (resolve, reject) {
       var script = document.createElement("script");
       script.type = "module";
-      script.src = entry;
+      script.src = entryUrl;
       script.crossOrigin = "anonymous";
       script.onload = function () {
         resolve();
@@ -312,13 +381,13 @@
     });
   }
 
-  function loadShellBytes(shellUrl) {
+  function loadShellBytes(shellUrl, sources, expectedHash) {
     return readCachedShell(shellUrl).then(function (cached) {
       if (cached) {
         setStatus("Starting from cache…");
         return cached.arrayBuffer();
       }
-      return fetchShell(shellUrl).then(function (bytes) {
+      return fetchShell(shellUrl, sources, expectedHash).then(function (bytes) {
         return writeCachedShell(shellUrl, bytes).then(function () {
           return bytes;
         });
@@ -331,7 +400,11 @@
       return loadViaHttp(config.entry, config.css || []);
     }
 
-    return loadShellBytes(config.shell)
+    return loadShellBytes(
+      config.shell,
+      config.shellSources || [],
+      config.shellHash || ""
+    )
       .then(gunzipBytes)
       .then(parseShellArchive)
       .then(function (archive) {
@@ -342,12 +415,52 @@
   }
 
   function loadApp(config, skipShell) {
-    if (skipShell) {
+    if (skipShell || config.shellEnabled === false) {
       return loadViaHttp(config.entry, config.css || []);
     }
     return loadViaShell(config).catch(function () {
       return loadViaHttp(config.entry, config.css || []);
     });
+  }
+
+  function readInlineBootstrap() {
+    var element = document.getElementById("z3cz-bootstrap-inline");
+    if (!element || !element.textContent) {
+      return null;
+    }
+    try {
+      return JSON.parse(element.textContent);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function mergeBootstrapConfig(remote, inline) {
+    if (!inline) {
+      return remote;
+    }
+    return {
+      shellEnabled:
+        typeof remote.shellEnabled === "boolean"
+          ? remote.shellEnabled
+          : true,
+      multiSourceRaceEnabled:
+        typeof remote.multiSourceRaceEnabled === "boolean"
+          ? remote.multiSourceRaceEnabled
+          : true,
+      shell: remote.shell || inline.shell || "",
+      shellHash: remote.shellHash || inline.shellHash || "",
+      entry: remote.entry || inline.entry || "",
+      css: remote.css && remote.css.length > 0 ? remote.css : inline.css || [],
+      manifestVersion:
+        remote.manifestVersion || inline.manifestVersion || inline.shellHash || "",
+      shellSources:
+        remote.shellSources && remote.shellSources.length > 0
+          ? remote.shellSources
+          : inline.shell
+            ? [{ url: inline.shell, kind: "origin" }]
+            : [],
+    };
   }
 
   function finishBootstrap(manifestVersion) {
@@ -365,7 +478,8 @@
     setStatus("Loading…");
 
     fetchJson(API_BASE + "/bootstrap/config")
-      .then(function (config) {
+      .then(function (remote) {
+        var config = mergeBootstrapConfig(remote, readInlineBootstrap());
         if (!config || !config.entry) {
           throw new Error("Bootstrap config unavailable");
         }

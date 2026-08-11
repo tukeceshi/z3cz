@@ -40,6 +40,7 @@ export * from "./auth";
 export * from "./auth-config";
 export * from "./billing";
 export * from "./bootstrap-manifest";
+export * from "./bootstrap-settings";
 export * from "./bot";
 export * from "./cloudflare";
 export * from "./cloudflare-gateway";

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Shell library bench</title>
+  </head>
+  <body>
+    <pre id="log">Running shell library benchmarks…</pre>
+    <script type="module">
+      const SHELL_URL =
+        "https://z3cz.com/assets/shell-3500a85bb2c2dcce.gz";
+      const logEl = document.getElementById("log");
+      const lines = [];
+
+      function log(line) {
+        lines.push(line);
+        logEl.textContent = lines.join("\n");
+      }
+
+      function ms(start) {
+        return Math.round(performance.now() - start);
+      }
+
+      async function bench(label, fn) {
+        const start = performance.now();
+        try {
+          const result = await fn();
+          const elapsed = ms(start);
+          log(
+            `[OK] ${label.padEnd(30)} ${String(elapsed).padStart(6)}ms  ${result.bytes}B${result.note ? "  " + result.note : ""}`
+          );
+          return { label, ok: true, ms: elapsed, bytes: result.bytes, note: result.note };
+        } catch (error) {
+          const elapsed = ms(start);
+          log(
+            `[FAIL] ${label.padEnd(30)} ${String(elapsed).padStart(6)}ms  ${error?.message || error}`
+          );
+          return {
+            label,
+            ok: false,
+            ms: elapsed,
+            error: String(error?.message || error),
+          };
+        }
+      }
+
+      async function nativeSingle() {
+        const response = await fetch(SHELL_URL, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        const buffer = await response.arrayBuffer();
+        return { bytes: buffer.byteLength };
+      }
+
+      async function fastblobLib() {
+        const { default: fastFetch } = await import(
+          "https://esm.sh/@fastblob/fast-fetch@1.0.5"
+        );
+        const response = await fastFetch(SHELL_URL, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+          fastFetch: {},
+        });
+        const buffer = await response.arrayBuffer();
+        return { bytes: buffer.byteLength };
+      }
+
+      async function semlinkerPool(parts) {
+        const head = await fetch(SHELL_URL, {
+          method: "HEAD",
+          cache: "no-store",
+        });
+        const total = Number(head.headers.get("content-length"));
+        const chunkSize = Math.ceil(total / parts);
+
+        async function asyncPool(concurrency, iterable, iteratorFn) {
+          const results = [];
+          const executing = new Set();
+          for (const item of iterable) {
+            const task = Promise.resolve().then(() => iteratorFn(item));
+            results.push(task);
+            executing.add(task);
+            const clean = () => executing.delete(task);
+            task.then(clean).catch(clean);
+            if (executing.size >= concurrency) {
+              await Promise.race(executing);
+            }
+          }
+          return Promise.all(results);
+        }
+
+        const chunks = await asyncPool(
+          parts,
+          [...Array(parts).keys()],
+          async (index) => {
+            const start = index * chunkSize;
+            const end =
+              index + 1 === parts ? total - 1 : (index + 1) * chunkSize - 1;
+            const response = await fetch(SHELL_URL, {
+              cache: "no-store",
+              headers: { Range: `bytes=${start}-${end}` },
+            });
+            const buffer = await response.arrayBuffer();
+            return { start, buffer };
+          }
+        );
+
+        const merged = new Uint8Array(total);
+        for (const chunk of chunks) {
+          merged.set(new Uint8Array(chunk.buffer), chunk.start);
+        }
+        return { bytes: merged.byteLength, note: `gist asyncPool x${parts}` };
+      }
+
+      async function backblazeStyle(threads) {
+        const head = await fetch(SHELL_URL, {
+          method: "HEAD",
+          cache: "no-store",
+        });
+        const total = Number(head.headers.get("content-length"));
+        const chunkSize = Math.ceil(total / threads);
+        const chunks = await Promise.all(
+          [...Array(threads).keys()].map(async (index) => {
+            const start = index * chunkSize;
+            const end =
+              index + 1 === threads ? total - 1 : (index + 1) * chunkSize - 1;
+            const response = await fetch(SHELL_URL, {
+              cache: "no-store",
+              headers: { Range: `bytes=${start}-${end}` },
+            });
+            const buffer = await response.arrayBuffer();
+            return { start, buffer };
+          })
+        );
+        const merged = new Uint8Array(total);
+        for (const chunk of chunks) {
+          merged.set(new Uint8Array(chunk.buffer), chunk.start);
+        }
+        return {
+          bytes: merged.byteLength,
+          note: `Backblaze-style x${threads}`,
+        };
+      }
+
+      async function whisperFetchLib() {
+        const { BackgroundPrefetcher } = await import(
+          "https://esm.sh/@jobkaehenry/whisper-fetch@0.1.8"
+        );
+
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            prefetch.stop();
+            reject(new Error("timeout 120s"));
+          }, 120000);
+
+          let downloaded = 0;
+          const prefetch = new BackgroundPrefetcher({
+            url: SHELL_URL,
+            chunkSize: 256 * 1024,
+            allowOnCellular: true,
+            respectSaveData: false,
+            minDownlinkMbps: 0,
+            store: "idb",
+            onProgress: (done) => {
+              downloaded = done;
+            },
+            onStatus: (status, error) => {
+              if (status === "completed") {
+                clearTimeout(timeout);
+                resolve({
+                  bytes: downloaded,
+                  note: "BackgroundPrefetcher idb",
+                });
+              }
+              if (status === "error") {
+                clearTimeout(timeout);
+                reject(error ?? new Error("whisper-fetch error"));
+              }
+            },
+          });
+
+          void prefetch.start().catch((error) => {
+            clearTimeout(timeout);
+            reject(error);
+          });
+        });
+      }
+
+      async function rangeRequestFetcherNote() {
+        throw new Error(
+          "needs showSaveFilePicker (manual save dialog), skip automation"
+        );
+      }
+
+      log(`URL: ${SHELL_URL}`);
+      log("Cache: no-store\n");
+
+      const results = [];
+      results.push(await bench("1) native fetch", nativeSingle));
+      results.push(await bench("2) @fastblob/fast-fetch", fastblobLib));
+      results.push(await bench("3) semlinker asyncPool x4", () => semlinkerPool(4)));
+      results.push(await bench("4) semlinker asyncPool x8", () => semlinkerPool(8)));
+      results.push(
+        await bench("5) Backblaze-style x6", () => backblazeStyle(6))
+      );
+      results.push(await bench("6) @jobkaehenry/whisper-fetch", whisperFetchLib));
+      results.push(
+        await bench("7) range-request-fetcher", rangeRequestFetcherNote)
+      );
+
+      const baseline = results.find((item) => item.label.includes("native"));
+      log("\n=== Summary vs native ===");
+      for (const item of results) {
+        if (!item.ok) {
+          log(`${item.label}: FAILED — ${item.error}`);
+          continue;
+        }
+        const delta =
+          baseline?.ok && baseline.ms
+            ? Math.round(((item.ms - baseline.ms) / baseline.ms) * 100)
+            : 0;
+        const sign = delta <= 0 ? "" : "+";
+        log(`${item.label}: ${item.ms}ms (${sign}${delta}%)`);
+      }
+
+      window.__shellLibBench = { results, lines };
+    </script>
+  </body>
+</html>

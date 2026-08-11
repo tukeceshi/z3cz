@@ -21,6 +21,7 @@ import {
   AdminOrganizationRedirectPage,
   AdminSettingsPage,
   AdminLoginMethodsPage,
+  AdminBootstrapPage,
   AdminLegalDocumentsPage,
   AdminStuckUsersPage,
   AdminSupportPage,
@@ -282,6 +283,17 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminLoginMethods") },
+  },
+  {
+    path: "/admin/bootstrap",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminBootstrapPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminBootstrap") },
   },
   {
     path: "/admin/legal-documents",

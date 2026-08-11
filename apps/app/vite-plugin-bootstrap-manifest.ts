@@ -284,6 +284,46 @@ export function bootstrapManifestPlugin(): Plugin {
 
       );
 
+      const indexPath = path.join(outDir, "index.html");
+
+      if (fs.existsSync(indexPath)) {
+
+        let html = fs.readFileSync(indexPath, "utf8");
+
+        const inlinePayload = JSON.stringify({
+
+          shell,
+
+          shellHash,
+
+          entry,
+
+          css: capturedCss,
+
+          manifestVersion: shellHash,
+
+        });
+
+        const preloadTag = `<link rel="preload" href="${shell}" as="fetch" crossorigin="anonymous" />`;
+
+        const inlineTag = `<script type="application/json" id="z3cz-bootstrap-inline">${inlinePayload}</script>`;
+
+        if (!html.includes('id="z3cz-bootstrap-inline"')) {
+
+          html = html.replace(
+
+            "</head>",
+
+            `    ${preloadTag}\n    ${inlineTag}\n  </head>`
+
+          );
+
+          fs.writeFileSync(indexPath, html, "utf8");
+
+        }
+
+      }
+
     },
 
     transformIndexHtml: {
