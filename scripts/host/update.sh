@@ -10,6 +10,8 @@ set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 HOST_DIR="${INSTALL_DIR}/docker-host"
+# shellcheck source=postgres-data-dir.sh
+source "${INSTALL_DIR}/scripts/host/postgres-data-dir.sh"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
 DETACH=0
 SKIP_MIGRATE=0
@@ -91,8 +93,9 @@ reset_install() {
   fi
 
   log "wipe shared data (postgres, storage)"
-  rm -rf "${HOST_DIR}/shared/postgres"/* "${HOST_DIR}/shared/storage"/*
-  mkdir -p "${HOST_DIR}/shared/postgres" "${HOST_DIR}/shared/storage"
+  reset_postgres_data_dir "${HOST_DIR}/shared/postgres"
+  rm -rf "${HOST_DIR}/shared/storage"/*
+  mkdir -p "${HOST_DIR}/shared/storage"
 
   log "git fetch + reset --hard origin/${BRANCH}"
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"

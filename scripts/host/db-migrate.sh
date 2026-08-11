@@ -9,6 +9,8 @@ set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 HOST_DIR="${INSTALL_DIR}/docker-host"
+# shellcheck source=postgres-data-dir.sh
+source "${INSTALL_DIR}/scripts/host/postgres-data-dir.sh"
 COMPOSE_FILE="${HOST_DIR}/docker-compose.generated.yml"
 ENV_FILE="${HOST_DIR}/.env.generated"
 APP_YML="${HOST_DIR}/containers/app.yml"
@@ -39,18 +41,27 @@ log "Ensure compose files"
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $COMPOSE_FILE after render"
 [[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE after render"
 
+prepare_postgres_data_dir "${HOST_DIR}/shared/postgres"
+
 log "Start Postgres"
 compose up -d postgres
 
 info "Wait for Postgres healthy"
-for _ in $(seq 1 60); do
+postgres_ready=0
+for _ in $(seq 1 120); do
   if compose exec -T postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+    postgres_ready=1
     break
   fi
   sleep 1
 done
-compose exec -T postgres pg_isready -U postgres -d postgres >/dev/null \
-  || die "Postgres not ready"
+if [[ "$postgres_ready" -ne 1 ]]; then
+  info "Postgres container status:"
+  compose ps postgres >&2 || true
+  info "Postgres logs (last 80 lines):"
+  compose logs postgres --tail 80 >&2 || true
+  die "Postgres not ready — check permissions on ${HOST_DIR}/shared/postgres (expected uid ${POSTGRES_CONTAINER_UID})"
+fi
 
 # Journal tags in install order (file order matches idx). Drizzle applies the same order.
 mapfile -t JOURNAL_TAGS < <(
