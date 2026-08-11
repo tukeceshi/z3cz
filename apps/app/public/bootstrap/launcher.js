@@ -1,9 +1,13 @@
 (function bootstrapLauncher() {
   "use strict";
 
-  var CACHE_PREFIX = "z3cz-bootstrap:v1:";
+  var CACHE_NAME = "z3cz-bootstrap-shell:v1";
   var SESSION_DONE_KEY = "z3cz-bootstrap:session-done";
+  var APP_READY_EVENT = "z3cz-app-ready";
   var API_BASE = "/api";
+  var FETCH_TIMEOUT_MS = 30000;
+  var MAX_RETRIES = 3;
+  var APP_READY_TIMEOUT_MS = 15000;
 
   var launcher = document.getElementById("z3cz-launcher");
   var statusEl = document.getElementById("z3cz-launcher-status");
@@ -36,6 +40,13 @@
     }
   }
 
+  function dismissLauncherOverlay() {
+    if (launcher) {
+      launcher.style.visibility = "hidden";
+      launcher.style.pointerEvents = "none";
+    }
+  }
+
   function teardownLauncher() {
     var script = document.querySelector('script[src="/bootstrap/launcher.js"]');
     if (script && script.parentNode) {
@@ -44,6 +55,27 @@
     if (launcher && launcher.parentNode) {
       launcher.parentNode.removeChild(launcher);
     }
+  }
+
+  function waitForAppReady() {
+    return new Promise(function (resolve) {
+      var settled = false;
+      function finish() {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.removeEventListener(APP_READY_EVENT, onReady);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(resolve);
+        });
+      }
+      function onReady() {
+        finish();
+      }
+      window.addEventListener(APP_READY_EVENT, onReady);
+      setTimeout(finish, APP_READY_TIMEOUT_MS);
+    });
   }
 
   function fetchJson(url) {
@@ -55,12 +87,67 @@
     });
   }
 
-  function loadStylesheets(cssFiles) {
+  function fetchWithTimeout(url, init, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () {
+        reject(new Error("Request timed out"));
+      }, timeoutMs);
+      fetch(url, init)
+        .then(function (response) {
+          clearTimeout(timer);
+          resolve(response);
+        })
+        .catch(function (error) {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
+  function fetchShell(url) {
+    var attempt = 0;
+
+    function tryFetch() {
+      attempt += 1;
+      setStatus(
+        attempt > 1 ? "Retrying download…" : "Downloading application…"
+      );
+      return fetchWithTimeout(
+        url,
+        { credentials: "same-origin", cache: "no-store" },
+        FETCH_TIMEOUT_MS
+      ).then(function (response) {
+        if (!response.ok) {
+          throw new Error("Shell download failed");
+        }
+        return response.arrayBuffer();
+      });
+    }
+
+    function run() {
+      return tryFetch().catch(function (error) {
+        if (attempt >= MAX_RETRIES) {
+          throw error;
+        }
+        return run();
+      });
+    }
+
+    return run();
+  }
+
+  function loadStylesheets(cssFiles, fileBytes) {
     cssFiles.forEach(function (href) {
       var link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = href;
-      link.crossOrigin = "anonymous";
+      if (fileBytes && fileBytes[href]) {
+        link.href = URL.createObjectURL(
+          new Blob([fileBytes[href]], { type: "text/css" })
+        );
+      } else {
+        link.href = href;
+        link.crossOrigin = "anonymous";
+      }
       document.head.appendChild(link);
     });
   }
@@ -80,62 +167,6 @@
       };
       document.body.appendChild(script);
     });
-  }
-
-  function bytesToBase64(bytes) {
-    var chunkSize = 0x8000;
-    var binary = "";
-    for (var index = 0; index < bytes.length; index += chunkSize) {
-      binary += String.fromCharCode.apply(
-        null,
-        bytes.subarray(index, index + chunkSize)
-      );
-    }
-    return btoa(binary);
-  }
-
-  function base64ToBytes(base64) {
-    var binary = atob(base64);
-    var bytes = new Uint8Array(binary.length);
-    for (var index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return bytes;
-  }
-
-  function readCache(cacheKey) {
-    try {
-      var raw = sessionStorage.getItem(cacheKey);
-      if (!raw) {
-        return null;
-      }
-      var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || !parsed.files) {
-        return null;
-      }
-      var paths = Object.keys(parsed.files);
-      for (var index = 0; index < paths.length; index += 1) {
-        var encoded = parsed.files[paths[index]];
-        if (typeof encoded !== "string" || encoded.length === 0) {
-          return null;
-        }
-      }
-      return parsed.files;
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function writeCache(cacheKey, files) {
-    try {
-      var payload = JSON.stringify({ files: files });
-      if (payload.length > 4 * 1024 * 1024) {
-        return;
-      }
-      sessionStorage.setItem(cacheKey, payload);
-    } catch (_error) {
-      return;
-    }
   }
 
   function getBootstrapDoneVersion() {
@@ -158,7 +189,7 @@
     }
   }
 
-  function shouldSkipPreload(manifestVersion) {
+  function shouldSkipShell(manifestVersion) {
     return (
       typeof manifestVersion === "string" &&
       manifestVersion.length > 0 &&
@@ -180,13 +211,16 @@
   function mountFromBytes(fileBytes, entry, cssFiles) {
     var blobUrls = {};
     Object.keys(fileBytes).forEach(function (path) {
+      if (path.slice(-3) !== ".js") {
+        return;
+      }
       var blob = new Blob([fileBytes[path]], {
         type: "application/javascript",
       });
       blobUrls[path] = URL.createObjectURL(blob);
     });
     installImportMap(blobUrls);
-    loadStylesheets(cssFiles);
+    loadStylesheets(cssFiles, fileBytes);
     return new Promise(function (resolve, reject) {
       var script = document.createElement("script");
       script.type = "module";
@@ -202,232 +236,133 @@
     });
   }
 
-  function getWebSocketBaseUrl() {
-    var cfg = window.__Z3CZ_WS__ || {};
-    var viaProxy = cfg.viaProxy === true;
-    var wsHost = typeof cfg.wsHost === "string" ? cfg.wsHost : "";
-    var apiBase =
-      typeof cfg.apiBase === "string" && cfg.apiBase.length > 0
-        ? cfg.apiBase
-        : API_BASE;
-
-    if (!viaProxy && wsHost.length > 0) {
-      return wsHost.replace(/\/$/, "");
+  function gunzipBytes(compressed) {
+    if (typeof DecompressionStream === "undefined") {
+      return Promise.reject(new Error("Gzip decompression unavailable"));
     }
-
-    if (apiBase.indexOf("http://") === 0 || apiBase.indexOf("https://") === 0) {
-      return apiBase.replace(/^http/, "ws").replace(/\/$/, "");
-    }
-
-    // Vite /api proxy cannot upgrade @hono/node-ws; connect to API directly in dev.
-    if (!viaProxy && apiBase.charAt(0) === "/") {
-      return "ws://localhost:3102";
-    }
-
-    var origin = location.origin.replace(/^http/, "ws");
-    return origin + apiBase.replace(/\/$/, "");
+    return new Response(
+      new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"))
+    ).arrayBuffer();
   }
 
-  function wsUrl() {
-    return getWebSocketBaseUrl() + "/bootstrap-ws";
+  function parseShellArchive(raw) {
+    var bytes = new Uint8Array(raw);
+    if (bytes.byteLength < 4) {
+      throw new Error("Invalid shell archive");
+    }
+    var headerLength =
+      (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+    var headerStart = 4;
+    var headerEnd = headerStart + headerLength;
+    if (headerEnd > bytes.byteLength) {
+      throw new Error("Invalid shell header");
+    }
+    var headerText = new TextDecoder().decode(
+      bytes.subarray(headerStart, headerEnd)
+    );
+    var header = JSON.parse(headerText);
+    if (!header || !Array.isArray(header.files)) {
+      throw new Error("Invalid shell manifest");
+    }
+
+    var fileBytes = {};
+    var offset = headerEnd;
+    header.files.forEach(function (file) {
+      if (
+        !file ||
+        typeof file.path !== "string" ||
+        typeof file.size !== "number"
+      ) {
+        throw new Error("Invalid shell file entry");
+      }
+      if (offset + file.size > bytes.byteLength) {
+        throw new Error("Shell archive truncated");
+      }
+      fileBytes[file.path] = bytes.subarray(offset, offset + file.size);
+      offset += file.size;
+    });
+
+    return {
+      entry: typeof header.entry === "string" ? header.entry : "",
+      css: Array.isArray(header.css) ? header.css : [],
+      fileBytes: fileBytes,
+    };
   }
 
-  function fetchAllOverWs(files) {
-    return new Promise(function (resolve, reject) {
-      var socket = new WebSocket(wsUrl());
-      var transfers = {};
-      var completed = 0;
-
-      files.forEach(function (file, index) {
-        transfers[index + 1] = {
-          path: file.path,
-          chunks: [],
-          receivedSize: 0,
-          expectedSize: file.size || 0,
-          done: false,
-        };
-      });
-
-      function updateProgress() {
-        var totalExpected = 0;
-        var totalReceived = 0;
-        files.forEach(function (_file, index) {
-          var transfer = transfers[index + 1];
-          totalExpected += transfer.expectedSize;
-          totalReceived += transfer.receivedSize;
-        });
-        if (totalExpected > 0) {
-          setStatus(
-            "Downloading " +
-              completed +
-              "/" +
-              files.length +
-              " · " +
-              Math.min(100, Math.round((totalReceived / totalExpected) * 100)) +
-              "%"
-          );
-        } else {
-          setStatus("Downloading " + completed + "/" + files.length);
-        }
-      }
-
-      function maybeFinish() {
-        if (completed < files.length) {
-          return;
-        }
-        socket.close();
-        var fileBytes = {};
-        files.forEach(function (_file, index) {
-          var transfer = transfers[index + 1];
-          var merged = new Uint8Array(transfer.receivedSize);
-          var offset = 0;
-          transfer.chunks.forEach(function (chunk) {
-            merged.set(chunk, offset);
-            offset += chunk.length;
-          });
-          fileBytes[transfer.path] = merged;
-        });
-        resolve(fileBytes);
-      }
-
-      socket.onopen = function () {
-        files.forEach(function (file, index) {
-          socket.send(
-            JSON.stringify({
-              op: "fetch",
-              id: index + 1,
-              path: file.path,
-            })
-          );
-        });
-      };
-
-      socket.onmessage = function (event) {
-        if (typeof event.data === "string") {
-          var message = JSON.parse(event.data);
-          var transfer = transfers[message.id];
-          if (!transfer) {
-            return;
-          }
-          if (message.op === "begin") {
-            transfer.expectedSize = message.size || transfer.expectedSize;
-            updateProgress();
-            return;
-          }
-          if (message.op === "chunk") {
-            var chunk = base64ToBytes(message.data);
-            transfer.chunks.push(chunk);
-            transfer.receivedSize += chunk.byteLength;
-            updateProgress();
-            return;
-          }
-          if (message.op === "done") {
-            if (
-              transfer.expectedSize > 0 &&
-              transfer.receivedSize !== transfer.expectedSize
-            ) {
-              reject(
-                new Error("Incomplete download for " + transfer.path)
-              );
-              return;
-            }
-            transfer.done = true;
-            completed += 1;
-            updateProgress();
-            maybeFinish();
-            return;
-          }
-          if (message.op === "error") {
-            reject(new Error(message.message || "WebSocket download failed"));
-          }
-          return;
-        }
-
-        var buffer = new Uint8Array(event.data);
-        if (buffer.byteLength < 4) {
-          return;
-        }
-        var frameId =
-          (buffer[0] << 24) |
-          (buffer[1] << 16) |
-          (buffer[2] << 8) |
-          buffer[3];
-        var transfer = transfers[frameId];
-        if (!transfer) {
-          return;
-        }
-        var payload = buffer.subarray(4);
-        transfer.chunks.push(payload);
-        transfer.receivedSize += payload.byteLength;
-        updateProgress();
-      };
-
-      socket.onerror = function () {
-        reject(new Error("WebSocket connection failed"));
-      };
-
-      socket.onclose = function () {
-        if (completed < files.length) {
-          reject(new Error("WebSocket closed"));
-        }
-      };
+  function readCachedShell(shellUrl) {
+    if (typeof caches === "undefined") {
+      return Promise.resolve(null);
+    }
+    return caches.open(CACHE_NAME).then(function (cache) {
+      return cache.match(shellUrl);
     });
   }
 
-  function getPreloadFiles(config) {
-    if (config.preloadFiles && config.preloadFiles.length > 0) {
-      return config.preloadFiles;
+  function writeCachedShell(shellUrl, bytes) {
+    if (typeof caches === "undefined") {
+      return Promise.resolve();
     }
-    return config.files
-      .slice()
-      .sort(function (left, right) {
-        return right.size - left.size;
-      })
-      .slice(0, 20);
-  }
-
-  function mountDownloaded(config, fileBytes) {
-    return mountFromBytes(fileBytes, config.entry, config.css || []);
-  }
-
-  function loadViaWs(config) {
-    var preloadFiles = getPreloadFiles(config);
-
-    var cacheKey = CACHE_PREFIX + config.manifestVersion;
-    var cached = readCache(cacheKey);
-    if (cached) {
-      setStatus("Starting from cache…");
-      var cachedBytes = {};
-      Object.keys(cached).forEach(function (path) {
-        cachedBytes[path] = base64ToBytes(cached[path]);
-      });
-      return mountDownloaded(config, cachedBytes);
-    }
-
-    setStatus("Connecting…");
-    return fetchAllOverWs(preloadFiles).then(function (fileBytes) {
-      var encoded = {};
-      Object.keys(fileBytes).forEach(function (path) {
-        encoded[path] = bytesToBase64(fileBytes[path]);
-      });
-      writeCache(cacheKey, encoded);
-      return mountDownloaded(config, fileBytes);
+    return caches.open(CACHE_NAME).then(function (cache) {
+      return cache.put(
+        shellUrl,
+        new Response(bytes, {
+          headers: { "Content-Type": "application/gzip" },
+        })
+      );
     });
   }
 
-  function loadApp(config, skipPreload) {
-    if (skipPreload || !config.enabled) {
+  function loadShellBytes(shellUrl) {
+    return readCachedShell(shellUrl).then(function (cached) {
+      if (cached) {
+        setStatus("Starting from cache…");
+        return cached.arrayBuffer();
+      }
+      return fetchShell(shellUrl).then(function (bytes) {
+        return writeCachedShell(shellUrl, bytes).then(function () {
+          return bytes;
+        });
+      });
+    });
+  }
+
+  function loadViaShell(config) {
+    if (!config.shell) {
       return loadViaHttp(config.entry, config.css || []);
     }
-    return loadViaWs(config);
+
+    return loadShellBytes(config.shell)
+      .then(gunzipBytes)
+      .then(parseShellArchive)
+      .then(function (archive) {
+        var entry = archive.entry || config.entry;
+        var css = archive.css.length > 0 ? archive.css : config.css || [];
+        return mountFromBytes(archive.fileBytes, entry, css);
+      });
+  }
+
+  function loadApp(config, skipShell) {
+    if (skipShell) {
+      return loadViaHttp(config.entry, config.css || []);
+    }
+    return loadViaShell(config).catch(function () {
+      return loadViaHttp(config.entry, config.css || []);
+    });
+  }
+
+  function finishBootstrap(manifestVersion) {
+    dismissLauncherOverlay();
+    return waitForAppReady().then(function () {
+      if (manifestVersion) {
+        markBootstrapDone(manifestVersion);
+      }
+      teardownLauncher();
+    });
   }
 
   function start() {
     clearError();
-
-    if (getBootstrapDoneVersion() && launcher) {
-      launcher.style.display = "none";
-    }
+    setStatus("Loading…");
 
     fetchJson(API_BASE + "/bootstrap/config")
       .then(function (config) {
@@ -436,29 +371,12 @@
         }
 
         var manifestVersion = config.manifestVersion || "";
-        var skipPreload = shouldSkipPreload(manifestVersion);
-
-        if (skipPreload) {
-          teardownLauncher();
-          return loadApp(config, true).then(function () {
-            return manifestVersion;
-          });
-        }
-
-        if (launcher) {
-          launcher.style.display = "";
-        }
-        setStatus("Loading…");
-        return loadApp(config, false).then(function () {
+        var skipShell = shouldSkipShell(manifestVersion);
+        return loadApp(config, skipShell).then(function () {
           return manifestVersion;
         });
       })
-      .then(function (manifestVersion) {
-        if (manifestVersion) {
-          markBootstrapDone(manifestVersion);
-        }
-        teardownLauncher();
-      })
+      .then(finishBootstrap)
       .catch(function (error) {
         setStatus("Unable to load");
         showError(error && error.message ? error.message : "Load failed");

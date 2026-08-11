@@ -9,7 +9,6 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { createApp } from "./app";
 import type { Bindings } from "./context";
 import { createNodeBindings } from "./env/create-node-bindings";
-import { registerNodeBootstrapWsRoutes } from "./routes/bootstrap-ws-node";
 import { registerNodeWsRoutes } from "./routes/ws-node";
 import { handleScheduledEvent } from "./scheduled";
 
@@ -74,7 +73,6 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
   });
 
   registerNodeWsRoutes(app, upgradeWebSocket);
-  registerNodeBootstrapWsRoutes(app, upgradeWebSocket);
 
   writeBootPhase("starting_server");
   const server = serve(

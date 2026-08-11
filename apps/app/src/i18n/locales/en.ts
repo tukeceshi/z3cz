@@ -209,9 +209,6 @@ export const en = {
     homepageModeMarketing: "Marketing site",
     homepageModeHelp:
       "Controls where visitors land at /. Marketing opens /m/ on the same domain; console opens login or the dashboard.",
-    wsBootstrapToggle: "WebSocket accelerated loading (experimental)",
-    wsBootstrapHint:
-      "When enabled, first visits download app JavaScript over WebSocket instead of regular script tags. No HTTP fallback.",
   },
   legalDocuments: {
     title: "Terms & Privacy",

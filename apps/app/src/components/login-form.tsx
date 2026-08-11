@@ -65,12 +65,9 @@ export function LoginForm({
 
   const { authConfig } = usePublicAuthConfig();
 
-  const isSetupStatusReady = setupStatus !== undefined;
   const isSubAccountInvite = !!subAccountInvitationId;
   const isBootstrap =
-    isSetupStatusReady &&
-    setupStatus.hasUsers === false &&
-    !isSubAccountInvite;
+    setupStatus?.hasUsers === false && !isSubAccountInvite;
   const requiresVerification =
     authConfig?.email.requireVerificationOnRegister === true && !isBootstrap;
   const showOAuthProviders =
@@ -168,10 +165,6 @@ export function LoginForm({
   const handlePasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
-
-    if (!isSetupStatusReady) {
-      return;
-    }
 
     if (isSubAccountInvite || isBootstrap) {
       await handleRegisterAndLogin();
@@ -374,7 +367,7 @@ export function LoginForm({
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!isSetupStatusReady || isSubmitting}
+                disabled={isSubmitting}
               >
                 {submitButtonLabel}
               </Button>

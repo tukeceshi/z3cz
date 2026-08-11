@@ -13,6 +13,7 @@ import useSWR from "swr";
 import {
   createTranslator,
   detectBrowserLocale,
+  getCachedLocaleDictionary,
   loadLocaleDictionary,
   LOCALE_STORAGE_KEY,
   readStoredLocale,
@@ -21,8 +22,9 @@ import {
   type TranslationDictionary,
   type TranslationKey,
 } from "@/i18n";
-import { RoutePageFallback } from "@/components/route-page-fallback";
 import { makeRequest } from "@/services/utils";
+
+const APP_READY_EVENT = "z3cz-app-ready";
 
 const bootLocale = resolveInitialLocale(
   readStoredLocale() ?? detectBrowserLocale()
@@ -67,7 +69,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     resolveInitialLocale(readStoredLocale() ?? detectBrowserLocale())
   );
   const [dictionary, setDictionary] = useState<TranslationDictionary | null>(
-    null
+    () => getCachedLocaleDictionary(bootLocale)
   );
 
   useEffect(() => {
@@ -83,6 +85,13 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [locale]);
+
+  useEffect(() => {
+    if (!dictionary) {
+      return;
+    }
+    window.dispatchEvent(new Event(APP_READY_EVENT));
+  }, [dictionary]);
 
   useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
@@ -115,10 +124,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     }),
     [locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings]
   );
-
-  if (!dictionary) {
-    return <RoutePageFallback variant="full" />;
-  }
 
   return (
     <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>

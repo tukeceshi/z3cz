@@ -22,6 +22,12 @@ const localeLoaders: Record<
 
 const localeCache = new Map<AppLocale, TranslationDictionary>();
 
+export function getCachedLocaleDictionary(
+  locale: AppLocale
+): TranslationDictionary | null {
+  return localeCache.get(locale) ?? null;
+}
+
 export async function loadLocaleDictionary(
   locale: AppLocale
 ): Promise<TranslationDictionary> {

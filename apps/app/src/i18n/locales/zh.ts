@@ -205,9 +205,6 @@ export const zh: TranslationDictionary = {
     homepageModeMarketing: "营销站",
     homepageModeHelp:
       "控制访问 / 时的去向。营销站模式跳转到同域 /m/；控制台模式进入登录页或控制台。",
-    wsBootstrapToggle: "WebSocket 加速加载（实验）",
-    wsBootstrapHint:
-      "开启后，首次访问通过 WebSocket 下载应用 JavaScript，而非普通 script 标签。失败时不回退 HTTP。",
   },
   legalDocuments: {
     title: "条款与隐私",

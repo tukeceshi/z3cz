@@ -1,7 +1,6 @@
 import { Navigate, useSearchParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
-import { InsetLoading } from "@/components/inset-loading";
 import { LoginForm } from "@/components/login-form";
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
@@ -15,15 +14,11 @@ import {
 import { getDashboardPath } from "@/utils/auth-navigation";
 
 export function LoginPage() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const subAccountInvitation = searchParams.get("subAccountInvitation");
-
-  if (isLoading) {
-    return <InsetLoading />;
-  }
 
   if (isAuthenticated && user && subAccountInvitation) {
     return (

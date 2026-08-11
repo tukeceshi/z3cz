@@ -42,7 +42,6 @@ export function AdminSettingsPage() {
   const [supportEmail, setSupportEmail] = useState("");
   const [newUserTourEnabled, setNewUserTourEnabled] = useState(false);
   const [homepageMode, setHomepageMode] = useState<HomepageMode>("console");
-  const [wsBootstrapEnabled, setWsBootstrapEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -59,7 +58,6 @@ export function AdminSettingsPage() {
     setSupportEmail(settings.supportEmail ?? "");
     setNewUserTourEnabled(settings.newUserTourEnabled);
     setHomepageMode(settings.homepageMode);
-    setWsBootstrapEnabled(settings.wsBootstrapEnabled);
   }, [settings]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -72,7 +70,6 @@ export function AdminSettingsPage() {
       supportEmail: supportEmail.trim() ? supportEmail.trim() : null,
       newUserTourEnabled,
       homepageMode,
-      wsBootstrapEnabled,
     };
 
     try {
@@ -201,21 +198,6 @@ export function AdminSettingsPage() {
               <Switch
                 checked={newUserTourEnabled}
                 onCheckedChange={setNewUserTourEnabled}
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">
-                  {t("siteSettings.wsBootstrapToggle")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("siteSettings.wsBootstrapHint")}
-                </p>
-              </div>
-              <Switch
-                checked={wsBootstrapEnabled}
-                onCheckedChange={setWsBootstrapEnabled}
               />
             </div>
 
