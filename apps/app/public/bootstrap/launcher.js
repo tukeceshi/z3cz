@@ -246,11 +246,18 @@
     });
   }
 
-  function installImportMap(blobUrls) {
+  function installImportMap(blobUrls, entryPath) {
     var imports = {};
     Object.keys(blobUrls).forEach(function (path) {
+      // Entry must keep its /assets/ URL so Vite relative dynamic imports resolve.
+      if (path === entryPath) {
+        return;
+      }
       imports[path] = blobUrls[path];
     });
+    if (Object.keys(imports).length === 0) {
+      return;
+    }
     var script = document.createElement("script");
     script.type = "importmap";
     script.textContent = JSON.stringify({ imports: imports });
@@ -268,13 +275,12 @@
       });
       blobUrls[path] = URL.createObjectURL(blob);
     });
-    installImportMap(blobUrls);
+    installImportMap(blobUrls, entry);
     loadStylesheets(cssFiles, fileBytes);
-    var entryUrl = blobUrls[entry] || entry;
     return new Promise(function (resolve, reject) {
       var script = document.createElement("script");
       script.type = "module";
-      script.src = entryUrl;
+      script.src = entry;
       script.crossOrigin = "anonymous";
       script.onload = function () {
         resolve();
