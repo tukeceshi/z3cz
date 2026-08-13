@@ -343,7 +343,7 @@ export const VIDEO_TRANSFORM_STANDARD_SCHEMA: readonly TransformStandardSchemaNo
 export const VIDEO_FORWARDING_STANDARD_SCHEMA = VIDEO_TRANSFORM_STANDARD_SCHEMA;
 
 export function getTransformStandardSchema(
-  provider: FormatTransformProvider
+  _provider: FormatTransformProvider
 ): readonly TransformStandardSchemaNode[] {
   return VIDEO_TRANSFORM_STANDARD_SCHEMA;
 }
@@ -698,7 +698,7 @@ export function buildTransformParamMappingFromSchemaNode(
 
 export function resolveTransformMappingLabel(
   mapping: TransformParamMapping | undefined,
-  schema: readonly TransformStandardSchemaNode[] = VIDEO_TRANSFORM_STANDARD_SCHEMA,
+  _schema: readonly TransformStandardSchemaNode[] = VIDEO_TRANSFORM_STANDARD_SCHEMA,
   valueType?: TransformParamValueType
 ): string | null {
   if (!mapping) {

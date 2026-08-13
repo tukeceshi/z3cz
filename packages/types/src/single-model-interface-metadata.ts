@@ -7,7 +7,6 @@ import {
   findEnabledSingleModelInstanceByCanonicalId,
   findSingleModelInstanceByCanonicalId,
   listSingleModelMetadataEntries,
-  singleModelInstanceCanonicalId,
 } from "./single-model-instances";
 import {
   CLAUDE_BRAND_ONLY_CANONICAL_IDS,

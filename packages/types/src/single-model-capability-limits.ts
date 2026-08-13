@@ -308,10 +308,10 @@ export function capabilityLimitsFromLegacyFormatTransform(params: {
   readonly platformRules: VideoModelParameterRules;
 }): SingleModelCapabilityLimits | undefined {
   const platformField = readResolutionFieldFromVideoRules(params.platformRules);
-  const limits: SingleModelCapabilityLimits = {};
+  let limits: SingleModelCapabilityLimits = {};
 
   if (params.supportsTaskCancel === false) {
-    limits.supportsTaskCancel = false;
+    limits = { ...limits, supportsTaskCancel: false };
   }
 
   if (params.lockedResolution && platformField) {
@@ -352,13 +352,13 @@ export function normalizeCapabilityLimitsForSave(params: {
   readonly platformBaseline: PlatformVideoCapabilityBaseline;
   readonly limits: SingleModelCapabilityLimits;
 }): SingleModelCapabilityLimits | null {
-  const result: SingleModelCapabilityLimits = {};
+  let result: SingleModelCapabilityLimits = {};
 
   if (
     params.limits.supportsTaskCancel !== undefined &&
     params.limits.supportsTaskCancel !== params.platformBaseline.supportsTaskCancel
   ) {
-    result.supportsTaskCancel = params.limits.supportsTaskCancel;
+    result = { ...result, supportsTaskCancel: params.limits.supportsTaskCancel };
   }
 
   if (
@@ -369,7 +369,7 @@ export function normalizeCapabilityLimitsForSave(params: {
       params.platformBaseline.resolution
     )
   ) {
-    result.resolution = params.limits.resolution;
+    result = { ...result, resolution: params.limits.resolution };
   }
 
   if (
@@ -380,7 +380,7 @@ export function normalizeCapabilityLimitsForSave(params: {
       params.platformBaseline.duration
     )
   ) {
-    result.duration = params.limits.duration;
+    result = { ...result, duration: params.limits.duration };
   }
 
   if (
@@ -388,21 +388,21 @@ export function normalizeCapabilityLimitsForSave(params: {
     params.limits.maxReferenceImages !==
       params.platformBaseline.maxReferenceImages
   ) {
-    result.maxReferenceImages = params.limits.maxReferenceImages;
+    result = { ...result, maxReferenceImages: params.limits.maxReferenceImages };
   }
 
   if (
     params.limits.maxReferenceVideos !== undefined &&
     params.limits.maxReferenceVideos !== params.platformBaseline.maxReferenceVideos
   ) {
-    result.maxReferenceVideos = params.limits.maxReferenceVideos;
+    result = { ...result, maxReferenceVideos: params.limits.maxReferenceVideos };
   }
 
   if (
     params.limits.maxReferenceAudios !== undefined &&
     params.limits.maxReferenceAudios !== params.platformBaseline.maxReferenceAudios
   ) {
-    result.maxReferenceAudios = params.limits.maxReferenceAudios;
+    result = { ...result, maxReferenceAudios: params.limits.maxReferenceAudios };
   }
 
   if (!hasCapabilityLimitValues(result)) {

@@ -1,4 +1,4 @@
-import type { OrgModelChannelKind } from "./format-platform-model-label";
+import type { OrgModelChannelKind } from "./org-model-label";
 import type { VideoModelParameterRules } from "./platform-ai-model";
 import {
   resolveEffectiveVideoSupportsTaskCancel,
