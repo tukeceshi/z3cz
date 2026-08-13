@@ -54,9 +54,13 @@ export function listPresetAvailableModels<T extends PlatformCatalogModelLike>(
 }
 
 export function useApiPresetChannelIdMap(organizationId: string | undefined) {
-  const { channels } = usePlatformModelChannels(organizationId);
+  const { channels, isLoading } = usePlatformModelChannels(organizationId);
+  const presetChannelIds = useMemo(
+    () => buildApiPresetChannelIdMap(channels),
+    [channels]
+  );
 
-  return useMemo(() => buildApiPresetChannelIdMap(channels), [channels]);
+  return { presetChannelIds, isLoading };
 }
 
 export function usePresetChannelModelIds(
@@ -64,7 +68,7 @@ export function usePresetChannelModelIds(
   presetId: string,
   platformModels: readonly PlatformCatalogModelLike[]
 ) {
-  const presetChannelIds = useApiPresetChannelIdMap(organizationId);
+  const { presetChannelIds } = useApiPresetChannelIdMap(organizationId);
 
   return useMemo(
     () => listPresetEnabledModelIds(presetChannelIds, presetId, platformModels),

@@ -3,6 +3,7 @@ import type {
   CreateOrganizationAiInterfaceRequest,
   ListOrganizationAiInterfacesResponse,
   OrganizationAiInterface,
+  ListFormatTransformTemplatesResponse,
   UpdateOrganizationAiInterfaceRequest,
   VolcanoProbeActivationResponse,
   VolcanoProbeCredentialsRequest,
@@ -12,7 +13,14 @@ import type {
 } from "@dafthunk/types";
 import {
   ALL_AI_INTERFACE_PROVIDERS,
+  hasRequiredSingleModelFormatTransforms,
+  isCapabilityLimitsSubsetOfPlatform,
+  isTransformMappingConfigComplete,
   isVolcanoAiInterfaceProvider,
+  migrateLegacyFormatTemplateToModels,
+  readSingleModelFormatTemplateId,
+  singleModelFormatTransformFromTemplate,
+  validateCustomSingleModelEndpointRules,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
@@ -24,6 +32,11 @@ import {
   requireAiInterfacesAccess,
 } from "../middleware/org-permissions";
 import { createDatabase } from "../db";
+import { listEnabledPlatformFormatTransformTemplates, getFormatTransformTemplateById } from "../db/format-transform-template-queries";
+import {
+  getVideoParameterRules as getPlatformVideoRules,
+  listPlatformAiModels,
+} from "../db/platform-ai-model-queries";
 import {
   createOrganizationAiInterface,
   deleteOrganizationAiInterface,
@@ -65,8 +78,12 @@ import {
   serializeInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
 import {
+  mergeSingleModelCapabilityLimitsMetadata,
   mergeSingleModelModelEnabledMetadata,
   mergeSingleModelModelAliasMetadata,
+  mergeSingleModelEndpointRulesMetadata,
+  mergeSingleModelFormatTransformsMetadata,
+  mergeSingleModelModelsMetadata,
   mergeSingleModelUpstreamModelIdsMetadata,
   parseSingleModelMetadata,
 } from "../integrations/single-model/metadata";
@@ -211,6 +228,68 @@ const createSchema = z
     }
   }) satisfies z.ZodType<CreateOrganizationAiInterfaceRequest>;
 
+const transformValueTypeSchema = z.enum([
+  "string",
+  "number",
+  "boolean",
+  "string[]",
+  "object[]",
+]);
+const transformCollectModeSchema = z.enum(["first", "all"]);
+const transformUpstreamParamSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, "Use letters, numbers, and underscores"),
+  valueType: transformValueTypeSchema,
+});
+const transformParamMappingSchema = z
+  .object({
+    upstreamParamId: z.string().trim().min(1),
+    sourcePath: z.string().trim().max(500).optional(),
+    collectMode: transformCollectModeSchema.optional(),
+    transform: z.enum(["ratio_resolution_to_size"]).optional(),
+  })
+  .refine(
+    (mapping) =>
+      mapping.transform === "ratio_resolution_to_size" ||
+      Boolean(mapping.sourcePath?.trim()),
+    { message: "Mapping requires sourcePath or transform" }
+  );
+const singleModelFormatTransformSchema = z.object({
+  sourceTemplateId: z.string().trim().min(1),
+  upstreamParams: z.array(transformUpstreamParamSchema),
+  paramMappings: z.array(transformParamMappingSchema),
+});
+
+const upstreamParamProfileFieldSchema = z.object({
+  name: z.string().trim().min(1),
+  apiName: z.string().trim().min(1),
+  type: z.enum(["string", "number", "boolean", "json"]),
+  description: z.string(),
+  required: z.boolean().optional(),
+  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  hidden: z.boolean().optional(),
+  clientOnly: z.boolean().optional(),
+  enumValues: z.array(z.string().trim().min(1)).optional(),
+  implementationMode: z
+    .enum(["direct", "ratio_prompt", "pixel_size", "sequential_count"])
+    .optional(),
+});
+
+const singleModelCapabilityLimitsSchema = z.object({
+  supportsTaskCancel: z.boolean().optional(),
+  resolution: upstreamParamProfileFieldSchema.optional(),
+  duration: upstreamParamProfileFieldSchema.optional(),
+  maxReferenceImages: z.number().int().min(0).optional(),
+  maxReferenceVideos: z.number().int().min(0).optional(),
+  maxReferenceAudios: z.number().int().min(0).optional(),
+  resolutions: z.array(z.string().trim().min(1)).optional(),
+});
+
 const updateSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
@@ -225,6 +304,32 @@ const updateSchema = z
     singleModelModelEnabled: z.record(z.string(), z.boolean()).optional(),
     singleModelModelAlias: z.record(z.string(), z.string()).optional(),
     singleModelUpstreamModelIds: z.record(z.string(), z.string()).optional(),
+    singleModelEndpointRules: z
+      .object({
+        useOfficial: z.boolean().optional(),
+        useFullSubmitUrl: z.boolean().optional(),
+      })
+      .optional(),
+    singleModelFormatTransformsByCanonicalId: z
+      .record(z.string(), singleModelFormatTransformSchema.nullable())
+      .optional(),
+    singleModelCapabilityLimitsByCanonicalId: z
+      .record(z.string(), singleModelCapabilityLimitsSchema.nullable())
+      .optional(),
+    singleModelModels: z
+      .record(
+        z.string(),
+        z.object({
+          enabled: z.boolean(),
+          upstreamModelId: z.string(),
+          modality: z.enum(["text", "image", "video", "audio"]),
+          canonicalId: z.string().optional(),
+          alias: z.string().optional(),
+          formatTransform: singleModelFormatTransformSchema.optional(),
+          capabilityLimits: singleModelCapabilityLimitsSchema.optional(),
+        })
+      )
+      .optional(),
     tosStorage: z
       .object({
         enabled: z.boolean(),
@@ -262,6 +367,37 @@ const probeTosBucketsSchema = z.object({
 
 const probeActivationSchema = z.object({
   canonicalIds: z.array(z.string()).optional(),
+});
+
+async function ensureMigratedSingleModelMetadata(
+  db: ReturnType<typeof createDatabase>,
+  metadata: import("@dafthunk/types").SingleModelProviderMetadata
+): Promise<import("@dafthunk/types").SingleModelProviderMetadata> {
+  const legacyId = readSingleModelFormatTemplateId(metadata);
+  if (!legacyId) {
+    return metadata;
+  }
+  const template = await getFormatTransformTemplateById(db, legacyId);
+  if (!template?.enabled || template.scope !== "platform") {
+    const { formatTemplateId: _removed, ...rest } = metadata;
+    return rest;
+  }
+  return migrateLegacyFormatTemplateToModels(
+    metadata,
+    singleModelFormatTransformFromTemplate(template)
+  );
+}
+
+aiInterfaceRoutes.get("/format-transform-templates", async (c) => {
+  const db = createDatabase(c.env);
+
+  try {
+    const templates = await listEnabledPlatformFormatTransformTemplates(db);
+    return c.json({ templates } satisfies ListFormatTransformTemplatesResponse);
+  } catch (error) {
+    console.error("Failed to list format transform templates:", error);
+    return c.json({ error: "Failed to list templates" }, 500);
+  }
 });
 
 aiInterfaceRoutes.get("/", async (c) => {
@@ -950,12 +1086,36 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
       c.env,
       organizationId
     );
-    const metadataRaw = serializeInterfaceMetadata(
-      mergeApiKeyHintIntoMetadata(
-        (body.metadata as Record<string, unknown> | undefined) ?? undefined,
-        body.apiKey!
-      )
+    const metadataRecord = mergeApiKeyHintIntoMetadata(
+      (body.metadata as Record<string, unknown> | undefined) ?? undefined,
+      body.apiKey!
     );
+    if (provider === "custom") {
+      const singleModel = parseSingleModelMetadata(metadataRecord);
+      if (singleModel) {
+        const validationError = validateCustomSingleModelEndpointRules({
+          category: singleModel.singleModelCategory ?? "video",
+          rules: singleModel.endpointRules ?? { useOfficial: true },
+        });
+        if (validationError) {
+          return c.json({ error: validationError }, 400);
+        }
+        if (
+          singleModel.endpointRules?.useOfficial === false &&
+          singleModel.singleModelCategory === "video" &&
+          !hasRequiredSingleModelFormatTransforms(singleModel)
+        ) {
+          return c.json(
+            {
+              error:
+                "Each enabled video model requires a format transform for custom endpoint rules",
+            },
+            400
+          );
+        }
+      }
+    }
+    const metadataRaw = serializeInterfaceMetadata(metadataRecord);
 
     const iface = await createOrganizationAiInterface(db, organizationId, {
       name: body.name,
@@ -1101,6 +1261,197 @@ aiInterfaceRoutes.patch(
           current,
           body.singleModelUpstreamModelIds
         );
+      }
+
+      if (body.singleModelEndpointRules !== undefined) {
+        let current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        current = await ensureMigratedSingleModelMetadata(db, current);
+        const validationError = validateCustomSingleModelEndpointRules({
+          category: current.singleModelCategory ?? "video",
+          rules: body.singleModelEndpointRules,
+        });
+        if (validationError) {
+          return c.json({ error: validationError }, 400);
+        }
+        metadataUpdate = mergeSingleModelEndpointRulesMetadata(
+          current,
+          body.singleModelEndpointRules
+        );
+        if (
+          body.singleModelEndpointRules.useOfficial === false &&
+          current.singleModelCategory === "video" &&
+          body.singleModelFormatTransformsByCanonicalId === undefined &&
+          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+        ) {
+          return c.json(
+            {
+              error:
+                "Each enabled video model requires a format transform for custom endpoint rules",
+            },
+            400
+          );
+        }
+      }
+
+      if (body.singleModelFormatTransformsByCanonicalId !== undefined) {
+        let current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        current = await ensureMigratedSingleModelMetadata(db, current);
+        if (current.endpointRules?.useOfficial !== false) {
+          return c.json(
+            { error: "Format transform requires custom endpoint rules" },
+            400
+          );
+        }
+        for (const transform of Object.values(
+          body.singleModelFormatTransformsByCanonicalId
+        )) {
+          if (!transform) {
+            continue;
+          }
+          const template = await getFormatTransformTemplateById(
+            db,
+            transform.sourceTemplateId
+          );
+          if (!template?.enabled || template.scope !== "platform") {
+            return c.json({ error: "Format transform template not found" }, 400);
+          }
+          if (
+            !isTransformMappingConfigComplete(
+              transform.upstreamParams,
+              transform.paramMappings
+            )
+          ) {
+            return c.json(
+              { error: "Format transform mapping configuration is incomplete" },
+              400
+            );
+          }
+        }
+        metadataUpdate = mergeSingleModelFormatTransformsMetadata(
+          current,
+          body.singleModelFormatTransformsByCanonicalId
+        );
+        if (
+          current.singleModelCategory === "video" &&
+          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+        ) {
+          return c.json(
+            {
+              error:
+                "Each enabled video model requires a format transform for custom endpoint rules",
+            },
+            400
+          );
+        }
+      }
+
+      if (body.singleModelCapabilityLimitsByCanonicalId !== undefined) {
+        let current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        const platformModels = await listPlatformAiModels(db, "video");
+        const platformRulesById = new Map(
+          platformModels.map((model) => [
+            model.canonicalId,
+            getPlatformVideoRules(model),
+          ])
+        );
+        for (const [canonicalId, limits] of Object.entries(
+          body.singleModelCapabilityLimitsByCanonicalId
+        )) {
+          if (!limits) {
+            continue;
+          }
+          const platformRules = platformRulesById.get(canonicalId);
+          if (!platformRules) {
+            return c.json({ error: `Unknown video model: ${canonicalId}` }, 400);
+          }
+          if (
+            !isCapabilityLimitsSubsetOfPlatform({
+              platformRules,
+              capabilityLimits: limits,
+            })
+          ) {
+            return c.json(
+              { error: "Capability limits must be a subset of platform model rules" },
+              400
+            );
+          }
+        }
+        metadataUpdate = mergeSingleModelCapabilityLimitsMetadata(
+          current,
+          body.singleModelCapabilityLimitsByCanonicalId
+        );
+      }
+
+      if (body.singleModelModels !== undefined) {
+        let current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        for (const config of Object.values(body.singleModelModels)) {
+          if (config.enabled && !config.upstreamModelId.trim()) {
+            return c.json({ error: "Model ID cannot be empty" }, 400);
+          }
+        }
+        metadataUpdate = mergeSingleModelModelsMetadata(
+          current,
+          body.singleModelModels
+        );
+        if (
+          metadataUpdate.singleModelCategory === "video" &&
+          metadataUpdate.endpointRules?.useOfficial === false &&
+          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+        ) {
+          return c.json(
+            {
+              error:
+                "Each enabled video model requires a format transform for custom endpoint rules",
+            },
+            400
+          );
+        }
+        if (
+          metadataUpdate.singleModelCategory === "video" &&
+          metadataUpdate.endpointRules?.useOfficial === false
+        ) {
+          for (const config of Object.values(metadataUpdate.models)) {
+            if (!config.enabled || config.modality !== "video") {
+              continue;
+            }
+            const transform = config.formatTransform;
+            if (
+              transform &&
+              !isTransformMappingConfigComplete(
+                transform.upstreamParams,
+                transform.paramMappings
+              )
+            ) {
+              return c.json(
+                {
+                  error:
+                    "Format transform mapping configuration is incomplete",
+                },
+                400
+              );
+            }
+          }
+        }
       }
 
       if (body.apiKey !== undefined) {

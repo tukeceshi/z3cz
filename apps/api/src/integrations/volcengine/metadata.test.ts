@@ -18,26 +18,41 @@ const sample: VolcanoInterfaceMetadata = {
   region: "cn-beijing",
   models: {
     "deepseek-v4-flash": {
+      canonicalId: "deepseek-v4-flash",
       enabled: true,
-      providerModelId: "deepseek-v4-flash-260425",
+      upstreamModelId: "deepseek-v4-flash-260425",
       modality: "text",
     },
   },
 };
 
+const legacySampleJson = JSON.stringify({
+  credentialMode: "volcengine_iam",
+  accessKeyId: "ak",
+  secretAccessKeyEncrypted: "enc",
+  arkApiKeyDurationSeconds: 3600,
+  region: "cn-beijing",
+  models: {
+    "deepseek-v4-flash": {
+      enabled: true,
+      providerModelId: "deepseek-v4-flash-260425",
+      modality: "text",
+    },
+  },
+});
+
 describe("parseInterfaceMetadata", () => {
-  it("parses JSON strings", () => {
-    const parsed = parseInterfaceMetadata(JSON.stringify(sample));
+  it("parses JSON strings and normalizes model records", () => {
+    const parsed = parseInterfaceMetadata(legacySampleJson);
     expect(isVolcanoMetadata(parsed)).toBe(true);
     expect(parsed).toEqual(sample);
   });
 
-  it("returns already-parsed objects without re-stringifying", () => {
-    // Regression: listOrganizationAiInterfaces pre-parses metadata.
-    // JSON.parse(object) becomes JSON.parse("[object Object]") → null.
-    const parsed = parseInterfaceMetadata(sample);
-    expect(parsed).toBe(sample);
+  it("returns already-parsed objects and normalizes model records", () => {
+    const legacy = JSON.parse(legacySampleJson) as VolcanoInterfaceMetadata;
+    const parsed = parseInterfaceMetadata(legacy);
     expect(isVolcanoMetadata(parsed)).toBe(true);
+    expect(parsed).toEqual(sample);
   });
 
   it("returns null for empty / invalid input", () => {
@@ -61,8 +76,9 @@ describe("mergeVolcanoActivationCache", () => {
       models: {
         ...sample.models,
         [platformOnly.canonicalId]: {
+          canonicalId: platformOnly.canonicalId,
           enabled: true,
-          providerModelId: platformOnly.providerModelId,
+          upstreamModelId: platformOnly.providerModelId,
           modality: "text",
         },
       },

@@ -6,7 +6,7 @@ import type {
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
 import { executeTextModel } from "../services/execute-text-model";
-import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
+import { resolveOrgModelInferenceModelId } from "../services/resolve-org-model-inference-id";
 import {
   inferOrgModelInterfaceId,
   listOrgTextModelOptions,
@@ -82,13 +82,28 @@ export class CloudflareTextModelService {
     organizationId: string;
     interfaceId: string;
     canonicalId: string;
+    instanceId?: string;
   }): Promise<string | undefined> {
     const db = createDatabase(this.env);
-    const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+    const resolved = await resolveTextModelInterface(
+      db,
+      params.organizationId,
+      params.canonicalId,
+      params.interfaceId,
+      params.instanceId
+    );
+    if (!resolved) {
+      return undefined;
+    }
+
+    const inferenceModelId = await resolveOrgModelInferenceModelId({
       db,
       organizationId: params.organizationId,
-      interfaceId: params.interfaceId,
-      canonicalId: params.canonicalId,
+      interfaceId: resolved.interfaceId,
+      canonicalId: resolved.canonicalId,
+      instanceId: resolved.instanceId,
+      channelKind: resolved.channelKind,
+      upstreamModelId: resolved.providerModelId,
     });
 
     return inferenceModelId ?? undefined;

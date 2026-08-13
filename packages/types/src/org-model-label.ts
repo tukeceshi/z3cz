@@ -2,14 +2,14 @@ export type OrgModelChannelKind = "aggregate" | "api";
 
 export function buildOrgModelOptionId(
   interfaceId: string,
-  canonicalId: string
+  instanceId: string
 ): string {
-  return `${interfaceId}:${canonicalId}`;
+  return `${interfaceId}:${instanceId}`;
 }
 
 export function parseOrgModelOptionId(optionId: string): {
   readonly interfaceId: string;
-  readonly canonicalId: string;
+  readonly instanceId: string;
 } | null {
   const separatorIndex = optionId.indexOf(":");
   if (separatorIndex <= 0 || separatorIndex >= optionId.length - 1) {
@@ -17,7 +17,22 @@ export function parseOrgModelOptionId(optionId: string): {
   }
   return {
     interfaceId: optionId.slice(0, separatorIndex),
-    canonicalId: optionId.slice(separatorIndex + 1),
+    instanceId: optionId.slice(separatorIndex + 1),
+  };
+}
+
+/** Legacy alias — aggregate volcano uses instanceId === canonicalId. */
+export function parseOrgModelOptionIdLegacy(optionId: string): {
+  readonly interfaceId: string;
+  readonly canonicalId: string;
+} | null {
+  const parsed = parseOrgModelOptionId(optionId);
+  if (!parsed) {
+    return null;
+  }
+  return {
+    interfaceId: parsed.interfaceId,
+    canonicalId: parsed.instanceId,
   };
 }
 
@@ -43,6 +58,7 @@ export function formatCanvasModelLabel(params: {
 export interface OrgModelBindingPickRef {
   readonly canonicalId: string;
   readonly interfaceId: string;
+  readonly instanceId?: string;
   readonly selectable: boolean;
 }
 

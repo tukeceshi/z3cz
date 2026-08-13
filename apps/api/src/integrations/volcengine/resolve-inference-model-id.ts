@@ -1,12 +1,18 @@
-import { resolveVolcanoInferenceModelId } from "@dafthunk/types";
+import {
+  findEnabledOrgModelInstanceByCanonicalId,
+  findEnabledSingleModelInstanceByCanonicalId,
+  listOrgModelEntries,
+  readOrgModelUpstreamId,
+  resolveVolcanoInferenceModelId,
+} from "@dafthunk/types";
 
 import type { Database } from "../../db";
 import { getOrganizationAiInterfaceRow } from "../../db/ai-interface-queries";
+import { parseSingleModelMetadata } from "../single-model/metadata";
 import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
 } from "./metadata";
-import { parseSingleModelMetadata } from "../single-model/metadata";
 
 /**
  * Resolve the chat/inference `model` field after `ensureVolcanoApiKey` may have
@@ -19,6 +25,7 @@ export async function resolveVolcanoInferenceModelIdAfterEnsure(params: {
   readonly organizationId: string;
   readonly interfaceId: string;
   readonly canonicalId: string;
+  readonly instanceId?: string;
 }): Promise<string | null> {
   const row = await getOrganizationAiInterfaceRow(
     params.db,
@@ -35,20 +42,39 @@ export async function resolveVolcanoInferenceModelIdAfterEnsure(params: {
     if (!singleModelMetadata) {
       return null;
     }
-    const upstreamModelId =
-      singleModelMetadata.models[params.canonicalId]?.upstreamModelId?.trim();
+    const found = params.instanceId
+      ? singleModelMetadata.models[params.instanceId]?.enabled
+        ? {
+            instanceId: params.instanceId,
+            config: singleModelMetadata.models[params.instanceId]!,
+          }
+        : null
+      : findEnabledSingleModelInstanceByCanonicalId(
+          singleModelMetadata,
+          params.canonicalId
+        );
+    const upstreamModelId = found?.config.upstreamModelId?.trim();
     return upstreamModelId || null;
   }
 
-  const providerModelId =
-    metadata.models[params.canonicalId]?.providerModelId?.trim();
-  if (!providerModelId) {
+  const volcanoEntries = listOrgModelEntries(metadata.models);
+  const found = params.instanceId
+    ? volcanoEntries.find(
+        (entry) =>
+          entry.instanceId === params.instanceId && entry.config.enabled
+      )
+    : findEnabledOrgModelInstanceByCanonicalId(volcanoEntries, params.canonicalId);
+  const providerModelId = readOrgModelUpstreamId(found?.config);
+  if (!providerModelId || !found) {
     return null;
   }
 
   return resolveVolcanoInferenceModelId({
-    canonicalId: params.canonicalId,
+    canonicalId: found.config.canonicalId,
     providerModelId,
-    metadata,
+    metadata: {
+      arkEndpoints: metadata.arkEndpoints,
+      arkApiKeyScope: metadata.arkApiKeyScope,
+    },
   });
 }

@@ -1,13 +1,22 @@
-import type { AiInterfaceService } from "@dafthunk/runtime";
-import { buildBuiltinAiInterfaceArtifact } from "@dafthunk/runtime/ai-interface/builtin-artifact";
-import { mergeResolvedAiInterface } from "@dafthunk/runtime/ai-interface/execute-sync";
-import type {
-  AiInterfaceProvider,
-  ResolvedOrgAiInterface,
+import type { FormatTransformConfig } from "@dafthunk/types";
+import {
+  isSingleModelProviderMetadata,
+  readSingleModelCapabilityLimits,
+  readSingleModelFormatTemplateId,
+  readSingleModelFormatTransform,
+  resolveEffectiveVideoSupportsTaskCancel,
+  resolveSingleModelVideoEndpoints,
+  singleModelFormatTransformFromTemplate,
+  singleModelFormatTransformToConfig,
 } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
+import { getFormatTransformTemplateById } from "../db/format-transform-template-queries";
+import {
+  getVideoParameterRules,
+  listPlatformAiModels,
+} from "../db/platform-ai-model-queries";
 import {
   resolveOrganizationAiInterfaceRow,
   updateOrganizationAiInterface,
@@ -17,8 +26,100 @@ import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
-import { readSingleModelPresetId } from "@dafthunk/types";
 import { decryptSecret } from "../utils/encryption";
+import type { AiInterfaceService } from "@dafthunk/runtime";
+import { buildBuiltinAiInterfaceArtifact } from "@dafthunk/runtime/ai-interface/builtin-artifact";
+import { mergeResolvedAiInterface } from "@dafthunk/runtime/ai-interface/execute-sync";
+import type {
+  AiInterfaceProvider,
+  ResolvedOrgAiInterface,
+} from "@dafthunk/types";
+import { readSingleModelPresetId } from "@dafthunk/types";
+
+function resolveVideoEndpointsFromMetadata(
+  metadataRaw: string | null,
+  supportsTaskCancel?: boolean
+): ReturnType<typeof resolveSingleModelVideoEndpoints> | undefined {
+  const metadata = parseInterfaceMetadata(metadataRaw);
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return undefined;
+  }
+  if (metadata.singleModelCategory !== "video") {
+    return undefined;
+  }
+  return resolveSingleModelVideoEndpoints({ metadata, supportsTaskCancel });
+}
+
+async function resolveSupportsTaskCancelForModel(
+  env: Bindings,
+  metadataRaw: string | null,
+  modelCanonicalId?: string
+): Promise<boolean | undefined> {
+  if (!modelCanonicalId) {
+    return undefined;
+  }
+
+  const metadata = parseInterfaceMetadata(metadataRaw);
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return undefined;
+  }
+
+  const db = createDatabase(env);
+  const platformModels = await listPlatformAiModels(db, "video");
+  const platformModel = platformModels.find(
+    (model) => model.canonicalId === modelCanonicalId
+  );
+  if (!platformModel) {
+    return undefined;
+  }
+
+  const platformRules = getVideoParameterRules(platformModel);
+  const capabilityLimits = readSingleModelCapabilityLimits(
+    metadata,
+    modelCanonicalId
+  );
+
+  return resolveEffectiveVideoSupportsTaskCancel({
+    platformRules,
+    capabilityLimits,
+  });
+}
+
+async function resolveFormatTransformFromMetadata(
+  env: Bindings,
+  metadataRaw: string | null,
+  modelCanonicalId?: string
+): Promise<FormatTransformConfig | undefined> {
+  const metadata = parseInterfaceMetadata(metadataRaw);
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return undefined;
+  }
+
+  if (modelCanonicalId) {
+    const modelTransform = readSingleModelFormatTransform(
+      metadata,
+      modelCanonicalId
+    );
+    if (modelTransform) {
+      return singleModelFormatTransformToConfig(modelTransform);
+    }
+  }
+
+  const templateId = readSingleModelFormatTemplateId(metadata);
+  if (!templateId) {
+    return undefined;
+  }
+
+  const db = createDatabase(env);
+  const template = await getFormatTransformTemplateById(db, templateId);
+  if (!template?.enabled || template.scope !== "platform") {
+    return undefined;
+  }
+
+  return singleModelFormatTransformToConfig(
+    singleModelFormatTransformFromTemplate(template)
+  );
+}
 
 export class CloudflareAiInterfaceService implements AiInterfaceService {
   constructor(private readonly env: Bindings) {}
@@ -27,6 +128,7 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
     organizationId: string;
     interfaceId?: string;
     templateId?: string;
+    modelCanonicalId?: string;
   }): Promise<ResolvedOrgAiInterface | undefined> {
     const db = createDatabase(this.env);
     const row = await resolveOrganizationAiInterfaceRow(
@@ -100,12 +202,31 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
         this.env,
         params.organizationId
       );
+      let videoEndpoints = resolveVideoEndpointsFromMetadata(row.metadata);
+      const formatTransform = await resolveFormatTransformFromMetadata(
+        this.env,
+        row.metadata,
+        params.modelCanonicalId
+      );
+      const supportsTaskCancel = await resolveSupportsTaskCancelForModel(
+        this.env,
+        row.metadata,
+        params.modelCanonicalId
+      );
+      if (videoEndpoints && supportsTaskCancel !== undefined) {
+        videoEndpoints = {
+          ...videoEndpoints,
+          supportsTaskCancel,
+        };
+      }
       return mergeResolvedAiInterface({
         artifact,
         interfaceId: row.id,
         baseUrl: row.baseUrl,
         selectedModel: row.selectedModel,
         apiKey,
+        videoEndpoints,
+        formatTransform,
       });
     } catch (error) {
       console.error(

@@ -12,8 +12,6 @@ import {
   type SubmitAiVideoRequest,
   createEphemeralMediaExpiresAt,
   isEphemeralMediaReference,
-  isGrokImagineVideoCanonicalId,
-  isVeoCanonicalId,
   type MediaReference,
 } from "@dafthunk/types";
 import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
@@ -46,6 +44,7 @@ import {
   resolveTextModelInterface,
 } from "../services/resolve-text-model-interface";
 import { listPlatformCatalogModelOptions } from "../services/list-platform-catalog-model-options";
+import { listPlatformVideoModelBaselines } from "../services/list-platform-video-model-baselines";
 import {
   listAggregateVolcanoCatalogEntries,
   listPlatformAiModelChannels,
@@ -69,7 +68,7 @@ import {
   resolveAudioModelInterface,
 } from "../services/resolve-audio-model-interface";
 import { executeMinimaxSpeech } from "../integrations/minimax/execute-minimax-speech";
-import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
+import { resolveOrgModelInferenceModelId } from "../services/resolve-org-model-inference-id";
 import {
   downloadOrgVideo,
   pollOrgVideoTask,
@@ -334,6 +333,10 @@ platformAiRoutes.get("/video-models", async (c) => {
   const scope = c.req.query("scope");
   if (scope === "catalog") {
     const models = await listPlatformCatalogModelOptions(db, "video");
+    return c.json({ models });
+  }
+  if (scope === "platform-baseline") {
+    const models = await listPlatformVideoModelBaselines(db);
     return c.json({ models });
   }
   const models = await listOrgVideoModelOptions(db, organizationId);
@@ -1006,11 +1009,14 @@ platformAiRoutes.post(
       return c.json({ error: "Could not resolve AI interface" }, 400);
     }
 
-    const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+    const inferenceModelId = await resolveOrgModelInferenceModelId({
       db,
       organizationId,
       interfaceId: resolvedModel.interfaceId,
       canonicalId: resolvedModel.canonicalId,
+      instanceId: resolvedModel.instanceId,
+      channelKind: resolvedModel.channelKind,
+      upstreamModelId: resolvedModel.providerModelId,
     });
 
     if (!inferenceModelId) {
@@ -1386,6 +1392,7 @@ platformAiRoutes.post(
 const submitVideoSchema = z.object({
   modelCanonicalId: z.string().min(1),
   aiInterfaceId: z.string().min(1),
+  instanceId: z.string().min(1).optional(),
   prompt: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   referenceImageUrls: z.array(z.string().min(1)).optional(),
@@ -1453,7 +1460,8 @@ platformAiRoutes.post(
       db,
       organizationId,
       body.modelCanonicalId,
-      body.aiInterfaceId
+      body.aiInterfaceId,
+      body.instanceId
     );
 
     if (!resolvedModel) {
@@ -1482,22 +1490,22 @@ platformAiRoutes.post(
     const iface = await service.resolveOrgInterface({
       organizationId,
       interfaceId: resolvedModel.interfaceId,
+      modelCanonicalId: resolvedModel.canonicalId,
     });
 
     if (!iface) {
       return c.json({ error: "Could not resolve AI interface" }, 400);
     }
 
-    const inferenceModelId =
-      isVeoCanonicalId(resolvedModel.canonicalId) ||
-      isGrokImagineVideoCanonicalId(resolvedModel.canonicalId)
-        ? resolvedModel.providerModelId
-        : await resolveVolcanoInferenceModelIdAfterEnsure({
-            db,
-            organizationId,
-            interfaceId: resolvedModel.interfaceId,
-            canonicalId: resolvedModel.canonicalId,
-          });
+    const inferenceModelId = await resolveOrgModelInferenceModelId({
+      db,
+      organizationId,
+      interfaceId: resolvedModel.interfaceId,
+      canonicalId: resolvedModel.canonicalId,
+      instanceId: resolvedModel.instanceId,
+      channelKind: resolvedModel.channelKind,
+      upstreamModelId: resolvedModel.providerModelId,
+    });
 
     if (!inferenceModelId) {
       return c.json(
@@ -1537,20 +1545,35 @@ platformAiRoutes.post(
       operation: "submit",
     });
 
-    const submitResult = await submitOrgVideoTask({
-      apiKey: iface.apiKey,
-      baseUrl: iface.baseUrl,
-      canonicalId: resolvedModel.canonicalId,
-      providerModelId: inferenceModelId,
-      prompt,
-      parameterRules: resolvedModel.parameterRules,
-      generationParams: body.params,
-      referenceImageUrls: body.referenceImageUrls,
-      referenceImageInline: body.referenceImageInline,
-      referenceVideoUrls: body.referenceVideoUrls,
-      referenceAudioUrls: body.referenceAudioUrls,
-      upstreamLog,
-    });
+    let submitResult;
+    try {
+      submitResult = await submitOrgVideoTask({
+        apiKey: iface.apiKey,
+        baseUrl: iface.baseUrl,
+        canonicalId: resolvedModel.canonicalId,
+        providerModelId: inferenceModelId,
+        prompt,
+        parameterRules: resolvedModel.parameterRules,
+        generationParams: body.params,
+        referenceImageUrls: body.referenceImageUrls,
+        referenceImageInline: body.referenceImageInline,
+        referenceVideoUrls: body.referenceVideoUrls,
+        referenceAudioUrls: body.referenceAudioUrls,
+        upstreamLog,
+        videoEndpoints: iface.videoEndpoints,
+        formatTransform: iface.formatTransform,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Upstream request failed";
+      await finalizeAiModelInvocation(db, {
+        id: invocationId,
+        organizationId,
+        status: "failed",
+        error: message,
+      });
+      return c.json({ error: `Upstream request failed: ${message}` }, 502);
+    }
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
       await finalizeAiModelInvocation(db, {
@@ -1767,16 +1790,6 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     });
   }
 
-  const service = new CloudflareAiInterfaceService(c.env);
-  const iface = await service.resolveOrgInterface({
-    organizationId,
-    interfaceId,
-  });
-
-  if (!iface) {
-    return c.json({ error: "Could not resolve AI interface" }, 400);
-  }
-
   const modelCanonicalId =
     trackedJob?.modelCanonicalId ?? c.req.query("modelCanonicalId")?.trim();
   if (!modelCanonicalId) {
@@ -1784,6 +1797,17 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
       { error: "modelCanonicalId query parameter is required" },
       400
     );
+  }
+
+  const service = new CloudflareAiInterfaceService(c.env);
+  const iface = await service.resolveOrgInterface({
+    organizationId,
+    interfaceId,
+    modelCanonicalId,
+  });
+
+  if (!iface) {
+    return c.json({ error: "Could not resolve AI interface" }, 400);
   }
 
   if (trackedJob?.status === "generating") {

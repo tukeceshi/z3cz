@@ -1,0 +1,4 @@
+-- Org model records in interface metadata now use unified shape:
+--   models[instanceId].{ canonicalId, enabled, upstreamModelId, modality, ... }
+-- Legacy volcano entries used providerModelId without canonicalId.
+-- Runtime normalizeOrgModelInstancesMap() upgrades on read; re-save writes new shape.

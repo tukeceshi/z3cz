@@ -1,17 +1,25 @@
+import type {
+  FormatTransformConfig,
+  ReferenceImageInline,
+  ResolvedSingleModelVideoEndpoints,
+  VideoModelParameterRules,
+} from "@dafthunk/types";
 import {
   buildVolcanoVideoGenerationBody,
   countSubmitAiVideoMediaReferences,
   createEphemeralMediaExpiresAt,
   type MediaReference,
   type ObjectReference,
-  type VideoModelParameterRules,
-  type ReferenceImageInline,
   normalizeVideoModelParameterRules,
   validateSubmitAiVideoReferences,
+  buildVideoPollUrl,
+  buildVideoSubmitUrl,
+  resolveOfficialVideoEndpoints,
 } from "@dafthunk/types";
 
 import type { ObjectStore } from "../node-types";
 import type { CloudImageUploadTarget } from "./execute-volcano-image";
+import { applyForwardingMappings } from "./apply-forwarding-mappings";
 import {
   fetchWithUpstreamLog,
   type UpstreamRequestLogSink,
@@ -34,6 +42,17 @@ export interface VolcanoVideoPollResult {
   readonly upstreamPhase?: "queued" | "running";
   readonly videoUrl?: string;
   readonly error?: string;
+}
+
+export interface VolcanoVideoCancelResult {
+  readonly status: "cancelled" | "skipped" | "failed";
+  readonly error?: string;
+}
+
+function resolveVideoEndpoints(
+  videoEndpoints?: ResolvedSingleModelVideoEndpoints
+): ResolvedSingleModelVideoEndpoints {
+  return videoEndpoints ?? resolveOfficialVideoEndpoints();
 }
 
 export interface VolcanoVideoDownloadResult {
@@ -109,6 +128,8 @@ export async function submitVolcanoVideoTask(params: {
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  readonly formatTransform?: FormatTransformConfig;
 }): Promise<VolcanoVideoSubmitResult> {
   const rules = normalizeVideoModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -143,8 +164,21 @@ export async function submitVolcanoVideoTask(params: {
     referenceAudioUrls: params.referenceAudioUrls,
   });
 
-  const baseUrl = params.baseUrl.replace(/\/$/, "");
-  const url = `${baseUrl}/contents/generations/tasks`;
+  const requestBody = params.formatTransform
+    ? applyForwardingMappings({
+        sourceBody: body,
+        upstreamParams: params.formatTransform.upstreamParams,
+        paramMappings: params.formatTransform.paramMappings,
+        lockedResolution: params.formatTransform.lockedResolution ?? null,
+      })
+    : body;
+
+  const endpoints = resolveVideoEndpoints(params.videoEndpoints);
+  const url = buildVideoSubmitUrl({
+    baseUrl: params.baseUrl,
+    submitPath: endpoints.submitPath,
+    useFullSubmitUrl: endpoints.useFullSubmitUrl,
+  });
 
   const response = await fetchWithUpstreamLog(
     url,
@@ -154,7 +188,7 @@ export async function submitVolcanoVideoTask(params: {
         Authorization: `Bearer ${params.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     },
     params.upstreamLog
   );
@@ -187,7 +221,12 @@ export async function submitVolcanoVideoTask(params: {
   return {
     status: "submitted",
     taskId,
-    pollUrl: `${baseUrl}/contents/generations/tasks/${taskId}`,
+    pollUrl: buildVideoPollUrl({
+      baseUrl: params.baseUrl,
+      submitPath: endpoints.submitPath,
+      taskId,
+      useFullSubmitUrl: endpoints.useFullSubmitUrl,
+    }),
   };
 }
 
@@ -253,6 +292,44 @@ export async function pollVolcanoVideoTask(params: {
   }
 
   return { status: "pending", upstreamPhase: "running" };
+}
+
+export async function cancelVolcanoVideoTask(params: {
+  readonly apiKey: string;
+  readonly pollUrl: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}): Promise<VolcanoVideoCancelResult> {
+  const response = await fetchWithUpstreamLog(
+    params.pollUrl,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    },
+    params.upstreamLog
+  );
+
+  if (response.status === 204 || (response.status >= 200 && response.status < 300)) {
+    return { status: "cancelled" };
+  }
+
+  const text = await response.text();
+  let message: string | undefined;
+  try {
+    const parsed = JSON.parse(text) as VolcanoVideoTaskResponse;
+    message = parsed.error?.message;
+  } catch {
+    message = undefined;
+  }
+
+  return {
+    status: "failed",
+    error:
+      message ??
+      `Cancel request failed (${response.status}): ${text.slice(0, 300)}`,
+  };
 }
 
 export async function downloadVolcanoVideo(params: {

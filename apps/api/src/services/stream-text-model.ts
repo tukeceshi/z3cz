@@ -14,7 +14,7 @@ import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upst
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
-import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
+import { resolveOrgModelInferenceModelId } from "./resolve-org-model-inference-id";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
 import {
   resolveOrgModelInterfaceCandidate,
@@ -74,11 +74,14 @@ export async function prepareTextModelStream(params: {
     };
   }
 
-  const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+  const inferenceModelId = await resolveOrgModelInferenceModelId({
     db: params.db,
     organizationId: params.organizationId,
     interfaceId: candidate.interfaceId,
     canonicalId: params.canonicalId,
+    instanceId: candidate.instanceId,
+    channelKind: candidate.channelKind,
+    upstreamModelId: candidate.providerModelId,
   });
 
   if (!inferenceModelId) {

@@ -42,7 +42,9 @@ import {
 } from "@dafthunk/types";
 import { useCallback, useMemo, useState } from "react";
 
+import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { useTranslation } from "@/components/locale-provider";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { TranslationKey } from "@/i18n";
 import {
   usePlatformCatalogAudioModels,
@@ -51,8 +53,6 @@ import {
   usePlatformCatalogVideoModels,
 } from "@/services/platform-ai-model-service";
 import { cn } from "@/utils/utils";
-
-import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 
 import { ModelBrandIcon } from "./model-brand-icon";
 import { resolveSingleModelPresetCardName } from "./single-model-display-name";
@@ -148,6 +148,16 @@ function FilterTab({
   );
 }
 
+function PickerTileSkeletons() {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {Array.from({ length: 9 }, (_, index) => (
+        <Skeleton key={index} className="h-10 rounded-lg" />
+      ))}
+    </div>
+  );
+}
+
 function PresetTile({
   label,
   selected,
@@ -192,10 +202,22 @@ export function SingleModelPickerStep({
 }: SingleModelPickerStepProps) {
   const { t } = useTranslation();
   const grouped = getSingleModelPresetsByCategory();
-  const { models: textModels } = usePlatformCatalogTextModels(organizationId);
-  const { models: imageModels } = usePlatformCatalogImageModels(organizationId);
-  const { models: videoModels } = usePlatformCatalogVideoModels(organizationId);
-  const { models: audioModels } = usePlatformCatalogAudioModels(organizationId);
+  const { models: textModels, isLoading: isTextLoading } =
+    usePlatformCatalogTextModels(organizationId);
+  const { models: imageModels, isLoading: isImageLoading } =
+    usePlatformCatalogImageModels(organizationId);
+  const { models: videoModels, isLoading: isVideoLoading } =
+    usePlatformCatalogVideoModels(organizationId);
+  const { models: audioModels, isLoading: isAudioLoading } =
+    usePlatformCatalogAudioModels(organizationId);
+  const { presetChannelIds: apiPresetChannelIds, isLoading: isChannelsLoading } =
+    useApiPresetChannelIdMap(organizationId);
+  const isPickerLoading =
+    isTextLoading ||
+    isImageLoading ||
+    isVideoLoading ||
+    isAudioLoading ||
+    isChannelsLoading;
 
   const selectedPreset =
     selection.kind === "preset"
@@ -222,7 +244,6 @@ export function SingleModelPickerStep({
     return new Set(models.map((model) => model.canonicalId));
   }, [activeFilter, audioModels, imageModels, textModels, videoModels]);
 
-  const apiPresetChannelIds = useApiPresetChannelIdMap(organizationId);
   const enabledIdsForPreset = useCallback(
     (presetId: string, models: readonly { readonly canonicalId: string }[]) =>
       listPresetEnabledModelIds(apiPresetChannelIds, presetId, models),
@@ -457,6 +478,8 @@ export function SingleModelPickerStep({
           <div className="bg-muted/40 text-muted-foreground rounded-lg border p-4 text-sm">
             <p>{t("pages.aiInterfaces.singleModel.storageTabEmpty")}</p>
           </div>
+        ) : isPickerLoading ? (
+          <PickerTileSkeletons />
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {showDeepSeekCard ? (
@@ -653,7 +676,7 @@ export function isSingleModelStep2Valid(
     selection.kind === "minimax-speech" ||
     selection.kind === "seedream"
   ) {
-    return selection.checkedCanonicalIds.length > 0;
+    return true;
   }
   return true;
 }

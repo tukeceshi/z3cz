@@ -17,10 +17,12 @@ import type { WorkflowParameter } from "./workflow-types";
 function binding(
   interfaceId: string,
   canonicalId: string,
-  selectable = true
+  selectable = true,
+  instanceId = canonicalId
 ) {
   return {
-    optionId: buildOrgModelOptionId(interfaceId, canonicalId),
+    optionId: buildOrgModelOptionId(interfaceId, instanceId),
+    instanceId,
     canonicalId,
     interfaceId,
     selectable,

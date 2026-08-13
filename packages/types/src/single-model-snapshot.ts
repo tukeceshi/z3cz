@@ -7,8 +7,12 @@ import {
   type SingleModelModelConfig,
   type SingleModelProviderMetadata,
 } from "./single-model-interface-metadata";
+import {
+  listSingleModelMetadataEntries,
+} from "./single-model-instances";
 
 export interface SingleModelSnapshotRow {
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly alias: string;
   readonly modality: AiModelModality;
@@ -30,16 +34,19 @@ function catalogAliasFor(canonicalId: string): string {
 export function buildSingleModelSnapshotFromMetadata(
   metadata: SingleModelProviderMetadata
 ): SingleModelSnapshotResponse {
-  const models = Object.entries(metadata.models).map(([canonicalId, config]) => ({
-    canonicalId,
-    alias: resolveInterfaceModelAlias({
-      alias: config.alias,
-      platformDisplayName: catalogAliasFor(canonicalId),
-    }),
-    modality: config.modality,
-    upstreamModelId: config.upstreamModelId,
-    enabled: config.enabled,
-  }));
+  const models = listSingleModelMetadataEntries(metadata).map(
+    ({ instanceId, config, canonicalId }) => ({
+      instanceId,
+      canonicalId,
+      alias: resolveInterfaceModelAlias({
+        alias: config.alias,
+        platformDisplayName: catalogAliasFor(canonicalId),
+      }),
+      modality: config.modality,
+      upstreamModelId: config.upstreamModelId,
+      enabled: config.enabled,
+    })
+  );
 
   return { models };
 }

@@ -283,7 +283,7 @@ export function VolcanoWizardFlow({
   const { t, locale } = useTranslation();
 
   const appToast = useAppToast();
-  const { catalog: aggregateCatalog } = useVolcanoAggregateCatalog(organizationId, {
+  const { catalog: aggregateCatalog, catalogError } = useVolcanoAggregateCatalog(organizationId, {
     enabled: open,
   });
 
@@ -1094,6 +1094,18 @@ export function VolcanoWizardFlow({
                 <VolcanoWizardSetupBanners
                   notOpenModelCount={notOpenModelCount}
                 />
+
+                {catalogError ? (
+                  <p className="text-destructive text-sm">
+                    {t("pages.aiInterfaces.volcano.activation.catalogLoadFailed")}
+                  </p>
+                ) : null}
+
+                {!catalogError && aggregateCatalog.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    {t("pages.aiInterfaces.volcano.activation.catalogEmpty")}
+                  </p>
+                ) : null}
 
                 <div className="columns-1 gap-3 md:columns-2">
 

@@ -2,10 +2,11 @@ import {
   VOLCANO_ARK_API_KEY_DURATION_SECONDS,
   VOLCANO_AGGREGATE_MODEL_CATALOG,
   normalizeVolcanoArkEndpoints,
+  normalizeOrgModelInstancesMap,
   type AiModelCatalogEntry,
+  type OrgModelInstanceConfig,
   type VolcanoActivationProbeResult,
   type VolcanoInterfaceMetadata,
-  type VolcanoModelConfig,
 } from "@dafthunk/types";
 
 import { VOLCANO_DEFAULT_REGION } from "./constants";
@@ -26,7 +27,7 @@ export function isVolcanoMetadata(
 export function buildDefaultVolcanoModels(
   enabledCanonicalIds?: readonly string[],
   catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AGGREGATE_MODEL_CATALOG
-): Record<string, VolcanoModelConfig> {
+): Record<string, OrgModelInstanceConfig> {
   const catalog =
     catalogEntries.length > 0 ? catalogEntries : VOLCANO_AGGREGATE_MODEL_CATALOG;
   const enabledSet = new Set(
@@ -37,8 +38,9 @@ export function buildDefaultVolcanoModels(
     catalog.map((entry) => [
       entry.canonicalId,
       {
+        canonicalId: entry.canonicalId,
         enabled: enabledSet.has(entry.canonicalId),
-        providerModelId: entry.providerModelId,
+        upstreamModelId: entry.providerModelId,
         modality: entry.modality,
       },
     ])
@@ -134,8 +136,9 @@ export function mergeVolcanoModelEnabled(
     const catalogEntry = catalogById.get(canonicalId);
     if (!catalogEntry) continue;
     models[canonicalId] = {
+      canonicalId,
       enabled,
-      providerModelId: catalogEntry.providerModelId,
+      upstreamModelId: catalogEntry.providerModelId,
       modality: catalogEntry.modality,
     };
   }
@@ -234,7 +237,11 @@ export function normalizeVolcanoInterfaceMetadata(
   if (!isVolcanoMetadata(metadata)) {
     return metadata;
   }
-  return normalizeVolcanoArkEndpoints(metadata);
+  const normalized = normalizeVolcanoArkEndpoints(metadata);
+  return {
+    ...normalized,
+    models: normalizeOrgModelInstancesMap(normalized.models),
+  };
 }
 
 export function serializeInterfaceMetadata(

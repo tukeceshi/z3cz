@@ -12,8 +12,7 @@ import {
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
 import { buildOrgModelBindings } from "./build-org-model-bindings";
 import {
-  collectSingleModelInterfaces,
-  collectVolcanoInterfaces,
+  collectOrgBindingInterfaces,
   resolveOrgModelInterfaceBinding,
   type ResolvedOrgModelInterface,
 } from "./resolve-text-model-interface";
@@ -31,13 +30,9 @@ export async function listOrgImageModelOptions(
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
-  const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
-  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
-
   return buildOrgModelBindings({
     platformModels,
-    volcanoInterfaces,
-    singleModelInterfaces,
+    interfaces: collectOrgBindingInterfaces(interfaces),
   }).map((binding) => ({
     ...binding,
     unavailableReason:
@@ -54,13 +49,15 @@ export async function resolveImageModelInterface(
   db: Database,
   organizationId: string,
   canonicalId: string,
-  interfaceId: string
+  interfaceId: string,
+  instanceId?: string
 ): Promise<ResolvedImageModelInterface | null> {
   return resolveOrgModelInterfaceBinding(
     db,
     organizationId,
     canonicalId,
     interfaceId,
-    listOrgImageModelOptions
+    listOrgImageModelOptions,
+    instanceId
   );
 }

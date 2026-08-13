@@ -3,7 +3,6 @@ import type {
   GenerationJobRecord,
   LocalMediaReference,
   ObjectReference,
-  ResourceIdReference,
   WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
@@ -25,7 +24,10 @@ import {
   completeGenerationJobUpload,
   getGenerationJob,
 } from "@/services/platform-ai-model-service";
-import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
+import {
+  cloudUploadToResourceId,
+  uploadGenerativeMediaFromLocalStaging,
+} from "@/services/stage-generative-media";
 
 export type PersistGenerativeMediaPhase = "downloading" | "uploading";
 
@@ -346,12 +348,6 @@ export async function runGenerationJobPersistWorker(params: {
       objectRefs
     );
 
-    return objectRefs.map((object) => ({
-      resourceId:
-        object.storageKey && object.storageKey.length > 0
-          ? object.storageKey
-          : object.id,
-      mimeType: object.mimeType,
-    }));
+    return objectRefs.map((object) => cloudUploadToResourceId(object));
   }
 }

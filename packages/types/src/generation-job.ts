@@ -173,6 +173,10 @@ export interface GetGenerationJobResponse {
 export interface CancelGenerationJobResponse extends GetGenerationJobResponse {
   /** True only when the job ended in `cancelled` status. */
   readonly cancelled: boolean;
+  /** True when the interface did not call upstream task cancel. */
+  readonly upstreamCancelSkipped?: boolean;
+  /** True when upstream task cancel was attempted but failed. */
+  readonly upstreamCancelFailed?: boolean;
 }
 
 export function isGenerationJobPastUpstreamGeneration(job: {

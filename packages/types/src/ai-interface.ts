@@ -1,3 +1,12 @@
+import type {
+  FormatTransformConfig,
+  SingleModelFormatTransform,
+} from "./format-transform-template";
+import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
+import type {
+  ResolvedSingleModelVideoEndpoints,
+  SingleModelEndpointRules,
+} from "./single-model-endpoint-rules";
 import type { NodeType } from "./workflow";
 import type { VolcanoActivationProbeResult } from "./volcano-activation";
 import type { VolcanoSetupStatus } from "./volcano-setup";
@@ -237,6 +246,16 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly singleModelModelEnabled?: Readonly<Record<string, boolean>>;
   readonly singleModelModelAlias?: Readonly<Record<string, string>>;
   readonly singleModelUpstreamModelIds?: Readonly<Record<string, string>>;
+  readonly singleModelEndpointRules?: SingleModelEndpointRules;
+  readonly singleModelFormatTransformsByCanonicalId?: Readonly<
+    Record<string, SingleModelFormatTransform | null>
+  >;
+  readonly singleModelCapabilityLimitsByCanonicalId?: Readonly<
+    Record<string, SingleModelCapabilityLimits | null>
+  >;
+  readonly singleModelModels?: Readonly<
+    Record<string, import("./single-model-interface-metadata").SingleModelModelConfig>
+  >;
   readonly tosStorage?: VolcanoTosStorageConfig & {
     readonly createBucket?: boolean;
   };
@@ -252,6 +271,8 @@ export interface ResolvedOrgAiInterface {
   readonly apiKey: string;
   readonly selectedModel: string;
   readonly artifact: AiInterfaceRuntimeArtifact;
+  readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  readonly formatTransform?: FormatTransformConfig;
 }
 
 export function withSelectedModel(

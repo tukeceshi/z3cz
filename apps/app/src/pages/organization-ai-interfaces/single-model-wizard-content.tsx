@@ -1,8 +1,7 @@
 import {
-  buildSingleModelInterfaceMetadata,
   buildSingleModelProviderMetadata,
   createEmptyPresetSelection,
-  defaultUpstreamModelIdForCanonical,
+  endpointRulesForMetadata,
   DEEPSEEK_DEFAULT_ENDPOINT_URL,
   DEEPSEEK_PROVIDER_CARD_ID,
   getSingleModelPresetById,
@@ -37,33 +36,57 @@ import {
   SEED_PROVIDER_CARD_ID,
   SEEDREAM_DEFAULT_ENDPOINT_URL,
   SEEDREAM_PROVIDER_CARD_ID,
+  prepareSingleModelInstancesForSave,
+  type SingleModelInstanceDraft,
+  type SingleModelCapabilityLimits,
+  type SingleModelFormatTransform,
   type SingleModelPresetEntry,
   type SingleModelWizardSelection,
+  validateCustomSingleModelEndpointRules,
 } from "@dafthunk/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Settings } from "lucide-react";
 
 import { useTranslation } from "@/components/locale-provider";
 import {
   CredentialPlainInput,
   CredentialSecretInput,
-  credentialAutofillIgnoreProps,
 } from "@/components/credential-secret-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { createOrganizationAiInterface } from "@/services/organization-ai-interface-service";
-import { usePlatformCatalogAudioModels, usePlatformCatalogImageModels, usePlatformCatalogTextModels, usePlatformCatalogVideoModels } from "@/services/platform-ai-model-service";
+import {
+  createOrganizationAiInterface,
+  useOrganizationFormatTransformTemplates,
+} from "@/services/organization-ai-interface-service";
+import {
+  usePlatformCatalogAudioModels,
+  usePlatformCatalogImageModels,
+  usePlatformCatalogTextModels,
+  usePlatformCatalogVideoModels,
+  usePlatformVideoModelBaselines,
+} from "@/services/platform-ai-model-service";
 import { cn } from "@/utils/utils";
 
-import { DeepSeekModelConfigList } from "./deepseek-model-config-row";
+import { CapabilityLimitsSettingsDialog } from "./capability-limits-settings-dialog";
 import { KimiEndpointRegionHints } from "./kimi-endpoint-region-hints";
+import {
+  SingleModelInstanceList,
+  type ProviderModelPoolOption,
+} from "./single-model-instance-list";
+import {
+  createDefaultEndpointRulesFormState,
+  SingleModelEndpointRulesFields,
+  type SingleModelEndpointRulesFormState,
+} from "./single-model-endpoint-rules-fields";
+import {
+  SingleModelVideoEndpointUrlFields,
+} from "./single-model-endpoint-url-preview";
 import {
   resolveDefaultInterfaceListName,
 } from "./single-model-display-name";
 import {
   isSingleModelSelectionValid,
-  isSingleModelStep2Valid,
   SingleModelPickerStep,
 } from "./single-model-picker-step";
 import {
@@ -80,11 +103,6 @@ interface SingleModelWizardContentProps {
   onCancel: () => void;
 }
 
-interface MultiModelDraft {
-  readonly canonicalId: string;
-  modelId: string;
-}
-
 function applyPresetDefaults(preset: SingleModelPresetEntry): {
   endpointUrl: string;
   selectedModel: string;
@@ -93,6 +111,30 @@ function applyPresetDefaults(preset: SingleModelPresetEntry): {
     endpointUrl: preset.defaultEndpointUrl,
     selectedModel: preset.defaultModelId ?? preset.canonicalId ?? "",
   };
+}
+
+function buildMetadataModelsFromInstances(
+  instances: readonly SingleModelInstanceDraft[],
+  applyCustomVideoRules: boolean
+) {
+  return instances.map((instance) => ({
+    instanceId: instance.instanceId,
+    canonicalId: instance.canonicalId,
+    upstreamModelId: instance.upstreamModelId.trim(),
+    enabled: instance.enabled,
+    modality: instance.modality,
+    ...(instance.displayName.trim()
+      ? { alias: instance.displayName.trim() }
+      : {}),
+    ...(instance.capabilityLimits
+      ? { capabilityLimits: instance.capabilityLimits }
+      : {}),
+    ...(applyCustomVideoRules &&
+    instance.modality === "video" &&
+    instance.formatTransform
+      ? { formatTransform: instance.formatTransform }
+      : {}),
+  }));
 }
 
 export function SingleModelWizardContent({
@@ -109,7 +151,8 @@ export function SingleModelWizardContent({
   const { models: imagePlatformModels } = usePlatformCatalogImageModels(organizationId);
   const { models: videoPlatformModels } = usePlatformCatalogVideoModels(organizationId);
   const { models: audioPlatformModels } = usePlatformCatalogAudioModels(organizationId);
-  const apiPresetChannelIds = useApiPresetChannelIdMap(organizationId);
+  const { presetChannelIds: apiPresetChannelIds } =
+    useApiPresetChannelIdMap(organizationId);
 
   const deepSeekAvailableModels = useMemo(
     () =>
@@ -277,9 +320,25 @@ export function SingleModelWizardContent({
   const [endpointUrl, setEndpointUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [multiModelDrafts, setMultiModelDrafts] = useState<MultiModelDraft[]>([]);
+  const [modelInstances, setModelInstances] = useState<
+    SingleModelInstanceDraft[]
+  >([]);
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [endpointRulesForm, setEndpointRulesForm] =
+    useState<SingleModelEndpointRulesFormState>(() =>
+      createDefaultEndpointRulesFormState()
+    );
+  const [capabilityLimitsByInstanceId, setCapabilityLimitsByInstanceId] =
+    useState<Record<string, SingleModelCapabilityLimits | null>>({});
+  const [sharedFormatTransform, setSharedFormatTransform] =
+    useState<SingleModelFormatTransform | null>(null);
+  const [capabilitySettingsInstanceId, setCapabilitySettingsInstanceId] =
+    useState<string | null>(null);
+  const { formatTemplates, isFormatTemplatesLoading } =
+    useOrganizationFormatTransformTemplates(organizationId);
+  const { baselines: platformBaselines, isBaselinesLoading } =
+    usePlatformVideoModelBaselines(step === 2 ? organizationId : undefined);
 
   const selectedPreset = useMemo(() => {
     if (selection.kind !== "preset") {
@@ -287,6 +346,18 @@ export function SingleModelWizardContent({
     }
     return getSingleModelPresetById(selection.presetId);
   }, [selection]);
+
+  const wizardSelectionKey = useMemo((): string | null => {
+    if (selection.kind === "preset") {
+      return `preset:${selection.presetId}`;
+    }
+    if (isMultiModelProviderSelection(selection)) {
+      return `multi:${selection.kind}`;
+    }
+    return null;
+  }, [selection]);
+
+  const initializedWizardSelectionRef = useRef<string | null>(null);
 
   const multiModelProviderConfig = useMemo(() => {
     if (selection.kind === "deepseek") {
@@ -470,15 +541,108 @@ export function SingleModelWizardContent({
     selection.kind,
   ]);
 
+  const endpointRulesCategory =
+    multiModelProviderConfig?.category ?? selectedPreset?.category ?? "text";
+
+  const baselineById = useMemo(
+    () =>
+      new Map(
+        platformBaselines.map((baseline) => [baseline.canonicalId, baseline])
+      ),
+    [platformBaselines]
+  );
+
+  const modelPoolOptions = useMemo((): readonly ProviderModelPoolOption[] => {
+    if (!multiModelProviderConfig) {
+      return [];
+    }
+    return multiModelProviderConfig.availableModels.map((model) => ({
+      canonicalId: model.canonicalId,
+      displayName: model.displayName,
+      modality: model.modality,
+    }));
+  }, [multiModelProviderConfig]);
+
+  const isVideoCategory = endpointRulesCategory === "video";
+
+  const capabilitySettingsLabel = t(
+    "pages.aiInterfaces.singleModel.capabilityLimitsSettingsTitle"
+  );
+
+  const singlePresetVideoCanonicalId =
+    selectedPreset?.category === "video"
+      ? (selectedPreset.canonicalId ??
+        selectedPreset.id.replace(/^preset:/, ""))
+      : null;
+
+  const capabilitySettingsModelLabel = useMemo(() => {
+    if (!capabilitySettingsInstanceId) {
+      return "";
+    }
+    const instance = modelInstances.find(
+      (entry) => entry.instanceId === capabilitySettingsInstanceId
+    );
+    if (instance) {
+      return instance.displayName;
+    }
+    if (
+      singlePresetVideoCanonicalId === capabilitySettingsInstanceId &&
+      selectedPreset
+    ) {
+      return resolveDefaultInterfaceListName({ preset: selectedPreset, t });
+    }
+    return capabilitySettingsInstanceId;
+  }, [
+    capabilitySettingsInstanceId,
+    modelInstances,
+    selectedPreset,
+    singlePresetVideoCanonicalId,
+    t,
+  ]);
+
+  const capabilitySettingsBaseline = useMemo(() => {
+    if (!capabilitySettingsInstanceId) {
+      return null;
+    }
+    const instance = modelInstances.find(
+      (entry) => entry.instanceId === capabilitySettingsInstanceId
+    );
+    if (instance) {
+      return baselineById.get(instance.canonicalId) ?? null;
+    }
+    if (singlePresetVideoCanonicalId) {
+      return baselineById.get(singlePresetVideoCanonicalId) ?? null;
+    }
+    return null;
+  }, [
+    baselineById,
+    capabilitySettingsInstanceId,
+    modelInstances,
+    singlePresetVideoCanonicalId,
+  ]);
+
   const resolvePresetListName = (preset: SingleModelPresetEntry): string =>
     resolveDefaultInterfaceListName({ preset, t });
 
   useEffect(() => {
+    if (!wizardSelectionKey) {
+      return;
+    }
+    if (initializedWizardSelectionRef.current === wizardSelectionKey) {
+      return;
+    }
+    initializedWizardSelectionRef.current = wizardSelectionKey;
+
     if (multiModelProviderConfig) {
       setEndpointUrl(multiModelProviderConfig.defaultEndpoint);
       setSelectedModel("");
       setName(t(multiModelProviderConfig.listNameKey));
       setApiKey("");
+      setEndpointRulesForm(createDefaultEndpointRulesFormState());
+      setModelInstances([]);
+      setSharedFormatTransform(null);
+      setCapabilityLimitsByInstanceId({});
+      setCapabilitySettingsInstanceId(null);
       return;
     }
 
@@ -490,69 +654,15 @@ export function SingleModelWizardContent({
     setEndpointUrl(defaults.endpointUrl);
     setSelectedModel(defaults.selectedModel);
     setName(resolvePresetListName(selectedPreset));
-    setMultiModelDrafts([]);
+    setModelInstances([]);
     setApiKey("");
-  }, [multiModelProviderConfig, selectedPreset, t]);
-
-  const multiModelCheckedKey =
-    isMultiModelProviderSelection(selection)
-      ? selection.checkedCanonicalIds.join("|")
-      : "";
-
-  useEffect(() => {
-    if (!isMultiModelProviderSelection(selection)) {
-      return;
-    }
-
-    setMultiModelDrafts((current) => {
-      const currentById = new Map(
-        current.map((draft) => [draft.canonicalId, draft])
-      );
-      return selection.checkedCanonicalIds.map((canonicalId) => {
-        const existing = currentById.get(canonicalId);
-        if (existing) {
-          return existing;
-        }
-        return {
-          canonicalId,
-          modelId: defaultUpstreamModelIdForCanonical(canonicalId),
-        };
-      });
-    });
-  }, [multiModelCheckedKey, selection]);
-
-  const multiModelDraftsByCanonicalId = useMemo(
-    () =>
-      new Map(
-        multiModelDrafts.map((draft) => [
-          draft.canonicalId,
-          { modelId: draft.modelId },
-        ])
-      ),
-    [multiModelDrafts]
-  );
-
-  const handleMultiModelIdChange = (canonicalId: string, value: string) => {
-    setMultiModelDrafts((current) =>
-      current.map((entry) =>
-        entry.canonicalId === canonicalId ? { ...entry, modelId: value } : entry
-      )
-    );
-  };
+    setEndpointRulesForm(createDefaultEndpointRulesFormState());
+    setSharedFormatTransform(null);
+    setCapabilityLimitsByInstanceId({});
+    setCapabilitySettingsInstanceId(null);
+  }, [wizardSelectionKey, multiModelProviderConfig, selectedPreset, t]);
 
   const canProceedStep1 = isSingleModelSelectionValid(selection);
-
-  const handleMultiModelToggle = (canonicalId: string, checked: boolean) => {
-    setSelection((current) => {
-      if (!isMultiModelProviderSelection(current)) {
-        return current;
-      }
-      const nextIds = checked
-        ? [...new Set([...current.checkedCanonicalIds, canonicalId])]
-        : current.checkedCanonicalIds.filter((id) => id !== canonicalId);
-      return { kind: current.kind, checkedCanonicalIds: nextIds };
-    });
-  };
 
   const canProceedStep2 = useMemo(() => {
     if (!endpointUrl.trim()) {
@@ -560,15 +670,14 @@ export function SingleModelWizardContent({
     }
 
     if (isMultiModelProviderSelection(selection)) {
-      if (!isSingleModelStep2Valid(selection)) {
-        return false;
-      }
       if (!apiKey.trim()) {
         return false;
       }
-      return (
-        multiModelDrafts.every((draft) => draft.modelId.trim().length > 0) &&
-        name.trim().length > 0
+      if (!name.trim()) {
+        return false;
+      }
+      return modelInstances.some(
+        (instance) => instance.enabled && instance.upstreamModelId.trim().length > 0
       );
     }
 
@@ -579,7 +688,7 @@ export function SingleModelWizardContent({
       return false;
     }
     return name.trim().length > 0;
-  }, [apiKey, multiModelDrafts, endpointUrl, name, selectedModel, selection]);
+  }, [apiKey, endpointUrl, modelInstances, name, selectedModel, selection]);
 
   const handleSave = async () => {
     if (!endpointUrl.trim()) {
@@ -587,8 +696,32 @@ export function SingleModelWizardContent({
       return;
     }
 
+    const endpointRules = endpointRulesForMetadata({
+      useOfficial: endpointRulesForm.useOfficial,
+      useFullSubmitUrl: endpointRulesForm.useFullSubmitUrl,
+    });
+    const endpointRulesValidation = validateCustomSingleModelEndpointRules({
+      category: endpointRulesCategory,
+      rules: endpointRules ?? { useOfficial: true },
+    });
+    if (endpointRulesValidation) {
+      appToast.errorRaw(endpointRulesValidation);
+      return;
+    }
+
+    if (
+      endpointRulesCategory === "video" &&
+      !endpointRulesForm.useOfficial
+    ) {
+      if (!sharedFormatTransform) {
+        appToast.error("pages.aiInterfaces.singleModel.formatTemplateRequired");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
+      let created = false;
       const baseUrl = endpointUrl.trim();
 
       if (multiModelProviderConfig && isMultiModelProviderSelection(selection)) {
@@ -600,14 +733,24 @@ export function SingleModelWizardContent({
           appToast.error("pages.aiInterfaces.nameTemplateRequired");
           return;
         }
-        for (const draft of multiModelDrafts) {
-          if (!draft.modelId.trim()) {
-            appToast.error("pages.aiInterfaces.singleModel.modelIdRequired");
-            return;
-          }
+        if (
+          !modelInstances.some(
+            (instance) => instance.enabled && instance.upstreamModelId.trim()
+          )
+        ) {
+          appToast.error("pages.aiInterfaces.singleModel.modelIdRequired");
+          return;
         }
 
-        const checkedIds = new Set(selection.checkedCanonicalIds);
+        const applyCustomVideoRules =
+          endpointRulesCategory === "video" && !endpointRulesForm.useOfficial;
+        const preparedInstances = prepareSingleModelInstancesForSave({
+          instances: modelInstances,
+          sharedFormatTransform,
+          capabilityLimitsByInstanceId,
+          applyCustomVideoRules,
+        });
+
         await createOrganizationAiInterface(organizationId, {
           provider: "custom",
           name: name.trim(),
@@ -617,20 +760,16 @@ export function SingleModelWizardContent({
           metadata: buildSingleModelProviderMetadata({
             singleModelPresetId: multiModelProviderConfig.presetId,
             singleModelCategory: multiModelProviderConfig.category,
-            models: multiModelProviderConfig.availableModels.map((model) => ({
-              canonicalId: model.canonicalId,
-              upstreamModelId:
-                multiModelDrafts.find(
-                  (draft) => draft.canonicalId === model.canonicalId
-                )?.modelId.trim() ??
-                defaultUpstreamModelIdForCanonical(model.canonicalId),
-              enabled: checkedIds.has(model.canonicalId),
-              modality: model.modality,
-            })),
+            models: buildMetadataModelsFromInstances(
+              preparedInstances,
+              applyCustomVideoRules
+            ),
+            endpointRules,
           }),
           enabled: true,
           isDefault: false,
         });
+        created = true;
       } else if (selectedPreset) {
         if (!apiKey.trim()) {
           appToast.error("pages.aiInterfaces.apiKeyRequired");
@@ -640,20 +779,58 @@ export function SingleModelWizardContent({
           appToast.error("pages.aiInterfaces.nameTemplateRequired");
           return;
         }
+        const presetCanonicalId =
+          selectedPreset.canonicalId ??
+          selectedPreset.id.replace(/^preset:/, "");
+        const applyCustomVideoRules =
+          endpointRulesCategory === "video" && !endpointRulesForm.useOfficial;
+        const preparedInstances = prepareSingleModelInstancesForSave({
+          instances: [
+            {
+              instanceId: presetCanonicalId,
+              canonicalId: presetCanonicalId,
+              displayName: resolveDefaultInterfaceListName({
+                preset: selectedPreset,
+                t,
+              }),
+              modality: selectedPreset.category as
+                | "text"
+                | "image"
+                | "video"
+                | "audio",
+              upstreamModelId: selectedModel.trim(),
+              enabled: true,
+            },
+          ],
+          sharedFormatTransform,
+          capabilityLimitsByInstanceId,
+          applyCustomVideoRules,
+        });
+
         await createOrganizationAiInterface(organizationId, {
           provider: "custom",
           name: name.trim(),
           apiKey: apiKey.trim(),
           baseUrl,
           selectedModel: selectedModel.trim(),
-          metadata: buildSingleModelInterfaceMetadata({
-            canonicalId: selectedPreset.canonicalId ?? selectedPreset.id,
+          metadata: buildSingleModelProviderMetadata({
             singleModelPresetId: selectedPreset.id,
             singleModelCategory: selectedPreset.category,
+            models: buildMetadataModelsFromInstances(
+              preparedInstances,
+              applyCustomVideoRules
+            ),
+            endpointRules,
           }),
           enabled: true,
           isDefault: true,
         });
+        created = true;
+      }
+
+      if (!created) {
+        appToast.error("pages.aiInterfaces.saveFailed");
+        return;
       }
 
       appToast.success("pages.aiInterfaces.created");
@@ -692,23 +869,34 @@ export function SingleModelWizardContent({
         <p className="text-muted-foreground text-sm">
           {t("pages.aiInterfaces.singleModel.step2Description")}
         </p>
-        <div className="bg-muted/40 text-muted-foreground mb-4 rounded-lg border p-3 text-sm">
-          {t("pages.aiInterfaces.singleModel.defaultsHint")}
-        </div>
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="single-model-endpoint">
               {t("pages.aiInterfaces.singleModel.endpointUrl")}
             </Label>
-            <Input
+            <CredentialPlainInput
               id="single-model-endpoint"
+              name="single_model_endpoint"
               type="url"
               value={endpointUrl}
               onChange={(event) => setEndpointUrl(event.target.value)}
-              {...credentialAutofillIgnoreProps}
             />
             {multiModelProviderConfig?.showEndpointRegionHints ? (
               <KimiEndpointRegionHints />
+            ) : null}
+            {endpointRulesCategory === "video" ? (
+              <SingleModelVideoEndpointUrlFields
+                idPrefix="single-model"
+                baseUrl={endpointUrl}
+                category={endpointRulesCategory}
+                useFullSubmitUrl={endpointRulesForm.useFullSubmitUrl}
+                onUseFullSubmitUrlChange={(useFullSubmitUrl) =>
+                  setEndpointRulesForm((current) => ({
+                    ...current,
+                    useFullSubmitUrl,
+                  }))
+                }
+              />
             ) : null}
           </div>
 
@@ -742,16 +930,18 @@ export function SingleModelWizardContent({
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.aiInterfaces.singleModel.selectModels")}</Label>
-                <DeepSeekModelConfigList
-                  models={multiModelProviderConfig.availableModels}
-                  checkedCanonicalIds={selection.checkedCanonicalIds}
-                  draftsByCanonicalId={multiModelDraftsByCanonicalId}
+                <SingleModelInstanceList
+                  availableModels={modelPoolOptions}
+                  instances={modelInstances}
+                  onChange={setModelInstances}
                   modelColumnLabel={t(
                     "pages.aiInterfaces.singleModel.modelColumn"
                   )}
                   modelIdLabel={t("pages.aiInterfaces.singleModel.modelId")}
-                  onCheckedChange={handleMultiModelToggle}
-                  onModelIdChange={handleMultiModelIdChange}
+                  addModelLabel={t("pages.aiInterfaces.singleModel.addModel")}
+                  showCapabilitySettings={isVideoCategory}
+                  onOpenCapabilitySettings={setCapabilitySettingsInstanceId}
+                  capabilitySettingsLabel={capabilitySettingsLabel}
                 />
               </div>
             </>
@@ -772,36 +962,65 @@ export function SingleModelWizardContent({
                 <Label htmlFor="single-model-id">
                   {t("pages.aiInterfaces.singleModel.modelId")}
                 </Label>
-                <CredentialPlainInput
-                  id="single-model-id"
-                  name="single_model_id"
-                  value={selectedModel}
-                  onChange={(event) => setSelectedModel(event.target.value)}
-                />
+                <div className="flex items-center gap-2">
+                  <CredentialPlainInput
+                    id="single-model-id"
+                    name="single_model_id"
+                    className="min-w-0 flex-1"
+                    value={selectedModel}
+                    onChange={(event) => setSelectedModel(event.target.value)}
+                  />
+                  {isVideoCategory && singlePresetVideoCanonicalId ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0"
+                      onClick={() =>
+                        setCapabilitySettingsInstanceId(
+                          singlePresetVideoCanonicalId
+                        )
+                      }
+                      aria-label={capabilitySettingsLabel}
+                    >
+                      <Settings className="size-4" />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
+              {selectedPreset ? (
+                <div className="space-y-2">
+                  <Label htmlFor="single-model-name">
+                    {t("pages.aiInterfaces.singleModel.interfaceListName")}
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    {t("pages.aiInterfaces.singleModel.interfaceListNameHint")}
+                  </p>
+                  <CredentialPlainInput
+                    id="single-model-name"
+                    name="single_model_interface_name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </div>
+              ) : null}
             </>
           )}
-          {!multiModelProviderConfig && selectedPreset ? (
-            <div className="space-y-2">
-              <Label htmlFor="single-model-name">
-                {t("pages.aiInterfaces.singleModel.interfaceListName")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                {t("pages.aiInterfaces.singleModel.interfaceListNameHint")}
-              </p>
-              <CredentialPlainInput
-                id="single-model-name"
-                name="single_model_interface_name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
+
+          {endpointRulesCategory !== "storage" ? (
+            <SingleModelEndpointRulesFields
+              category={endpointRulesCategory}
+              value={endpointRulesForm}
+              onChange={setEndpointRulesForm}
+              idPrefix="single-model"
+              sharedFormatTransform={sharedFormatTransform}
+              onSharedFormatTransformChange={setSharedFormatTransform}
+              formatTemplates={formatTemplates}
+              isFormatTemplatesLoading={
+                isFormatTemplatesLoading || isBaselinesLoading
+              }
+            />
           ) : null}
-        </div>
-        <div className="rounded-lg border p-3 text-sm">
-          <p className="text-muted-foreground">
-            {t("pages.aiInterfaces.singleModel.saveHint")}
-          </p>
         </div>
         <WizardFooter
           showBack
@@ -810,6 +1029,32 @@ export function SingleModelWizardContent({
           onSave={handleSave}
           saveDisabled={!canProceedStep2 || isSaving}
           isSaving={isSaving}
+        />
+
+        <CapabilityLimitsSettingsDialog
+          open={capabilitySettingsInstanceId !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setCapabilitySettingsInstanceId(null);
+            }
+          }}
+          modelLabel={capabilitySettingsModelLabel}
+          platformBaseline={capabilitySettingsBaseline}
+          value={
+            capabilitySettingsInstanceId
+              ? (capabilityLimitsByInstanceId[capabilitySettingsInstanceId] ??
+                null)
+              : null
+          }
+          onChange={(limits) => {
+            if (!capabilitySettingsInstanceId) {
+              return;
+            }
+            setCapabilityLimitsByInstanceId((current) => ({
+              ...current,
+              [capabilitySettingsInstanceId]: limits,
+            }));
+          }}
         />
       </>
     );

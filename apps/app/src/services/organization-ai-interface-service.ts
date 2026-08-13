@@ -1,5 +1,6 @@
 import type {
   CreateOrganizationAiInterfaceRequest,
+  FormatTransformTemplate,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
   VolcanoProbeActivationResponse,
@@ -36,6 +37,27 @@ export function useOrganizationAiInterfaces(organizationId: string | undefined) 
     interfacesError: error,
     isInterfacesLoading: isLoading,
     refreshInterfaces: mutate,
+  };
+}
+
+export function useOrganizationFormatTransformTemplates(
+  organizationId: string | undefined
+) {
+  const key = organizationId
+    ? `${orgEndpoint(organizationId)}/format-transform-templates`
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(key, async () => {
+    const response = await makeRequest<{ templates: FormatTransformTemplate[] }>(
+      `${orgEndpoint(organizationId!)}/format-transform-templates`
+    );
+    return response.templates;
+  });
+
+  return {
+    formatTemplates: data ?? [],
+    formatTemplatesError: error,
+    isFormatTemplatesLoading: isLoading,
+    refreshFormatTemplates: mutate,
   };
 }
 

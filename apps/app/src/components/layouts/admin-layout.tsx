@@ -1,3 +1,4 @@
+import ArrowLeftRight from "lucide-react/icons/arrow-left-right";
 import FileText from "lucide-react/icons/file-text";
 import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
@@ -122,6 +123,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.modelInvocations"),
           url: "/admin/model-invocations",
           icon: Sparkles,
+        },
+        {
+          id: "format-templates",
+          title: t("sidebar.apiForwarding"),
+          url: "/admin/format-templates",
+          icon: ArrowLeftRight,
         },
         {
           id: "persist-workers",

@@ -106,10 +106,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     lazyRoute(() => import("./routes/feedback-forms"))
   );
   app.route("/templates", lazyRoute(() => import("./routes/templates")));
-  app.route(
-    "/workflow-schemes",
-    lazyRoute(() => import("./routes/workflow-schemes"))
-  );
+  app.route("/workflow-schemes", lazyRoute(() => import("./routes/workflow-schemes")));
   app.route("/types", lazyRoute(() => import("./routes/types")));
   app.route(
     "/:organizationId/api-keys",

@@ -1,6 +1,8 @@
 import type {
   AiInterfaceRuntimeArtifact,
+  FormatTransformConfig,
   ResolvedOrgAiInterface,
+  ResolvedSingleModelVideoEndpoints,
 } from "@dafthunk/types";
 
 import { buildBodyFromSlots } from "./build-body";
@@ -138,6 +140,8 @@ export function mergeResolvedAiInterface(params: {
   baseUrl?: string | null;
   selectedModel?: string | null;
   apiKey: string;
+  videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  formatTransform?: FormatTransformConfig;
 }): ResolvedOrgAiInterface {
   const { artifact } = params;
   return {
@@ -150,5 +154,7 @@ export function mergeResolvedAiInterface(params: {
       (input) => input.name === "model"
     )?.default as string ?? "",
     artifact,
+    ...(params.videoEndpoints ? { videoEndpoints: params.videoEndpoints } : {}),
+    ...(params.formatTransform ? { formatTransform: params.formatTransform } : {}),
   };
 }

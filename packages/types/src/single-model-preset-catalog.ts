@@ -517,11 +517,11 @@ export type SingleModelWizardSelection =
   | MinimaxSpeechWizardSelection;
 
 export function createDefaultDeepSeekSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[] = []
 ): DeepSeekWizardSelection {
   return {
     kind: "deepseek",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -530,7 +530,7 @@ export function createDefaultSeedanceSelection(
 ): SeedanceWizardSelection {
   return {
     kind: "seedance",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -539,7 +539,7 @@ export function createDefaultSeedreamSelection(
 ): SeedreamWizardSelection {
   return {
     kind: "seedream",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -548,7 +548,7 @@ export function createDefaultSeedSelection(
 ): SeedWizardSelection {
   return {
     kind: "seed",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -557,7 +557,7 @@ export function createDefaultGlmSelection(
 ): GlmWizardSelection {
   return {
     kind: "glm",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -566,7 +566,7 @@ export function createDefaultKimiSelection(
 ): KimiWizardSelection {
   return {
     kind: "kimi",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -575,7 +575,7 @@ export function createDefaultOpenAiSelection(
 ): OpenAiWizardSelection {
   return {
     kind: "openai",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -584,7 +584,7 @@ export function createDefaultOpenAiImageSelection(
 ): OpenAiImageWizardSelection {
   return {
     kind: "openai-image",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -593,7 +593,7 @@ export function createDefaultGeminiSelection(
 ): GeminiWizardSelection {
   return {
     kind: "gemini",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -602,7 +602,7 @@ export function createDefaultNanoBananaSelection(
 ): NanoBananaWizardSelection {
   return {
     kind: "nano-banana",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -611,7 +611,7 @@ export function createDefaultVeoSelection(
 ): VeoWizardSelection {
   return {
     kind: "veo",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -620,7 +620,7 @@ export function createDefaultGrokSelection(
 ): GrokWizardSelection {
   return {
     kind: "grok",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -629,7 +629,7 @@ export function createDefaultGrokImagineImageSelection(
 ): GrokImagineImageWizardSelection {
   return {
     kind: "grok-imagine-image",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -638,7 +638,7 @@ export function createDefaultGrokImagineVideoSelection(
 ): GrokImagineVideoWizardSelection {
   return {
     kind: "grok-imagine-video",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -647,7 +647,7 @@ export function createDefaultClaudeSelection(
 ): ClaudeWizardSelection {
   return {
     kind: "claude",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 
@@ -656,7 +656,7 @@ export function createDefaultMinimaxSpeechSelection(
 ): MinimaxSpeechWizardSelection {
   return {
     kind: "minimax-speech",
-    checkedCanonicalIds: [...enabledCanonicalIds],
+    checkedCanonicalIds: [],
   };
 }
 

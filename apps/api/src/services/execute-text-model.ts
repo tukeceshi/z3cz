@@ -9,7 +9,7 @@ import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upst
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
-import { resolveVolcanoInferenceModelIdAfterEnsure } from "../integrations/volcengine/resolve-inference-model-id";
+import { resolveOrgModelInferenceModelId } from "./resolve-org-model-inference-id";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
 import {
   listOrgTextModelOptions,
@@ -53,11 +53,14 @@ async function executeTextModelCandidate(params: {
     return { ok: false, error: "Could not resolve AI interface" };
   }
 
-  const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+  const inferenceModelId = await resolveOrgModelInferenceModelId({
     db: params.db,
     organizationId: params.organizationId,
     interfaceId: params.candidate.interfaceId,
     canonicalId: params.canonicalId,
+    instanceId: params.candidate.instanceId,
+    channelKind: params.candidate.channelKind,
+    upstreamModelId: params.candidate.providerModelId,
   });
 
   if (!inferenceModelId) {
@@ -131,8 +134,8 @@ export async function executeTextModel(params: {
 
   const modelOption = options.find(
     (entry) =>
-      entry.canonicalId === params.canonicalId &&
-      entry.interfaceId === params.interfaceId
+      entry.interfaceId === params.interfaceId &&
+      entry.instanceId === params.candidate.instanceId
   );
 
   const result = await executeTextModelCandidate({

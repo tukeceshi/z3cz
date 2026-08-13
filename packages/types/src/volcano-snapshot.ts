@@ -1,4 +1,5 @@
 import type { AiModelModality } from "./ai-model-catalog";
+import type { OrgModelInstanceConfig } from "./org-model-instance";
 import type { VolcanoSetupStatus } from "./volcano-setup";
 import type { VolcanoModelActivationCacheEntry } from "./volcano-activation";
 import type { VolcanoTosRegionPricingSnapshot } from "./volcano-tos-pricing";
@@ -14,13 +15,8 @@ export type VolcanoApiKeyStatus =
   | "expired"
   | "renew_failed";
 
-export interface VolcanoModelConfig {
-  readonly enabled: boolean;
-  readonly providerModelId: string;
-  readonly modality: AiModelModality;
-  /** Org-custom display name; falls back to platform display name when unset. */
-  readonly alias?: string;
-}
+/** @deprecated Alias for OrgModelInstanceConfig */
+export type VolcanoModelConfig = OrgModelInstanceConfig;
 
 export type VolcanoArkApiKeyScope = "endpoint" | "model";
 

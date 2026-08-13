@@ -68,11 +68,11 @@ export function SingleModelProviderPanel({
     iface.name.trim() ||
     (preset ? resolveSingleModelPresetCardName(preset, t) : iface.name);
 
-  const handleToggle = async (canonicalId: string, enabled: boolean) => {
-    setTogglingId(canonicalId);
+  const handleToggle = async (instanceId: string, enabled: boolean) => {
+    setTogglingId(instanceId);
     try {
       await updateSingleModelModelEnabled(organizationId, iface.id, {
-        [canonicalId]: enabled,
+        [instanceId]: enabled,
       });
       await onUpdated();
     } catch {
@@ -82,11 +82,11 @@ export function SingleModelProviderPanel({
     }
   };
 
-  const handleAliasChange = async (canonicalId: string, alias: string) => {
-    setAliasSavingId(canonicalId);
+  const handleAliasChange = async (instanceId: string, alias: string) => {
+    setAliasSavingId(instanceId);
     try {
       await updateSingleModelModelAlias(organizationId, iface.id, {
-        [canonicalId]: alias,
+        [instanceId]: alias,
       });
       await onUpdated();
     } catch {
@@ -113,18 +113,18 @@ export function SingleModelProviderPanel({
           />
           <div className="columns-1 gap-3 md:columns-2">
           {snapshot.models.map((row) => (
-            <div key={row.canonicalId} className="mb-3 break-inside-avoid">
+            <div key={row.instanceId} className="mb-3 break-inside-avoid">
               <SingleModelModelRow
                 row={row}
                 disabled={
-                  togglingId === row.canonicalId ||
-                  aliasSavingId === row.canonicalId
+                  togglingId === row.instanceId ||
+                  aliasSavingId === row.instanceId
                 }
                 onEnabledChange={(enabled) =>
-                  void handleToggle(row.canonicalId, enabled)
+                  void handleToggle(row.instanceId, enabled)
                 }
                 onAliasChange={(alias) =>
-                  void handleAliasChange(row.canonicalId, alias)
+                  void handleAliasChange(row.instanceId, alias)
                 }
               />
             </div>

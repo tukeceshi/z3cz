@@ -15,6 +15,7 @@ import { isAiAudioGenerating } from "./ai-audio-node-utils";
 import { isAiImageGenerating } from "./ai-image-node-utils";
 import { isAiVideoGenerating } from "./ai-video-node-utils";
 import { cancelGenerativeGenerationForNode } from "./generative-generation-cancel";
+import { readVideoTaskCancelSupportFromMetadata } from "./generative-reference-metadata";
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "./generative-card-styles";
 import {
   formatGenerativeBusyOverlayLabel,
@@ -306,9 +307,11 @@ export function WorkflowNodeGenerativeBusyOverlay({
   const overlayProgressPhase =
     progressPhase ??
     (isAiImageBusy || isAiVideoBusy ? ("generating" as const) : null);
+  const supportsTaskCancel = readVideoTaskCancelSupportFromMetadata(metadata);
   const showCancel =
     isAiVideoNode &&
     visible &&
+    supportsTaskCancel &&
     progressPhase !== "cancelling" &&
     isGenerativePhaseCancellable(overlayProgressPhase);
 

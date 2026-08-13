@@ -12,7 +12,7 @@ import {
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
 import { buildOrgModelBindings } from "./build-org-model-bindings";
 import {
-  collectSingleModelInterfaces,
+  collectOrgBindingInterfaces,
   resolveOrgModelInterfaceBinding,
   type ResolvedOrgModelInterface,
 } from "./resolve-text-model-interface";
@@ -30,12 +30,9 @@ export async function listOrgAudioModelOptions(
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
-  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
-
   return buildOrgModelBindings({
     platformModels,
-    volcanoInterfaces: [],
-    singleModelInterfaces,
+    interfaces: collectOrgBindingInterfaces(interfaces),
   }).map((binding) => ({
     ...binding,
     unavailableReason:
@@ -52,13 +49,15 @@ export async function resolveAudioModelInterface(
   db: Database,
   organizationId: string,
   canonicalId: string,
-  interfaceId: string
+  interfaceId: string,
+  instanceId?: string
 ): Promise<ResolvedAudioModelInterface | null> {
   return resolveOrgModelInterfaceBinding(
     db,
     organizationId,
     canonicalId,
     interfaceId,
-    listOrgAudioModelOptions
+    listOrgAudioModelOptions,
+    instanceId
   );
 }

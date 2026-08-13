@@ -29,6 +29,8 @@ import {
   AdminUsersPage,
   AdminWorkflowDetailPage,
   AdminWorkflowSchemesPage,
+  AdminApiForwardingPage,
+  AdminApiForwardingDetailPage,
   AdminWorkflowsPage,
   ApiKeysPage,
   BillingPage,
@@ -316,6 +318,28 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminWorkflowSchemes") },
+  },
+  {
+    path: "/admin/format-templates",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminApiForwardingPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminApiForwarding") },
+  },
+  {
+    path: "/admin/format-templates/:id",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminApiForwardingDetailPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminApiForwardingDetail") },
   },
   {
     path: "/org",

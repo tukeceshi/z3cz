@@ -23,6 +23,7 @@ import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
 import adminUsersRoutes from "./users";
 import adminWorkflowSchemesRoutes from "./workflow-schemes";
+import adminFormatTransformTemplateRoutes from "./format-transform-templates";
 import adminWorkflowsRoutes from "./workflows";
 
 const adminRoutes = new Hono<ApiContext>();
@@ -41,6 +42,7 @@ adminRoutes.route("/auth-config", adminAuthConfigRoutes);
 adminRoutes.route("/bootstrap-config", adminBootstrapConfigRoutes);
 adminRoutes.route("/feature-config", adminFeatureConfigRoutes);
 adminRoutes.route("/workflow-schemes", adminWorkflowSchemesRoutes);
+adminRoutes.route("/format-templates", adminFormatTransformTemplateRoutes);
 adminRoutes.route("/persist-workers", adminPersistWorkerRoutes);
 adminRoutes.route("/ai-models", adminAiModelsRoutes);
 adminRoutes.route("/model-invocations", adminModelInvocationsRoutes);

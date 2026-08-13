@@ -15,12 +15,13 @@ import {
 } from "@/services/platform-ai-model-service";
 import type { PersistGenerativeMediaPhase } from "@/services/persist-generative-media-from-url";
 import { isGenerationJobPastUpstreamGeneration } from "@dafthunk/types";
+import type { CancelGenerationJobResponse } from "@dafthunk/types";
 
 interface UseGenerativeGenerationSessionOptions {
   readonly nodeId: string;
   readonly orgId: string | undefined;
   readonly metadata: Record<string, string> | undefined;
-  readonly onCancelConfirmed?: () => void;
+  readonly onCancelConfirmed?: (response: CancelGenerationJobResponse) => void;
   readonly setIsGenerating: (generating: boolean) => void;
   readonly setPersistPhase: (phase: PersistGenerativeMediaPhase | null) => void;
   readonly generateInFlightRef: React.MutableRefObject<boolean>;
@@ -93,7 +94,7 @@ export function useGenerativeGenerationSession(
           markNodeGenerationCancelled(options.nodeId);
           abortRef.current?.abort();
           finalizeLocalCancel();
-          options.onCancelConfirmed?.();
+          options.onCancelConfirmed?.(response);
           return { kind: "cancelled", response };
         }
 

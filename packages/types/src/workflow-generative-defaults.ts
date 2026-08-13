@@ -2,6 +2,7 @@
 export interface WorkflowGenerativeDefaultEntry {
   readonly canonicalId: string;
   readonly interfaceId: string;
+  readonly instanceId?: string;
   readonly params?: Readonly<Record<string, unknown>>;
 }
 

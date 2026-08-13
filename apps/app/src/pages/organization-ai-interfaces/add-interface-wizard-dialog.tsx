@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { usePrefetchSingleModelPickerData } from "@/services/platform-ai-model-service";
 
 import { ChannelSelectStep } from "./channel-select-step";
 import { SingleModelWizardContent } from "./single-model-wizard-content";
@@ -44,6 +45,7 @@ export function AddInterfaceWizardDialog({
   onCreated,
 }: AddInterfaceWizardDialogProps) {
   const { t } = useTranslation();
+  usePrefetchSingleModelPickerData(open ? organizationId : undefined);
   const [phase, setPhase] = useState<WizardPhase>("channel");
   const [channelId, setChannelId] = useState<AiInterfaceChannelId | null>(null);
   const [singleModelStep, setSingleModelStep] = useState(1);

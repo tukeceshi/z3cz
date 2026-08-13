@@ -5,5 +5,6 @@ export interface AiInterfaceService {
     organizationId: string;
     interfaceId?: string;
     templateId?: string;
+    modelCanonicalId?: string;
   }): Promise<ResolvedOrgAiInterface | undefined>;
 }

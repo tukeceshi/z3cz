@@ -1,4 +1,14 @@
 import type { AiModelModality } from "./ai-model-catalog";
+import type { OrgModelInstanceConfig } from "./org-model-instance";
+import type { SingleModelFormatTransform } from "./format-transform-template";
+import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
+import type { SingleModelEndpointRules } from "./single-model-endpoint-rules";
+import {
+  findEnabledSingleModelInstanceByCanonicalId,
+  findSingleModelInstanceByCanonicalId,
+  listSingleModelMetadataEntries,
+  singleModelInstanceCanonicalId,
+} from "./single-model-instances";
 import {
   CLAUDE_BRAND_ONLY_CANONICAL_IDS,
   GEMINI_BRAND_ONLY_CANONICAL_IDS,
@@ -281,19 +291,17 @@ export const MINIMAX_SPEECH_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
   "minimax-speech-2-8-turbo": "speech-2.8-turbo",
 } as const;
 
-export interface SingleModelModelConfig {
-  readonly enabled: boolean;
-  readonly upstreamModelId: string;
-  readonly modality: AiModelModality;
-  /** Org-custom display name; falls back to platform display name when unset. */
-  readonly alias?: string;
-}
+/** @deprecated Alias for OrgModelInstanceConfig */
+export type SingleModelModelConfig = OrgModelInstanceConfig;
 
 export interface SingleModelProviderMetadata {
   readonly channel: typeof SINGLE_MODEL_INTERFACE_CHANNEL;
   readonly singleModelPresetId: string;
   readonly singleModelCategory?: string;
   readonly models: Readonly<Record<string, SingleModelModelConfig>>;
+  readonly endpointRules?: SingleModelEndpointRules;
+  /** @deprecated Migrated to models[canonicalId].formatTransform */
+  readonly formatTemplateId?: string | null;
   readonly tos?: {
     readonly accessKeyId: string;
     readonly region: string;
@@ -469,22 +477,38 @@ export function buildSingleModelProviderMetadata(params: {
   readonly singleModelPresetId: string;
   readonly singleModelCategory?: string;
   readonly models: readonly {
+    readonly instanceId?: string;
     readonly canonicalId: string;
     readonly upstreamModelId: string;
     readonly enabled?: boolean;
     readonly modality?: AiModelModality;
+    readonly alias?: string;
+    readonly formatTransform?: SingleModelFormatTransform;
+    readonly capabilityLimits?: SingleModelCapabilityLimits;
   }[];
   readonly tos?: SingleModelProviderMetadata["tos"];
+  readonly endpointRules?: SingleModelProviderMetadata["endpointRules"];
 }): SingleModelProviderMetadata {
   const models = Object.fromEntries(
-    params.models.map((entry) => [
-      entry.canonicalId,
-      {
-        enabled: entry.enabled ?? true,
-        upstreamModelId: entry.upstreamModelId.trim(),
-        modality: entry.modality ?? catalogModalityFor(entry.canonicalId),
-      },
-    ])
+    params.models.map((entry) => {
+      const instanceId = entry.instanceId?.trim() || entry.canonicalId.trim();
+      return [
+        instanceId,
+        {
+          canonicalId: entry.canonicalId.trim(),
+          enabled: entry.enabled ?? true,
+          upstreamModelId: entry.upstreamModelId.trim(),
+          modality: entry.modality ?? catalogModalityFor(entry.canonicalId),
+          ...(entry.alias?.trim() ? { alias: entry.alias.trim() } : {}),
+          ...(entry.formatTransform
+            ? { formatTransform: entry.formatTransform }
+            : {}),
+          ...(entry.capabilityLimits
+            ? { capabilityLimits: entry.capabilityLimits }
+            : {}),
+        },
+      ];
+    })
   );
 
   return {
@@ -495,6 +519,7 @@ export function buildSingleModelProviderMetadata(params: {
       : {}),
     models,
     ...(params.tos ? { tos: params.tos } : {}),
+    ...(params.endpointRules ? { endpointRules: params.endpointRules } : {}),
   };
 }
 
@@ -533,10 +558,10 @@ export function mergeSingleModelModelEnabled(
   toggles: Readonly<Record<string, boolean>>
 ): SingleModelProviderMetadata {
   const models = { ...metadata.models };
-  for (const [canonicalId, enabled] of Object.entries(toggles)) {
-    const existing = models[canonicalId];
+  for (const [instanceId, enabled] of Object.entries(toggles)) {
+    const existing = models[instanceId];
     if (existing) {
-      models[canonicalId] = { ...existing, enabled };
+      models[instanceId] = { ...existing, enabled };
     }
   }
   return { ...metadata, models };
@@ -547,8 +572,8 @@ export function mergeSingleModelModelAlias(
   aliases: Readonly<Record<string, string>>
 ): SingleModelProviderMetadata {
   const models = { ...metadata.models };
-  for (const [canonicalId, alias] of Object.entries(aliases)) {
-    const existing = models[canonicalId];
+  for (const [instanceId, alias] of Object.entries(aliases)) {
+    const existing = models[instanceId];
     if (!existing) {
       continue;
     }
@@ -556,7 +581,7 @@ export function mergeSingleModelModelAlias(
     if (trimmed.length === 0) {
       continue;
     }
-    models[canonicalId] = { ...existing, alias: trimmed };
+    models[instanceId] = { ...existing, alias: trimmed };
   }
   return { ...metadata, models };
 }
@@ -566,14 +591,284 @@ export function mergeSingleModelUpstreamModelIds(
   updates: Readonly<Record<string, string>>
 ): SingleModelProviderMetadata {
   const models = { ...metadata.models };
-  for (const [canonicalId, rawId] of Object.entries(updates)) {
-    const existing = models[canonicalId];
+  for (const [instanceId, rawId] of Object.entries(updates)) {
+    const existing = models[instanceId];
     const upstreamModelId = rawId.trim();
     if (existing && upstreamModelId) {
-      models[canonicalId] = { ...existing, upstreamModelId };
+      models[instanceId] = { ...existing, upstreamModelId };
     }
   }
   return { ...metadata, models };
+}
+
+export function mergeSingleModelEndpointRules(
+  metadata: SingleModelProviderMetadata,
+  rules: SingleModelEndpointRules | undefined
+): SingleModelProviderMetadata {
+  if (!rules || Object.keys(rules).length === 0) {
+    const { endpointRules: _removed, ...rest } = metadata;
+    return rest;
+  }
+
+  if (rules.useOfficial === false) {
+    return {
+      ...metadata,
+      endpointRules: rules.useFullSubmitUrl
+        ? { useOfficial: false, useFullSubmitUrl: true }
+        : { useOfficial: false },
+    };
+  }
+
+  const cleared = clearAllSingleModelFormatTransforms(metadata);
+  if (rules.useFullSubmitUrl === true) {
+    return { ...cleared, endpointRules: { useFullSubmitUrl: true } };
+  }
+
+  const { endpointRules: _removed, ...rest } = cleared;
+  return rest;
+}
+
+export function readSingleModelFormatTemplateId(
+  metadata: unknown
+): string | null {
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return null;
+  }
+  const id = metadata.formatTemplateId;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+export function mergeSingleModelFormatTemplateId(
+  metadata: SingleModelProviderMetadata,
+  formatTemplateId: string | null | undefined
+): SingleModelProviderMetadata {
+  const trimmed = formatTemplateId?.trim();
+  if (!trimmed) {
+    const { formatTemplateId: _removed, ...rest } = metadata;
+    return rest;
+  }
+  return { ...metadata, formatTemplateId: trimmed };
+}
+
+export function listEnabledVideoModelInstanceIds(
+  metadata: SingleModelProviderMetadata
+): string[] {
+  return listSingleModelMetadataEntries(metadata)
+    .filter(
+      ({ config }) => config.enabled && config.modality === "video"
+    )
+    .map(({ instanceId }) => instanceId);
+}
+
+export function listEnabledVideoModelCanonicalIds(
+  metadata: SingleModelProviderMetadata
+): string[] {
+  return listSingleModelMetadataEntries(metadata)
+    .filter(
+      ({ config }) => config.enabled && config.modality === "video"
+    )
+    .map(({ canonicalId }) => canonicalId);
+}
+
+export function readSingleModelFormatTransform(
+  metadata: unknown,
+  canonicalId: string
+): SingleModelFormatTransform | null {
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return null;
+  }
+  const found = findSingleModelInstanceByCanonicalId(metadata, canonicalId);
+  const transform = found?.config.formatTransform;
+  if (!transform?.sourceTemplateId?.trim()) {
+    return null;
+  }
+  return transform;
+}
+
+export function clearAllSingleModelFormatTransforms(
+  metadata: SingleModelProviderMetadata
+): SingleModelProviderMetadata {
+  const models = Object.fromEntries(
+    Object.entries(metadata.models).map(([canonicalId, config]) => {
+      const { formatTransform: _removed, ...rest } = config;
+      return [canonicalId, rest];
+    })
+  );
+  const { formatTemplateId: _legacy, ...restMetadata } = metadata;
+  return { ...restMetadata, models };
+}
+
+export function mergeSingleModelFormatTransform(
+  metadata: SingleModelProviderMetadata,
+  instanceId: string,
+  formatTransform: SingleModelFormatTransform | null | undefined
+): SingleModelProviderMetadata {
+  const existing = metadata.models[instanceId];
+  if (!existing) {
+    return metadata;
+  }
+
+  const models = { ...metadata.models };
+  if (!formatTransform?.sourceTemplateId?.trim()) {
+    const { formatTransform: _removed, ...rest } = existing;
+    models[instanceId] = rest;
+  } else {
+    models[instanceId] = { ...existing, formatTransform };
+  }
+
+  const { formatTemplateId: _legacy, ...restMetadata } = metadata;
+  return { ...restMetadata, models };
+}
+
+export function mergeSingleModelFormatTransformsByInstanceId(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<
+    Record<string, SingleModelFormatTransform | null | undefined>
+  >
+): SingleModelProviderMetadata {
+  let next = metadata;
+  for (const [instanceId, transform] of Object.entries(updates)) {
+    next = mergeSingleModelFormatTransform(next, instanceId, transform);
+  }
+  return next;
+}
+
+/** @deprecated Use mergeSingleModelFormatTransformsByInstanceId */
+export function mergeSingleModelFormatTransformsByCanonicalId(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<
+    Record<string, SingleModelFormatTransform | null | undefined>
+  >
+): SingleModelProviderMetadata {
+  let next = metadata;
+  for (const [canonicalId, transform] of Object.entries(updates)) {
+    const found = findSingleModelInstanceByCanonicalId(next, canonicalId);
+    if (found) {
+      next = mergeSingleModelFormatTransform(next, found.instanceId, transform);
+    }
+  }
+  return next;
+}
+
+export function readSingleModelCapabilityLimits(
+  metadata: unknown,
+  canonicalId: string
+): SingleModelCapabilityLimits | null {
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return null;
+  }
+  const found = findEnabledSingleModelInstanceByCanonicalId(metadata, canonicalId);
+  const limits = found?.config.capabilityLimits;
+  if (!limits) {
+    return null;
+  }
+  return limits;
+}
+
+export function mergeSingleModelCapabilityLimits(
+  metadata: SingleModelProviderMetadata,
+  instanceId: string,
+  capabilityLimits: SingleModelCapabilityLimits | null | undefined
+): SingleModelProviderMetadata {
+  const existing = metadata.models[instanceId];
+  if (!existing) {
+    return metadata;
+  }
+
+  const models = { ...metadata.models };
+  const hasLimits =
+    capabilityLimits &&
+    (capabilityLimits.supportsTaskCancel !== undefined ||
+      capabilityLimits.resolution !== undefined ||
+      capabilityLimits.duration !== undefined ||
+      capabilityLimits.maxReferenceImages !== undefined ||
+      capabilityLimits.maxReferenceVideos !== undefined ||
+      capabilityLimits.maxReferenceAudios !== undefined);
+
+  if (!hasLimits) {
+    const { capabilityLimits: _removed, ...rest } = existing;
+    models[instanceId] = rest;
+  } else {
+    models[instanceId] = { ...existing, capabilityLimits };
+  }
+
+  return { ...metadata, models };
+}
+
+export function mergeSingleModelCapabilityLimitsByInstanceId(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<
+    Record<string, SingleModelCapabilityLimits | null | undefined>
+  >
+): SingleModelProviderMetadata {
+  let next = metadata;
+  for (const [instanceId, limits] of Object.entries(updates)) {
+    next = mergeSingleModelCapabilityLimits(next, instanceId, limits);
+  }
+  return next;
+}
+
+/** @deprecated Use mergeSingleModelCapabilityLimitsByInstanceId */
+export function mergeSingleModelCapabilityLimitsByCanonicalId(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<
+    Record<string, SingleModelCapabilityLimits | null | undefined>
+  >
+): SingleModelProviderMetadata {
+  let next = metadata;
+  for (const [canonicalId, limits] of Object.entries(updates)) {
+    const found = findSingleModelInstanceByCanonicalId(next, canonicalId);
+    if (found) {
+      next = mergeSingleModelCapabilityLimits(next, found.instanceId, limits);
+    }
+  }
+  return next;
+}
+
+export function migrateLegacyFormatTemplateToModels(
+  metadata: SingleModelProviderMetadata,
+  templateSnapshot: SingleModelFormatTransform
+): SingleModelProviderMetadata {
+  const legacyId = readSingleModelFormatTemplateId(metadata);
+  if (!legacyId) {
+    return metadata;
+  }
+
+  const hasAnyModelTransform = Object.values(metadata.models).some(
+    (config) => config.formatTransform?.sourceTemplateId
+  );
+  if (hasAnyModelTransform) {
+    const { formatTemplateId: _removed, ...rest } = metadata;
+    return rest;
+  }
+
+  let next = metadata;
+  for (const instanceId of listEnabledVideoModelInstanceIds(metadata)) {
+    next = mergeSingleModelFormatTransform(next, instanceId, templateSnapshot);
+  }
+  const { formatTemplateId: _removed, ...rest } = next;
+  return rest;
+}
+
+export function hasRequiredSingleModelFormatTransforms(
+  metadata: SingleModelProviderMetadata
+): boolean {
+  if (metadata.singleModelCategory !== "video") {
+    return true;
+  }
+  if (metadata.endpointRules?.useOfficial !== false) {
+    return true;
+  }
+
+  const videoInstanceIds = listEnabledVideoModelInstanceIds(metadata);
+  if (videoInstanceIds.length === 0) {
+    return true;
+  }
+
+  return videoInstanceIds.every((instanceId) => {
+    const transform = metadata.models[instanceId]?.formatTransform;
+    return Boolean(transform?.sourceTemplateId?.trim());
+  });
 }
 
 export function defaultUpstreamModelIdForCanonical(

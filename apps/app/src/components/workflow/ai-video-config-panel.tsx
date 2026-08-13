@@ -10,6 +10,7 @@ import {
   type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
+  type CancelGenerationJobResponse,
   VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS,
 } from "@dafthunk/types";
 import {
@@ -335,6 +336,7 @@ export function AiVideoConfigPanel({
           persistModelBindingToInputs(current.inputs, {
             canonicalId: model.canonicalId,
             interfaceId: model.interfaceId,
+            instanceId: model.instanceId,
           }),
           { params: defaultParams },
           { params: "json" }
@@ -529,21 +531,29 @@ export function AiVideoConfigPanel({
     [nodeId, updateNodeData]
   );
 
-  const applyCancelledUiState = useCallback(() => {
-    setPersistPhase(null);
-    setIsGenerating(false);
-    generateInFlightRef.current = false;
-    updateNodeData?.(nodeId, (current) => ({
-      metadata: withAiVideoGenerateError(
-        withAiVideoGeneratingFlag(
-          clearGenerativeProgress(current.metadata),
-          false
+  const applyCancelledUiState = useCallback(
+    (response?: CancelGenerationJobResponse) => {
+      setPersistPhase(null);
+      setIsGenerating(false);
+      generateInFlightRef.current = false;
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withAiVideoGenerateError(
+          withAiVideoGeneratingFlag(
+            clearGenerativeProgress(current.metadata),
+            false
+          ),
+          null
         ),
-        null
-      ),
-    }));
-    showGenerativeCancelledNotice(nodeId);
-  }, [nodeId, updateNodeData]);
+      }));
+      if (response?.upstreamCancelSkipped) {
+        toast.info("workflow.generativeCancel.upstreamSkipped");
+      } else if (response?.upstreamCancelFailed) {
+        toast.info("workflow.generativeCancel.upstreamFailed");
+      }
+      showGenerativeCancelledNotice(nodeId);
+    },
+    [nodeId, toast, updateNodeData]
+  );
 
   const {
     beginSession,
@@ -1008,6 +1018,9 @@ export function AiVideoConfigPanel({
       const submitPayload = {
         modelCanonicalId: effectiveModel.canonicalId,
         aiInterfaceId: effectiveModel.interfaceId,
+        ...(effectiveModel.instanceId.trim()
+          ? { instanceId: effectiveModel.instanceId.trim() }
+          : {}),
         prompt,
         params: mergedGenerationParams,
         referenceImageUrls:
@@ -1321,7 +1334,9 @@ export function AiVideoConfigPanel({
     }
   };
 
-  const canCancelGeneration = isGenerativePhaseCancellable(activeProgressPhase);
+  const canCancelGeneration =
+    isGenerativePhaseCancellable(activeProgressPhase) &&
+    effectiveModel?.supportsTaskCancel === true;
 
   const handleCancelGeneration = async (): Promise<void> => {
     if (cancelInFlightRef.current || isCancelling) {
@@ -1606,7 +1621,7 @@ export function AiVideoConfigPanel({
         </div>
 
         <div className="mt-2 flex items-end justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-end gap-2">
               <AiTextModelPicker
                 orgId={orgId}

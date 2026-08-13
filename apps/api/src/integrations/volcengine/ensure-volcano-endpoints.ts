@@ -1,5 +1,6 @@
 import {
   VOLCANO_AGGREGATE_MODEL_CATALOG,
+  readOrgModelUpstreamId,
   type AiModelCatalogEntry,
   type VolcanoArkApiKeyScope,
   type VolcanoInterfaceMetadata,
@@ -27,14 +28,15 @@ function catalogByCanonicalId(
   return new Map(catalog.map((entry) => [entry.canonicalId, entry]));
 }
 
-function resolveProviderModelId(params: {
+function resolveUpstreamModelId(params: {
   readonly canonicalId: string;
   readonly config: VolcanoInterfaceMetadata["models"][string];
   readonly catalog: Map<string, AiModelCatalogEntry>;
 }): string {
   return (
-    params.catalog.get(params.canonicalId)?.providerModelId ??
-    params.config.providerModelId
+    readOrgModelUpstreamId(params.config) ||
+    params.catalog.get(params.canonicalId)?.providerModelId ||
+    ""
   );
 }
 
@@ -219,15 +221,15 @@ export async function ensureVolcanoModelEndpoints(params: {
       continue;
     }
 
-    const providerModelId = resolveProviderModelId({
+    const upstreamModelId = resolveUpstreamModelId({
       canonicalId,
       config,
       catalog,
     });
     const syncedConfig =
-      providerModelId === config.providerModelId
+      upstreamModelId === readOrgModelUpstreamId(config)
         ? config
-        : { ...config, providerModelId };
+        : { ...config, upstreamModelId };
 
     if (syncedConfig !== config) {
       models = { ...models, [canonicalId]: syncedConfig };
@@ -237,7 +239,7 @@ export async function ensureVolcanoModelEndpoints(params: {
     const endpointId = await createVolcanoEndpoint({
       credentials: params.credentials,
       canonicalId,
-      providerModelId,
+      providerModelId: upstreamModelId,
     });
 
     if (!endpointId) {

@@ -1,6 +1,8 @@
 import type { OrgTextModelOption } from "@dafthunk/types";
+import { Settings } from "lucide-react";
 
 import { CredentialPlainInput } from "@/components/credential-secret-input";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
 import { ModelBrandIcon } from "./model-brand-icon";
@@ -24,11 +26,19 @@ interface DeepSeekModelConfigRowProps {
 
   readonly onModelIdChange: (value: string) => void;
 
+  readonly showCapabilitySettings?: boolean;
+
+  readonly onOpenCapabilitySettings?: () => void;
+
+  readonly capabilitySettingsLabel?: string;
 }
 
 
 
 const MODEL_CONFIG_GRID =
+  "grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)_auto] sm:items-center sm:gap-3";
+
+const MODEL_CONFIG_GRID_WITHOUT_ACTIONS =
   "grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:items-center sm:gap-3";
 
 export function DeepSeekModelConfigRow({
@@ -38,14 +48,20 @@ export function DeepSeekModelConfigRow({
   modelIdLabel,
   onCheckedChange,
   onModelIdChange,
+  showCapabilitySettings = false,
+  onOpenCapabilitySettings,
+  capabilitySettingsLabel,
 }: DeepSeekModelConfigRowProps) {
   const modelIdInputId = `single-model-id-${model.canonicalId}`;
+  const gridClass = showCapabilitySettings
+    ? MODEL_CONFIG_GRID
+    : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
   return (
     <div
       className={cn(
         "px-3 py-2.5 transition-colors",
-        MODEL_CONFIG_GRID,
+        gridClass,
         checked ? "bg-primary/5" : "bg-muted/20 opacity-80"
       )}
     >
@@ -87,6 +103,25 @@ export function DeepSeekModelConfigRow({
           <span className="text-muted-foreground block px-3 text-sm">—</span>
         )}
       </div>
+
+      {showCapabilitySettings ? (
+        <div className="flex justify-end pl-6 sm:pl-0">
+          {checked && onOpenCapabilitySettings ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0"
+              onClick={onOpenCapabilitySettings}
+              aria-label={capabilitySettingsLabel}
+            >
+              <Settings className="size-4" />
+            </Button>
+          ) : (
+            <span className="text-muted-foreground block size-8" />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -105,6 +140,14 @@ interface DeepSeekModelIdEditRowProps {
 
   readonly onModelIdChange: (value: string) => void;
 
+  readonly showCapabilitySettings?: boolean;
+
+  readonly onOpenCapabilitySettings?: () => void;
+
+  readonly capabilitySettingsLabel?: string;
+
+  readonly isVideoModel?: boolean;
+
 }
 
 
@@ -121,14 +164,25 @@ export function DeepSeekModelIdEditRow({
 
   onModelIdChange,
 
+  showCapabilitySettings = false,
+
+  onOpenCapabilitySettings,
+
+  capabilitySettingsLabel,
+
+  isVideoModel = false,
+
 }: DeepSeekModelIdEditRowProps) {
 
   const modelIdInputId = `single-model-edit-id-${canonicalId}`;
+  const gridClass = showCapabilitySettings
+    ? MODEL_CONFIG_GRID
+    : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
 
 
   return (
-    <div className={cn("px-3 py-2.5", MODEL_CONFIG_GRID)}>
+    <div className={cn("px-3 py-2.5", gridClass)}>
       <div className="flex min-w-0 items-center gap-2">
         <ModelBrandIcon canonicalId={canonicalId} />
         <span className="truncate text-sm font-medium">{label}</span>
@@ -144,6 +198,27 @@ export function DeepSeekModelIdEditRow({
           onChange={(event) => onModelIdChange(event.target.value)}
         />
       </div>
+
+      {showCapabilitySettings && isVideoModel ? (
+        <div className="flex justify-end pl-6 sm:pl-0">
+          {onOpenCapabilitySettings ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0"
+              onClick={onOpenCapabilitySettings}
+              aria-label={capabilitySettingsLabel}
+            >
+              <Settings className="size-4" />
+            </Button>
+          ) : (
+            <span className="text-muted-foreground block size-8" />
+          )}
+        </div>
+      ) : showCapabilitySettings ? (
+        <span className="text-muted-foreground block size-8" />
+      ) : null}
     </div>
   );
 }
@@ -168,6 +243,14 @@ interface DeepSeekModelIdEditListProps {
 
   readonly onModelIdChange: (canonicalId: string, value: string) => void;
 
+  readonly showCapabilitySettings?: boolean;
+
+  readonly videoCanonicalIds?: ReadonlySet<string>;
+
+  readonly onOpenCapabilitySettings?: (canonicalId: string) => void;
+
+  readonly capabilitySettingsLabel?: string;
+
 }
 
 
@@ -182,7 +265,19 @@ export function DeepSeekModelIdEditList({
 
   onModelIdChange,
 
+  showCapabilitySettings = false,
+
+  videoCanonicalIds,
+
+  onOpenCapabilitySettings,
+
+  capabilitySettingsLabel,
+
 }: DeepSeekModelIdEditListProps) {
+
+  const headerGridClass = showCapabilitySettings
+    ? MODEL_CONFIG_GRID
+    : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
   return (
 
@@ -191,11 +286,12 @@ export function DeepSeekModelIdEditList({
       <div
         className={cn(
           "text-muted-foreground border-b bg-muted/40 px-3 py-2 text-xs font-medium",
-          MODEL_CONFIG_GRID
+          headerGridClass
         )}
       >
         <span>{modelColumnLabel}</span>
         <span className="pl-6 sm:pl-0">{modelIdLabel}</span>
+        {showCapabilitySettings ? <span className="sr-only">{capabilitySettingsLabel}</span> : null}
       </div>
 
       <div className="divide-y">
@@ -214,6 +310,18 @@ export function DeepSeekModelIdEditList({
             modelIdLabel={modelIdLabel}
 
             onModelIdChange={(value) => onModelIdChange(row.canonicalId, value)}
+
+            showCapabilitySettings={showCapabilitySettings}
+
+            isVideoModel={videoCanonicalIds?.has(row.canonicalId) ?? false}
+
+            onOpenCapabilitySettings={
+              onOpenCapabilitySettings
+                ? () => onOpenCapabilitySettings(row.canonicalId)
+                : undefined
+            }
+
+            capabilitySettingsLabel={capabilitySettingsLabel}
 
           />
 
@@ -248,6 +356,14 @@ interface DeepSeekModelConfigListProps {
 
   readonly onModelIdChange: (canonicalId: string, value: string) => void;
 
+  readonly showCapabilitySettings?: boolean;
+
+  readonly videoCanonicalIds?: ReadonlySet<string>;
+
+  readonly onOpenCapabilitySettings?: (canonicalId: string) => void;
+
+  readonly capabilitySettingsLabel?: string;
+
 }
 
 
@@ -268,7 +384,18 @@ export function DeepSeekModelConfigList({
 
   onModelIdChange,
 
+  showCapabilitySettings = false,
+
+  videoCanonicalIds,
+
+  onOpenCapabilitySettings,
+
+  capabilitySettingsLabel,
+
 }: DeepSeekModelConfigListProps) {
+  const headerGridClass = showCapabilitySettings
+    ? MODEL_CONFIG_GRID
+    : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
   return (
 
@@ -277,11 +404,12 @@ export function DeepSeekModelConfigList({
       <div
         className={cn(
           "text-muted-foreground border-b bg-muted/40 px-3 py-2 text-xs font-medium",
-          MODEL_CONFIG_GRID
+          headerGridClass
         )}
       >
         <span>{modelColumnLabel}</span>
         <span className="pl-6 sm:pl-0">{modelIdLabel}</span>
+        {showCapabilitySettings ? <span className="sr-only">{capabilitySettingsLabel}</span> : null}
       </div>
 
       <div className="divide-y">
@@ -316,6 +444,19 @@ export function DeepSeekModelConfigList({
                 onModelIdChange(model.canonicalId, value)
 
               }
+
+              showCapabilitySettings={
+                showCapabilitySettings &&
+                (videoCanonicalIds?.has(model.canonicalId) ?? false)
+              }
+
+              onOpenCapabilitySettings={
+                onOpenCapabilitySettings
+                  ? () => onOpenCapabilitySettings(model.canonicalId)
+                  : undefined
+              }
+
+              capabilitySettingsLabel={capabilitySettingsLabel}
 
             />
 

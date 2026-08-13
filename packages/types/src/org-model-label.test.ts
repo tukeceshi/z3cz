@@ -4,6 +4,7 @@ import {
   buildOrgModelOptionId,
   formatCanvasModelLabel,
   parseOrgModelOptionId,
+  parseOrgModelOptionIdLegacy,
   pickLegacyOrgModelInterfaceId,
   resolveInterfaceModelAlias,
 } from "./org-model-label";
@@ -21,6 +22,10 @@ describe("org-model-label", () => {
   it("round-trips option ids", () => {
     const optionId = buildOrgModelOptionId("iface-1", "deepseek-v4-flash");
     expect(parseOrgModelOptionId(optionId)).toEqual({
+      interfaceId: "iface-1",
+      instanceId: "deepseek-v4-flash",
+    });
+    expect(parseOrgModelOptionIdLegacy(optionId)).toEqual({
       interfaceId: "iface-1",
       canonicalId: "deepseek-v4-flash",
     });

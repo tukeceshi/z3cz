@@ -72,6 +72,20 @@ function readInterfaceId(data: WorkflowNodeType): string {
   return typeof value === "string" ? value : "";
 }
 
+function readInstanceId(data: WorkflowNodeType): string {
+  const value = data.inputs?.find((input) => input.id === "model_instance_id")
+    ?.value;
+  return typeof value === "string" ? value : "";
+}
+
+function readModelBindingFromNode(data: WorkflowNodeType) {
+  return readModelSelectionRecord({
+    modelId: readModelId(data),
+    interfaceId: readInterfaceId(data),
+    instanceId: readInstanceId(data),
+  });
+}
+
 function resolveMaterializeParams<T extends OrgModelBindingRef>(
   model: T,
   inputs: WorkflowNodeType["inputs"],
@@ -86,6 +100,8 @@ function resolveMaterializeParams<T extends OrgModelBindingRef>(
     defaultEntry &&
     defaultEntry.canonicalId === model.canonicalId &&
     defaultEntry.interfaceId === model.interfaceId &&
+    (defaultEntry.instanceId === undefined ||
+      defaultEntry.instanceId === model.instanceId) &&
     defaultEntry.params !== undefined
   ) {
     return { ...defaultEntry.params };
@@ -113,6 +129,7 @@ export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
       {
         canonicalId: model.canonicalId,
         interfaceId: model.interfaceId,
+        instanceId: model.instanceId,
       },
       handlers.readGenerationFields && handlers.buildDefaultParams
         ? sanitizeCardGenerationParams(
@@ -133,6 +150,7 @@ export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
       writeWorkflowGenerativeDefault(params.generativeDefaults, params.modality, {
         canonicalId: model.canonicalId,
         interfaceId: model.interfaceId,
+        instanceId: model.instanceId,
         params: paramsEntry,
       })
     );
@@ -172,16 +190,14 @@ export function resolveModelForNewReference<T extends OrgModelBindingRef>(
     readonly modelFits: (model: T) => boolean;
   }
 ): ResolveModelForNewReferenceResult<T> {
-  const nodeBinding = readModelSelectionRecord({
-    modelId: readModelId(params.targetNodeData),
-    interfaceId: readInterfaceId(params.targetNodeData),
-  });
+  const nodeBinding = readModelBindingFromNode(params.targetNodeData);
 
   const currentFromNode = nodeBinding
     ? resolveSelectedModelBinding(
         params.models,
         nodeBinding.canonicalId,
-        nodeBinding.interfaceId
+        nodeBinding.interfaceId,
+        nodeBinding.instanceId
       )
     : undefined;
 
@@ -239,6 +255,7 @@ export function generativeModelBindingHandlersForModality(
               persistModelBindingToInputs(current.inputs, {
                 canonicalId: model.canonicalId,
                 interfaceId: model.interfaceId,
+                instanceId: model.instanceId,
               }),
               { params: defaultParams },
               { params: "json" }
@@ -265,6 +282,7 @@ export function generativeModelBindingHandlersForModality(
               persistModelBindingToInputs(current.inputs, {
                 canonicalId: model.canonicalId,
                 interfaceId: model.interfaceId,
+                instanceId: model.instanceId,
               }),
               { params: defaultParams },
               { params: "json" }
@@ -291,6 +309,7 @@ export function generativeModelBindingHandlersForModality(
               persistModelBindingToInputs(current.inputs, {
                 canonicalId: model.canonicalId,
                 interfaceId: model.interfaceId,
+                instanceId: model.instanceId,
               }),
               { params: defaultParams },
               { params: "json" }

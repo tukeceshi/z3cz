@@ -3,15 +3,19 @@ import type {
   AiModelModality,
   OrgTextModelOption,
   PlatformAiModel,
+  SingleModelEndpointRules,
   SingleModelModelConfig,
   VolcanoArkApiKeyScope,
   VolcanoInterfaceMetadata,
   VolcanoModelConfig,
 } from "@dafthunk/types";
 import {
+  findEnabledOrgModelInstanceByCanonicalId,
   isExternalBrandOnlyCanonicalId,
   isVolcanoAiInterfaceProvider,
+  listOrgModelEntries,
   pickLegacyOrgModelInterfaceId,
+  readOrgModelUpstreamId,
   resolveVolcanoInferenceModelId,
 } from "@dafthunk/types";
 import { parseSingleModelMetadata } from "../integrations/single-model/metadata";
@@ -27,13 +31,19 @@ import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
-import { buildOrgModelBindings } from "./build-org-model-bindings";
+import {
+  buildOrgModelBindings,
+  toOrgBindingInterfaces,
+  type OrgBindingInterface,
+} from "./build-org-model-bindings";
 
 export interface ResolvedOrgModelInterface<TRules> {
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly displayName: string;
   readonly interfaceId: string;
   readonly interfaceName: string;
+  readonly channelKind: "aggregate" | "api";
   readonly providerModelId: string;
   readonly parameterRules: TRules;
 }
@@ -45,6 +55,7 @@ export type ResolvedTextModelInterface = ResolvedOrgModelInterface<
 export type TextModelChannelKind = "aggregate" | "api";
 
 export interface TextModelInterfaceCandidate {
+  readonly instanceId: string;
   readonly interfaceId: string;
   readonly interfaceName: string;
   readonly channelKind: TextModelChannelKind;
@@ -63,6 +74,8 @@ export interface SingleModelInterfaceCandidate {
   readonly id: string;
   readonly createdAt: Date;
   readonly singleModelPresetId: string;
+  readonly singleModelCategory?: string;
+  readonly endpointRules?: SingleModelEndpointRules;
   readonly models: Readonly<Record<string, SingleModelModelConfig>>;
 }
 
@@ -151,10 +164,21 @@ export function collectSingleModelInterfaces(
           id: row.id,
           createdAt: new Date(row.createdAt),
           singleModelPresetId: metadata.singleModelPresetId,
+          singleModelCategory: metadata.singleModelCategory,
+          endpointRules: metadata.endpointRules,
           models: metadata.models,
         },
       ];
     });
+}
+
+export function collectOrgBindingInterfaces(
+  interfaces: Awaited<ReturnType<typeof listOrganizationAiInterfaces>>
+): OrgBindingInterface[] {
+  return toOrgBindingInterfaces({
+    volcanoInterfaces: collectVolcanoInterfaces(interfaces),
+    singleModelInterfaces: collectSingleModelInterfaces(interfaces),
+  });
 }
 
 export async function listOrgTextModelOptions(
@@ -166,13 +190,9 @@ export async function listOrgTextModelOptions(
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
-  const volcanoInterfaces = collectVolcanoInterfaces(interfaces);
-  const singleModelInterfaces = collectSingleModelInterfaces(interfaces);
-
   return buildOrgModelBindings({
     platformModels,
-    volcanoInterfaces,
-    singleModelInterfaces,
+    interfaces: collectOrgBindingInterfaces(interfaces),
   }).map((binding) => ({
     ...binding,
     parameterRules: getTextParameterRules(
@@ -184,10 +204,13 @@ export async function listOrgTextModelOptions(
 }
 
 export interface OrgModelInterfaceBindingOption {
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly selectable: boolean;
   readonly displayName: string;
+  readonly channelKind: "aggregate" | "api";
+  readonly providerModelId: string;
 }
 
 export async function resolveOrgModelInterfaceBinding<TRules>(
@@ -202,13 +225,21 @@ export async function resolveOrgModelInterfaceBinding<TRules>(
     readonly (OrgModelInterfaceBindingOption & {
       readonly parameterRules: TRules;
     })[]
-  >
+  >,
+  instanceId?: string
 ): Promise<ResolvedOrgModelInterface<TRules> | null> {
   const options = await listOptions(db, organizationId);
-  const option = options.find(
-    (entry) =>
-      entry.canonicalId === canonicalId && entry.interfaceId === interfaceId
-  );
+  const trimmedInstanceId = instanceId?.trim();
+  const option = trimmedInstanceId
+    ? options.find(
+        (entry) =>
+          entry.instanceId === trimmedInstanceId &&
+          entry.interfaceId === interfaceId
+      )
+    : options.find(
+        (entry) =>
+          entry.canonicalId === canonicalId && entry.interfaceId === interfaceId
+      );
   if (!option?.selectable) {
     return null;
   }
@@ -216,18 +247,21 @@ export async function resolveOrgModelInterfaceBinding<TRules>(
   const candidate = await resolveOrgModelInterfaceCandidate(
     db,
     organizationId,
-    canonicalId,
-    interfaceId
+    option.canonicalId,
+    interfaceId,
+    option.instanceId
   );
   if (!candidate) {
     return null;
   }
 
   return {
-    canonicalId,
+    instanceId: candidate.instanceId,
+    canonicalId: option.canonicalId,
     displayName: option.displayName,
     interfaceId: candidate.interfaceId,
     interfaceName: candidate.interfaceName,
+    channelKind: candidate.channelKind,
     providerModelId: candidate.providerModelId,
     parameterRules: option.parameterRules,
   };
@@ -237,7 +271,8 @@ export async function resolveOrgModelInterfaceCandidate(
   db: Database,
   organizationId: string,
   canonicalId: string,
-  interfaceId: string
+  interfaceId: string,
+  instanceId?: string
 ): Promise<TextModelInterfaceCandidate | null> {
   const interfaces = await listOrganizationAiInterfaces(db, organizationId);
   const ifaceRow = interfaces.find((row) => row.id === interfaceId);
@@ -250,20 +285,25 @@ export async function resolveOrgModelInterfaceCandidate(
     if (!isVolcanoMetadata(metadata)) {
       return null;
     }
-    const config = metadata.models[canonicalId];
-    if (!config?.enabled) {
+    const entries = listOrgModelEntries(metadata.models);
+    const trimmedInstanceId = instanceId?.trim();
+    const found = trimmedInstanceId
+      ? entries.find((entry) => entry.instanceId === trimmedInstanceId)
+      : findEnabledOrgModelInstanceByCanonicalId(entries, canonicalId);
+    if (!found?.config.enabled) {
       return null;
     }
-    const metaProviderModelId = config.providerModelId?.trim();
+    const metaProviderModelId = readOrgModelUpstreamId(found.config);
     if (!metaProviderModelId) {
       return null;
     }
     return {
+      instanceId: found.instanceId,
       interfaceId: ifaceRow.id,
       interfaceName: ifaceRow.name,
       channelKind: "aggregate",
       providerModelId: resolveVolcanoInferenceModelId({
-        canonicalId,
+        canonicalId: found.canonicalId,
         providerModelId: metaProviderModelId,
         metadata: {
           arkEndpoints: metadata.arkEndpoints,
@@ -280,15 +320,20 @@ export async function resolveOrgModelInterfaceCandidate(
     if (!metadata) {
       return null;
     }
-    const config = metadata.models[canonicalId];
-    if (!config?.enabled) {
+    const entries = listOrgModelEntries(metadata.models);
+    const trimmedInstanceId = instanceId?.trim();
+    const found = trimmedInstanceId
+      ? entries.find((entry) => entry.instanceId === trimmedInstanceId)
+      : findEnabledOrgModelInstanceByCanonicalId(entries, canonicalId);
+    if (!found?.config.enabled) {
       return null;
     }
-    const upstreamModelId = config.upstreamModelId?.trim();
+    const upstreamModelId = found.config.upstreamModelId.trim();
     if (!upstreamModelId) {
       return null;
     }
     return {
+      instanceId: found.instanceId,
       interfaceId: ifaceRow.id,
       interfaceName: ifaceRow.name,
       channelKind: "api",
@@ -316,14 +361,16 @@ export async function resolveTextModelInterface(
   db: Database,
   organizationId: string,
   canonicalId: string,
-  interfaceId: string
+  interfaceId: string,
+  instanceId?: string
 ): Promise<ResolvedTextModelInterface | null> {
   return resolveOrgModelInterfaceBinding(
     db,
     organizationId,
     canonicalId,
     interfaceId,
-    listOrgTextModelOptions
+    listOrgTextModelOptions,
+    instanceId
   );
 }
 
@@ -353,7 +400,8 @@ export function ensureVolcanoModelsIncludePlatformCatalog(
     }
     models[entry.canonicalId] = {
       enabled: false,
-      providerModelId: entry.providerModelId,
+      canonicalId: entry.canonicalId,
+      upstreamModelId: entry.providerModelId,
       modality: entry.modality,
     };
   }

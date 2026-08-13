@@ -129,14 +129,16 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     [generativeDefaults, modality]
   );
 
-  const nodeBinding = useMemo(
-    () =>
-      readModelSelectionRecord({
-        modelId: readModelId(liveData),
-        interfaceId: readInterfaceId(liveData),
-      }),
-    [liveData, readInterfaceId, readModelId]
-  );
+  const nodeBinding = useMemo(() => {
+    const instanceValue = liveData.inputs?.find(
+      (input) => input.id === "model_instance_id"
+    )?.value;
+    return readModelSelectionRecord({
+      modelId: readModelId(liveData),
+      interfaceId: readInterfaceId(liveData),
+      instanceId: typeof instanceValue === "string" ? instanceValue : "",
+    });
+  }, [liveData, readInterfaceId, readModelId]);
 
   const optimisticBinding = useMemo(() => {
     if (!optimisticOptionId) {
@@ -149,6 +151,7 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     return {
       canonicalId: model.canonicalId,
       interfaceId: model.interfaceId,
+      instanceId: model.instanceId,
     };
   }, [models, optimisticOptionId]);
 
@@ -202,7 +205,8 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       ? resolveSelectedModelBinding(
           models,
           nodeBinding.canonicalId,
-          nodeBinding.interfaceId
+          nodeBinding.interfaceId,
+          nodeBinding.instanceId
         )
       : undefined;
 
@@ -283,7 +287,9 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     if (
       model &&
       nodeBinding.canonicalId === model.canonicalId &&
-      nodeBinding.interfaceId === model.interfaceId
+      nodeBinding.interfaceId === model.interfaceId &&
+      (nodeBinding.instanceId === undefined ||
+        nodeBinding.instanceId === model.instanceId)
     ) {
       setOptimisticOptionId(null);
     }
@@ -297,14 +303,15 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       const match = resolveSelectedModelBinding(
         models,
         bindingForResolution.canonicalId,
-        bindingForResolution.interfaceId
+        bindingForResolution.interfaceId,
+        bindingForResolution.instanceId
       );
       if (match) {
         return match.optionId;
       }
       return buildModelBindingOptionId(
         bindingForResolution.interfaceId,
-        bindingForResolution.canonicalId
+        bindingForResolution.instanceId ?? bindingForResolution.canonicalId
       );
     }
     return optimisticOptionId ?? "";

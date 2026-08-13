@@ -1,10 +1,11 @@
-import { buildOrgModelOptionId } from "@dafthunk/types";
+import { buildOrgModelOptionId, parseOrgModelOptionId } from "@dafthunk/types";
 
 import { upsertNodeInputValues } from "./workflow-context";
 import type { WorkflowParameter } from "./workflow-types";
 
 export interface OrgModelBindingRef {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly selectable: boolean;
@@ -13,11 +14,13 @@ export interface OrgModelBindingRef {
 export interface ModelSelectionRecord {
   readonly canonicalId: string;
   readonly interfaceId: string;
+  readonly instanceId?: string;
 }
 
 export interface ModelBindingRef {
   readonly canonicalId: string;
   readonly interfaceId: string;
+  readonly instanceId?: string;
 }
 
 export type GenerativeModelModality = "text" | "image" | "video" | "audio";
@@ -37,32 +40,57 @@ export type ModelCardState<T extends OrgModelBindingRef> =
 export function readModelSelectionRecord(params: {
   readonly modelId: string;
   readonly interfaceId: string;
+  readonly instanceId?: string;
 }): ModelSelectionRecord | undefined {
   const canonicalId = params.modelId.trim();
   const interfaceId = params.interfaceId.trim();
+  const instanceId = params.instanceId?.trim();
   if (!canonicalId || !interfaceId) {
     return undefined;
   }
-  return { canonicalId, interfaceId };
+  return {
+    canonicalId,
+    interfaceId,
+    ...(instanceId ? { instanceId } : {}),
+  };
 }
 
 export function resolveSelectedModelBinding<T extends OrgModelBindingRef>(
   models: readonly T[],
   canonicalId: string,
-  interfaceId: string
+  interfaceId: string,
+  instanceId?: string
 ): T | undefined {
+  const trimmedInstanceId = instanceId?.trim();
+  if (trimmedInstanceId) {
+    const byInstance = models.find(
+      (entry) =>
+        entry.instanceId === trimmedInstanceId &&
+        entry.interfaceId === interfaceId.trim()
+    );
+    if (byInstance) {
+      return byInstance;
+    }
+  }
+
   if (!canonicalId.trim()) {
     return undefined;
   }
 
   if (interfaceId.trim()) {
-    const exact = models.find(
+    const matches = models.filter(
       (entry) =>
         entry.canonicalId === canonicalId &&
-        entry.interfaceId === interfaceId
+        entry.interfaceId === interfaceId.trim()
     );
-    if (exact) {
-      return exact;
+    if (matches.length === 1) {
+      return matches[0];
+    }
+    if (matches.length > 1 && trimmedInstanceId) {
+      return matches.find((entry) => entry.instanceId === trimmedInstanceId);
+    }
+    if (matches.length > 1) {
+      return matches.find((entry) => entry.selectable) ?? matches[0];
     }
   }
 
@@ -92,7 +120,8 @@ export function resolveEffectiveGenerativeModel<T extends OrgModelBindingRef>(
     const match = resolveSelectedModelBinding(
       models,
       nodeBinding.canonicalId,
-      nodeBinding.interfaceId
+      nodeBinding.interfaceId,
+      nodeBinding.instanceId
     );
     if (match?.selectable) {
       return { model: match, source: "node" };
@@ -103,7 +132,8 @@ export function resolveEffectiveGenerativeModel<T extends OrgModelBindingRef>(
     const match = resolveSelectedModelBinding(
       models,
       workflowDefault.canonicalId,
-      workflowDefault.interfaceId
+      workflowDefault.interfaceId,
+      workflowDefault.instanceId
     );
     if (match?.selectable) {
       return { model: match, source: "workflow" };
@@ -137,9 +167,24 @@ export function resolveModelCardState<T extends OrgModelBindingRef>(
 
 export function buildModelBindingOptionId(
   interfaceId: string,
-  canonicalId: string
+  instanceId: string
 ): string {
-  return buildOrgModelOptionId(interfaceId, canonicalId);
+  return buildOrgModelOptionId(interfaceId, instanceId);
+}
+
+export function resolveModelBindingFromOptionId<T extends OrgModelBindingRef>(
+  models: readonly T[],
+  optionId: string
+): T | undefined {
+  const parsed = parseOrgModelOptionId(optionId);
+  if (!parsed) {
+    return undefined;
+  }
+  return models.find(
+    (entry) =>
+      entry.interfaceId === parsed.interfaceId &&
+      entry.instanceId === parsed.instanceId
+  );
 }
 
 /** Write model binding + generation params onto node inputs. */
@@ -163,12 +208,16 @@ export function persistModelBindingToInputs(
   return upsertNodeInputValues(inputs, {
     model: binding.canonicalId,
     ai_interface_id: binding.interfaceId,
+    ...(binding.instanceId?.trim()
+      ? { model_instance_id: binding.instanceId.trim() }
+      : { model_instance_id: "" }),
   });
 }
 
 export interface HistoryModelBinding {
   readonly platformModelId?: string;
   readonly aiInterfaceId?: string;
+  readonly modelInstanceId?: string;
 }
 
 export function resolveHistoryModelBinding(
@@ -176,11 +225,16 @@ export function resolveHistoryModelBinding(
 ): ModelBindingRef | undefined {
   const canonicalId = item?.platformModelId?.trim();
   const interfaceId = item?.aiInterfaceId?.trim();
+  const instanceId = item?.modelInstanceId?.trim();
   if (!canonicalId || !interfaceId) {
     return undefined;
   }
 
-  return { canonicalId, interfaceId };
+  return {
+    canonicalId,
+    interfaceId,
+    ...(instanceId ? { instanceId } : {}),
+  };
 }
 
 /** Copy usage record from history into node model selection record. */
@@ -200,7 +254,9 @@ export function clearModelBindingInputs(
   inputs: readonly WorkflowParameter[]
 ): WorkflowParameter[] {
   return inputs.map((input) =>
-    input.id === "model" || input.id === "ai_interface_id"
+    input.id === "model" ||
+    input.id === "ai_interface_id" ||
+    input.id === "model_instance_id"
       ? ({ ...input, value: "" } as WorkflowParameter)
       : input
   );

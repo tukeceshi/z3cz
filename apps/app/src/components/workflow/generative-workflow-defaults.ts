@@ -42,6 +42,9 @@ export function readWorkflowGenerativeDefault(
   return {
     canonicalId,
     interfaceId,
+    ...(entry.instanceId?.trim()
+      ? { instanceId: entry.instanceId.trim() }
+      : {}),
     ...(entry.params !== undefined ? { params: entry.params } : {}),
   };
 }
@@ -56,6 +59,9 @@ export function writeWorkflowGenerativeDefault(
     [modality]: {
       canonicalId: entry.canonicalId,
       interfaceId: entry.interfaceId,
+      ...(entry.instanceId?.trim()
+        ? { instanceId: entry.instanceId.trim() }
+        : {}),
       ...(entry.params !== undefined ? { params: entry.params } : {}),
     },
   };

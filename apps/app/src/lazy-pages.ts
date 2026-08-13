@@ -81,6 +81,14 @@ export const AdminWorkflowSchemesPage = lazyRoutePage(
   () => import("@/pages/admin/admin-workflow-schemes-page"),
   "AdminWorkflowSchemesPage"
 );
+export const AdminApiForwardingPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-api-forwarding-page"),
+  "AdminApiForwardingPage"
+);
+export const AdminApiForwardingDetailPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-api-forwarding-detail-page"),
+  "AdminApiForwardingDetailPage"
+);
 export const AdminPersistWorkersPage = lazyRoutePage(
   () => import("@/pages/admin/admin-persist-workers-page"),
   "AdminPersistWorkersPage"

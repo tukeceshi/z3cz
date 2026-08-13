@@ -40,6 +40,12 @@ function readBindingFromNode(
   return readModelSelectionRecord({
     modelId: typeof modelValue === "string" ? modelValue : "",
     interfaceId: typeof interfaceValue === "string" ? interfaceValue : "",
+    instanceId:
+      typeof data.inputs?.find((input) => input.id === "model_instance_id")
+        ?.value === "string"
+        ? (data.inputs.find((input) => input.id === "model_instance_id")!
+            .value as string)
+        : "",
   });
 }
 
@@ -83,7 +89,8 @@ export function applyHistoryItemSettingsToNode<T extends OrgModelBindingRef>(
     resolvedModel = resolveSelectedModelBinding(
       params.models,
       historyBindingRef.canonicalId,
-      historyBindingRef.interfaceId
+      historyBindingRef.interfaceId,
+      historyBindingRef.instanceId
     );
     if (!resolvedModel?.selectable) {
       modelUnavailable = true;
@@ -101,7 +108,8 @@ export function applyHistoryItemSettingsToNode<T extends OrgModelBindingRef>(
       return resolveSelectedModelBinding(
         params.models,
         currentBinding.canonicalId,
-        currentBinding.interfaceId
+        currentBinding.interfaceId,
+        currentBinding.instanceId
       );
     })();
 
@@ -142,6 +150,7 @@ export function applyHistoryItemSettingsToNode<T extends OrgModelBindingRef>(
         {
           canonicalId: resolvedModel.canonicalId,
           interfaceId: resolvedModel.interfaceId,
+          instanceId: resolvedModel.instanceId,
         },
         sanitizedParams
       ),

@@ -1,29 +1,27 @@
 import type {
   AiModelModality,
+  OrgModelInstanceConfig,
+  OrgModelInstanceEntry,
   OrgTextModelUnavailableReason,
   PlatformAiModel,
-  SingleModelModelConfig,
-  VolcanoModelConfig,
 } from "@dafthunk/types";
 import {
   formatCanvasModelLabel,
   buildOrgModelOptionId,
+  listOrgModelEntries,
   resolveInterfaceModelAlias,
   type OrgModelChannelKind,
 } from "@dafthunk/types";
 
-export interface VolcanoBindingInterface {
+export interface OrgBindingInterface {
   readonly id: string;
-  readonly models: Readonly<Record<string, VolcanoModelConfig>>;
-}
-
-export interface SingleModelBindingInterface {
-  readonly id: string;
-  readonly models: Readonly<Record<string, SingleModelModelConfig>>;
+  readonly channelKind: OrgModelChannelKind;
+  readonly entries: readonly OrgModelInstanceEntry[];
 }
 
 export interface OrgModelBindingBase {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
@@ -38,20 +36,37 @@ export interface OrgModelBindingBase {
   readonly providerModelId: string;
 }
 
-function bindingFromConfig(params: {
+/** @deprecated Use OrgBindingInterface */
+export interface VolcanoBindingInterface {
+  readonly id: string;
+  readonly models: Readonly<Record<string, OrgModelInstanceConfig>>;
+}
+
+/** @deprecated Use OrgBindingInterface */
+export interface SingleModelBindingInterface {
+  readonly id: string;
+  readonly models: Readonly<Record<string, OrgModelInstanceConfig>>;
+}
+
+function bindingFromEntry(params: {
   readonly model: PlatformAiModel;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
-  readonly config: VolcanoModelConfig | SingleModelModelConfig;
-  readonly providerModelId: string;
-}): OrgModelBindingBase {
+  readonly entry: OrgModelInstanceEntry;
+}): OrgModelBindingBase | null {
+  const upstreamModelId = params.entry.config.upstreamModelId.trim();
+  if (!upstreamModelId) {
+    return null;
+  }
+
   const alias = resolveInterfaceModelAlias({
-    alias: params.config.alias,
+    alias: params.entry.config.alias,
     platformDisplayName: params.model.displayName,
   });
 
   return {
-    optionId: buildOrgModelOptionId(params.interfaceId, params.model.canonicalId),
+    optionId: buildOrgModelOptionId(params.interfaceId, params.entry.instanceId),
+    instanceId: params.entry.instanceId,
     canonicalId: params.model.canonicalId,
     interfaceId: params.interfaceId,
     channelKind: params.channelKind,
@@ -61,67 +76,61 @@ function bindingFromConfig(params: {
       alias,
     }),
     modality: params.model.modality as AiModelModality,
-    selectable: params.config.enabled === true,
+    selectable: params.entry.config.enabled === true,
     unavailableReason:
-      params.config.enabled === true
+      params.entry.config.enabled === true
         ? undefined
         : "model_disabled_on_interface",
     description: params.model.description,
     sortOrder: params.model.sortOrder,
     brandIcon: params.model.brandIcon,
-    providerModelId: params.providerModelId,
+    providerModelId: upstreamModelId,
   };
 }
 
 export function buildOrgModelBindings(params: {
   readonly platformModels: readonly PlatformAiModel[];
-  readonly volcanoInterfaces: readonly VolcanoBindingInterface[];
-  readonly singleModelInterfaces: readonly SingleModelBindingInterface[];
+  readonly interfaces: readonly OrgBindingInterface[];
 }): OrgModelBindingBase[] {
   const visibleModels = params.platformModels.filter((model) => model.platformEnabled);
   const bindings: OrgModelBindingBase[] = [];
 
   for (const model of visibleModels) {
-    for (const iface of params.volcanoInterfaces) {
-      const config = iface.models[model.canonicalId];
-      if (!config) {
-        continue;
-      }
-      const providerModelId = config.providerModelId?.trim();
-      if (!providerModelId) {
-        continue;
-      }
-      bindings.push(
-        bindingFromConfig({
+    for (const iface of params.interfaces) {
+      for (const entry of iface.entries) {
+        if (entry.canonicalId !== model.canonicalId) {
+          continue;
+        }
+        const binding = bindingFromEntry({
           model,
           interfaceId: iface.id,
-          channelKind: "aggregate",
-          config,
-          providerModelId,
-        })
-      );
-    }
-
-    for (const iface of params.singleModelInterfaces) {
-      const config = iface.models[model.canonicalId];
-      if (!config) {
-        continue;
+          channelKind: iface.channelKind,
+          entry,
+        });
+        if (binding) {
+          bindings.push(binding);
+        }
       }
-      const upstreamModelId = config.upstreamModelId?.trim();
-      if (!upstreamModelId) {
-        continue;
-      }
-      bindings.push(
-        bindingFromConfig({
-          model,
-          interfaceId: iface.id,
-          channelKind: "api",
-          config,
-          providerModelId: upstreamModelId,
-        })
-      );
     }
   }
 
   return bindings;
+}
+
+export function toOrgBindingInterfaces(params: {
+  readonly volcanoInterfaces: readonly VolcanoBindingInterface[];
+  readonly singleModelInterfaces: readonly SingleModelBindingInterface[];
+}): OrgBindingInterface[] {
+  return [
+    ...params.volcanoInterfaces.map((iface) => ({
+      id: iface.id,
+      channelKind: "aggregate" as const,
+      entries: listOrgModelEntries(iface.models),
+    })),
+    ...params.singleModelInterfaces.map((iface) => ({
+      id: iface.id,
+      channelKind: "api" as const,
+      entries: listOrgModelEntries(iface.models),
+    })),
+  ];
 }

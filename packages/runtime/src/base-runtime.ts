@@ -1239,6 +1239,7 @@ export abstract class Runtime<Env = unknown> {
                 organizationId: context.organizationId,
                 interfaceId: params.interfaceId,
                 templateId: params.templateId,
+                modelCanonicalId: params.modelCanonicalId,
               })
           : undefined,
         executeTextModel: this.textModelService
@@ -1292,11 +1293,12 @@ export abstract class Runtime<Env = unknown> {
               })
           : undefined,
         resolveVideoModel: this.videoModelService
-          ? (canonicalId, interfaceId) =>
+          ? (canonicalId, interfaceId, instanceId) =>
               this.videoModelService!.resolveVideoModel({
                 organizationId: context.organizationId,
                 canonicalId,
                 interfaceId,
+                instanceId,
               })
           : undefined,
         inferVideoModelInterfaceId: this.videoModelService

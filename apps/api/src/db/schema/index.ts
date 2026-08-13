@@ -307,6 +307,29 @@ export const apiKeys = pgTable(
   ]
 );
 
+// Format transform templates — admin-configured standard-to-upstream body transforms
+export const formatTransformTemplates = pgTable(
+  "format_transform_templates",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(),
+    scope: text("scope").notNull().default("platform"),
+    upstreamParams: jsonb("upstream_params").notNull().default([]),
+    paramMappings: jsonb("param_mappings").notNull().default([]),
+    lockedResolution: text("locked_resolution"),
+    supportsTaskCancel: boolean("supports_task_cancel").notNull().default(false),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+    updatedBy: text("updated_by").references(() => users.id),
+  },
+  (table) => [
+    index("format_transform_templates_enabled_idx").on(table.enabled),
+    index("format_transform_templates_scope_idx").on(table.scope),
+  ]
+);
+
 // Workflow schemes (方案) — platform-level node/trigger/runtime catalogs
 export const workflowSchemes = pgTable(
   "workflow_schemes",
@@ -1539,3 +1562,8 @@ export type PlatformSettingsInsert = typeof platformSettings.$inferInsert;
 
 export type WorkflowSchemeRow = typeof workflowSchemes.$inferSelect;
 export type WorkflowSchemeInsert = typeof workflowSchemes.$inferInsert;
+
+export type FormatTransformTemplateRow =
+  typeof formatTransformTemplates.$inferSelect;
+export type FormatTransformTemplateInsert =
+  typeof formatTransformTemplates.$inferInsert;

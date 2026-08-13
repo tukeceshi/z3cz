@@ -10,6 +10,7 @@ import {
   getResourceIdFromValue,
   isLocalMediaReference,
   isResourceIdReference,
+  mediaReferenceToWorkflowValue,
 } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
@@ -269,12 +270,9 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
   return result.object;
 }
 
+/** Cloud object → workflow JSON; resourceId is catalog UUID (ObjectReference.id). */
 export function cloudUploadToResourceId(
   object: ObjectReference
 ): ResourceIdReference {
-  const resourceId =
-    object.storageKey && object.storageKey.length > 0
-      ? object.storageKey
-      : object.id;
-  return { resourceId, mimeType: object.mimeType };
+  return mediaReferenceToWorkflowValue(object);
 }

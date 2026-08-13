@@ -9,19 +9,27 @@ import {
   submitVeoVideoTask,
 } from "@dafthunk/runtime/ai-interface/execute-veo-video";
 import {
+  cancelVolcanoVideoTask,
   downloadVolcanoVideo,
   pollVolcanoVideoTask,
   submitVolcanoVideoTask,
+  type VolcanoVideoCancelResult,
   type VolcanoVideoDownloadResult,
   type VolcanoVideoPollResult,
   type VolcanoVideoSubmitResult,
 } from "@dafthunk/runtime/ai-interface/execute-volcano-video";
 import type { CloudImageUploadTarget } from "@dafthunk/runtime/ai-interface/execute-volcano-image";
 import type { ObjectStore } from "@dafthunk/runtime";
+import type {
+  FormatTransformConfig,
+  ResolvedSingleModelVideoEndpoints,
+  VideoModelParameterRules,
+} from "@dafthunk/types";
 import {
+  buildVideoPollUrl,
   isGrokImagineVideoCanonicalId,
   isVeoCanonicalId,
-  type VideoModelParameterRules,
+  resolveOfficialVideoEndpoints,
 } from "@dafthunk/types";
 import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
@@ -53,6 +61,8 @@ export async function submitOrgVideoTask(params: {
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  readonly formatTransform?: FormatTransformConfig;
 }): Promise<VolcanoVideoSubmitResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
 
@@ -109,6 +119,8 @@ export async function submitOrgVideoTask(params: {
     referenceVideoUrls: params.referenceVideoUrls,
     referenceAudioUrls: params.referenceAudioUrls,
     upstreamLog: params.upstreamLog,
+    videoEndpoints: params.videoEndpoints,
+    formatTransform: params.formatTransform,
   });
 }
 
@@ -147,7 +159,38 @@ export async function pollOrgVideoTask(params: {
     apiKey: params.apiKey,
     pollUrl:
       params.videoPollUrl ??
-      `${baseUrl}/contents/generations/tasks/${params.upstreamTaskId}`,
+      buildVideoPollUrl({
+        baseUrl: params.baseUrl,
+        submitPath:
+          params.videoEndpoints?.submitPath ??
+          resolveOfficialVideoEndpoints().submitPath,
+        taskId: params.upstreamTaskId,
+        useFullSubmitUrl: params.videoEndpoints?.useFullSubmitUrl,
+      }),
+    upstreamLog: params.upstreamLog,
+  });
+}
+
+export async function cancelOrgVideoTask(params: {
+  readonly apiKey: string;
+  readonly canonicalId: string;
+  readonly pollUrl: string;
+  readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}): Promise<VolcanoVideoCancelResult> {
+  const backend = resolveOrgVideoBackend(params.canonicalId);
+
+  if (backend !== "volcano") {
+    return { status: "skipped" };
+  }
+
+  if (params.videoEndpoints && !params.videoEndpoints.supportsTaskCancel) {
+    return { status: "skipped" };
+  }
+
+  return cancelVolcanoVideoTask({
+    apiKey: params.apiKey,
+    pollUrl: params.pollUrl,
     upstreamLog: params.upstreamLog,
   });
 }

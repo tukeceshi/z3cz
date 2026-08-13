@@ -19,6 +19,7 @@ import {
 import { useCallback } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { useNumericDraftInput } from "@/hooks/use-numeric-draft-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -68,7 +69,7 @@ function adminGenerationOptionChipClass({
   );
 }
 
-function AdminGenerationOptionChip({
+export function AdminGenerationOptionChip({
   label,
   enabled,
   isDefault,
@@ -146,7 +147,7 @@ export interface GenerationOptionLabels {
   readonly referenceModeFirstLastFrame: string;
 }
 
-function formatAdminGenerationOptionLabel(
+export function formatAdminGenerationOptionLabel(
   fieldName: string,
   option: string,
   labels: GenerationOptionLabels
@@ -443,18 +444,15 @@ export function ImageCountEditor({
   const countField = fields.find((field) => field.name === "generate_count");
   const working = countField ?? template;
   const effectMode = normalizeGenerationCountEffectMode(policy.effectMode);
-
-  if (!working || !policy.enabled) {
-    return null;
-  }
-
-  const maxCount = resolveMaxCountFromField(working);
-  const defaultCount = Math.min(
-    resolveDefaultCountFromField(working),
-    maxCount
-  );
+  const maxCount = working ? resolveMaxCountFromField(working) : 1;
+  const defaultCount = working
+    ? Math.min(resolveDefaultCountFromField(working), maxCount)
+    : 1;
 
   const setCountField = (next: UpstreamParamProfileField) => {
+    if (!working) {
+      return;
+    }
     if (countField) {
       onFieldsChange(
         fields.map((field) => (field.name === "generate_count" ? next : field))
@@ -464,28 +462,52 @@ export function ImageCountEditor({
     onFieldsChange([...fields, next]);
   };
 
-  const handleMaxCountChange = (value: string) => {
-    const nextMax = Math.min(
+  const handleMaxCountChange = (nextMax: number) => {
+    if (!working) {
+      return;
+    }
+    const clampedMax = Math.min(
       IMAGE_GENERATE_COUNT_MAX,
-      Math.max(1, Math.floor(Number(value)) || 1)
+      Math.max(1, nextMax)
     );
     setCountField({
       ...working,
-      enumValues: [...buildGenerateCountOptions(nextMax)],
-      default: Math.min(defaultCount, nextMax),
+      enumValues: [...buildGenerateCountOptions(clampedMax)],
+      default: Math.min(defaultCount, clampedMax),
     });
   };
 
-  const handleDefaultCountChange = (value: string) => {
-    const nextDefault = Math.min(
+  const handleDefaultCountChange = (nextDefault: number) => {
+    if (!working) {
+      return;
+    }
+    const clampedDefault = Math.min(
       maxCount,
-      Math.max(1, Math.floor(Number(value)) || 1)
+      Math.max(1, nextDefault)
     );
     setCountField({
       ...working,
-      default: nextDefault,
+      default: clampedDefault,
     });
   };
+
+  const maxCountInput = useNumericDraftInput({
+    value: maxCount,
+    min: 1,
+    max: IMAGE_GENERATE_COUNT_MAX,
+    onCommit: handleMaxCountChange,
+  });
+
+  const defaultCountInput = useNumericDraftInput({
+    value: defaultCount,
+    min: 1,
+    max: maxCount,
+    onCommit: handleDefaultCountChange,
+  });
+
+  if (!working || !policy.enabled) {
+    return null;
+  }
 
   return (
     <div className={ADMIN_SETTINGS_GRID_CLASS}>
@@ -525,8 +547,7 @@ export function ImageCountEditor({
           min={1}
           max={IMAGE_GENERATE_COUNT_MAX}
           className={ADMIN_CONTROL_CLASS}
-          value={maxCount}
-          onChange={(event) => handleMaxCountChange(event.target.value)}
+          {...maxCountInput}
         />
       </div>
       <div className="space-y-1.5">
@@ -538,15 +559,14 @@ export function ImageCountEditor({
           min={1}
           max={maxCount}
           className={ADMIN_CONTROL_CLASS}
-          value={defaultCount}
-          onChange={(event) => handleDefaultCountChange(event.target.value)}
+          {...defaultCountInput}
         />
       </div>
     </div>
   );
 }
 
-function resolveMinDurationFromField(
+export function resolveMinDurationFromField(
   field: UpstreamParamProfileField
 ): number {
   const fromEnum = (field.enumValues ?? [])
@@ -558,7 +578,7 @@ function resolveMinDurationFromField(
   return VIDEO_DURATION_MIN;
 }
 
-function resolveMaxDurationFromField(
+export function resolveMaxDurationFromField(
   field: UpstreamParamProfileField
 ): number {
   const fromEnum = (field.enumValues ?? [])
@@ -570,7 +590,7 @@ function resolveMaxDurationFromField(
   return VIDEO_DURATION_MAX;
 }
 
-function resolveDefaultDurationFromField(
+export function resolveDefaultDurationFromField(
   field: UpstreamParamProfileField
 ): number {
   const raw = field.default;
@@ -584,9 +604,14 @@ function resolveDefaultDurationFromField(
 export function VideoDurationEditor({
   fields,
   onFieldsChange,
+  platformBounds,
 }: {
   readonly fields: readonly UpstreamParamProfileField[];
   readonly onFieldsChange: (fields: UpstreamParamProfileField[]) => void;
+  readonly platformBounds?: {
+    readonly min: number;
+    readonly max: number;
+  };
 }) {
   const { t } = useTranslation();
   const template = DEFAULT_VIDEO_GENERATION_FIELDS.find(
@@ -594,19 +619,22 @@ export function VideoDurationEditor({
   );
   const durationField = fields.find((field) => field.name === "duration");
   const working = durationField ?? template;
-
-  if (!working) {
-    return null;
-  }
-
-  const minDuration = resolveMinDurationFromField(working);
-  const maxDuration = resolveMaxDurationFromField(working);
-  const defaultDuration = Math.min(
-    resolveDefaultDurationFromField(working),
-    maxDuration
-  );
+  const boundMin = platformBounds?.min ?? VIDEO_DURATION_MIN;
+  const boundMax = platformBounds?.max ?? VIDEO_DURATION_MAX;
+  const minDuration = working
+    ? resolveMinDurationFromField(working)
+    : boundMin;
+  const maxDuration = working
+    ? resolveMaxDurationFromField(working)
+    : boundMax;
+  const defaultDuration = working
+    ? Math.min(resolveDefaultDurationFromField(working), maxDuration)
+    : boundMin;
 
   const setDurationField = (next: UpstreamParamProfileField) => {
+    if (!working) {
+      return;
+    }
     if (durationField) {
       onFieldsChange(
         fields.map((field) => (field.name === "duration" ? next : field))
@@ -616,38 +644,79 @@ export function VideoDurationEditor({
     onFieldsChange([...fields, next]);
   };
 
-  const handleMinDurationChange = (value: string) => {
-    const nextMin = Math.max(1, Math.floor(Number(value)) || VIDEO_DURATION_MIN);
-    const nextMax = Math.max(nextMin, maxDuration);
+  const clampDurationRange = (nextMin: number, nextMax: number) => {
+    const clampedMin = Math.max(
+      boundMin,
+      Math.min(nextMin, boundMax)
+    );
+    const clampedMax = Math.max(
+      clampedMin,
+      Math.min(Math.max(nextMax, clampedMin), boundMax)
+    );
+    return { min: clampedMin, max: clampedMax };
+  };
+
+  const commitMinDuration = (nextMin: number) => {
+    if (!working) {
+      return;
+    }
+    const { min, max } = clampDurationRange(nextMin, maxDuration);
     setDurationField({
       ...working,
-      enumValues: [...buildDurationOptions(nextMin, nextMax)],
-      default: Math.min(Math.max(defaultDuration, nextMin), nextMax),
+      enumValues: [...buildDurationOptions(min, max)],
+      default: Math.min(Math.max(defaultDuration, min), max),
     });
   };
 
-  const handleMaxDurationChange = (value: string) => {
-    const nextMax = Math.max(
-      minDuration,
-      Math.floor(Number(value)) || VIDEO_DURATION_MAX
-    );
+  const commitMaxDuration = (nextMax: number) => {
+    if (!working) {
+      return;
+    }
+    const { min, max } = clampDurationRange(minDuration, nextMax);
     setDurationField({
       ...working,
-      enumValues: [...buildDurationOptions(minDuration, nextMax)],
-      default: Math.min(Math.max(defaultDuration, minDuration), nextMax),
+      enumValues: [...buildDurationOptions(min, max)],
+      default: Math.min(Math.max(defaultDuration, min), max),
     });
   };
 
-  const handleDefaultDurationChange = (value: string) => {
-    const nextDefault = Math.min(
-      maxDuration,
-      Math.max(minDuration, Math.floor(Number(value)) || minDuration)
-    );
+  const commitDefaultDuration = (nextDefault: number) => {
+    if (!working) {
+      return;
+    }
     setDurationField({
       ...working,
-      default: nextDefault,
+      default: Math.min(
+        maxDuration,
+        Math.max(minDuration, nextDefault)
+      ),
     });
   };
+
+  const minDurationInput = useNumericDraftInput({
+    value: minDuration,
+    min: boundMin,
+    max: boundMax,
+    onCommit: commitMinDuration,
+  });
+
+  const maxDurationInput = useNumericDraftInput({
+    value: maxDuration,
+    min: Math.max(minDuration, boundMin),
+    max: boundMax,
+    onCommit: commitMaxDuration,
+  });
+
+  const defaultDurationInput = useNumericDraftInput({
+    value: defaultDuration,
+    min: minDuration,
+    max: maxDuration,
+    onCommit: commitDefaultDuration,
+  });
+
+  if (!working) {
+    return null;
+  }
 
   return (
     <div className={ADMIN_SETTINGS_GRID_CLASS}>
@@ -657,10 +726,10 @@ export function VideoDurationEditor({
         </Label>
         <Input
           type="number"
-          min={1}
+          min={boundMin}
+          max={boundMax}
           className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
-          value={minDuration}
-          onChange={(event) => handleMinDurationChange(event.target.value)}
+          {...minDurationInput}
         />
       </div>
       <div className="space-y-1.5">
@@ -669,10 +738,10 @@ export function VideoDurationEditor({
         </Label>
         <Input
           type="number"
-          min={minDuration}
+          min={Math.max(minDuration, boundMin)}
+          max={boundMax}
           className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
-          value={maxDuration}
-          onChange={(event) => handleMaxDurationChange(event.target.value)}
+          {...maxDurationInput}
         />
       </div>
       <div className="space-y-1.5">
@@ -684,8 +753,7 @@ export function VideoDurationEditor({
           min={minDuration}
           max={maxDuration}
           className={cn(ADMIN_CONTROL_CLASS, ADMIN_NUMBER_INPUT_CLASS)}
-          value={defaultDuration}
-          onChange={(event) => handleDefaultDurationChange(event.target.value)}
+          {...defaultDurationInput}
         />
       </div>
     </div>

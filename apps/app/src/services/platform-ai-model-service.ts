@@ -37,6 +37,11 @@ const ORG_MODELS_SWR_OPTIONS = {
   dedupingInterval: 0,
 } as const;
 
+const CATALOG_SWR_OPTIONS = {
+  revalidateOnFocus: false,
+  dedupingInterval: 5 * 60 * 1000,
+} as const;
+
 const CATALOG_MODELS_QUERY = "scope=catalog";
 
 function usePlatformCatalogModels(
@@ -52,7 +57,7 @@ function usePlatformCatalogModels(
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListPlatformCatalogModelsResponse>(`${key}`),
-    ORG_MODELS_SWR_OPTIONS
+    CATALOG_SWR_OPTIONS
   );
 
   return {
@@ -84,6 +89,27 @@ export function usePlatformCatalogVideoModels(
   return usePlatformCatalogModels(orgId, "video", options);
 }
 
+export function usePlatformVideoModelBaselines(orgId: string | undefined) {
+  const key = orgId
+    ? `${platformAiEndpoint(orgId)}/video-models?scope=platform-baseline`
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () =>
+      makeRequest<{ models: import("@dafthunk/types").PlatformVideoModelBaseline[] }>(
+        `${key}`
+      ),
+    ORG_MODELS_SWR_OPTIONS
+  );
+
+  return {
+    baselines: data?.models ?? [],
+    baselinesError: error,
+    isBaselinesLoading: isLoading,
+    refreshBaselines: mutate,
+  };
+}
+
 export function usePlatformCatalogAudioModels(
   orgId: string | undefined,
   options?: { readonly enabled?: boolean }
@@ -101,7 +127,7 @@ export function usePlatformModelChannels(
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => makeRequest<ListPlatformAiModelChannelsResponse>(`${key}`),
-    ORG_MODELS_SWR_OPTIONS
+    CATALOG_SWR_OPTIONS
   );
 
   return {
@@ -110,6 +136,17 @@ export function usePlatformModelChannels(
     isLoading: !data && isLoading,
     refreshChannels: mutate,
   };
+}
+
+/** Start fetching picker lists as soon as the add-API dialog opens. */
+export function usePrefetchSingleModelPickerData(
+  orgId: string | undefined
+): void {
+  usePlatformCatalogTextModels(orgId);
+  usePlatformCatalogImageModels(orgId);
+  usePlatformCatalogVideoModels(orgId);
+  usePlatformCatalogAudioModels(orgId);
+  usePlatformModelChannels(orgId);
 }
 
 export function useVolcanoAggregateCatalog(

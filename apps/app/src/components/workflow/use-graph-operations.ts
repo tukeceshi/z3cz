@@ -248,6 +248,9 @@ function applyGenerativeDefaultsOnCreate(
     {
       canonicalId: entry.canonicalId,
       interfaceId: entry.interfaceId,
+      ...(entry.instanceId?.trim()
+        ? { instanceId: entry.instanceId.trim() }
+        : {}),
     },
     entry.params ?? {}
   );

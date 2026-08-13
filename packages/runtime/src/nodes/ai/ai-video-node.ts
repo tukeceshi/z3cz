@@ -172,9 +172,16 @@ export class AiVideoNode extends ExecutableNode {
       );
     }
 
+    const modelInstanceId = context.inputs.model_instance_id;
+    const instanceId =
+      typeof modelInstanceId === "string" && modelInstanceId.trim().length > 0
+        ? modelInstanceId.trim()
+        : undefined;
+
     const resolvedModel = await context.resolveVideoModel(
       modelCanonicalId,
-      interfaceId
+      interfaceId,
+      instanceId
     );
     if (!resolvedModel) {
       return this.createErrorResult(
@@ -182,7 +189,10 @@ export class AiVideoNode extends ExecutableNode {
       );
     }
 
-    const resolvedInterface = await context.resolveAiInterface({ interfaceId });
+    const resolvedInterface = await context.resolveAiInterface({
+      interfaceId,
+      modelCanonicalId,
+    });
     if (!resolvedInterface) {
       return this.createErrorResult(
         "Could not resolve an AI interface. Please configure an AI interface in your organization settings."
@@ -270,6 +280,8 @@ export class AiVideoNode extends ExecutableNode {
             parameterRules: resolvedModel.parameterRules,
             generationParams,
             referenceImageUrls,
+            videoEndpoints: resolvedInterface.videoEndpoints,
+            formatTransform: resolvedInterface.formatTransform,
           });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {

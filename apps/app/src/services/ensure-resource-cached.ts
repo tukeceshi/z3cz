@@ -20,6 +20,8 @@ import { readGenerativeStagingBlob } from "@/services/generative-media-staging";
 
 import {
 
+  cloudUploadToResourceId,
+
   ensureGenerativeMediaCached,
 
   stageGenerativeMediaBlob,
@@ -298,13 +300,7 @@ export async function ensureLocalResourcesUploaded(params: {
 
 
 
-    const resourceId =
-
-      cloudObject.storageKey && cloudObject.storageKey.length > 0
-
-        ? cloudObject.storageKey
-
-        : cloudObject.id;
+    const promoted = cloudUploadToResourceId(cloudObject);
 
 
 
@@ -314,7 +310,7 @@ export async function ensureLocalResourcesUploaded(params: {
 
       workflowId: params.workflowId,
 
-      mediaId: resourceId,
+      mediaId: promoted.resourceId,
 
       blob: staging.blob,
 
@@ -334,7 +330,7 @@ export async function ensureLocalResourcesUploaded(params: {
 
 
 
-    next.push({ resourceId, mimeType: item.mimeType });
+    next.push(promoted);
 
   }
 

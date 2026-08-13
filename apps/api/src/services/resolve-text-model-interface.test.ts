@@ -96,6 +96,7 @@ describe("resolveOrgModelInterfaceBinding", () => {
         "resolveOrgModelInterfaceCandidate"
       )
       .mockResolvedValue({
+        instanceId: "doubao-seedream-5",
         interfaceId: "iface-1",
         interfaceName: "Volcano",
         channelKind: "aggregate",
@@ -105,10 +106,13 @@ describe("resolveOrgModelInterfaceBinding", () => {
     const db = {} as import("../db").Database;
     const listOptions = vi.fn(async () => [
       {
+        instanceId: "doubao-seedream-5",
         canonicalId: "doubao-seedream-5",
         interfaceId: "iface-1",
         selectable: true,
         displayName: "[聚合] Seedream 5",
+        channelKind: "aggregate" as const,
+        providerModelId: "seedream-id",
         parameterRules: { promptMaxChars: 2000 },
       },
     ]);
@@ -122,10 +126,12 @@ describe("resolveOrgModelInterfaceBinding", () => {
     );
 
     expect(resolved).toEqual({
+      instanceId: "doubao-seedream-5",
       canonicalId: "doubao-seedream-5",
       displayName: "[聚合] Seedream 5",
       interfaceId: "iface-1",
       interfaceName: "Volcano",
+      channelKind: "aggregate",
       providerModelId: "seedream-id",
       parameterRules: { promptMaxChars: 2000 },
     });
@@ -140,6 +146,7 @@ describe("resolveOrgModelInterfaceBinding", () => {
         "resolveOrgModelInterfaceCandidate"
       )
       .mockResolvedValue({
+        instanceId: "doubao-seedream-5",
         interfaceId: "iface-1",
         interfaceName: "Volcano",
         channelKind: "aggregate",
@@ -149,10 +156,13 @@ describe("resolveOrgModelInterfaceBinding", () => {
     const db = {} as import("../db").Database;
     const listOptions = vi.fn(async () => [
       {
+        instanceId: "doubao-seedream-5",
         canonicalId: "doubao-seedream-5",
         interfaceId: "iface-1",
         selectable: false,
         displayName: "[聚合] Seedream 5",
+        channelKind: "aggregate" as const,
+        providerModelId: "seedream-id",
         parameterRules: { promptMaxChars: 2000 },
       },
     ]);
@@ -180,8 +190,9 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
       region: "cn-beijing",
       models: {
         "deepseek-v4-pro": {
+          canonicalId: "deepseek-v4-pro",
           enabled: true,
-          providerModelId: "deepseek-v4-pro-260425",
+          upstreamModelId: "deepseek-v4-pro-260425",
           modality: "text",
         },
       },
@@ -205,7 +216,8 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
     expect(next.models["deepseek-v4-pro"]?.enabled).toBe(true);
     expect(next.models["deepseek-v4-flash"]).toEqual({
       enabled: false,
-      providerModelId: "deepseek-v4-flash-260425",
+      canonicalId: "deepseek-v4-flash",
+      upstreamModelId: "deepseek-v4-flash-260425",
       modality: "text",
     });
   });
@@ -219,8 +231,9 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
       region: "cn-beijing",
       models: {
         "glm-5-2": {
+          canonicalId: "glm-5-2",
           enabled: true,
-          providerModelId: "glm-5.2",
+          upstreamModelId: "glm-5.2",
           modality: "text",
         },
       },
@@ -237,7 +250,8 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
 
     expect(next.models["glm-5-2"]).toEqual({
       enabled: true,
-      providerModelId: "glm-5.2",
+      canonicalId: "glm-5-2",
+      upstreamModelId: "glm-5.2",
       modality: "text",
     });
   });

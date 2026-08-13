@@ -10,6 +10,7 @@ import {
 } from "@dafthunk/types";
 
 import type { OrgModelBindingRef } from "./org-model-selection-utils";
+import type { OrgVideoModelOption } from "@dafthunk/types";
 import type { GenerativeModelModality } from "./org-model-selection-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -20,6 +21,7 @@ export const REF_MAX_IMAGES_META_KEY = "refMaxImages" as const;
 export const REF_MAX_VIDEOS_META_KEY = "refMaxVideos" as const;
 export const REF_MAX_AUDIOS_META_KEY = "refMaxAudios" as const;
 export const REF_REFERENCE_MODE_META_KEY = "refReferenceMode" as const;
+export const REF_SUPPORTS_TASK_CANCEL_META_KEY = "refSupportsTaskCancel" as const;
 
 export function parseNonNegativeInt(
   raw: string | undefined,
@@ -83,12 +85,19 @@ export function generativeReferenceMetadataForModel(
           (model as { parameterRules: ImageModelParameterRules }).parameterRules
         )
       );
-    case "video":
-      return videoReferenceMetadataFromRules(
-        normalizeVideoModelParameterRules(
-          (model as { parameterRules: VideoModelParameterRules }).parameterRules
-        )
+    case "video": {
+      const videoRules = normalizeVideoModelParameterRules(
+        (model as { parameterRules: VideoModelParameterRules }).parameterRules
       );
+      const supportsTaskCancel =
+        (model as OrgVideoModelOption).supportsTaskCancel === true;
+      return {
+        ...videoReferenceMetadataFromRules(videoRules),
+        ...(supportsTaskCancel
+          ? { [REF_SUPPORTS_TASK_CANCEL_META_KEY]: "1" }
+          : {}),
+      };
+    }
     default:
       return undefined;
   }
@@ -147,6 +156,12 @@ export function readVideoReferenceLimitsFromMetadata(
       fallback.maxReferenceAudios
     ),
   };
+}
+
+export function readVideoTaskCancelSupportFromMetadata(
+  metadata: Record<string, string> | undefined
+): boolean {
+  return metadata?.[REF_SUPPORTS_TASK_CANCEL_META_KEY] === "1";
 }
 
 export function readVideoReferenceModeFromMetadata(

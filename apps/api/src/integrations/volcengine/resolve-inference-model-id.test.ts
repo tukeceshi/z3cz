@@ -81,4 +81,30 @@ describe("resolveVolcanoInferenceModelIdAfterEnsure", () => {
 
     expect(inferenceModelId).toBeNull();
   });
+
+  it("reads upstreamModelId from single-model instance map keyed by UUID", async () => {
+    vi.mocked(getOrganizationAiInterfaceRow).mockResolvedValue({
+      metadata: JSON.stringify({
+        channel: "single-model",
+        singleModelPresetId: "provider:newapi",
+        models: {
+          "550e8400-e29b-41d4-a716-446655440000": {
+            canonicalId: "seedance-1.5-pro",
+            enabled: true,
+            upstreamModelId: "seedance-1-5-pro",
+            modality: "video",
+          },
+        },
+      }),
+    } as never);
+
+    const inferenceModelId = await resolveVolcanoInferenceModelIdAfterEnsure({
+      db: {} as never,
+      organizationId: "org-1",
+      interfaceId: "iface-1",
+      canonicalId: "seedance-1.5-pro",
+    });
+
+    expect(inferenceModelId).toBe("seedance-1-5-pro");
+  });
 });

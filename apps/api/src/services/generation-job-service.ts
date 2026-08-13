@@ -10,15 +10,19 @@ import type {
   MediaReference,
 } from "@dafthunk/types";
 import {
+  buildVideoPollUrl,
   isEphemeralMediaReference,
   isGenerationJobReadyAtExpired,
+  isGrokImagineVideoCanonicalId,
+  isVeoCanonicalId,
   isVideoUpstreamPollDue,
   mediaReferenceToWorkflowValue,
   nextVideoUpstreamPollAt,
+  resolveOfficialVideoEndpoints,
   shouldDeferClientPersistToServer,
   type ResourceIdReference,
 } from "@dafthunk/types";
-import { pollOrgVideoTask } from "./org-video-task";
+import { pollOrgVideoTask, cancelOrgVideoTask } from "./org-video-task";
 import { createJobUpstreamRequestLogger } from "./job-upstream-request-logger";
 import { fetchWithUpstreamLog } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
@@ -293,15 +297,83 @@ async function persistPendingMediaOnServer(
 }
 
 function toCancelGenerationJobResponse(
-  job: GenerationJobRecord
+  job: GenerationJobRecord,
+  extras?: {
+    readonly upstreamCancelSkipped?: boolean;
+    readonly upstreamCancelFailed?: boolean;
+  }
 ): CancelGenerationJobResponse {
   return {
     ...toGetGenerationJobResponse(job),
     cancelled: job.status === "cancelled",
+    ...(extras?.upstreamCancelSkipped
+      ? { upstreamCancelSkipped: true }
+      : {}),
+    ...(extras?.upstreamCancelFailed ? { upstreamCancelFailed: true } : {}),
   };
 }
 
+async function tryCancelUpstreamVideoTask(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<{
+  readonly upstreamCancelSkipped: boolean;
+  readonly upstreamCancelFailed: boolean;
+}> {
+  if (
+    job.modality !== "video" ||
+    !job.upstreamTaskId ||
+    isGrokImagineVideoCanonicalId(job.modelCanonicalId) ||
+    isVeoCanonicalId(job.modelCanonicalId)
+  ) {
+    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+  }
+
+  const service = new CloudflareAiInterfaceService(env);
+  const iface = await service.resolveOrgInterface({
+    organizationId: job.organizationId,
+    interfaceId: job.interfaceId,
+    modelCanonicalId: job.modelCanonicalId,
+  });
+  if (!iface) {
+    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+  }
+
+  const videoEndpoints =
+    iface.videoEndpoints ?? resolveOfficialVideoEndpoints();
+  if (!videoEndpoints.supportsTaskCancel) {
+    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+  }
+
+  const pollUrl =
+    job.resultJson?.videoPollUrl ??
+    buildVideoPollUrl({
+      baseUrl: iface.baseUrl,
+      submitPath: videoEndpoints.submitPath,
+      taskId: job.upstreamTaskId,
+      useFullSubmitUrl: videoEndpoints.useFullSubmitUrl,
+    });
+
+  const result = await cancelOrgVideoTask({
+    apiKey: iface.apiKey,
+    canonicalId: job.modelCanonicalId,
+    pollUrl,
+    videoEndpoints,
+    upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
+  });
+
+  if (result.status === "skipped") {
+    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+  }
+  if (result.status === "failed") {
+    return { upstreamCancelSkipped: false, upstreamCancelFailed: true };
+  }
+  return { upstreamCancelSkipped: false, upstreamCancelFailed: false };
+}
+
 async function cancelGenerationJobRecord(
+  env: Bindings,
   db: Database,
   job: GenerationJobRecord
 ): Promise<CancelGenerationJobResponse> {
@@ -312,6 +384,8 @@ async function cancelGenerationJobRecord(
   if (job.status !== "pending" && job.status !== "generating") {
     return toCancelGenerationJobResponse(job);
   }
+
+  const upstreamCancel = await tryCancelUpstreamVideoTask(env, db, job);
 
   const cancelled = await updateGenerationJob(db, {
     id: job.id,
@@ -324,11 +398,11 @@ async function cancelGenerationJobRecord(
   if (cancelled) {
     await syncGenerationJobInvocation(db, cancelled);
     await writeGenerationJobCancelLog(db, cancelled);
-    return toCancelGenerationJobResponse(cancelled);
+    return toCancelGenerationJobResponse(cancelled, upstreamCancel);
   }
 
   const latest = await getGenerationJob(db, job.id, job.organizationId);
-  return toCancelGenerationJobResponse(latest ?? job);
+  return toCancelGenerationJobResponse(latest ?? job, upstreamCancel);
 }
 
 export async function pollVideoGenerationJob(
@@ -352,6 +426,7 @@ export async function pollVideoGenerationJob(
   const iface = await service.resolveOrgInterface({
     organizationId: job.organizationId,
     interfaceId: job.interfaceId,
+    modelCanonicalId: job.modelCanonicalId,
   });
   if (!iface) {
     const failed = await updateGenerationJob(db, {
@@ -717,7 +792,7 @@ export async function cancelUserGenerationJob(
     return null;
   }
 
-  return cancelGenerationJobRecord(db, job);
+  return cancelGenerationJobRecord(env, db, job);
 }
 
 export async function cancelUserGenerationJobByClientRequestId(
@@ -734,7 +809,7 @@ export async function cancelUserGenerationJobByClientRequestId(
     return null;
   }
 
-  return cancelGenerationJobRecord(db, job);
+  return cancelGenerationJobRecord(env, db, job);
 }
 
 export async function refreshGenerationJob(

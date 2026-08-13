@@ -790,6 +790,9 @@ function VideoModelSettingsDialog({
   const [generationFields, setGenerationFields] = useState<
     UpstreamParamProfileField[]
   >(baseRules.generationFields.map((field) => ({ ...field })));
+  const [supportsTaskCancel, setSupportsTaskCancel] = useState(
+    baseRules.supportsTaskCancel !== false
+  );
   const durationApiName =
     generationFields.find((field) => field.name === "duration")?.apiName ??
     "duration";
@@ -844,6 +847,7 @@ function VideoModelSettingsDialog({
         promptMaxChars:
           Number(promptMaxChars) ||
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
+        supportsTaskCancel,
         generationFields: ensureVideoGenerationFieldsForSave(generationFields),
       },
     });
@@ -932,6 +936,18 @@ function VideoModelSettingsDialog({
           onChange={setMaxAudioReferenceSeconds}
         />
       </SettingsSection>
+
+      <SettingsSection
+        compact
+        columns={1}
+        title={t("pages.aiInterfaces.singleModel.supportsTaskCancel")}
+        action={
+          <Switch
+            checked={supportsTaskCancel}
+            onCheckedChange={setSupportsTaskCancel}
+          />
+        }
+      />
 
       <SettingsSection
         compact

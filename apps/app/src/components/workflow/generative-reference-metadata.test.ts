@@ -39,6 +39,7 @@ describe("generativeReferenceMetadataForModel", () => {
   it("writes image and video reference snapshots", () => {
     const imageModel: OrgImageModelOption = {
       optionId: buildOrgModelOptionId("iface", "img"),
+      instanceId: "img",
       canonicalId: "img",
       interfaceId: "iface",
       channelKind: "aggregate",
@@ -65,6 +66,7 @@ describe("generativeReferenceMetadataForModel", () => {
 
     const videoModel: OrgVideoModelOption = {
       optionId: buildOrgModelOptionId("iface", "vid"),
+      instanceId: "vid",
       canonicalId: "vid",
       interfaceId: "iface",
       channelKind: "aggregate",
@@ -88,6 +90,7 @@ describe("generativeReferenceMetadataForModel", () => {
         ],
       },
       selectable: true,
+      supportsTaskCancel: true,
       description: "",
       sortOrder: 0,
       brandIcon: null,
@@ -97,6 +100,7 @@ describe("generativeReferenceMetadataForModel", () => {
       {
         refMaxVideos: "0",
         refReferenceMode: "first_last_frame",
+        refSupportsTaskCancel: "1",
       }
     );
   });
@@ -161,6 +165,7 @@ describe("applyModelBindingToNodeData", () => {
   it("always snapshots video reference metadata", () => {
     const model: OrgVideoModelOption = {
       optionId: buildOrgModelOptionId("iface", "vid"),
+      instanceId: "vid",
       canonicalId: "vid",
       interfaceId: "iface",
       channelKind: "aggregate",
@@ -173,6 +178,7 @@ describe("applyModelBindingToNodeData", () => {
         maxReferenceAudios: 0,
       },
       selectable: true,
+      supportsTaskCancel: true,
       description: "",
       sortOrder: 0,
       brandIcon: null,

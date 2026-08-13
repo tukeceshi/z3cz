@@ -286,6 +286,7 @@ export interface NodeContext {
   resolveAiInterface?: (params: {
     interfaceId?: string;
     templateId?: string;
+    modelCanonicalId?: string;
   }) => Promise<
     import("@dafthunk/types").ResolvedOrgAiInterface | undefined
   >;
@@ -347,7 +348,8 @@ export interface NodeContext {
   /** Resolve a platform video model to interface + provider model id. */
   resolveVideoModel?: (
     canonicalId: string,
-    interfaceId: string
+    interfaceId: string,
+    instanceId?: string
   ) => Promise<
     | {
         readonly interfaceId: string;

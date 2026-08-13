@@ -118,6 +118,7 @@ export interface VideoModelParameterRules {
   readonly maxAudioReferenceBytes: number;
   readonly maxAudioReferenceSeconds: number;
   readonly promptMaxChars: number;
+  readonly supportsTaskCancel?: boolean;
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
@@ -169,6 +170,7 @@ export type OrgTextModelUnavailableReason =
 
 export interface OrgTextModelOption {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
@@ -200,6 +202,21 @@ export interface PlatformCatalogModelOption {
 
 export interface ListPlatformCatalogModelsResponse {
   readonly models: readonly PlatformCatalogModelOption[];
+}
+
+/** Platform video model baseline for org capability-limit configuration. */
+export interface PlatformVideoModelBaseline {
+  readonly canonicalId: string;
+  readonly supportsTaskCancel: boolean;
+  readonly resolution: UpstreamParamProfileField | null;
+  readonly duration: UpstreamParamProfileField | null;
+  readonly maxReferenceImages: number;
+  readonly maxReferenceVideos: number;
+  readonly maxReferenceAudios: number;
+}
+
+export interface ListPlatformVideoModelBaselinesResponse {
+  readonly models: readonly PlatformVideoModelBaseline[];
 }
 
 export type AiModelInvocationStatus =
@@ -337,6 +354,7 @@ export type OrgImageModelUnavailableReason = OrgTextModelUnavailableReason;
 
 export interface OrgImageModelOption {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
@@ -383,6 +401,7 @@ export type OrgVideoModelUnavailableReason = OrgTextModelUnavailableReason;
 
 export interface OrgVideoModelOption {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
@@ -391,6 +410,7 @@ export interface OrgVideoModelOption {
   readonly modality: AiModelModality;
   readonly providerModelId: string;
   readonly parameterRules: VideoModelParameterRules;
+  readonly supportsTaskCancel: boolean;
   readonly selectable: boolean;
   readonly unavailableReason?: OrgVideoModelUnavailableReason;
   readonly description: string;
@@ -405,6 +425,7 @@ export interface ListOrgVideoModelsResponse {
 export interface SubmitAiVideoRequest {
   readonly modelCanonicalId: string;
   readonly aiInterfaceId: string;
+  readonly instanceId?: string;
   readonly prompt?: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
@@ -447,6 +468,7 @@ export type OrgAudioModelUnavailableReason = OrgTextModelUnavailableReason;
 
 export interface OrgAudioModelOption {
   readonly optionId: string;
+  readonly instanceId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly channelKind: OrgModelChannelKind;
@@ -867,6 +889,7 @@ export const DEFAULT_VIDEO_MODEL_PARAMETER_RULES: VideoModelParameterRules = {
   maxAudioReferenceBytes: 15 * 1024 * 1024,
   maxAudioReferenceSeconds: 15,
   promptMaxChars: 1000,
+  supportsTaskCancel: true,
   generationFields: DEFAULT_VIDEO_GENERATION_FIELDS,
 };
 
@@ -1004,6 +1027,9 @@ export function normalizeVideoModelParameterRules(
     promptMaxChars:
       rules.promptMaxChars ??
       DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
+    supportsTaskCancel:
+      rules.supportsTaskCancel ??
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES.supportsTaskCancel,
     generationFields,
   };
 }

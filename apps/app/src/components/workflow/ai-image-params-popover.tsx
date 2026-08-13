@@ -45,6 +45,7 @@ export interface AiImageParamsPopoverProps {
   readonly triggerLabel: string;
   readonly title: string;
   readonly onChange: (next: Record<string, unknown>) => void;
+  readonly displayMode?: "popover" | "inline";
 }
 
 export const RATIO_FIELD_NAMES = new Set(["ratio", "aspect_ratio"]);
@@ -776,6 +777,7 @@ export function AiImageParamsPopover({
   triggerLabel,
   title: _title,
   onChange,
+  displayMode = "popover",
 }: AiImageParamsPopoverProps) {
   const { t } = useTranslation();
   const smartLabel = t("workflow.aiImagePanel.smartOption");
@@ -812,6 +814,57 @@ export function AiImageParamsPopover({
     });
   };
 
+  const fieldPanel = (
+    <div
+      className={cn(
+        displayMode === "inline"
+          ? "flex flex-wrap items-end gap-x-4 gap-y-3"
+          : "space-y-4 max-h-[min(70vh,28rem)]",
+        displayMode === "popover" && LIST_SCROLL_CLASS
+      )}
+    >
+      {mainFields.map((field) => (
+        <FieldSection
+          key={field.name}
+          field={field}
+          value={readFieldValue(field, values)}
+          disabled={disabled}
+          sizeLabels={sizeLabels}
+          smartLabel={smartLabel}
+          onChange={(next) =>
+            handleFieldChange(field, next as string | number | boolean)
+          }
+        />
+      ))}
+      {tailFields.length > 0 ? (
+        <div
+          className={cn(
+            displayMode === "inline"
+              ? "flex flex-wrap items-center gap-2"
+              : "grid grid-cols-3 gap-2"
+          )}
+        >
+          {tailFields.map((field) => (
+            <TailFieldSection
+              key={field.name}
+              field={field}
+              value={readFieldValue(field, values)}
+              disabled={disabled}
+              smartLabel={smartLabel}
+              onChange={(next) =>
+                handleFieldChange(field, next as string | number | boolean)
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (displayMode === "inline") {
+    return fieldPanel;
+  }
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -833,48 +886,7 @@ export function AiImageParamsPopover({
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div
-          className={cn(
-            "space-y-4 max-h-[min(70vh,28rem)]",
-            LIST_SCROLL_CLASS
-          )}
-        >
-          {mainFields.map((field) => (
-            <FieldSection
-              key={field.name}
-              field={field}
-              value={readFieldValue(field, values)}
-              disabled={disabled}
-              sizeLabels={sizeLabels}
-              smartLabel={smartLabel}
-              onChange={(next) =>
-                handleFieldChange(
-                  field,
-                  next as string | number | boolean
-                )
-              }
-            />
-          ))}
-          {tailFields.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
-              {tailFields.map((field) => (
-                <TailFieldSection
-                  key={field.name}
-                  field={field}
-                  value={readFieldValue(field, values)}
-                  disabled={disabled}
-                  smartLabel={smartLabel}
-                  onChange={(next) =>
-                    handleFieldChange(
-                      field,
-                      next as string | number | boolean
-                    )
-                  }
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {fieldPanel}
       </PopoverContent>
     </Popover>
   );

@@ -11,6 +11,7 @@ function mockModel(
 ): OrgTextModelOption {
   return {
     optionId: buildOrgModelOptionId(interfaceId, canonicalId),
+    instanceId: canonicalId,
     canonicalId,
     interfaceId,
     channelKind: "aggregate",

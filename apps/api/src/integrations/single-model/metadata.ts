@@ -1,8 +1,14 @@
 import {
   isSingleModelProviderMetadata,
+  mergeSingleModelCapabilityLimitsByCanonicalId,
+  mergeSingleModelEndpointRules,
+  mergeSingleModelFormatTransformsByCanonicalId,
   mergeSingleModelModelAlias,
   mergeSingleModelModelEnabled,
   mergeSingleModelUpstreamModelIds,
+  normalizeOrgModelInstancesMap,
+  type SingleModelCapabilityLimits,
+  type SingleModelFormatTransform,
   type SingleModelProviderMetadata,
 } from "@dafthunk/types";
 
@@ -12,7 +18,13 @@ export function parseSingleModelMetadata(
   if (!raw || typeof raw !== "object") {
     return null;
   }
-  return isSingleModelProviderMetadata(raw) ? raw : null;
+  if (!isSingleModelProviderMetadata(raw)) {
+    return null;
+  }
+  return {
+    ...raw,
+    models: normalizeOrgModelInstancesMap(raw.models),
+  };
 }
 
 export function serializeSingleModelMetadata(
@@ -40,4 +52,32 @@ export function mergeSingleModelModelAliasMetadata(
   aliases: Readonly<Record<string, string>>
 ): SingleModelProviderMetadata {
   return mergeSingleModelModelAlias(metadata, aliases);
+}
+
+export function mergeSingleModelEndpointRulesMetadata(
+  metadata: SingleModelProviderMetadata,
+  rules: SingleModelProviderMetadata["endpointRules"]
+): SingleModelProviderMetadata {
+  return mergeSingleModelEndpointRules(metadata, rules);
+}
+
+export function mergeSingleModelFormatTransformsMetadata(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<Record<string, SingleModelFormatTransform | null | undefined>>
+): SingleModelProviderMetadata {
+  return mergeSingleModelFormatTransformsByCanonicalId(metadata, updates);
+}
+
+export function mergeSingleModelCapabilityLimitsMetadata(
+  metadata: SingleModelProviderMetadata,
+  updates: Readonly<Record<string, SingleModelCapabilityLimits | null | undefined>>
+): SingleModelProviderMetadata {
+  return mergeSingleModelCapabilityLimitsByCanonicalId(metadata, updates);
+}
+
+export function mergeSingleModelModelsMetadata(
+  metadata: SingleModelProviderMetadata,
+  models: SingleModelProviderMetadata["models"]
+): SingleModelProviderMetadata {
+  return { ...metadata, models };
 }
