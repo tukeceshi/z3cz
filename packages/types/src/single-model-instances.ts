@@ -1,10 +1,8 @@
 import type { AiModelModality } from "./ai-model-catalog";
+import type { SingleModelFormatTransform } from "./format-transform-template";
 import type { OrgModelInstanceConfig } from "./org-model-instance";
-import type {
-  SingleModelCapabilityLimits,
-  SingleModelFormatTransform,
-  SingleModelProviderMetadata,
-} from "./single-model-interface-metadata";
+import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
+import type { SingleModelProviderMetadata } from "./single-model-interface-metadata";
 
 export interface SingleModelInstanceDraft {
   readonly instanceId: string;

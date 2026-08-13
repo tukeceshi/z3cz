@@ -526,7 +526,7 @@ export function createDefaultDeepSeekSelection(
 }
 
 export function createDefaultSeedanceSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): SeedanceWizardSelection {
   return {
     kind: "seedance",
@@ -535,7 +535,7 @@ export function createDefaultSeedanceSelection(
 }
 
 export function createDefaultSeedreamSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): SeedreamWizardSelection {
   return {
     kind: "seedream",
@@ -544,7 +544,7 @@ export function createDefaultSeedreamSelection(
 }
 
 export function createDefaultSeedSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): SeedWizardSelection {
   return {
     kind: "seed",
@@ -553,7 +553,7 @@ export function createDefaultSeedSelection(
 }
 
 export function createDefaultGlmSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): GlmWizardSelection {
   return {
     kind: "glm",
@@ -562,7 +562,7 @@ export function createDefaultGlmSelection(
 }
 
 export function createDefaultKimiSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): KimiWizardSelection {
   return {
     kind: "kimi",
@@ -571,7 +571,7 @@ export function createDefaultKimiSelection(
 }
 
 export function createDefaultOpenAiSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): OpenAiWizardSelection {
   return {
     kind: "openai",
@@ -580,7 +580,7 @@ export function createDefaultOpenAiSelection(
 }
 
 export function createDefaultOpenAiImageSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): OpenAiImageWizardSelection {
   return {
     kind: "openai-image",
@@ -589,7 +589,7 @@ export function createDefaultOpenAiImageSelection(
 }
 
 export function createDefaultGeminiSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): GeminiWizardSelection {
   return {
     kind: "gemini",
@@ -598,7 +598,7 @@ export function createDefaultGeminiSelection(
 }
 
 export function createDefaultNanoBananaSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): NanoBananaWizardSelection {
   return {
     kind: "nano-banana",
@@ -607,7 +607,7 @@ export function createDefaultNanoBananaSelection(
 }
 
 export function createDefaultVeoSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): VeoWizardSelection {
   return {
     kind: "veo",
@@ -616,7 +616,7 @@ export function createDefaultVeoSelection(
 }
 
 export function createDefaultGrokSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): GrokWizardSelection {
   return {
     kind: "grok",
@@ -625,7 +625,7 @@ export function createDefaultGrokSelection(
 }
 
 export function createDefaultGrokImagineImageSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): GrokImagineImageWizardSelection {
   return {
     kind: "grok-imagine-image",
@@ -634,7 +634,7 @@ export function createDefaultGrokImagineImageSelection(
 }
 
 export function createDefaultGrokImagineVideoSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): GrokImagineVideoWizardSelection {
   return {
     kind: "grok-imagine-video",
@@ -643,7 +643,7 @@ export function createDefaultGrokImagineVideoSelection(
 }
 
 export function createDefaultClaudeSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): ClaudeWizardSelection {
   return {
     kind: "claude",
@@ -652,7 +652,7 @@ export function createDefaultClaudeSelection(
 }
 
 export function createDefaultMinimaxSpeechSelection(
-  enabledCanonicalIds: readonly string[]
+  _enabledCanonicalIds: readonly string[]
 ): MinimaxSpeechWizardSelection {
   return {
     kind: "minimax-speech",

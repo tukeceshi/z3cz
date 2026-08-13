@@ -1,8 +1,6 @@
 import type { AiModelModality } from "./ai-model-catalog";
-import type {
-  SingleModelCapabilityLimits,
-  SingleModelFormatTransform,
-} from "./single-model-interface-metadata";
+import type { SingleModelFormatTransform } from "./format-transform-template";
+import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
 
 /** Unified org model record stored in interface metadata.models[instanceId]. */
 export interface OrgModelInstanceConfig {
