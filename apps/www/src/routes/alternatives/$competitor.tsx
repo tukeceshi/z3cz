@@ -308,7 +308,7 @@ export default function AlternativePage({
               Start for free
             </a>
             <a
-              href="https://github.com/dafthunk-com/dafthunk"
+              href="https://github.com/tukeceshi/z3cz"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-lg bg-white border border-gray-300 text-gray-900 px-8 py-4 rounded-lg hover:bg-gray-50 transition-colors"

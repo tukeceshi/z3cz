@@ -2,6 +2,8 @@
 
 **开源可视化工作流与 AI 创作工作台**
 
+独立维护项目，源码仓库：[github.com/tukeceshi/z3cz](https://github.com/tukeceshi/z3cz)。
+
 [快速开始](#快速开始) · [核心功能](#核心功能) · [效果展示](#效果展示) · [项目结构](#项目结构) 
 
 ## 核心功能
@@ -41,7 +43,7 @@
 
 ```bash
 # 1. 环境 + 拉代码
-curl -fsSL "https://raw.githubusercontent.com/tukeceshi/dafthunk/main/bootstrap-install" | sudo bash
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
 
 # 2. 写域名配置
 sudo bash /var/dafthunk/scripts/host/configure.sh
@@ -119,8 +121,8 @@ CentOS / RHEL 若未自动启动：`sudo systemctl enable --now docker`。
 #### 启动
 
 ```bash
-git clone https://github.com/tukeceshi/dafthunk.git
-cd dafthunk
+git clone https://github.com/tukeceshi/z3cz.git
+cd z3cz
 docker compose up -d --build --wait   # 或 pnpm dev
 ```
 

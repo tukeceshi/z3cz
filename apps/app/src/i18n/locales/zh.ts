@@ -2702,7 +2702,7 @@ export const zh: TranslationDictionary = {
     execution: {
       errorTitle: "工作流执行错误",
       errorDescription:
-        "计算额度已用尽。感谢体验预览版。源码见 https://github.com/tukeceshi/dafthunk。",
+        "计算额度已用尽。感谢体验预览版。源码见 https://github.com/tukeceshi/z3cz。",
       close: "关闭",
     },
     generativeCancel: {

@@ -17,7 +17,7 @@ const navigation: NavigationItem[] = [
   { href: "/docs", label: "Docs" },
   { href: "/blog", label: "Blog" },
   {
-    href: "https://github.com/dafthunk-com/dafthunk",
+    href: "https://github.com/tukeceshi/z3cz",
     label: "GitHub",
     external: true,
   },

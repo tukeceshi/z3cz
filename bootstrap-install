@@ -2,7 +2,7 @@
 # Downloads scripts/host/bootstrap.sh and runs it.
 set -euo pipefail
 
-URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host/bootstrap.sh}"
+URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/z3cz/main/scripts/host/bootstrap.sh}"
 TARGET="${DAFTHUNK_BOOTSTRAP_SCRIPT:-/tmp/dafthunk-bootstrap.sh}"
 
 if command -v curl >/dev/null 2>&1; then

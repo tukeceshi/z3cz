@@ -40,7 +40,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           "@type": "ImageObject",
           url: `${websiteUrl}/icon.svg`,
         },
-        sameAs: ["https://github.com/dafthunk-com/dafthunk"],
+        sameAs: ["https://github.com/tukeceshi/z3cz"],
         contactPoint: {
           "@type": "ContactPoint",
           email: "contact@dafthunk.com",
@@ -85,7 +85,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           "MIT licensed, self-host on your own Cloudflare account",
         ],
         license: "https://opensource.org/licenses/MIT",
-        codeRepository: "https://github.com/dafthunk-com/dafthunk",
+        codeRepository: "https://github.com/tukeceshi/z3cz",
       },
     ],
   };
