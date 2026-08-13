@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
+    "@types/smtp-server": "^3.5.13",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

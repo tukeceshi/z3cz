@@ -38,7 +38,7 @@ async function forwardToApi(
       "X-Envelope-From": envelope.from,
       "X-Envelope-To": toAddress,
     },
-    body: rawMime,
+    body: new Uint8Array(rawMime),
   });
 
   if (!response.ok) {
@@ -63,7 +63,7 @@ function startGateway(config: GatewayConfig): SMTPServer {
             await forwardToApi(
               config,
               {
-                from: session.envelope.mailFrom ?? "",
+                from: session.envelope.mailFrom ? session.envelope.mailFrom.address : "",
                 to: session.envelope.rcptTo.map((rcpt) => rcpt.address),
               },
               rawMime
