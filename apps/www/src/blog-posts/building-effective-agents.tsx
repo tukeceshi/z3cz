@@ -249,7 +249,7 @@ export const buildingEffectiveAgentsContent = (
       <Link to="/docs/concepts">core concepts</Link> page describes how
       triggers, executions, and resources fit together. z3cz.com is{" "}
       <a
-        href="https://github.com/dafthunk-com/dafthunk"
+        href="https://github.com/tukeceshi/z3cz"
         target="_blank"
         rel="noopener noreferrer"
       >

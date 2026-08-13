@@ -5,9 +5,9 @@
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
-REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/dafthunk.git}"
+REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/z3cz.git}"
 BRANCH="${DAFTHUNK_BRANCH:-main}"
-RAW_BASE="${DAFTHUNK_RAW_BASE:-https://raw.githubusercontent.com/tukeceshi/dafthunk/main/scripts/host}"
+RAW_BASE="${DAFTHUNK_RAW_BASE:-https://raw.githubusercontent.com/tukeceshi/z3cz/main/scripts/host}"
 
 log() { printf '==> %s\n' "$*"; }
 info() { printf ' -> %s\n' "$*"; }

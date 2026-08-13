@@ -128,7 +128,7 @@ export default function DocsDevelopers() {
       <ol>
         <li>
           克隆仓库：
-          <code>git clone https://github.com/dafthunk-com/dafthunk.git</code>
+          <code>git clone https://github.com/tukeceshi/z3cz.git</code>
         </li>
         <li>
           复制配置：
@@ -160,7 +160,7 @@ export default function DocsDevelopers() {
       <p>
         在{" "}
         <a
-          href="https://github.com/dafthunk-com/dafthunk/issues"
+          href="https://github.com/tukeceshi/z3cz/issues"
           target="_blank"
           rel="noopener noreferrer"
         >

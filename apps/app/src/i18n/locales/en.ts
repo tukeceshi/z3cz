@@ -2809,7 +2809,7 @@ export const en = {
     execution: {
       errorTitle: "Workflow Execution Error",
       errorDescription:
-        "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/tukeceshi/dafthunk.",
+        "You have run out of compute credits. Thanks for checking out the preview. The code is available at https://github.com/tukeceshi/z3cz.",
       close: "Close",
     },
     generativeCancel: {

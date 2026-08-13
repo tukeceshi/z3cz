@@ -95,7 +95,7 @@ export function SiteFooter() {
             Blog
           </a>
           <a
-            href="https://github.com/dafthunk-com/dafthunk/issues"
+            href="https://github.com/tukeceshi/z3cz/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="text-base hover:text-white"
@@ -113,7 +113,7 @@ export function SiteFooter() {
         </p>
         <nav className="flex flex-wrap items-center gap-8">
           <a
-            href="https://github.com/dafthunk-com/dafthunk"
+            href="https://github.com/tukeceshi/z3cz"
             target="_blank"
             rel="noopener noreferrer"
             className="text-base hover:text-white"

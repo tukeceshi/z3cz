@@ -81,7 +81,7 @@ export function AppHeader() {
             </NavLink>
           )}
           <a
-            href="https://github.com/tukeceshi/dafthunk"
+            href="https://github.com/tukeceshi/z3cz"
             target="_blank"
             rel="noopener noreferrer"
             className={navLinkClasses}
