@@ -126,7 +126,7 @@ export function formatPollValuesForInput(
 
 export function isTransformPollMappingComplete(
   pollMapping: TransformPollMapping | undefined | null
-): boolean {
+): pollMapping is TransformPollMapping {
   if (!pollMapping) {
     return false;
   }
