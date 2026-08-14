@@ -376,6 +376,8 @@ export interface NodeContext {
   inferAudioModelInterfaceId?: (
     canonicalId: string
   ) => Promise<string | undefined>;
+  /** Load persisted text content by resource id (AI text references). */
+  readTextContent?: (resourceId: string) => Promise<string | null>;
   /** Resolve ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution

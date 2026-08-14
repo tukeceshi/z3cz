@@ -1,8 +1,9 @@
 import type { FormatTransformProvider } from "@dafthunk/types";
 import {
-  FORMAT_TRANSFORM_PROVIDERS,
   isTransformMappingConfigComplete,
   isTransformPollMappingComplete,
+  listSingleModelGroupIds,
+  resolveSingleModelGroupLabel,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -134,7 +135,7 @@ export function AdminApiForwardingCreateDialog(
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>{t("adminApiForwarding.provider")}</Label>
+                  <Label>{t("adminApiForwarding.singleModelGroup")}</Label>
                   <Select
                     value={form.provider}
                     onValueChange={(value) =>
@@ -148,9 +149,9 @@ export function AdminApiForwardingCreateDialog(
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {FORMAT_TRANSFORM_PROVIDERS.map((provider) => (
-                        <SelectItem key={provider} value={provider}>
-                          {provider}
+                      {listSingleModelGroupIds().map((groupId) => (
+                        <SelectItem key={groupId} value={groupId}>
+                          {resolveSingleModelGroupLabel(groupId)}
                         </SelectItem>
                       ))}
                     </SelectContent>

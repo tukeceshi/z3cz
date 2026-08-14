@@ -2,6 +2,7 @@ import type {
   AudioModelParameterRules,
   UpstreamParamProfileField,
 } from "@dafthunk/types";
+import { buildVideoSubmitUrl } from "@dafthunk/types";
 import {
   fetchWithUpstreamLog,
   type UpstreamRequestLogSink,
@@ -18,6 +19,7 @@ export interface ExecuteMinimaxSpeechParams {
   readonly parameterRules: AudioModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly useFullSubmitUrl?: boolean;
 }
 
 export interface ExecuteMinimaxSpeechResult {
@@ -66,10 +68,6 @@ function buildVoiceSetting(
   return voiceSetting;
 }
 
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
-
 export async function executeMinimaxSpeech(
   params: ExecuteMinimaxSpeechParams
 ): Promise<ExecuteMinimaxSpeechResult> {
@@ -83,7 +81,11 @@ export async function executeMinimaxSpeech(
     );
 
     const response = await fetchWithUpstreamLog(
-      `${normalizeBaseUrl(params.baseUrl)}/v1/t2a_v2`,
+      buildVideoSubmitUrl({
+        baseUrl: params.baseUrl,
+        submitPath: "/v1/t2a_v2",
+        useFullSubmitUrl: params.useFullSubmitUrl,
+      }),
       {
         method: "POST",
         headers: {

@@ -505,6 +505,13 @@
       "when": 1789160000000,
       "tag": "0076_format_transform_poll_mapping",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1789240000000,
+      "tag": "0077_format_transform_provider_to_group",
+      "breakpoints": true
     }
   ]
 }

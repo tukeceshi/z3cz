@@ -20,4 +20,14 @@ describe("resolveSyncRequestUrl", () => {
       )
     ).toBe("https://ark.cn-beijing.volces.com/api/v3/chat/completions");
   });
+
+  it("uses base URL as-is when useFullSubmitUrl is enabled", () => {
+    expect(
+      resolveSyncRequestUrl(
+        "https://host/v1/custom/chat/completions",
+        "/chat/completions",
+        { useFullSubmitUrl: true }
+      )
+    ).toBe("https://host/v1/custom/chat/completions");
+  });
 });

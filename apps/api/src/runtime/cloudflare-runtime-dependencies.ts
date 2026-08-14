@@ -43,6 +43,7 @@ import { resolveAiVideoStorage } from "../services/ai-video-storage";
 import { resolveAiAudioStorage } from "../services/ai-audio-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "../services/assert-cloud-storage-healthy-for-generative-media";
 import { createWorkflowGenerationJobTracker } from "../services/workflow-generation-job-tracker";
+import { readTextContentBody } from "../services/text-content-service";
 
 export async function buildDependencies(
   env: Bindings,
@@ -124,6 +125,7 @@ export async function buildDependencies(
       return resolveAiAudioStorage(env, params);
     },
     trackWorkflowGenerationJob: createWorkflowGenerationJobTracker(env),
+    readTextContent: (params) => readTextContentBody(env, params),
     runtimeVersion,
   };
 }

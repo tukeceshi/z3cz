@@ -1,5 +1,6 @@
 import {
   createEphemeralMediaExpiresAt,
+  buildVideoSubmitUrl,
   normalizeAudioModelParameterRules,
   type AudioModelParameterRules,
   type EphemeralMediaReference,
@@ -68,9 +69,6 @@ function buildVoiceSetting(
   return voiceSetting;
 }
 
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
 
 function hexToUint8Array(hex: string): Uint8Array {
   const normalized = hex.trim();
@@ -89,6 +87,7 @@ async function requestMinimaxSpeech(params: {
   readonly parameterRules: AudioModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly useFullSubmitUrl?: boolean;
 }): Promise<
   | { readonly ok: true; readonly audio: Uint8Array; readonly mimeType: string }
   | { readonly ok: false; readonly error: string }
@@ -103,7 +102,11 @@ async function requestMinimaxSpeech(params: {
     );
 
     const response = await fetchWithUpstreamLog(
-      `${normalizeBaseUrl(params.baseUrl)}/v1/t2a_v2`,
+      buildVideoSubmitUrl({
+        baseUrl: params.baseUrl,
+        submitPath: "/v1/t2a_v2",
+        useFullSubmitUrl: params.useFullSubmitUrl,
+      }),
       {
         method: "POST",
         headers: {
@@ -176,6 +179,7 @@ export async function executeMinimaxAudioGeneration(params: {
   readonly workflowId?: string;
   readonly cloudUpload?: CloudImageUploadTarget;
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly useFullSubmitUrl?: boolean;
 }): Promise<MinimaxAudioGenerationResult> {
   const rules = normalizeAudioModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -199,6 +203,7 @@ export async function executeMinimaxAudioGeneration(params: {
     parameterRules: rules,
     generationParams: params.generationParams,
     upstreamLog: params.upstreamLog,
+    useFullSubmitUrl: params.useFullSubmitUrl,
   });
 
   if (!speechResult.ok) {

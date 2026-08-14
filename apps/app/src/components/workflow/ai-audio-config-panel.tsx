@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
 import {
@@ -74,7 +75,6 @@ import { generativePromptWithinModelLimit } from "./generative-card-upload-utils
 import {
   hasAiAudioPromptReference,
   listPickableAiAudioPromptSources,
-  resolveAiAudioReferencedPrompt,
   evaluateAiAudioPromptReferenceStructural,
   collectAiAudioPromptReferenceChips,
 } from "./ai-audio-prompt-reference";
@@ -148,15 +148,15 @@ export function AiAudioConfigPanel({
     [edges, nodeId]
   );
 
-  const referencedPrompt = useMemo(
-    () =>
-      resolveAiAudioReferencedPrompt({
-        nodeId,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      }),
-    [edges, nodeId, typedNodes]
-  );
+  const { text: referencedPrompt, loading: referencedPromptLoading } =
+    useResolvedReferencedPrompt({
+      nodeId,
+      targetHandle: AI_AUDIO_PROMPT_HANDLE_ID,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      organizationId: orgId,
+      workflowId,
+    });
 
   const modelFitsCurrentRefs = useCallback(
     (_model: OrgTextModelOption) => true,
@@ -239,7 +239,14 @@ export function AiAudioConfigPanel({
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
   useEffect(() => {
-    if (!hasPromptReference || disabled || !updateNodeData) return;
+    if (
+      !hasPromptReference ||
+      disabled ||
+      !updateNodeData ||
+      referencedPromptLoading
+    ) {
+      return;
+    }
     if (referencedPrompt === promptValue) return;
     updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
   }, [
@@ -249,19 +256,13 @@ export function AiAudioConfigPanel({
     nodeId,
     promptValue,
     referencedPrompt,
+    referencedPromptLoading,
     updateNodeData,
   ]);
 
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
-  const promptForGenerate = useMemo(() => {
-    if (!hasPromptReference) return displayPrompt;
-    return resolveAiAudioReferencedPrompt({
-      nodeId,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-    });
-  }, [displayPrompt, edges, hasPromptReference, nodeId, typedNodes]);
+  const promptForGenerate = displayPrompt;
   const promptMaxLength = modelRules.promptMaxChars;
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;

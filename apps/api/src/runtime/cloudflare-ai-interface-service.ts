@@ -50,6 +50,16 @@ function resolveVideoEndpointsFromMetadata(
   return resolveSingleModelVideoEndpoints({ metadata, supportsTaskCancel });
 }
 
+function resolveUseFullSubmitUrlFromMetadata(
+  metadataRaw: string | null
+): boolean {
+  const metadata = parseInterfaceMetadata(metadataRaw);
+  if (!isSingleModelProviderMetadata(metadata)) {
+    return false;
+  }
+  return metadata.endpointRules?.useFullSubmitUrl === true;
+}
+
 async function resolveSupportsTaskCancelForModel(
   env: Bindings,
   metadataRaw: string | null,
@@ -203,6 +213,7 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
         params.organizationId
       );
       let videoEndpoints = resolveVideoEndpointsFromMetadata(row.metadata);
+      const useFullSubmitUrl = resolveUseFullSubmitUrlFromMetadata(row.metadata);
       const formatTransform = await resolveFormatTransformFromMetadata(
         this.env,
         row.metadata,
@@ -227,6 +238,7 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
         apiKey,
         videoEndpoints,
         formatTransform,
+        useFullSubmitUrl,
       });
     } catch (error) {
       console.error(

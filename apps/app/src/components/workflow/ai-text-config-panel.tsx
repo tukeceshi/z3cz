@@ -2,7 +2,6 @@ import {
   AI_TEXT_NODE_TYPE,
   normalizeTextModelParameterRules,
   validateAiTextPromptAssembly,
-  type AiTextReferenceInput,
   type GenerateAiTextResponse,
   isClientCancelledTextModelError,
   type MediaReference,
@@ -28,6 +27,9 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { inferAiTextMimeType } from "@dafthunk/types";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
+import {
+  resolveAiTextReferenceInputsFromChips,
+} from "./resolve-ai-text-result";
 import { useObjectService } from "@/services/object-service";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
@@ -191,14 +193,10 @@ export function AiTextConfigPanel({
     });
   }, [data, effectiveModel, textModelCatalog]);
 
-  const textReferences = useMemo((): readonly AiTextReferenceInput[] => {
-    return referenceChips
-      .filter((chip) => chip.kind === "text" && chip.textExcerpt?.trim())
-      .map((chip) => ({
-        name: chip.label,
-        content: chip.textExcerpt!.trim(),
-      }));
-  }, [referenceChips]);
+  const textReferenceChips = useMemo(
+    () => referenceChips.filter((chip) => chip.kind === "text"),
+    [referenceChips]
+  );
 
   const imageMediaReferences = useMemo((): readonly MediaReference[] => {
     return referenceChips
@@ -419,8 +417,14 @@ export function AiTextConfigPanel({
       return;
     }
 
+    const textReferences = await resolveAiTextReferenceInputsFromChips({
+      chips: textReferenceChips,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      organizationId: orgId,
+      workflowId,
+    });
+
     const assembly = validateAiTextPromptAssembly({
-      references: textReferences,
       question,
       parameterRules: modelRules,
       mediaReferenceCount,
@@ -597,12 +601,9 @@ export function AiTextConfigPanel({
     !disabled &&
     !isGenerating &&
     !(hasNonTextReferences && !modelSupportsMedia) &&
-    validateAiTextPromptAssembly({
-      references: textReferences,
-      question: promptBuffer.value,
-      parameterRules: modelRules,
-      mediaReferenceCount,
-    }).ok;
+    (promptBuffer.value.trim().length > 0 ||
+      mediaReferenceCount > 0 ||
+      textReferenceChips.length > 0);
 
   const pickableOutputs = useMemo((): readonly GenerativePickNodeEntry[] => {
     return listPickableReferenceSources({

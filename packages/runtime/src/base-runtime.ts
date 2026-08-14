@@ -141,6 +141,11 @@ export interface RuntimeDependencies<Env = unknown> {
   resolveAiAudioStorage?: ResolveAiImageStorage;
   /** Workflow cloud generation job tracking. */
   trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
+  /** Load persisted text content by resource id (AI text keyword references). */
+  readTextContent?: (params: {
+    readonly organizationId: string;
+    readonly resourceId: string;
+  }) => Promise<string | null>;
   runtimeVersion?: string;
 }
 
@@ -186,6 +191,7 @@ export abstract class Runtime<Env = unknown> {
   protected resolveAiVideoStorage?: ResolveAiImageStorage;
   protected resolveAiAudioStorage?: ResolveAiImageStorage;
   protected trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
+  protected readTextContent?: RuntimeDependencies<Env>["readTextContent"];
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -228,6 +234,7 @@ export abstract class Runtime<Env = unknown> {
     this.resolveAiVideoStorage = dependencies.resolveAiVideoStorage;
     this.resolveAiAudioStorage = dependencies.resolveAiAudioStorage;
     this.trackWorkflowGenerationJob = dependencies.trackWorkflowGenerationJob;
+    this.readTextContent = dependencies.readTextContent;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -1321,6 +1328,13 @@ export abstract class Runtime<Env = unknown> {
               this.audioModelService!.inferAudioModelInterfaceId({
                 organizationId: context.organizationId,
                 canonicalId,
+              })
+          : undefined,
+        readTextContent: this.readTextContent
+          ? (resourceId) =>
+              this.readTextContent!({
+                organizationId: context.organizationId,
+                resourceId,
               })
           : undefined,
         resolveAiImageStorage: this.resolveAiImageStorage

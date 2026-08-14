@@ -25,6 +25,7 @@ import { Link, useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
 import {
@@ -132,7 +133,6 @@ import {
 import {
   hasAiVideoPromptReference,
   listPickableAiVideoPromptSources,
-  resolveAiVideoReferencedPrompt,
   evaluateAiVideoPromptReferenceStructural,
   collectAiVideoUnifiedReferenceChips,
 } from "./ai-video-prompt-reference";
@@ -271,15 +271,15 @@ export function AiVideoConfigPanel({
     [edges, nodeId]
   );
 
-  const referencedPrompt = useMemo(
-    () =>
-      resolveAiVideoReferencedPrompt({
-        nodeId,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      }),
-    [edges, nodeId, typedNodes]
-  );
+  const { text: referencedPrompt, loading: referencedPromptLoading } =
+    useResolvedReferencedPrompt({
+      nodeId,
+      targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      organizationId: orgId,
+      workflowId,
+    });
 
   const referenceCounts = useMemo(
     () =>
@@ -471,7 +471,14 @@ export function AiVideoConfigPanel({
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
   useEffect(() => {
-    if (!hasPromptReference || disabled || !updateNodeData) return;
+    if (
+      !hasPromptReference ||
+      disabled ||
+      !updateNodeData ||
+      referencedPromptLoading
+    ) {
+      return;
+    }
     if (referencedPrompt === promptValue) return;
     updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
   }, [
@@ -481,6 +488,7 @@ export function AiVideoConfigPanel({
     nodeId,
     promptValue,
     referencedPrompt,
+    referencedPromptLoading,
     updateNodeData,
   ]);
 

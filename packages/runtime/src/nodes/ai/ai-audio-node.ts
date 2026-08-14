@@ -191,6 +191,7 @@ export class AiAudioNode extends ExecutableNode {
       organizationId: context.organizationId,
       workflowId: context.workflowId,
       cloudUpload: storageResolution.cloudUpload,
+      useFullSubmitUrl: resolvedInterface.useFullSubmitUrl,
     });
 
     if (result.status === "failed") {

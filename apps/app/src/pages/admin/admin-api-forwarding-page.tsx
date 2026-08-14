@@ -45,11 +45,9 @@ import {
   useAdminFormatTransformTemplates,
 
 } from "@/services/admin-format-transform-service";
-
-
+import { resolveSingleModelGroupLabel } from "@dafthunk/types";
 
 export function AdminApiForwardingPage() {
-
   const { t } = useTranslation();
 
   const navigate = useNavigate();
@@ -200,7 +198,9 @@ export function AdminApiForwardingPage() {
 
                 <TableCell className="align-top font-medium">{template.name}</TableCell>
 
-                <TableCell className="align-top">{template.provider}</TableCell>
+                <TableCell className="align-top">
+                  {resolveSingleModelGroupLabel(template.provider)}
+                </TableCell>
 
                 <TableCell className="align-top">
 

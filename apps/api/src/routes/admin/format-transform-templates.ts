@@ -1,10 +1,9 @@
 import type {
   CreateFormatTransformTemplateRequest,
-  FormatTransformProvider,
   ListFormatTransformTemplatesResponse,
   UpdateFormatTransformTemplateRequest,
 } from "@dafthunk/types";
-import { FORMAT_TRANSFORM_PROVIDERS, FORWARDING_LOCKED_RESOLUTIONS } from "@dafthunk/types";
+import { FORWARDING_LOCKED_RESOLUTIONS } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -20,13 +19,6 @@ import {
 } from "../../db";
 
 const adminFormatTransformTemplateRoutes = new Hono<ApiContext>();
-
-const providerSchema = z.enum(
-  FORMAT_TRANSFORM_PROVIDERS as unknown as [
-    (typeof FORMAT_TRANSFORM_PROVIDERS)[number],
-    ...(typeof FORMAT_TRANSFORM_PROVIDERS)[number][],
-  ]
-);
 
 const valueTypeSchema = z.enum([
   "string",
@@ -78,7 +70,7 @@ const pollMappingSchema = z.object({
 
 const createTemplateSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  provider: providerSchema,
+  provider: z.string().trim().min(1).max(120),
   upstreamParams: z.array(upstreamParamSchema).optional(),
   paramMappings: z.array(paramMappingSchema).optional(),
   pollMapping: pollMappingSchema.optional(),
@@ -89,7 +81,7 @@ const createTemplateSchema = z.object({
 
 const updateTemplateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  provider: providerSchema.optional(),
+  provider: z.string().trim().min(1).max(120).optional(),
   upstreamParams: z.array(upstreamParamSchema).optional(),
   paramMappings: z.array(paramMappingSchema).optional(),
   pollMapping: pollMappingSchema.optional(),

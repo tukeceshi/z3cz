@@ -991,6 +991,7 @@ export const zh: TranslationDictionary = {
     slug: "Slug",
     proxySlug: "代理标识",
     provider: "Provider",
+    singleModelGroup: "单模型分组",
     upstreamUrl: "上游根 URL",
     upstreamUrlHelp:
       "填上游 API 根地址（如 https://host/v1）。代理会把 slug 后面的路径拼到此地址后；请自行确保与组织接口路径一致。",
@@ -1003,7 +1004,7 @@ export const zh: TranslationDictionary = {
     disabled: "已停用",
     columns: {
       name: "名称",
-      provider: "Provider",
+      provider: "分组",
       upstream: "上游",
       proxyPath: "代理路径",
       status: "状态",
@@ -1036,6 +1037,7 @@ export const zh: TranslationDictionary = {
       pollSuccessValues: "成功状态值",
       pollFailedValues: "失败状态值",
       pollOutputKey: "成功内容键名",
+      standardSchemaEmpty: "该分组暂无标准数据结构。",
     },
   },
   errors: {
