@@ -2,6 +2,7 @@ import type {
   FormatTransformConfig,
   ReferenceImageInline,
   ResolvedSingleModelVideoEndpoints,
+  TransformPollMapping,
   VideoModelParameterRules,
 } from "@dafthunk/types";
 import {
@@ -20,6 +21,7 @@ import {
 import type { ObjectStore } from "../node-types";
 import type { CloudImageUploadTarget } from "./execute-volcano-image";
 import { applyForwardingMappings } from "./apply-forwarding-mappings";
+import { parsePollResponse } from "./parse-poll-response";
 import {
   fetchWithUpstreamLog,
   type UpstreamRequestLogSink,
@@ -84,6 +86,7 @@ export function createVolcanoVideoPollContinuation(params: {
   pollUrl: string;
   interfaceId: string;
   organizationId: string;
+  modelCanonicalId?: string;
   pollIntervalMs?: number;
   timeoutMinutes?: number;
   generationJobId?: string;
@@ -109,6 +112,9 @@ export function createVolcanoVideoPollContinuation(params: {
     metadata: {
       interfaceId: params.interfaceId,
       organizationId: params.organizationId,
+      ...(params.modelCanonicalId
+        ? { modelCanonicalId: params.modelCanonicalId }
+        : {}),
       ...(params.generationJobId
         ? { generationJobId: params.generationJobId }
         : {}),
@@ -233,6 +239,7 @@ export async function submitVolcanoVideoTask(params: {
 export async function pollVolcanoVideoTask(params: {
   readonly apiKey: string;
   readonly pollUrl: string;
+  readonly pollMapping?: TransformPollMapping;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
   const response = await fetchWithUpstreamLog(
@@ -265,6 +272,10 @@ export async function pollVolcanoVideoTask(params: {
         parsed.error?.message ??
         `Poll request failed (${response.status}): ${text.slice(0, 300)}`,
     };
+  }
+
+  if (params.pollMapping) {
+    return parsePollResponse(parsed, params.pollMapping);
   }
 
   const status = (parsed.status ?? "").trim().toLowerCase();
@@ -429,6 +440,7 @@ export async function awaitVolcanoVideoPoll(params: {
   readonly pollUrl: string;
   readonly pollIntervalMs: number;
   readonly timeoutAt: string;
+  readonly pollMapping?: TransformPollMapping;
 }): Promise<VolcanoVideoPollResult> {
   const deadline = Date.parse(params.timeoutAt);
 
@@ -436,6 +448,7 @@ export async function awaitVolcanoVideoPoll(params: {
     const result = await pollVolcanoVideoTask({
       apiKey: params.apiKey,
       pollUrl: params.pollUrl,
+      pollMapping: params.pollMapping,
     });
 
     if (result.status !== "pending") {

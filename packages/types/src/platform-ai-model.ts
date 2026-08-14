@@ -1446,9 +1446,7 @@ export function buildVolcanoImageGenerationBody(params: {
     } else {
       body.sequential_image_generation = "disabled";
       delete body.sequential_image_generation_options;
-      if (generateCount > 1) {
-        body[countApiName] = generateCount;
-      }
+      body[countApiName] = generateCount;
     }
   } else {
     body.sequential_image_generation = "disabled";

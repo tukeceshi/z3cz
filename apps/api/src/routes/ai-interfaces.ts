@@ -263,6 +263,14 @@ const singleModelFormatTransformSchema = z.object({
   sourceTemplateId: z.string().trim().min(1),
   upstreamParams: z.array(transformUpstreamParamSchema),
   paramMappings: z.array(transformParamMappingSchema),
+  pollMapping: z
+    .object({
+      statusKey: z.string().trim().min(1),
+      outputKey: z.string().trim().min(1),
+      successValues: z.array(z.string().trim().min(1)).min(1),
+      failedValues: z.array(z.string().trim().min(1)).min(1),
+    })
+    .optional(),
 });
 
 const upstreamParamProfileFieldSchema = z.object({

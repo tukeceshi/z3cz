@@ -72,6 +72,7 @@ class VolcanoVideoUpstreamPollProvider implements UpstreamPollProvider {
     const iface = await context.aiInterfaceService.resolveOrgInterface({
       organizationId,
       interfaceId,
+      modelCanonicalId: continuation.metadata?.modelCanonicalId,
     });
 
     if (!iface?.apiKey) {
@@ -84,6 +85,7 @@ class VolcanoVideoUpstreamPollProvider implements UpstreamPollProvider {
     const pollResult = await pollVolcanoVideoTask({
       apiKey: iface.apiKey,
       pollUrl: continuation.pollUrl,
+      pollMapping: iface.formatTransform?.pollMapping,
     });
 
     if (pollResult.status === "failed") {

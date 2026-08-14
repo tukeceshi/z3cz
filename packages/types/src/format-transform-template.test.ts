@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSeedanceTransformExamplePreset,
+  createDefaultTransformPollMapping,
   describeFormatTransformTemplateRules,
   findTransformSchemaNodeById,
   isTransformMappingConfigComplete,
+  isTransformPollMappingComplete,
+  resolveTransformPollMapping,
   resolveTransformUpstreamDisplayExample,
 } from "./format-transform-template";
 
@@ -31,6 +34,7 @@ describe("format-transform-template presets", () => {
         preset.paramMappings
       )
     ).toBe(true);
+    expect(isTransformPollMappingComplete(preset.pollMapping)).toBe(true);
   });
 
   it("rejects incomplete mapping config", () => {
@@ -38,6 +42,13 @@ describe("format-transform-template presets", () => {
     expect(
       isTransformMappingConfigComplete(preset.upstreamParams, [])
     ).toBe(false);
+  });
+
+  it("defaults incomplete poll mapping", () => {
+    expect(resolveTransformPollMapping(null)).toEqual(
+      createDefaultTransformPollMapping()
+    );
+    expect(isTransformPollMappingComplete({} as never)).toBe(false);
   });
 
   it("describes configured template rules for display", () => {

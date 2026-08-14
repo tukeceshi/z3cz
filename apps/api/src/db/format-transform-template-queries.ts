@@ -4,10 +4,14 @@ import type {
   FormatTransformTemplate,
   ForwardingLockedResolution,
   TransformParamMapping,
+  TransformPollMapping,
   TransformUpstreamParam,
   UpdateFormatTransformTemplateRequest,
 } from "@dafthunk/types";
-import { FORWARDING_LOCKED_RESOLUTIONS } from "@dafthunk/types";
+import {
+  FORWARDING_LOCKED_RESOLUTIONS,
+  resolveTransformPollMapping,
+} from "@dafthunk/types";
 import { asc, eq } from "drizzle-orm";
 
 import type { Database } from "./index";
@@ -69,6 +73,30 @@ function parseScope(value: string | null | undefined): FormatTransformScope {
   return value === "platform" ? "platform" : "platform";
 }
 
+function parsePollMapping(value: unknown): TransformPollMapping {
+  if (typeof value !== "object" || value === null) {
+    return resolveTransformPollMapping(null);
+  }
+
+  const mapping = value as TransformPollMapping;
+  return resolveTransformPollMapping({
+    statusKey:
+      typeof mapping.statusKey === "string" ? mapping.statusKey : "",
+    outputKey:
+      typeof mapping.outputKey === "string" ? mapping.outputKey : "",
+    successValues: Array.isArray(mapping.successValues)
+      ? mapping.successValues.filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+    failedValues: Array.isArray(mapping.failedValues)
+      ? mapping.failedValues.filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+  });
+}
+
 function rowToTemplate(
   row: typeof formatTransformTemplates.$inferSelect
 ): FormatTransformTemplate {
@@ -79,6 +107,7 @@ function rowToTemplate(
     scope: parseScope(row.scope),
     upstreamParams: parseUpstreamParams(row.upstreamParams),
     paramMappings: parseParamMappings(row.paramMappings),
+    pollMapping: parsePollMapping(row.pollMapping),
     lockedResolution: parseLockedResolution(row.lockedResolution),
     supportsTaskCancel: row.supportsTaskCancel,
     enabled: row.enabled,
@@ -144,6 +173,7 @@ export async function createFormatTransformTemplate(
       scope: "platform",
       upstreamParams: params.input.upstreamParams ?? [],
       paramMappings: params.input.paramMappings ?? [],
+      pollMapping: resolveTransformPollMapping(params.input.pollMapping),
       lockedResolution: params.input.lockedResolution ?? null,
       supportsTaskCancel: params.input.supportsTaskCancel ?? false,
       enabled: params.input.enabled ?? true,
@@ -182,6 +212,9 @@ export async function updateFormatTransformTemplate(
   }
   if (params.input.paramMappings !== undefined) {
     patch.paramMappings = params.input.paramMappings;
+  }
+  if (params.input.pollMapping !== undefined) {
+    patch.pollMapping = resolveTransformPollMapping(params.input.pollMapping);
   }
   if (params.input.lockedResolution !== undefined) {
     patch.lockedResolution = params.input.lockedResolution;

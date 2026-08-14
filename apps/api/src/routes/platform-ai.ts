@@ -1846,6 +1846,8 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     baseUrl: iface.baseUrl,
     upstreamTaskId: taskId,
     videoPollUrl: trackedJob?.resultJson?.videoPollUrl,
+    videoEndpoints: iface.videoEndpoints,
+    formatTransform: iface.formatTransform,
     upstreamLog: pollLog,
   });
 

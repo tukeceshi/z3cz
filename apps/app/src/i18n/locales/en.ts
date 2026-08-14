@@ -1006,6 +1006,7 @@ export const en = {
       mappingSection: "Parameter mappings",
       mappingValidation:
         "Add at least one upstream parameter and map every parameter.",
+      pollMappingValidation: "Complete all poll task parameter fields.",
     },
     saveSuccess: "Forwarding rule saved.",
     saveError: "Failed to save forwarding rule.",
@@ -1060,6 +1061,13 @@ export const en = {
       standardSchemaPickHelp:
         "Select a standard field, then add the upstream parameter on the left.",
       exampleStructure: "Actual structure",
+      pollTaskParams: "Poll task parameters",
+      pollTaskParamsHelp:
+        "Configure status and output URL fields in poll responses.",
+      pollStatusKey: "Status key",
+      pollSuccessValues: "Success status values",
+      pollFailedValues: "Failed status values",
+      pollOutputKey: "Success output key",
     },
   },
   errors: {
@@ -1702,6 +1710,7 @@ export const en = {
           "Format transform not configured. Open settings to configure.",
         formatTransformIncomplete:
           "Format transform mapping is incomplete. Map every upstream parameter.",
+        pollMappingIncomplete: "Poll task parameters are incomplete.",
         rulesSettingsTitle: "Rules settings",
         capabilityLimitsTitle: "Capability limits",
         formatMappingTitle: "Format mapping",
