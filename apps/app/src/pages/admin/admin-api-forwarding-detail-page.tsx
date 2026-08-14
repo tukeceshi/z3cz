@@ -1,8 +1,13 @@
 import type {
   ForwardingParamMapping,
   ForwardingUpstreamParam,
+  TransformPollMapping,
 } from "@dafthunk/types";
-import { isTransformMappingConfigComplete } from "@dafthunk/types";
+import {
+  isTransformMappingConfigComplete,
+  isTransformPollMappingComplete,
+  resolveTransformPollMapping,
+} from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -38,6 +43,9 @@ export function AdminApiForwardingDetailPage() {
   const [paramMappings, setParamMappings] = useState<
     readonly ForwardingParamMapping[]
   >([]);
+  const [pollMapping, setPollMapping] = useState<TransformPollMapping>(
+    resolveTransformPollMapping(undefined)
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -47,6 +55,7 @@ export function AdminApiForwardingDetailPage() {
     setName(template.name);
     setUpstreamParams(template.upstreamParams);
     setParamMappings(template.paramMappings);
+    setPollMapping(template.pollMapping);
   }, [template]);
 
   const setBreadcrumbs = useBreadcrumbsSetter();
@@ -79,12 +88,18 @@ export function AdminApiForwardingDetailPage() {
       return;
     }
 
+    if (!isTransformPollMappingComplete(pollMapping)) {
+      toast.error(t("adminApiForwarding.createWizard.pollMappingValidation"));
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updateAdminFormatTransformTemplate(id, {
         name: name.trim(),
         upstreamParams,
         paramMappings,
+        pollMapping,
       });
       toast.success(t("adminApiForwarding.saveSuccess"));
       await refreshTemplate();
@@ -153,6 +168,7 @@ export function AdminApiForwardingDetailPage() {
               onApply={(source) => {
                 setUpstreamParams(source.upstreamParams);
                 setParamMappings(source.paramMappings);
+                setPollMapping(source.pollMapping);
               }}
             />
           </div>
@@ -162,6 +178,8 @@ export function AdminApiForwardingDetailPage() {
             paramMappings={paramMappings}
             onUpstreamParamsChange={setUpstreamParams}
             onParamMappingsChange={setParamMappings}
+            pollMapping={pollMapping}
+            onPollMappingChange={setPollMapping}
           />
         </section>
       </div>

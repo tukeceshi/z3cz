@@ -317,6 +317,14 @@ export const formatTransformTemplates = pgTable(
     scope: text("scope").notNull().default("platform"),
     upstreamParams: jsonb("upstream_params").notNull().default([]),
     paramMappings: jsonb("param_mappings").notNull().default([]),
+    pollMapping: jsonb("poll_mapping")
+      .notNull()
+      .default({
+        statusKey: "status",
+        successValues: ["succeeded", "success"],
+        failedValues: ["failed", "expired"],
+        outputKey: "content.video_url",
+      }),
     lockedResolution: text("locked_resolution"),
     supportsTaskCancel: boolean("supports_task_cancel").notNull().default(false),
     enabled: boolean("enabled").notNull().default(true),

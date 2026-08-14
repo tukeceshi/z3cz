@@ -1,9 +1,13 @@
 import type {
   FormatTransformTemplate,
   SingleModelFormatTransform,
+  TransformPollMapping,
 } from "@dafthunk/types";
 import {
+  createDefaultTransformPollMapping,
   isTransformMappingConfigComplete,
+  isTransformPollMappingComplete,
+  resolveTransformPollMapping,
   singleModelFormatTransformFromTemplate,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
@@ -56,6 +60,9 @@ export function FormatMappingSettingsDialog({
   const [paramMappings, setParamMappings] = useState<
     SingleModelFormatTransform["paramMappings"]
   >([]);
+  const [pollMapping, setPollMapping] = useState<TransformPollMapping>(
+    createDefaultTransformPollMapping()
+  );
 
   useEffect(() => {
     if (!open) {
@@ -67,6 +74,7 @@ export function FormatMappingSettingsDialog({
     setMappingTemplateId(templateId || null);
     setUpstreamParams(value?.upstreamParams ?? []);
     setParamMappings(value?.paramMappings ?? []);
+    setPollMapping(resolveTransformPollMapping(value?.pollMapping));
   }, [open, value]);
 
   const appliedTemplate =
@@ -96,6 +104,7 @@ export function FormatMappingSettingsDialog({
     const snapshot = singleModelFormatTransformFromTemplate(template);
     setUpstreamParams(snapshot.upstreamParams);
     setParamMappings(snapshot.paramMappings);
+    setPollMapping(snapshot.pollMapping);
     setMappingTemplateId(sourceTemplateId);
   };
 
@@ -115,10 +124,16 @@ export function FormatMappingSettingsDialog({
       return;
     }
 
+    if (!isTransformPollMappingComplete(pollMapping)) {
+      appToast.error("pages.aiInterfaces.singleModel.pollMappingIncomplete");
+      return;
+    }
+
     onChange({
       sourceTemplateId: sourceTemplateId.trim(),
       upstreamParams,
       paramMappings,
+      pollMapping,
     });
     onOpenChange(false);
   };
@@ -178,6 +193,8 @@ export function FormatMappingSettingsDialog({
             paramMappings={paramMappings}
             onUpstreamParamsChange={setUpstreamParams}
             onParamMappingsChange={setParamMappings}
+            pollMapping={pollMapping}
+            onPollMappingChange={setPollMapping}
           />
         </div>
 

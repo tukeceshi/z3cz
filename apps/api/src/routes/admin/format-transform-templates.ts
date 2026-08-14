@@ -69,11 +69,19 @@ const paramMappingSchema = z
     { message: "Mapping requires sourcePath or transform" }
   );
 
+const pollMappingSchema = z.object({
+  statusKey: z.string().trim().min(1),
+  outputKey: z.string().trim().min(1),
+  successValues: z.array(z.string().trim().min(1)).min(1),
+  failedValues: z.array(z.string().trim().min(1)).min(1),
+});
+
 const createTemplateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   provider: providerSchema,
   upstreamParams: z.array(upstreamParamSchema).optional(),
   paramMappings: z.array(paramMappingSchema).optional(),
+  pollMapping: pollMappingSchema.optional(),
   lockedResolution: lockedResolutionSchema.nullable().optional(),
   supportsTaskCancel: z.boolean().optional(),
   enabled: z.boolean().optional(),
@@ -84,6 +92,7 @@ const updateTemplateSchema = z.object({
   provider: providerSchema.optional(),
   upstreamParams: z.array(upstreamParamSchema).optional(),
   paramMappings: z.array(paramMappingSchema).optional(),
+  pollMapping: pollMappingSchema.optional(),
   lockedResolution: lockedResolutionSchema.nullable().optional(),
   supportsTaskCancel: z.boolean().optional(),
   enabled: z.boolean().optional(),

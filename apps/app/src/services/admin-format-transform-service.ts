@@ -4,9 +4,12 @@ import type {
   FormatTransformTemplate,
   ForwardingParamMapping,
   ForwardingUpstreamParam,
+  TransformPollMapping,
   UpdateFormatTransformTemplateRequest,
 } from "@dafthunk/types";
 import useSWR from "swr";
+
+import { createDefaultTransformPollMapping } from "@dafthunk/types";
 
 import { makeRequest } from "./utils";
 
@@ -87,6 +90,7 @@ export interface FormatTransformCreateFormState {
   readonly provider: FormatTransformProvider;
   readonly upstreamParams: readonly ForwardingUpstreamParam[];
   readonly paramMappings: readonly ForwardingParamMapping[];
+  readonly pollMapping: TransformPollMapping;
 }
 
 export const emptyFormatTransformCreateForm = (): FormatTransformCreateFormState => ({
@@ -94,4 +98,5 @@ export const emptyFormatTransformCreateForm = (): FormatTransformCreateFormState
   provider: "seedance",
   upstreamParams: [],
   paramMappings: [],
+  pollMapping: createDefaultTransformPollMapping(),
 });

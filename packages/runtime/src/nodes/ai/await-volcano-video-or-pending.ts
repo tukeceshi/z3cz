@@ -1,4 +1,4 @@
-import type { NodeExecution, ParameterValue, UpstreamPollContinuation } from "@dafthunk/types";
+import type { NodeExecution, ParameterValue, TransformPollMapping, UpstreamPollContinuation } from "@dafthunk/types";
 
 import type { NodeContext } from "../../node-types";
 import {
@@ -38,6 +38,7 @@ export async function awaitVolcanoVideoOrPending(params: {
   context: NodeContext;
   continuation: UpstreamPollContinuation;
   apiKey: string;
+  pollMapping?: TransformPollMapping;
   timeoutLabel: string;
   storageMode: "ephemeral" | "cloud";
   cloudUpload?: import("../../ai-interface/execute-volcano-image").CloudImageUploadTarget;
@@ -121,6 +122,7 @@ export async function awaitVolcanoVideoOrPending(params: {
             pollUrl: continuation.pollUrl,
             pollIntervalMs: continuation.pollIntervalMs,
             timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
+            pollMapping: params.pollMapping,
           });
 
   if (pollResult.status === "failed") {

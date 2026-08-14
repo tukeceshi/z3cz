@@ -1,6 +1,7 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { OrgModelInstanceConfig } from "./org-model-instance";
 import type { SingleModelFormatTransform } from "./format-transform-template";
+import { resolveTransformPollMapping } from "./format-transform-template";
 import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
 import type { SingleModelEndpointRules } from "./single-model-endpoint-rules";
 import {
@@ -681,7 +682,10 @@ export function readSingleModelFormatTransform(
   if (!transform?.sourceTemplateId?.trim()) {
     return null;
   }
-  return transform;
+  return {
+    ...transform,
+    pollMapping: resolveTransformPollMapping(transform.pollMapping),
+  };
 }
 
 export function clearAllSingleModelFormatTransforms(

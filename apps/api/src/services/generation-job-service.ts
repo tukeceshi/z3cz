@@ -449,6 +449,8 @@ export async function pollVideoGenerationJob(
     baseUrl,
     upstreamTaskId: job.upstreamTaskId,
     videoPollUrl: job.resultJson?.videoPollUrl,
+    videoEndpoints: iface.videoEndpoints,
+    formatTransform: iface.formatTransform,
     upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
   });
 

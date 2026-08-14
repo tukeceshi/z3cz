@@ -80,6 +80,63 @@ export interface TransformStandardSchemaNode {
 /** @deprecated Use TransformStandardSchemaNode */
 export type StandardSchemaNode = TransformStandardSchemaNode;
 
+export interface TransformPollMapping {
+  readonly statusKey: string;
+  readonly successValues: readonly string[];
+  readonly failedValues: readonly string[];
+  readonly outputKey: string;
+}
+
+export const DEFAULT_TRANSFORM_POLL_MAPPING: TransformPollMapping = {
+  statusKey: "status",
+  successValues: ["succeeded", "success"],
+  failedValues: ["failed", "expired"],
+  outputKey: "content.video_url",
+};
+
+export function createDefaultTransformPollMapping(): TransformPollMapping {
+  return DEFAULT_TRANSFORM_POLL_MAPPING;
+}
+
+export function parsePollValuesFromInput(input: string): readonly string[] {
+  return input
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+export function formatPollValuesForInput(
+  values: readonly string[]
+): string {
+  return values.join(",");
+}
+
+export function isTransformPollMappingComplete(
+  pollMapping: TransformPollMapping | undefined | null
+): boolean {
+  if (!pollMapping) {
+    return false;
+  }
+
+  return (
+    pollMapping.statusKey.trim().length > 0 &&
+    pollMapping.outputKey.trim().length > 0 &&
+    pollMapping.successValues.length > 0 &&
+    pollMapping.failedValues.length > 0 &&
+    pollMapping.successValues.every((value) => value.trim().length > 0) &&
+    pollMapping.failedValues.every((value) => value.trim().length > 0)
+  );
+}
+
+export function resolveTransformPollMapping(
+  pollMapping: TransformPollMapping | undefined | null
+): TransformPollMapping {
+  if (isTransformPollMappingComplete(pollMapping)) {
+    return pollMapping;
+  }
+  return createDefaultTransformPollMapping();
+}
+
 export interface FormatTransformTemplate {
   readonly id: string;
   readonly name: string;
@@ -87,6 +144,7 @@ export interface FormatTransformTemplate {
   readonly scope: FormatTransformScope;
   readonly upstreamParams: readonly TransformUpstreamParam[];
   readonly paramMappings: readonly TransformParamMapping[];
+  readonly pollMapping: TransformPollMapping;
   readonly lockedResolution: ForwardingLockedResolution | null;
   readonly supportsTaskCancel: boolean;
   readonly enabled: boolean;
@@ -98,6 +156,7 @@ export interface FormatTransformTemplate {
 export interface FormatTransformConfig {
   readonly upstreamParams: readonly TransformUpstreamParam[];
   readonly paramMappings: readonly TransformParamMapping[];
+  readonly pollMapping: TransformPollMapping;
   readonly lockedResolution?: ForwardingLockedResolution | null;
 }
 
@@ -106,19 +165,21 @@ export interface SingleModelFormatTransform {
   readonly sourceTemplateId: string;
   readonly upstreamParams: readonly TransformUpstreamParam[];
   readonly paramMappings: readonly TransformParamMapping[];
+  readonly pollMapping: TransformPollMapping;
   readonly lockedResolution?: ForwardingLockedResolution | null;
 }
 
 export function singleModelFormatTransformFromTemplate(
   template: Pick<
     FormatTransformTemplate,
-    "id" | "upstreamParams" | "paramMappings" | "lockedResolution"
+    "id" | "upstreamParams" | "paramMappings" | "pollMapping" | "lockedResolution"
   >
 ): SingleModelFormatTransform {
   return {
     sourceTemplateId: template.id,
     upstreamParams: template.upstreamParams,
     paramMappings: template.paramMappings,
+    pollMapping: resolveTransformPollMapping(template.pollMapping),
     ...(template.lockedResolution
       ? { lockedResolution: template.lockedResolution }
       : {}),
@@ -131,6 +192,7 @@ export function singleModelFormatTransformToConfig(
   return {
     upstreamParams: transform.upstreamParams,
     paramMappings: transform.paramMappings,
+    pollMapping: resolveTransformPollMapping(transform.pollMapping),
     ...(transform.lockedResolution !== undefined
       ? { lockedResolution: transform.lockedResolution }
       : {}),
@@ -150,6 +212,7 @@ export interface CreateFormatTransformTemplateRequest {
   readonly provider: FormatTransformProvider;
   readonly upstreamParams?: readonly TransformUpstreamParam[];
   readonly paramMappings?: readonly TransformParamMapping[];
+  readonly pollMapping?: TransformPollMapping;
   readonly lockedResolution?: ForwardingLockedResolution | null;
   readonly supportsTaskCancel?: boolean;
   readonly enabled?: boolean;
@@ -160,6 +223,7 @@ export interface UpdateFormatTransformTemplateRequest {
   readonly provider?: FormatTransformProvider;
   readonly upstreamParams?: readonly TransformUpstreamParam[];
   readonly paramMappings?: readonly TransformParamMapping[];
+  readonly pollMapping?: TransformPollMapping;
   readonly lockedResolution?: ForwardingLockedResolution | null;
   readonly supportsTaskCancel?: boolean;
   readonly enabled?: boolean;
@@ -423,6 +487,7 @@ function findSchemaPath(schemaNodeId: string): string {
 export function buildSeedanceTransformExamplePreset(): {
   readonly upstreamParams: readonly TransformUpstreamParam[];
   readonly paramMappings: readonly TransformParamMapping[];
+  readonly pollMapping: TransformPollMapping;
 } {
   const upstreamParams: TransformUpstreamParam[] = [];
   const paramMappings: TransformParamMapping[] = [];
@@ -443,7 +508,11 @@ export function buildSeedanceTransformExamplePreset(): {
     });
   }
 
-  return { upstreamParams, paramMappings };
+  return {
+    upstreamParams,
+    paramMappings,
+    pollMapping: createDefaultTransformPollMapping(),
+  };
 }
 
 /** @deprecated Use buildSeedanceTransformExamplePreset */

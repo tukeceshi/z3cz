@@ -2,6 +2,7 @@ import type { FormatTransformProvider } from "@dafthunk/types";
 import {
   FORMAT_TRANSFORM_PROVIDERS,
   isTransformMappingConfigComplete,
+  isTransformPollMappingComplete,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -69,6 +70,11 @@ export function AdminApiForwardingCreateDialog(
       return;
     }
 
+    if (!isTransformPollMappingComplete(form.pollMapping)) {
+      toast.error(t("adminApiForwarding.createWizard.pollMappingValidation"));
+      return;
+    }
+
     setIsCreating(true);
     try {
       await createAdminFormatTransformTemplate({
@@ -76,6 +82,7 @@ export function AdminApiForwardingCreateDialog(
         provider: form.provider,
         upstreamParams: form.upstreamParams,
         paramMappings: form.paramMappings,
+        pollMapping: form.pollMapping,
       });
       toast.success(t("adminApiForwarding.createSuccess"));
       props.onOpenChange(false);
@@ -166,6 +173,7 @@ export function AdminApiForwardingCreateDialog(
                       ...current,
                       upstreamParams: template.upstreamParams,
                       paramMappings: template.paramMappings,
+                      pollMapping: template.pollMapping,
                     }))
                   }
                 />
@@ -179,6 +187,10 @@ export function AdminApiForwardingCreateDialog(
                 }
                 onParamMappingsChange={(paramMappings) =>
                   setForm((current) => ({ ...current, paramMappings }))
+                }
+                pollMapping={form.pollMapping}
+                onPollMappingChange={(pollMapping) =>
+                  setForm((current) => ({ ...current, pollMapping }))
                 }
               />
             </section>

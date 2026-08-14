@@ -1,5 +1,6 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { SingleModelFormatTransform } from "./format-transform-template";
+import { resolveTransformPollMapping } from "./format-transform-template";
 import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
 
 /** Unified org model record stored in interface metadata.models[instanceId]. */
@@ -66,7 +67,12 @@ export function normalizeOrgModelInstanceConfig(
       : {}),
     ...(record.formatTransform && typeof record.formatTransform === "object"
       ? {
-          formatTransform: record.formatTransform as SingleModelFormatTransform,
+          formatTransform: {
+            ...(record.formatTransform as SingleModelFormatTransform),
+            pollMapping: resolveTransformPollMapping(
+              (record.formatTransform as SingleModelFormatTransform).pollMapping
+            ),
+          },
         }
       : {}),
   };

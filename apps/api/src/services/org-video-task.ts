@@ -130,6 +130,8 @@ export async function pollOrgVideoTask(params: {
   readonly baseUrl: string;
   readonly upstreamTaskId: string;
   readonly videoPollUrl?: string;
+  readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
+  readonly formatTransform?: FormatTransformConfig;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoPollResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
@@ -167,6 +169,7 @@ export async function pollOrgVideoTask(params: {
         taskId: params.upstreamTaskId,
         useFullSubmitUrl: params.videoEndpoints?.useFullSubmitUrl,
       }),
+    pollMapping: params.formatTransform?.pollMapping,
     upstreamLog: params.upstreamLog,
   });
 }

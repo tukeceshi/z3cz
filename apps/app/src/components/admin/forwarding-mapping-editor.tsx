@@ -3,6 +3,7 @@ import type {
   ForwardingParamMapping,
   ForwardingUpstreamParam,
   StandardSchemaNode,
+  TransformPollMapping,
 } from "@dafthunk/types";
 import {
   buildTransformParamMappingFromSchemaNode,
@@ -22,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { cn } from "@/utils/utils";
 
+import { PollMappingFields } from "./poll-mapping-fields";
+
 interface ForwardingMappingEditorProps {
   readonly provider: ApiFormatForwardingProvider;
   readonly upstreamParams: readonly ForwardingUpstreamParam[];
@@ -32,6 +35,8 @@ interface ForwardingMappingEditorProps {
   readonly onParamMappingsChange: (
     mappings: readonly ForwardingParamMapping[]
   ) => void;
+  readonly pollMapping?: TransformPollMapping;
+  readonly onPollMappingChange?: (value: TransformPollMapping) => void;
 }
 
 function formatSchemaExample(example: unknown): string {
@@ -265,6 +270,13 @@ export function ForwardingMappingEditor(props: ForwardingMappingEditorProps) {
             })
           )}
         </div>
+
+        {props.pollMapping && props.onPollMappingChange ? (
+          <PollMappingFields
+            value={props.pollMapping}
+            onChange={props.onPollMappingChange}
+          />
+        ) : null}
       </div>
 
       <div className="space-y-4 rounded-lg border bg-background p-4">
