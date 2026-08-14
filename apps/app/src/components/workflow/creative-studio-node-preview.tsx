@@ -16,7 +16,6 @@ import LoaderIcon from "lucide-react/icons/loader-circle";
 import { useMemo } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
-import { useAuth } from "@/components/auth-context";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
@@ -34,7 +33,6 @@ import type { GenerativeCardUploadKind } from "./generative-card-upload-utils";
 import { StudioMediaEmptyPreview } from "./creative-studio-media-preview-frame";
 import { readStudioMediaCardState } from "./studio-media-card-state";
 import { StudioMediaFullPreview } from "./studio-media-full-preview";
-import { useCreativeStudio } from "./creative-studio-context";
 import {
   STUDIO_PREVIEW_MEDIA_FALLBACK,
   STUDIO_REFERENCE_THUMB,
@@ -308,16 +306,16 @@ export function CreativeStudioNodePreview({
   detailDisplayStale,
 }: CreativeStudioNodePreviewProps) {
   const { t } = useTranslation();
-  const { organization } = useAuth();
-  const { workflowId } = useCreativeStudio();
   const nodeType = data.nodeType ?? "";
   const resolvedText = useResolvedAiText({
-    organizationId: organization?.id,
-    workflowId,
     inputs: data.inputs,
     outputs: data.outputs,
+    nodeData: data,
   });
-  const textPreview = (resolvedText.excerpt ?? resolvedText.text).trim();
+  const textPreview =
+    variant === "detail"
+      ? resolvedText.text.trim()
+      : resolvedText.displayExcerpt.trim();
 
   const primaryImage = readAiImageCardPrimaryImage(
     data.inputs,

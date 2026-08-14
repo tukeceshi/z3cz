@@ -8,6 +8,7 @@ import {
   RoutePageFallback,
   type RoutePageFallbackProps,
 } from "@/components/route-page-fallback";
+import { ensureConsolePageReady } from "@/utils/console-prefetch";
 
 type LazyModule = Record<string, ComponentType<object> | unknown>;
 
@@ -17,6 +18,7 @@ export function lazyRoutePage(
   fallback: RoutePageFallbackProps["variant"] = "inset"
 ): ComponentType<object> {
   const LazyPage = lazy(async () => {
+    await ensureConsolePageReady(exportName);
     const module = await loader();
     const component = module[exportName];
     if (typeof component !== "function") {

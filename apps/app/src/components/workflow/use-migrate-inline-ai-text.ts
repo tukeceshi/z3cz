@@ -8,6 +8,7 @@ import {
   migrateInlineAiTextNodeData,
   nodeHasInlineAiText,
 } from "./migrate-inline-ai-text";
+import { isAiTextGenerating } from "./ai-text-node-utils";
 
 interface UseMigrateInlineAiTextParams {
   readonly organizationId: string | undefined;
@@ -56,8 +57,10 @@ export function useMigrateInlineAiText({
     }
 
     const snapshotNodes = nodesRef.current;
-    const targets = snapshotNodes.filter((node) =>
-      nodeHasInlineAiText(node.data)
+    const targets = snapshotNodes.filter(
+      (node) =>
+        nodeHasInlineAiText(node.data) &&
+        !isAiTextGenerating(node.data.metadata)
     );
     if (targets.length === 0) {
       migratedFingerprintRef.current = inlineFingerprint;

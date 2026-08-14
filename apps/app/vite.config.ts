@@ -1,8 +1,9 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import fs from "node:fs";
 import path from "path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 import { bootstrapManifestPlugin } from "./vite-plugin-bootstrap-manifest";
 
@@ -20,8 +21,60 @@ const apiProxyConfig = {
   },
 };
 
+function isBootstrapArchivePath(urlPath: string): boolean {
+  return /\/assets\/(?:shell|prefetch)-.+\.gz$/.test(urlPath);
+}
+
+function bootstrapArchivePreviewPlugin(): Plugin {
+  let outDir = path.resolve(process.cwd(), "dist");
+
+  const serveBootstrapArchive = (
+    root: string,
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void
+  ) => {
+    const urlPath = req.url?.split("?")[0] ?? "";
+    if (req.method !== "GET" || !isBootstrapArchivePath(urlPath)) {
+      next();
+      return;
+    }
+
+    const filePath = path.join(root, urlPath);
+    if (!fs.existsSync(filePath)) {
+      next();
+      return;
+    }
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    fs.createReadStream(filePath).pipe(res);
+  };
+
+  return {
+    name: "bootstrap-archive-preview",
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        serveBootstrapArchive(outDir, req, res, next);
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        serveBootstrapArchive(outDir, req, res, next);
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    manifest: true,
+  },
   plugins: [
     tailwindcss(),
     react({
@@ -30,6 +83,7 @@ export default defineConfig({
       },
     }),
     bootstrapManifestPlugin(),
+    bootstrapArchivePreviewPlugin(),
   ],
   server: {
     host: true,

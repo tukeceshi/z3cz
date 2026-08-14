@@ -21,6 +21,8 @@ bootstrapRoutes.get("/config", async (c) => {
       css: [],
       manifestVersion: "",
       shellSources: [],
+      prefetchPacks: [],
+      routeToPacks: {},
     };
     return c.json(response);
   }
@@ -32,6 +34,12 @@ bootstrapRoutes.get("/config", async (c) => {
     css: [...manifest.css],
     manifestVersion: manifest.manifestVersion || manifest.shellHash,
     shellSources: buildBootstrapShellSources(manifest.shell, settings),
+    prefetchPacks: (manifest.prefetchPacks ?? []).map((pack) => ({
+      ...pack,
+      assets: [...pack.assets],
+      sources: buildBootstrapShellSources(pack.path, settings),
+    })),
+    routeToPacks: manifest.routeToPacks ?? {},
   };
 
   return c.json(response);

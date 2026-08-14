@@ -1,4 +1,5 @@
 import { Navigate, useSearchParams } from "react-router";
+import { useEffect } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { LoginForm } from "@/components/login-form";
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getDashboardPath } from "@/utils/auth-navigation";
+import { scheduleConsolePrefetch } from "@/utils/console-prefetch";
 
 export function LoginPage() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -19,6 +21,10 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const subAccountInvitation = searchParams.get("subAccountInvitation");
+
+  useEffect(() => {
+    scheduleConsolePrefetch();
+  }, []);
 
   if (isAuthenticated && user && subAccountInvitation) {
     return (

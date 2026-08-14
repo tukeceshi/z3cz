@@ -40,6 +40,7 @@ import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
   readAiTextResultHistory,
+  readAiTextSessionBodySync,
 } from "./ai-text-node-utils";
 import {
   AiImageHistoryOverlay,
@@ -190,15 +191,16 @@ function StudioTextDetail({
   const nodeId = node.id;
   const metadata = node.data.metadata;
   const orgId = organization?.id;
+  const isGenerating = isAiTextGenerating(metadata);
   const resolvedText = useResolvedAiText({
-    organizationId: orgId,
-    workflowId,
     inputs: node.data.inputs,
     outputs: node.data.outputs,
+    nodeData: node.data,
   });
-  const text = resolvedText.text;
+  const text = isGenerating
+    ? readAiTextSessionBodySync(node.data)
+    : resolvedText.text;
   const historyItems = readAiTextResultHistory(node.data.inputs);
-  const isGenerating = isAiTextGenerating(metadata);
   const generateError = readGenerativeCardError(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
@@ -369,7 +371,6 @@ function StudioTextDetail({
       const committed = await commitAiTextHistorySelection({
         organizationId: orgId,
         workflowId,
-        cloudConfigured,
         nodeId,
         selectedId: id,
         updateNodeData,
@@ -446,7 +447,7 @@ function StudioTextDetail({
             ) : (
               <StudioTextOutputView
                 key={nodeId}
-                value={textBuffer.value}
+                value={isGenerating ? text : textBuffer.value}
                 onChange={textBuffer.onChange}
                 onFocus={textBuffer.onFocus}
                 onBlur={stopEditing}
@@ -500,7 +501,9 @@ function StudioTextDetail({
         <AiTextHistoryOverlay
           open={historyOpen}
           history={historyItems}
-          currentOutput={textBuffer.value}
+          currentId={historyItems.selectedId}
+          organizationId={orgId}
+          workflowId={workflowId}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
         />

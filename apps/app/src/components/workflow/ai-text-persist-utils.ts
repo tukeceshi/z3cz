@@ -12,9 +12,11 @@ import {
 } from "@dafthunk/types";
 
 import {
+  AI_TEXT_BODY_OUTPUT_ID,
   AI_TEXT_OUTPUT_ID,
   AI_TEXT_RESULT_HISTORY_INPUT_ID,
   AI_TEXT_RESULT_INPUT_ID,
+  buildAiTextSessionOutputValues,
   readAiTextResultHistory,
 } from "./ai-text-node-utils";
 import {
@@ -99,13 +101,33 @@ export function withAiTextStagedResult(
     "json"
   );
 
-  const outputs = current.outputs.map((output) =>
-    output.id === AI_TEXT_OUTPUT_ID
-      ? ({ ...output, value: staged.sessionText } as WorkflowParameter)
-      : output
-  );
+  const { excerpt, body } = buildAiTextSessionOutputValues(staged.sessionText);
+  const outputs = current.outputs.map((output) => {
+    if (output.id === AI_TEXT_OUTPUT_ID) {
+      return { ...output, value: excerpt } as WorkflowParameter;
+    }
+    if (output.id === AI_TEXT_BODY_OUTPUT_ID) {
+      return { ...output, value: body } as WorkflowParameter;
+    }
+    return output;
+  });
 
-  return { inputs, outputs };
+  const outputsWithBody = outputs.some(
+    (output) => output.id === AI_TEXT_BODY_OUTPUT_ID
+  )
+    ? outputs
+    : [
+        ...outputs,
+        {
+          id: AI_TEXT_BODY_OUTPUT_ID,
+          name: AI_TEXT_BODY_OUTPUT_ID,
+          type: "string",
+          hidden: true,
+          value: body,
+        } as WorkflowParameter,
+      ];
+
+  return { inputs, outputs: outputsWithBody };
 }
 
 export function withAiTextStagedGeneratedResult(
@@ -251,7 +273,9 @@ export function normalizeAiTextNodeDataForPersist(
   });
 
   const outputs = data.outputs.map((output) =>
-    output.id === AI_TEXT_OUTPUT_ID ? { ...output, value: undefined } : output
+    output.id === AI_TEXT_OUTPUT_ID || output.id === AI_TEXT_BODY_OUTPUT_ID
+      ? { ...output, value: undefined }
+      : output
   );
 
   return { ...data, inputs, outputs };

@@ -8,7 +8,6 @@ import {
 import {
   getResourceIdFromValue,
   isLocalMediaReference,
-  isResourceIdReference,
 } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
@@ -21,7 +20,6 @@ import {
   readGenerativeStagingBlob,
   writeGenerativeStagingWithNewId,
 } from "@/services/generative-media-staging";
-import { resolveMediaResourceFetchUrl } from "@/services/resolve-media-resource-fetch-url";
 import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
 
 const AI_TEXT_NODE_TYPE: AiMediaCacheNodeType = "ai-text";
@@ -82,25 +80,6 @@ export async function readAiTextContent(params: {
 
   if (cached) {
     return cached.blob.text();
-  }
-
-  if (isResourceIdReference(params.value)) {
-    const fetchUrl = await resolveMediaResourceFetchUrl({
-      organizationId: params.organizationId,
-      media: params.value,
-    });
-    if (!fetchUrl) {
-      return null;
-    }
-    try {
-      const response = await fetch(fetchUrl, { credentials: "include" });
-      if (!response.ok) {
-        return null;
-      }
-      return response.text();
-    } catch {
-      return null;
-    }
   }
 
   return null;

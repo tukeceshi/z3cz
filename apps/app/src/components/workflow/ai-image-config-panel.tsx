@@ -266,8 +266,6 @@ export function AiImageConfigPanel({
       targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
       edges,
       nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      organizationId: orgId,
-      workflowId,
     });
 
   const modelRules = useMemo(() => {
