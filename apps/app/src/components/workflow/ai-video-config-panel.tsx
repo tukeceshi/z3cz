@@ -277,8 +277,6 @@ export function AiVideoConfigPanel({
       targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
       edges,
       nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      organizationId: orgId,
-      workflowId,
     });
 
   const referenceCounts = useMemo(

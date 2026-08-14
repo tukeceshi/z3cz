@@ -1,20 +1,23 @@
 import { createPortal } from "react-dom";
 import HistoryIcon from "lucide-react/icons/history";
+import LoaderIcon from "lucide-react/icons/loader-circle";
 import XIcon from "lucide-react/icons/x";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
-import type { AiTextResultHistory } from "@dafthunk/types";
+import { buildAiTextExcerpt, type AiTextResultHistory } from "@dafthunk/types";
+import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
 
 import { STUDIO_SCROLL } from "./creative-studio-surface";
 
 export interface AiTextHistoryOverlayProps {
   readonly open: boolean;
   readonly history: AiTextResultHistory;
-  /** Current card output — used to mark which history row is active. */
-  readonly currentOutput: string;
+  readonly currentId?: string | null;
+  readonly organizationId?: string;
+  readonly workflowId?: string;
   readonly onSelect: (id: string) => void;
   readonly onClose: () => void;
 }
@@ -22,29 +25,81 @@ export interface AiTextHistoryOverlayProps {
 export function AiTextHistoryOverlay({
   open,
   history,
-  currentOutput,
+  currentId,
+  organizationId,
+  workflowId,
   onSelect,
   onClose,
 }: AiTextHistoryOverlayProps) {
   const { t } = useTranslation();
-
-  const matchingCurrent = history.items.filter(
-    (item) => item.text === currentOutput
-  );
-  const derivedCurrentId =
-    matchingCurrent.length === 1
-      ? matchingCurrent[0]?.id
-      : history.selectedId &&
-          matchingCurrent.some((item) => item.id === history.selectedId)
-        ? history.selectedId
-        : matchingCurrent[0]?.id;
-
+  const selectedId = currentId ?? history.selectedId;
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [bodies, setBodies] = useState<Readonly<Record<string, string>>>({});
+  const [loadingIds, setLoadingIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+
+  const itemKey = useMemo(
+    () => history.items.map((item) => item.id).join("|"),
+    [history.items]
+  );
 
   useEffect(() => {
     if (!open) return;
-    setPreviewId(derivedCurrentId ?? history.items[0]?.id ?? null);
-  }, [open, derivedCurrentId, history.items]);
+    setPreviewId(selectedId ?? history.items[0]?.id ?? null);
+  }, [open, selectedId, itemKey, history.items]);
+
+  useEffect(() => {
+    if (!open || !organizationId || !workflowId) {
+      return;
+    }
+
+    let cancelled = false;
+    const missing = history.items.filter(
+      (item) => Boolean(item.resourceId) && !item.text?.trim()
+    );
+
+    if (missing.length === 0) {
+      return;
+    }
+
+    setLoadingIds(new Set(missing.map((item) => item.id)));
+
+    void (async () => {
+      const loaded: Record<string, string> = {};
+      await Promise.all(
+        missing.map(async (item) => {
+          if (!item.resourceId) {
+            loaded[item.id] = "";
+            return;
+          }
+          const body =
+            (await loadAiTextBodyFromCache({
+              organizationId,
+              workflowId,
+              reference: {
+                resourceId: item.resourceId,
+                contentSha256: item.contentSha256,
+                mimeType: "text/plain; charset=utf-8",
+              },
+              workflowSha: item.contentSha256,
+            })) ?? "";
+          loaded[item.id] = body;
+        })
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      setBodies((current) => ({ ...current, ...loaded }));
+      setLoadingIds(new Set());
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [history.items, open, organizationId, workflowId]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,11 +116,24 @@ export function AiTextHistoryOverlay({
     history.items.find((item) => item.id === previewId) ?? history.items[0];
   const total = history.items.length;
 
+  const readItemBody = (itemId: string): string => {
+    const item = history.items.find((entry) => entry.id === itemId);
+    if (item?.text?.trim()) {
+      return item.text;
+    }
+    return bodies[itemId] ?? "";
+  };
+
   const handleApply = () => {
     if (!previewItem) return;
     onSelect(previewItem.id);
     onClose();
   };
+
+  const previewBody = previewItem ? readItemBody(previewItem.id) : "";
+  const previewLoading = previewItem
+    ? loadingIds.has(previewItem.id) && !previewBody
+    : false;
 
   return createPortal(
     <div
@@ -79,7 +147,6 @@ export function AiTextHistoryOverlay({
         className="nodrag nopan nowheel flex h-[min(85vh,720px)] w-[min(92vw,820px)] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        {/* Left: numbered list */}
         <div className="flex w-[200px] shrink-0 flex-col border-r border-border bg-muted/30">
           <div className="border-b border-border px-3 py-3">
             <h3 className="text-sm font-medium">
@@ -97,8 +164,11 @@ export function AiTextHistoryOverlay({
             ) : (
               history.items.map((item, index) => {
                 const active = item.id === previewItem?.id;
-                const isCurrent = item.id === derivedCurrentId;
+                const isCurrent = item.id === selectedId;
                 const ordinal = total - index;
+                const body = readItemBody(item.id);
+                const excerpt = body ? buildAiTextExcerpt(body) : "";
+                const itemLoading = loadingIds.has(item.id) && !body;
                 return (
                   <button
                     key={item.id}
@@ -123,7 +193,9 @@ export function AiTextHistoryOverlay({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="line-clamp-3 text-xs leading-snug text-foreground">
-                        {item.text || t("workflow.aiTextPanel.historyEmptyItem")}
+                        {itemLoading
+                          ? t("workflow.aiTextPanel.historyLoadingItem")
+                          : excerpt || t("workflow.aiTextPanel.historyEmptyItem")}
                       </span>
                       {isCurrent ? (
                         <span className="mt-1 block text-[10px] text-muted-foreground">
@@ -138,7 +210,6 @@ export function AiTextHistoryOverlay({
           </div>
         </div>
 
-        {/* Right: preview + actions */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <p className="text-sm font-medium">
@@ -156,9 +227,16 @@ export function AiTextHistoryOverlay({
           </div>
           <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", STUDIO_SCROLL)}>
             {previewItem ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {previewItem.text || t("workflow.aiTextPanel.historyEmptyItem")}
-              </p>
+              previewLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                  {t("workflow.aiTextPanel.historyLoadingItem")}
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                  {previewBody || t("workflow.aiTextPanel.historyEmptyItem")}
+                </p>
+              )
             ) : (
               <p className="text-sm text-muted-foreground">
                 {t("workflow.aiTextPanel.historyEmpty")}

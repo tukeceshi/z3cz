@@ -25,6 +25,7 @@ export interface UseAiTextOutputScrollOptions {
   readonly contentKey: string;
   readonly variant: AiTextOutputScrollVariant;
   readonly isEditing?: boolean;
+  readonly selected?: boolean;
   /** Canvas: keep tail visible after generate while node stays selected. */
   readonly holdTailAfterComplete?: boolean;
 }
@@ -84,6 +85,7 @@ export function useAiTextOutputScroll({
   contentKey,
   variant,
   isEditing = false,
+  selected = false,
   holdTailAfterComplete = false,
 }: UseAiTextOutputScrollOptions): UseAiTextOutputScrollResult {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -94,7 +96,8 @@ export function useAiTextOutputScroll({
   const prevContentKeyRef = useRef(contentKey);
 
   const tailPreview =
-    variant === "canvas-card" && (isGenerating || holdTailAfterComplete);
+    variant === "canvas-card" &&
+    (isGenerating || selected || holdTailAfterComplete);
 
   const rememberScrollForEdit = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -183,6 +186,7 @@ export function useAiTextOutputScroll({
     holdTailAfterComplete,
     isEditing,
     isGenerating,
+    selected,
     text,
     variant,
   ]);

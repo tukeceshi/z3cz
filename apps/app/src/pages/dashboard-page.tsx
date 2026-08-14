@@ -23,7 +23,7 @@ import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useDashboard } from "@/services/dashboard-service";
 import { useOrganizationAiInterfaces } from "@/services/organization-ai-interface-service";
 import { useModelCalls } from "@/services/platform-ai-model-service";
-import { schedulePrefetchWorkflowEditorChunks } from "@/utils/workflow-editor-prefetch";
+import { scheduleConsolePrefetch } from "@/utils/console-prefetch";
 
 const AI_SETUP_DISMISS_KEY = "dafthunk:dashboard-ai-setup-dismissed";
 
@@ -70,7 +70,7 @@ function DashboardPageContent() {
   }, [setBreadcrumbs, t]);
 
   useEffect(() => {
-    schedulePrefetchWorkflowEditorChunks();
+    scheduleConsolePrefetch();
   }, []);
 
   if (

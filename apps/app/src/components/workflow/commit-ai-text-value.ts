@@ -1,4 +1,4 @@
-import type { AiTextResultHistoryItem, OrgTextModelOption } from "@dafthunk/types";
+import type { OrgTextModelOption } from "@dafthunk/types";
 import {
   inferAiTextMimeType,
   isResourceIdReference,
@@ -22,7 +22,9 @@ import {
   readAiTextResultHistory,
 } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
-import { readAiTextContent, stageAiTextContent } from "@/services/ai-text-storage-service";
+import { stageAiTextContent } from "@/services/ai-text-storage-service";
+import { hangAiTextDisplayFromReference } from "@/services/ai-text-display-registry";
+import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
 import { notifyTextContentConflict } from "@/services/text-content-conflict";
 import {
   buildTextStageRequest,
@@ -171,6 +173,13 @@ export async function commitAiTextValue(
     sessionText: params.value,
   };
 
+  hangAiTextDisplayFromReference({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    reference,
+    body: params.value,
+  });
+
   params.updateNodeData(params.nodeId, (current) => {
     if (hasAiTextGeneratedHistory(current.inputs)) {
       return withAiTextStagedEditedResult(current, staged);
@@ -182,7 +191,6 @@ export async function commitAiTextValue(
 interface CommitAiTextHistorySelectionParams {
   readonly organizationId: string;
   readonly workflowId: string;
-  readonly cloudConfigured: boolean;
   readonly nodeId: string;
   readonly selectedId: string;
   readonly updateNodeData: UpdateNodeDataFn;
@@ -195,62 +203,52 @@ export interface AiTextHistorySelectionCommit {
   readonly modelUnavailable: boolean;
 }
 
+/** Apply history: write resource ID/sha and cache body/preview in one node update. */
 export async function commitAiTextHistorySelection(
   params: CommitAiTextHistorySelectionParams
 ): Promise<AiTextHistorySelectionCommit> {
   const history = readAiTextResultHistory(params.current.inputs);
   const selected = history.items.find((entry) => entry.id === params.selectedId);
-  if (!selected) {
+  if (!selected?.resourceId) {
     return { resolvedText: "", modelUnavailable: false };
   }
 
-  let resolvedText = selected.text ?? "";
-  if (!resolvedText.trim() && selected.resourceId) {
-    resolvedText =
-      (await readAiTextContent({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        value: {
-          resourceId: selected.resourceId,
-          contentSha256: selected.contentSha256,
-          mimeType: inferAiTextMimeType(""),
-        },
-      })) ?? "";
-  }
+  const referenceForCache: WorkflowMediaValue = selected.contentSha256
+    ? buildResourceIdReference({
+        resourceId: selected.resourceId,
+        contentSha256: selected.contentSha256,
+        mimeType: inferAiTextMimeType(""),
+      })
+    : {
+        resourceId: selected.resourceId,
+        mimeType: inferAiTextMimeType(""),
+      };
 
-  let reference: WorkflowMediaValue | null = null;
-  if (selected.resourceId && selected.contentSha256) {
-    reference = buildResourceIdReference({
-      resourceId: selected.resourceId,
-      contentSha256: selected.contentSha256,
-      mimeType: inferAiTextMimeType(resolvedText),
-    });
-  } else if (selected.resourceId) {
-    reference = {
-      resourceId: selected.resourceId,
-      mimeType: inferAiTextMimeType(resolvedText),
-    };
-  } else if (resolvedText.trim()) {
-    reference = await stageAiTextContent({
+  const sessionText =
+    (await loadAiTextBodyFromCache({
       organizationId: params.organizationId,
       workflowId: params.workflowId,
-      text: resolvedText,
-    });
-  }
+      reference: referenceForCache,
+      workflowSha: selected.contentSha256,
+    })) ?? "";
 
-  if (!reference) {
-    return { resolvedText, modelUnavailable: false };
-  }
-
-  const contentSha256 =
-    (isResourceIdReference(reference) ? reference.contentSha256 : undefined) ??
-    selected.contentSha256 ??
-    (await sha256HexFromText(resolvedText));
+  const mimeType = inferAiTextMimeType(sessionText);
+  const contentSha256 = selected.contentSha256 ?? "";
+  const reference: WorkflowMediaValue = contentSha256
+    ? buildResourceIdReference({
+        resourceId: selected.resourceId,
+        contentSha256,
+        mimeType,
+      })
+    : {
+        resourceId: selected.resourceId,
+        mimeType,
+      };
 
   const staged: AiTextStagedResultPatch = {
     reference,
     contentSha256,
-    sessionText: resolvedText,
+    sessionText,
   };
 
   const settings = params.models
@@ -272,7 +270,7 @@ export async function commitAiTextHistorySelection(
   });
 
   return {
-    resolvedText,
+    resolvedText: sessionText,
     modelUnavailable: settings.modelUnavailable,
   };
 }

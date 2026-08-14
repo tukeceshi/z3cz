@@ -160,15 +160,13 @@ export function validateBootstrapSettingsUpdate(
 }
 
 export function buildBootstrapShellSources(
-  shellPath: string,
+  assetPath: string,
   settings: BootstrapSettings
 ): BootstrapShellSource[] {
-  const sources: BootstrapShellSource[] = [
-    { url: shellPath, kind: "origin" },
-  ];
+  const sources: BootstrapShellSource[] = [{ url: assetPath, kind: "origin" }];
 
   if (settings.r2Enabled && isBootstrapR2Configured(settings)) {
-    const fileName = shellPath.replace(/^\/assets\//, "");
+    const fileName = assetPath.replace(/^\/assets\//, "");
     const publicBase = settings.publicBaseUrl.trim().replace(/\/$/, "");
     sources.push({
       url: `${publicBase}/${fileName}`,

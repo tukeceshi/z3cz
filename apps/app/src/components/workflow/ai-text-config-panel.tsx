@@ -27,7 +27,9 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { inferAiTextMimeType } from "@dafthunk/types";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
+import { hangAiTextDisplayFromReference } from "@/services/ai-text-display-registry";
 import {
+  isAiTextReferencePendingFromChips,
   resolveAiTextReferenceInputsFromChips,
 } from "./resolve-ai-text-result";
 import { useObjectService } from "@/services/object-service";
@@ -417,14 +419,13 @@ export function AiTextConfigPanel({
       return;
     }
 
-    const textReferences = await resolveAiTextReferenceInputsFromChips({
+    const textReferences = resolveAiTextReferenceInputsFromChips({
       chips: textReferenceChips,
       nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      organizationId: orgId,
-      workflowId,
     });
 
     const assembly = validateAiTextPromptAssembly({
+      references: textReferences,
       question,
       parameterRules: modelRules,
       mediaReferenceCount,
@@ -432,7 +433,16 @@ export function AiTextConfigPanel({
 
     if (!assembly.ok) {
       if (textReferences.length === 0 && referenceChips.length > 0) {
-        toast.error("workflow.aiTextPanel.keywordsEmpty");
+        if (
+          isAiTextReferencePendingFromChips({
+            chips: textReferenceChips,
+            nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+          })
+        ) {
+          toast.error("workflow.aiTextPanel.keywordsPending");
+        } else {
+          toast.error("workflow.aiTextPanel.keywordsEmpty");
+        }
       } else if (!question && mediaReferenceCount === 0) {
         toast.error("workflow.aiTextPanel.promptRequired");
       } else {
@@ -543,6 +553,13 @@ export function AiTextConfigPanel({
         contentSha256,
         sessionText: response.text,
       };
+
+      hangAiTextDisplayFromReference({
+        organizationId: orgId,
+        workflowId,
+        reference,
+        body: response.text,
+      });
 
       updateNodeData(nodeId, (current) => {
         const withResult = withAiTextStagedGeneratedResult(current, staged, {

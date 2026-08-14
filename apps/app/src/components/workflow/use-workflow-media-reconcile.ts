@@ -12,6 +12,10 @@ import {
   ingestWorkflowCanvasMediaInBackground,
 } from "@/services/ingest-canvas-media";
 import {
+  collectWorkflowAiTextNodeRefs,
+  pushWorkflowAiTextCacheInBackground,
+} from "@/services/push-ai-text-cache-to-node";
+import {
   MEDIA_RESOURCE_REKEYED_EVENT,
   type MediaResourceRekeyedDetail,
 } from "@/services/media-resource-rekey-events";
@@ -29,11 +33,20 @@ interface UseWorkflowMediaReconcileParams {
 function buildWorkflowMediaFingerprint(
   nodes: readonly ReactFlowNode<WorkflowNodeType>[]
 ): string {
-  const resourceIds = collectWorkflowCanvasMedia(nodes)
-    .map((item) => getResourceIdFromValue(item.media))
-    .filter((id): id is string => Boolean(id))
-    .sort();
-  return resourceIds.join("|");
+  const keys = new Set<string>();
+
+  for (const item of collectWorkflowCanvasMedia(nodes)) {
+    const id = getResourceIdFromValue(item.media);
+    if (id) {
+      keys.add(`media:${id}`);
+    }
+  }
+
+  for (const item of collectWorkflowAiTextNodeRefs(nodes)) {
+    keys.add(`text:${item.nodeId}:${item.fingerprint}`);
+  }
+
+  return [...keys].sort().join("|");
 }
 
 export function useWorkflowMediaReconcile({
@@ -45,6 +58,9 @@ export function useWorkflowMediaReconcile({
 }: UseWorkflowMediaReconcileParams): void {
   const ingestedFingerprintRef = useRef<string | null>(null);
   const ingestedResourceIdsRef = useRef<Set<string>>(new Set());
+  const ingestedTextFingerprintByNodeRef = useRef<Map<string, string>>(
+    new Map()
+  );
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
 
@@ -56,6 +72,7 @@ export function useWorkflowMediaReconcile({
   useEffect(() => {
     ingestedFingerprintRef.current = null;
     ingestedResourceIdsRef.current = new Set();
+    ingestedTextFingerprintByNodeRef.current = new Map();
   }, [organizationId, workflowId]);
 
   useEffect(() => {
@@ -72,8 +89,32 @@ export function useWorkflowMediaReconcile({
       return;
     }
 
-    let cancelled = false;
     const snapshotNodes = nodesRef.current;
+    const newTextFingerprints = new Set<string>();
+    for (const item of collectWorkflowAiTextNodeRefs(snapshotNodes)) {
+      if (
+        ingestedTextFingerprintByNodeRef.current.get(item.nodeId) ===
+        item.fingerprint
+      ) {
+        continue;
+      }
+      ingestedTextFingerprintByNodeRef.current.set(
+        item.nodeId,
+        item.fingerprint
+      );
+      newTextFingerprints.add(item.fingerprint);
+    }
+
+    if (newTextFingerprints.size > 0) {
+      pushWorkflowAiTextCacheInBackground({
+        organizationId,
+        workflowId,
+        nodes: snapshotNodes,
+        onlyFingerprints: newTextFingerprints,
+      });
+    }
+
+    let cancelled = false;
 
     void reconcileWorkflowMediaReferencesInNodes(
       snapshotNodes,

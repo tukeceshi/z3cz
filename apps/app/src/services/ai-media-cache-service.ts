@@ -31,6 +31,11 @@ import {
   workflowMediaMimeType,
 } from "@/services/resolve-media-resource-fetch-url";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+import { invalidateAiTextHydrateState } from "@/services/ensure-ai-text-cached";
+import {
+  dropAiTextDisplayForMediaId,
+  rekeyAiTextDisplay,
+} from "@/services/ai-text-display-registry";
 
 export type AiMediaCacheNodeType =
   | "ai-image"
@@ -468,6 +473,7 @@ async function deleteEntry(db: IDBDatabase, key: string): Promise<void> {
   if (!entry) return;
 
   dropStableBlobUrlsForMediaId(entry.mediaId);
+  dropAiTextDisplayForMediaId(entry.mediaId);
 
   await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
     transaction.objectStore(ENTRIES_STORE).delete(key);
@@ -737,6 +743,7 @@ export async function deleteCacheResourceTiers(
     if (!entry) return;
 
     dropStableBlobUrlsForMediaId(entry.mediaId);
+    dropAiTextDisplayForMediaId(entry.mediaId);
 
     const tierFilter = tiers ? new Set(tiers) : null;
     const specs =
@@ -1539,7 +1546,9 @@ export function cacheEntryDownloadFilename(
       ? "video"
       : entry.nodeType === "ai-audio"
         ? "audio"
-        : "image";
+        : entry.nodeType === "ai-text"
+          ? "text"
+          : "image";
   const idPart = entry.mediaId.slice(0, 8);
   return `${prefix}-${idPart}-${index + 1}.${ext}`;
 }
@@ -1629,6 +1638,17 @@ export async function clearCacheEntriesByKeys(
   keys: readonly string[]
 ): Promise<void> {
   if (keys.length === 0) return;
+
+  for (const key of keys) {
+    const segments = key.split(":");
+    if (segments.length >= 3) {
+      invalidateAiTextHydrateState({
+        organizationId: segments[0]!,
+        workflowId: segments[1]!,
+        mediaId: segments.slice(2).join(":"),
+      });
+    }
+  }
 
   await withDatabase(async (db) => {
     for (const key of keys) {
@@ -1788,6 +1808,10 @@ export async function rekeyCacheEntry(params: {
     await reconcileCacheMeta(db);
 
     dropStableBlobUrlsForMediaId(params.fromMediaId);
+    rekeyAiTextDisplay({
+      fromMediaId: params.fromMediaId,
+      toMediaId: params.toMediaId,
+    });
     recordMediaResourceAlias({
       organizationId: params.organizationId,
       workflowId: params.workflowId,

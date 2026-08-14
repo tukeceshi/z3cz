@@ -40,7 +40,6 @@ import {
   deleteCacheResourceTiers,
   downloadCacheForWorkflows,
   formatBytes,
-  getCacheResourcePreviewUrl,
   listWorkflowCacheResources,
   regenerateCacheResourceTiers,
   setAiMediaCacheSettings,
@@ -63,45 +62,38 @@ function tierLabelKey(tier: AiMediaCacheTierKind): string {
   return "workflow.aiMediaCache.tierCanvasL";
 }
 
-function CacheResourcePreview({
-  entryKey,
+function cacheEntryTypeLabelKey(
+  nodeType: AiMediaCacheResourceSummary["nodeType"]
+): string {
+  if (nodeType === "ai-video") return "workflow.aiMediaCache.entryVideo";
+  if (nodeType === "ai-audio") return "workflow.aiMediaCache.entryAudio";
+  if (nodeType === "ai-text") return "workflow.aiMediaCache.entryText";
+  return "workflow.aiMediaCache.entryImage";
+}
+
+function cacheResourceTypeBadge(
+  nodeType: AiMediaCacheResourceSummary["nodeType"],
+  mimeType: string
+): string {
+  if (nodeType === "ai-video") return "VID";
+  if (nodeType === "ai-audio") return "MP3";
+  if (nodeType === "ai-text") {
+    return mimeType.toLowerCase().includes("markdown") ? "MD" : "TXT";
+  }
+  return "IMG";
+}
+
+function CacheResourceTypeBadge({
   nodeType,
+  mimeType,
 }: {
-  readonly entryKey: string;
   readonly nodeType: AiMediaCacheResourceSummary["nodeType"];
+  readonly mimeType: string;
 }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getCacheResourcePreviewUrl(entryKey).then((url) => {
-      if (!cancelled) {
-        setPreviewUrl(url);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [entryKey]);
-
-  if (nodeType === "ai-audio") {
-    return (
-      <div className="flex size-10 shrink-0 items-center justify-center rounded border bg-muted/40 text-[10px] text-muted-foreground">
-        MP3
-      </div>
-    );
-  }
-
-  if (!previewUrl) {
-    return <div className="size-10 shrink-0 rounded border bg-muted/40" />;
-  }
-
   return (
-    <img
-      src={previewUrl}
-      alt=""
-      className="size-10 shrink-0 rounded border object-cover"
-    />
+    <div className="flex size-10 shrink-0 items-center justify-center rounded border bg-muted/40 text-[10px] font-medium text-muted-foreground">
+      {cacheResourceTypeBadge(nodeType, mimeType)}
+    </div>
   );
 }
 
@@ -185,86 +177,96 @@ function WorkflowResourceList({
 
   return (
     <div className="space-y-2 border-t pt-2">
-      {resources.map((resource) => (
-        <div
-          key={resource.entryKey}
-          className="rounded-md border bg-background/60 p-2"
-        >
-          <div className="flex items-start gap-2">
-            <CacheResourcePreview
-              entryKey={resource.entryKey}
-              nodeType={resource.nodeType}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">
-                {t(
-                  resource.nodeType === "ai-video"
-                    ? "workflow.aiMediaCache.entryVideo"
-                    : resource.nodeType === "ai-audio"
-                      ? "workflow.aiMediaCache.entryAudio"
-                      : "workflow.aiMediaCache.entryImage"
-                )}{" "}
-                · {resource.mediaId.slice(0, 12)}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                {t("workflow.aiMediaCache.resourceSizeBreakdown", {
-                  original: formatBytes(resource.originalBytes),
-                  thumbs: formatBytes(resource.thumbBytes),
-                  total: formatBytes(resource.totalBytes),
-                })}
-              </div>
-              {resource.tiers.length > 0 ? (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {resource.tiers.map((tier) => (
-                    <span
-                      key={`${resource.entryKey}-${tier.tier}`}
-                      className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                    >
-                      {t(tierLabelKey(tier.tier))} {formatBytes(tier.byteSize)}
-                    </span>
-                  ))}
+      {resources.map((resource) => {
+        const isText = resource.nodeType === "ai-text";
+
+        return (
+          <div
+            key={resource.entryKey}
+            className="rounded-md border bg-background/60 p-2"
+          >
+            <div className="flex items-start gap-2">
+              <CacheResourceTypeBadge
+                nodeType={resource.nodeType}
+                mimeType={resource.mimeType}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium">
+                  {t(cacheEntryTypeLabelKey(resource.nodeType))} ·{" "}
+                  {resource.mediaId.slice(0, 12)}
                 </div>
-              ) : (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {t("workflow.aiMediaCache.noThumbs")}
-                </p>
-              )}
+                <div className="text-[11px] text-muted-foreground">
+                  {isText
+                    ? t("workflow.aiMediaCache.resourceOriginalSize", {
+                        original: formatBytes(resource.originalBytes),
+                      })
+                    : t("workflow.aiMediaCache.resourceSizeBreakdown", {
+                        original: formatBytes(resource.originalBytes),
+                        thumbs: formatBytes(resource.thumbBytes),
+                        total: formatBytes(resource.totalBytes),
+                      })}
+                </div>
+                {!isText &&
+                  (resource.tiers.length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {resource.tiers.map((tier) => (
+                        <span
+                          key={`${resource.entryKey}-${tier.tier}`}
+                          className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          {t(tierLabelKey(tier.tier))}{" "}
+                          {formatBytes(tier.byteSize)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {t("workflow.aiMediaCache.noThumbs")}
+                    </p>
+                  ))}
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {!isText ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() =>
+                      void handleRegenerateThumbs(resource.entryKey)
+                    }
+                  >
+                    <RefreshCw className="mr-1 size-3" />
+                    {t("workflow.aiMediaCache.regenerateThumbs")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={resource.thumbBytes <= 0}
+                    onClick={() => void handleDeleteThumbs(resource.entryKey)}
+                  >
+                    {t("workflow.aiMediaCache.deleteThumbs")}
+                  </Button>
+                </>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => void handleDeleteResource(resource.entryKey)}
+              >
+                <Trash2 className="mr-1 size-3" />
+                {t("workflow.aiMediaCache.deleteResource")}
+              </Button>
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              onClick={() => void handleRegenerateThumbs(resource.entryKey)}
-            >
-              <RefreshCw className="mr-1 size-3" />
-              {t("workflow.aiMediaCache.regenerateThumbs")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              disabled={resource.thumbBytes <= 0}
-              onClick={() => void handleDeleteThumbs(resource.entryKey)}
-            >
-              {t("workflow.aiMediaCache.deleteThumbs")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              onClick={() => void handleDeleteResource(resource.entryKey)}
-            >
-              <Trash2 className="mr-1 size-3" />
-              {t("workflow.aiMediaCache.deleteResource")}
-            </Button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

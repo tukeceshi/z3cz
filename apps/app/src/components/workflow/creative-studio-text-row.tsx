@@ -3,7 +3,6 @@ import FileText from "lucide-react/icons/file-text";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import { useRef, useState } from "react";
 
-import { useAuth } from "@/components/auth-context";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 import { readStudioModelLabel } from "./creative-studio-media-meta";
@@ -29,15 +28,13 @@ export function CreativeStudioTextRow({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioTextRowProps) {
-  const { organization } = useAuth();
-  const { workflowId, isListNodeRenaming } = useCreativeStudio();
+  const { isListNodeRenaming } = useCreativeStudio();
   const resolvedText = useResolvedAiText({
-    organizationId: organization?.id,
-    workflowId,
     inputs: node.data.inputs,
     outputs: node.data.outputs,
+    nodeData: node.data,
   });
-  const previewText = (resolvedText.excerpt ?? resolvedText.text)
+  const previewText = resolvedText.displayExcerpt
     .replace(/\s+/g, " ")
     .trim();
   const modelLabel = readStudioModelLabel(node.data);

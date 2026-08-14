@@ -3,28 +3,35 @@ import { describe, expect, it } from "vitest";
 import type { WorkflowNodeType } from "./workflow-types";
 import type { NodeType } from "./workflow-types";
 import {
+  AI_TEXT_BODY_OUTPUT_ID,
   AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_OUTPUT_ID,
   AI_TEXT_RESULT_HISTORY_INPUT_ID,
   AI_TEXT_RESULT_INPUT_ID,
   hasAiTextGeneratedHistory,
   mergeAiTextNodeCatalogInputs,
+  readAiTextResult,
   readAiTextResultHistory,
   withAiTextEditedResult,
   withAiTextGeneratedResult,
   withAiTextManualResult,
+  withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
 import { isGenerativeManualContent } from "./generative-card-mode-utils";
 
-function createTextNode(): WorkflowNodeType {
+function createTextNode(
+  overrides?: Partial<Pick<WorkflowNodeType, "inputs" | "outputs">>
+): WorkflowNodeType {
   return {
     id: "node-1",
     type: "workflowNode",
     name: "AI Text",
     nodeType: "ai-text",
     position: { x: 0, y: 0 },
-    inputs: [],
-    outputs: [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
+    inputs: overrides?.inputs ?? [],
+    outputs:
+      overrides?.outputs ??
+      [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
     metadata: undefined,
   };
 }
@@ -111,5 +118,62 @@ describe("ai-text-node-utils editing behavior", () => {
         },
       ])
     ).toBe(false);
+  });
+
+  it("reads session body when result is an external reference", () => {
+    const node = createTextNode();
+    const text = readAiTextResult(
+      [
+        {
+          id: AI_TEXT_RESULT_INPUT_ID,
+          name: AI_TEXT_RESULT_INPUT_ID,
+          type: "json",
+          value: {
+            resourceId: "res-1",
+            contentSha256: "abc",
+            mimeType: "text/plain; charset=utf-8",
+          },
+        },
+      ],
+      [
+        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "excerpt" },
+        { id: AI_TEXT_BODY_OUTPUT_ID, name: "textBody", type: "string", value: "full body" },
+      ]
+    );
+
+    expect(text).toBe("full body");
+  });
+
+  it("streaming preview writes session outputs only", () => {
+    const node = createTextNode({
+      inputs: [
+        {
+          id: AI_TEXT_RESULT_INPUT_ID,
+          name: AI_TEXT_RESULT_INPUT_ID,
+          type: "json",
+          value: {
+            kind: "local",
+            mediaId: "media-1",
+            mimeType: "text/plain; charset=utf-8",
+          },
+        },
+      ],
+    });
+
+    const patch = withAiTextStreamingPreview(node, "一位成年动漫美少女");
+    const resultInput = patch.inputs?.find(
+      (input) => input.id === AI_TEXT_RESULT_INPUT_ID
+    );
+    expect(resultInput?.value).toEqual({
+      kind: "local",
+      mediaId: "media-1",
+      mimeType: "text/plain; charset=utf-8",
+    });
+    expect(
+      patch.outputs?.find((output) => output.id === AI_TEXT_BODY_OUTPUT_ID)?.value
+    ).toBe("一位成年动漫美少女");
+    expect(
+      patch.outputs?.find((output) => output.id === AI_TEXT_OUTPUT_ID)?.value
+    ).toBe("一位成年动漫美少女");
   });
 });

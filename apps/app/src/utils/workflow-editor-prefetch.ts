@@ -3,8 +3,6 @@ import type { WorkflowWithMetadata } from "@dafthunk/types";
 import { getWorkflow } from "@/services/workflow-service";
 import { prefetchNodeTypes } from "@/services/type-service";
 
-let editorChunksPrefetched = false;
-
 function workflowMetadataKey(orgId: string, workflowId: string): string {
   return `${orgId}:${workflowId}`;
 }
@@ -12,36 +10,11 @@ function workflowMetadataKey(orgId: string, workflowId: string): string {
 const workflowMetadataCache = new Map<string, WorkflowWithMetadata>();
 const workflowMetadataInflight = new Map<string, Promise<WorkflowWithMetadata>>();
 
-export function prefetchWorkflowEditorChunks(): void {
-  if (editorChunksPrefetched) {
-    return;
-  }
-
-  editorChunksPrefetched = true;
-  void import("@/pages/editor-page");
-  void import("@/components/workflow/workflow-builder");
-}
-
-export function schedulePrefetchWorkflowEditorChunks(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const run = () => prefetchWorkflowEditorChunks();
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(run, { timeout: 3000 });
-    return;
-  }
-
-  globalThis.setTimeout(run, 500);
-}
-
 export function prefetchWorkflowEditorSession(
   workflowId: string,
   orgId: string,
   schemeId?: string
 ): void {
-  prefetchWorkflowEditorChunks();
   prefetchWorkflowMetadata(workflowId, orgId);
   prefetchNodeTypes(schemeId);
 }

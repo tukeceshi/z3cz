@@ -16,7 +16,6 @@ import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
 import { AiTextExpandButton } from "../../ai-text-expand-overlay";
-import { useCloudStorageCanvasContext } from "../../cloud-storage-canvas-provider";
 import { commitAiTextHistorySelection } from "../../commit-ai-text-value";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
 import {
@@ -28,6 +27,7 @@ import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
   readAiTextResultHistory,
+  readAiTextSessionBodySync,
 } from "../../ai-text-node-utils";
 import {
   GenerativeCardErrorBlock,
@@ -79,24 +79,28 @@ function AiTextWidget({
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { id: workflowId } = useParams<{ id: string }>();
-  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const [holdTailAfterGenerate, setHoldTailAfterGenerate] = useState(false);
+  const isGenerating = isAiTextGenerating(metadata);
+  const streamBody = readAiTextSessionBodySync(nodeData);
   const resolvedText = useResolvedAiText({
-    organizationId: orgId,
-    workflowId,
     inputs: nodeData.inputs,
     outputs: nodeData.outputs,
+    nodeData,
   });
-  const isGenerating = isAiTextGenerating(metadata);
-  const displayValue = isGenerating
-    ? resolvedText.text
-    : (resolvedText.excerpt ?? resolvedText.text);
-  const hasOutput = resolvedText.text.trim().length > 0;
+  const showFullBody = isGenerating || selected;
+  const displayValue = showFullBody
+    ? isGenerating
+      ? streamBody
+      : resolvedText.text
+    : resolvedText.displayExcerpt;
+  const hasOutput = isGenerating
+    ? streamBody.trim().length > 0
+    : (resolvedText.text || resolvedText.displayExcerpt).trim().length > 0;
   const showTextLoading =
     resolvedText.loading && !hasOutput && !isGenerating;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
@@ -134,6 +138,7 @@ function AiTextWidget({
     contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
     variant: "canvas-card",
     isEditing: false,
+    selected,
     holdTailAfterComplete: selected && holdTailAfterGenerate,
   });
 
@@ -184,7 +189,6 @@ function AiTextWidget({
         const committed = await commitAiTextHistorySelection({
           organizationId: orgId,
           workflowId,
-          cloudConfigured,
           nodeId,
           selectedId: id,
           updateNodeData,
@@ -195,7 +199,6 @@ function AiTextWidget({
       })();
     },
     [
-      cloudConfigured,
       editLocked,
       historyModels.text,
       nodeData,
@@ -314,7 +317,9 @@ function AiTextWidget({
         <AiTextHistoryOverlay
           open={historyOpen}
           history={historyItems}
-          currentOutput={resolvedText.text}
+          currentId={historyItems.selectedId}
+          organizationId={orgId}
+          workflowId={workflowId}
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
         />

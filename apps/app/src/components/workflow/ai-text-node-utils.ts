@@ -2,6 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
+  buildAiTextExcerpt,
   DEEPSEEK_V4_FLASH_CANONICAL_ID,
   normalizeTextModelParameterRules,
   type AiTextResultHistory,
@@ -23,7 +24,53 @@ import {
 export const AI_TEXT_RESULT_INPUT_ID = "result" as const;
 export const AI_TEXT_RESULT_HISTORY_INPUT_ID = "result_history" as const;
 export const AI_TEXT_OUTPUT_ID = "text" as const;
+/** Session-only full body for references — never persisted in workflow JSON. */
+export const AI_TEXT_BODY_OUTPUT_ID = "textBody" as const;
 export const AI_TEXT_KEYWORDS_HANDLE_ID = "keywords" as const;
+
+export function buildAiTextSessionOutputValues(body: string): {
+  readonly excerpt: string;
+  readonly body: string;
+} {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return { excerpt: "", body: "" };
+  }
+  return { excerpt: buildAiTextExcerpt(trimmed), body: trimmed };
+}
+
+function mapOutputsWithSessionCache(
+  outputs: readonly WorkflowParameter[],
+  excerpt: string,
+  body: string
+): WorkflowParameter[] {
+  let hasTextBody = false;
+  const mapped = outputs.map((output) => {
+    if (output.id === AI_TEXT_OUTPUT_ID) {
+      return { ...output, value: excerpt } as WorkflowParameter;
+    }
+    if (output.id === AI_TEXT_BODY_OUTPUT_ID) {
+      hasTextBody = true;
+      return { ...output, value: body } as WorkflowParameter;
+    }
+    return output;
+  });
+
+  if (hasTextBody) {
+    return mapped;
+  }
+
+  return [
+    ...mapped,
+    {
+      id: AI_TEXT_BODY_OUTPUT_ID,
+      name: AI_TEXT_BODY_OUTPUT_ID,
+      type: "string",
+      hidden: true,
+      value: body,
+    } as WorkflowParameter,
+  ];
+}
 
 /** Hard ceiling for output length — Admin must not configure above this. */
 export const AI_TEXT_HARD_OUTPUT_MAX_CHARS = 32_000;
@@ -145,27 +192,35 @@ export function withAiTextResult(
     );
   }
 
-  const outputs = current.outputs.map((output) =>
-    output.id === AI_TEXT_OUTPUT_ID
-      ? ({ ...output, value: text } as WorkflowParameter)
-      : output
-  );
+  const { excerpt, body } = buildAiTextSessionOutputValues(text);
+  const outputs = mapOutputsWithSessionCache(current.outputs, excerpt, body);
 
   return { inputs, outputs };
 }
 
-/** Live stream preview: update card text without rewriting history entries. */
+/** Write cache-resolved 原文 + 截断 preview onto session outputs only. */
+export function withAiTextSessionCacheMirror(
+  current: WorkflowNodeType,
+  body: string
+): Partial<WorkflowNodeType> {
+  const { excerpt, body: fullBody } = buildAiTextSessionOutputValues(body);
+  return {
+    outputs: mapOutputsWithSessionCache(current.outputs, excerpt, fullBody),
+  };
+}
+
+/** @deprecated Use withAiTextSessionCacheMirror */
+export const withAiTextSessionOutputMirror = withAiTextSessionCacheMirror;
+
+/** Live stream preview: session outputs only — never write inline result strings. */
 export function withAiTextStreamingPreview(
   current: WorkflowNodeType,
   text: string
 ): Partial<WorkflowNodeType> {
-  const inputs = upsertInputValue(current.inputs, AI_TEXT_RESULT_INPUT_ID, text);
-  const outputs = current.outputs.map((output) =>
-    output.id === AI_TEXT_OUTPUT_ID
-      ? ({ ...output, value: text } as WorkflowParameter)
-      : output
-  );
-  return { inputs, outputs };
+  const { excerpt, body } = buildAiTextSessionOutputValues(text);
+  return {
+    outputs: mapOutputsWithSessionCache(current.outputs, excerpt, body),
+  };
 }
 
 function upsertInputValue(
@@ -192,31 +247,56 @@ function upsertInputValue(
   ];
 }
 
+/** Truncated canvas/list preview from session output.text. */
+export function readAiTextDisplayExcerptSync(data: WorkflowNodeType): string {
+  const fromOutput = data.outputs?.find(
+    (output) => output.id === AI_TEXT_OUTPUT_ID
+  );
+  return typeof fromOutput?.value === "string" ? fromOutput.value : "";
+}
+
+/** Full 原文 from session output.textBody — used by downstream references. */
+export function readAiTextSessionBodySync(data: WorkflowNodeType): string {
+  const fromBody = data.outputs?.find(
+    (output) => output.id === AI_TEXT_BODY_OUTPUT_ID
+  );
+  if (typeof fromBody?.value === "string" && fromBody.value.trim()) {
+    return fromBody.value.trim();
+  }
+  return "";
+}
+
+/** Full body for edit/commit paths — prefers session body, then legacy inline. */
 export function readAiTextResult(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[]
 ): string | undefined {
-  const fromInput = inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID);
-  if (typeof fromInput?.value === "string") {
-    return fromInput.value;
+  const fromBody = outputs?.find(
+    (output) => output.id === AI_TEXT_BODY_OUTPUT_ID
+  );
+  if (typeof fromBody?.value === "string" && fromBody.value.trim()) {
+    return fromBody.value;
   }
 
-  const fromOutput = outputs?.find((output) => output.id === AI_TEXT_OUTPUT_ID);
-  return typeof fromOutput?.value === "string" ? fromOutput.value : undefined;
+  const fromInput = inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID);
+  const inputValue = fromInput?.value;
+  if (typeof inputValue === "string" && inputValue.trim()) {
+    return inputValue;
+  }
+
+  return undefined;
 }
 
-/** Session / inline result text — never falls back to the node's generation prompt. */
+/** Reference / keyword resolution — full body only, never the truncated preview. */
 export function readAiTextResultTextSync(data: WorkflowNodeType): string {
-  const fromResult = readAiTextResult(data.inputs, data.outputs);
-  if (typeof fromResult === "string" && fromResult.trim()) {
-    return fromResult.trim();
+  const sessionBody = readAiTextSessionBodySync(data);
+  if (sessionBody) {
+    return sessionBody;
   }
 
-  const resultInput = data.inputs.find(
-    (input) => input.id === AI_TEXT_RESULT_INPUT_ID
-  );
-  if (typeof resultInput?.value === "string" && resultInput.value.trim()) {
-    return resultInput.value.trim();
+  const fromCommit = readAiTextResult(data.inputs, data.outputs);
+  if (typeof fromCommit === "string" && fromCommit.trim()) {
+    return fromCommit.trim();
   }
 
   const history = readAiTextResultHistory(data.inputs);

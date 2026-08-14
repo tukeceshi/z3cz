@@ -58,7 +58,6 @@ import {
 } from "@/services/workflow-service";
 import {
   prefetchWorkflowEditorSession,
-  schedulePrefetchWorkflowEditorChunks,
 } from "@/utils/workflow-editor-prefetch";
 import { formatRelativeDate } from "@/utils/date";
 
@@ -122,10 +121,6 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
   const [workflowToDelete, setWorkflowToDelete] =
     useState<WorkflowWithMetadata | null>(null);
   const [isDeletingWorkflow, setIsDeletingWorkflow] = useState(false);
-
-  useEffect(() => {
-    schedulePrefetchWorkflowEditorChunks();
-  }, []);
 
   useEffect(() => {
     if (isRoot) {
