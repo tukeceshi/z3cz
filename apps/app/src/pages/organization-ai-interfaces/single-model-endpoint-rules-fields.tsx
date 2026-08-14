@@ -40,6 +40,7 @@ interface SingleModelEndpointRulesFieldsProps {
   readonly value: SingleModelEndpointRulesFormState;
   readonly onChange: (value: SingleModelEndpointRulesFormState) => void;
   readonly idPrefix: string;
+  readonly singleModelPresetId?: string;
   readonly sharedFormatTransform?: SingleModelFormatTransform | null;
   readonly onSharedFormatTransformChange?: (
     value: SingleModelFormatTransform | null
@@ -242,6 +243,7 @@ export function SingleModelEndpointRulesFields({
   value,
   onChange,
   idPrefix,
+  singleModelPresetId = "",
   sharedFormatTransform = null,
   onSharedFormatTransformChange,
   formatTemplates = [],
@@ -292,6 +294,7 @@ export function SingleModelEndpointRulesFields({
           value={sharedFormatTransform}
           onChange={onSharedFormatTransformChange}
           formatTemplates={formatTemplates}
+          singleModelPresetId={singleModelPresetId}
           isFormatTemplatesLoading={isFormatTemplatesLoading}
         />
       ) : null}

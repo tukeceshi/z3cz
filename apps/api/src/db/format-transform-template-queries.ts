@@ -10,6 +10,7 @@ import type {
 } from "@dafthunk/types";
 import {
   FORWARDING_LOCKED_RESOLUTIONS,
+  normalizeFormatTransformProvider,
   resolveTransformPollMapping,
 } from "@dafthunk/types";
 import { asc, eq } from "drizzle-orm";
@@ -103,7 +104,7 @@ function rowToTemplate(
   return {
     id: row.id,
     name: row.name,
-    provider: row.provider as FormatTransformTemplate["provider"],
+    provider: normalizeFormatTransformProvider(row.provider),
     scope: parseScope(row.scope),
     upstreamParams: parseUpstreamParams(row.upstreamParams),
     paramMappings: parseParamMappings(row.paramMappings),
@@ -169,7 +170,7 @@ export async function createFormatTransformTemplate(
     .values({
       id: params.id,
       name: params.input.name,
-      provider: params.input.provider,
+      provider: normalizeFormatTransformProvider(params.input.provider),
       scope: "platform",
       upstreamParams: params.input.upstreamParams ?? [],
       paramMappings: params.input.paramMappings ?? [],
@@ -205,7 +206,7 @@ export async function updateFormatTransformTemplate(
     patch.name = params.input.name;
   }
   if (params.input.provider !== undefined) {
-    patch.provider = params.input.provider;
+    patch.provider = normalizeFormatTransformProvider(params.input.provider);
   }
   if (params.input.upstreamParams !== undefined) {
     patch.upstreamParams = params.input.upstreamParams;

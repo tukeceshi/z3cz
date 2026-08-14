@@ -65,7 +65,7 @@ export function SingleModelUseFullSubmitUrlField(
   );
 }
 
-interface SingleModelVideoEndpointUrlFieldsProps {
+interface SingleModelEndpointUrlFieldsProps {
   readonly baseUrl: string;
   readonly category: SingleModelPresetCategory | string;
   readonly useFullSubmitUrl: boolean;
@@ -73,13 +73,13 @@ interface SingleModelVideoEndpointUrlFieldsProps {
   readonly idPrefix: string;
 }
 
-export function SingleModelVideoEndpointUrlFields({
+export function SingleModelEndpointUrlFields({
   baseUrl,
   category,
   useFullSubmitUrl,
   onUseFullSubmitUrlChange,
   idPrefix,
-}: SingleModelVideoEndpointUrlFieldsProps) {
+}: SingleModelEndpointUrlFieldsProps) {
   return (
     <div className="space-y-2">
       <SingleModelEndpointUrlPreview
@@ -95,3 +95,6 @@ export function SingleModelVideoEndpointUrlFields({
     </div>
   );
 }
+
+/** @deprecated Use SingleModelEndpointUrlFields */
+export const SingleModelVideoEndpointUrlFields = SingleModelEndpointUrlFields;

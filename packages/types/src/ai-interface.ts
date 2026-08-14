@@ -273,6 +273,8 @@ export interface ResolvedOrgAiInterface {
   readonly artifact: AiInterfaceRuntimeArtifact;
   readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
   readonly formatTransform?: FormatTransformConfig;
+  /** When true, upstream requests use baseUrl as-is without appending the default API path. */
+  readonly useFullSubmitUrl?: boolean;
 }
 
 export function withSelectedModel(

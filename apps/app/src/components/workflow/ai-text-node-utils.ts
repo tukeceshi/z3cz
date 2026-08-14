@@ -205,28 +205,33 @@ export function readAiTextResult(
   return typeof fromOutput?.value === "string" ? fromOutput.value : undefined;
 }
 
-/** Text usable as downstream image/video prompt from an AI text node. */
-export function readAiTextPromptSource(data: WorkflowNodeType): string {
+/** Session / inline result text — never falls back to the node's generation prompt. */
+export function readAiTextResultTextSync(data: WorkflowNodeType): string {
   const fromResult = readAiTextResult(data.inputs, data.outputs);
   if (typeof fromResult === "string" && fromResult.trim()) {
     return fromResult.trim();
   }
 
-  const promptInput = data.inputs.find((input) => input.id === "prompt");
-  if (typeof promptInput?.value === "string" && promptInput.value.trim()) {
-    return promptInput.value.trim();
+  const resultInput = data.inputs.find(
+    (input) => input.id === AI_TEXT_RESULT_INPUT_ID
+  );
+  if (typeof resultInput?.value === "string" && resultInput.value.trim()) {
+    return resultInput.value.trim();
   }
 
   const history = readAiTextResultHistory(data.inputs);
   const selected = history.selectedId
     ? history.items.find((item) => item.id === history.selectedId)
     : undefined;
-  if (selected?.text.trim()) {
+  if (typeof selected?.text === "string" && selected.text.trim()) {
     return selected.text.trim();
   }
 
   return "";
 }
+
+/** @deprecated Use readAiTextResultTextSync */
+export const readAiTextPromptSource = readAiTextResultTextSync;
 
 export function readAiTextResultHistory(
   inputs: readonly WorkflowParameter[]

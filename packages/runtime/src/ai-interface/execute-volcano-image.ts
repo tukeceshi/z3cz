@@ -1,5 +1,6 @@
 import {
   buildImageGenerationRequestSnapshot,
+  buildVideoSubmitUrl,
   buildVolcanoImageGenerationBody,
   type EphemeralMediaReference,
   type ImageGenerationRequestSnapshot,
@@ -69,6 +70,7 @@ export async function executeVolcanoImageGeneration(params: {
   readonly cloudUpload?: CloudImageUploadTarget;
   readonly timeoutMs?: number;
   readonly upstreamLog?: UpstreamRequestLogSink;
+  readonly useFullSubmitUrl?: boolean;
 }): Promise<VolcanoImageGenerationResult> {
   const rules = normalizeImageModelParameterRules(params.parameterRules);
   const trimmedPrompt = params.prompt.trim();
@@ -112,8 +114,11 @@ export async function executeVolcanoImageGeneration(params: {
     prompt: trimmedPrompt,
   });
 
-  const baseUrl = params.baseUrl.replace(/\/$/, "");
-  const url = `${baseUrl}/images/generations`;
+  const url = buildVideoSubmitUrl({
+    baseUrl: params.baseUrl,
+    submitPath: "/images/generations",
+    useFullSubmitUrl: params.useFullSubmitUrl,
+  });
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),

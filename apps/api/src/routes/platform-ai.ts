@@ -1082,6 +1082,7 @@ platformAiRoutes.post(
       workflowId: body.workflowId,
       cloudUpload: deferCloudPersist ? undefined : storageResolution.cloudUpload,
       upstreamLog,
+      useFullSubmitUrl: iface.useFullSubmitUrl,
     });
 
     if (result.status === "failed") {
@@ -1300,6 +1301,7 @@ platformAiRoutes.post(
       parameterRules: resolvedModel.parameterRules,
       generationParams: body.params,
       upstreamLog,
+      useFullSubmitUrl: iface.useFullSubmitUrl,
     });
 
     if (result.status === "failed" || !result.audio || !result.mimeType) {

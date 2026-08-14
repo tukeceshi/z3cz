@@ -80,7 +80,7 @@ import {
   type SingleModelEndpointRulesFormState,
 } from "./single-model-endpoint-rules-fields";
 import {
-  SingleModelVideoEndpointUrlFields,
+  SingleModelEndpointUrlFields,
 } from "./single-model-endpoint-url-preview";
 import {
   resolveDefaultInterfaceListName,
@@ -541,6 +541,9 @@ export function SingleModelWizardContent({
     selection.kind,
   ]);
 
+  const formatMappingPresetId =
+    multiModelProviderConfig?.presetId ?? selectedPreset?.id ?? "";
+
   const endpointRulesCategory =
     multiModelProviderConfig?.category ?? selectedPreset?.category ?? "text";
 
@@ -884,8 +887,8 @@ export function SingleModelWizardContent({
             {multiModelProviderConfig?.showEndpointRegionHints ? (
               <KimiEndpointRegionHints />
             ) : null}
-            {endpointRulesCategory === "video" ? (
-              <SingleModelVideoEndpointUrlFields
+            {endpointRulesCategory !== "storage" ? (
+              <SingleModelEndpointUrlFields
                 idPrefix="single-model"
                 baseUrl={endpointUrl}
                 category={endpointRulesCategory}
@@ -1013,6 +1016,7 @@ export function SingleModelWizardContent({
               value={endpointRulesForm}
               onChange={setEndpointRulesForm}
               idPrefix="single-model"
+              singleModelPresetId={formatMappingPresetId}
               sharedFormatTransform={sharedFormatTransform}
               onSharedFormatTransformChange={setSharedFormatTransform}
               formatTemplates={formatTemplates}

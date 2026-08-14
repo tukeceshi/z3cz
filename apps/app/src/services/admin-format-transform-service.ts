@@ -9,7 +9,7 @@ import type {
 } from "@dafthunk/types";
 import useSWR from "swr";
 
-import { createDefaultTransformPollMapping } from "@dafthunk/types";
+import { createDefaultTransformPollMapping, DEFAULT_FORMAT_TRANSFORM_PROVIDER } from "@dafthunk/types";
 
 import { makeRequest } from "./utils";
 
@@ -95,7 +95,7 @@ export interface FormatTransformCreateFormState {
 
 export const emptyFormatTransformCreateForm = (): FormatTransformCreateFormState => ({
   name: "",
-  provider: "seedance",
+  provider: DEFAULT_FORMAT_TRANSFORM_PROVIDER,
   upstreamParams: [],
   paramMappings: [],
   pollMapping: createDefaultTransformPollMapping(),

@@ -465,6 +465,50 @@ export async function streamTextContentSync(
   });
 }
 
+/** Read merged text body for workflow/runtime keyword resolution. */
+export async function readTextContentBody(
+  env: Bindings,
+  params: {
+    readonly organizationId: string;
+    readonly resourceId: string;
+  }
+): Promise<string | null> {
+  const db = createDatabase(env);
+  const row = await getCatalogRow(
+    db,
+    params.organizationId,
+    params.resourceId
+  );
+  if (!row) {
+    return null;
+  }
+
+  const cache = getTextContentCacheEntry(
+    params.organizationId,
+    params.resourceId
+  );
+
+  const baseBytes = row.storageKey
+    ? ((await fetchTosTextBytes(env, {
+        organizationId: params.organizationId,
+        storageKey: row.storageKey,
+      })) ?? new Uint8Array())
+    : new Uint8Array();
+
+  if (cache && cache.ops.length > 0) {
+    const pendingBytes = applyTextEditOps(baseBytes, cache.ops);
+    if (sha256HexFromBytes(pendingBytes) === cache.pendingSha256) {
+      return new TextDecoder().decode(pendingBytes);
+    }
+  }
+
+  if (baseBytes.byteLength === 0) {
+    return null;
+  }
+
+  return new TextDecoder().decode(baseBytes);
+}
+
 export function flushTextContentMerge(
   env: Bindings,
   params: {

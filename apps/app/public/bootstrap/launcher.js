@@ -1,12 +1,15 @@
 (function bootstrapLauncher() {
   "use strict";
 
-  var CACHE_NAME = "z3cz-bootstrap-shell:v1";
+  var SHELL_CACHE_NAME = "z3cz-bootstrap-shell:v1";
+  var ASSETS_CACHE_NAME = "z3cz-bootstrap-assets:v1";
+  var ASSET_SW_URL = "/z3cz-asset-sw.js";
   var APP_READY_EVENT = "z3cz-app-ready";
   var API_BASE = "/api";
   var FETCH_TIMEOUT_MS = 30000;
   var MAX_RETRIES = 3;
   var APP_READY_TIMEOUT_MS = 15000;
+  var SW_CONTROL_TIMEOUT_MS = 5000;
 
   var launcher = document.getElementById("z3cz-launcher");
   var statusEl = document.getElementById("z3cz-launcher-status");
@@ -213,18 +216,12 @@
     return run();
   }
 
-  function loadStylesheets(cssFiles, fileBytes) {
+  function loadStylesheets(cssFiles) {
     cssFiles.forEach(function (href) {
       var link = document.createElement("link");
       link.rel = "stylesheet";
-      if (fileBytes && fileBytes[href]) {
-        link.href = URL.createObjectURL(
-          new Blob([fileBytes[href]], { type: "text/css" })
-        );
-      } else {
-        link.href = href;
-        link.crossOrigin = "anonymous";
-      }
+      link.href = href;
+      link.crossOrigin = "anonymous";
       document.head.appendChild(link);
     });
   }
@@ -246,50 +243,79 @@
     });
   }
 
-  function installImportMap(blobUrls, entryPath) {
-    var imports = {};
-    Object.keys(blobUrls).forEach(function (path) {
-      // Entry must keep its /assets/ URL so Vite relative dynamic imports resolve.
-      if (path === entryPath) {
-        return;
-      }
-      imports[path] = blobUrls[path];
-    });
-    if (Object.keys(imports).length === 0) {
-      return;
+  function contentTypeForAssetPath(path) {
+    if (path.slice(-3) === ".js") {
+      return "application/javascript";
     }
-    var script = document.createElement("script");
-    script.type = "importmap";
-    script.textContent = JSON.stringify({ imports: imports });
-    document.head.appendChild(script);
+    if (path.slice(-4) === ".css") {
+      return "text/css";
+    }
+    return "application/octet-stream";
   }
 
-  function mountFromBytes(fileBytes, entry, cssFiles) {
-    var blobUrls = {};
-    Object.keys(fileBytes).forEach(function (path) {
-      if (path.slice(-3) !== ".js") {
-        return;
-      }
-      var blob = new Blob([fileBytes[path]], {
-        type: "application/javascript",
+  function seedAssetCache(fileBytes) {
+    if (typeof caches === "undefined") {
+      return Promise.resolve(false);
+    }
+
+    return caches.open(ASSETS_CACHE_NAME).then(function (cache) {
+      var writes = Object.keys(fileBytes).map(function (path) {
+        return cache.put(
+          path,
+          new Response(fileBytes[path], {
+            headers: { "Content-Type": contentTypeForAssetPath(path) },
+          })
+        );
       });
-      blobUrls[path] = URL.createObjectURL(blob);
+      return Promise.all(writes).then(function () {
+        return true;
+      });
     });
-    installImportMap(blobUrls, entry);
-    loadStylesheets(cssFiles, fileBytes);
-    return new Promise(function (resolve, reject) {
-      var script = document.createElement("script");
-      script.type = "module";
-      script.src = entry;
-      script.crossOrigin = "anonymous";
-      script.onload = function () {
-        resolve();
-      };
-      script.onerror = function () {
-        reject(new Error("Failed to load application"));
-      };
-      document.body.appendChild(script);
+  }
+
+  function waitForServiceWorkerControl() {
+    if (!("serviceWorker" in navigator)) {
+      return Promise.resolve(false);
+    }
+    if (navigator.serviceWorker.controller) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise(function (resolve) {
+      var settled = false;
+      function finish(active) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(active);
+      }
+
+      var timer = setTimeout(function () {
+        finish(Boolean(navigator.serviceWorker.controller));
+      }, SW_CONTROL_TIMEOUT_MS);
+
+      navigator.serviceWorker.addEventListener("controllerchange", function onChange() {
+        clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+        finish(true);
+      });
     });
+  }
+
+  function registerAssetServiceWorker() {
+    if (!("serviceWorker" in navigator)) {
+      return Promise.resolve(false);
+    }
+
+    return navigator.serviceWorker
+      .register(ASSET_SW_URL)
+      .then(function () {
+        return waitForServiceWorkerControl();
+      })
+      .catch(function () {
+        return false;
+      });
   }
 
   function gunzipBytes(compressed) {
@@ -349,7 +375,7 @@
     if (typeof caches === "undefined") {
       return Promise.resolve(null);
     }
-    return caches.open(CACHE_NAME).then(function (cache) {
+    return caches.open(SHELL_CACHE_NAME).then(function (cache) {
       return cache.match(shellUrl);
     });
   }
@@ -358,7 +384,7 @@
     if (typeof caches === "undefined") {
       return Promise.resolve();
     }
-    return caches.open(CACHE_NAME).then(function (cache) {
+    return caches.open(SHELL_CACHE_NAME).then(function (cache) {
       return cache.put(
         shellUrl,
         new Response(bytes, {
@@ -391,14 +417,24 @@
       return loadViaHttp(config.entry, config.css || []);
     }
 
-    return loadShellBytes(config)
-      .then(gunzipBytes)
-      .then(parseShellArchive)
-      .then(function (archive) {
-        var entry = archive.entry || config.entry;
-        var css = archive.css.length > 0 ? archive.css : config.css || [];
-        return mountFromBytes(archive.fileBytes, entry, css);
+    var serviceWorkerReady = registerAssetServiceWorker();
+    var shellArchive = loadShellBytes(config).then(gunzipBytes).then(parseShellArchive);
+
+    return Promise.all([serviceWorkerReady, shellArchive]).then(function (results) {
+      var swReady = results[0];
+      var archive = results[1];
+      var entry = archive.entry || config.entry;
+      var css = archive.css.length > 0 ? archive.css : config.css || [];
+
+      if (!swReady) {
+        return loadViaHttp(entry, css);
+      }
+
+      setStatus("Starting application…");
+      return seedAssetCache(archive.fileBytes).then(function () {
+        return loadViaHttp(entry, css);
       });
+    });
   }
 
   function loadApp(config) {

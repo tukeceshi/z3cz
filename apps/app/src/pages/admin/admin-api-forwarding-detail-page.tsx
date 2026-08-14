@@ -4,8 +4,10 @@ import type {
   TransformPollMapping,
 } from "@dafthunk/types";
 import {
+  DEFAULT_FORMAT_TRANSFORM_PROVIDER,
   isTransformMappingConfigComplete,
   isTransformPollMappingComplete,
+  resolveSingleModelGroupLabel,
   resolveTransformPollMapping,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
@@ -151,8 +153,10 @@ export function AdminApiForwardingDetailPage() {
             />
           </div>
           <div className="space-y-1">
-            <Label>{t("adminApiForwarding.provider")}</Label>
-            <p className="text-sm text-muted-foreground">{template.provider}</p>
+            <Label>{t("adminApiForwarding.singleModelGroup")}</Label>
+            <p className="text-sm text-muted-foreground">
+              {resolveSingleModelGroupLabel(template.provider)}
+            </p>
           </div>
         </div>
 

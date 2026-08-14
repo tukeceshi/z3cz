@@ -21,6 +21,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { LIST_SCROLL_CLASS } from "@/components/list-scroll";
 import { cn } from "@/utils/utils";
@@ -106,7 +107,6 @@ import {
 import {
   hasAiImagePromptReference,
   listPickableAiImagePromptSources,
-  resolveAiImageReferencedPrompt,
   evaluateAiImagePromptReferenceStructural,
   collectAiImageUnifiedReferenceChips,
 } from "./ai-image-prompt-reference";
@@ -260,15 +260,15 @@ export function AiImageConfigPanel({
     [edges, nodeId]
   );
 
-  const referencedPrompt = useMemo(
-    () =>
-      resolveAiImageReferencedPrompt({
-        nodeId,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-      }),
-    [edges, nodeId, typedNodes]
-  );
+  const { text: referencedPrompt, loading: referencedPromptLoading } =
+    useResolvedReferencedPrompt({
+      nodeId,
+      targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
+      edges,
+      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      organizationId: orgId,
+      workflowId,
+    });
 
   const modelRules = useMemo(() => {
     if (effectiveModel) {
@@ -308,7 +308,14 @@ export function AiImageConfigPanel({
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
   useEffect(() => {
-    if (!hasPromptReference || disabled || !updateNodeData) return;
+    if (
+      !hasPromptReference ||
+      disabled ||
+      !updateNodeData ||
+      referencedPromptLoading
+    ) {
+      return;
+    }
     if (referencedPrompt === promptValue) return;
     updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
   }, [
@@ -318,19 +325,13 @@ export function AiImageConfigPanel({
     nodeId,
     promptValue,
     referencedPrompt,
+    referencedPromptLoading,
     updateNodeData,
   ]);
 
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
-  const promptForGenerate = useMemo(() => {
-    if (!hasPromptReference) return displayPrompt;
-    return resolveAiImageReferencedPrompt({
-      nodeId,
-      edges,
-      nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-    });
-  }, [displayPrompt, edges, hasPromptReference, nodeId, typedNodes]);
+  const promptForGenerate = displayPrompt;
   const promptMaxLength = modelRules.promptMaxChars;
   const promptOverLimit =
     promptForGenerate.trim().length > promptMaxLength;

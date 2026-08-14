@@ -5,7 +5,7 @@ import {
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
-import { AI_TEXT_OUTPUT_ID, readAiTextPromptSource } from "./ai-text-node-utils";
+import { AI_TEXT_OUTPUT_ID, readAiTextResultTextSync } from "./ai-text-node-utils";
 import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -26,7 +26,7 @@ export interface AiVideoPromptReferenceEdge {
 }
 
 function readTextFromSource(data: WorkflowNodeType): string {
-  return readAiTextPromptSource(data);
+  return readAiTextResultTextSync(data);
 }
 
 /** Live prompt text from connected AI text output(s), joined by newline. */

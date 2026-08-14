@@ -5,6 +5,7 @@ import {
   isEphemeralMediaReference,
   isLocalMediaReference,
   normalizeAiTextReferences,
+  resolveAiTextKeywordStrings,
   type MediaReference,
 } from "@dafthunk/types";
 
@@ -92,7 +93,11 @@ export class AiTextNode extends ExecutableNode {
 
   public async execute(context: NodeContext): Promise<NodeExecution> {
     const keywords = context.inputs[AI_TEXT_KEYWORDS_INPUT];
-    const references = normalizeAiTextReferences(keywords);
+    const keywordStrings = await resolveAiTextKeywordStrings(
+      keywords,
+      context.readTextContent
+    );
+    const references = normalizeAiTextReferences(keywordStrings);
     const media = collectAiTextMediaReferences(keywords);
     const question =
       typeof context.inputs.prompt === "string"

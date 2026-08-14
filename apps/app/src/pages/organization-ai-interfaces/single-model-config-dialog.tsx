@@ -74,7 +74,7 @@ import {
   useApiPresetChannelIdMap,
 } from "./use-preset-channel-model-ids";
 import {
-  SingleModelVideoEndpointUrlFields,
+  SingleModelEndpointUrlFields,
 } from "./single-model-endpoint-url-preview";
 
 interface SingleModelConfigDialogProps {
@@ -375,8 +375,8 @@ export function SingleModelConfigDialog({
               onChange={(event) => setBaseUrl(event.target.value)}
             />
             {isKimiProvider ? <KimiEndpointRegionHints /> : null}
-            {endpointRulesCategory === "video" ? (
-              <SingleModelVideoEndpointUrlFields
+            {endpointRulesCategory !== "storage" ? (
+              <SingleModelEndpointUrlFields
                 idPrefix="single-model-config"
                 baseUrl={baseUrl}
                 category={endpointRulesCategory}
@@ -434,6 +434,7 @@ export function SingleModelConfigDialog({
               value={endpointRulesForm}
               onChange={setEndpointRulesForm}
               idPrefix="single-model-config"
+              singleModelPresetId={presetId ?? ""}
               sharedFormatTransform={sharedFormatTransform}
               onSharedFormatTransformChange={setSharedFormatTransform}
               formatTemplates={formatTemplates}

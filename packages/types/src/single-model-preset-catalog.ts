@@ -52,8 +52,29 @@ import {
   SEEDREAM_PROVIDER_CARD_ID,
   defaultUpstreamModelIdForCanonical,
 } from "./single-model-interface-metadata";
+import { VOLCANO_AGGREGATE_PRESET_ID } from "./platform-ai-model-channel";
 
 export type SingleModelPresetCategory = "text" | "image" | "video" | "audio" | "storage";
+
+const SINGLE_MODEL_PROVIDER_GROUP_IDS = [
+  DEEPSEEK_PROVIDER_CARD_ID,
+  SEEDANCE_PROVIDER_CARD_ID,
+  SEEDREAM_PROVIDER_CARD_ID,
+  SEED_PROVIDER_CARD_ID,
+  GLM_PROVIDER_CARD_ID,
+  KIMI_PROVIDER_CARD_ID,
+  OPENAI_PROVIDER_CARD_ID,
+  OPENAI_IMAGE_PROVIDER_CARD_ID,
+  GEMINI_PROVIDER_CARD_ID,
+  NANO_BANANA_PROVIDER_CARD_ID,
+  VEO_PROVIDER_CARD_ID,
+  GROK_PROVIDER_CARD_ID,
+  GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID,
+  GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
+  CLAUDE_PROVIDER_CARD_ID,
+  MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  VOLCANO_AGGREGATE_PRESET_ID,
+] as const;
 
 export type SingleModelPresetIcon =
   | "message-square"
@@ -230,6 +251,31 @@ export function getSingleModelPresetById(
     return undefined;
   }
   return SINGLE_MODEL_PRESET_CATALOG.find((entry) => entry.id === id);
+}
+
+/** All single-model group ids used by format-transform template `provider`. */
+export function listSingleModelGroupIds(): readonly string[] {
+  const catalogIds = SINGLE_MODEL_PRESET_CATALOG.map((entry) => entry.id);
+  return [...SINGLE_MODEL_PROVIDER_GROUP_IDS, ...catalogIds];
+}
+
+export function resolveSingleModelGroupLabel(groupId: string): string {
+  const preset = getSingleModelPresetById(groupId);
+  if (preset) {
+    return preset.name;
+  }
+
+  if (groupId.startsWith("provider:")) {
+    return groupId.slice("provider:".length);
+  }
+  if (groupId.startsWith("preset:")) {
+    return groupId.slice("preset:".length);
+  }
+  if (groupId.startsWith("aggregate:")) {
+    return groupId.slice("aggregate:".length);
+  }
+
+  return groupId;
 }
 
 export function getSingleModelPresetsByCategory(): Readonly<

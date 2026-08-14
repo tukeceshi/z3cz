@@ -1018,6 +1018,7 @@ export const en = {
     slug: "Slug",
     proxySlug: "Proxy ID",
     provider: "Provider",
+    singleModelGroup: "Single-model group",
     upstreamUrl: "Upstream root URL",
     upstreamUrlHelp:
       "Upstream API root (e.g. https://host/v1). Paths after the proxy slug are appended as-is; align this with your org interface paths.",
@@ -1030,7 +1031,7 @@ export const en = {
     disabled: "Disabled",
     columns: {
       name: "Name",
-      provider: "Provider",
+      provider: "Group",
       upstream: "Upstream",
       proxyPath: "Proxy Path",
       status: "Status",
@@ -1068,6 +1069,7 @@ export const en = {
       pollSuccessValues: "Success status values",
       pollFailedValues: "Failed status values",
       pollOutputKey: "Success output key",
+      standardSchemaEmpty: "No standard schema for this group yet.",
     },
   },
   errors: {

@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildAiTextUserPrompt,
   buildOpenAiMultimodalUserContent,
   collectAiTextMediaReferences,
+  resolveAiTextKeywordStrings,
   validateAiTextPromptAssembly,
 } from "./platform-ai-model";
 
@@ -79,5 +80,27 @@ describe("collectAiTextMediaReferences", () => {
     ]);
     expect(result.images).toHaveLength(1);
     expect(result.videos).toHaveLength(1);
+  });
+});
+
+describe("resolveAiTextKeywordStrings", () => {
+  it("resolves resource id references via readText callback", async () => {
+    const readText = vi.fn(async (resourceId: string) =>
+      resourceId === "res-1" ? "loaded text" : null
+    );
+
+    await expect(
+      resolveAiTextKeywordStrings(
+        [
+          "inline",
+          {
+            resourceId: "res-1",
+            contentSha256: "abc",
+            mimeType: "text/plain; charset=utf-8",
+          },
+        ],
+        readText
+      )
+    ).resolves.toEqual(["inline", "loaded text"]);
   });
 });

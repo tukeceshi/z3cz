@@ -78,7 +78,9 @@ export async function* iterateAiInterfaceChatStream(params: {
     return;
   }
 
-  const url = resolveSyncRequestUrl(params.resolved.baseUrl, sync.path);
+  const url = resolveSyncRequestUrl(params.resolved.baseUrl, sync.path, {
+    useFullSubmitUrl: params.resolved.useFullSubmitUrl,
+  });
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "text/event-stream",

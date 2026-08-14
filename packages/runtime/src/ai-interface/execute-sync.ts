@@ -12,7 +12,15 @@ import {
   type UpstreamRequestLogSink,
 } from "./upstream-request-log";
 
-export function resolveSyncRequestUrl(baseUrl: string, path: string): string {
+export function resolveSyncRequestUrl(
+  baseUrl: string,
+  path: string,
+  options?: { readonly useFullSubmitUrl?: boolean }
+): string {
+  if (options?.useFullSubmitUrl) {
+    return baseUrl.trim().replace(/\/$/, "");
+  }
+
   const normalizedBase = baseUrl.trim().replace(/\/$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
@@ -56,7 +64,9 @@ export async function executeAiInterfaceSync(params: {
     return { status: "failed", error: failure.error };
   }
 
-  const url = resolveSyncRequestUrl(resolved.baseUrl, sync.path);
+  const url = resolveSyncRequestUrl(resolved.baseUrl, sync.path, {
+    useFullSubmitUrl: resolved.useFullSubmitUrl,
+  });
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...artifact.connection.defaultHeaders,
@@ -142,6 +152,7 @@ export function mergeResolvedAiInterface(params: {
   apiKey: string;
   videoEndpoints?: ResolvedSingleModelVideoEndpoints;
   formatTransform?: FormatTransformConfig;
+  useFullSubmitUrl?: boolean;
 }): ResolvedOrgAiInterface {
   const { artifact } = params;
   return {
@@ -156,5 +167,6 @@ export function mergeResolvedAiInterface(params: {
     artifact,
     ...(params.videoEndpoints ? { videoEndpoints: params.videoEndpoints } : {}),
     ...(params.formatTransform ? { formatTransform: params.formatTransform } : {}),
+    ...(params.useFullSubmitUrl ? { useFullSubmitUrl: true } : {}),
   };
 }

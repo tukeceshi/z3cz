@@ -7,7 +7,7 @@ import {
   type ReferenceImageInline,
 } from "./reference-image-input";
 import type { MediaReference, WorkflowMediaValue } from "./media-reference";
-import { isMediaReference } from "./media-reference";
+import { isMediaReference, isResourceIdReference } from "./media-reference";
 
 export const PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION = 1 as const;
 
@@ -1718,6 +1718,29 @@ export function normalizeAiTextReferences(
       }));
   }
   return [];
+}
+
+/** Resolve keyword values to plain strings, fetching external text bodies when needed. */
+export async function resolveAiTextKeywordStrings(
+  keywords: unknown,
+  readText?: (resourceId: string) => Promise<string | null>
+): Promise<readonly string[]> {
+  const strings: string[] = [];
+
+  for (const entry of flattenAiTextKeywordValues(keywords)) {
+    if (typeof entry === "string" && entry.trim().length > 0) {
+      strings.push(entry.trim());
+      continue;
+    }
+    if (isResourceIdReference(entry) && readText) {
+      const text = await readText(entry.resourceId);
+      if (typeof text === "string" && text.trim().length > 0) {
+        strings.push(text.trim());
+      }
+    }
+  }
+
+  return strings;
 }
 
 function flattenAiTextKeywordValues(keywords: unknown): unknown[] {

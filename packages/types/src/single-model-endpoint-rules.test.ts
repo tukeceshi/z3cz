@@ -110,6 +110,26 @@ describe("single-model-endpoint-rules", () => {
     ).toEqual({
       fullUrlPreview: "https://host/v1/contents/generations/tasks",
     });
+
+    expect(
+      buildSingleModelEndpointUrlPreview({
+        baseUrl: "https://host/v1",
+        category: "text",
+        useFullSubmitUrl: false,
+      })
+    ).toEqual({
+      fullUrlPreview: "https://host/v1/chat/completions",
+    });
+
+    expect(
+      buildSingleModelEndpointUrlPreview({
+        baseUrl: "https://host/v1/full",
+        category: "image",
+        useFullSubmitUrl: true,
+      })
+    ).toEqual({
+      fullUrlPreview: "https://host/v1/full",
+    });
   });
 
   it("persists official and custom rules independently", () => {

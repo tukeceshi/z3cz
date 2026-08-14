@@ -2,8 +2,16 @@ import {
   resolveForwardingVideoSize,
   type ForwardingLockedResolution,
 } from "./forwarding-video-size";
+import { SEEDANCE_PROVIDER_CARD_ID } from "./single-model-interface-metadata";
+import { listSingleModelGroupIds } from "./single-model-preset-catalog";
 
-export const FORMAT_TRANSFORM_PROVIDERS = ["seedance"] as const;
+/** Single-model group id stored in template `provider` (e.g. provider:seedance). */
+export type FormatTransformProvider = string;
+
+export const DEFAULT_FORMAT_TRANSFORM_PROVIDER = SEEDANCE_PROVIDER_CARD_ID;
+
+/** @deprecated Use listSingleModelGroupIds */
+export const FORMAT_TRANSFORM_PROVIDERS = listSingleModelGroupIds();
 
 export {
   FORWARDING_LOCKED_RESOLUTIONS,
@@ -17,14 +25,19 @@ export type {
   ForwardingVideoResolutionTier,
 } from "./forwarding-video-size";
 
-export type FormatTransformProvider =
-  (typeof FORMAT_TRANSFORM_PROVIDERS)[number];
-
 /** @deprecated Use FormatTransformProvider */
 export type ApiFormatForwardingProvider = FormatTransformProvider;
 
-/** @deprecated Use FORMAT_TRANSFORM_PROVIDERS */
+/** @deprecated Use listSingleModelGroupIds */
 export const API_FORMAT_FORWARDING_PROVIDERS = FORMAT_TRANSFORM_PROVIDERS;
+
+export function normalizeFormatTransformProvider(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "seedance") {
+    return SEEDANCE_PROVIDER_CARD_ID;
+  }
+  return trimmed;
+}
 
 export type FormatTransformScope = "platform";
 
@@ -407,16 +420,20 @@ export const VIDEO_TRANSFORM_STANDARD_SCHEMA: readonly TransformStandardSchemaNo
 export const VIDEO_FORWARDING_STANDARD_SCHEMA = VIDEO_TRANSFORM_STANDARD_SCHEMA;
 
 export function getTransformStandardSchema(
-  _provider: FormatTransformProvider
+  groupId: string
 ): readonly TransformStandardSchemaNode[] {
-  return VIDEO_TRANSFORM_STANDARD_SCHEMA;
+  const normalized = normalizeFormatTransformProvider(groupId);
+  if (normalized === SEEDANCE_PROVIDER_CARD_ID) {
+    return VIDEO_TRANSFORM_STANDARD_SCHEMA;
+  }
+  return [];
 }
 
 /** @deprecated Use getTransformStandardSchema */
 export function getForwardingStandardSchema(
-  provider: FormatTransformProvider
+  groupId: FormatTransformProvider
 ): readonly TransformStandardSchemaNode[] {
-  return getTransformStandardSchema(provider);
+  return getTransformStandardSchema(groupId);
 }
 
 interface SeedanceTransformExampleEntry {

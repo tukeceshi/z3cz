@@ -442,6 +442,8 @@ export class AiImageNode extends ExecutableNode {
 
       cloudUpload: storageResolution.cloudUpload,
 
+      useFullSubmitUrl: resolvedInterface.useFullSubmitUrl,
+
     });
 
 

@@ -102,6 +102,7 @@ export function ForwardingMappingEditor(props: ForwardingMappingEditorProps) {
     () => getForwardingStandardSchema(props.provider),
     [props.provider]
   );
+  const hasStandardSchema = schemaNodes.length > 0;
 
   const mappingByParamId = useMemo(
     () =>
@@ -209,7 +210,7 @@ export function ForwardingMappingEditor(props: ForwardingMappingEditorProps) {
             <Button
               type="button"
               variant="outline"
-              disabled={!selectedSchemaNode}
+              disabled={!selectedSchemaNode || !hasStandardSchema}
               onClick={handleAddParam}
             >
               {t("adminApiForwarding.mapping.addParam")}
@@ -290,24 +291,30 @@ export function ForwardingMappingEditor(props: ForwardingMappingEditorProps) {
         </div>
 
         <div className="space-y-2">
-          {schemaNodes.map((node) => {
-            const selected = selectedSchemaNodeId === node.id;
-            return (
-              <div key={node.id} className="space-y-2">
-                <SchemaNodePickButton
-                  node={node}
-                  selected={selected}
-                  mapped={mappedSchemaNodeIds.has(node.id)}
-                  onSelect={(entry) => setSelectedSchemaNodeId(entry.id)}
-                />
-                {selected ? (
-                  <SchemaNodeExamplePanel
-                    example={resolveTransformUpstreamDisplayExample(node)}
+          {schemaNodes.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              {t("adminApiForwarding.mapping.standardSchemaEmpty")}
+            </p>
+          ) : (
+            schemaNodes.map((node) => {
+              const selected = selectedSchemaNodeId === node.id;
+              return (
+                <div key={node.id} className="space-y-2">
+                  <SchemaNodePickButton
+                    node={node}
+                    selected={selected}
+                    mapped={mappedSchemaNodeIds.has(node.id)}
+                    onSelect={(entry) => setSelectedSchemaNodeId(entry.id)}
                   />
-                ) : null}
-              </div>
-            );
-          })}
+                  {selected ? (
+                    <SchemaNodeExamplePanel
+                      example={resolveTransformUpstreamDisplayExample(node)}
+                    />
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

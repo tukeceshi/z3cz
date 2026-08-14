@@ -7,6 +7,7 @@ import {
   createDefaultTransformPollMapping,
   isTransformMappingConfigComplete,
   isTransformPollMappingComplete,
+  normalizeFormatTransformProvider,
   resolveTransformPollMapping,
   singleModelFormatTransformFromTemplate,
 } from "@dafthunk/types";
@@ -37,6 +38,7 @@ interface FormatMappingSettingsDialogProps {
   readonly value: SingleModelFormatTransform | null;
   readonly onChange: (value: SingleModelFormatTransform | null) => void;
   readonly formatTemplates: readonly FormatTransformTemplate[];
+  readonly singleModelPresetId: string;
   readonly isFormatTemplatesLoading?: boolean;
 }
 
@@ -46,6 +48,7 @@ export function FormatMappingSettingsDialog({
   value,
   onChange,
   formatTemplates,
+  singleModelPresetId,
   isFormatTemplatesLoading = false,
 }: FormatMappingSettingsDialogProps) {
   const { t } = useTranslation();
@@ -77,16 +80,14 @@ export function FormatMappingSettingsDialog({
     setPollMapping(resolveTransformPollMapping(value?.pollMapping));
   }, [open, value]);
 
-  const appliedTemplate =
-    formatTemplates.find((template) => template.id === mappingTemplateId) ??
-    null;
+  const normalizedPresetId = normalizeFormatTransformProvider(singleModelPresetId);
 
-  const mappingProvider =
-    formatTemplates.find((template) => template.id === sourceTemplateId)
-      ?.provider ??
-    appliedTemplate?.provider ??
-    formatTemplates[0]?.provider ??
-    "seedance";
+  const groupFormatTemplates = formatTemplates.filter(
+    (template) =>
+      normalizeFormatTransformProvider(template.provider) === normalizedPresetId
+  );
+
+  const mappingGroupId = normalizedPresetId;
 
   const handleApplyTemplate = () => {
     if (!sourceTemplateId.trim()) {
@@ -94,7 +95,7 @@ export function FormatMappingSettingsDialog({
       return;
     }
 
-    const template = formatTemplates.find(
+    const template = groupFormatTemplates.find(
       (entry) => entry.id === sourceTemplateId
     );
     if (!template) {
@@ -169,7 +170,7 @@ export function FormatMappingSettingsDialog({
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {formatTemplates.map((template) => (
+                  {groupFormatTemplates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}
                     </SelectItem>
@@ -188,7 +189,7 @@ export function FormatMappingSettingsDialog({
           </div>
 
           <ForwardingMappingEditor
-            provider={mappingProvider}
+            provider={mappingGroupId}
             upstreamParams={upstreamParams}
             paramMappings={paramMappings}
             onUpstreamParamsChange={setUpstreamParams}

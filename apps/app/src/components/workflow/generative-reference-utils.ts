@@ -11,6 +11,7 @@ import { addEdge, type Connection } from "@xyflow/react";
 import { readAiAudioCardAudios } from "./ai-audio-node-utils";
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
 import type { AiTextReferenceKind } from "./ai-text-node-utils";
+import { readAiTextResultExcerptSync } from "./resolve-ai-text-result";
 import { readAiVideoCardPrimaryVideo } from "./ai-video-node-utils";
 import {
   classifyAiVideoReferenceFromNodeType,
@@ -118,15 +119,7 @@ export function collectGenerativeReferenceChips(params: {
       let media: WorkflowMediaValue | undefined;
 
       if (kind === "text") {
-        const fromOutput =
-          typeof output?.value === "string" ? output.value : undefined;
-        const fromResult = sourceData.inputs?.find(
-          (entry) => entry.id === "result"
-        )?.value;
-        const text =
-          fromOutput ??
-          (typeof fromResult === "string" ? fromResult : undefined);
-        textExcerpt = text?.trim() || undefined;
+        textExcerpt = readAiTextResultExcerptSync(sourceData);
       } else {
         media = resolveReferenceMediaFromSource({
           kind,
