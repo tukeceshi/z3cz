@@ -309,16 +309,29 @@ export function buildOpenAiMultimodalUserContent(params: {
   return parts;
 }
 
+/** Partial node inputs/outputs the server wrote at generate time. */
+export interface WorkflowNodeContentPatch {
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly outputs?: Readonly<Record<string, unknown>>;
+  readonly metadata?: Readonly<Record<string, string>>;
+}
+
 export interface GenerateAiTextResponse {
   readonly text: string;
   readonly invocationId: string;
   readonly aiInterfaceId: string;
   readonly resourceId?: string;
   readonly contentSha256?: string;
+  readonly workflowNodeContent?: WorkflowNodeContentPatch;
 }
 
 /** SSE payload for `/ai-text/generate-stream`. */
 export type GenerateAiTextStreamEvent =
+  | {
+      readonly type: "started";
+      readonly invocationId: string;
+      readonly workflowNodeContent?: WorkflowNodeContentPatch;
+    }
   | { readonly type: "delta"; readonly text: string }
   | {
       readonly type: "done";
@@ -327,6 +340,7 @@ export type GenerateAiTextStreamEvent =
       readonly aiInterfaceId: string;
       readonly resourceId?: string;
       readonly contentSha256?: string;
+      readonly workflowNodeContent?: WorkflowNodeContentPatch;
     }
   | { readonly type: "error"; readonly error: string };
 
@@ -343,6 +357,8 @@ export interface AiTextResultHistoryItem {
   readonly providerModelId?: string;
   readonly modelDisplayName?: string;
   readonly createdAt: string;
+  /** AI generate record — used to show failure without storing error text. */
+  readonly invocationId?: string;
 }
 
 export interface AiTextResultHistory {
@@ -392,9 +408,11 @@ export interface GenerateAiImageResponse {
   readonly aiInterfaceId: string;
   readonly storageMode: "ephemeral" | "cloud";
   readonly jobId?: string;
-  readonly phase?: "ready_to_persist" | "succeeded";
+  readonly phase?: "generating" | "ready_to_persist" | "succeeded";
+  readonly resourceIds?: readonly string[];
   readonly requestedCount?: number;
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;
+  readonly workflowNodeContent?: WorkflowNodeContentPatch;
 }
 
 export type OrgVideoModelUnavailableReason = OrgTextModelUnavailableReason;
@@ -448,6 +466,8 @@ export interface SubmitAiVideoResponse {
   readonly invocationId: string;
   readonly aiInterfaceId: string;
   readonly jobId?: string;
+  readonly resourceIds?: readonly string[];
+  readonly workflowNodeContent?: WorkflowNodeContentPatch;
 }
 
 export interface PollAiVideoTaskResponse {
@@ -505,6 +525,8 @@ export interface GenerateAiAudioResponse {
   readonly storageMode: "ephemeral" | "cloud";
   readonly jobId?: string;
   readonly phase?: "ready_to_persist" | "succeeded";
+  readonly resourceIds?: readonly string[];
+  readonly workflowNodeContent?: WorkflowNodeContentPatch;
 }
 
 export interface AiImageResultHistoryItem {
@@ -518,6 +540,8 @@ export interface AiImageResultHistoryItem {
   readonly modelDisplayName?: string;
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;
   readonly createdAt: string;
+  /** Generation job — resume and failed-record error lookup. */
+  readonly jobId?: string;
 }
 
 export interface AiImageResultHistory {
@@ -535,6 +559,7 @@ export interface AiVideoResultHistoryItem {
   readonly providerModelId?: string;
   readonly modelDisplayName?: string;
   readonly createdAt: string;
+  readonly jobId?: string;
 }
 
 export interface AiVideoResultHistory {

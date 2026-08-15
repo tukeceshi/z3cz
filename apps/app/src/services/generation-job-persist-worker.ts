@@ -162,8 +162,6 @@ async function waitForJobReadyToPersist(params: {
       params.onProgressPhase?.("server_persisting");
     } else if (response.displayPhase === "queued") {
       params.onProgressPhase?.("queued");
-    } else {
-      params.onProgressPhase?.("generating");
     }
 
     await sleep(JOB_POLL_INTERVAL_MS);

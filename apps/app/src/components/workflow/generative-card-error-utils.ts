@@ -115,6 +115,15 @@ export const TRANSIENT_GENERATIVE_METADATA_KEYS = [
   AI_IMAGE_GENERATE_ERROR_META_KEY,
   AI_VIDEO_GENERATE_ERROR_META_KEY,
   "aiTextGenerating",
+  "aiTextStreamStarted",
+  "aiImageGenerating",
+  "aiVideoGenerating",
+  "aiAudioGenerating",
+] as const;
+
+const IN_FLIGHT_GENERATIVE_METADATA_KEYS = [
+  "aiTextGenerating",
+  "aiTextStreamStarted",
   "aiImageGenerating",
   "aiVideoGenerating",
   "aiAudioGenerating",
@@ -135,5 +144,34 @@ export function stripTransientGenerativeMetadata(
   }
 
   if (!changed) return metadata;
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/** Keep local generating flags when a saved/remote node would otherwise clear them. */
+export function preserveInFlightGenerativeMetadata(
+  incoming: Record<string, string> | undefined,
+  local: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!local) {
+    return incoming;
+  }
+
+  let next = incoming ? { ...incoming } : {};
+  let changed = false;
+  for (const key of IN_FLIGHT_GENERATIVE_METADATA_KEYS) {
+    const localValue = local[key];
+    if (localValue === undefined) {
+      continue;
+    }
+    if (next[key] === localValue) {
+      continue;
+    }
+    next[key] = localValue;
+    changed = true;
+  }
+
+  if (!changed) {
+    return incoming;
+  }
   return Object.keys(next).length > 0 ? next : undefined;
 }

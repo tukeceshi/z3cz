@@ -11,11 +11,13 @@ import {
 import { cn } from "@/utils/utils";
 
 import { useCreativeStudioOptional } from "./creative-studio-context";
+import { STUDIO_TEXT_PLAIN_SEGMENT } from "./creative-studio-surface";
 import { WorkflowAddNodeMenuPanel } from "./workflow-add-node-menu-panel";
 
 export interface StudioTextSectionFrameActionsProps {
   readonly sectionBody: string;
   readonly precedingText: string;
+  readonly headingText: string;
   readonly showEditHint?: boolean;
   readonly className?: string;
 }
@@ -23,6 +25,7 @@ export interface StudioTextSectionFrameActionsProps {
 export function StudioTextSectionFrameActions({
   sectionBody,
   precedingText,
+  headingText,
   showEditHint = false,
   className,
 }: StudioTextSectionFrameActionsProps) {
@@ -48,45 +51,57 @@ export function StudioTextSectionFrameActions({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute top-full left-1/2 z-20 mt-1.5 -translate-x-1/2",
+        "pointer-events-none absolute inset-x-0 top-0 z-20 select-none",
         className
       )}
     >
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "studio-text-section-frame-action pointer-events-auto",
-              "flex items-center gap-1.5 rounded-full border border-border/50",
-              "px-3 py-1.5 text-sm font-medium shadow-sm backdrop-blur-sm",
-              "bg-background/50 text-foreground/70",
-              "opacity-0 transition-[opacity,background-color,color,border-color]",
-              showEditHint && "opacity-40",
-              "group-hover/section:opacity-100",
-              "group-focus-within/section:opacity-100",
-              "data-[state=open]:border-border/70 data-[state=open]:bg-background/90",
-              "data-[state=open]:text-foreground data-[state=open]:opacity-100",
-              "hover:border-border/60 hover:bg-background/60 hover:text-foreground/85",
-              "data-[state=open]:hover:bg-background/90",
-              "focus-visible:opacity-100 focus-visible:outline-none",
-              "focus-visible:ring-2 focus-visible:ring-ring/40"
-            )}
-            aria-label={t("workflow.studio.sectionCreateNodeAria")}
+      {headingText ? (
+        <div
+          className={cn(
+            STUDIO_TEXT_PLAIN_SEGMENT,
+            "studio-text-heading-spacer invisible select-none"
+          )}
+          data-studio-heading-spacer={headingText}
+          aria-hidden
+        />
+      ) : null}
+      <div className="flex justify-center pt-1.5">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "studio-text-section-frame-action pointer-events-auto select-none",
+                "flex items-center gap-1.5 rounded-full border border-border/50",
+                "px-3 py-1.5 text-sm font-medium shadow-sm backdrop-blur-sm",
+                "bg-background/50 text-foreground/70",
+                "opacity-0 transition-[opacity,background-color,color,border-color]",
+                showEditHint && "opacity-40",
+                "group-hover/section:opacity-100",
+                "group-focus-within/section:opacity-100",
+                "data-[state=open]:border-border/70 data-[state=open]:bg-background/90",
+                "data-[state=open]:text-foreground data-[state=open]:opacity-100",
+                "hover:border-border/60 hover:bg-background/60 hover:text-foreground/85",
+                "data-[state=open]:hover:bg-background/90",
+                "focus-visible:opacity-100 focus-visible:outline-none",
+                "focus-visible:ring-2 focus-visible:ring-ring/40"
+              )}
+              aria-label={t("workflow.studio.sectionCreateNodeAria")}
+            >
+              <Plus className="size-4 shrink-0" aria-hidden />
+              {t("workflow.studio.sectionCreateNode")}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="center"
+            side="bottom"
+            sideOffset={6}
+            className="w-auto border-0 bg-transparent p-0 shadow-none"
           >
-            <Plus className="size-4 shrink-0" aria-hidden />
-            {t("workflow.studio.sectionCreateNode")}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="center"
-          side="bottom"
-          sideOffset={6}
-          className="w-auto border-0 bg-transparent p-0 shadow-none"
-        >
-          <WorkflowAddNodeMenuPanel onSelect={handleSelect} />
-        </PopoverContent>
-      </Popover>
+            <WorkflowAddNodeMenuPanel onSelect={handleSelect} />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

@@ -137,6 +137,8 @@ export interface GenerationJobResultJson {
   readonly nextUpstreamPollAt?: string;
   /** Snapshot of outbound /images/generations fields (image jobs). */
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;
+  /** Pre-created catalog ids written to the node while upstream is running. */
+  readonly placeholderResourceIds?: readonly string[];
 }
 
 export interface GenerationJobRecord {

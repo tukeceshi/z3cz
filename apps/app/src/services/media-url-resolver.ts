@@ -1,5 +1,5 @@
 import {
-  getMediaReferenceKey,
+  getResourceIdFromValue,
   isEphemeralMediaReference,
   isLocalMediaReference,
   type MediaReference,
@@ -78,7 +78,8 @@ export async function resolveMediaDisplayUrl(params: {
     );
   }
 
-  const mediaId = getMediaReferenceKey(params.media);
+  const mediaId = getResourceIdFromValue(params.media);
+  if (!mediaId) return null;
 
   const cached = await getCachedMediaBlobUrl({
     organizationId: params.organizationId,

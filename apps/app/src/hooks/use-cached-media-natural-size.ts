@@ -1,4 +1,4 @@
-import { getMediaReferenceKey, type MediaReference } from "@dafthunk/types";
+import { getResourceIdFromValue, type MediaReference } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 
@@ -12,7 +12,7 @@ export function useCachedMediaNaturalSize(
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id ?? "";
-  const mediaId = media ? getMediaReferenceKey(media) : null;
+  const mediaId = media ? getResourceIdFromValue(media) : null;
   const [naturalSize, setNaturalSize] = useState<{
     readonly width: number;
     readonly height: number;

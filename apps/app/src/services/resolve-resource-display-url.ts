@@ -1,4 +1,4 @@
-import { getMediaReferenceKey, isLocalMediaReference, type MediaReference, type WorkflowMediaValue } from "@dafthunk/types";
+import { getResourceIdFromValue, isLocalMediaReference, type MediaReference, type WorkflowMediaValue } from "@dafthunk/types";
 
 
 
@@ -49,14 +49,6 @@ import {
   resolveCanonicalResourceId,
 
 } from "@/services/media-resource-alias-service";
-
-
-
-export function getResourceId(media: MediaReference): string {
-
-  return getMediaReferenceKey(media);
-
-}
 
 
 
@@ -150,7 +142,7 @@ export function resolveStableMediaDisplayUrlSet(params: {
 
   const resourceId = resolveCanvasResourceId(params);
 
-  return getStableMediaDisplayUrlSet({
+  const canonical = getStableMediaDisplayUrlSet({
 
     organizationId: params.organizationId,
 
@@ -159,6 +151,30 @@ export function resolveStableMediaDisplayUrlSet(params: {
     mediaId: resourceId,
 
   });
+
+  if (!isMediaDisplayUrlSetEmpty(canonical)) {
+
+    return canonical;
+
+  }
+
+  const rawId = getResourceIdFromValue(params.media);
+
+  if (rawId && rawId !== resourceId) {
+
+    return getStableMediaDisplayUrlSet({
+
+      organizationId: params.organizationId,
+
+      workflowId: params.workflowId,
+
+      mediaId: rawId,
+
+    });
+
+  }
+
+  return canonical;
 
 }
 

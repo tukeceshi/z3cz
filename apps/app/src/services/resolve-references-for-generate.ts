@@ -2,14 +2,11 @@ import type {
   ReferenceImageInline,
   WorkflowMediaValue,
 } from "@dafthunk/types";
-import { isLocalMediaReference } from "@dafthunk/types";
+import { getResourceIdFromValue, isLocalMediaReference } from "@dafthunk/types";
 
-import {
-  collectResourceIds,
-  ensureLocalResourcesUploaded,
-  filterCloudResolvableReferences,
-} from "@/services/ensure-resource-cached";
+import { collectResourceIds } from "@/services/ensure-resource-cached";
 import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
+import { resolveCanonicalResourceId } from "@/services/media-resource-alias-service";
 import { makeRequest } from "@/services/utils";
 
 export type {
@@ -60,6 +57,65 @@ async function resolveResourceIdsOnServer(params: {
       body: JSON.stringify({ resourceIds: params.resourceIds }),
     }
   );
+}
+
+function lookupIdsForMedia(params: {
+  readonly media: WorkflowMediaValue;
+  readonly organizationId: string;
+  readonly workflowId?: string;
+}): readonly string[] {
+  const id = getResourceIdFromValue(params.media);
+  const ids: string[] = id ? [id] : [];
+  if (!params.workflowId) {
+    return ids;
+  }
+
+  const canonical = resolveCanonicalResourceId({
+    media: params.media,
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+  });
+  if (canonical && !ids.includes(canonical)) {
+    ids.push(canonical);
+  }
+  return ids;
+}
+
+function collectLookupResourceIds(params: {
+  readonly media: readonly WorkflowMediaValue[];
+  readonly organizationId: string;
+  readonly workflowId?: string;
+}): readonly string[] {
+  return [
+    ...new Set(
+      params.media.flatMap((entry) =>
+        lookupIdsForMedia({
+          media: entry,
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+        })
+      )
+    ),
+  ];
+}
+
+function pushResolvedUrl(params: {
+  readonly mimeType: string;
+  readonly url: string;
+  readonly referenceImageUrls: string[];
+  readonly referenceVideoUrls: string[];
+  readonly referenceAudioUrls: string[];
+}): void {
+  const mime = params.mimeType.toLowerCase();
+  if (isVideoMimeType(mime)) {
+    params.referenceVideoUrls.push(params.url);
+    return;
+  }
+  if (isAudioMimeType(mime)) {
+    params.referenceAudioUrls.push(params.url);
+    return;
+  }
+  params.referenceImageUrls.push(params.url);
 }
 
 async function resolveLocalInline(
@@ -116,58 +172,84 @@ async function resolveMediaGroup(params: {
     };
   }
 
-  let refs = params.media;
-  if (params.cloudConfigured && params.workflowId) {
-    refs = await ensureLocalResourcesUploaded({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      media: params.media,
-      cloudConfigured: true,
-    });
-  }
-
-  const images = refs.filter((entry) => !isVideoMimeType(entry.mimeType) && !isAudioMimeType(entry.mimeType));
-  const videos = refs.filter((entry) => isVideoMimeType(entry.mimeType));
-  const audios = refs.filter((entry) => isAudioMimeType(entry.mimeType));
-
-  const cloudRefs = filterCloudResolvableReferences(refs);
-  const localRefs = refs.filter((entry) => isLocalMediaReference(entry));
+  const resourceIds = collectLookupResourceIds({
+    media: params.media,
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+  });
 
   const server = await resolveResourceIdsOnServer({
     organizationId: params.organizationId,
-    resourceIds: collectResourceIds(cloudRefs),
+    resourceIds,
   });
 
-  if (server.unresolved.length > 0 && localRefs.length === 0) {
-    throw new Error(
-      `Unable to resolve resource references: ${server.unresolved.join(", ")}`
-    );
-  }
+  const resolvedById = new Map(
+    server.resolved
+      .filter((entry) => entry.url.length > 0)
+      .map((entry) => [entry.resourceId, entry])
+  );
 
   const referenceImageUrls: string[] = [];
   const referenceVideoUrls: string[] = [];
   const referenceAudioUrls: string[] = [];
+  const unresolvedMedia: WorkflowMediaValue[] = [];
 
-  for (const entry of server.resolved) {
-    const mime = entry.mimeType.toLowerCase();
-    if (mime.startsWith("video/")) {
-      referenceVideoUrls.push(entry.url);
-    } else if (mime.startsWith("audio/")) {
-      referenceAudioUrls.push(entry.url);
-    } else {
-      referenceImageUrls.push(entry.url);
+  for (const entry of params.media) {
+    const ids = lookupIdsForMedia({
+      media: entry,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    });
+    const hit = ids
+      .map((id) => resolvedById.get(id))
+      .find((resolved) => resolved !== undefined);
+
+    if (!hit) {
+      unresolvedMedia.push(entry);
+      continue;
     }
+
+    pushResolvedUrl({
+      mimeType: hit.mimeType || entry.mimeType || "",
+      url: hit.url,
+      referenceImageUrls,
+      referenceVideoUrls,
+      referenceAudioUrls,
+    });
   }
 
-  const referenceImageInline = await resolveLocalInline(
-    images.filter((entry) => isLocalMediaReference(entry))
+  if (params.cloudConfigured) {
+    if (unresolvedMedia.length > 0) {
+      const missing = unresolvedMedia
+        .map((entry) => getResourceIdFromValue(entry))
+        .filter((id): id is string => Boolean(id));
+      throw new Error(
+        `Unable to resolve resource references: ${missing.join(", ")}`
+      );
+    }
+
+    return {
+      referenceImageUrls,
+      referenceImageInline: [],
+      referenceVideoUrls,
+      referenceAudioUrls,
+    };
+  }
+
+  const images = unresolvedMedia.filter((entry) => {
+    const mime = entry.mimeType ?? "";
+    return !isVideoMimeType(mime) && !isAudioMimeType(mime);
+  });
+  const videos = unresolvedMedia.filter((entry) =>
+    isVideoMimeType(entry.mimeType ?? "")
   );
-  referenceVideoUrls.push(
-    ...(await resolveLocalDataUrls(videos.filter((entry) => isLocalMediaReference(entry))))
+  const audios = unresolvedMedia.filter((entry) =>
+    isAudioMimeType(entry.mimeType ?? "")
   );
-  referenceAudioUrls.push(
-    ...(await resolveLocalDataUrls(audios.filter((entry) => isLocalMediaReference(entry))))
-  );
+
+  const referenceImageInline = await resolveLocalInline(images);
+  referenceVideoUrls.push(...(await resolveLocalDataUrls(videos)));
+  referenceAudioUrls.push(...(await resolveLocalDataUrls(audios)));
 
   return {
     referenceImageUrls,

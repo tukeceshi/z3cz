@@ -13,6 +13,8 @@ export interface UpsertMediaResourceParams {
   readonly upstreamUrl?: string | null;
   readonly expiresAt?: string | Date | null;
   readonly contentSha256?: string | null;
+  readonly generating?: boolean;
+  readonly failed?: boolean;
 }
 
 function mapMediaResourceRow(
@@ -27,6 +29,8 @@ function mapMediaResourceRow(
     upstreamUrl: row.upstreamUrl,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     contentSha256: row.contentSha256 ?? null,
+    generating: row.generating,
+    failed: row.failed,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -55,6 +59,8 @@ export async function upsertMediaResources(
             : new Date(resource.expiresAt)
           : null,
         contentSha256: resource.contentSha256 ?? null,
+        generating: resource.generating ?? false,
+        failed: resource.failed ?? false,
       }))
     )
     .onConflictDoUpdate({
@@ -66,6 +72,8 @@ export async function upsertMediaResources(
         upstreamUrl: sql`excluded.upstream_url`,
         expiresAt: sql`excluded.expires_at`,
         contentSha256: sql`excluded.content_sha256`,
+        generating: sql`excluded.generating`,
+        failed: sql`excluded.failed`,
       },
     });
 }
@@ -97,6 +105,8 @@ export async function rekeyMediaResource(
         storageKey: params.storageKey ?? null,
         upstreamUrl: null,
         expiresAt: null,
+        generating: false,
+        failed: false,
       },
     ]);
     return;
@@ -132,6 +142,8 @@ export async function rekeyMediaResource(
         storageKey: params.storageKey ?? null,
         upstreamUrl: null,
         expiresAt: null,
+        generating: false,
+        failed: false,
       })
       .where(
         and(

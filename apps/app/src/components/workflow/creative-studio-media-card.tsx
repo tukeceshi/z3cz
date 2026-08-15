@@ -48,8 +48,6 @@ export function CreativeStudioMediaCard({
 }: CreativeStudioMediaCardProps) {
   const nodeType = node.data.nodeType ?? "";
   const isVideo = nodeType === AI_VIDEO_NODE_TYPE;
-  const cardState = readStudioMediaCardState(node.data.metadata, isVideo);
-
   const primaryMedia = isVideo
     ? readAiVideoCardPrimaryVideo(
         node.data.inputs,
@@ -61,6 +59,11 @@ export function CreativeStudioMediaCard({
         node.data.outputs,
         node.data.metadata
       );
+  const cardState = readStudioMediaCardState(
+    node.data.metadata,
+    isVideo,
+    primaryMedia ? [primaryMedia] : undefined
+  );
 
   const mediaRef =
     primaryMedia && isWorkflowMediaValue(primaryMedia) ? primaryMedia : null;

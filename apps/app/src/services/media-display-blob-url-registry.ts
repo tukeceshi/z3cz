@@ -1,3 +1,5 @@
+import { forgetMediaDisplayUrlSetsForMediaId } from "@/services/media-display-url-set-memory";
+
 /** Stable object URLs keyed by org/workflow/media/tier — survives display cache invalidation. */
 
 const stableBlobUrls = new Map<string, string>();
@@ -59,6 +61,7 @@ export function rekeyStableBlobUrlsForMediaId(params: {
 }
 
 export function dropStableBlobUrlsForMediaId(mediaId: string): void {
+  forgetMediaDisplayUrlSetsForMediaId(mediaId);
   for (const [key, url] of [...stableBlobUrls.entries()]) {
     if (!key.includes(`:${mediaId}:`)) {
       continue;

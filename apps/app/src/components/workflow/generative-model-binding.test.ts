@@ -4,14 +4,17 @@ import {
   AI_VIDEO_NODE_TYPE,
   buildOrgModelOptionId,
   type OrgTextModelOption,
+  type WorkflowGenerativeDefaults,
 } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import {
   applyModelBindingToNodeData,
+  applySelectedModelRecord,
   generativeModelBindingHandlersForModality,
   resolveModelForNewReference,
 } from "./generative-model-binding";
+import type { GenerativeModelModality } from "./org-model-selection-utils";
 import { createProjectedModelFits } from "./generative-model-ref-fit";
 import { AI_IMAGE_PROMPT_HANDLE_ID } from "./ai-image-node-utils";
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
@@ -130,6 +133,70 @@ describe("resolveModelForNewReference", () => {
       modelToApply: undefined,
       effectiveModel: undefined,
     });
+  });
+});
+
+describe("applySelectedModelRecord", () => {
+  const modalities: readonly GenerativeModelModality[] = [
+    "text",
+    "image",
+    "video",
+    "audio",
+  ];
+
+  it("writes the same model fields for every modality and leaves params unchanged", () => {
+    const model = mockTextModel("picked-model");
+    const existingParams = { ratio: "16:9" };
+
+    for (const modality of modalities) {
+      const current: WorkflowNodeType = {
+        nodeType: AI_TEXT_NODE_TYPE,
+        name: modality,
+        inputs: [
+          { id: "model", value: "old-model" },
+          { id: "ai_interface_id", value: "old-iface" },
+          { id: "model_instance_id", value: "old-instance" },
+          { id: "params", type: "json", value: existingParams },
+        ],
+        outputs: [],
+      };
+      let defaults: WorkflowGenerativeDefaults | undefined = {
+        [modality]: {
+          canonicalId: "old-model",
+          interfaceId: "old-iface",
+          instanceId: "old-instance",
+          params: { ratio: "1:1" },
+        },
+      };
+
+      const patch = applySelectedModelRecord({
+        model,
+        current,
+        modality,
+        generativeDefaults: defaults,
+        onGenerativeDefaultChange: (next) => {
+          defaults = next;
+        },
+      });
+
+      expect(patch.inputs?.find((input) => input.id === "model")?.value).toBe(
+        "picked-model"
+      );
+      expect(
+        patch.inputs?.find((input) => input.id === "ai_interface_id")?.value
+      ).toBe("iface-1");
+      expect(
+        patch.inputs?.find((input) => input.id === "model_instance_id")?.value
+      ).toBe("picked-model");
+      expect(patch.inputs?.find((input) => input.id === "params")?.value).toEqual(
+        existingParams
+      );
+      expect(defaults?.[modality]).toEqual({
+        canonicalId: "picked-model",
+        interfaceId: "iface-1",
+        instanceId: "picked-model",
+      });
+    }
   });
 });
 

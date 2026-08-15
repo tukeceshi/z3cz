@@ -47,7 +47,22 @@ describe("generation job guard helpers", () => {
     const response = buildImageGenerateResponseFromJob(buildJob());
     expect(response.jobId).toBe("job-1");
     expect(response.phase).toBe("ready_to_persist");
-    expect(response.images).toHaveLength(1);
+    expect(response.images).toHaveLength(0);
+  });
+
+  it("builds image responses from generating jobs", () => {
+    const response = buildImageGenerateResponseFromJob(
+      buildJob({
+        status: "generating",
+        readyAt: null,
+        resultJson: {
+          placeholderResourceIds: ["res-1"],
+        },
+      })
+    );
+    expect(response.phase).toBe("generating");
+    expect(response.resourceIds).toEqual(["res-1"]);
+    expect(response.images).toHaveLength(0);
   });
 
   it("builds video submit responses from tracked jobs", () => {

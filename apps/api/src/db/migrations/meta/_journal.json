@@ -512,6 +512,20 @@
       "when": 1789240000000,
       "tag": "0077_format_transform_provider_to_group",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1789320000000,
+      "tag": "0078_media_resource_generating",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1789400000000,
+      "tag": "0079_media_resource_failed",
+      "breakpoints": true
     }
   ]
 }

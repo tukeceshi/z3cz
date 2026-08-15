@@ -3,6 +3,8 @@ import { useCallback, useMemo, useRef } from "react";
 import { cn } from "@/utils/utils";
 import {
   sectionBodyMarkdown,
+  sectionContentRanges,
+  sectionHeadingDisplayText,
   sectionPrecedingText,
   splitMarkdownSections,
 } from "./split-markdown-sections";
@@ -120,37 +122,34 @@ export function StudioTextFormattedView({
 
         const sectionBody = sectionBodyMarkdown(value, part);
         const precedingText = sectionPrecedingText(value, part);
+        const headingText = sectionHeadingDisplayText(value, part);
         const sectionAnchorKey = `${contentKey}-section-${part.index}`;
-        const hasHeadingRange = part.bodyStart > part.headingStart;
+        const contentRanges = sectionContentRanges(part, readOnly);
 
         return (
           <div
             key={sectionAnchorKey}
             data-studio-scroll-anchor={sectionAnchorKey}
-            className="group/section w-full"
+            className="group/section relative w-full"
           >
-            {hasHeadingRange ? (
-              <div className="relative w-full">
-                <StudioTextMarkdownRange
-                  {...rangeProps}
-                  contentKey={`${sectionAnchorKey}-heading`}
-                  rangeStart={part.headingStart}
-                  rangeEnd={part.bodyStart}
-                  trimTrailingNewlines
-                />
-                <StudioTextSectionFrameActions
-                  sectionBody={sectionBody}
-                  precedingText={precedingText}
-                  showEditHint={!readOnly}
-                />
-              </div>
+            {contentRanges.map((range) => (
+              <StudioTextMarkdownRange
+                key={`${sectionAnchorKey}-${range.key}`}
+                {...rangeProps}
+                contentKey={`${sectionAnchorKey}-${range.key}`}
+                rangeStart={range.start}
+                rangeEnd={range.end}
+                trimTrailingNewlines={range.trimTrailingNewlines}
+              />
+            ))}
+            {headingText ? (
+              <StudioTextSectionFrameActions
+                sectionBody={sectionBody}
+                precedingText={precedingText}
+                headingText={headingText}
+                showEditHint={!readOnly}
+              />
             ) : null}
-            <StudioTextMarkdownRange
-              {...rangeProps}
-              contentKey={`${sectionAnchorKey}-body`}
-              rangeStart={part.bodyStart}
-              rangeEnd={part.bodyEnd}
-            />
           </div>
         );
       })}

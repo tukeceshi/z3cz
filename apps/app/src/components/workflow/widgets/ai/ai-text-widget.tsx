@@ -12,6 +12,7 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
@@ -26,6 +27,7 @@ import { STUDIO_SCROLL } from "../../creative-studio-surface";
 import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
+  isAiTextAwaitingStream,
   readAiTextResultHistory,
   readAiTextSessionBodySync,
 } from "../../ai-text-node-utils";
@@ -34,6 +36,7 @@ import {
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
+import { GenerativeBusyOverlay } from "../../generative-busy-overlay";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import {
   shouldShowGenerativeHistoryIcon,
@@ -92,22 +95,47 @@ function AiTextWidget({
     outputs: nodeData.outputs,
     nodeData,
   });
+  const resolvedOutput = (resolvedText.text || resolvedText.displayExcerpt).trim();
+  const hasStreamOutput = streamBody.trim().length > 0;
   const showFullBody = isGenerating || selected;
   const displayValue = showFullBody
     ? isGenerating
-      ? streamBody
+      ? hasStreamOutput
+        ? streamBody
+        : resolvedText.text || resolvedText.displayExcerpt
       : resolvedText.text
     : resolvedText.displayExcerpt;
   const hasOutput = isGenerating
-    ? streamBody.trim().length > 0
-    : (resolvedText.text || resolvedText.displayExcerpt).trim().length > 0;
+    ? hasStreamOutput || resolvedOutput.length > 0
+    : resolvedOutput.length > 0;
   const showTextLoading =
     resolvedText.loading && !hasOutput && !isGenerating;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
   );
+  const selectedHistoryItem =
+    historyItems.items.find((item) => item.id === historyItems.selectedId) ??
+    historyItems.items[0];
+  const selectedFailed =
+    Boolean(selectedHistoryItem) &&
+    !selectedHistoryItem.resourceId &&
+    !selectedHistoryItem.text &&
+    !isGenerating;
+  useGenerativeRecordErrorDisplay({
+    orgId,
+    nodeId,
+    invocationId: selectedFailed ? selectedHistoryItem?.invocationId : undefined,
+    modality: "text",
+    enabled: selectedFailed && Boolean(selectedHistoryItem?.invocationId),
+    clearError: Boolean(
+      selectedHistoryItem?.resourceId || selectedHistoryItem?.text
+    ),
+    updateNodeData,
+  });
   const generateError = readGenerativeCardError(metadata);
+  const showGeneratingMask =
+    isAiTextAwaitingStream(metadata) && !generateError;
   const generatingMessage = t("workflow.aiTextPanel.generating");
   const editLocked = disabled || isGenerating;
 
@@ -231,7 +259,7 @@ function AiTextWidget({
     !hasOutput &&
     !showTextLoading &&
     !generateError &&
-    (isGenerating || uploading);
+    uploading;
 
   return (
     <>
@@ -269,17 +297,25 @@ function AiTextWidget({
             <LoaderIcon className="h-4 w-4 animate-spin text-muted-foreground/50" />
           </div>
         ) : (
-          <div
-            ref={scrollContainerRef}
-            onScroll={tailPreview ? handleScroll : undefined}
-            className={cn(
-              "min-h-0 flex-1 whitespace-pre-wrap break-words p-3 text-sm leading-4 text-foreground/80",
-              tailPreview
-                ? cn("nodrag nopan nowheel overflow-y-auto", STUDIO_SCROLL)
-                : "overflow-hidden"
-            )}
-          >
-            {displayValue}
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={scrollContainerRef}
+              onScroll={tailPreview ? handleScroll : undefined}
+              className={cn(
+                "h-full min-h-0 whitespace-pre-wrap break-words p-3 text-sm leading-4 text-foreground/80",
+                tailPreview
+                  ? cn("nodrag nopan nowheel overflow-y-auto", STUDIO_SCROLL)
+                  : "overflow-hidden"
+              )}
+            >
+              {displayValue}
+            </div>
+            <GenerativeBusyOverlay
+              visible={showGeneratingMask}
+              modality={null}
+              metadata={metadata}
+              label={generatingMessage}
+            />
           </div>
         )}
 

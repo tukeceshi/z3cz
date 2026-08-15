@@ -21,8 +21,8 @@ describe("mediaReferenceToCatalogInsert", () => {
       kind: "local",
       mimeType: "image/png",
       storageKey: null,
-      upstreamUrl: null,
-      expiresAt: null,
+      generating: false,
+      failed: false,
     });
   });
 
@@ -43,6 +43,8 @@ describe("mediaReferenceToCatalogInsert", () => {
       storageKey: null,
       upstreamUrl: "https://example.com/image.png",
       expiresAt: "2026-01-01T00:00:00.000Z",
+      generating: false,
+      failed: false,
     });
   });
 
@@ -62,6 +64,8 @@ describe("mediaReferenceToCatalogInsert", () => {
       storageKey: "org/wf/image/obj-1.jpg",
       upstreamUrl: null,
       expiresAt: null,
+      generating: false,
+      failed: false,
     });
   });
 });
@@ -84,6 +88,8 @@ describe("registerRequestToCatalogInsert", () => {
       upstreamUrl: null,
       expiresAt: null,
       contentSha256: null,
+      generating: false,
+      failed: false,
     });
   });
 });

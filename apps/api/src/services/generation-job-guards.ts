@@ -95,13 +95,18 @@ export function buildImageGenerateResponseFromJob(
     job.status === "succeeded" && finalMedia && finalMedia.length > 0
       ? finalMedia.filter(isMediaReference)
       : [];
+  const resourceIds =
+    job.resultJson?.placeholderResourceIds ??
+    job.resultJson?.pendingMedia
+      ?.map((item) => item.resourceId)
+      .filter((id): id is string => Boolean(id));
 
   const phase =
     job.status === "succeeded"
       ? ("succeeded" as const)
       : job.status === "ready_to_persist" || job.status === "uploading"
         ? ("ready_to_persist" as const)
-        : ("ready_to_persist" as const);
+        : ("generating" as const);
 
   return {
     images,
@@ -110,6 +115,7 @@ export function buildImageGenerateResponseFromJob(
     storageMode: "cloud",
     jobId: job.id,
     phase,
+    resourceIds,
   };
 }
 

@@ -1,7 +1,7 @@
 import type { MediaReference } from "@dafthunk/types";
 import type { GenerativeCardError } from "@dafthunk/types";
 
-import { getMediaReferenceKey } from "@dafthunk/types";
+import { getResourceIdFromValue } from "@dafthunk/types";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import { cn } from "@/utils/utils";
 
@@ -105,7 +105,7 @@ export function StudioMediaFullPreview({
   onVideoExpandView,
   displayUrl,
 }: StudioMediaFullPreviewProps) {
-  const mediaKey = getMediaReferenceKey(media);
+  const mediaKey = getResourceIdFromValue(media);
   const { containerRef, displaySize, applyPrimaryNaturalSize } =
     useStudioDetailMediaFrameSize(mediaKey);
   const modality = readModality(nodeType);

@@ -86,6 +86,47 @@ function readModelBindingFromNode(data: WorkflowNodeType) {
   });
 }
 
+/** Picker write: model identity only. Leaves node params untouched. */
+export function applySelectedModelRecord<T extends OrgModelBindingRef>(params: {
+  readonly model: T;
+  readonly current: WorkflowNodeType;
+  readonly modality: GenerativeModelModality;
+  readonly generativeDefaults?: WorkflowGenerativeDefaults;
+  readonly onGenerativeDefaultChange?: (
+    defaults: WorkflowGenerativeDefaults
+  ) => void;
+}): Partial<WorkflowNodeType> {
+  const nextInputs = persistModelBindingToInputs(params.current.inputs, {
+    canonicalId: params.model.canonicalId,
+    interfaceId: params.model.interfaceId,
+    instanceId: params.model.instanceId,
+  });
+
+  params.onGenerativeDefaultChange?.(
+    writeWorkflowGenerativeDefault(params.generativeDefaults, params.modality, {
+      canonicalId: params.model.canonicalId,
+      interfaceId: params.model.interfaceId,
+      instanceId: params.model.instanceId,
+    })
+  );
+
+  const referenceMetadata = generativeReferenceMetadataForModel(
+    params.modality,
+    params.model
+  );
+  const nextMetadata = {
+    ...(params.current.metadata ?? {}),
+    ...(referenceMetadata ?? {}),
+  };
+
+  return {
+    inputs: nextInputs,
+    ...(Object.keys(nextMetadata).length > 0
+      ? { metadata: nextMetadata }
+      : {}),
+  };
+}
+
 function resolveMaterializeParams<T extends OrgModelBindingRef>(
   model: T,
   inputs: WorkflowNodeType["inputs"],
@@ -112,7 +153,7 @@ function resolveMaterializeParams<T extends OrgModelBindingRef>(
   return handlers.buildDefaultParams(handlers.readGenerationFields(model));
 }
 
-/** Shared model binding apply path for manual pick, history, and auto-switch. */
+/** Shared model binding apply path for history and auto-switch. */
 export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
   params: ApplyModelBindingParams<T>
 ): Partial<WorkflowNodeType> {

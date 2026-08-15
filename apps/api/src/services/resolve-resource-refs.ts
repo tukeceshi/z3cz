@@ -60,9 +60,17 @@ export async function resolveResourceRefs(
 
   const resolved: ResolvedResourceUrl[] = [];
 
+  const unresolved = [...result.unresolved];
+
   for (const entry of result.resolved) {
 
-    if (!entry.url) continue;
+    if (!entry.url) {
+
+      unresolved.push(entry.resourceId);
+
+      continue;
+
+    }
 
     resolved.push({
 
@@ -82,7 +90,7 @@ export async function resolveResourceRefs(
 
     resolved,
 
-    unresolved: result.unresolved,
+    unresolved,
 
   };
 

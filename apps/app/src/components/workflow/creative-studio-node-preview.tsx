@@ -3,7 +3,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
-  getMediaReferenceKey,
+  getResourceIdFromValue,
   isWorkflowMediaValue,
   type GenerativeCardError,
   type MediaReference,
@@ -167,7 +167,7 @@ function StudioAudioPreview({
         )}
       >
         <Music className="h-5 w-5 shrink-0" />
-        <span className="truncate text-xs">{getMediaReferenceKey(media)}</span>
+        <span className="truncate text-xs">{getResourceIdFromValue(media)}</span>
       </div>
     );
   }
@@ -177,7 +177,7 @@ function StudioAudioPreview({
       src={displayUrl}
       className={cn("mx-auto h-full w-full max-w-lg", className)}
       variant="card"
-      waveformCacheKey={getMediaReferenceKey(media) ?? undefined}
+      waveformCacheKey={getResourceIdFromValue(media) ?? undefined}
     />
   );
 }
@@ -210,7 +210,11 @@ function StudioDetailMediaPreview({
   detailDisplayStale,
 }: StudioDetailMediaPreviewProps) {
   const { t } = useTranslation();
-  const cardState = readStudioMediaCardState(metadata, isVideo);
+  const cardState = readStudioMediaCardState(
+    metadata,
+    isVideo,
+    media ? [media] : undefined
+  );
   const modality = isVideo ? "video" : "image";
   const resolved = useMediaDisplayUrl({
     media: detailDisplayUrl === undefined ? (media ?? null) : null,
@@ -380,7 +384,11 @@ export function CreativeStudioNodePreview({
       );
     }
     if (!primaryImage) {
-      const cardState = readStudioMediaCardState(data.metadata, false);
+      const cardState = readStudioMediaCardState(
+        data.metadata,
+        false,
+        primaryImage ? [primaryImage] : undefined
+      );
       return (
         <StudioMediaEmptyPreview
           layout="list"

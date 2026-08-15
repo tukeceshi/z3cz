@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
+  useOrgAudioModels,
   useOrgImageModels,
   useOrgVideoModels,
 } from "@/services/platform-ai-model-service";
@@ -77,7 +78,17 @@ import {
   generativeModalityForNodeType,
   readWorkflowGenerativeDefault,
 } from "./generative-workflow-defaults";
-import { persistGenerativeBindingWithParams } from "./org-model-selection-utils";
+import {
+  catalogModelsForModality,
+  generationFieldsForModality,
+  resolveParamsForNewNode,
+  type GenerativeParamModelCatalog,
+} from "./generative-workflow-param-defaults";
+import {
+  persistGenerativeBindingWithParams,
+  persistModelBindingToInputs,
+  resolveSelectedModelBinding,
+} from "./org-model-selection-utils";
 import {
   mergePreparedWorkflowEdge,
   prepareWorkflowConnectionAppend,
@@ -233,7 +244,8 @@ function mergeGenerativeNodeCatalogInputs(
 function applyGenerativeDefaultsOnCreate(
   nodeType: string | undefined,
   inputs: WorkflowParameter[],
-  generativeDefaults: WorkflowGenerativeDefaults | undefined
+  generativeDefaults: WorkflowGenerativeDefaults | undefined,
+  paramCatalog: GenerativeParamModelCatalog | undefined
 ): WorkflowParameter[] {
   const modality = generativeModalityForNodeType(nodeType);
   if (!modality) {
@@ -243,16 +255,27 @@ function applyGenerativeDefaultsOnCreate(
   if (!entry) {
     return inputs;
   }
+  const binding = {
+    canonicalId: entry.canonicalId,
+    interfaceId: entry.interfaceId,
+    ...(entry.instanceId?.trim()
+      ? { instanceId: entry.instanceId.trim() }
+      : {}),
+  };
+  const model = resolveSelectedModelBinding(
+    catalogModelsForModality(paramCatalog, modality),
+    binding.canonicalId,
+    binding.interfaceId,
+    binding.instanceId
+  );
+  const fields = model ? generationFieldsForModality(modality, model) : [];
+  if (fields.length === 0) {
+    return persistModelBindingToInputs(inputs, binding);
+  }
   return persistGenerativeBindingWithParams(
     inputs,
-    {
-      canonicalId: entry.canonicalId,
-      interfaceId: entry.interfaceId,
-      ...(entry.instanceId?.trim()
-        ? { instanceId: entry.instanceId.trim() }
-        : {}),
-    },
-    entry.params ?? {}
+    binding,
+    resolveParamsForNewNode(fields, entry.params)
   );
 }
 
@@ -264,6 +287,7 @@ function createReactFlowNode(
   t: (key: string) => string,
   _orgId: string | undefined,
   generativeDefaults: WorkflowGenerativeDefaults | undefined,
+  paramCatalog: GenerativeParamModelCatalog | undefined,
   id?: string
 ): ReactFlowNode<WorkflowNodeType> {
   const mergedInputs = mergeGenerativeNodeCatalogInputs(
@@ -274,7 +298,8 @@ function createReactFlowNode(
   const inputs = applyGenerativeDefaultsOnCreate(
     nodeType.type,
     mergedInputs,
-    generativeDefaults
+    generativeDefaults,
+    paramCatalog
   );
 
   return {
@@ -425,6 +450,17 @@ export function useGraphOperations({
   const { models: orgVideoModels } = useOrgVideoModels(orgId, {
     enabled: Boolean(orgId),
   });
+  const { models: orgAudioModels } = useOrgAudioModels(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const paramCatalog = useMemo(
+    (): GenerativeParamModelCatalog => ({
+      image: orgImageModels,
+      video: orgVideoModels,
+      audio: orgAudioModels,
+    }),
+    [orgAudioModels, orgImageModels, orgVideoModels]
+  );
   const generativeReferenceCatalogs = useMemo(
     () =>
       orgId
@@ -966,7 +1002,8 @@ export function useGraphOperations({
         existingNodes,
         t,
         orgId,
-        generativeDefaults
+        generativeDefaults,
+        paramCatalog
       );
       newNode.selected = true;
 
@@ -1062,6 +1099,7 @@ export function useGraphOperations({
       createObjectUrl,
       generativeReferenceCatalogs,
       generativeDefaults,
+      paramCatalog,
       graphEditBlocked,
       nodeTypes,
       orgId,
@@ -1096,7 +1134,8 @@ export function useGraphOperations({
         nodesRef.current,
         t,
         orgId,
-        generativeDefaults
+        generativeDefaults,
+        paramCatalog
       );
 
       if (options?.prompt && options.precedingText !== undefined) {
@@ -1153,6 +1192,7 @@ export function useGraphOperations({
       t,
       orgId,
       generativeDefaults,
+      paramCatalog,
       commitEditorViewport,
       suppressViewportPersistEndRef,
     ]
@@ -1398,6 +1438,7 @@ export function useGraphOperations({
           t,
           orgId,
           generativeDefaults,
+          paramCatalog,
           `${nodeType.type}-${Date.now()}-${i}`
         );
       });
@@ -1406,7 +1447,7 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults]
+    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults, paramCatalog]
   );
 
   return {

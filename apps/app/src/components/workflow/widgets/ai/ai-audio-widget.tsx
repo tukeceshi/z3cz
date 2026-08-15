@@ -1,6 +1,9 @@
 import {
   AI_AUDIO_NODE_TYPE,
-  getMediaReferenceKey,
+  getResourceIdFromValue,
+  hasDisplayableWorkflowMedia,
+  hasFailedResource,
+  hasGeneratingResource,
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
@@ -10,6 +13,7 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
@@ -24,6 +28,7 @@ import {
 } from "../../ai-image-history-overlay";
 import { AiTextExpandButton } from "../../ai-text-expand-overlay";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
+import type { GenerativeCardCoverRead } from "../../generative-history-utils";
 import {
   readGenerativeProgressPhase,
   withGenerativeUploadProgress,
@@ -31,8 +36,7 @@ import {
 import {
   AI_AUDIO_CARD_HEIGHT_PX,
   AI_AUDIO_CARD_WIDTH_PX,
-  isAiAudioGenerating,
-  readAiAudioCardAudios,
+  readAiAudioCardDisplay,
   readAiAudioResultHistory,
   withAiAudioHistorySelection,
   withAiAudioGenerateError,
@@ -68,7 +72,7 @@ import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
 interface AiAudioWidgetProps extends BaseWidgetProps {
-  audios: MediaReference[];
+  cardDisplay: GenerativeCardCoverRead<MediaReference>;
   historyItems: ReturnType<typeof readAiAudioResultHistory>;
   nodeId: string;
   prompt: string;
@@ -77,7 +81,7 @@ interface AiAudioWidgetProps extends BaseWidgetProps {
 }
 
 function AiAudioWidget({
-  audios,
+  cardDisplay,
   historyItems,
   disabled = false,
   className,
@@ -103,20 +107,42 @@ function AiAudioWidget({
     metadata
   );
   const progressPhase = readGenerativeProgressPhase(metadata);
+  const selectedHistoryItem =
+    historyItems.items.find((item) => item.id === historyItems.selectedId) ??
+    historyItems.items[0];
+  const selectedFailed =
+    Boolean(selectedHistoryItem?.jobId) &&
+    (selectedHistoryItem.audios.length === 0 ||
+      hasFailedResource(selectedHistoryItem.audios));
   const isGenerating =
-    isAiAudioGenerating(metadata) || progressPhase !== undefined;
-  useGenerativeMediaWorkSession(uploading || progressPhase !== undefined);
+    (!selectedFailed && cardDisplay.isBusy) ||
+    progressPhase === "cancelled";
+  useGenerativeMediaWorkSession(uploading || (!selectedFailed && cardDisplay.isBusy));
+  useGenerativeRecordErrorDisplay({
+    orgId,
+    nodeId,
+    jobId: selectedFailed ? selectedHistoryItem?.jobId : undefined,
+    modality: "audio",
+    enabled: selectedFailed,
+    clearError: Boolean(
+      selectedHistoryItem &&
+        hasDisplayableWorkflowMedia(selectedHistoryItem.audios) &&
+        !hasFailedResource(selectedHistoryItem.audios) &&
+        !hasGeneratingResource(selectedHistoryItem.audios)
+    ),
+    updateNodeData,
+  });
   const generateError = readGenerativeCardError(metadata);
   const cardPlaceholder = t(
     generativeCardProgressKey(
-      progressPhase ??
-        (isAiAudioGenerating(metadata) ? "generating" : null),
+      progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
       "audio"
     )
   );
-  const activeAudio = audios[0];
-  const activeAudioExpired = activeAudio ? isMediaExpired(activeAudio) : false;
-  const canDownloadActiveAudio = Boolean(activeAudio) && !activeAudioExpired;
+  const coverAudio = cardDisplay.coverMedia[0];
+  const hasAudio = cardDisplay.hasCover;
+  const activeAudioExpired = hasAudio && coverAudio ? isMediaExpired(coverAudio) : false;
+  const canDownloadActiveAudio = hasAudio && !activeAudioExpired;
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -128,7 +154,7 @@ function AiAudioWidget({
   const { canUpload, handleUploadClick, uploadConfirmDialog } =
     useGenerativeCardUpload({
       prompt,
-      hasMedia: Boolean(activeAudio),
+      hasMedia: hasAudio,
       isGenerating,
       disabled,
       blocksGenerativeMedia,
@@ -322,7 +348,7 @@ function AiAudioWidget({
           }
         }}
       >
-        {!activeAudio && !generateError ? (
+        {!hasAudio && !generateError ? (
           <GenerativeCardEmptyUploadSlot
             kind="audio"
             size="canvas"
@@ -332,19 +358,19 @@ function AiAudioWidget({
             canUpload={canUpload}
             onUploadClick={handleUploadClick}
           />
-        ) : activeAudio ? (
+        ) : hasAudio && coverAudio ? (
           <CanvasAudioCover className="h-full w-full" />
         ) : null}
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
 
-        {!generateError && activeAudio ? (
+        {!generateError && hasAudio ? (
           <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            {canDownloadActiveAudio ? (
+            {canDownloadActiveAudio && coverAudio ? (
               <GenerativeMediaLazyDownloadButton
-                media={activeAudio}
+                media={coverAudio}
                 nodeType="ai-audio"
-                fileName={`audio-${getMediaReferenceKey(activeAudio)}.mp3`}
+                fileName={`audio-${getResourceIdFromValue(coverAudio) ?? "audio"}.mp3`}
               />
             ) : null}
             {showHistoryIcon ? (
@@ -370,7 +396,13 @@ function AiAudioWidget({
         <AiImageHistoryOverlay
           open={historyOpen}
           history={historyAsImageHistory}
-          currentImages={audios}
+          currentImages={
+            selectedHistoryItem?.audios.length
+              ? [...selectedHistoryItem.audios]
+              : coverAudio
+                ? [coverAudio]
+                : []
+          }
           mediaKind="audio"
           onClose={() => setHistoryOpen(false)}
           onSelect={handleHistorySelect}
@@ -395,7 +427,7 @@ export const aiAudioWidget = createWidget({
     "ai_interface_id",
   ],
   extractConfig: (nodeId, inputs, outputs, metadata) => ({
-    audios: readAiAudioCardAudios(inputs, outputs, metadata),
+    cardDisplay: readAiAudioCardDisplay(inputs, outputs, metadata),
     historyItems: readAiAudioResultHistory(inputs),
     nodeId,
     prompt: readGenerativePrompt(inputs),

@@ -66,6 +66,47 @@ class NodeWorkflowSessionHub {
     this.sessions.delete(key);
   }
 
+  /** Push a server-written node update to connected editors (other tabs / co-editors). */
+  async broadcastServerNodeUpdate(
+    _env: Bindings,
+    workflowId: string,
+    updatedNode: WorkflowState["nodes"][number]
+  ): Promise<void> {
+    const session = this.sessions.get(this.sessionKey(workflowId));
+    if (!session) {
+      return;
+    }
+
+    const nodeIndex = session.workflowState.nodes.findIndex(
+      (node) => node.id === updatedNode.id
+    );
+    if (nodeIndex < 0) {
+      await this.reloadSessionFromStore(session);
+      return;
+    }
+
+    const nodes = [...session.workflowState.nodes];
+    nodes[nodeIndex] = updatedNode;
+    session.workflowState = {
+      ...session.workflowState,
+      nodes,
+      timestamp: Date.now(),
+    };
+    session.rev += 1;
+
+    const patchMsg: WorkflowGraphPatchBroadcast = {
+      type: "patch_graph",
+      rev: session.rev,
+      nodePatches: [{ type: "update", node: updatedNode }],
+      edgePatches: [],
+      timestamp: session.workflowState.timestamp,
+    };
+    const payload = JSON.stringify(patchMsg);
+    for (const client of session.clients.values()) {
+      client.ws.send(payload);
+    }
+  }
+
   async handleOpen(
     workflowId: string,
     userId: string,

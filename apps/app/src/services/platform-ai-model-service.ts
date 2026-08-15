@@ -560,6 +560,10 @@ export async function generateAiText(
 }
 
 export interface GenerateAiTextStreamHandlers {
+  readonly onStarted?: (payload: {
+    readonly invocationId: string;
+    readonly workflowNodeContent?: import("@dafthunk/types").WorkflowNodeContentPatch;
+  }) => void;
   readonly onDelta?: (delta: string, fullText: string) => void;
   readonly signal?: AbortSignal;
 }
@@ -648,10 +652,19 @@ export async function generateAiTextStream(
             aiInterfaceId?: string;
             resourceId?: string;
             contentSha256?: string;
+            workflowNodeContent?: import("@dafthunk/types").WorkflowNodeContentPatch;
           };
           try {
             event = JSON.parse(data) as typeof event;
           } catch {
+            continue;
+          }
+
+          if (event.type === "started" && typeof event.invocationId === "string") {
+            handlers.onStarted?.({
+              invocationId: event.invocationId,
+              workflowNodeContent: event.workflowNodeContent,
+            });
             continue;
           }
 

@@ -3,7 +3,6 @@ import {
   AI_MEDIA_CACHE_MAX_LIMIT_MB,
   AI_MEDIA_CACHE_MIN_LIMIT_MB,
   type AiMediaCacheSettings,
-  getMediaReferenceKey,
   getResourceIdFromValue,
   isResourceIdReference,
   type WorkflowMediaValue,
@@ -13,6 +12,7 @@ import {
   createStableBlobUrl,
   dropStableBlobUrlsForMediaId,
   getStableBlobUrl,
+  stagingBlobUrlKey,
 } from "@/services/media-display-blob-url-registry";
 import { recordMediaResourceAlias } from "@/services/media-resource-alias-service";
 import {
@@ -1136,14 +1136,15 @@ export function getStableMediaDisplayUrlSet(params: {
   readonly mediaId: string;
 }): MediaDisplayUrlSet {
   return {
-    full: getStableBlobUrl(
-      stableBlobUrlKey({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        mediaId: params.mediaId,
-        tierLabel: "full",
-      })
-    ),
+    full:
+      getStableBlobUrl(
+        stableBlobUrlKey({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          mediaId: params.mediaId,
+          tierLabel: "full",
+        })
+      ) ?? getStableBlobUrl(stagingBlobUrlKey(params)),
     s: stableUrlForCanvasTierWidth({
       ...params,
       width: CANVAS_TIER_SHORT_EDGE.s,

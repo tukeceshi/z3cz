@@ -205,60 +205,67 @@ function MentionPickerThumb({ chip }: { readonly chip: AiTextReferenceChip }) {
   );
 }
 
+function chipMatchesQuery(chip: AiTextReferenceChip, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return chip.label.toLowerCase().includes(normalized);
+}
+
 function MentionPicker({
+  visible,
   anchor,
   query,
   chips,
   onPick,
 }: {
-  readonly anchor: DOMRect;
+  readonly visible: boolean;
+  readonly anchor: DOMRect | null;
   readonly query: string;
   readonly chips: readonly AiTextReferenceChip[];
   readonly onPick: (chip: AiTextReferenceChip) => void;
 }) {
   const { t } = useTranslation();
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return chips;
-    return chips.filter((chip) =>
-      chip.label.toLowerCase().includes(normalized)
-    );
-  }, [chips, query]);
+  const matchCount = useMemo(
+    () => chips.filter((chip) => chipMatchesQuery(chip, query)).length,
+    [chips, query]
+  );
 
   const style = {
-    left: anchor.left,
-    top: anchor.bottom + MENTION_PICKER_GAP_PX,
+    left: anchor?.left ?? 0,
+    top: (anchor?.bottom ?? 0) + MENTION_PICKER_GAP_PX,
   } as const;
 
   return createPortal(
     <div
+      hidden={!visible}
+      aria-hidden={!visible}
       className="nodrag nopan nowheel fixed z-[250] w-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
       style={{ ...style, maxHeight: MENTION_PICKER_MAX_HEIGHT_PX }}
       onMouseDown={(event) => {
         event.preventDefault();
       }}
     >
-      {filtered.length === 0 ? (
+      {visible && matchCount === 0 ? (
         <p className="px-3 py-2 text-xs text-muted-foreground">
           {chips.length === 0
             ? t("workflow.aiVideoPanel.promptMentionEmpty")
             : t("workflow.aiVideoPanel.promptMentionNoMatch")}
         </p>
-      ) : (
-        filtered.map((chip) => (
-          <button
-            key={chip.edgeId}
-            type="button"
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent"
-            onClick={() => onPick(chip)}
-          >
-            <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-border">
-              <MentionPickerThumb chip={chip} />
-            </span>
-            <span className="min-w-0 truncate text-xs">{chip.label}</span>
-          </button>
-        ))
-      )}
+      ) : null}
+      {chips.map((chip) => (
+        <button
+          key={chip.edgeId}
+          type="button"
+          hidden={!chipMatchesQuery(chip, query)}
+          className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent"
+          onClick={() => onPick(chip)}
+        >
+          <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-border">
+            <MentionPickerThumb chip={chip} />
+          </span>
+          <span className="min-w-0 truncate text-xs">{chip.label}</span>
+        </button>
+      ))}
     </div>,
     document.body
   );
@@ -290,22 +297,44 @@ function EditorChipThumbHydrator({
     const frame = chipEl?.querySelector<HTMLElement>('[data-chip-frame="true"]');
     if (!frame) return;
 
-    frame.replaceChildren();
+    const existingImg = frame.querySelector("img");
     if (chip && thumbUrl) {
+      if (existingImg?.getAttribute("data-thumb-url") === thumbUrl) {
+        return;
+      }
+      if (existingImg) {
+        existingImg.src = thumbUrl;
+        existingImg.alt = chip.label;
+        existingImg.setAttribute("data-thumb-url", thumbUrl);
+        return;
+      }
+      frame.replaceChildren();
       const img = document.createElement("img");
       img.src = thumbUrl;
       img.alt = chip.label;
       img.className = "h-full w-full object-cover";
+      img.setAttribute("data-thumb-url", thumbUrl);
       frame.appendChild(img);
-    } else {
-      const icon = document.createElement("span");
-      icon.className =
-        "flex h-full w-full items-center justify-center text-muted-foreground";
-      icon.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><path d="M18 12l-4.5-4.5"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/></svg>';
-      frame.appendChild(icon);
+      return;
     }
 
+    if (frame.querySelector("[data-chip-fallback='true']")) {
+      return;
+    }
+    frame.replaceChildren();
+    const icon = document.createElement("span");
+    icon.dataset.chipFallback = "true";
+    icon.className =
+      "flex h-full w-full items-center justify-center text-muted-foreground";
+    icon.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><path d="M18 12l-4.5-4.5"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/></svg>';
+    frame.appendChild(icon);
+  }, [chip, edgeId, editorRef, thumbUrl]);
+
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root) return;
+    const chipEl = root.querySelector<HTMLElement>(`[data-ref-edge-id="${edgeId}"]`);
     if (!chipEl) return;
     const handleEnter = () => {
       if (!chip) return;
@@ -317,7 +346,7 @@ function EditorChipThumbHydrator({
       chipEl.removeEventListener("mouseenter", handleEnter);
       chipEl.removeEventListener("mouseleave", onHoverEnd);
     };
-  }, [chip, edgeId, editorRef, onHover, onHoverEnd, thumbUrl]);
+  }, [chip, edgeId, editorRef, onHover, onHoverEnd]);
 
   return null;
 }
@@ -550,10 +579,11 @@ export function VideoPromptMentionEditor({
         />
       ))}
 
-      {mentionPicker ? (
+      {imageChips.length > 0 ? (
         <MentionPicker
-          anchor={mentionPicker.anchor}
-          query={mentionPicker.query}
+          visible={mentionPicker !== null}
+          anchor={mentionPicker?.anchor ?? null}
+          query={mentionPicker?.query ?? ""}
           chips={imageChips}
           onPick={handlePickMention}
         />

@@ -6,6 +6,9 @@ import {
   normalizeImageModelParameterRules,
   type ImageModelParameterRules,
   type OrgImageModelOption,
+  hasGeneratingResource,
+  hasDisplayableWorkflowMedia,
+  isResourceIdReference,
   isWorkflowMediaValue,
   mediaReferenceToWorkflowValue,
   type MediaReference,
@@ -28,7 +31,11 @@ import {
   applyHistoryItemSettingsToNode,
   type GenerativeHistorySelectionResult,
 } from "./apply-history-item-settings";
-import { splitHistoryMediaRows } from "./generative-history-utils";
+import {
+  readGenerativeCardCoverFromHistory,
+  splitHistoryMediaRows,
+  type GenerativeCardCoverRead,
+} from "./generative-history-utils";
 
 import {
   AI_IMAGE_EMPTY_CARD_SIZE,
@@ -284,6 +291,225 @@ export function withAiImageResult(
   return { inputs, outputs };
 }
 
+function stripGeneratingFlag(
+  image: WorkflowMediaValue
+): WorkflowMediaValue {
+  if (!isResourceIdReference(image) || !image.generating) {
+    return image;
+  }
+  return {
+    resourceId: image.resourceId,
+    mimeType: image.mimeType,
+    contentSha256: image.contentSha256,
+  };
+}
+
+function markResourceRefFailed(image: WorkflowMediaValue): WorkflowMediaValue {
+  if (!isResourceIdReference(image)) {
+    return image;
+  }
+  return {
+    resourceId: image.resourceId,
+    mimeType: image.mimeType,
+    contentSha256: image.contentSha256,
+    failed: true,
+  };
+}
+
+export function withAiImageGeneratingHistory(
+  current: WorkflowNodeType,
+  params: {
+    readonly resourceIds: readonly string[];
+    readonly prompt: string;
+    readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
+    readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
+    readonly jobId?: string;
+  }
+): Partial<WorkflowNodeType> {
+  if (params.resourceIds.length === 0) {
+    return {};
+  }
+
+  const history = readAiImageResultHistory(current.inputs);
+  const createdAt = new Date().toISOString();
+  const batchId = Date.now();
+  const newItems: AiImageResultHistoryItem[] = params.resourceIds.map(
+    (resourceId, index) => ({
+      id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      images: [
+        {
+          resourceId,
+          mimeType: "image/png",
+          generating: true,
+        },
+      ],
+      prompt: params.prompt,
+      params: params.params,
+      platformModelId: params.platformModelId,
+      aiInterfaceId: params.aiInterfaceId,
+      providerModelId: params.providerModelId,
+      modelDisplayName: params.modelDisplayName,
+      createdAt,
+      ...(params.jobId ? { jobId: params.jobId } : {}),
+    })
+  );
+  const primary = newItems[0]!;
+  const nextHistory: AiImageResultHistory = {
+    items: [...newItems, ...history.items].slice(0, AI_IMAGE_MAX_HISTORY_ITEMS),
+    selectedId: primary.id,
+  };
+
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  inputs = upsertInputValue(inputs, "manual_images", [], "json");
+  return {
+    ...withAiImageResult(current, primary.images, { inputs }),
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
+}
+
+export function readAiImageGeneratingJobId(
+  inputs: readonly WorkflowParameter[]
+): string | undefined {
+  const history = readAiImageResultHistory(inputs);
+  for (const item of history.items) {
+    if (item.jobId && hasGeneratingResource(item.images)) {
+      return item.jobId;
+    }
+  }
+  return undefined;
+}
+
+export function withAiImageResourceGeneratingCleared(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiImageResultHistory(current.inputs);
+  const nextHistory: AiImageResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      images: item.images.map((image) => {
+        if (
+          isResourceIdReference(image) &&
+          image.generating &&
+          ids.has(image.resourceId)
+        ) {
+          return stripGeneratingFlag(image);
+        }
+        return image;
+      }),
+    })),
+  };
+
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultImages = readAiImageResult(inputs, current.outputs).map((image) => {
+    if (
+      isResourceIdReference(image) &&
+      image.generating &&
+      ids.has(image.resourceId)
+    ) {
+      return stripGeneratingFlag(image);
+    }
+    return image;
+  });
+  return withAiImageResult(current, resultImages, { inputs });
+}
+
+export function withAiImageGeneratingHistoryFailed(
+  current: WorkflowNodeType,
+  jobId?: string | null
+): Partial<WorkflowNodeType> {
+  const history = readAiImageResultHistory(current.inputs);
+  const nextItems = history.items.map((item) => {
+    const matchesJob = Boolean(jobId && item.jobId === jobId);
+    if (!matchesJob && !hasGeneratingResource(item.images)) {
+      return item;
+    }
+    if (jobId && item.jobId && item.jobId !== jobId) {
+      return item;
+    }
+    return {
+      ...item,
+      images: item.images.map(markResourceRefFailed),
+    };
+  });
+  const selected =
+    nextItems.find((item) => item.id === history.selectedId) ?? nextItems[0];
+  const nextHistory: AiImageResultHistory = {
+    items: nextItems,
+    selectedId: selected?.id ?? null,
+  };
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const selectedImages = selected?.images ?? [];
+  return withAiImageResult(current, selectedImages, { inputs });
+}
+
+export function withAiImageResourcesMarkedFailed(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiImageResultHistory(current.inputs);
+  const nextHistory: AiImageResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      images: item.images.map((image) =>
+        isResourceIdReference(image) && ids.has(image.resourceId)
+          ? markResourceRefFailed(image)
+          : image
+      ),
+    })),
+  };
+
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_IMAGE_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultImages = readAiImageResult(inputs, current.outputs).map((image) =>
+    isResourceIdReference(image) && ids.has(image.resourceId)
+      ? markResourceRefFailed(image)
+      : image
+  );
+  return withAiImageResult(current, resultImages, { inputs });
+}
+
+export function isAiImageResourceGenerating(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[]
+): boolean {
+  return hasGeneratingResource(readAiImageResult(inputs, outputs));
+}
+
 /**
  * Card preview while cloud persist is uploading. Does not append history —
  * final success path writes the single history entry.
@@ -306,21 +532,47 @@ export function withAiImageStagingPreview(
   return { inputs, outputs };
 }
 
-export function readAiImageCardImages(
+export function readAiImageCardDisplay(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
-): WorkflowMediaValue[] {
+): GenerativeCardCoverRead<WorkflowMediaValue> {
   if (isGenerativeManualContent(metadata)) {
     const manual = parseWorkflowMediaValues(
       inputs.find((input) => input.id === "manual_images")?.value
     );
     if (manual.length > 0) {
-      return manual;
+      return {
+        coverMedia: manual,
+        isBusy: false,
+        hasCover: hasDisplayableWorkflowMedia(manual),
+      };
     }
   }
 
-  return readAiImageResult(inputs, outputs);
+  const history = readAiImageResultHistory(inputs);
+  if (history.selectedId) {
+    return readGenerativeCardCoverFromHistory(history, (item) => item.images, {
+      metadata,
+      isModalityGenerating: isAiImageGenerating(metadata),
+    });
+  }
+
+  const fallback = readAiImageResult(inputs, outputs);
+  return {
+    coverMedia: fallback,
+    isBusy:
+      isAiImageGenerating(metadata) || hasGeneratingResource(fallback),
+    hasCover: hasDisplayableWorkflowMedia(fallback),
+  };
+}
+
+export function readAiImageCardImages(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): WorkflowMediaValue[] {
+  return [...readAiImageCardDisplay(inputs, outputs, metadata).coverMedia];
 }
 
 /** Current card output — at most one image. */
@@ -329,7 +581,7 @@ export function readAiImageCardPrimaryImage(
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
 ): WorkflowMediaValue | undefined {
-  return readAiImageCardImages(inputs, outputs, metadata)[0];
+  return readAiImageCardDisplay(inputs, outputs, metadata).coverMedia[0];
 }
 
 export function withAiImageManualUpload(
@@ -369,12 +621,87 @@ export function withAiImageGeneratedResult(
     readonly providerModelId?: string;
     readonly modelDisplayName?: string;
     readonly requestSnapshot?: ImageGenerationRequestSnapshot;
+    readonly jobId?: string;
   }
 ): Partial<WorkflowNodeType> {
   const storedImages = toStoredWorkflowMedia(images);
   if (storedImages.length === 0) return {};
 
   const history = readAiImageResultHistory(current.inputs);
+  const pendingItems = history.items.filter((item) => {
+    if (meta?.jobId) {
+      return (
+        item.jobId === meta.jobId ||
+        (!item.jobId && hasGeneratingResource(item.images))
+      );
+    }
+    return hasGeneratingResource(item.images);
+  });
+
+  if (pendingItems.length > 0) {
+    const pendingIds = new Set(pendingItems.map((item) => item.id));
+    let storedIndex = 0;
+    const items = history.items.map((item) => {
+      if (!pendingIds.has(item.id)) {
+        return item;
+      }
+      const image = storedImages[storedIndex];
+      storedIndex += 1;
+      if (!image) {
+        return {
+          ...item,
+          images: item.images.map(stripGeneratingFlag),
+          jobId: undefined,
+        };
+      }
+      return {
+        ...item,
+        images: [image],
+        jobId: undefined,
+        prompt: meta?.prompt ?? item.prompt,
+        params: meta?.params ?? item.params,
+        platformModelId: meta?.platformModelId ?? item.platformModelId,
+        aiInterfaceId: meta?.aiInterfaceId ?? item.aiInterfaceId,
+        providerModelId: meta?.providerModelId ?? item.providerModelId,
+        modelDisplayName: meta?.modelDisplayName ?? item.modelDisplayName,
+        requestSnapshot: meta?.requestSnapshot ?? item.requestSnapshot,
+      };
+    });
+    const extraItems: AiImageResultHistoryItem[] = storedImages
+      .slice(storedIndex)
+      .map((image, index) => ({
+        id: `gen-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        images: [image],
+        prompt: meta?.prompt ?? pendingItems[0]?.prompt ?? "",
+        params: meta?.params ?? pendingItems[0]?.params,
+        platformModelId: meta?.platformModelId ?? pendingItems[0]?.platformModelId,
+        aiInterfaceId: meta?.aiInterfaceId ?? pendingItems[0]?.aiInterfaceId,
+        providerModelId: meta?.providerModelId ?? pendingItems[0]?.providerModelId,
+        modelDisplayName:
+          meta?.modelDisplayName ?? pendingItems[0]?.modelDisplayName,
+        requestSnapshot:
+          meta?.requestSnapshot ?? pendingItems[0]?.requestSnapshot,
+        createdAt: new Date().toISOString(),
+      }));
+    const primaryId = pendingItems[0]!.id;
+    const nextHistory: AiImageResultHistory = {
+      items: [...extraItems, ...items].slice(0, AI_IMAGE_MAX_HISTORY_ITEMS),
+      selectedId: primaryId,
+    };
+    let inputs = upsertInputValue(
+      current.inputs,
+      AI_IMAGE_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+    inputs = upsertInputValue(inputs, "manual_images", [], "json");
+    const result = withAiImageResult(current, [storedImages[0]!], { inputs });
+    return {
+      ...result,
+      metadata: withGenerativeGeneratedContentMode(current.metadata),
+    };
+  }
+
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
   const newItems: AiImageResultHistoryItem[] = storedImages.map((image, index) => ({

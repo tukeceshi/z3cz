@@ -15,12 +15,15 @@ interface UseCanvasCardSizeParams {
   readonly kind: "image" | "video";
   readonly hasMedia: boolean;
   readonly mediaKey: string | null;
+  /** Keep the last size (e.g. while generating). */
+  readonly holdSize?: boolean;
 }
 
 export function useCanvasCardSize({
   kind,
   hasMedia,
   mediaKey,
+  holdSize = false,
 }: UseCanvasCardSizeParams): {
   readonly cardSize: MediaCardSize;
   readonly onNaturalSize: (width: number, height: number) => void;
@@ -30,8 +33,11 @@ export function useCanvasCardSize({
   );
 
   useEffect(() => {
+    if (holdSize || hasMedia) {
+      return;
+    }
     setCardSize(emptyCardSize(kind));
-  }, [kind, hasMedia, mediaKey]);
+  }, [kind, hasMedia, mediaKey, holdSize]);
 
   const onNaturalSize = useCallback((width: number, height: number) => {
     setCardSize((current) => {

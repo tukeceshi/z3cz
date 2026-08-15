@@ -9,6 +9,9 @@ import {
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
   type OrgVideoModelOption,
+  hasGeneratingResource,
+  hasDisplayableWorkflowMedia,
+  isResourceIdReference,
   isWorkflowMediaValue,
   mediaReferenceToWorkflowValue,
   type MediaReference,
@@ -30,7 +33,15 @@ import {
   applyHistoryItemSettingsToNode,
   type GenerativeHistorySelectionResult,
 } from "./apply-history-item-settings";
-import { splitHistoryMediaRows } from "./generative-history-utils";
+import {
+  readGenerativeCardCoverFromHistory,
+  splitHistoryMediaRows,
+  type GenerativeCardCoverRead,
+} from "./generative-history-utils";
+import {
+  markResourceRefFailed,
+  stripGeneratingFlag,
+} from "./generative-resource-ref-utils";
 
 import {
   AI_VIDEO_EMPTY_CARD_SIZE,
@@ -323,21 +334,47 @@ export function withAiVideoStagingPreview(
   return { inputs, outputs };
 }
 
-export function readAiVideoCardVideos(
+export function readAiVideoCardDisplay(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
-): WorkflowMediaValue[] {
+): GenerativeCardCoverRead<WorkflowMediaValue> {
   if (isGenerativeManualContent(metadata)) {
     const manual = parseWorkflowMediaValues(
       inputs.find((input) => input.id === "manual_videos")?.value
     );
     if (manual.length > 0) {
-      return manual;
+      return {
+        coverMedia: manual,
+        isBusy: false,
+        hasCover: hasDisplayableWorkflowMedia(manual),
+      };
     }
   }
 
-  return readAiVideoResult(inputs, outputs);
+  const history = readAiVideoResultHistory(inputs);
+  if (history.selectedId) {
+    return readGenerativeCardCoverFromHistory(history, (item) => item.videos, {
+      metadata,
+      isModalityGenerating: isAiVideoGenerating(metadata),
+    });
+  }
+
+  const fallback = readAiVideoResult(inputs, outputs);
+  return {
+    coverMedia: fallback,
+    isBusy:
+      isAiVideoGenerating(metadata) || hasGeneratingResource(fallback),
+    hasCover: hasDisplayableWorkflowMedia(fallback),
+  };
+}
+
+export function readAiVideoCardVideos(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): WorkflowMediaValue[] {
+  return [...readAiVideoCardDisplay(inputs, outputs, metadata).coverMedia];
 }
 
 /** Current card output — at most one video. */
@@ -346,7 +383,7 @@ export function readAiVideoCardPrimaryVideo(
   outputs?: readonly WorkflowParameter[],
   metadata?: Record<string, string>
 ): WorkflowMediaValue | undefined {
-  return readAiVideoCardVideos(inputs, outputs, metadata)[0];
+  return readAiVideoCardDisplay(inputs, outputs, metadata).coverMedia[0];
 }
 
 export function withAiVideoManualUpload(
@@ -405,12 +442,47 @@ export function appendAiVideoGeneratedHistoryItems(
     readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
     readonly modelDisplayName?: string;
+    readonly jobId?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (videos.length === 0) return {};
 
   const storedVideos = toStoredWorkflowMedia(videos);
   const history = readAiVideoResultHistory(current.inputs);
+  const pendingIndex = meta?.jobId
+    ? history.items.findIndex((item) => item.jobId === meta.jobId)
+    : -1;
+  if (pendingIndex >= 0) {
+    const pending = history.items[pendingIndex]!;
+    const nextItems = history.items.map((item, index) =>
+      index === pendingIndex
+        ? {
+            ...item,
+            videos: [storedVideos[0]!],
+            jobId: undefined,
+          }
+        : item
+    );
+    const nextHistory: AiVideoResultHistory = {
+      items: nextItems,
+      selectedId: pending.id,
+    };
+    let nextInputs = upsertInputValue(
+      current.inputs,
+      AI_VIDEO_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+    nextInputs = upsertInputValue(nextInputs, "manual_videos", [], "json");
+    const result = withAiVideoResult(current, [storedVideos[0]!], {
+      inputs: nextInputs,
+    });
+    return {
+      ...result,
+      metadata: withGenerativeGeneratedContentMode(current.metadata),
+    };
+  }
+
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
   const newItems: AiVideoResultHistoryItem[] = storedVideos.map((video, index) => ({
@@ -425,12 +497,10 @@ export function appendAiVideoGeneratedHistoryItems(
     createdAt,
   }));
   const primary = newItems[0]!;
-
   const nextHistory: AiVideoResultHistory = {
     items: [...newItems, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
     selectedId: primary.id,
   };
-
   let inputs = upsertInputValue(
     current.inputs,
     AI_VIDEO_HISTORY_INPUT_ID,
@@ -438,12 +508,176 @@ export function appendAiVideoGeneratedHistoryItems(
     "json"
   );
   inputs = upsertInputValue(inputs, "manual_videos", [], "json");
-
   const result = withAiVideoResult(current, [storedVideos[0]!], { inputs });
   return {
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
   };
+}
+
+export function withAiVideoGeneratingHistory(
+  current: WorkflowNodeType,
+  params: {
+    readonly jobId: string;
+    readonly prompt: string;
+    readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
+    readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
+  }
+): Partial<WorkflowNodeType> {
+  const history = readAiVideoResultHistory(current.inputs);
+  const item: AiVideoResultHistoryItem = {
+    id: `gen-${Date.now()}-0-${Math.random().toString(36).slice(2, 8)}`,
+    videos: [],
+    prompt: params.prompt,
+    params: params.params,
+    platformModelId: params.platformModelId,
+    aiInterfaceId: params.aiInterfaceId,
+    providerModelId: params.providerModelId,
+    modelDisplayName: params.modelDisplayName,
+    createdAt: new Date().toISOString(),
+    jobId: params.jobId,
+  };
+  const nextHistory: AiVideoResultHistory = {
+    items: [item, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
+    selectedId: item.id,
+  };
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_VIDEO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  return {
+    ...withAiVideoResult(current, [], { inputs }),
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
+}
+
+export function withAiVideoGeneratingHistoryFailed(
+  current: WorkflowNodeType,
+  jobId?: string | null
+): Partial<WorkflowNodeType> {
+  const history = readAiVideoResultHistory(current.inputs);
+  const nextItems = history.items.map((item) => {
+    const matchesJob = Boolean(jobId && item.jobId === jobId);
+    if (!matchesJob && !hasGeneratingResource(item.videos)) {
+      return item;
+    }
+    if (jobId && item.jobId && item.jobId !== jobId) {
+      return item;
+    }
+    return {
+      ...item,
+      videos: item.videos.map((video) =>
+        isResourceIdReference(video)
+          ? {
+              resourceId: video.resourceId,
+              mimeType: video.mimeType,
+              contentSha256: video.contentSha256,
+              failed: true,
+            }
+          : video
+      ),
+    };
+  });
+  const selected =
+    nextItems.find((item) => item.id === history.selectedId) ?? nextItems[0];
+  const nextHistory: AiVideoResultHistory = {
+    items: nextItems,
+    selectedId: selected?.id ?? null,
+  };
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_VIDEO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  return withAiVideoResult(current, selected?.videos ?? [], { inputs });
+}
+
+export function withAiVideoResourcesMarkedFailed(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiVideoResultHistory(current.inputs);
+  const nextHistory: AiVideoResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      videos: item.videos.map((video) =>
+        isResourceIdReference(video) && ids.has(video.resourceId)
+          ? markResourceRefFailed(video)
+          : video
+      ),
+    })),
+  };
+
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_VIDEO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultVideos = readAiVideoResult(inputs, current.outputs).map((video) =>
+    isResourceIdReference(video) && ids.has(video.resourceId)
+      ? markResourceRefFailed(video)
+      : video
+  );
+  return withAiVideoResult(current, resultVideos, { inputs });
+}
+
+export function withAiVideoResourceGeneratingCleared(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiVideoResultHistory(current.inputs);
+  const nextHistory: AiVideoResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      videos: item.videos.map((video) => {
+        if (
+          isResourceIdReference(video) &&
+          video.generating &&
+          ids.has(video.resourceId)
+        ) {
+          return stripGeneratingFlag(video);
+        }
+        return video;
+      }),
+    })),
+  };
+
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_VIDEO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultVideos = readAiVideoResult(inputs, current.outputs).map((video) => {
+    if (
+      isResourceIdReference(video) &&
+      video.generating &&
+      ids.has(video.resourceId)
+    ) {
+      return stripGeneratingFlag(video);
+    }
+    return video;
+  });
+  return withAiVideoResult(current, resultVideos, { inputs });
 }
 
 export function withAiVideoHistorySelection(

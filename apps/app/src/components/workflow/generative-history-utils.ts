@@ -1,4 +1,100 @@
-import type { ImageGenerationRequestSnapshot } from "@dafthunk/types";
+import {
+  hasDisplayableWorkflowMedia,
+  hasFailedResource,
+  hasGeneratingResource,
+  isDisplayableWorkflowMedia,
+  isLocalMediaReference,
+  type ImageGenerationRequestSnapshot,
+} from "@dafthunk/types";
+
+import {
+  isGenerativePersistPhase,
+  isGenerativeProgressBusyPhase,
+  readGenerativeProgressPhase,
+} from "./generative-progress-utils";
+
+export interface GenerativeCardCoverRead<TMedia> {
+  readonly coverMedia: readonly TMedia[];
+  readonly isBusy: boolean;
+  readonly hasCover: boolean;
+}
+
+/** True while the card should keep loading UI and hold layout. */
+export function isGenerativeCardCoverBusy(
+  metadata: Record<string, string> | undefined,
+  isModalityGenerating: boolean
+): boolean {
+  if (isModalityGenerating) {
+    return true;
+  }
+  const phase = readGenerativeProgressPhase(metadata);
+  return isGenerativeProgressBusyPhase(phase);
+}
+
+export function shouldHoldUnreadyCardCover(params: {
+  readonly metadata?: Record<string, string>;
+  readonly isModalityGenerating: boolean;
+  readonly selectedMedia?: readonly unknown[];
+}): boolean {
+  if (params.isModalityGenerating) {
+    return true;
+  }
+  if (hasGeneratingResource(params.selectedMedia)) {
+    return true;
+  }
+  const phase = readGenerativeProgressPhase(params.metadata);
+  return isGenerativePersistPhase(phase) || phase === "queued" || phase === "generating";
+}
+
+export function readGenerativeCardCoverFromHistory<
+  TItem extends { readonly id: string },
+  TMedia,
+>(
+  history: {
+    readonly items: readonly TItem[];
+    readonly selectedId: string | null;
+  },
+  getMedia: (item: TItem) => readonly TMedia[],
+  params: {
+    readonly metadata?: Record<string, string>;
+    readonly isModalityGenerating: boolean;
+  }
+): GenerativeCardCoverRead<TMedia> {
+  const selected = readSelectedHistoryMedia(history, getMedia);
+  const selectedFailed = hasFailedResource(selected ?? undefined);
+  const isBusy =
+    !selectedFailed &&
+    (isGenerativeCardCoverBusy(params.metadata, params.isModalityGenerating) ||
+      hasGeneratingResource(selected ?? undefined));
+  const holdUnreadyCover =
+    !selectedFailed &&
+    shouldHoldUnreadyCardCover({
+      metadata: params.metadata,
+      isModalityGenerating: params.isModalityGenerating,
+      selectedMedia: selected ?? undefined,
+    });
+  const coverMedia =
+    readDisplayHistoryMedia(history, getMedia, { holdUnreadyCover }) ?? [];
+
+  return {
+    coverMedia,
+    isBusy,
+    hasCover: hasDisplayableWorkflowMedia(coverMedia),
+  };
+}
+
+function isReadyCoverMedia(
+  value: unknown,
+  holdUnreadyCover: boolean
+): boolean {
+  if (isLocalMediaReference(value)) {
+    return true;
+  }
+  if (!isDisplayableWorkflowMedia(value)) {
+    return false;
+  }
+  return !holdUnreadyCover;
+}
 
 /**
  * Shared helpers for generative media history: one media per row.
@@ -31,6 +127,73 @@ export function splitHistoryMediaRows<TMedia, TItem extends {
     }
   }
   return out;
+}
+
+export function readSelectedHistoryMedia<TItem extends { readonly id: string }, TMedia>(
+  history: {
+    readonly items: readonly TItem[];
+    readonly selectedId: string | null;
+  },
+  getMedia: (item: TItem) => readonly TMedia[]
+): readonly TMedia[] | null {
+  if (!history.selectedId) {
+    return null;
+  }
+  const selected = history.items.find((item) => item.id === history.selectedId);
+  if (!selected) {
+    return null;
+  }
+  return getMedia(selected);
+}
+
+/** Card cover: keep the last ready media while the selected row is still generating. */
+export function readDisplayHistoryMedia<TItem extends { readonly id: string }, TMedia>(
+  history: {
+    readonly items: readonly TItem[];
+    readonly selectedId: string | null;
+  },
+  getMedia: (item: TItem) => readonly TMedia[],
+  options?: { readonly holdUnreadyCover?: boolean }
+): readonly TMedia[] | null {
+  const selected = readSelectedHistoryMedia(history, getMedia);
+  if (selected === null) {
+    return null;
+  }
+
+  if (hasFailedResource(selected)) {
+    return selected;
+  }
+
+  const holdUnreadyCover = options?.holdUnreadyCover === true;
+  const selectedReady = selected.filter((entry) =>
+    isReadyCoverMedia(entry, holdUnreadyCover)
+  );
+  if (selectedReady.length > 0) {
+    return selectedReady;
+  }
+
+  const shouldHold =
+    hasGeneratingResource(selected) ||
+    (holdUnreadyCover && !selected.some(isLocalMediaReference));
+  if (!shouldHold) {
+    return selected;
+  }
+
+  for (const item of history.items) {
+    if (item.id === history.selectedId) {
+      continue;
+    }
+    const media = getMedia(item);
+    const ready = media.filter((entry) => isReadyCoverMedia(entry, false));
+    if (ready.length > 0) {
+      return ready;
+    }
+  }
+
+  if (hasGeneratingResource(selected)) {
+    return selected;
+  }
+  return [];
 }
 
 export function formatHistoryCreatedAt(iso: string): string {
