@@ -3,7 +3,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
-  getMediaReferenceKey,
+  getResourceIdFromValue,
   type MediaReference,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
@@ -39,6 +39,7 @@ import {
 import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
   isAiTextGenerating,
+  isAiTextAwaitingStream,
   readAiTextResultHistory,
   readAiTextSessionBodySync,
 } from "./ai-text-node-utils";
@@ -116,6 +117,7 @@ import { useAiTextOutputScroll } from "./use-ai-text-output-scroll";
 import { StudioTextOutputView } from "./studio-text-output-view";
 import { readStudioMediaCardState } from "./studio-media-card-state";
 import { useBufferedTextValue } from "./use-buffered-text-value";
+import { GenerativeBusyOverlay } from "./generative-busy-overlay";
 import { GenerativeCardEmptyUploadSlot } from "./generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "./use-generative-card-upload";
 import { useTextCardFileUpload } from "./use-text-card-file-upload";
@@ -197,11 +199,17 @@ function StudioTextDetail({
     outputs: node.data.outputs,
     nodeData: node.data,
   });
+  const streamBody = isGenerating ? readAiTextSessionBodySync(node.data) : "";
+  const hasStreamOutput = streamBody.trim().length > 0;
   const text = isGenerating
-    ? readAiTextSessionBodySync(node.data)
+    ? hasStreamOutput
+      ? streamBody
+      : resolvedText.text
     : resolvedText.text;
   const historyItems = readAiTextResultHistory(node.data.inputs);
   const generateError = readGenerativeCardError(metadata);
+  const showGeneratingMask =
+    isAiTextAwaitingStream(metadata) && !generateError;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
@@ -272,7 +280,7 @@ function StudioTextDetail({
   const showEmptyUpload =
     !hasOutput && !isTextEditing && !isGenerating && !generateError && !uploading;
   const showEmptyBusy =
-    !hasOutput && !isTextEditing && !generateError && (uploading || isGenerating);
+    !hasOutput && !isTextEditing && !generateError && uploading;
 
   const {
     scrollContainerRef,
@@ -445,29 +453,38 @@ function StudioTextDetail({
                 className="h-full"
               />
             ) : (
-              <StudioTextOutputView
-                key={nodeId}
-                value={isGenerating ? text : textBuffer.value}
-                onChange={textBuffer.onChange}
-                onFocus={textBuffer.onFocus}
-                onBlur={stopEditing}
-                onCompositionStart={textBuffer.onCompositionStart}
-                onCompositionEnd={textBuffer.onCompositionEnd}
-                isEditing={editing}
-                isGenerating={isGenerating}
-                editLocked={editLocked}
-                maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
-                placeholder={
-                  showEditHint
-                    ? undefined
-                    : t("workflow.aiTextPanel.cardInputPlaceholder")
-                }
-                scrollContainerRef={scrollContainerRef}
-                textareaRef={textareaRef}
-                handleScroll={handleScroll}
-                scrollToTailIfAllowed={scrollToTailIfAllowed}
-                contentKey={`${nodeId}:${historyItems.selectedId ?? ""}`}
-              />
+              <>
+                <StudioTextOutputView
+                  key={nodeId}
+                  value={isGenerating ? text : textBuffer.value}
+                  onChange={textBuffer.onChange}
+                  onFocus={textBuffer.onFocus}
+                  onBlur={stopEditing}
+                  onCompositionStart={textBuffer.onCompositionStart}
+                  onCompositionEnd={textBuffer.onCompositionEnd}
+                  isEditing={editing}
+                  isGenerating={isGenerating}
+                  editLocked={editLocked}
+                  maxLength={AI_TEXT_HARD_OUTPUT_MAX_CHARS}
+                  placeholder={
+                    showEditHint
+                      ? undefined
+                      : t("workflow.aiTextPanel.cardInputPlaceholder")
+                  }
+                  scrollContainerRef={scrollContainerRef}
+                  textareaRef={textareaRef}
+                  handleScroll={handleScroll}
+                  scrollToTailIfAllowed={scrollToTailIfAllowed}
+                  contentKey={`${nodeId}:${historyItems.selectedId ?? ""}`}
+                />
+                <GenerativeBusyOverlay
+                  visible={showGeneratingMask}
+                  modality={null}
+                  metadata={metadata}
+                  label={t("workflow.aiTextPanel.generating")}
+                  roundedClass="rounded-lg"
+                />
+              </>
             )}
           </div>
         </div>
@@ -734,7 +751,7 @@ function StudioPrimaryDownload({
   return (
     <StudioDownloadActionButton
       src={displayUrl}
-      fileName={`${filePrefix}-${getMediaReferenceKey(media)}.${ext}`}
+      fileName={`${filePrefix}-${getResourceIdFromValue(media) ?? "media"}.${ext}`}
     />
   );
 }
@@ -756,7 +773,11 @@ function StudioImageDetail({
   );
   const historyItems = readAiImageResultHistory(node.data.inputs);
   const prompt = readGenerativePrompt(node.data.inputs);
-  const isGenerating = readStudioMediaCardState(metadata, false).isBusy;
+  const isGenerating = readStudioMediaCardState(
+    metadata,
+    false,
+    primaryImage ? [primaryImage] : undefined
+  ).isBusy;
   const generateError = readGenerativeCardError(metadata);
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,

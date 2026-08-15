@@ -9,6 +9,8 @@ export interface MediaResourceRecord {
   readonly upstreamUrl: string | null;
   readonly expiresAt: string | null;
   readonly contentSha256: string | null;
+  readonly generating: boolean;
+  readonly failed: boolean;
   readonly createdAt: string;
 }
 
@@ -20,6 +22,8 @@ export interface RegisterMediaResourceRequest {
   readonly upstreamUrl?: string;
   readonly expiresAt?: string;
   readonly contentSha256?: string;
+  readonly generating?: boolean;
+  readonly failed?: boolean;
   /** When set, updates an existing row (e.g. ephemeral/local → cloud) instead of creating a duplicate. */
   readonly replacesResourceId?: string;
 }
@@ -56,6 +60,8 @@ export interface ResolvedMediaResourceEntry {
   readonly upstreamUrl?: string;
   readonly expiresAt?: string;
   readonly contentSha256?: string;
+  readonly generating?: boolean;
+  readonly failed?: boolean;
 }
 
 export interface ResolveMediaResourcesResponse {

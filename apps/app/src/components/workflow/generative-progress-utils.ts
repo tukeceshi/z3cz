@@ -134,6 +134,16 @@ export function isGenerativePhaseCancellable(
   return phase === "queued" || phase === "generating";
 }
 
+export function isGenerativePersistPhase(
+  phase: GenerativeProgressPhase | null | undefined
+): boolean {
+  return (
+    phase === "downloading" ||
+    phase === "uploading" ||
+    phase === "server_persisting"
+  );
+}
+
 /** True while work is in-flight; excludes terminal cancelled feedback. */
 export function isGenerativeProgressBusyPhase(
   phase: GenerativeProgressPhase | undefined
@@ -143,7 +153,13 @@ export function isGenerativeProgressBusyPhase(
 
 /** Persist immediately when job id or staged blob ids change (refresh resume). */
 export function snapshotGenerativeProgressForPersist(
-  nodes: readonly { readonly id: string; readonly data: { readonly metadata?: Record<string, string> } }[]
+  nodes: readonly {
+    readonly id: string;
+    readonly data: {
+      readonly metadata?: Record<string, string>;
+      readonly inputs?: readonly { readonly value?: unknown }[];
+    };
+  }[]
 ): string {
   return JSON.stringify(
     nodes.map((node) => ({
@@ -152,8 +168,133 @@ export function snapshotGenerativeProgressForPersist(
       phase: node.data.metadata?.[GENERATIVE_PROGRESS_PHASE_META_KEY] ?? null,
       stagingMediaIds:
         node.data.metadata?.[GENERATIVE_STAGING_MEDIA_IDS_META_KEY] ?? null,
+      generatingResourceIds: collectGeneratingResourceIds(node.data.inputs),
+      historyFingerprint: collectHistoryPersistFingerprint(node.data.inputs),
     }))
   );
+}
+
+function collectGeneratingResourceIds(
+  inputs: readonly { readonly value?: unknown }[] | undefined
+): readonly string[] {
+  if (!inputs) {
+    return [];
+  }
+  const ids: string[] = [];
+  for (const input of inputs) {
+    collectGeneratingResourceIdsFromValue(input.value, ids);
+  }
+  return ids;
+}
+
+function collectHistoryPersistFingerprint(
+  inputs: readonly { readonly value?: unknown }[] | undefined
+): readonly string[] {
+  if (!inputs) {
+    return [];
+  }
+  const keys: string[] = [];
+  for (const input of inputs) {
+    collectHistoryPersistFingerprintFromValue(input.value, keys);
+  }
+  return keys;
+}
+
+function collectHistoryPersistFingerprintFromValue(
+  value: unknown,
+  keys: string[]
+): void {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  const record = value as {
+    readonly items?: unknown;
+    readonly selectedId?: unknown;
+  };
+  if (!Array.isArray(record.items)) {
+    return;
+  }
+  keys.push(
+    `sel:${typeof record.selectedId === "string" ? record.selectedId : ""}`
+  );
+  for (const item of record.items) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const entry = item as {
+      readonly id?: unknown;
+      readonly jobId?: unknown;
+      readonly invocationId?: unknown;
+      readonly images?: unknown;
+      readonly videos?: unknown;
+      readonly audios?: unknown;
+      readonly resourceId?: unknown;
+    };
+    const media = [entry.images, entry.videos, entry.audios];
+    const resourceBits: string[] = [];
+    for (const group of media) {
+      if (!Array.isArray(group)) {
+        continue;
+      }
+      for (const ref of group) {
+        if (!ref || typeof ref !== "object") {
+          continue;
+        }
+        const mediaRef = ref as {
+          readonly resourceId?: unknown;
+          readonly generating?: unknown;
+          readonly failed?: unknown;
+        };
+        if (typeof mediaRef.resourceId !== "string") {
+          continue;
+        }
+        resourceBits.push(
+          `${mediaRef.resourceId}:${mediaRef.generating === true ? "g" : ""}${mediaRef.failed === true ? "f" : ""}`
+        );
+      }
+    }
+    if (typeof entry.resourceId === "string") {
+      resourceBits.push(entry.resourceId);
+    }
+    keys.push(
+      [
+        typeof entry.id === "string" ? entry.id : "",
+        typeof entry.jobId === "string" ? entry.jobId : "",
+        typeof entry.invocationId === "string" ? entry.invocationId : "",
+        resourceBits.join(","),
+      ].join("|")
+    );
+  }
+}
+
+function collectGeneratingResourceIdsFromValue(
+  value: unknown,
+  ids: string[]
+): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectGeneratingResourceIdsFromValue(entry, ids);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  const record = value as {
+    readonly resourceId?: unknown;
+    readonly generating?: unknown;
+    readonly images?: unknown;
+    readonly items?: unknown;
+  };
+  if (record.generating === true && typeof record.resourceId === "string") {
+    ids.push(record.resourceId);
+  }
+  if (Array.isArray(record.images)) {
+    collectGeneratingResourceIdsFromValue(record.images, ids);
+  }
+  if (Array.isArray(record.items)) {
+    collectGeneratingResourceIdsFromValue(record.items, ids);
+  }
 }
 
 /** Formats elapsed generation time for progress labels (e.g. `3m 20s`). */

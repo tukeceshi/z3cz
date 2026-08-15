@@ -53,6 +53,7 @@ import {
 } from "./ai-video-node-utils";
 import {
   isAiImageGenerating,
+  isAiImageResourceGenerating,
 } from "./ai-image-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
@@ -62,6 +63,7 @@ import {
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
 import {
+  isGenerativePersistPhase,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
 } from "./generative-progress-utils";
@@ -589,7 +591,10 @@ export const WorkflowNode = memo(
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
     const isAiImageBusy =
       isAiImageNode &&
-      (isAiImageGenerating(data.metadata) || progressPhase !== undefined);
+      (isAiImageGenerating(data.metadata) ||
+        isAiImageResourceGenerating(data.inputs, data.outputs) ||
+        isGenerativePersistPhase(progressPhase) ||
+        progressPhase === "cancelled");
     const isAiVideoBusy =
       isAiVideoNode &&
       (isAiVideoGenerating(data.metadata) ||

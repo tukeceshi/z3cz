@@ -10,6 +10,7 @@ export * from "./media-resource-catalog";
 export * from "./ai-model-catalog";
 export * from "./format-text-model-failure-message";
 export * from "./generative-error-rules";
+export * from "./generative-node-content";
 export * from "./interpret-upstream-text-model-error";
 export * from "./generative-card-error";
 export * from "./format-platform-model-label";

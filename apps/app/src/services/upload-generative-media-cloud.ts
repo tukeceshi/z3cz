@@ -10,7 +10,7 @@ import type {
 
 } from "@dafthunk/types";
 
-import { getMediaReferenceKey } from "@dafthunk/types";
+import { getResourceId } from "@dafthunk/types";
 
 
 
@@ -80,7 +80,7 @@ async function rekeyStagingMediaToCloud(params: {
 
 }): Promise<void> {
 
-  const toMediaId = getMediaReferenceKey(params.reference);
+  const toMediaId = getResourceId(params.reference);
 
   if (params.fromMediaId === toMediaId) {
 
@@ -273,7 +273,7 @@ export async function uploadBlobToCloudStorage(params: {
 
 
 
-  const resourceId = getMediaReferenceKey(presign.reference);
+  const resourceId = getResourceId(presign.reference);
 
   return {
 

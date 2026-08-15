@@ -16,8 +16,6 @@ export async function resolveCloudGenerationJobMedia(params: {
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly WorkflowMediaValue[]> {
-  params.onProgressPhase?.("generating");
-
   return runGenerationJobPersistWorker({
     organizationId: params.organizationId,
     jobId: params.jobId,

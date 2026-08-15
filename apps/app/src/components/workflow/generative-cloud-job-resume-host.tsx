@@ -6,20 +6,30 @@ import { useAuth } from "@/components/auth-context";
 import { readAiAudioGenerationParams } from "@/components/workflow/ai-audio-params-popover";
 import {
   appendAiAudioGeneratedHistoryItems,
+  readAiAudioResult,
+  readAiAudioResultHistory,
+  withAiAudioGeneratingHistoryFailed,
   withAiAudioGenerateError,
   withAiAudioGeneratingFlag,
   withAiAudioStagingPreview,
 } from "@/components/workflow/ai-audio-node-utils";
 import { readAiImageGenerationParams } from "@/components/workflow/ai-image-params-popover";
 import {
+  readAiImageGeneratingJobId,
+  readAiImageResult,
+  readAiImageResultHistory,
   withAiImageGenerateError,
   withAiImageGeneratedResult,
   withAiImageGeneratingFlag,
+  withAiImageGeneratingHistoryFailed,
   withAiImageStagingPreview,
 } from "@/components/workflow/ai-image-node-utils";
 import { readAiVideoGenerationParams } from "@/components/workflow/ai-video-params-popover";
 import {
   appendAiVideoGeneratedHistoryItems,
+  readAiVideoResult,
+  readAiVideoResultHistory,
+  withAiVideoGeneratingHistoryFailed,
   withAiVideoGenerateError,
   withAiVideoGeneratingFlag,
   withAiVideoStagingPreview,
@@ -29,6 +39,7 @@ import { prepareGenerativeCardError } from "@/components/workflow/prepare-genera
 import { readGenerativePrompt } from "@/components/workflow/generative-card-upload-utils";
 import {
   clearGenerativeProgress,
+  isGenerativePersistPhase,
   readGenerativeProgressJobId,
   readGenerativeProgressPhase,
   withGenerativeProgress,
@@ -42,6 +53,7 @@ import { useWorkflow } from "@/components/workflow/workflow-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeCloudJobProgress, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
+import { useSyncGeneratingResourceRefs } from "@/hooks/use-sync-generating-resource-refs";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 
@@ -134,13 +146,16 @@ export function GenerativeCloudJobResumeHost({
   );
 
   const handleResumeSuccess = useCallback(
-    (result: ResolveGenerativeJobMediaResult) => {
-      void (async () => {
-        if (!updateNodeData || result.media.length === 0 || !orgId || !workflowId) {
-          return;
-        }
+    async (result: ResolveGenerativeJobMediaResult) => {
+      if (!updateNodeData || result.media.length === 0 || !orgId || !workflowId) {
+        return;
+      }
 
-        const jobId = readGenerativeProgressJobId(data.metadata);
+        const jobId =
+          readGenerativeProgressJobId(data.metadata) ??
+          (modality === "image"
+            ? readAiImageGeneratingJobId(data.inputs)
+            : undefined);
         const canWriteHistory = !jobId || tryClaimGenerativeJobFinalize(jobId);
 
         if (!canWriteHistory) {
@@ -189,6 +204,9 @@ export function GenerativeCloudJobResumeHost({
                   params,
                   platformModelId: result.modelCanonicalId,
                   requestSnapshot: result.requestSnapshot,
+                  jobId:
+                    readGenerativeProgressJobId(current.metadata) ??
+                    readAiImageGeneratingJobId(current.inputs),
                 })
               : modality === "video"
                 ? appendAiVideoGeneratedHistoryItems(
@@ -233,11 +251,11 @@ export function GenerativeCloudJobResumeHost({
         } else {
           toast.success("workflow.aiAudioPanel.generated");
         }
-      })();
     },
     [
       applyBusyMetadata,
       cloudConfigured,
+      data.inputs,
       data.metadata,
       modality,
       nodeId,
@@ -267,12 +285,63 @@ export function GenerativeCloudJobResumeHost({
             : modality === "video"
               ? withAiVideoGenerateError(withBusy, cardError)
               : withAiAudioGenerateError(withBusy, cardError);
-        return { metadata: withError };
+        const failedJobId = readGenerativeProgressJobId(current.metadata);
+        if (modality === "image") {
+          return {
+            ...withAiImageGeneratingHistoryFailed(
+              current,
+              failedJobId ?? readAiImageGeneratingJobId(current.inputs)
+            ),
+            metadata: withError,
+          };
+        }
+        if (modality === "video") {
+          return {
+            ...withAiVideoGeneratingHistoryFailed(current, failedJobId),
+            metadata: withError,
+          };
+        }
+        return {
+          ...withAiAudioGeneratingHistoryFailed(current, failedJobId),
+          metadata: withError,
+        };
       });
       toast.errorRaw(cardError.summary);
     },
     [applyBusyMetadata, modality, nodeId, t, toast, updateNodeData]
   );
+
+  useSyncGeneratingResourceRefs({
+    orgId,
+    nodeId,
+    modality,
+    media:
+      modality === "image"
+        ? [
+            ...readAiImageResult(data.inputs, data.outputs),
+            ...readAiImageResultHistory(data.inputs).items.flatMap(
+              (item) => item.images
+            ),
+          ]
+        : modality === "video"
+          ? [
+              ...readAiVideoResult(data.inputs, data.outputs),
+              ...readAiVideoResultHistory(data.inputs).items.flatMap(
+                (item) => item.videos
+              ),
+            ]
+          : [
+              ...readAiAudioResult(data.inputs, data.outputs),
+              ...readAiAudioResultHistory(data.inputs).items.flatMap(
+                (item) => item.audios
+              ),
+            ],
+    enabled: !disabled,
+    holdClear: isGenerativePersistPhase(
+      readGenerativeProgressPhase(data.metadata)
+    ),
+    updateNodeData,
+  });
 
   useGenerativeCloudJobProgress({
     nodeId,
@@ -283,6 +352,11 @@ export function GenerativeCloudJobResumeHost({
     isGenerating: isResuming,
     persistPhase,
     autoResume: !disabled,
+    resumeJobId:
+      modality === "image"
+        ? readGenerativeProgressJobId(data.metadata) ??
+          readAiImageGeneratingJobId(data.inputs)
+        : readGenerativeProgressJobId(data.metadata),
     updateNodeData,
     setPersistPhase,
     setIsGenerating: setIsResuming,

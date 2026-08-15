@@ -10,13 +10,13 @@ import type {
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { applyWorkflowGraphPatch } from "@dafthunk/types";
+import { applyWorkflowGraphPatch, mergeGenerativeNodeContentOnSave } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { stripTransientGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
+import { stripTransientGenerativeMetadata, preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 import { normalizeAiTextNodeDataForPersist } from "@/components/workflow/ai-text-persist-utils";
 import type {
   NodeType,
@@ -64,12 +64,18 @@ interface UseEditableWorkflowProps {
  */
 function buildWorkflowPayload(
   nodes: Node<WorkflowNodeType>[],
-  edges: Edge<WorkflowEdgeType>[]
+  edges: Edge<WorkflowEdgeType>[],
+  options?: {
+    readonly mergeFromPersisted?: readonly WorkflowBackendNode[];
+  }
 ): { nodes: WorkflowBackendNode[]; edges: WorkflowBackendEdge[] } {
+  const persistedById = new Map(
+    (options?.mergeFromPersisted ?? []).map((node) => [node.id, node])
+  );
   const workflowNodes = nodes.map((node) => {
     const incomingEdges = edges.filter((edge) => edge.target === node.id);
     const persistableData = normalizeAiTextNodeDataForPersist(node.data);
-    return {
+    const built = {
       id: node.id,
       name: persistableData.name,
       type: persistableData.nodeType || "default",
@@ -103,7 +109,12 @@ function buildWorkflowPayload(
           description: output.name,
         } as Parameter;
       }),
-    };
+    } as WorkflowBackendNode;
+    const persisted = persistedById.get(node.id);
+    if (persisted) {
+      return mergeGenerativeNodeContentOnSave(persisted, built);
+    }
+    return built;
   }) as WorkflowBackendNode[];
 
   const workflowEdges = edges.map((edge) => ({
@@ -201,7 +212,9 @@ export function useEditableWorkflow({
 
     if (!hasInitializedRef.current || !workflowId) return;
 
-    const payload = buildWorkflowPayload(nodesRef.current, edgesRef.current);
+    const payload = buildWorkflowPayload(nodesRef.current, edgesRef.current, {
+      mergeFromPersisted: lastSentGraphRef.current.nodes,
+    });
     const serialized = JSON.stringify(payload);
 
     if (serialized === lastSavedSerializedRef.current) return;
@@ -292,10 +305,29 @@ export function useEditableWorkflow({
       backendEdges: WorkflowBackendEdge[],
       timestamp: number
     ) => {
-      const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+      const incomingNodes = adaptBackendNodesToReactFlowNodes(
         backendNodes,
         nodeTypes
       );
+      const localMetadataById = new Map(
+        nodesRef.current.map((node) => [node.id, node.data.metadata] as const)
+      );
+      const reactFlowNodes = incomingNodes.map((node) => {
+        const metadata = preserveInFlightGenerativeMetadata(
+          node.data.metadata,
+          localMetadataById.get(node.id)
+        );
+        if (metadata === node.data.metadata) {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            metadata,
+          },
+        };
+      });
       const reactFlowEdges = backendEdges.map((edge) => ({
         id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
         source: edge.source,

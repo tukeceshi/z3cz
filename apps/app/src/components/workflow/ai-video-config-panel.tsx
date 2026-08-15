@@ -80,7 +80,6 @@ import {
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import { useGenerativeModelCard } from "./use-generative-model-card";
-import { persistModelBindingToInputs } from "./org-model-selection-utils";
 import {
   AiTextReferenceBar,
   type AiTextReferenceChip,
@@ -96,10 +95,8 @@ import {
   shouldShowReferenceModeAutoSwitchNotice,
   syncVideoReferenceModeIfNeeded,
 } from "./ai-video-reference-mode";
-import {
-  readNodeGenerationParams,
-  sanitizeCardGenerationParams,
-} from "./generative-card-params";
+import { readNodeGenerationParams } from "./generative-card-params";
+import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
 import {
   AI_IMAGE_OUTPUT_ID,
   mergeAiImageNodeCatalogInputs,
@@ -112,11 +109,13 @@ import {
   canGenerateAiVideo,
   referencesFitVideoModelLimits,
   appendAiVideoGeneratedHistoryItems,
+  withAiVideoGeneratingHistoryFailed,
   withAiVideoStagingPreview,
   withAiVideoGeneratingFlag,
   withAiVideoGenerateError,
   isAiVideoGenerating,
 } from "./ai-video-node-utils";
+import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import {
@@ -150,7 +149,7 @@ import {
   generativeVideoProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
 import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
-import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
+import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 const VIDEO_POLL_INTERVAL_MS = VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS;
@@ -239,6 +238,8 @@ export function AiVideoConfigPanel({
     edges = [],
     deleteEdge,
     nodeTypes = [],
+    generativeDefaults,
+    onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
   const { setNodes, setEdges, getNode } = useReactFlow();
@@ -324,23 +325,6 @@ export function AiVideoConfigPanel({
     buildDefaultParams: buildDefaultVideoGenerationParams,
     useModels: useOrgVideoModels,
     modelFitsCurrentRefs,
-    onModelSelected: (model, current) => {
-      const rules = normalizeVideoModelParameterRules(model.parameterRules);
-      const defaultParams = buildDefaultVideoGenerationParams(
-        rules.generationFields
-      );
-      return {
-        inputs: upsertNodeInputValues(
-          persistModelBindingToInputs(current.inputs, {
-            canonicalId: model.canonicalId,
-            interfaceId: model.interfaceId,
-            instanceId: model.instanceId,
-          }),
-          { params: defaultParams },
-          { params: "json" }
-        ),
-      };
-    },
   });
 
   const videoModelCatalog = useMemo(
@@ -679,13 +663,26 @@ export function AiVideoConfigPanel({
     (next: Record<string, unknown>) => {
       if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
 
-      const sanitized = sanitizeCardGenerationParams(
-        cardGenerationParams.fields,
-        next
-      );
-      updateNodeInput(nodeId, "params", sanitized, nodeInputs, updateNodeData);
+      commitGenerativeParamWindow({
+        next,
+        fields: cardGenerationParams.fields,
+        nodeId,
+        nodeInputs,
+        updateNodeData,
+        modality: "video",
+        generativeDefaults,
+        onGenerativeDefaultChange,
+      });
     },
-    [cardGenerationParams, disabled, nodeId, nodeInputs, updateNodeData]
+    [
+      cardGenerationParams,
+      disabled,
+      generativeDefaults,
+      nodeId,
+      nodeInputs,
+      onGenerativeDefaultChange,
+      updateNodeData,
+    ]
   );
 
   const connectReferenceEdge = useCallback(
@@ -1073,6 +1070,18 @@ export function AiVideoConfigPanel({
         if (submitResponse.jobId) {
           jobId = submitResponse.jobId;
           trackJobId(submitResponse.jobId);
+          if (submitResponse.workflowNodeContent) {
+            updateNodeData?.(nodeId, (current) => ({
+              ...applyWorkflowNodeContentPatch(
+                current,
+                submitResponse.workflowNodeContent!
+              ),
+              metadata: withGenerativeProgress(
+                withAiVideoGeneratingFlag(current.metadata, true),
+                { jobId: submitResponse.jobId, phase: "generating" }
+              ),
+            }));
+          }
 
           const deferredResult = await flushDeferredCancelIfPending();
           if (
@@ -1199,6 +1208,7 @@ export function AiVideoConfigPanel({
             platformModelId: effectiveModel.canonicalId,
             aiInterfaceId: lastAiInterfaceId || effectiveModel.interfaceId,
             modelDisplayName: effectiveModel.alias,
+            jobId: completed[0]?.jobId ?? undefined,
           }
         );
         return {
@@ -1246,8 +1256,6 @@ export function AiVideoConfigPanel({
             return;
           }
           const videos = resolvedJob.media;
-          setPersistPhase(null);
-          clearProgress();
           if (workflowId && orgId) {
             persistMediaForNodeInBackground({
               organizationId: orgId,
@@ -1280,6 +1288,7 @@ export function AiVideoConfigPanel({
                   params: mergedGenerationParams,
                   platformModelId: effectiveModel.canonicalId,
                   aiInterfaceId: effectiveModel.interfaceId,
+                  jobId: activeJobId,
                   modelDisplayName: effectiveModel.alias,
                 }
               );
@@ -1309,7 +1318,9 @@ export function AiVideoConfigPanel({
         return;
       }
       const cardError = prepareGenerativeCardError(raw, t, "video");
+      const failedJobId = readActiveGenerationJobId(error);
       updateNodeData?.(nodeId, (current) => ({
+        ...withAiVideoGeneratingHistoryFailed(current, failedJobId),
         metadata: withAiVideoGenerateError(
           withAiVideoGeneratingFlag(
             clearGenerativeProgress(current.metadata),
@@ -1422,6 +1433,7 @@ export function AiVideoConfigPanel({
             platformModelId: effectiveModel!.canonicalId,
             aiInterfaceId: effectiveModel!.interfaceId,
             modelDisplayName: effectiveModel!.alias,
+            jobId,
           }
         );
         return {

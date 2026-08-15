@@ -34,6 +34,7 @@ export interface GenerativeBusyOverlayProps {
   readonly metadata: Record<string, string> | undefined;
   readonly nodeId?: string;
   readonly uploading?: boolean;
+  readonly label?: string;
   readonly roundedClass?: string;
   readonly className?: string;
 }
@@ -69,7 +70,7 @@ function resolveBusyOverlayLabel(params: {
   const modalityBusy = readModalityBusy(params.modality, params.metadata);
 
   if (!modalityBusy && !progressPhase && !params.uploading) {
-    return null;
+    return params.t(generativeCardProgressKey("generating", params.modality));
   }
 
   if (!modalityBusy && !progressPhase && params.uploading) {
@@ -106,6 +107,7 @@ export function GenerativeBusyOverlay({
   metadata,
   nodeId,
   uploading = false,
+  label: labelOverride,
   roundedClass,
   className,
 }: GenerativeBusyOverlayProps) {
@@ -117,7 +119,7 @@ export function GenerativeBusyOverlay({
   const progressPhase = readGenerativeProgressPhase(metadata);
   const modalityBusy =
     modality != null ? readModalityBusy(modality, metadata) : false;
-  const showOverlay = visible && (modalityBusy || uploading || progressPhase != null);
+  const showOverlay = visible;
 
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -134,6 +136,9 @@ export function GenerativeBusyOverlay({
   }, [progressPhase, showOverlay]);
 
   const label = useMemo(() => {
+    if (labelOverride !== undefined) {
+      return labelOverride;
+    }
     if (!modality) {
       return null;
     }
@@ -144,7 +149,7 @@ export function GenerativeBusyOverlay({
       uploading,
       t,
     });
-  }, [metadata, modality, progressNowMs, t, uploading]);
+  }, [labelOverride, metadata, modality, progressNowMs, t, uploading]);
 
   const overlayProgressPhase =
     progressPhase ??

@@ -1,5 +1,9 @@
 import type { AiImageResultHistory, MediaReference } from "@dafthunk/types";
-import { getMediaReferenceKey } from "@dafthunk/types";
+import {
+  getResourceIdFromValue,
+  isFailedResourceRef,
+  isGeneratingResourceRef,
+} from "@dafthunk/types";
 import { createPortal } from "react-dom";
 import HistoryIcon from "lucide-react/icons/history";
 import XIcon from "lucide-react/icons/x";
@@ -43,7 +47,7 @@ function imagesMatch(
   if (a.length !== b.length) return false;
   return a.every(
     (entry, index) =>
-      getMediaReferenceKey(entry) === getMediaReferenceKey(b[index]!)
+      getResourceIdFromValue(entry) === getResourceIdFromValue(b[index]!)
   );
 }
 
@@ -135,6 +139,22 @@ export function AiImageHistoryOverlay({
       return (
         <span className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
           {t("workflow.aiImagePanel.historyEmptyItem")}
+        </span>
+      );
+    }
+
+    if (isGeneratingResourceRef(thumb)) {
+      return (
+        <span className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          {t("workflow.aiImagePanel.generating")}
+        </span>
+      );
+    }
+
+    if (isFailedResourceRef(thumb)) {
+      return (
+        <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-muted-foreground">
+          {t("workflow.generativeErrors.generationFailed")}
         </span>
       );
     }
@@ -256,7 +276,11 @@ export function AiImageHistoryOverlay({
             {previewMedia ? (
               <div className="mb-3">
                 <GenerativeHistoryMediaPreview
-                  key={getMediaReferenceKey(previewMedia)}
+                  key={
+                    previewItem?.id ??
+                    getResourceIdFromValue(previewMedia) ??
+                    "preview"
+                  }
                   mediaKind={mediaKind}
                   value={previewMedia}
                   createObjectUrl={createObjectUrl}

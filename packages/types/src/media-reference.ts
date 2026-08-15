@@ -22,6 +22,10 @@ export interface ResourceIdReference {
   readonly mimeType?: string;
   /** Full-text SHA-256 (hex) — pending or stable. */
   readonly contentSha256?: string;
+  /** Upstream still generating. Not a download/upload state. */
+  readonly generating?: boolean;
+  /** Generate failed. No media to load; look up error via history jobId. */
+  readonly failed?: boolean;
 }
 
 export type WorkflowMediaValue = ResourceIdReference | LocalMediaReference;
@@ -140,19 +144,58 @@ export function isResourceIdReference(
   );
 }
 
+export function isGeneratingResourceRef(value: unknown): boolean {
+  return isResourceIdReference(value) && value.generating === true;
+}
+
+export function isFailedResourceRef(value: unknown): boolean {
+  return isResourceIdReference(value) && value.failed === true;
+}
+
+/** Generating or failed — do not fetch or render as media. */
+export function isUnloadedResourceRef(value: unknown): boolean {
+  return isGeneratingResourceRef(value) || isFailedResourceRef(value);
+}
+
+export function hasGeneratingResource(
+  values: readonly unknown[] | undefined
+): boolean {
+  return Boolean(values?.some(isGeneratingResourceRef));
+}
+
+export function hasFailedResource(
+  values: readonly unknown[] | undefined
+): boolean {
+  return Boolean(values?.some(isFailedResourceRef));
+}
+
 export function isWorkflowMediaValue(
   value: unknown
 ): value is WorkflowMediaValue {
   return isResourceIdReference(value) || isLocalMediaReference(value);
 }
 
-/** Canvas JSON — only resourceId or local staging id. */
+/** Ready to show on the card — not generating or failed. */
+export function isDisplayableWorkflowMedia(value: unknown): boolean {
+  return isWorkflowMediaValue(value) && !isUnloadedResourceRef(value);
+}
+
+export function hasDisplayableWorkflowMedia(
+  values: readonly unknown[] | undefined
+): boolean {
+  return Boolean(values?.some(isDisplayableWorkflowMedia));
+}
+
+/** Any stored or API media ref — resourceId, local/ephemeral mediaId, then object id. */
 export function getResourceIdFromValue(value: unknown): string | null {
   if (isResourceIdReference(value)) {
     return value.resourceId;
   }
-  if (isLocalMediaReference(value)) {
+  if (isLocalMediaReference(value) || isEphemeralMediaReference(value)) {
     return value.mediaId;
+  }
+  if (isObjectReference(value)) {
+    return value.id;
   }
   return null;
 }
@@ -197,16 +240,13 @@ export function isCloudObjectReference(
   );
 }
 
-export function getMediaReferenceKey(ref: MediaReference): string {
-  if (isEphemeralMediaReference(ref) || isLocalMediaReference(ref)) {
-    return ref.mediaId;
-  }
-  return ref.id;
-}
-
-/** Stable resource identifier for display, cache, and server-side link resolution. */
+/** Stable id for an API/job media ref. */
 export function getResourceId(ref: MediaReference): string {
-  return getMediaReferenceKey(ref);
+  const id = getResourceIdFromValue(ref);
+  if (!id) {
+    throw new Error("Media reference has no id");
+  }
+  return id;
 }
 
 export function isEphemeralMediaExpired(ref: EphemeralMediaReference): boolean {

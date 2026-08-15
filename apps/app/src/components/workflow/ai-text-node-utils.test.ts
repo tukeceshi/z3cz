@@ -16,6 +16,8 @@ import {
   withAiTextGeneratedResult,
   withAiTextManualResult,
   withAiTextStreamingPreview,
+  isAiTextAwaitingStream,
+  withAiTextGeneratingFlag,
 } from "./ai-text-node-utils";
 import { isGenerativeManualContent } from "./generative-card-mode-utils";
 
@@ -175,5 +177,23 @@ describe("ai-text-node-utils editing behavior", () => {
     expect(
       patch.outputs?.find((output) => output.id === AI_TEXT_OUTPUT_ID)?.value
     ).toBe("一位成年动漫美少女");
+  });
+
+  it("keeps awaiting-stream until the first preview token", () => {
+    const node = createTextNode({
+      outputs: [
+        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "old excerpt" },
+        { id: AI_TEXT_BODY_OUTPUT_ID, name: "textBody", type: "string", value: "old body" },
+      ],
+    });
+    const started = withAiTextStreamingPreview(node, "");
+    const generating = withAiTextGeneratingFlag(started.metadata, true);
+    expect(isAiTextAwaitingStream(generating)).toBe(true);
+
+    const firstToken = withAiTextStreamingPreview(
+      { ...node, metadata: generating, outputs: started.outputs ?? node.outputs },
+      "一"
+    );
+    expect(isAiTextAwaitingStream(firstToken.metadata)).toBe(false);
   });
 });

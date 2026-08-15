@@ -28,6 +28,7 @@ import { cn } from "@/utils/utils";
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
 import { DurationDragSlider } from "./duration-drag-slider";
 import { readNodeGenerationParams } from "./generative-card-params";
+import { useParamsPopoverDraft } from "./use-params-popover-draft";
 import {
   formatGenerationDurationLabel,
   resolveGenerationFieldLabel,
@@ -803,15 +804,25 @@ export function AiImageParamsPopover({
   );
   const summaryText = summary.text;
   const { mainFields, tailFields } = partitionVisibleFields(fields);
+  const { open, draft, updateDraft, handleOpenChange } = useParamsPopoverDraft(
+    values,
+    onChange
+  );
+  const editorValues = displayMode === "inline" ? values : draft;
 
   const handleFieldChange = (
     field: UpstreamParamProfileField,
     raw: string | number | boolean
   ) => {
-    onChange({
-      ...values,
+    const next = {
+      ...editorValues,
       [field.name]: coerceFieldValue(field, raw),
-    });
+    };
+    if (displayMode === "inline") {
+      onChange(next);
+      return;
+    }
+    updateDraft(next);
   };
 
   const fieldPanel = (
@@ -827,7 +838,7 @@ export function AiImageParamsPopover({
         <FieldSection
           key={field.name}
           field={field}
-          value={readFieldValue(field, values)}
+          value={readFieldValue(field, editorValues)}
           disabled={disabled}
           sizeLabels={sizeLabels}
           smartLabel={smartLabel}
@@ -848,7 +859,7 @@ export function AiImageParamsPopover({
             <TailFieldSection
               key={field.name}
               field={field}
-              value={readFieldValue(field, values)}
+              value={readFieldValue(field, editorValues)}
               disabled={disabled}
               smartLabel={smartLabel}
               onChange={(next) =>
@@ -866,7 +877,7 @@ export function AiImageParamsPopover({
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

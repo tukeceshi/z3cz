@@ -61,9 +61,6 @@ import {
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import { useGenerativeModelCard } from "./use-generative-model-card";
 import {
-  persistModelBindingToInputs,
-} from "./org-model-selection-utils";
-import {
   AiTextReferenceBar,
   type AiTextReferenceChip,
 } from "./ai-text-reference-bar";
@@ -73,10 +70,7 @@ import {
   buildDefaultImageGenerationParams,
   mergeImageGenerationParams,
 } from "./ai-image-params-popover";
-import {
-  persistNodeGenerationParams,
-  sanitizeCardGenerationParams,
-} from "./generative-card-params";
+import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
 import {
   AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -87,10 +81,12 @@ import {
   mergeAiImageNodeCatalogInputs,
   referencesFitImageModelLimits,
   withAiImageGeneratedResult,
+  withAiImageGeneratingHistoryFailed,
   withAiImageStagingPreview,
   withAiImageGeneratingFlag,
   withAiImageGenerateError,
 } from "./ai-image-node-utils";
+import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import {
@@ -111,7 +107,7 @@ import {
   collectAiImageUnifiedReferenceChips,
 } from "./ai-image-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
-import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
+import { updateNodeInput, useWorkflow } from "./workflow-context";
 import { useGenerativeCloudJobProgress, generativeProgressButtonKey, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -140,6 +136,8 @@ export function AiImageConfigPanel({
     edges = [],
     deleteEdge,
     nodeTypes = [],
+    generativeDefaults,
+    onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
   const { setNodes, setEdges, getNode } = useReactFlow();
@@ -202,22 +200,6 @@ export function AiImageConfigPanel({
     buildDefaultParams: buildDefaultImageGenerationParams,
     useModels: useOrgImageModels,
     modelFitsCurrentRefs,
-    onModelSelected: (model, current) => {
-      const rules = normalizeImageModelParameterRules(model.parameterRules);
-      const defaultParams = buildDefaultImageGenerationParams(
-        rules.generationFields
-      );
-      return {
-        inputs: upsertNodeInputValues(
-          persistModelBindingToInputs(current.inputs, {
-            canonicalId: model.canonicalId,
-            interfaceId: model.interfaceId,
-          }),
-          { params: defaultParams },
-          { params: "json" }
-        ),
-      };
-    },
   });
 
   const imageModelCatalog = useMemo(
@@ -405,13 +387,26 @@ export function AiImageConfigPanel({
     (next: Record<string, unknown>) => {
       if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
 
-      const sanitized = sanitizeCardGenerationParams(
-        cardGenerationParams.fields,
-        next
-      );
-      updateNodeInput(nodeId, "params", sanitized, nodeInputs, updateNodeData);
+      commitGenerativeParamWindow({
+        next,
+        fields: cardGenerationParams.fields,
+        nodeId,
+        nodeInputs,
+        updateNodeData,
+        modality: "image",
+        generativeDefaults,
+        onGenerativeDefaultChange,
+      });
     },
-    [cardGenerationParams, disabled, nodeId, nodeInputs, updateNodeData]
+    [
+      cardGenerationParams,
+      disabled,
+      generativeDefaults,
+      nodeId,
+      nodeInputs,
+      onGenerativeDefaultChange,
+      updateNodeData,
+    ]
   );
 
   const connectReferenceEdge = useCallback(
@@ -711,13 +706,10 @@ export function AiImageConfigPanel({
     const signal = beginSession();
     /** False when another caller owns persist/progress for this job. */
     let ownsJobProgress = true;
-    syncProgress({ phase: "generating" });
+    let finalizeJobId: string | null = null;
     updateNodeData?.(nodeId, (current) => ({
       metadata: withAiImageGenerateError(
-        withGenerativeProgress(
-          withAiImageGeneratingFlag(current.metadata, true),
-          { phase: "generating" }
-        ),
+        withAiImageGeneratingFlag(current.metadata, true),
         null
       ),
     }));
@@ -773,13 +765,24 @@ export function AiImageConfigPanel({
       );
 
       let finalImages = response.images;
-      let finalizeJobId: string | null = null;
       let jobPersistMeta:
         | Pick<ResolveGenerativeJobMediaResult, "requestSnapshot" | "modelCanonicalId">
         | undefined;
-      if (response.jobId && response.phase === "ready_to_persist") {
+      if (response.workflowNodeContent) {
+        updateNodeData?.(nodeId, (current) => ({
+          ...applyWorkflowNodeContentPatch(current, response.workflowNodeContent!),
+          metadata: withGenerativeProgress(
+            withAiImageGenerateError(
+              withAiImageGeneratingFlag(current.metadata, true),
+              null
+            ),
+            response.jobId ? { jobId: response.jobId } : {}
+          ),
+        }));
+      }
+      if (response.jobId) {
         finalizeJobId = response.jobId;
-        syncProgress({ jobId: response.jobId, phase: "generating" });
+        syncProgress({ jobId: response.jobId });
         const resolvedJob = await resolveJobMedia(response.jobId);
         jobPersistMeta = resolvedJob;
         finalImages = resolvedJob.media;
@@ -788,8 +791,6 @@ export function AiImageConfigPanel({
           return;
         }
       }
-      setPersistPhase(null);
-      clearProgress();
 
       if (!updateNodeData) return;
 
@@ -827,6 +828,7 @@ export function AiImageConfigPanel({
           modelDisplayName: effectiveModel.alias,
           requestSnapshot:
             response.requestSnapshot ?? jobPersistMeta?.requestSnapshot,
+          jobId: finalizeJobId ?? undefined,
         });
         return {
           ...withResult,
@@ -862,8 +864,6 @@ export function AiImageConfigPanel({
             return;
           }
           const finalImages = resolvedJob.media;
-          setPersistPhase(null);
-          clearProgress();
           const canWriteHistory = tryClaimGenerativeJobFinalize(activeJobId);
           if (workflowId && orgId) {
             persistMediaForNodeInBackground({
@@ -895,6 +895,7 @@ export function AiImageConfigPanel({
                 providerModelId: effectiveModel.providerModelId,
                 modelDisplayName: effectiveModel.alias,
                 requestSnapshot: resolvedJob.requestSnapshot,
+                jobId: activeJobId,
               });
               return {
                 ...withResult,
@@ -926,6 +927,7 @@ export function AiImageConfigPanel({
       const raw = error instanceof Error ? error.message : String(error);
       const cardError = prepareGenerativeCardError(raw, t, "image");
       updateNodeData?.(nodeId, (current) => ({
+        ...withAiImageGeneratingHistoryFailed(current, finalizeJobId),
         metadata: withAiImageGenerateError(
           withAiImageGeneratingFlag(current.metadata, false),
           cardError

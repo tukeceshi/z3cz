@@ -42,6 +42,8 @@ import { resolveAiImageStorage } from "./ai-image-storage";
 import { resolveAiVideoStorage } from "./ai-video-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "./assert-cloud-storage-healthy-for-generative-media";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
+import { ensureFailedJobPlaceholderResourcesMarked } from "./ensure-failed-job-placeholder-resources";
+import { markMediaResourcesFailed, placeholderMimeTypeForModality } from "./mark-media-resources-failed";
 import {
   registerMediaResourceTransitions,
   registerMediaResourcesFromReferences,
@@ -437,6 +439,11 @@ export async function pollVideoGenerationJob(
       failureReason: "Could not resolve AI interface",
     });
     if (failed) {
+      await markMediaResourcesFailed(db, {
+        organizationId: failed.organizationId,
+        resourceIds: failed.resultJson?.placeholderResourceIds ?? [],
+        mimeType: placeholderMimeTypeForModality(failed.modality),
+      });
       await syncGenerationJobInvocation(db, failed);
     }
     return failed ?? job;
@@ -463,6 +470,11 @@ export async function pollVideoGenerationJob(
       failureReason: pollResult.error ?? "Video generation failed",
     });
     if (failed) {
+      await markMediaResourcesFailed(db, {
+        organizationId: failed.organizationId,
+        resourceIds: failed.resultJson?.placeholderResourceIds ?? [],
+        mimeType: placeholderMimeTypeForModality(failed.modality),
+      });
       await syncGenerationJobInvocation(db, failed);
     }
     return failed ?? job;
@@ -564,6 +576,11 @@ async function completeInlineServerGenerationJobPersist(
       failureReason: message,
     });
     if (failed) {
+      await markMediaResourcesFailed(db, {
+        organizationId: failed.organizationId,
+        resourceIds: failed.resultJson?.placeholderResourceIds ?? [],
+        mimeType: placeholderMimeTypeForModality(failed.modality),
+      });
       await syncGenerationJobInvocation(db, failed);
     }
     return failed ?? claimed;
@@ -844,6 +861,10 @@ export async function refreshGenerationJob(
     job = await maybeRunServerPersistFallback(env, db, job);
   }
 
+  if (job.status === "failed") {
+    await ensureFailedJobPlaceholderResourcesMarked(db, job);
+  }
+
   return toGetGenerationJobResponse(job);
 }
 
@@ -1020,26 +1041,40 @@ export async function createReadyToPersistAudioJob(
     invocationId: params.invocationId,
   });
 
-  return createGenerationJob(db, {
-    id: params.id,
+  const existing = await getGenerationJob(db, params.id, params.organizationId);
+  const job = existing
+    ? await updateGenerationJob(db, {
+        id: params.id,
+        organizationId: params.organizationId,
+        status: "ready_to_persist",
+        expectedStatuses: ["generating"],
+        readyAt,
+        resultJson,
+      })
+    : await createGenerationJob(db, {
+        id: params.id,
+        organizationId: params.organizationId,
+        userId: params.userId,
+        workflowId: params.workflowId,
+        nodeId: params.nodeId,
+        modality: "audio",
+        status: "ready_to_persist",
+        modelCanonicalId: params.modelCanonicalId,
+        interfaceId: params.interfaceId,
+        readyAt,
+        resultJson,
+        clientRequestId: params.clientRequestId,
+      });
+
+  if (!job) {
+    throw new Error("Failed to mark audio job ready to persist");
+  }
+
+  await registerMediaResourcesFromReferences(db, {
     organizationId: params.organizationId,
-    userId: params.userId,
-    workflowId: params.workflowId,
-    nodeId: params.nodeId,
-    modality: "audio",
-    status: "ready_to_persist",
-    modelCanonicalId: params.modelCanonicalId,
-    interfaceId: params.interfaceId,
-    readyAt,
-    resultJson,
-    clientRequestId: params.clientRequestId,
-  }).then(async (job) => {
-    await registerMediaResourcesFromReferences(db, {
-      organizationId: params.organizationId,
-      references: params.audios,
-    });
-    return job;
+    references: params.audios,
   });
+  return job;
 }
 
 export { GenerationJobUploadValidationError } from "./validate-generation-job-upload";

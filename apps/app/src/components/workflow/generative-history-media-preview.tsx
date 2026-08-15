@@ -1,4 +1,12 @@
-import { getMediaReferenceKey, type MediaReference } from "@dafthunk/types";
+import {
+  getResourceIdFromValue,
+  isFailedResourceRef,
+  isGeneratingResourceRef,
+  isMediaReference,
+  isWorkflowMediaValue,
+  type MediaReference,
+  type WorkflowMediaValue,
+} from "@dafthunk/types";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -133,15 +141,20 @@ export function GenerativeHistoryImagePreview({
   value,
   className,
 }: {
-  readonly value: MediaReference;
+  readonly value: MediaReference | WorkflowMediaValue;
   readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
   readonly className?: string;
 }) {
   const { t } = useTranslation();
-  const mediaKey = getMediaReferenceKey(value);
-  const expired = isMediaExpired(value);
+  const generating = isGeneratingResourceRef(value);
+  const failed = isFailedResourceRef(value);
+  const mediaKey = getResourceIdFromValue(value) ?? "image";
+  const expired = isMediaReference(value) ? isMediaExpired(value) : false;
   const { displayUrl, stale } = useMediaDisplayUrl({
-    media: expired ? null : value,
+    media:
+      expired || generating || failed || !isWorkflowMediaValue(value)
+        ? null
+        : value,
     nodeType: "ai-image",
   });
   const [imgError, setImgError] = useState(false);
@@ -151,6 +164,21 @@ export function GenerativeHistoryImagePreview({
     setImgError(false);
     setNaturalSize(null);
   }, [mediaKey]);
+
+  if (generating || failed) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-[200px] w-full items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 px-3 text-center text-xs text-muted-foreground dark:border-neutral-700 dark:bg-neutral-900",
+          className
+        )}
+      >
+        {generating
+          ? t("workflow.aiImagePanel.generating")
+          : t("workflow.generativeErrors.generationFailed")}
+      </div>
+    );
+  }
 
   if (!expired && !stale && !displayUrl) {
     return (
@@ -203,7 +231,7 @@ export function GenerativeHistoryVideoPreview({
   readonly className?: string;
 }) {
   const { t } = useTranslation();
-  const mediaKey = getMediaReferenceKey(value);
+  const mediaKey = getResourceIdFromValue(value) ?? "video";
   const expired = isMediaExpired(value);
   const { displayUrl, stale } = useMediaDisplayUrl({
     media: expired ? null : value,
@@ -270,7 +298,7 @@ export function GenerativeHistoryAudioPreview({
   readonly className?: string;
 }) {
   const { t } = useTranslation();
-  const mediaKey = getMediaReferenceKey(value);
+  const mediaKey = getResourceIdFromValue(value) ?? "audio";
   const expired = isMediaExpired(value);
   const { displayUrl, stale } = useMediaDisplayUrl({
     media: expired ? null : value,
@@ -322,11 +350,11 @@ export function GenerativeHistoryMediaPreview({
   className,
 }: {
   readonly mediaKind: GenerativeHistoryMediaKind;
-  readonly value: MediaReference;
+  readonly value: MediaReference | WorkflowMediaValue;
   readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
   readonly className?: string;
 }) {
-  const mediaKey = getMediaReferenceKey(value);
+  const mediaKey = getResourceIdFromValue(value) ?? "media";
 
   if (mediaKind === "video") {
     return (

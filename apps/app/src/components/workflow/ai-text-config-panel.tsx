@@ -59,8 +59,10 @@ import {
   probeVideoUrlDurationSeconds,
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
+  withAiTextGeneratingHistoryFailed,
   withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
+import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
 import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
 import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
@@ -455,13 +457,16 @@ export function AiTextConfigPanel({
     const abortController = new AbortController();
     generateAbortRef.current = abortController;
     setIsGenerating(true);
-    updateNodeData?.(nodeId, (current) => ({
-      ...withAiTextStreamingPreview(current, ""),
-      metadata: withGenerativeCardGenerateError(
-        withAiTextGeneratingFlag(current.metadata, true),
-        null
-      ),
-    }));
+    updateNodeData?.(nodeId, (current) => {
+      const preview = withAiTextStreamingPreview(current, "");
+      return {
+        ...preview,
+        metadata: withGenerativeCardGenerateError(
+          withAiTextGeneratingFlag(preview.metadata ?? current.metadata, true),
+          null
+        ),
+      };
+    });
     try {
       let referenceImageUrls: readonly string[] | undefined;
       let referenceImageInline:
@@ -502,9 +507,28 @@ export function AiTextConfigPanel({
           referenceImageInline,
           referenceVideoUrls,
           nodeId,
+          workflowId,
         },
         {
           signal: abortController.signal,
+          onStarted: ({ workflowNodeContent }) => {
+            if (!workflowNodeContent) {
+              return;
+            }
+            updateNodeData?.(nodeId, (current) => {
+              const patched = applyWorkflowNodeContentPatch(
+                current,
+                workflowNodeContent
+              );
+              return {
+                ...patched,
+                metadata: withAiTextGeneratingFlag(
+                  patched.metadata ?? current.metadata,
+                  true
+                ),
+              };
+            });
+          },
           onDelta: (_delta, fullText) => {
             streamPreviewPendingRef.current = fullText;
             if (streamPreviewRafRef.current !== null) {
@@ -514,10 +538,16 @@ export function AiTextConfigPanel({
               streamPreviewRafRef.current = null;
               const pending = streamPreviewPendingRef.current;
               if (pending == null) return;
-              updateNodeData?.(nodeId, (current) => ({
-                ...withAiTextStreamingPreview(current, pending),
-                metadata: withAiTextGeneratingFlag(current.metadata, true),
-              }));
+              updateNodeData?.(nodeId, (current) => {
+                const preview = withAiTextStreamingPreview(current, pending);
+                return {
+                  ...preview,
+                  metadata: withAiTextGeneratingFlag(
+                    preview.metadata ?? current.metadata,
+                    true
+                  ),
+                };
+              });
             });
           },
         }
@@ -590,6 +620,7 @@ export function AiTextConfigPanel({
       }
       const cardError = prepareGenerativeCardError(raw, t, "text");
       updateNodeData?.(nodeId, (current) => ({
+        ...withAiTextGeneratingHistoryFailed(current),
         metadata: withGenerativeCardGenerateError(
           withAiTextGeneratingFlag(current.metadata, false),
           cardError

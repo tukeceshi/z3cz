@@ -194,3 +194,41 @@ export function sectionPrecedingText(
 ): string {
   return markdown.slice(0, section.bodyStart);
 }
+
+/** Heading line only, for parking the create-node overlay under the title. */
+export function sectionHeadingDisplayText(
+  markdown: string,
+  section: MarkdownHeadingSection
+): string {
+  return markdown.slice(section.headingStart, section.bodyStart).replace(/\n+$/, "");
+}
+
+export interface SectionContentRange {
+  readonly key: "heading" | "body" | "content";
+  readonly start: number;
+  readonly end: number;
+  readonly trimTrailingNewlines?: boolean;
+}
+
+/** Browse keeps title/body split; edit uses one range so selection can cross. */
+export function sectionContentRanges(
+  section: MarkdownHeadingSection,
+  readOnly: boolean
+): readonly SectionContentRange[] {
+  const hasHeading = section.bodyStart > section.headingStart;
+  if (readOnly && hasHeading) {
+    return [
+      {
+        key: "heading",
+        start: section.headingStart,
+        end: section.bodyStart,
+        trimTrailingNewlines: true,
+      },
+      { key: "body", start: section.bodyStart, end: section.bodyEnd },
+    ];
+  }
+
+  return [
+    { key: "content", start: section.headingStart, end: section.bodyEnd },
+  ];
+}

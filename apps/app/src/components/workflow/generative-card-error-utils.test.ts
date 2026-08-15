@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_IMAGE_GENERATE_ERROR_META_KEY,
   GENERATIVE_CARD_GENERATE_ERROR_META_KEY,
+  preserveInFlightGenerativeMetadata,
   readGenerativeCardError,
   stripTransientGenerativeMetadata,
   withGenerativeCardGenerateError,
@@ -68,6 +69,7 @@ describe("generative-card-error-utils", () => {
         [GENERATIVE_CARD_GENERATE_ERROR_META_KEY]: "403",
         [AI_IMAGE_GENERATE_ERROR_META_KEY]: "legacy",
         aiTextGenerating: "1",
+        aiTextStreamStarted: "1",
         keepMe: "yes",
       })
     ).toEqual({ keepMe: "yes" });
@@ -77,5 +79,17 @@ describe("generative-card-error-utils", () => {
         [GENERATIVE_CARD_GENERATE_ERROR_META_KEY]: "only-error",
       })
     ).toBeUndefined();
+  });
+
+  it("keeps local generating flags over a remote node without them", () => {
+    expect(
+      preserveInFlightGenerativeMetadata(
+        { keepMe: "yes" },
+        { aiTextGenerating: "1", keepMe: "old" }
+      )
+    ).toEqual({
+      keepMe: "yes",
+      aiTextGenerating: "1",
+    });
   });
 });

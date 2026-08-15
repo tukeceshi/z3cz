@@ -51,25 +51,24 @@ import {
 } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import { useGenerativeModelCard } from "./use-generative-model-card";
-import { persistModelBindingToInputs } from "./org-model-selection-utils";
 import { AiTextReferenceBar } from "./ai-text-reference-bar";
 import {
   AiAudioParamsPopover,
   buildDefaultAudioGenerationParams,
 } from "./ai-audio-params-popover";
-import {
-  sanitizeCardGenerationParams,
-} from "./generative-card-params";
+import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
 import {
   AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_AUDIO_PROMPT_HANDLE_ID,
   appendAiAudioGeneratedHistoryItems,
+  withAiAudioGeneratingHistoryFailed,
   withAiAudioStagingPreview,
   canGenerateAiAudio,
   resolveAiAudioModelRules,
   withAiAudioGeneratingFlag,
   withAiAudioGenerateError,
 } from "./ai-audio-node-utils";
+import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
 import {
@@ -83,7 +82,7 @@ import {
   useGenerativeCloudJobProgress,
   generativeAudioProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
-import { updateNodeInput, upsertNodeInputValues, useWorkflow } from "./workflow-context";
+import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export interface AiAudioConfigPanelProps {
@@ -109,6 +108,8 @@ export function AiAudioConfigPanel({
     disabled,
     edges = [],
     deleteEdge,
+    generativeDefaults,
+    onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
   const { setEdges } = useReactFlow();
@@ -187,22 +188,6 @@ export function AiAudioConfigPanel({
     buildDefaultParams: buildDefaultAudioGenerationParams,
     useModels: useOrgAudioModels,
     modelFitsCurrentRefs,
-    onModelSelected: (model, current) => {
-      const rules = normalizeAudioModelParameterRules(model.parameterRules);
-      const defaultParams = buildDefaultAudioGenerationParams(
-        rules.generationFields
-      );
-      return {
-        inputs: upsertNodeInputValues(
-          persistModelBindingToInputs(current.inputs, {
-            canonicalId: model.canonicalId,
-            interfaceId: model.interfaceId,
-          }),
-          { params: defaultParams },
-          { params: "json" }
-        ),
-      };
-    },
   });
 
   const audioModelCatalog = useMemo(
@@ -327,13 +312,26 @@ export function AiAudioConfigPanel({
     (next: Record<string, unknown>) => {
       if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
 
-      const sanitized = sanitizeCardGenerationParams(
-        cardGenerationParams.fields,
-        next
-      );
-      updateNodeInput(nodeId, "params", sanitized, nodeInputs, updateNodeData);
+      commitGenerativeParamWindow({
+        next,
+        fields: cardGenerationParams.fields,
+        nodeId,
+        nodeInputs,
+        updateNodeData,
+        modality: "audio",
+        generativeDefaults,
+        onGenerativeDefaultChange,
+      });
     },
-    [cardGenerationParams, disabled, nodeId, nodeInputs, updateNodeData]
+    [
+      cardGenerationParams,
+      disabled,
+      generativeDefaults,
+      nodeId,
+      nodeInputs,
+      onGenerativeDefaultChange,
+      updateNodeData,
+    ]
   );
 
   const connectReferenceEdge = useCallback(
@@ -462,7 +460,16 @@ export function AiAudioConfigPanel({
       });
 
       let finalAudios = response.audios;
-      let finalizeJobId: string | null = null;
+      let finalizeJobId: string | null = response.jobId ?? null;
+      if (finalizeJobId && response.workflowNodeContent) {
+        updateNodeData?.(nodeId, (current) => ({
+          ...applyWorkflowNodeContentPatch(current, response.workflowNodeContent!),
+          metadata: withGenerativeProgress(
+            withAiAudioGeneratingFlag(current.metadata, true),
+            { jobId: finalizeJobId!, phase: "generating" }
+          ),
+        }));
+      }
       if (response.jobId && response.phase === "ready_to_persist") {
         finalizeJobId = response.jobId;
         const resolvedJob = await resolveJobMedia(response.jobId);
@@ -472,8 +479,6 @@ export function AiAudioConfigPanel({
           return;
         }
       }
-      setPersistPhase(null);
-      clearProgress();
 
       const audio = finalAudios[0];
       if (!audio) {
@@ -512,6 +517,7 @@ export function AiAudioConfigPanel({
           platformModelId: effectiveModel.canonicalId,
           aiInterfaceId: response.aiInterfaceId,
           modelDisplayName: effectiveModel.alias,
+          jobId: finalizeJobId ?? undefined,
         });
         return {
           ...withResult,
@@ -538,8 +544,6 @@ export function AiAudioConfigPanel({
             return;
           }
           const audios = resolvedJob.media;
-          setPersistPhase(null);
-          clearProgress();
           if (workflowId && orgId) {
             persistMediaForNodeInBackground({
               organizationId: orgId,
@@ -573,6 +577,7 @@ export function AiAudioConfigPanel({
                   platformModelId: effectiveModel.canonicalId,
                   aiInterfaceId: effectiveModel.interfaceId,
                   modelDisplayName: effectiveModel.alias,
+                  jobId: activeJobId,
                 }
               );
               return {
@@ -598,7 +603,9 @@ export function AiAudioConfigPanel({
 
       const raw = error instanceof Error ? error.message : String(error);
       const cardError = prepareGenerativeCardError(raw, t, "audio");
+      const failedJobId = readActiveGenerationJobId(error);
       updateNodeData?.(nodeId, (current) => ({
+        ...withAiAudioGeneratingHistoryFailed(current, failedJobId),
         metadata: withAiAudioGenerateError(
           withAiAudioGeneratingFlag(
             clearGenerativeProgress(current.metadata),

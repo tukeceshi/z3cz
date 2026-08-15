@@ -5,6 +5,9 @@ import {
   normalizeAudioModelParameterRules,
   type AudioModelParameterRules,
   type OrgAudioModelOption,
+  hasGeneratingResource,
+  hasDisplayableWorkflowMedia,
+  isResourceIdReference,
   isWorkflowMediaValue,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
@@ -24,7 +27,15 @@ import {
   applyHistoryItemSettingsToNode,
   type GenerativeHistorySelectionResult,
 } from "./apply-history-item-settings";
-import { splitHistoryMediaRows } from "./generative-history-utils";
+import {
+  readGenerativeCardCoverFromHistory,
+  splitHistoryMediaRows,
+  type GenerativeCardCoverRead,
+} from "./generative-history-utils";
+import {
+  markResourceRefFailed,
+  stripGeneratingFlag,
+} from "./generative-resource-ref-utils";
 
 export const AI_AUDIO_PROMPT_HANDLE_ID = "prompt_reference" as const;
 export const AI_AUDIO_OUTPUT_ID = "audios" as const;
@@ -61,6 +72,7 @@ export interface AiAudioResultHistoryItem {
   readonly providerModelId?: string;
   readonly modelDisplayName?: string;
   readonly createdAt: string;
+  readonly jobId?: string;
 }
 
 export interface AiAudioResultHistory {
@@ -280,19 +292,45 @@ export function withAiAudioStagingPreview(
   return { inputs, outputs };
 }
 
-export function readAiAudioCardAudios(
+export function readAiAudioCardDisplay(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
-  _metadata?: Record<string, string>
-): WorkflowMediaValue[] {
+  metadata?: Record<string, string>
+): GenerativeCardCoverRead<WorkflowMediaValue> {
   const manual = parseWorkflowMediaValues(
     inputs.find((input) => input.id === "manual_audios")?.value
   );
   if (manual.length > 0) {
-    return manual;
+    return {
+      coverMedia: manual,
+      isBusy: false,
+      hasCover: hasDisplayableWorkflowMedia(manual),
+    };
   }
 
-  return readAiAudioResult(inputs, outputs);
+  const history = readAiAudioResultHistory(inputs);
+  if (history.selectedId) {
+    return readGenerativeCardCoverFromHistory(history, (item) => item.audios, {
+      metadata,
+      isModalityGenerating: isAiAudioGenerating(metadata),
+    });
+  }
+
+  const fallback = readAiAudioResult(inputs, outputs);
+  return {
+    coverMedia: fallback,
+    isBusy:
+      isAiAudioGenerating(metadata) || hasGeneratingResource(fallback),
+    hasCover: hasDisplayableWorkflowMedia(fallback),
+  };
+}
+
+export function readAiAudioCardAudios(
+  inputs: readonly WorkflowParameter[],
+  outputs?: readonly WorkflowParameter[],
+  metadata?: Record<string, string>
+): WorkflowMediaValue[] {
+  return [...readAiAudioCardDisplay(inputs, outputs, metadata).coverMedia];
 }
 
 export function withAiAudioManualUpload(
@@ -331,11 +369,41 @@ export function appendAiAudioGeneratedHistoryItems(
     readonly aiInterfaceId?: string;
     readonly providerModelId?: string;
     readonly modelDisplayName?: string;
+    readonly jobId?: string;
   }
 ): Partial<WorkflowNodeType> {
   if (audios.length === 0) return {};
 
   const history = readAiAudioResultHistory(current.inputs);
+  const pendingIndex = meta?.jobId
+    ? history.items.findIndex((item) => item.jobId === meta.jobId)
+    : -1;
+  if (pendingIndex >= 0) {
+    const pending = history.items[pendingIndex]!;
+    const nextItems = history.items.map((item, index) =>
+      index === pendingIndex
+        ? { ...item, audios: [audios[0]!], jobId: undefined }
+        : item
+    );
+    const nextHistory: AiAudioResultHistory = {
+      items: nextItems,
+      selectedId: pending.id,
+    };
+    let nextInputs = upsertInputValue(
+      current.inputs,
+      AI_AUDIO_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+    nextInputs = upsertInputValue(nextInputs, "manual_audios", [], "json");
+    const result = withAiAudioResult(current, [audios[0]!], {
+      inputs: nextInputs,
+    });
+    return {
+      ...result,
+      metadata: withGenerativeGeneratedContentMode(current.metadata),
+    };
+  }
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
   const newItems: AiAudioResultHistoryItem[] = audios.map((audio, index) => ({
@@ -369,6 +437,171 @@ export function appendAiAudioGeneratedHistoryItems(
     ...result,
     metadata: withGenerativeGeneratedContentMode(current.metadata),
   };
+}
+
+export function withAiAudioGeneratingHistory(
+  current: WorkflowNodeType,
+  params: {
+    readonly jobId: string;
+    readonly prompt: string;
+    readonly params?: Readonly<Record<string, unknown>>;
+    readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
+    readonly providerModelId?: string;
+    readonly modelDisplayName?: string;
+  }
+): Partial<WorkflowNodeType> {
+  const history = readAiAudioResultHistory(current.inputs);
+  const item: AiAudioResultHistoryItem = {
+    id: `gen-${Date.now()}-0-${Math.random().toString(36).slice(2, 8)}`,
+    audios: [],
+    prompt: params.prompt,
+    params: params.params,
+    platformModelId: params.platformModelId,
+    aiInterfaceId: params.aiInterfaceId,
+    providerModelId: params.providerModelId,
+    modelDisplayName: params.modelDisplayName,
+    createdAt: new Date().toISOString(),
+    jobId: params.jobId,
+  };
+  const nextHistory: AiAudioResultHistory = {
+    items: [item, ...history.items].slice(0, AI_AUDIO_MAX_HISTORY_ITEMS),
+    selectedId: item.id,
+  };
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_AUDIO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  return {
+    ...withAiAudioResult(current, [], { inputs }),
+    metadata: withGenerativeGeneratedContentMode(current.metadata),
+  };
+}
+
+export function withAiAudioGeneratingHistoryFailed(
+  current: WorkflowNodeType,
+  jobId?: string | null
+): Partial<WorkflowNodeType> {
+  const history = readAiAudioResultHistory(current.inputs);
+  const nextItems = history.items.map((item) => {
+    const matchesJob = Boolean(jobId && item.jobId === jobId);
+    if (!matchesJob && !hasGeneratingResource(item.audios)) {
+      return item;
+    }
+    if (jobId && item.jobId && item.jobId !== jobId) {
+      return item;
+    }
+    return {
+      ...item,
+      audios: item.audios.map((audio) =>
+        isResourceIdReference(audio)
+          ? {
+              resourceId: audio.resourceId,
+              mimeType: audio.mimeType,
+              contentSha256: audio.contentSha256,
+              failed: true,
+            }
+          : audio
+      ),
+    };
+  });
+  const selected =
+    nextItems.find((item) => item.id === history.selectedId) ?? nextItems[0];
+  const nextHistory: AiAudioResultHistory = {
+    items: nextItems,
+    selectedId: selected?.id ?? null,
+  };
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_AUDIO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  return withAiAudioResult(current, selected?.audios ?? [], { inputs });
+}
+
+export function withAiAudioResourcesMarkedFailed(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiAudioResultHistory(current.inputs);
+  const nextHistory: AiAudioResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      audios: item.audios.map((audio) =>
+        isResourceIdReference(audio) && ids.has(audio.resourceId)
+          ? markResourceRefFailed(audio)
+          : audio
+      ),
+    })),
+  };
+
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_AUDIO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultAudios = readAiAudioResult(inputs, current.outputs).map((audio) =>
+    isResourceIdReference(audio) && ids.has(audio.resourceId)
+      ? markResourceRefFailed(audio)
+      : audio
+  );
+  return withAiAudioResult(current, resultAudios, { inputs });
+}
+
+export function withAiAudioResourceGeneratingCleared(
+  current: WorkflowNodeType,
+  resourceIds: readonly string[]
+): Partial<WorkflowNodeType> {
+  const ids = new Set(resourceIds);
+  if (ids.size === 0) {
+    return {};
+  }
+
+  const history = readAiAudioResultHistory(current.inputs);
+  const nextHistory: AiAudioResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      audios: item.audios.map((audio) => {
+        if (
+          isResourceIdReference(audio) &&
+          audio.generating &&
+          ids.has(audio.resourceId)
+        ) {
+          return stripGeneratingFlag(audio);
+        }
+        return audio;
+      }),
+    })),
+  };
+
+  const inputs = upsertInputValue(
+    current.inputs,
+    AI_AUDIO_HISTORY_INPUT_ID,
+    nextHistory,
+    "json"
+  );
+  const resultAudios = readAiAudioResult(inputs, current.outputs).map((audio) => {
+    if (
+      isResourceIdReference(audio) &&
+      audio.generating &&
+      ids.has(audio.resourceId)
+    ) {
+      return stripGeneratingFlag(audio);
+    }
+    return audio;
+  });
+  return withAiAudioResult(current, resultAudios, { inputs });
 }
 
 export function withAiAudioHistorySelection(

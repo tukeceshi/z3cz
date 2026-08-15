@@ -85,6 +85,8 @@ export const AI_TEXT_PANEL_HEIGHT_PX = 336;
 export const AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX = 220;
 
 export const AI_TEXT_GENERATING_META_KEY = "aiTextGenerating" as const;
+/** Set on the first streamed token of the current generation. */
+export const AI_TEXT_STREAM_STARTED_META_KEY = "aiTextStreamStarted" as const;
 
 /** Only these generative nodes may connect into AI Text keywords. */
 export const AI_TEXT_ALLOWED_REFERENCE_NODE_TYPES = [
@@ -220,6 +222,7 @@ export function withAiTextStreamingPreview(
   const { excerpt, body } = buildAiTextSessionOutputValues(text);
   return {
     outputs: mapOutputsWithSessionCache(current.outputs, excerpt, body),
+    metadata: withAiTextStreamStartedFlag(current.metadata, body.length > 0),
   };
 }
 
@@ -336,7 +339,9 @@ export function readAiTextResultHistory(
           (typeof (entry as AiTextResultHistoryItem).text === "string" ||
             typeof (entry as AiTextResultHistoryItem).resourceId === "string" ||
             typeof (entry as AiTextResultHistoryItem).contentSha256 === "string" ||
-            typeof (entry as AiTextResultHistoryItem).excerpt === "string")
+            typeof (entry as AiTextResultHistoryItem).excerpt === "string" ||
+            typeof (entry as AiTextResultHistoryItem).invocationId === "string" ||
+            typeof (entry as AiTextResultHistoryItem).createdAt === "string")
       )
     : [];
 
@@ -412,6 +417,68 @@ export function withAiTextGeneratedResult(
   };
 }
 
+export function withAiTextGeneratingHistory(
+  current: WorkflowNodeType,
+  params?: {
+    readonly invocationId?: string;
+    readonly platformModelId?: string;
+    readonly aiInterfaceId?: string;
+    readonly modelDisplayName?: string;
+  }
+): Partial<WorkflowNodeType> {
+  const history = readAiTextResultHistory(current.inputs);
+  const item: AiTextResultHistoryItem = {
+    id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    platformModelId: params?.platformModelId,
+    aiInterfaceId: params?.aiInterfaceId,
+    modelDisplayName: params?.modelDisplayName,
+    createdAt: new Date().toISOString(),
+    ...(params?.invocationId ? { invocationId: params.invocationId } : {}),
+  };
+  const nextHistory: AiTextResultHistory = {
+    items: [item, ...history.items].slice(0, 30),
+    selectedId: item.id,
+  };
+  return {
+    inputs: upsertInputValue(
+      current.inputs,
+      AI_TEXT_RESULT_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    ),
+  };
+}
+
+export function withAiTextGeneratingHistoryFailed(
+  current: WorkflowNodeType,
+  invocationId?: string | null
+): Partial<WorkflowNodeType> {
+  const history = readAiTextResultHistory(current.inputs);
+  const selectedId = history.selectedId;
+  const nextItems = history.items.map((item) => {
+    const isPending =
+      item.id === selectedId &&
+      !item.resourceId &&
+      !item.text &&
+      !item.contentSha256;
+    if (!isPending) {
+      return item;
+    }
+    return {
+      ...item,
+      ...(invocationId ? { invocationId } : {}),
+    };
+  });
+  return {
+    inputs: upsertInputValue(
+      current.inputs,
+      AI_TEXT_RESULT_HISTORY_INPUT_ID,
+      { items: nextItems, selectedId },
+      "json"
+    ),
+  };
+}
+
 /** Mark history selection; caller should then commit item text via the text buffer. */
 export function withAiTextHistorySelectedId(
   current: WorkflowNodeType,
@@ -482,6 +549,35 @@ export function isAiTextGenerating(
   return metadata?.[AI_TEXT_GENERATING_META_KEY] === "1";
 }
 
+export function isAiTextStreamStarted(
+  metadata: Record<string, string> | undefined
+): boolean {
+  return metadata?.[AI_TEXT_STREAM_STARTED_META_KEY] === "1";
+}
+
+export function isAiTextAwaitingStream(
+  metadata: Record<string, string> | undefined
+): boolean {
+  return isAiTextGenerating(metadata) && !isAiTextStreamStarted(metadata);
+}
+
+export function withAiTextStreamStartedFlag(
+  metadata: Record<string, string> | undefined,
+  started: boolean
+): Record<string, string> | undefined {
+  if (started) {
+    return { ...(metadata ?? {}), [AI_TEXT_STREAM_STARTED_META_KEY]: "1" };
+  }
+
+  if (!metadata || !(AI_TEXT_STREAM_STARTED_META_KEY in metadata)) {
+    return metadata;
+  }
+
+  const next = { ...metadata };
+  delete next[AI_TEXT_STREAM_STARTED_META_KEY];
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
 export function withAiTextGeneratingFlag(
   metadata: Record<string, string> | undefined,
   generating: boolean
@@ -490,12 +586,17 @@ export function withAiTextGeneratingFlag(
     return { ...(metadata ?? {}), [AI_TEXT_GENERATING_META_KEY]: "1" };
   }
 
-  if (!metadata || !(AI_TEXT_GENERATING_META_KEY in metadata)) {
+  if (
+    !metadata ||
+    (!(AI_TEXT_GENERATING_META_KEY in metadata) &&
+      !(AI_TEXT_STREAM_STARTED_META_KEY in metadata))
+  ) {
     return metadata;
   }
 
   const next = { ...metadata };
   delete next[AI_TEXT_GENERATING_META_KEY];
+  delete next[AI_TEXT_STREAM_STARTED_META_KEY];
   return Object.keys(next).length > 0 ? next : undefined;
 }
 

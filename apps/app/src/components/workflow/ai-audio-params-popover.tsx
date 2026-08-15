@@ -18,6 +18,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
+import { useParamsPopoverDraft } from "./use-params-popover-draft";
 import {
   resolveGenerationFieldLabel,
   resolveGenerationOptionLabel,
@@ -186,19 +187,23 @@ export function AiAudioParamsPopover({
   const { t } = useTranslation();
   const summary = formatParamSummary(fields, values, t);
   const visibleFields = fields.filter((field) => !field.hidden);
+  const { open, draft, updateDraft, handleOpenChange } = useParamsPopoverDraft(
+    values,
+    onChange
+  );
 
   const handleFieldChange = (
     field: UpstreamParamProfileField,
     raw: string | number
   ) => {
-    onChange({
-      ...values,
+    updateDraft({
+      ...draft,
       [field.name]: coerceFieldValue(field, raw),
     });
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -217,7 +222,7 @@ export function AiAudioParamsPopover({
       >
         <p className="text-xs font-medium text-foreground">{title}</p>
         {visibleFields.map((field) => {
-          const current = readFieldValue(field, values);
+          const current = readFieldValue(field, draft);
           const fieldLabel = resolveGenerationFieldLabel(field, t);
 
           if (SPEED_FIELD_NAMES.has(field.name)) {

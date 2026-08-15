@@ -11,11 +11,9 @@ import {
   type GenerateAiTextRequest,
   type SubmitAiVideoRequest,
   createEphemeralMediaExpiresAt,
-  isEphemeralMediaReference,
   type MediaReference,
 } from "@dafthunk/types";
 import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
-import { executeVolcanoImageGeneration } from "@dafthunk/runtime/ai-interface/execute-volcano-image";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -97,7 +95,6 @@ import {
 import {
   completeGenerationJobClientUpload,
   claimClientGenerationJobUpload,
-  createReadyToPersistImageJob,
   createReadyToPersistAudioJob,
   GenerationJobUploadValidationError,
   markVideoGenerationJobReadyToPersist,
@@ -111,10 +108,19 @@ import {
   ActiveGenerationJobConflictError,
   assertNoActiveGenerationJobForNode,
   buildAudioGenerateResponseFromJob,
-  buildImageGenerateResponseFromJob,
   buildVideoSubmitResponseFromJob,
   findGenerationJobByClientRequestId,
 } from "../services/generation-job-guards";
+import {
+  buildCanvasImageGenerateResponse,
+  createCanvasImageGenerationJob,
+  resolveCanvasImageCount,
+  runCanvasImageGenerationJob,
+} from "../services/canvas-image-generation-job";
+import { runAfterResponse } from "../utils/run-after-response";
+import { persistGeneratingNodeContentToWorkflow } from "../services/persist-generating-node-content";
+import { markMediaResourcesFailed } from "../services/mark-media-resources-failed";
+import { registerGeneratingPlaceholderResources } from "../services/register-generating-placeholder-resources";
 import {
   presignTosMediaDownloadUrls,
   presignTosMediaUpload,
@@ -609,6 +615,22 @@ platformAiRoutes.post(
       nodeId: body.nodeId,
     });
 
+    const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+      c.env,
+      {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "text",
+        entry: {
+          invocationId,
+          platformModelId: modelOption.canonicalId,
+          aiInterfaceId: body.aiInterfaceId,
+          modelDisplayName: modelOption.displayName,
+        },
+      }
+    );
+
     const upstreamLog = createUpstreamRequestLogger(db, {
       organizationId,
       interfaceId: body.aiInterfaceId,
@@ -654,6 +676,7 @@ platformAiRoutes.post(
       text: result.text,
       invocationId,
       aiInterfaceId: result.interfaceId,
+      ...(workflowNodeContent ? { workflowNodeContent } : {}),
     });
   }
 );
@@ -729,6 +752,22 @@ platformAiRoutes.post(
       nodeId: body.nodeId,
     });
 
+    const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+      c.env,
+      {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "text",
+        entry: {
+          invocationId,
+          platformModelId: modelOption.canonicalId,
+          aiInterfaceId: body.aiInterfaceId,
+          modelDisplayName: modelOption.displayName,
+        },
+      }
+    );
+
     const prepared = await prepareTextModelStream({
       env: c.env,
       db,
@@ -785,6 +824,12 @@ platformAiRoutes.post(
         };
 
         try {
+          send({
+            type: "started",
+            invocationId,
+            ...(workflowNodeContent ? { workflowNodeContent } : {}),
+          });
+
           for await (const event of streamPreparedTextModel({
             prepared: prepared.prepared,
             signal: clientSignal,
@@ -945,7 +990,16 @@ platformAiRoutes.post(
       modality: "image",
     });
     if (existingJob) {
-      return c.json(buildImageGenerateResponseFromJob(existingJob));
+      const storageResolution = await resolveAiImageStorage(c.env, {
+        organizationId,
+        workflowId: body.workflowId,
+      });
+      return c.json(
+        buildCanvasImageGenerateResponse({
+          job: existingJob,
+          storageMode: storageResolution.storageMode,
+        })
+      );
     }
 
     try {
@@ -1026,8 +1080,8 @@ platformAiRoutes.post(
       );
     }
 
-    const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
     const invocationId = crypto.randomUUID();
+    const jobId = crypto.randomUUID();
     const promptExcerpt =
       prompt.length > 0
         ? prompt.length > 200
@@ -1039,9 +1093,23 @@ platformAiRoutes.post(
       organizationId,
       workflowId: body.workflowId,
     });
+    const requestedCount = resolveCanvasImageCount(
+      body.params,
+      resolvedModel.parameterRules
+    );
 
-    const deferCloudPersist = storageResolution.storageMode === "cloud";
-    const jobId = deferCloudPersist ? crypto.randomUUID() : null;
+    const { job, resourceIds } = await createCanvasImageGenerationJob(db, {
+      id: jobId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      workflowId: body.workflowId,
+      nodeId: body.nodeId,
+      modelCanonicalId: resolvedModel.canonicalId,
+      interfaceId: resolvedModel.interfaceId,
+      requestedCount,
+      clientRequestId: body.clientRequestId,
+      invocationId,
+    });
 
     await createAiModelInvocation(db, {
       id: invocationId,
@@ -1057,109 +1125,76 @@ platformAiRoutes.post(
       status: "pending",
       workflowId: body.workflowId,
       nodeId: body.nodeId,
-    });
-
-    const upstreamLog = createUpstreamRequestLogger(db, {
-      organizationId,
-      interfaceId: resolvedModel.interfaceId,
-      invocationId,
       generationJobId: jobId,
-      operation: "submit",
     });
 
-    const result = await executeVolcanoImageGeneration({
-      apiKey: iface.apiKey,
-      baseUrl: iface.baseUrl,
-      providerModelId: inferenceModelId,
-      prompt,
-      parameterRules: resolvedModel.parameterRules,
-      generationParams: body.params,
-      referenceImageUrls: body.referenceImageUrls,
-      referenceImageInline: body.referenceImageInline,
-      storageMode: deferCloudPersist ? "ephemeral" : storageResolution.storageMode,
-      objectStore: deferCloudPersist ? undefined : objectStore,
-      organizationId,
-      workflowId: body.workflowId,
-      cloudUpload: deferCloudPersist ? undefined : storageResolution.cloudUpload,
-      upstreamLog,
-      useFullSubmitUrl: iface.useFullSubmitUrl,
-    });
-
-    if (result.status === "failed") {
-      await finalizeAiModelInvocation(db, {
-        id: invocationId,
+    const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+      c.env,
+      {
         organizationId,
-        status: "failed",
-        error: result.error ?? "Generation failed",
-      });
-      return c.json({ error: result.error ?? "Generation failed" }, 502);
-    }
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "image",
+        entry: {
+          resourceIds,
+          prompt,
+          params: body.params,
+          platformModelId: resolvedModel.canonicalId,
+          aiInterfaceId: resolvedModel.interfaceId,
+          providerModelId: resolvedModel.providerModelId,
+          modelDisplayName: resolvedModel.displayName,
+          jobId,
+        },
+      }
+    );
 
-    const images = result.images ?? [];
-    if (deferCloudPersist && jobId) {
-      const ephemeralImages = images.filter(isEphemeralMediaReference);
-      if (ephemeralImages.length !== images.length) {
-        await finalizeAiModelInvocation(db, {
+    runAfterResponse(
+      c.executionCtx,
+      runCanvasImageGenerationJob({
+        env: c.env,
+        organizationId,
+        jobId,
+        invocationId,
+        resourceIds,
+        apiKey: iface.apiKey,
+        baseUrl: iface.baseUrl,
+        providerModelId: inferenceModelId,
+        prompt,
+        parameterRules: resolvedModel.parameterRules,
+        generationParams: body.params,
+        referenceImageUrls: body.referenceImageUrls,
+        referenceImageInline: body.referenceImageInline,
+        workflowId: body.workflowId,
+        interfaceId: resolvedModel.interfaceId,
+        useFullSubmitUrl: iface.useFullSubmitUrl,
+        storageMode: storageResolution.storageMode,
+      }).catch(async (error) => {
+        const message =
+          error instanceof Error ? error.message : "Image generation failed";
+        const failDb = createDatabase(c.env);
+        await updateGenerationJob(failDb, {
+          id: jobId,
+          organizationId,
+          status: "failed",
+          expectedStatuses: ["generating"],
+          failureReason: message,
+        });
+        await finalizeAiModelInvocation(failDb, {
           id: invocationId,
           organizationId,
           status: "failed",
-          error: "Expected ephemeral upstream image URLs",
+          error: message,
         });
-        return c.json({ error: "Expected ephemeral upstream image URLs" }, 502);
-      }
-
-      await finalizeAiModelInvocation(db, {
-        id: invocationId,
-        organizationId,
-        status: "pending",
-        generationJobId: jobId,
-        error: null,
-      });
-
-      await createReadyToPersistImageJob(db, {
-        id: jobId,
-        organizationId,
-        userId: jwtPayload?.sub,
-        workflowId: body.workflowId,
-        nodeId: body.nodeId,
-        modelCanonicalId: resolvedModel.canonicalId,
-        interfaceId: resolvedModel.interfaceId,
-        images: ephemeralImages,
-        clientRequestId: body.clientRequestId,
-        invocationId,
-        requestSnapshot: result.requestSnapshot,
-      });
-
-      return c.json({
-        images: [],
-        invocationId,
-        aiInterfaceId: resolvedModel.interfaceId,
-        storageMode: "cloud" as const,
-        jobId,
-        phase: "ready_to_persist" as const,
-        requestedCount: result.requestedCount,
-        returnedCount: images.length,
-        requestSnapshot: result.requestSnapshot,
-      });
-    }
-
-    await finalizeAiModelInvocation(db, {
-      id: invocationId,
-      organizationId,
-      status: "completed",
-      content: `${result.images?.length ?? 0} image(s)`,
-      error: null,
-    });
+      })
+    );
 
     return c.json({
-      images,
-      invocationId,
-      aiInterfaceId: resolvedModel.interfaceId,
-      storageMode: storageResolution.storageMode,
-      phase: "succeeded" as const,
-      requestedCount: result.requestedCount,
-      returnedCount: images.length,
-      requestSnapshot: result.requestSnapshot,
+      ...buildCanvasImageGenerateResponse({
+        job,
+        storageMode: storageResolution.storageMode,
+        requestedCount,
+      }),
+      ...(workflowNodeContent ? { workflowNodeContent } : {}),
     });
   }
 );
@@ -1269,6 +1304,31 @@ platformAiRoutes.post(
     const promptExcerpt =
       prompt.length > 200 ? `${prompt.slice(0, 200)}…` : prompt;
 
+    let audioResourceIds: readonly string[] = [];
+    if (jobId) {
+      audioResourceIds = await registerGeneratingPlaceholderResources(db, {
+        organizationId,
+        mimeType: "audio/mpeg",
+      });
+      await createGenerationJob(db, {
+        id: jobId,
+        organizationId,
+        userId: jwtPayload?.sub,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "audio",
+        status: "generating",
+        modelCanonicalId: resolvedModel.canonicalId,
+        interfaceId: resolvedModel.interfaceId,
+        clientRequestId: body.clientRequestId,
+        resultJson: {
+          aiInterfaceId: resolvedModel.interfaceId,
+          invocationId,
+          placeholderResourceIds: audioResourceIds,
+        },
+      });
+    }
+
     await createAiModelInvocation(db, {
       id: invocationId,
       organizationId,
@@ -1283,7 +1343,29 @@ platformAiRoutes.post(
       status: "pending",
       workflowId: body.workflowId,
       nodeId: body.nodeId,
+      ...(jobId ? { generationJobId: jobId } : {}),
     });
+
+    const workflowNodeContent =
+      jobId && audioResourceIds.length > 0
+        ? await persistGeneratingNodeContentToWorkflow(c.env, {
+            organizationId,
+            workflowId: body.workflowId,
+            nodeId: body.nodeId,
+            modality: "audio",
+            entry: {
+              resourceIds: audioResourceIds,
+              jobId,
+              mimeType: "audio/mpeg",
+              prompt,
+              params: body.params,
+              platformModelId: resolvedModel.canonicalId,
+              aiInterfaceId: resolvedModel.interfaceId,
+              providerModelId: resolvedModel.providerModelId,
+              modelDisplayName: resolvedModel.displayName,
+            },
+          })
+        : null;
 
     const upstreamLog = createUpstreamRequestLogger(db, {
       organizationId,
@@ -1305,13 +1387,28 @@ platformAiRoutes.post(
     });
 
     if (result.status === "failed" || !result.audio || !result.mimeType) {
+      const message = result.error ?? "Generation failed";
+      if (jobId) {
+        await updateGenerationJob(db, {
+          id: jobId,
+          organizationId,
+          status: "failed",
+          expectedStatuses: ["generating"],
+          failureReason: message,
+        });
+        await markMediaResourcesFailed(db, {
+          organizationId,
+          resourceIds: audioResourceIds,
+          mimeType: "audio/mpeg",
+        });
+      }
       await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
         status: "failed",
-        error: result.error ?? "Generation failed",
+        error: message,
       });
-      return c.json({ error: result.error ?? "Generation failed" }, 502);
+      return c.json({ error: message }, 502);
     }
 
     const audioData = new Uint8Array(result.audio);
@@ -1363,6 +1460,8 @@ platformAiRoutes.post(
         storageMode: "cloud" as const,
         jobId,
         phase: "ready_to_persist" as const,
+        resourceIds: audioResourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
       });
     }
 
@@ -1524,6 +1623,37 @@ platformAiRoutes.post(
           : prompt
         : "(reference only)";
 
+    const storageResolution = await resolveAiVideoStorage(c.env, {
+      organizationId,
+      workflowId: body.workflowId,
+    });
+    const jobId =
+      storageResolution.storageMode === "cloud" ? crypto.randomUUID() : null;
+    let videoResourceIds: readonly string[] = [];
+    if (jobId) {
+      videoResourceIds = await registerGeneratingPlaceholderResources(db, {
+        organizationId,
+        mimeType: "video/mp4",
+      });
+      await createGenerationJob(db, {
+        id: jobId,
+        organizationId,
+        userId: jwtPayload?.sub,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "video",
+        status: "generating",
+        modelCanonicalId: resolvedModel.canonicalId,
+        interfaceId: resolvedModel.interfaceId,
+        clientRequestId: body.clientRequestId,
+        resultJson: {
+          aiInterfaceId: resolvedModel.interfaceId,
+          invocationId,
+          placeholderResourceIds: videoResourceIds,
+        },
+      });
+    }
+
     await createAiModelInvocation(db, {
       id: invocationId,
       organizationId,
@@ -1538,7 +1668,29 @@ platformAiRoutes.post(
       status: "pending",
       workflowId: body.workflowId,
       nodeId: body.nodeId,
+      ...(jobId ? { generationJobId: jobId } : {}),
     });
+
+    const workflowNodeContent =
+      jobId && videoResourceIds.length > 0
+        ? await persistGeneratingNodeContentToWorkflow(c.env, {
+            organizationId,
+            workflowId: body.workflowId,
+            nodeId: body.nodeId,
+            modality: "video",
+            entry: {
+              resourceIds: videoResourceIds,
+              jobId,
+              mimeType: "video/mp4",
+              prompt,
+              params: body.params,
+              platformModelId: resolvedModel.canonicalId,
+              aiInterfaceId: resolvedModel.interfaceId,
+              providerModelId: resolvedModel.providerModelId,
+              modelDisplayName: resolvedModel.displayName,
+            },
+          })
+        : null;
 
     const upstreamLog = createUpstreamRequestLogger(db, {
       organizationId,
@@ -1568,6 +1720,20 @@ platformAiRoutes.post(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Upstream request failed";
+      if (jobId) {
+        await updateGenerationJob(db, {
+          id: jobId,
+          organizationId,
+          status: "failed",
+          expectedStatuses: ["generating"],
+          failureReason: message,
+        });
+        await markMediaResourcesFailed(db, {
+          organizationId,
+          resourceIds: videoResourceIds,
+          mimeType: "video/mp4",
+        });
+      }
       await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
@@ -1578,21 +1744,31 @@ platformAiRoutes.post(
     }
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
+      const message = submitResult.error ?? "Submit failed";
+      if (jobId) {
+        await updateGenerationJob(db, {
+          id: jobId,
+          organizationId,
+          status: "failed",
+          expectedStatuses: ["generating"],
+          failureReason: message,
+        });
+        await markMediaResourcesFailed(db, {
+          organizationId,
+          resourceIds: videoResourceIds,
+          mimeType: "video/mp4",
+        });
+      }
       await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
         status: "failed",
-        error: submitResult.error ?? "Submit failed",
+        error: message,
       });
-      return c.json({ error: submitResult.error ?? "Submit failed" }, 502);
+      return c.json({ error: message }, 502);
     }
 
-    const storageResolution = await resolveAiVideoStorage(c.env, {
-      organizationId,
-      workflowId: body.workflowId,
-    });
-    const jobId = crypto.randomUUID();
-    if (storageResolution.storageMode === "cloud") {
+    if (jobId) {
       await finalizeAiModelInvocation(db, {
         id: invocationId,
         organizationId,
@@ -1601,18 +1777,12 @@ platformAiRoutes.post(
         error: null,
       });
 
-      await createGenerationJob(db, {
+      await updateGenerationJob(db, {
         id: jobId,
         organizationId,
-        userId: jwtPayload?.sub,
-        workflowId: body.workflowId,
-        nodeId: body.nodeId,
-        modality: "video",
         status: "generating",
+        expectedStatuses: ["generating"],
         upstreamTaskId: submitResult.taskId,
-        modelCanonicalId: resolvedModel.canonicalId,
-        interfaceId: resolvedModel.interfaceId,
-        clientRequestId: body.clientRequestId,
         resultJson: {
           upstreamTaskId: submitResult.taskId,
           videoPollUrl: submitResult.pollUrl,
@@ -1627,6 +1797,8 @@ platformAiRoutes.post(
         invocationId,
         aiInterfaceId: resolvedModel.interfaceId,
         jobId,
+        resourceIds: videoResourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
       });
     }
 

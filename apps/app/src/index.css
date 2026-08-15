@@ -510,6 +510,20 @@ html.dark .studio-mdx-table-frame table :is(th, td)[data-active="true"] {
   z-index: 20;
 }
 
+/* Heading clone for create-node overlay; CSS content is not copied. */
+.studio-text-heading-spacer::before {
+  content: attr(data-studio-heading-spacer);
+  display: block;
+  white-space: pre-wrap;
+}
+
+/* Keep text drag from being stolen by the overlay button. */
+.group\/section:has(textarea:active) .studio-text-section-frame-action,
+.group\/section:has([contenteditable="true"]:active)
+  .studio-text-section-frame-action {
+  pointer-events: none;
+}
+
 /* Markdown */
 .md h2 {
   @apply text-xl font-semibold;

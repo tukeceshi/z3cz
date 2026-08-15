@@ -45,6 +45,28 @@ describe("readStudioMediaCardState", () => {
     expect(state.isBusy).toBe(true);
   });
 
+  it("uses resource generating when image has no persist phase", () => {
+    const state = readStudioMediaCardState(undefined, false, [
+      { resourceId: "res-1", generating: true },
+    ]);
+    expect(state.placeholderKey).toBe(
+      "workflow.aiImagePanel.cardGenerating"
+    );
+    expect(state.isBusy).toBe(true);
+  });
+
+  it("keeps download phase over resource generating", () => {
+    const state = readStudioMediaCardState(
+      { genProgressPhase: "downloading" },
+      false,
+      [{ resourceId: "res-1", generating: true }]
+    );
+    expect(state.placeholderKey).toBe(
+      "workflow.aiImagePanel.cardDownloading"
+    );
+    expect(state.isBusy).toBe(true);
+  });
+
   it("treats video cancelled phase as idle (canvas-aligned)", () => {
     const state = readStudioMediaCardState(
       { genProgressPhase: "cancelled" },

@@ -142,18 +142,42 @@ export function withAiTextStagedGeneratedResult(
 ): Partial<WorkflowNodeType> {
   const history = readAiTextResultHistory(current.inputs);
   const resourceId = getResourceIdFromValue(staged.reference);
-  const item: AiTextResultHistoryItem = {
-    id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    ...(resourceId ? { resourceId } : {}),
-    contentSha256: staged.contentSha256,
-    platformModelId: meta?.platformModelId,
-    aiInterfaceId: meta?.aiInterfaceId,
-    providerModelId: meta?.providerModelId,
-    modelDisplayName: meta?.modelDisplayName,
-    createdAt: new Date().toISOString(),
-  };
+  const pendingIndex = history.items.findIndex(
+    (entry) =>
+      entry.id === history.selectedId &&
+      !entry.resourceId &&
+      !entry.text &&
+      !entry.contentSha256
+  );
+  const item: AiTextResultHistoryItem =
+    pendingIndex >= 0
+      ? {
+          ...history.items[pendingIndex]!,
+          ...(resourceId ? { resourceId } : {}),
+          contentSha256: staged.contentSha256,
+          platformModelId: meta?.platformModelId,
+          aiInterfaceId: meta?.aiInterfaceId,
+          providerModelId: meta?.providerModelId,
+          modelDisplayName: meta?.modelDisplayName,
+          invocationId: undefined,
+        }
+      : {
+          id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          ...(resourceId ? { resourceId } : {}),
+          contentSha256: staged.contentSha256,
+          platformModelId: meta?.platformModelId,
+          aiInterfaceId: meta?.aiInterfaceId,
+          providerModelId: meta?.providerModelId,
+          modelDisplayName: meta?.modelDisplayName,
+          createdAt: new Date().toISOString(),
+        };
   const nextHistory: AiTextResultHistory = {
-    items: [item, ...history.items].slice(0, 30),
+    items:
+      pendingIndex >= 0
+        ? history.items.map((entry, index) =>
+            index === pendingIndex ? item : entry
+          )
+        : [item, ...history.items].slice(0, 30),
     selectedId: item.id,
   };
 

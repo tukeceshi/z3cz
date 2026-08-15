@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   sectionBodyMarkdown,
+  sectionContentRanges,
+  sectionHeadingDisplayText,
   splitMarkdownSections,
 } from "./split-markdown-sections";
 
@@ -153,5 +155,31 @@ describe("splitMarkdownSections", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({ level: 4 });
     expect(sectionBodyMarkdown(markdown, sections[0]!)).toBe("deepest body");
+  });
+
+  it("exposes the heading line without the trailing newline", () => {
+    const markdown = ["## Alpha", "body"].join("\n");
+    const parts = splitMarkdownSections(markdown);
+    expect(parts[0]?.type).toBe("section");
+    if (parts[0]?.type !== "section") {
+      return;
+    }
+    expect(sectionHeadingDisplayText(markdown, parts[0])).toBe("## Alpha");
+  });
+
+  it("keeps title and body split only when browsing", () => {
+    const markdown = ["## Alpha", "body"].join("\n");
+    const parts = splitMarkdownSections(markdown);
+    expect(parts[0]?.type).toBe("section");
+    if (parts[0]?.type !== "section") {
+      return;
+    }
+
+    expect(sectionContentRanges(parts[0], true).map((range) => range.key)).toEqual(
+      ["heading", "body"]
+    );
+    expect(sectionContentRanges(parts[0], false)).toEqual([
+      { key: "content", start: parts[0].headingStart, end: parts[0].bodyEnd },
+    ]);
   });
 });

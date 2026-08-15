@@ -11,7 +11,10 @@ import {
   resolveCardGenerationParams,
   type CardGenerationParams,
 } from "./generative-card-params";
-import { applyModelBindingToNodeData } from "./generative-model-binding";
+import {
+  applyModelBindingToNodeData,
+  applySelectedModelRecord,
+} from "./generative-model-binding";
 import { generativeReferenceMetadataForModel } from "./generative-reference-metadata";
 import {
   readWorkflowGenerativeDefault,
@@ -356,18 +359,11 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
 
       setOptimisticOptionId(optionId);
       updateNodeData(nodeId, (current) => {
-        const patch = applyModelBindingToNodeData({
+        const patch = applySelectedModelRecord({
           model,
           current,
           modality,
-          updateWorkflowDefault: true,
           generativeDefaults,
-          workflowDefaultEntry: workflowDefault,
-          handlers: {
-            readGenerationFields,
-            buildDefaultParams,
-            onModelSelected,
-          },
           onGenerativeDefaultChange,
         });
 
@@ -377,7 +373,6 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       });
     },
     [
-      buildDefaultParams,
       disabled,
       generativeDefaults,
       modality,
@@ -385,11 +380,8 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
       models,
       nodeId,
       onGenerativeDefaultChange,
-      onModelSelected,
-      readGenerationFields,
       toast,
       updateNodeData,
-      workflowDefault,
     ]
   );
 

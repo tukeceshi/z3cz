@@ -107,9 +107,12 @@ interface UseGenerativeCloudJobOptions {
     busy: boolean
   ) => Record<string, string> | undefined;
   readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
-  readonly onResumeSuccess?: (result: ResolveGenerativeJobMediaResult) => void;
+  readonly onResumeSuccess?: (
+    result: ResolveGenerativeJobMediaResult
+  ) => void | Promise<void>;
   readonly onResumeError?: (error: unknown) => void;
   readonly shouldAbortJobPoll?: () => boolean;
+  readonly resumeJobId?: string;
 }
 
 export function useGenerativeCloudJobProgress(
@@ -128,7 +131,7 @@ export function useGenerativeCloudJobProgress(
 } {
   const resumeAttemptedRef = useRef(false);
   const initialResumeJobIdRef = useRef(
-    readGenerativeProgressJobId(options.metadata)
+    options.resumeJobId ?? readGenerativeProgressJobId(options.metadata)
   );
 
   const syncProgress = useCallback(
@@ -185,7 +188,12 @@ export function useGenerativeCloudJobProgress(
         const resumedPhase = readGenerativeProgressPhase(options.metadata);
         syncProgress({
           jobId,
-          phase: resumedPhase ?? "generating",
+          phase:
+            resumedPhase === "downloading" ||
+            resumedPhase === "uploading" ||
+            resumedPhase === "server_persisting"
+              ? resumedPhase
+              : undefined,
         });
 
         const media = await resolveCloudGenerationJobMedia({
@@ -254,7 +262,6 @@ export function useGenerativeCloudJobProgress(
     if (
       !jobId ||
       !options.orgId ||
-      !options.cloudConfigured ||
       options.isGenerating ||
       resumeAttemptedRef.current ||
       !options.onResumeSuccess ||
@@ -267,11 +274,11 @@ export function useGenerativeCloudJobProgress(
     options.setIsGenerating(true);
 
     void resolveJobMedia(jobId)
-      .then((result) => {
+      .then(async (result) => {
         if (!result.owned) {
           return;
         }
-        options.onResumeSuccess?.(result);
+        await options.onResumeSuccess?.(result);
         clearProgress();
       })
       .catch((error) => {
@@ -285,7 +292,6 @@ export function useGenerativeCloudJobProgress(
   }, [
     clearProgress,
     options.autoResume,
-    options.cloudConfigured,
     options.isGenerating,
     options.onResumeError,
     options.onResumeSuccess,

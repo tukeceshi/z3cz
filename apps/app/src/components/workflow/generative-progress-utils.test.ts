@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   clearGenerativeProgress,
   formatGenerativeProgressElapsed,
+  isGenerativePersistPhase,
   isGenerativePhaseCancellable,
   readGenerativeProgressJobId,
   readGenerativeProgressPhase,
   readGenerativeProgressStartedAt,
   readGenerativeStagingMediaIds,
+  snapshotGenerativeProgressForPersist,
   withGenerativeProgress,
   withGenerativeUploadProgress,
 } from "@/components/workflow/generative-progress-utils";
@@ -60,6 +62,57 @@ describe("generative-progress-utils", () => {
     expect(isGenerativePhaseCancellable("uploading")).toBe(false);
     expect(isGenerativePhaseCancellable("server_persisting")).toBe(false);
     expect(isGenerativePhaseCancellable(null)).toBe(false);
+  });
+
+  it("snapshots generating resource ids from history inputs", () => {
+    expect(
+      snapshotGenerativeProgressForPersist([
+        {
+          id: "node-1",
+          data: {
+            metadata: { genJobId: "job-2" },
+            inputs: [
+              {
+                value: {
+                  selectedId: "gen-1",
+                  items: [
+                    {
+                      id: "gen-1",
+                      images: [
+                        {
+                          resourceId: "pending-1",
+                          mimeType: "image/png",
+                          generating: true,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ])
+    ).toBe(
+      JSON.stringify([
+        {
+          id: "node-1",
+          jobId: "job-2",
+          phase: null,
+          stagingMediaIds: null,
+          generatingResourceIds: ["pending-1"],
+          historyFingerprint: ["sel:gen-1", "gen-1|||pending-1:g"],
+        },
+      ])
+    );
+  });
+
+  it("treats download and upload as persist phases, not generating", () => {
+    expect(isGenerativePersistPhase("downloading")).toBe(true);
+    expect(isGenerativePersistPhase("uploading")).toBe(true);
+    expect(isGenerativePersistPhase("server_persisting")).toBe(true);
+    expect(isGenerativePersistPhase("generating")).toBe(false);
+    expect(isGenerativePersistPhase("queued")).toBe(false);
   });
 
   it("sets and clears upload progress without touching other phases", () => {

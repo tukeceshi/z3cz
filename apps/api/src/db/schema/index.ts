@@ -611,6 +611,8 @@ export const mediaResources = pgTable(
     upstreamUrl: text("upstream_url"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     contentSha256: text("content_sha256"),
+    generating: boolean("generating").notNull().default(false),
+    failed: boolean("failed").notNull().default(false),
     createdAt: createCreatedAt(),
   },
   (table) => [index("media_resources_organization_id_idx").on(table.organizationId)]

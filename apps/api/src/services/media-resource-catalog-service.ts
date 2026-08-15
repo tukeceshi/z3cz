@@ -74,6 +74,9 @@ export function mediaReferenceToCatalogInsert(
 
       storageKey: null,
 
+      generating: false,
+      failed: false,
+
     };
 
   }
@@ -98,6 +101,9 @@ export function mediaReferenceToCatalogInsert(
 
       expiresAt: ref.expiresAt ?? null,
 
+      generating: false,
+      failed: false,
+
     };
 
   }
@@ -121,6 +127,9 @@ export function mediaReferenceToCatalogInsert(
       upstreamUrl: null,
 
       expiresAt: null,
+
+      generating: false,
+      failed: false,
 
     };
 
@@ -163,6 +172,9 @@ export function registerRequestToCatalogInsert(
       resource.kind === "ephemeral" ? (resource.expiresAt ?? null) : null,
 
     contentSha256: resource.contentSha256 ?? null,
+
+    generating: resource.generating ?? false,
+    failed: resource.failed ?? false,
 
   };
 
@@ -483,6 +495,42 @@ export async function resolveMediaResources(
     if (!catalogEntry) {
 
       unresolved.push(resourceId);
+
+      continue;
+
+    }
+
+
+
+    if (catalogEntry.generating || catalogEntry.failed) {
+
+      resolved.push({
+
+        resourceId,
+
+        kind: catalogEntry.kind,
+
+        mimeType: catalogEntry.mimeType,
+
+        generating: catalogEntry.generating,
+
+        failed: catalogEntry.failed,
+
+        ...(catalogEntry.upstreamUrl
+
+          ? {
+
+              url: catalogEntry.upstreamUrl,
+
+              upstreamUrl: catalogEntry.upstreamUrl,
+
+            }
+
+          : {}),
+
+        expiresAt: catalogEntry.expiresAt ?? undefined,
+
+      });
 
       continue;
 
