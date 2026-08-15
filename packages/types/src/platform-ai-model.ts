@@ -567,6 +567,24 @@ export interface AiVideoResultHistory {
   readonly selectedId: string | null;
 }
 
+export interface AiAudioResultHistoryItem {
+  readonly id: string;
+  readonly audios: readonly WorkflowMediaValue[];
+  readonly prompt: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly platformModelId?: string;
+  readonly aiInterfaceId?: string;
+  readonly providerModelId?: string;
+  readonly modelDisplayName?: string;
+  readonly createdAt: string;
+  readonly jobId?: string;
+}
+
+export interface AiAudioResultHistory {
+  readonly items: readonly AiAudioResultHistoryItem[];
+  readonly selectedId: string | null;
+}
+
 export const DEEPSEEK_V4_FLASH_CANONICAL_ID = "deepseek-v4-flash" as const;
 
 export const DEFAULT_TEXT_MODEL_PARAMETER_RULES: TextModelParameterRules = {
