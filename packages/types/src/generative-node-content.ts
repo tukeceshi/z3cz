@@ -176,10 +176,8 @@ function readTextHistory(inputs: readonly Parameter[]): AiTextResultHistory {
 function syncSelectedHistoryMedia<T extends { readonly id: string }>(
   inputs: Parameter[],
   historyInputName: string,
-  resultInputName: string,
   selectedId: string | null,
   media: readonly WorkflowMediaValue[],
-  getMedia: (item: T) => readonly WorkflowMediaValue[],
   withMedia: (item: T, media: readonly WorkflowMediaValue[]) => T
 ): Parameter[] {
   if (!selectedId) {
@@ -229,13 +227,8 @@ function applyMediaResultToNode(
     inputs = syncSelectedHistoryMedia(
       inputs,
       params.historyInputName,
-      params.resultInputName,
       historyRaw.selectedId,
       params.media,
-      (item) => (item as { images?: WorkflowMediaValue[]; videos?: WorkflowMediaValue[]; audios?: WorkflowMediaValue[] }).images ??
-        (item as AiVideoResultHistoryItem).videos ??
-        (item as AiAudioResultHistoryItem).audios ??
-        [],
       (item, nextMedia) => {
         if ("images" in item) {
           return { ...item, images: [...nextMedia] };
@@ -305,7 +298,6 @@ export function appendImageGeneratingContent(
   const mimeType = params.mimeType ?? "image/png";
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
-  const generatingRefs = buildGeneratingResourceRefs(params.resourceIds, mimeType);
 
   const newItems: AiImageResultHistoryItem[] = params.resourceIds.map(
     (resourceId, index) => ({
