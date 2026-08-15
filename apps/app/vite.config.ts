@@ -71,9 +71,12 @@ function bootstrapArchivePreviewPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   build: {
     manifest: true,
+    // After "rendering chunks", Vite gzip-compresses every file just to print
+    // sizes. On 2GB Docker hosts that looks hung and can thrash the 1536MB heap.
+    reportCompressedSize: mode !== "docker-prod",
   },
   plugins: [
     tailwindcss(),
@@ -138,4 +141,4 @@ export default defineConfig({
       ),
     },
   },
-});
+}));
