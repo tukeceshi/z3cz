@@ -126,8 +126,8 @@ async function main() {
     case "rebuild": {
       render();
       // Sequential builds avoid OOM on small VPS (parallel bake).
-      console.log("Building images sequentially (api → www → app)...");
-      for (const service of ["api", "www", "app"]) {
+      console.log("Building images sequentially (api → app)...");
+      for (const service of ["api", "app"]) {
         const buildCode = compose(["build", service]);
         if (buildCode !== 0) {
           process.exit(buildCode);

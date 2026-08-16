@@ -41,7 +41,7 @@ const devVars = readKeyValueFile(devVarsPath);
 
 /** @type {Map<string, string>} */
 const merged = new Map(example);
-for (const key of ["JWT_SECRET", "SECRET_MASTER_KEY", "INBOUND_EMAIL_SECRET"]) {
+for (const key of ["JWT_SECRET", "SECRET_MASTER_KEY"]) {
   const fromDev = devVars.get(key);
   if (fromDev && !fromDev.includes("change-me") && !fromDev.includes("CHANGE_ME")) {
     merged.set(key, fromDev);
@@ -52,10 +52,6 @@ if (!devVars.has("JWT_SECRET")) {
   console.warn(
     "[sync-env-docker-prod] apps/api/.dev.vars 无 JWT_SECRET，请手动编辑 .env.docker.prod"
   );
-}
-
-if (!merged.get("INBOUND_EMAIL_SECRET")?.trim()) {
-  merged.set("INBOUND_EMAIL_SECRET", devVars.get("JWT_SECRET") ?? "dev-inbound-email-secret");
 }
 
 const lines = fs.readFileSync(examplePath, "utf8").split(/\r?\n/).map((line) => {

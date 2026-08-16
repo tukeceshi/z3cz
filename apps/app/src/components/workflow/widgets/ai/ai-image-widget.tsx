@@ -8,7 +8,7 @@ import {
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
-import { useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useParams } from "react-router";
 import ZoomInIcon from "lucide-react/icons/zoom-in";
 
@@ -73,10 +73,16 @@ import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASS
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasMediaCover } from "../../canvas-media-cover";
-import {
-  StudioImagePhotoProvider,
-  StudioImageZoomHiddenTrigger,
-} from "../../studio-image-lightbox";
+const StudioImagePhotoProvider = lazy(() =>
+  import("../../studio-image-lightbox").then((module) => ({
+    default: module.StudioImagePhotoProvider,
+  }))
+);
+const StudioImageZoomHiddenTrigger = lazy(() =>
+  import("../../studio-image-lightbox").then((module) => ({
+    default: module.StudioImageZoomHiddenTrigger,
+  }))
+);
 import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
@@ -348,6 +354,7 @@ function AiImageWidget({
           event.target.value = "";
         }}
       />
+      <Suspense fallback={null}>
       <StudioImagePhotoProvider>
         {canDownloadPrimaryImage && coverImage && imageDisplayUrl ? (
           <StudioImageZoomHiddenTrigger
@@ -447,6 +454,7 @@ function AiImageWidget({
           ) : null}
         </div>
       </StudioImagePhotoProvider>
+      </Suspense>
 
       {generateError ? (
         <GenerativeCardErrorDetailDialog

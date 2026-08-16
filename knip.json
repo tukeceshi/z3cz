@@ -10,11 +10,6 @@
       },
       "ignore": ["src/components/ui/**", "src/services/**"]
     },
-    "apps/www": {
-      "entry": ["src/routes/**/*.tsx", "workers/app.ts"],
-      "project": ["src/**/*.{ts,tsx}", "workers/**/*.ts"],
-      "ignoreDependencies": ["@react-router/node", "isbot", "@react-router/cloudflare"]
-    },
     "apps/api": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"],

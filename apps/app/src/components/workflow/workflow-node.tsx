@@ -1,10 +1,9 @@
-import type { ObjectReference, ToolReference } from "@dafthunk/types";
+import type { ObjectReference } from "@dafthunk/types";
 import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
 import { DynamicIcon } from "lucide-react/dynamic.mjs";
-import BoxIcon from "lucide-react/icons/box";
 import BracesIcon from "lucide-react/icons/braces";
 import CalendarIcon from "lucide-react/icons/calendar";
 import CheckIcon from "lucide-react/icons/check";
@@ -19,15 +18,11 @@ import ImageIcon from "lucide-react/icons/image";
 import LayersIcon from "lucide-react/icons/layers";
 import LinkIcon from "lucide-react/icons/link";
 import LockIcon from "lucide-react/icons/lock";
-import MailIcon from "lucide-react/icons/mail";
 import MusicIcon from "lucide-react/icons/music";
-import SettingsIcon from "lucide-react/icons/settings";
 import TablePropertiesIcon from "lucide-react/icons/table-properties";
-import TrashIcon from "lucide-react/icons/trash-2";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
-import WrenchIcon from "lucide-react/icons/wrench";
-import { createElement, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { createElement, memo, useMemo, useState } from "react";
 import { useParams } from "react-router";
 
 import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
@@ -35,7 +30,6 @@ import { useTranslation } from "@/components/locale-provider";
 import { useAuth } from "@/components/auth-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { TranslateFn } from "@/i18n";
 import { cn } from "@/utils/utils";
 import {
   AI_TEXT_CARD_WIDTH_PX,
@@ -78,26 +72,7 @@ import { useGenerativeConnectionHighlight } from "./generative-connection-highli
 import { PropertyField } from "./fields";
 import { Field } from "./fields/field";
 import { SubscriptionBadge } from "./subscription-badge";
-import { ToolConfigPanel } from "./tool-config-panel";
 import { registry } from "./widgets";
-import {
-  CFG_META_KEY,
-  CLOUDFLARE_GATEWAY_MODEL_NODE_TYPE,
-  decodeCloudflareGatewayModelMeta,
-  deriveCloudflareGatewayModelDocs,
-} from "./widgets/input/cloudflare-gateway-model-utils";
-import {
-  CF_META_KEY,
-  CLOUDFLARE_MODEL_NODE_TYPE,
-  decodeCloudflareModelMeta,
-  deriveCloudflareModelDocs,
-} from "./widgets/input/cloudflare-model-utils";
-import {
-  decodeReplicateModelMeta,
-  deriveReplicateModelDocs,
-  REPLICATE_MODEL_NODE_TYPE,
-  RP_META_KEY,
-} from "./widgets/input/replicate-model-utils";
 import {
   clearNodeInput,
   convertValueByType,
@@ -107,46 +82,12 @@ import {
 } from "./workflow-context";
 import { WorkflowNodeBottomPanel } from "./workflow-node-bottom-panel";
 import { useWorkflowNodeBottomPanelData } from "./workflow-node-canvas-ui";
-import { WorkflowToolSelector } from "./workflow-tool-selector";
 import {
   InputOutputType,
   NodeExecutionState,
   WorkflowParameter,
   type WorkflowNodeType as CanvasWorkflowNodeType,
 } from "./workflow-types";
-
-/**
- * Derive docs-dialog overrides for generic node types whose description /
- * documentation / referenceUrl depend on user-selected configuration (e.g.
- * the Cloudflare Model node's selected model id). Returns an empty object
- * for every other node type, leaving the template's static fields in place.
- */
-function deriveDocOverridesForNode(
-  nodeType: string,
-  inputs: WorkflowParameter[],
-  metadata: Record<string, string> | undefined,
-  t: TranslateFn
-): { description?: string; documentation?: string; referenceUrl?: string } {
-  if (nodeType === CLOUDFLARE_MODEL_NODE_TYPE) {
-    const modelId = inputs.find((i) => i.id === "model")?.value;
-    if (typeof modelId !== "string" || !modelId) return {};
-    const meta = decodeCloudflareModelMeta(metadata?.[CF_META_KEY]);
-    return deriveCloudflareModelDocs(modelId, meta, t);
-  }
-  if (nodeType === REPLICATE_MODEL_NODE_TYPE) {
-    const modelId = inputs.find((i) => i.id === "model")?.value;
-    if (typeof modelId !== "string" || !modelId) return {};
-    const meta = decodeReplicateModelMeta(metadata?.[RP_META_KEY]);
-    return deriveReplicateModelDocs(modelId, meta, t);
-  }
-  if (nodeType === CLOUDFLARE_GATEWAY_MODEL_NODE_TYPE) {
-    const modelId = inputs.find((i) => i.id === "model")?.value;
-    if (typeof modelId !== "string" || !modelId) return {};
-    const meta = decodeCloudflareGatewayModelMeta(metadata?.[CFG_META_KEY]);
-    return deriveCloudflareGatewayModelDocs(modelId, meta, t);
-  }
-  return {};
-}
 
 export interface WorkflowNodeType {
   name: string;
@@ -193,7 +134,7 @@ export const TypeBadge = memo(
   }) => {
   const iconSize = "size-2.5!";
 
-  const icon: Record<InputOutputType, React.ReactNode> = {
+  const icon: Partial<Record<InputOutputType, React.ReactNode>> = {
     string: <TypeIcon className={iconSize} />,
     number: <HashIcon className={iconSize} />,
     boolean: <CheckIcon className={iconSize} />,
@@ -202,8 +143,6 @@ export const TypeBadge = memo(
     document: <FileTextIcon className={iconSize} />,
     audio: <MusicIcon className={iconSize} />,
     video: <VideoIcon className={iconSize} />,
-    gltf: <BoxIcon className={iconSize} />,
-    buffergeometry: <BoxIcon className={iconSize} />,
     json: <BracesIcon className={iconSize} />,
     date: <CalendarIcon className={iconSize} />,
     geojson: <GlobeIcon className={iconSize} />,
@@ -212,14 +151,9 @@ export const TypeBadge = memo(
     database: <DatabaseIcon className={iconSize} />,
     dataset: <FolderSearchIcon className={iconSize} />,
     queue: <LayersIcon className={iconSize} />,
-    email: <MailIcon className={iconSize} />,
-    discord: <LinkIcon className={iconSize} />,
-    telegram: <LinkIcon className={iconSize} />,
-    whatsapp: <LinkIcon className={iconSize} />,
-    slack: <LinkIcon className={iconSize} />,
     integration: <LinkIcon className={iconSize} />,
     any: <AsteriskIcon className={iconSize} />,
-  } satisfies Record<InputOutputType, React.ReactNode>;
+  };
 
   const handleClick = (e: React.MouseEvent<HTMLSpanElement>) => {
     if (disabled) return;
@@ -306,7 +240,7 @@ export const TypeBadge = memo(
             }
           )}
         >
-          {icon[type]}
+          {icon[type] ?? icon.any}
         </span>
       </Handle>
     </div>
@@ -332,7 +266,6 @@ export const WorkflowNode = memo(
       updateNodeData,
       disabled,
       nodeTypes,
-      allowedNodeTypes,
     } = useWorkflowActions();
     const { t } = useTranslation();
     const { organization } = useAuth();
@@ -346,11 +279,9 @@ export const WorkflowNode = memo(
       typeof data.viewportZoom === "number" ? data.viewportZoom : 1;
     const isViewportMovingCanvas = data.isViewportMoving === true;
     const isDragging = dragging;
-    const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
     const [isDocsOpen, setIsDocsOpen] = useState(false);
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [activeOutputId, setActiveOutputId] = useState<string | null>(null);
-    const [configToolId, setConfigToolId] = useState<string | null>(null);
     const [emptyTextEditing, setEmptyTextEditing] = useState(false);
 
     const nodeType = data.nodeType || "";
@@ -393,20 +324,12 @@ export const WorkflowNode = memo(
       }
       if (!template) return null;
 
-      const overrides = deriveDocOverridesForNode(
-        nodeType,
-        data.inputs,
-        data.metadata,
-        t
-      );
-
       return {
         ...template,
-        ...overrides,
         inputs: data.inputs ?? template.inputs,
         outputs: data.outputs ?? template.outputs,
       };
-    }, [nodeTypes, nodeType, data.name, data.inputs, data.outputs, data.metadata, t]);
+    }, [nodeTypes, nodeType, data.name, data.inputs, data.outputs]);
 
     const widget = useMemo(
       () =>
@@ -445,118 +368,13 @@ export const WorkflowNode = memo(
         "dataset",
         "queue",
         "schema",
-        "email",
         "integration",
-        "discord",
-        "telegram",
       ]);
       return data.inputs.filter(
         (input) =>
           resourceTypes.has(input.type) && !widget?.managedFields?.has(input.id)
       );
     }, [data.inputs, widget]);
-
-    const handleToolSelectorClose = () => {
-      setIsToolSelectorOpen(false);
-    };
-
-    const handleToolsSelect = (tool: ToolReference) => {
-      if (disabled || !updateNodeData) return;
-
-      // Use functional updater to always read the latest node data,
-      // avoiding stale closure issues with React.memo
-      updateNodeData(id, (currentData) => {
-        const toolsInput = currentData.inputs.find(
-          (input) => input.id === "tools"
-        );
-        if (!toolsInput) return {};
-
-        const currentTools = Array.isArray(toolsInput.value)
-          ? (toolsInput.value as ToolReference[])
-          : [];
-
-        if (currentTools.some((t) => t.identifier === tool.identifier)) {
-          return {};
-        }
-
-        const updatedTools = [...currentTools, tool];
-        const updatedInputs = currentData.inputs.map((input) =>
-          input.id === "tools"
-            ? ({ ...input, value: updatedTools } as WorkflowParameter)
-            : input
-        );
-        return { inputs: updatedInputs };
-      });
-    };
-
-    const handleRemoveTool = (toolIdentifier: string) => {
-      if (disabled || !updateNodeData) return;
-
-      updateNodeData(id, (currentData) => {
-        const toolsInput = currentData.inputs.find(
-          (input) => input.id === "tools"
-        );
-        if (!toolsInput) return {};
-
-        const currentTools = Array.isArray(toolsInput.value)
-          ? (toolsInput.value as ToolReference[])
-          : [];
-
-        const updatedTools = currentTools.filter(
-          (t) => t.identifier !== toolIdentifier
-        );
-
-        const updatedInputs = currentData.inputs.map((input) =>
-          input.id === "tools"
-            ? ({ ...input, value: updatedTools } as WorkflowParameter)
-            : input
-        );
-        return { inputs: updatedInputs };
-      });
-    };
-
-    const handleToolConfigSave = (
-      toolIdentifier: string,
-      config: Record<string, unknown>
-    ) => {
-      if (disabled || !updateNodeData) return;
-
-      updateNodeData(id, (currentData) => {
-        const toolsInput = currentData.inputs.find(
-          (input) => input.id === "tools"
-        );
-        if (!toolsInput) return {};
-
-        const currentTools = Array.isArray(toolsInput.value)
-          ? (toolsInput.value as ToolReference[])
-          : [];
-
-        const updatedTools = currentTools.map((t) =>
-          t.identifier === toolIdentifier
-            ? {
-                ...t,
-                config: Object.keys(config).length > 0 ? config : undefined,
-              }
-            : t
-        );
-
-        const updatedInputs = currentData.inputs.map((input) =>
-          input.id === "tools"
-            ? ({ ...input, value: updatedTools } as WorkflowParameter)
-            : input
-        );
-        return { inputs: updatedInputs };
-      });
-    };
-
-    // Get current selected tools from the tools input
-    const getCurrentSelectedTools = (): ToolReference[] => {
-      const toolsInput = data.inputs.find((input) => input.id === "tools");
-      if (toolsInput && Array.isArray(toolsInput.value)) {
-        return toolsInput.value as ToolReference[];
-      }
-      return [];
-    };
 
     const handleInputClick = (
       param: WorkflowParameter,
@@ -813,103 +631,6 @@ export const WorkflowNode = memo(
             </div>
           )}
 
-          {/* Tools bar (between header and body) */}
-          {data.functionCalling && (
-            <div className="px-2 py-2 nodrag border-b space-y-2">
-              <button
-                type="button"
-                className={cn(
-                  "w-full px-2 py-1 rounded text-xs font-medium flex items-center justify-center gap-1.5",
-                  "border border-border bg-background hover:bg-neutral-100",
-                  "dark:hover:bg-neutral-800",
-                  {
-                    "opacity-50 cursor-not-allowed": disabled,
-                  }
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (disabled) return;
-                  setIsToolSelectorOpen(true);
-                }}
-                disabled={disabled}
-              >
-                <WrenchIcon className="h-3 w-3" />
-                Add Tool
-              </button>
-              {getCurrentSelectedTools().length > 0 && (
-                <div className="space-y-1">
-                  {[...getCurrentSelectedTools()]
-                    .sort((a, b) => {
-                      const tplA = nodeTypes?.find(
-                        (t) => t.id === a.identifier
-                      );
-                      const tplB = nodeTypes?.find(
-                        (t) => t.id === b.identifier
-                      );
-                      const nameA = tplA?.name || a.identifier;
-                      const nameB = tplB?.name || b.identifier;
-                      return nameA.localeCompare(nameB);
-                    })
-                    .map((tool, idx) => {
-                      const tpl = nodeTypes?.find(
-                        (t) => t.id === tool.identifier
-                      );
-                      return (
-                        <div
-                          key={`${tool.identifier}-${idx}`}
-                          className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-neutral-100 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 w-full"
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            {tpl?.icon && (
-                              <DynamicIcon
-                                name={tpl.icon as any}
-                                className="h-3 w-3 shrink-0"
-                              />
-                            )}
-                            <span className="truncate">
-                              {tpl?.name || tool.identifier}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              className={cn(
-                                "hover:text-neutral-900 dark:hover:text-neutral-100",
-                                tool.config &&
-                                  Object.keys(tool.config).length > 0
-                                  ? "text-blue-500 dark:text-blue-400"
-                                  : "text-neutral-400 dark:text-neutral-500"
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfigToolId(tool.identifier);
-                              }}
-                              disabled={disabled}
-                              aria-label={t("workflow.node.configureTool")}
-                            >
-                              <SettingsIcon className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              className="text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveTool(tool.identifier);
-                              }}
-                              disabled={disabled}
-                              aria-label={t("workflow.node.removeTool")}
-                            >
-                              <TrashIcon className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
           {(!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode) ? (
           <div className="py-2 grid grid-cols-2 justify-between gap-3">
@@ -1009,36 +730,6 @@ export const WorkflowNode = memo(
             />
           </div>
         ) : null}
-
-        <WorkflowToolSelector
-          open={data.functionCalling ? isToolSelectorOpen : false}
-          onClose={handleToolSelectorClose}
-          onSelect={handleToolsSelect}
-          templates={nodeTypes || []}
-        />
-
-        {configToolId
-          ? (() => {
-            const tool = getCurrentSelectedTools().find(
-              (t) => t.identifier === configToolId
-            );
-            const tpl = nodeTypes?.find((t) => t.id === configToolId);
-            if (!tool || !tpl) return null;
-            return (
-              <ToolConfigPanel
-                open={!!configToolId}
-                onClose={() => setConfigToolId(null)}
-                onSave={(config) => {
-                  handleToolConfigSave(configToolId, config);
-                  setConfigToolId(null);
-                }}
-                toolName={tpl.name}
-                inputs={tpl.inputs}
-                currentConfig={tool.config ?? {}}
-              />
-            );
-          })()
-          : null}
 
         {resolvedNodeType && isDocsOpen ? (
           <NodeDocsDialog

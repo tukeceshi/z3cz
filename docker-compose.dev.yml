@@ -1,8 +1,8 @@
-# 全容器开发栈：Postgres + API + www + app（3100 / 3101 / 3102 均在容器内）
+# 全容器开发栈：Postgres + API + app（3101 / 3102 均在容器内）
 #
 # 启动：docker compose up -d --build --wait
 # 状态：docker compose ps
-# 日志：docker compose logs -f api www app
+# 日志：docker compose logs -f api app
 # 重置：docker compose down -v
 # 单容器旧模式：docker compose --profile monolith up -d --build
 #
@@ -50,7 +50,6 @@ services:
       - dafthunk_node_modules_api_root:/app/node_modules
       - dafthunk_node_modules_api:/app/apps/api/node_modules
       # 遮盖宿主机兄弟包 node_modules，避免 Windows 路径泄漏进 Linux 容器
-      - dafthunk_node_modules_api_mask_www:/app/apps/www/node_modules
       - dafthunk_node_modules_api_mask_app:/app/apps/app/node_modules
       - dafthunk_pnpm_store:/pnpm/store
       - dafthunk_local_storage:/app/data/storage
@@ -90,44 +89,6 @@ services:
     stdin_open: true
     tty: true
 
-  www:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev-www
-      args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-    image: dafthunk-dev-www:local
-    container_name: dafthunk-www-dev
-    depends_on:
-      api:
-        condition: service_healthy
-      supabase-db:
-        condition: service_healthy
-    ports:
-      - "${WWW_PORT:-3100}:3100"
-    volumes:
-      - .:/app
-      - dafthunk_node_modules_www_root:/app/node_modules
-      - dafthunk_node_modules_www:/app/apps/www/node_modules
-      - dafthunk_node_modules_www_mask_app:/app/apps/app/node_modules
-      - dafthunk_node_modules_www_mask_api:/app/apps/api/node_modules
-      - dafthunk_pnpm_store:/pnpm/store
-    env_file:
-      - path: .env.docker
-        required: false
-    environment:
-      DAFTHUNK_SERVICE: www
-      HOST: 0.0.0.0
-      # www 需要 nodes.json；entrypoint 按源文件哈希决定是否 extract（方案 II）
-      SKIP_EXTRACT_NODES: "0"
-    networks:
-      - dafthunk-network
-    restart: on-failure:5
-    stdin_open: true
-    tty: true
-
   app:
     build:
       context: .
@@ -147,7 +108,6 @@ services:
       - .:/app
       - dafthunk_node_modules_app_root:/app/node_modules
       - dafthunk_node_modules_app:/app/apps/app/node_modules
-      - dafthunk_node_modules_app_mask_www:/app/apps/www/node_modules
       - dafthunk_node_modules_app_mask_api:/app/apps/api/node_modules
       - dafthunk_pnpm_store:/pnpm/store
     env_file:
@@ -168,8 +128,7 @@ services:
   # Optional single-origin edge for parity with docker-host (default off).
   # Usage: docker compose --profile gateway up -d
   # Browser: http://localhost:8080  (do not mix cookies with :3101)
-  # Gateway parity: set in .env.docker — VITE_WWW_BASENAME=/m,
-  # VITE_WEBSITE_URL=http://localhost:8080/m, VITE_APP_URL=http://localhost:8080
+  # Gateway parity: set in .env.docker — VITE_APP_URL=http://localhost:8080
   caddy-gateway:
     profiles: ["gateway"]
     image: caddy:2.9-alpine
@@ -177,7 +136,6 @@ services:
     depends_on:
       - app
       - api
-      - www
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     volumes:
@@ -194,15 +152,9 @@ volumes:
   # 方案 I：按服务隔离 root + 包级 node_modules
   dafthunk_node_modules_api_root:
   dafthunk_node_modules_api:
-  dafthunk_node_modules_api_mask_www:
   dafthunk_node_modules_api_mask_app:
-  dafthunk_node_modules_www_root:
-  dafthunk_node_modules_www:
-  dafthunk_node_modules_www_mask_app:
-  dafthunk_node_modules_www_mask_api:
   dafthunk_node_modules_app_root:
   dafthunk_node_modules_app:
-  dafthunk_node_modules_app_mask_www:
   dafthunk_node_modules_app_mask_api:
   dafthunk_pnpm_store:
   dafthunk_postgres_data:

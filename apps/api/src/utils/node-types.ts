@@ -1,8 +1,18 @@
+import { AiAudioNode } from "@dafthunk/runtime/nodes/ai/ai-audio-node";
+import { AiImageNode } from "@dafthunk/runtime/nodes/ai/ai-image-node";
+import { AiTextNode } from "@dafthunk/runtime/nodes/ai/ai-text-node";
+import { AiVideoNode } from "@dafthunk/runtime/nodes/ai/ai-video-node";
 import type { NodeType } from "@dafthunk/types";
 import { AI_GENERATIVE_NODE_TYPES } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
-import { loadNodeTypesFromJson } from "../runtime/node-types-from-json";
+
+const CORE_NODE_TYPES: readonly NodeType[] = [
+  AiTextNode.nodeType,
+  AiImageNode.nodeType,
+  AiVideoNode.nodeType,
+  AiAudioNode.nodeType,
+];
 
 function filterToCoreGenerativeNodeTypes(
   nodeTypes: readonly NodeType[]
@@ -17,7 +27,7 @@ export async function getAllNodeTypes(
   developerMode = false
 ): Promise<NodeType[]> {
   if (env.RUNTIME === "node") {
-    return filterToCoreGenerativeNodeTypes(loadNodeTypesFromJson());
+    return filterToCoreGenerativeNodeTypes(CORE_NODE_TYPES);
   }
 
   const { createCloudflareNodeRegistry } = await import(

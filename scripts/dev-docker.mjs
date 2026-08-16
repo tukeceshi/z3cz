@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Docker 开发栈启动顺序：先启动 API，等待 /health 就绪后再启动 www 与 app，
+ * Docker 开发栈启动顺序：先启动 API，等待 /health 就绪后再启动 app，
  * 避免 app 代理在 API 启动完成前大量报 ECONNREFUSED。
  */
 import { spawn } from "node:child_process";
@@ -103,24 +103,17 @@ try {
   process.exit(1);
 }
 
-console.log("[dev:docker] Starting www and app...");
-const frontends = spawnPnpm([
-  "--parallel",
-  "--filter",
-  "@dafthunk/www",
-  "--filter",
-  "@dafthunk/app",
-  "dev:docker",
-]);
+console.log("[dev:docker] Starting app...");
+const app = spawnPnpm(["--filter", "@dafthunk/app", "dev:docker"]);
 forwardExit(api, "API");
-forwardExit(frontends, "frontends");
+forwardExit(app, "app");
 
 api.on("exit", (code) => {
-  frontends.kill("SIGTERM");
+  app.kill("SIGTERM");
   process.exit(code ?? 0);
 });
 
-frontends.on("exit", (code) => {
+app.on("exit", (code) => {
   api.kill("SIGTERM");
   process.exit(code ?? 0);
 });

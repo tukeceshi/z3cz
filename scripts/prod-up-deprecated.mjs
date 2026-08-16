@@ -17,7 +17,7 @@ Prefer Discourse-style self-host:
   pnpm host:setup
   pnpm host:rebuild
 
-Legacy stack (www + multi-port, no Caddy) still available with:
+Legacy stack (multi-port, no Caddy) still available with:
   ALLOW_LEGACY_PROD=1 pnpm prod:up
 `);
 

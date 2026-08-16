@@ -7,7 +7,7 @@ import {
   type MediaReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
@@ -18,8 +18,13 @@ import {
   fitGenerativeHistoryPreviewPlaceholder,
   fitGenerativeHistoryPreviewSize,
 } from "./fit-generative-history-preview-size";
-import { WorkflowMediaAudioPlayer } from "./workflow-media-audio-player";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
+
+const WorkflowMediaAudioPlayer = lazy(() =>
+  import("./workflow-media-audio-player").then((module) => ({
+    default: module.WorkflowMediaAudioPlayer,
+  }))
+);
 
 export type GenerativeHistoryMediaKind = "image" | "video" | "audio";
 
@@ -333,13 +338,15 @@ export function GenerativeHistoryAudioPreview({
   }
 
   return (
-    <WorkflowMediaAudioPlayer
-      key={mediaKey}
-      src={displayUrl}
-      className={className}
-      variant="card"
-      onError={() => setMediaError(true)}
-    />
+    <Suspense fallback={null}>
+      <WorkflowMediaAudioPlayer
+        key={mediaKey}
+        src={displayUrl}
+        className={className}
+        variant="card"
+        onError={() => setMediaError(true)}
+      />
+    </Suspense>
   );
 }
 

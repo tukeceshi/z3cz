@@ -5,9 +5,7 @@ export const RESOURCE_FEATURE_IDS = [
   "integrations",
   "secrets",
   "ai-interfaces",
-  "emails",
   "queues",
-  "bots",
 ] as const;
 
 /** Org sidebar workflow section — always visible, not controlled by featureConfig */
@@ -50,9 +48,7 @@ export const DEFAULT_PLATFORM_FEATURE_CONFIG: PlatformFeatureConfig = {
     datasets: { enabled: false },
     integrations: { enabled: false },
     secrets: { enabled: false },
-    emails: { enabled: false },
     queues: { enabled: false },
-    bots: { enabled: false },
   },
   defaultWorkflowSchemeId: "basic-canvas",
 };

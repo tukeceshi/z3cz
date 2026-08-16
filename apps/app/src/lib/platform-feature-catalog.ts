@@ -87,40 +87,12 @@ export const FEATURE_CATALOG: Record<ResourceFeatureId, FeatureCatalogEntry> = {
       { key: "CLOUDFLARE_API_TOKEN", hintKey: "featureSettings.env.cloudflareApiToken" },
     ],
   },
-  emails: {
-    id: "emails",
-    category: "admin_and_docker",
-    labelKey: "sidebar.emails",
-    descriptionKey: "featureSettings.descriptions.emails",
-    envVars: [
-      { key: "SEND_EMAIL", hintKey: "featureSettings.env.sendEmail" },
-      { key: "SEND_EMAIL_FROM", hintKey: "featureSettings.env.sendEmailFrom" },
-      { key: "EMAIL_DOMAIN", hintKey: "featureSettings.env.emailDomain" },
-      { key: "INBOUND_EMAIL_SECRET", hintKey: "featureSettings.env.inboundEmailSecret" },
-    ],
-  },
   queues: {
     id: "queues",
     category: "admin",
     labelKey: "sidebar.queues",
     descriptionKey: "featureSettings.descriptions.queues",
     envVars: [],
-  },
-  bots: {
-    id: "bots",
-    category: "admin_and_docker",
-    labelKey: "sidebar.bots",
-    descriptionKey: "featureSettings.descriptions.bots",
-    envVars: [
-      {
-        key: "INTEGRATION_DISCORD_CLIENT_ID",
-        hintKey: "featureSettings.env.integrationDiscordClientId",
-      },
-      {
-        key: "INTEGRATION_DISCORD_CLIENT_SECRET",
-        hintKey: "featureSettings.env.integrationDiscordClientSecret",
-      },
-    ],
   },
 };
 

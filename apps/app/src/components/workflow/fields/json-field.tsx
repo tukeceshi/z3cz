@@ -1,9 +1,14 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
-import { CodeEditor } from "@/components/ui/code-editor";
 import { cn } from "@/utils/utils";
+
+const CodeEditor = lazy(() =>
+  import("@/components/ui/code-editor").then((module) => ({
+    default: module.CodeEditor,
+  }))
+);
 
 import { ClearButton } from "./clear-button";
 import { FieldPlaceholder } from "./field-placeholder";
@@ -81,12 +86,14 @@ export function JsonField({
       }}
     >
       <div className="h-[200px] rounded-md border border-border overflow-hidden bg-background">
-        <CodeEditor
-          value={stringValue}
-          onChange={handleChange}
-          language="json"
-          readonly={readonly}
-        />
+        <Suspense fallback={null}>
+          <CodeEditor
+            value={stringValue}
+            onChange={handleChange}
+            language="json"
+            readonly={readonly}
+          />
+        </Suspense>
       </div>
       {!disabled && !readonly && isValidJson && (
         <Button

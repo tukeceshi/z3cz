@@ -123,8 +123,6 @@ function workflowParameterTypesConnect(
     "audio",
     "video",
     "document",
-    "buffergeometry",
-    "gltf",
   ]);
   const exactMatch = outputType === inputType;
   const anyTypeMatch = outputType === "any" || inputType === "any";

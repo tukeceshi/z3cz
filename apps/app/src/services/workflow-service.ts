@@ -6,8 +6,6 @@ import {
   Edge,
   ExecuteWorkflowRequest,
   ExecuteWorkflowResponse,
-  GetBotTriggerResponse,
-  GetEmailTriggerResponse,
   GetWorkflowResponse,
   ListWorkflowsResponse,
   Node,
@@ -27,7 +25,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 
 import { useAuth } from "@/components/auth-context";
-import type { EmailData } from "@/components/workflow/execution-email-dialog";
 import type { HttpRequestConfig } from "@/components/workflow/http-request-config-dialog";
 import {
   NodeType,
@@ -400,8 +397,6 @@ export function useWorkflowExecution(
   orgId: string,
   wsExecuteFn?: (options?: { parameters?: Record<string, unknown> }) => void
 ) {
-  const [isEmailFormDialogVisible, setIsEmailFormDialogVisible] =
-    useState(false);
   const [
     isHttpRequestConfigDialogVisible,
     setIsHttpRequestConfigDialogVisible,
@@ -679,18 +674,6 @@ export function useWorkflowExecution(
 
       const lowercasedWorkflowType = workflowTypeString?.toLowerCase();
 
-      // Check for email workflow type first
-      if (lowercasedWorkflowType === "email_message") {
-        setIsEmailFormDialogVisible(true);
-        setExecutionContext({
-          id,
-          onExecution,
-          workflowType: workflowTypeString,
-        });
-        return;
-      }
-
-      // Then check for HTTP workflow type - show new HTTP request config dialog
       if (
         lowercasedWorkflowType === "http_webhook" ||
         lowercasedWorkflowType === "http_request"
@@ -705,31 +688,9 @@ export function useWorkflowExecution(
         return;
       }
 
-      // If no specific dialog conditions met for 'email' or 'http' (with params),
-      // or if it's another workflow type, execute directly.
       performExecutionAndPoll(id, onExecution);
     },
     [performExecutionAndPoll, cleanup]
-  );
-
-  const submitEmailFormData = useCallback(
-    (emailData: EmailData) => {
-      if (!executionContext) return;
-
-      const { id, onExecution } = executionContext;
-      // Send email parameters at top level for WebSocket path
-      // The HTTP path will receive these via JSON body parsing
-      const parameters = {
-        from: emailData.from,
-        subject: emailData.subject,
-        body: emailData.body,
-        attachments: emailData.attachments,
-      };
-      performExecutionAndPoll(id, onExecution, { parameters });
-      setIsEmailFormDialogVisible(false);
-      setExecutionContext(null);
-    },
-    [executionContext, performExecutionAndPoll]
   );
 
   const submitHttpRequestConfig = useCallback(
@@ -767,7 +728,6 @@ export function useWorkflowExecution(
   );
 
   const closeExecutionForm = useCallback(() => {
-    setIsEmailFormDialogVisible(false);
     setIsHttpRequestConfigDialogVisible(false);
     setExecutionContext(null);
   }, []);
@@ -779,146 +739,8 @@ export function useWorkflowExecution(
   return {
     executeWorkflow: executeWorkflowWithForm,
     cancelWorkflowExecution,
-    isEmailFormDialogVisible,
     isHttpRequestConfigDialogVisible,
-    submitEmailFormData,
     submitHttpRequestConfig,
     closeExecutionForm,
   };
 }
-
-/**
- * Hook to get an email trigger for a specific workflow
- */
-export const useEmailTrigger = (
-  workflowId: string | null,
-  options?: SWRConfiguration<GetEmailTriggerResponse | null>
-) => {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const { data, error, isLoading, mutate } =
-    useSWR<GetEmailTriggerResponse | null>(
-      orgId && workflowId
-        ? `/${orgId}${API_ENDPOINT_BASE}/${workflowId}/email-trigger`
-        : null,
-      orgId && workflowId
-        ? async () => {
-            try {
-              const response = await makeOrgRequest<GetEmailTriggerResponse>(
-                orgId,
-                API_ENDPOINT_BASE,
-                `/${workflowId}/email-trigger`
-              );
-              return response;
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                "status" in error &&
-                (error as any).status === 404
-              ) {
-                return null;
-              }
-              throw error;
-            }
-          }
-        : null,
-      options
-    );
-
-  return {
-    emailTrigger: data || null,
-    emailTriggerError: error || null,
-    isEmailTriggerLoading: isLoading,
-    mutateEmailTrigger: mutate,
-  };
-};
-
-/**
- * Hook to get a bot trigger for a specific workflow
- */
-export const useBotTrigger = (
-  workflowId: string | null,
-  options?: SWRConfiguration<GetBotTriggerResponse | null>
-) => {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const { data, error, isLoading, mutate } =
-    useSWR<GetBotTriggerResponse | null>(
-      orgId && workflowId
-        ? `/${orgId}${API_ENDPOINT_BASE}/${workflowId}/bot-trigger`
-        : null,
-      orgId && workflowId
-        ? async () => {
-            try {
-              const response = await makeOrgRequest<GetBotTriggerResponse>(
-                orgId,
-                API_ENDPOINT_BASE,
-                `/${workflowId}/bot-trigger`
-              );
-              return response;
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                "status" in error &&
-                (error as never as { status: number }).status === 404
-              ) {
-                return null;
-              }
-              throw error;
-            }
-          }
-        : null,
-      options
-    );
-
-  return {
-    botTrigger: data || null,
-    botTriggerError: error || null,
-    isBotTriggerLoading: isLoading,
-    mutateBotTrigger: mutate,
-  };
-};
-
-// Backward-compatible aliases
-export const useDiscordTrigger = (
-  workflowId: string | null,
-  options?: SWRConfiguration<GetBotTriggerResponse | null>
-) => {
-  const { botTrigger, botTriggerError, isBotTriggerLoading, mutateBotTrigger } =
-    useBotTrigger(workflowId, options);
-  return {
-    discordTrigger: botTrigger?.provider === "discord" ? botTrigger : null,
-    discordTriggerError: botTriggerError,
-    isDiscordTriggerLoading: isBotTriggerLoading,
-    mutateDiscordTrigger: mutateBotTrigger,
-  };
-};
-
-export const useTelegramTrigger = (
-  workflowId: string | null,
-  options?: SWRConfiguration<GetBotTriggerResponse | null>
-) => {
-  const { botTrigger, botTriggerError, isBotTriggerLoading, mutateBotTrigger } =
-    useBotTrigger(workflowId, options);
-  return {
-    telegramTrigger: botTrigger?.provider === "telegram" ? botTrigger : null,
-    telegramTriggerError: botTriggerError,
-    isTelegramTriggerLoading: isBotTriggerLoading,
-    mutateTelegramTrigger: mutateBotTrigger,
-  };
-};
-
-/**
- * Delete a bot trigger for a workflow
- */
-export const deleteBotTrigger = async (
-  orgId: string,
-  workflowId: string
-): Promise<void> => {
-  await makeOrgRequest(orgId, API_ENDPOINT_BASE, `/${workflowId}/bot-trigger`, {
-    method: "DELETE",
-  });
-};
-
-export const deleteDiscordTrigger = deleteBotTrigger;
-export const deleteTelegramTrigger = deleteBotTrigger;

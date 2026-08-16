@@ -100,7 +100,6 @@ export const zh: TranslationDictionary = {
     workflows: "工作流",
     executions: "执行记录",
     modelCalls: "模型调用记录",
-    emails: "邮件",
     queues: "队列",
     datasets: "数据集",
     databases: "数据库",
@@ -120,10 +119,8 @@ export const zh: TranslationDictionary = {
     integrations: "集成",
     secrets: "密钥",
     aiInterfaces: "AI/资源 接口",
-    bots: "机器人",
     feedback: "反馈",
     templates: "模板",
-    playground: "演练场",
     apiKeys: "API 密钥",
     members: "子账户",
     billing: "账单",
@@ -202,11 +199,6 @@ export const zh: TranslationDictionary = {
     previewHint: "保存后，站点名称与标语会同步更新到页头、登录页和浏览器标签。",
     newUserTourToggle: "新用户引导",
     newUserTourHint: "开启后，新用户首次进入组织时会自动展示应用内引导。",
-    homepageMode: "首页",
-    homepageModeConsole: "控制台",
-    homepageModeMarketing: "营销站",
-    homepageModeHelp:
-      "控制访问 / 时的去向。营销站模式跳转到同域 /m/；控制台模式进入登录页或控制台。",
   },
   bootstrapAdmin: {
     title: "首屏加速",
@@ -326,11 +318,8 @@ export const zh: TranslationDictionary = {
       integrations: "第三方 OAuth 与 API 集成。",
       secrets: "工作流加密密钥。",
       aiInterfaces: "配置 AI 与资源类上游接口，供工作流与画布节点使用。",
-      emails: "收发邮件地址。",
       queues: "异步工作流消息队列。",
-      bots: "Discord、Telegram、Slack、WhatsApp 机器人。",
       templates: "预置工作流模板库。",
-      playground: "单节点测试演练场。",
     },
     env: {
       cloudflareAccountId: "Cloudflare 账户 ID",
@@ -341,8 +330,6 @@ export const zh: TranslationDictionary = {
       integrationDiscordClientSecret: "Discord OAuth Client Secret",
       sendEmail: "出站邮件服务绑定",
       sendEmailFrom: "默认发件地址",
-      emailDomain: "收件域名",
-      inboundEmailSecret: "收件 Webhook 密钥",
     },
   },
   seo: {
@@ -360,7 +347,6 @@ export const zh: TranslationDictionary = {
       adminWorkflowDetail: "工作流详情 - 管理 - {{siteName}}",
       adminExecutions: "执行记录 - 管理 - {{siteName}}",
       adminExecutionDetail: "执行详情 - 管理 - {{siteName}}",
-      adminEmails: "邮件 - 管理 - {{siteName}}",
       adminSupport: "支持 - 管理 - {{siteName}}",
       adminQueues: "队列 - 管理 - {{siteName}}",
       adminDatasets: "数据集 - 管理 - {{siteName}}",
@@ -400,13 +386,7 @@ export const zh: TranslationDictionary = {
       databaseExplorer: "浏览器 - 数据库 - {{siteName}}",
       schemas: "模式 - {{siteName}}",
       queues: "队列 - 队列 - {{siteName}}",
-      emails: "邮件 - 邮件 - {{siteName}}",
-      emailInbox: "收件箱 - 邮件 - {{siteName}}",
-      bots: "机器人 - {{siteName}}",
-      botDetail: "机器人详情 - {{siteName}}",
-      botAccountDetail: "账户详情 - {{siteName}}",
       executionDetail: "执行详情 - 工作流 - {{siteName}}",
-      playground: "演练场 - 工作流 - {{siteName}}",
       editor: "编辑工作流 - {{siteName}}",
       form: "表单 - {{siteName}}",
       feedbackForm: "反馈 - {{siteName}}",
@@ -493,7 +473,6 @@ export const zh: TranslationDictionary = {
       organizations: "个组织",
       executions: "条执行记录",
       queues: "个队列",
-      emails: "个邮箱",
       datasets: "个数据集",
       databases: "个数据库",
     },
@@ -569,12 +548,6 @@ export const zh: TranslationDictionary = {
       emptyTitle: "未找到队列",
       emptySearch: "没有符合搜索条件的队列。",
       emptyDefault: "尚未创建任何队列。",
-    },
-    emails: {
-      title: "邮件",
-      emptyTitle: "未找到邮件",
-      emptySearch: "没有符合搜索条件的邮件。",
-      emptyDefault: "尚未创建任何邮件。",
     },
     datasets: {
       title: "数据集",
@@ -1216,24 +1189,6 @@ export const zh: TranslationDictionary = {
       notFound: "未找到模板",
       createWorkflow: "创建工作流",
     },
-    playground: {
-      title: "演练场",
-      searchPlaceholder: "搜索节点...",
-      empty: "没有匹配的节点。",
-      count: "共 {{total}} 个，显示 {{filtered}} 个",
-    },
-    playgroundExecute: {
-      nodeNotFound: "未找到节点类型「{{type}}」。",
-      help: "帮助",
-      execute: "执行",
-      executing: "执行中...",
-      inputs: "输入",
-      outputs: "输出",
-      error: "错误",
-      noInputs: "此节点没有输入。",
-      noOutputs: "此节点没有输出。",
-      executionFailed: "执行失败",
-    },
     schemaForm: {
       enterJson: "输入 JSON...",
     },
@@ -1372,57 +1327,6 @@ export const zh: TranslationDictionary = {
         javascript: "JavaScript",
         python: "Python",
       },
-    },
-    emails: {
-      title: "邮件",
-      description: "创建和管理用于工作流收发邮件的邮箱。",
-      createButton: "创建邮箱",
-      untitled: "未命名邮箱",
-      email: "邮箱",
-      viewMessages: "查看邮件",
-      saveToAddressBook: "保存到通讯录",
-      emptyTitle: "暂无邮箱",
-      emptyDescription: "创建一个邮箱开始使用。",
-      editDialogTitle: "编辑邮箱",
-      editDialogDescription: "重命名邮箱。",
-      renameWarning:
-        "重命名将替换邮箱地址（当前 {{address}}）。使用旧地址的发件人将无法再送达。",
-      deleteTitle: "删除邮箱",
-      deleteConfirm: "确定删除「{{name}}」？此操作无法撤销。",
-      createDialog: {
-        stepNameTitle: "创建邮箱",
-        stepSetupTitle: "邮箱已创建",
-        stepNameDescription: "为邮箱命名，系统将自动生成邮箱地址。",
-        stepSetupDescription: "邮箱已就绪，可在工作流中使用下方地址。",
-        createFailed: "创建邮箱失败",
-        nameLabel: "名称",
-        namePlaceholder: "如：客服收件箱",
-        nameHint: "在 z3cz.com 中显示的名称。",
-        createdBadge: "已创建",
-        creating: "创建中...",
-        create: "创建邮箱",
-        done: "完成",
-      },
-    },
-    emailInbox: {
-      title: "收件箱",
-      searchPlaceholder: "按主题或发件人搜索…",
-      search: "搜索",
-      clear: "清除",
-      loadingConversations: "加载会话中…",
-      loadConversationsFailed: "加载会话失败：{{message}}",
-      noConversations: "暂无会话",
-      noSubject: "（无主题）",
-      loadingMore: "加载更多…",
-      loadingConversation: "加载会话中…",
-      selectConversation: "选择一条会话以阅读",
-      sentLabel: "{{email}}（已发送）",
-      bodyUnavailable: "邮件正文不可用",
-      noBody: "（无正文）",
-      loading: "加载中…",
-      hideTrimmed: "‹ 隐藏引用内容",
-      showTrimmed: "› 显示引用内容",
-      htmlBodyTitle: "邮件 HTML 正文",
     },
     databaseExplorer: {
       title: "数据库浏览器",
@@ -2077,306 +1981,6 @@ export const zh: TranslationDictionary = {
       tabApiLogs: "接口日志",
       apiLogsEmpty: "该次调用暂无接口日志。",
     },
-    bots: {
-      title: "机器人",
-      description: "连接聊天机器人，从消息触发工作流。",
-      addButton: "添加机器人",
-      type: "类型",
-      token: "Token",
-      emptyTitle: "暂无机器人",
-      emptyDescription: "添加一个机器人开始使用。",
-      deleteTitle: "删除机器人",
-      deleteConfirm:
-        "确定删除「{{name}}」？使用此机器人的触发器需重新配置其他机器人。",
-      createTitle: "添加机器人",
-      createDescription: "选择机器人平台。",
-      detailTitle: "机器人详情",
-      accountTitle: "账户详情",
-      notFound: "未找到机器人",
-      accountNotFound: "未找到账户",
-      edit: "编辑",
-      links: "链接",
-      setupInstructions: "配置说明",
-      webhookConfig: "Webhook 配置",
-      updateFailed: "更新机器人失败",
-      updateAccountFailed: "更新账户失败",
-      tokenKeepPlaceholder: "留空则保持当前 token",
-      secretKeepPlaceholder: "留空则保持当前 secret",
-      untitled: "未命名机器人",
-      untitledAccount: "未命名账户",
-      copiedToast: "{{label}} 已复制到剪贴板",
-      saveChanges: "保存更改",
-      applicationId: "Application ID",
-      publicKey: "Public Key",
-      botToken: "Bot Token",
-      signingSecret: "Signing Secret",
-      webhookUrl: "Webhook URL",
-      applicationIdImmutable: "Application ID 不可更改。",
-      botUsername: "机器人用户名",
-      workspace: "工作区",
-      appId: "App ID",
-      phoneNumberId: "Phone Number ID",
-      wabaId: "WhatsApp Business Account ID",
-      accessToken: "Access Token",
-      appSecret: "App Secret",
-      callbackUrl: "Callback URL",
-      verifyToken: "Verify Token",
-      optional: "（可选）",
-      editDiscordTitle: "编辑 Discord 机器人",
-      editDiscordDescription: "更新 Discord 机器人设置。",
-      editTelegramTitle: "编辑 Telegram 机器人",
-      editTelegramDescription: "更新 Telegram 机器人设置。",
-      editSlackTitle: "编辑 Slack 机器人",
-      editSlackDescription: "更新 Slack 机器人设置。",
-      editWhatsAppTitle: "编辑 WhatsApp 账户",
-      editWhatsAppDescription: "更新 WhatsApp Business API 设置。",
-      displayNameHint: "在 z3cz.com 中显示此账户的名称。",
-      appSecretHint:
-        "位于 Meta Developer Portal 的 Apps > App Settings > Basic。",
-      accessTokenHint:
-        "位于 Apps > Use cases > WhatsApp > API Setup，或通过 Business Settings > System Users 获取永久 token。",
-      phoneNumberIdHint:
-        "位于 Apps > Use cases > WhatsApp > API Setup 的电话号码下拉菜单中。",
-      wabaIdHint:
-        "WhatsApp Business Account ID，位于同一页面，仅供参考。",
-      wabaIdPlaceholder: "WhatsApp Business Account ID",
-      inviteDiscordBot: "邀请机器人加入服务器",
-      openDiscordDevPortal: "打开 Discord Developer Portal",
-      discordDeveloperPortal: "Discord Developer Portal",
-      generalInformation: "General Information",
-      inviteTheBot: "邀请机器人",
-      openTelegramBot: "在 Telegram 打开 @{{username}}",
-      openBotFather: "在 Telegram 打开 @BotFather",
-      telegramApiDocs: "Telegram Bot API 文档",
-      openSlackApiPortal: "打开 Slack API Portal",
-      webhookMetaHint:
-        "将以下值复制到 Meta Developer Portal 的 webhook 设置中。",
-      metaDeveloperPortal: "Meta Developer Portal",
-      webhookGenerateHint:
-        "创建带有 Receive WhatsApp Message 触发器的工作流以生成 webhook 配置。",
-      openMetaDevPortal: "打开 Meta Developer Portal",
-      whatsappCloudApiDocs: "WhatsApp Cloud API 文档",
-      yourBot: "你的机器人",
-      discordSetup1Before:
-        "复制上方的 Webhook URL，粘贴到 Interactions Endpoint URL（位于",
-      discordSetup1After: "页面）。",
-      discordSetup2After: "到一个 Discord 服务器。",
-      discordSetup3:
-        "创建带有接收 Discord 消息触发器的工作流，选择此机器人并启用。",
-      telegramSetup1:
-        "创建带有接收 Telegram 消息触发器的工作流并选择此机器人。",
-      telegramSetup2:
-        "启用工作流后，webhook 将自动注册到 Telegram。",
-      telegramSetup3Before: "向",
-      telegramSetup3After: "发送消息以触发工作流。",
-      slackSetup1:
-        "在 Event Subscriptions 中开启 Enable Events，将上方 Webhook URL 粘贴为 Request URL。在 Subscribe to bot events 中添加 message.channels 和 message.groups 后保存。",
-      slackSetup2:
-        "在 OAuth & Permissions 中确认机器人具有 channels:history、groups:history 和 chat:write 权限。",
-      slackSetup3: "使用 /invite @{{name}} 将机器人邀请到频道。",
-      slackSetup4:
-        "创建带有 Receive Slack Message 触发器的工作流，选择此机器人并启用。",
-      whatsappSetup1Before: "将上方的 Callback URL 和 Verify Token 复制到",
-      whatsappSetup1After: "的 webhook 设置中，并订阅 messages 字段。",
-      whatsappSetup2:
-        "创建带有接收 WhatsApp 消息触发器的工作流，选择此账户并启用。",
-      whatsappSetup3: "向你的商业号码发送 WhatsApp 消息以触发工作流。",
-      whatsappSetupInfoStep1:
-        "创建带有 {{trigger}} 触发器的工作流并选择此账户。",
-      whatsappSetupInfoStep2:
-        "创建工作流后，Callback URL 和 Verify Token 将显示在账户详情页。将它们复制到 Meta Developer Portal 的 webhook 设置中，并订阅 messages 字段。",
-      whatsappSetupInfoStep3:
-        "启用工作流后，向你的商业号码发送 WhatsApp 消息以触发。",
-      wizard: {
-        createBotFailed: "创建机器人失败",
-        createAccountFailed: "创建账户失败",
-        botNameHint:
-          "在 z3cz.com 中显示此机器人的名称，{{platform}} 用户不可见。",
-        accountNameHint:
-          "在 z3cz.com 中显示此账户的名称，WhatsApp 用户不可见。",
-        triggers: {
-          receiveDiscordMessage: "接收 Discord 消息",
-          receiveTelegramMessage: "接收 Telegram 消息",
-          receiveSlackMessage: "接收 Slack 消息",
-          receiveWhatsAppMessage: "接收 WhatsApp 消息",
-        },
-        placeholders: {
-          discordBot: "我的 Discord 机器人",
-          telegramBot: "我的 Telegram 机器人",
-          slackBot: "我的 Slack 机器人",
-          whatsappAccount: "我的 WhatsApp 账户",
-          applicationId: "123456789012345678",
-          publicKey: "abc123...",
-          botToken: "在此粘贴 bot token",
-          signingSecret: "在此粘贴 signing secret",
-          slackBotToken: "xoxb-...",
-          appSecret: "在此粘贴 App Secret",
-          accessToken: "在此粘贴 access token",
-          phoneNumberId: "123456789012345",
-          commandName: "ask",
-        },
-        discord: {
-          steps: {
-            name: {
-              title: "创建 Discord 机器人",
-              description: "选择一个在 z3cz.com 中标识此 Discord 机器人的显示名称。",
-            },
-            application: {
-              title: "应用信息",
-              description:
-                "从 Discord Developer Portal 的 General Information 页面复制 Application ID 和 Public Key。",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "从 Discord Developer Portal 的 Bot 页面复制 token。",
-            },
-            webhook: {
-              title: "Interactions Endpoint",
-              description:
-                "复制下方 webhook URL，粘贴为 Discord Developer Portal 中的 Interactions Endpoint URL。",
-            },
-            command: {
-              title: "斜杠命令",
-              description: "选择用于触发此工作流的斜杠命令名称。",
-            },
-            invite: {
-              title: "添加机器人到服务器",
-              description: "将机器人添加到 Discord 服务器以接收斜杠命令。",
-            },
-          },
-          applicationIdHint:
-            "从 Discord Developer Portal 的 General Information 页面复制。",
-          publicKeyHint:
-            "从同一 General Information 页面复制，用于验证 interaction 签名。",
-          botTokenHint:
-            "从 Discord Developer Portal 的 Bot 页面复制 token。",
-          interactionsEndpointUrl: "Interactions Endpoint URL",
-          interactionsHintBefore: "在",
-          interactionsHintAfter: "中将此粘贴为 Interactions Endpoint URL。",
-          webhookPasteHint:
-            "将此粘贴为 Discord 应用 General Information 页面中的 Interactions Endpoint URL。",
-          commandName: "命令名称",
-          commandHint: "用户将在 Discord 中输入 /{{command}} 来触发此工作流。",
-          addToServer: "将 {{name}} 添加到服务器",
-          invitePermissionsHint: "将请求机器人和斜杠命令权限。",
-          botPage: "Bot",
-        },
-        telegram: {
-          steps: {
-            name: {
-              title: "创建 Telegram 机器人",
-              description: "选择一个在 z3cz.com 中标识此 Telegram 机器人的显示名称。",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "在 Telegram 上通过 @BotFather 创建新机器人，然后复制它提供的 bot token。",
-            },
-            setup: {
-              title: "设置",
-              description:
-                "机器人已就绪。启用工作流时将自动注册 webhook。",
-            },
-          },
-          botTokenHint:
-            "从 Telegram 的 @BotFather 复制 token。如需新建可使用 /newbot。",
-          openBotFather: "打开 @BotFather",
-        },
-        slack: {
-          steps: {
-            name: {
-              title: "创建 Slack 机器人",
-              description: "选择一个在 z3cz.com 中标识此 Slack 机器人的显示名称。",
-            },
-            signingSecret: {
-              title: "Signing Secret",
-              description:
-                "从 Slack 应用的 Basic Information 页面复制 Signing Secret。",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "从 Slack 应用的 OAuth & Permissions 页面复制 Bot User OAuth Token。",
-            },
-            eventSubscriptions: {
-              title: "Event Subscriptions",
-              description:
-                "复制下方 webhook URL，粘贴为 Slack 应用 Event Subscriptions 页面的 Request URL。",
-            },
-            setup: {
-              title: "邀请机器人",
-              description: "确认权限、将机器人邀请到频道并创建工作流。",
-            },
-          },
-          openSlackApi: "打开 Slack API",
-          signingSecretHint:
-            "位于 Slack 应用设置的 Basic Information 下，用于验证 webhook 消息确实来自 Slack。",
-          botUserOAuthToken: "Bot User OAuth Token",
-          botTokenHint:
-            "位于 Slack 应用设置的 OAuth & Permissions 下。",
-          requestUrl: "Request URL",
-          eventSubscriptionsStep1:
-            "前往 Event Subscriptions 并将 Enable Events 切换为 On。",
-          eventSubscriptionsStep2:
-            "粘贴上方 Request URL 并等待 Slack 验证。",
-          eventSubscriptionsStep3:
-            "在 Subscribe to bot events 下添加 message.channels 和 message.groups，然后保存。",
-          basicInformation: "Basic Information",
-          oauthPermissions: "OAuth & Permissions",
-          eventSubscriptions: "Event Subscriptions",
-          enableEvents: "Enable Events",
-          subscribeToBotEvents: "订阅机器人事件",
-        },
-        whatsapp: {
-          steps: {
-            name: {
-              title: "添加 WhatsApp 账户",
-              description: "选择一个在 z3cz.com 中标识此 WhatsApp 账户的显示名称。",
-            },
-            appSecret: {
-              title: "App Secret",
-              description:
-                "从 Meta 应用复制 App Secret，路径为 Apps > App Settings > Basic。",
-            },
-            apiCredentials: {
-              title: "WhatsApp API 凭据",
-              description:
-                "从 Meta Developer Portal 的 WhatsApp API Setup 页面复制 Access Token 和 Phone Number ID。",
-            },
-            webhook: {
-              title: "Webhook 配置",
-              description:
-                "将下方 Callback URL 和 Verify Token 复制到 Meta 应用的 webhook 设置中。",
-            },
-            setup: {
-              title: "设置",
-              description: "确认 webhook 已配置并创建工作流以开始接收消息。",
-            },
-          },
-          openMetaPortal: "打开 Meta Developer Portal",
-          appSecretFieldHint:
-            "位于 Meta Developer Portal 的 Apps > App Settings > Basic。点击 App Secret 旁的 Show。用于验证 webhook 消息确实来自 Meta。",
-          accessTokenFieldHint:
-            "位于 Apps > Use cases > WhatsApp > API Setup 的临时 token 区域，或通过 Business > Settings > System Users 生成永久 token。",
-          temporaryTokenWarning:
-            "API Setup 中的临时 token 24 小时后过期。生产环境请通过 Business Settings 中的 System User 生成永久 token。",
-          phoneNumberIdFieldHint:
-            "位于 Apps > Use cases > WhatsApp > API Setup。从下拉菜单选择电话号码，其下方的数字 ID 即为 Phone Number ID，不是电话号码本身。",
-          webhookStep1:
-            "前往 Apps > Use cases > WhatsApp > API Setup，点击 Webhooks 旁的 Configure。",
-          webhookStep2:
-            "粘贴 Callback URL 和 Verify Token，然后点击 Verify and save。",
-          webhookStep3: "订阅 messages webhook 字段。",
-          setupStep2:
-            "启用工作流后，向你的商业号码发送 WhatsApp 消息以触发。",
-          configure: "Configure",
-          verifyAndSave: "验证并保存",
-          appsApiSetup: "Apps > Use cases > WhatsApp > API Setup",
-          appsSettingsBasic: "Apps > App Settings > Basic",
-        },
-      },
-    },
     members: {
       title: "子账户",
       loadingTitle: "子账户",
@@ -2670,17 +2274,6 @@ export const zh: TranslationDictionary = {
       yes: "是",
       no: "否",
     },
-    nodeBrowser: {
-      searchPlaceholder: "按名称、描述或标签搜索节点...",
-      cards: "卡片",
-      list: "列表",
-      loadError: "加载节点类型失败，请稍后重试。",
-      loading: "正在加载节点...",
-      showingAll: "显示全部 {{count}} 个节点",
-      showingFiltered: "显示 {{filtered}} / {{total}} 个节点",
-      noResults: "没有符合搜索条件的节点。",
-      clearFilters: "清除筛选",
-    },
   },
   workflow: {
     error: {
@@ -2964,14 +2557,6 @@ export const zh: TranslationDictionary = {
       notNow: "暂不升级",
       upgrade: "升级到 Early Adopter",
     },
-    emailSetup: {
-      addressLabel: "邮箱地址",
-      nextSteps: "后续步骤",
-      receiveEmailTrigger: "接收邮件",
-      step1: "创建带有「{{trigger}}」触发器的工作流，并选择此邮箱。",
-      step2: "启用工作流。",
-      step3: "向上述地址发送邮件以触发工作流。",
-    },
     subscription: {
       required: "需要订阅",
     },
@@ -3069,12 +2654,9 @@ export const zh: TranslationDictionary = {
       invalidImageFile: "请选择 PNG 或 JPG 图片",
       invalidAudioFile: "请选择有效的音频文件",
       invalidVideoFile: "请选择有效的视频文件",
-      invalidGltfFile: "请选择有效的 GLTF（.gltf 或 .glb）文件",
-      noGltf: "无 3D 模型",
       uploadFailedImage: "上传图片失败",
       uploadFailedVideo: "上传视频失败",
       uploadFailedDocument: "上传文档失败",
-      uploadFailedGltf: "上传 glTF 模型失败",
       noSecret: "未选择密钥",
       selectDate: "选择日期",
       uploadFailedFile: "上传文件失败",
@@ -3087,11 +2669,6 @@ export const zh: TranslationDictionary = {
       secret: {
         empty: "暂无密钥",
         select: "选择密钥",
-      },
-      email: {
-        none: "未选择邮箱",
-        empty: "暂无邮箱",
-        select: "选择邮箱",
       },
       queue: {
         none: "未选择队列",
@@ -3145,8 +2722,6 @@ export const zh: TranslationDictionary = {
       openDocs: "打开文档",
       docsUnavailable: "文档不可用",
       openDocsAria: "打开节点文档",
-      configureTool: "配置工具",
-      removeTool: "移除工具",
       editInput: "编辑输入",
       viewOutput: "查看输出",
     },
@@ -3638,28 +3213,6 @@ export const zh: TranslationDictionary = {
             "浏览 [Cloudflare 模型目录]({{url}}) 查找其他模型。",
         },
       },
-      triggers: {
-        selectBot: "选择机器人",
-        newBot: "+ 新建机器人",
-        discord: {
-          commandPlaceholder: "command",
-          inviteBot: "邀请机器人加入服务器",
-          syncStale: "命令未与 Discord 同步 — 点击同步",
-          sync: "与 Discord 同步斜杠命令",
-          syncSuccess: "斜杠命令已与 Discord 同步",
-          syncFailed: "同步斜杠命令失败",
-        },
-        telegram: {
-          chatIdPlaceholder: "Chat ID（可选）",
-        },
-        slack: {
-          channelIdPlaceholder: "Channel ID（可选）",
-        },
-        whatsapp: {
-          selectAccount: "选择账号",
-          newAccount: "+ 新建账号",
-        },
-      },
       cron: {
         choosePreset: "选择预设",
         everyMinute: "每分钟",
@@ -3697,19 +3250,6 @@ export const zh: TranslationDictionary = {
         startRecording: "开始录音",
         accessFailed: "无法访问麦克风",
       },
-      bufferGeometry: {
-        title: "缓冲几何体",
-        noGeometry: "无几何体",
-      },
-      modelViewer: {
-        errorTitle: "3D 模型错误",
-        loadViewerFailed: "加载 3D 查看器失败",
-        loadModelFailed: "加载模型失败",
-        loadingViewer: "正在加载 3D 查看器...",
-        loadingModel: "正在加载 3D 模型...",
-        gltfModelLabel: "glTF 模型（{{mimeType}}）",
-        downloadGlb: "下载 GLB 文件",
-      },
       switchFork: {
         removeCase: "移除分支",
         addCase: "添加分支",
@@ -3717,18 +3257,6 @@ export const zh: TranslationDictionary = {
       dynamicInputs: {
         removeInput: "移除输入",
         addInput: "添加输入",
-      },
-      executionEmail: {
-        title: "模拟邮件触发",
-        from: "发件人",
-        subject: "主题",
-        body: "正文",
-        fromPlaceholder: "sender@example.com",
-        subjectPlaceholder: "邮件主题",
-        bodyPlaceholder: "邮件正文内容…",
-        attachments: "附件",
-        addAttachments: "添加附件",
-        sendAndRun: "发送并运行",
       },
       file: {
         download: "下载文件",

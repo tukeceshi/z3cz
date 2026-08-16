@@ -34,23 +34,10 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh \
   && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh
 
-EXPOSE 3100 3101 3102
+EXPOSE 3101 3102
 
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["pnpm", "dev:docker"]
-
-# --- 本地开发（www）---
-FROM base AS dev-www
-
-COPY docker/entrypoint-common.sh /usr/local/bin/entrypoint-common.sh
-COPY docker/entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh \
-  && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh
-
-EXPOSE 3100
-
-ENTRYPOINT ["entrypoint-frontend.sh"]
-CMD ["pnpm", "--filter", "@dafthunk/www", "dev"]
 
 # --- 本地开发（app）---
 FROM base AS dev-app
@@ -96,7 +83,7 @@ RUN pnpm build
 FROM deps AS build-app-prod
 
 ARG VITE_API_HOST=/api
-ARG VITE_WEBSITE_URL=http://localhost:3100
+ARG VITE_WEBSITE_URL=http://localhost:3101
 ARG VITE_APP_URL=http://localhost:3101
 ARG VITE_WS_VIA_PROXY=1
 
@@ -118,59 +105,8 @@ COPY --from=build-app-prod /app/apps/app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-# --- 营销站 www Node SSR（生产）---
-FROM deps AS build-www-prod
-
-ARG VITE_API_HOST=http://localhost:3102
-ARG VITE_WEBSITE_URL=http://localhost:3100
-ARG VITE_APP_URL=http://localhost:3101
-ARG VITE_WWW_BASENAME=
-ARG VITE_CONTACT_EMAIL=hello@dafthunk.com
-
-ENV VITE_API_HOST=${VITE_API_HOST}
-ENV VITE_WEBSITE_URL=${VITE_WEBSITE_URL}
-ENV VITE_APP_URL=${VITE_APP_URL}
-ENV VITE_WWW_BASENAME=${VITE_WWW_BASENAME}
-ENV VITE_CONTACT_EMAIL=${VITE_CONTACT_EMAIL}
-
-ENV DAFTHUNK_WWW_TARGET=node
-ENV NODE_OPTIONS=--max-old-space-size=1536
-
-RUN pnpm --filter '@dafthunk/www' extract-nodes \
-  && pnpm --filter '@dafthunk/www' build:node
-
-FROM deps AS prod-www
-
-WORKDIR /app/apps/www
-
-COPY --from=build-www-prod /app/apps/www/build ./build
-COPY apps/www/server.ts ./server.ts
-
-ENV HOST=0.0.0.0
-ENV PORT=3100
-ENV NODE_ENV=production
-
-EXPOSE 3100
-
-CMD ["pnpm", "exec", "tsx", "server.ts"]
-
-# --- 入站 SMTP 网关 ---
-FROM deps AS prod-smtp-gateway
-
-WORKDIR /app/apps/smtp-gateway
-
-ENV SMTP_HOST=0.0.0.0
-ENV SMTP_PORT=2525
-
-EXPOSE 2525
-
-CMD ["pnpm", "start"]
-
 # --- Node API 生产运行（tsx 直跑源码，无需 pnpm build）---
 FROM deps AS prod-api
-
-# Workflow create/validate reads apps/www/data/nodes.json at runtime.
-RUN pnpm --filter '@dafthunk/www' extract-nodes
 
 COPY --from=build-app-prod /app/apps/app/dist/bootstrap-manifest.json /app/data/bootstrap/bootstrap-manifest.json
 COPY --from=build-app-prod /app/apps/app/dist/assets /app/data/bootstrap/assets

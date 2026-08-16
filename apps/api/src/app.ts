@@ -59,12 +59,6 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/legal-documents", legalDocumentsRoutes);
   app.route("/site-settings", siteSettingsRoutes);
   app.route("/bootstrap", lazyRoute(() => import("./routes/bootstrap")));
-  if (options.runtime === "node") {
-    app.route(
-      "/inbound-email",
-      lazyRoute(() => import("./routes/inbound-email"))
-    );
-  }
   app.route("/auth", auth);
   app.route("/admin", lazyRoute(() => import("./routes/admin")));
   app.route(
@@ -84,21 +78,8 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     "/stripe/webhooks",
     lazyRoute(() => import("./routes/stripe-webhooks"))
   );
-  app.route("/telegram", lazyRoute(() => import("./routes/telegram-webhook")));
-  app.route("/discord", lazyRoute(() => import("./routes/discord-webhook")));
-  app.route("/whatsapp", lazyRoute(() => import("./routes/whatsapp-webhook")));
-  app.route("/slack", lazyRoute(() => import("./routes/slack-webhook")));
   app.route("/http", lazyRoute(() => import("./routes/http-triggers")));
   app.route("/queues", lazyRoute(() => import("./routes/queue-publish")));
-  app.route("/replicate", lazyRoute(() => import("./routes/replicate")));
-  app.route(
-    "/cloudflare-ai",
-    lazyRoute(() => import("./routes/cloudflare-ai"))
-  );
-  app.route(
-    "/cloudflare-gateway",
-    lazyRoute(() => import("./routes/cloudflare-gateway"))
-  );
   app.route("/forms", lazyRoute(() => import("./routes/forms")));
   app.route("/form-triggers", lazyRoute(() => import("./routes/form-triggers")));
   app.route(
@@ -123,11 +104,6 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route(
     "/:organizationId/databases",
     lazyRoute(() => import("./routes/databases"))
-  );
-  app.route("/:organizationId/bots", lazyRoute(() => import("./routes/bots")));
-  app.route(
-    "/:organizationId/emails",
-    lazyRoute(() => import("./routes/emails"))
   );
   app.route(
     "/:organizationId/feedback",
@@ -180,10 +156,6 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route(
     "/:organizationId/objects",
     lazyRoute(() => import("./routes/objects"))
-  );
-  app.route(
-    "/:organizationId/playground",
-    lazyRoute(() => import("./routes/playground"))
   );
   app.route(
     "/:organizationId/usage",

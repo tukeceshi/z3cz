@@ -92,7 +92,6 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
       console.log("[api] WebSocket: Node in-memory session hub");
       console.log("[api] Queue: in-process workflow queue");
       console.log("[api] Mailbox: in-memory per-org store");
-      console.log("[api] Inbound email: POST /inbound-email");
     }
   );
 

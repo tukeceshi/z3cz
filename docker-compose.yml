@@ -25,14 +25,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "3100:3100"
       - "3101:3101"
       - "3102:3102"
     volumes:
       - .:/app
       # 单容器内隔离 root / 各包 node_modules（与四服务命名区分，避免混卷）
       - dafthunk_node_modules_mono_root:/app/node_modules
-      - dafthunk_node_modules_mono_www:/app/apps/www/node_modules
       - dafthunk_node_modules_mono_app:/app/apps/app/node_modules
       - dafthunk_node_modules_mono_api:/app/apps/api/node_modules
       - dafthunk_pnpm_store:/pnpm/store
@@ -58,6 +56,5 @@ services:
 
 volumes:
   dafthunk_node_modules_mono_root:
-  dafthunk_node_modules_mono_www:
   dafthunk_node_modules_mono_app:
   dafthunk_node_modules_mono_api:

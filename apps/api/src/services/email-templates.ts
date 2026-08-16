@@ -33,10 +33,8 @@ z3cz.com is a visual way to build serverless workflows on Cloudflare. Drag nodes
 
 Here are some quick tips:
 • Start from a use case template to see how nodes wire together
-• Experiment with AI nodes (Claude, GPT, Gemini, Replicate) in the playground
-• Add a trigger: webhooks, requests, email, cron, queues, or bots
-• Connect integrations like GitHub, Discord, Telegram or Gmail
-• Browse the Nodes Reference to see all 400+ available nodes
+• Create a workflow and add text, image, video, or audio nodes
+• Connect an AI interface, then run the canvas
 • Bonus: it's open source (MIT). Self-host it and contribute
 • Learn more: ${docsUrl}
 
@@ -57,10 +55,8 @@ ${websiteUrl}`;
 <p>Here are some quick tips:</p>
 <ul>
 <li>Start from a use case template to see how nodes wire together</li>
-<li>Experiment with AI nodes (Claude, GPT, Gemini, Replicate) in the playground</li>
-<li>Add a trigger: webhooks, requests, email, cron, queues, or bots</li>
-<li>Connect integrations like GitHub, Discord, Telegram or Gmail</li>
-<li>Browse the Nodes Reference to see all 400+ available nodes</li>
+<li>Create a workflow and add text, image, video, or audio nodes</li>
+<li>Connect an AI interface, then run the canvas</li>
 <li>Bonus: it's open source (MIT). Self-host it and contribute</li>
 <li><a href="${docsUrl}">Learn more</a></li>
 </ul>
