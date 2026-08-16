@@ -61,6 +61,10 @@ export const AdminSettingsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-settings-page"),
   "AdminSettingsPage"
 );
+export const AdminCompetitorPricingPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-competitor-pricing-page"),
+  "AdminCompetitorPricingPage"
+);
 export const AdminLoginMethodsPage = lazyRoutePage(
   () => import("@/pages/admin/admin-login-methods-page"),
   "AdminLoginMethodsPage"

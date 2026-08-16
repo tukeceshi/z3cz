@@ -9,6 +9,7 @@ import health from "./routes/health";
 import publicAuthConfigRoutes from "./routes/auth-config";
 import legalDocumentsRoutes from "./routes/legal-documents";
 import siteSettingsRoutes from "./routes/site-settings";
+import videoPriceEstimatesRoutes from "./routes/video-price-estimates";
 
 export interface CreateAppOptions {
   runtime: "node" | "workers";
@@ -58,6 +59,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/auth/config", publicAuthConfigRoutes);
   app.route("/legal-documents", legalDocumentsRoutes);
   app.route("/site-settings", siteSettingsRoutes);
+  app.route("/video-price-estimates", videoPriceEstimatesRoutes);
   app.route("/bootstrap", lazyRoute(() => import("./routes/bootstrap")));
   app.route("/auth", auth);
   app.route("/admin", lazyRoute(() => import("./routes/admin")));

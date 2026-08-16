@@ -1,4 +1,5 @@
 import ArrowLeftRight from "lucide-react/icons/arrow-left-right";
+import Coins from "lucide-react/icons/coins";
 import FileText from "lucide-react/icons/file-text";
 import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
@@ -93,6 +94,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.siteSettings"),
           url: "/admin/settings",
           icon: Settings,
+        },
+        {
+          id: "competitor-pricing",
+          title: t("sidebar.competitorPricing"),
+          url: "/admin/competitor-pricing",
+          icon: Coins,
         },
         {
           id: "login-methods",

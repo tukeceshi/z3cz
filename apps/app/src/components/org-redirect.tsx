@@ -1,8 +1,9 @@
 import React from "react";
-import { Navigate, useLocation, useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
+import { useRequireLoginDialog } from "@/components/login-dialog";
 
 interface OrgRedirectProps {
   to: string;
@@ -13,19 +14,18 @@ export const OrgRedirect: React.FC<OrgRedirectProps> = ({
   to,
   replace = true,
 }) => {
-  const { organization, isLoading } = useAuth();
+  const { organization, isLoading, isAuthenticated } = useAuth();
   const params = useParams();
-  const location = useLocation();
+  const waitingForLogin = useRequireLoginDialog();
 
-  if (isLoading) {
+  if (isLoading || waitingForLogin || !isAuthenticated) {
     return <InsetLoading />;
   }
 
   const orgId = params.organizationId || organization?.id;
 
   if (!orgId) {
-    const returnTo = encodeURIComponent(location.pathname);
-    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
+    return <InsetLoading />;
   }
 
   let redirectTo = to.replace(":organizationId", orgId);

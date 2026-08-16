@@ -8,8 +8,9 @@ import { AdminLayout } from "./components/layouts/admin-layout";
 import { AppLayout } from "./components/layouts/app-layout";
 import { OrgLayout } from "./components/org-layout";
 import { OrgFeatureRoute } from "./components/org-feature-route";
-import { HomeRedirect } from "./components/home-redirect";
 import { OrgRedirect } from "./components/org-redirect";
+import { LoginPage } from "./pages/login-page";
+import { LandingPage } from "./pages/landing-page";
 import { ProtectedRoute } from "./components/protected-route";
 import {
   AdminAiModelsPage,
@@ -20,6 +21,7 @@ import {
   AdminPersistWorkersPage,
   AdminOrganizationRedirectPage,
   AdminSettingsPage,
+  AdminCompetitorPricingPage,
   AdminLoginMethodsPage,
   AdminBootstrapPage,
   AdminLegalDocumentsPage,
@@ -59,7 +61,6 @@ import {
   WorkflowFolderPage,
   WorkflowsPage,
 } from "./lazy-pages";
-import { LoginPage } from "./pages/login-page";
 
 export interface RouteHandle {
   head?:
@@ -80,7 +81,10 @@ export type AppRouteObject = RouteObject & {
 export const routes: AppRouteObject[] = [
   {
     path: "/",
-    element: <HomeRedirect />,
+    element: <LandingPage />,
+    handle: {
+      head: createRouteHead("seo.routes.home", "seo.routes.homeDescription"),
+    },
   },
   {
     path: "/login",
@@ -268,6 +272,17 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminSettings") },
+  },
+  {
+    path: "/admin/competitor-pricing",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminCompetitorPricingPage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminCompetitorPricing") },
   },
   {
     path: "/admin/login-methods",

@@ -5,6 +5,9 @@ import {
   AI_VIDEO_NODE_TYPE,
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
+  readVideoPriceEstimateTier,
+  readVideoPriceEstimateBaseline480pWithVideo,
+  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   type LocalMediaReference,
   type MediaReference,
   type ObjectReference,
@@ -88,6 +91,7 @@ import {
   AiVideoParamsPopover,
   buildDefaultVideoGenerationParams,
 } from "./ai-video-params-popover";
+import { AiVideoPriceEstimateChip } from "./ai-video-price-estimate-chip";
 import {
   annotateVideoReferenceChips,
   clearReferenceModeAutoSwitchNoticeIfResolved,
@@ -1470,6 +1474,32 @@ export function AiVideoConfigPanel({
     }
   };
 
+  const referenceVideoMedia = useMemo(
+    () =>
+      referenceChips.flatMap((chip) =>
+        chip.kind === "video" && chip.media ? [chip.media] : []
+      ),
+    [referenceChips]
+  );
+
+  const generationValuesForEstimate = cardGenerationParams.visible
+    ? cardGenerationParams.values
+    : readNodeGenerationParams(data.inputs);
+
+  const baseline480pWithVideo = useMemo(
+    () => readVideoPriceEstimateBaseline480pWithVideo(modelRules),
+    [modelRules]
+  );
+
+  const priceEstimateTier = useMemo(() => {
+    const resolution =
+      typeof generationValuesForEstimate.resolution === "string" &&
+      generationValuesForEstimate.resolution.trim().length > 0
+        ? generationValuesForEstimate.resolution
+        : "720p";
+    return readVideoPriceEstimateTier(modelRules, resolution);
+  }, [generationValuesForEstimate, modelRules]);
+
   const canGenerate =
     modelReady &&
     !disabled &&
@@ -1666,6 +1696,17 @@ export function AiVideoConfigPanel({
                   triggerLabel={t("workflow.aiVideoPanel.params")}
                   title={t("workflow.aiVideoPanel.paramsTitle")}
                   onChange={commitGenerationParams}
+                />
+              ) : null}
+              {priceEstimateTier && effectiveModel ? (
+                <AiVideoPriceEstimateChip
+                  canonicalId={effectiveModel.canonicalId}
+                  priceWithoutVideo={priceEstimateTier.priceWithoutVideo}
+                  priceWithVideo={priceEstimateTier.priceWithVideo}
+                  baseline480pWithVideo={baseline480pWithVideo}
+                  generationValues={generationValuesForEstimate}
+                  referenceVideoMedia={referenceVideoMedia}
+                  disabled={disabled}
                 />
               ) : null}
             </div>

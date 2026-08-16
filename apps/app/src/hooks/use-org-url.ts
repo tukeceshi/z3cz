@@ -10,7 +10,7 @@ export const useOrgUrl = () => {
   const getOrgUrl = (path: string): string => {
     if (!orgId) {
       console.warn("No organization ID available for URL generation");
-      return "/login";
+      return "/";
     }
 
     // Remove leading slash if present

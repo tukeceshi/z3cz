@@ -17,10 +17,13 @@ import type {
   UpdateFeatureConfigRequest,
   UpdateLegalDocumentsRequest,
   UpdateSiteSettingsRequest,
+  LibtvComparisonConfig,
 } from "@dafthunk/types";
 import {
   DEFAULT_PLATFORM_FEATURE_CONFIG,
+  mergeLibtvComparisonConfig,
   mergePlatformFeatureConfig,
+  parseLibtvComparisonConfig,
 } from "@dafthunk/types";
 import { eq } from "drizzle-orm";
 
@@ -533,4 +536,52 @@ export async function saveBootstrapSettingsState(
     updatedBy,
     updatedAt: values.updatedAt,
   });
+}
+
+export async function getLibtvComparisonConfig(
+  db: Database
+): Promise<LibtvComparisonConfig> {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  return parseLibtvComparisonConfig(row?.competitorVideoPricing ?? null);
+}
+
+export async function updateLibtvComparisonConfig(
+  db: Database,
+  config: LibtvComparisonConfig,
+  updatedBy: string
+): Promise<LibtvComparisonConfig> {
+  const next = mergeLibtvComparisonConfig(config);
+  const serialized = JSON.stringify(next);
+  const [existing] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const values = {
+    competitorVideoPricing: serialized,
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID));
+    return next;
+  }
+
+  await db.insert(platformSettings).values({
+    id: PLATFORM_SETTINGS_ID,
+    competitorVideoPricing: serialized,
+    updatedBy,
+    updatedAt: values.updatedAt,
+  });
+  return next;
 }

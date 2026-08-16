@@ -17,6 +17,7 @@ import adminBootstrapConfigRoutes from "./bootstrap-config";
 import adminModelInvocationsRoutes from "./model-invocations";
 import adminQueuesRoutes from "./queues";
 import adminSettingsRoutes from "./settings";
+import adminCompetitorVideoPricingRoutes from "./competitor-video-pricing";
 import adminFeatureConfigRoutes from "./feature-config";
 import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
@@ -36,6 +37,7 @@ adminRoutes.use("*", adminMiddleware);
 // Mount admin sub-routes
 adminRoutes.route("/stats", adminStatsRoutes);
 adminRoutes.route("/settings", adminSettingsRoutes);
+adminRoutes.route("/competitor-video-pricing", adminCompetitorVideoPricingRoutes);
 adminRoutes.route("/legal-documents", adminLegalDocumentsRoutes);
 adminRoutes.route("/auth-config", adminAuthConfigRoutes);
 adminRoutes.route("/bootstrap-config", adminBootstrapConfigRoutes);

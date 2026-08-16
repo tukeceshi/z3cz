@@ -58,6 +58,18 @@ const countPolicySchema = z.object({
   effectMode: z.enum(["direct", "sequential", "sequential_image_generation"]),
 });
 
+const videoPriceEstimateTierSchema = z.object({
+  resolution: z.string().min(1),
+  enabled: z.boolean(),
+  priceWithoutVideo: z.number().nonnegative(),
+  priceWithVideo: z.number().nonnegative(),
+});
+
+const videoPriceEstimateSchema = z.object({
+  enabled: z.boolean(),
+  tiers: z.array(videoPriceEstimateTierSchema),
+});
+
 const videoRulesSchema = z.object({
   schemaVersion: z.literal(1),
   sizePolicy: sizePolicySchema.optional(),
@@ -70,6 +82,8 @@ const videoRulesSchema = z.object({
   maxAudioReferenceBytes: z.number().int().positive(),
   maxAudioReferenceSeconds: z.number().int().positive(),
   promptMaxChars: z.number().int().positive(),
+  supportsTaskCancel: z.boolean().optional(),
+  priceEstimate: videoPriceEstimateSchema.optional(),
   generationFields: z.array(generationFieldSchema),
 });
 
