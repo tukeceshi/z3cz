@@ -253,6 +253,7 @@ export const platformSettings = pgTable("platform_settings", {
   wsBootstrapEnabled: boolean("ws_bootstrap_enabled").notNull().default(false),
   bootstrapConfig: text("bootstrap_config"),
   legalConfig: text("legal_config"),
+  competitorVideoPricing: text("competitor_video_pricing"),
   persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
     .notNull()
     .default(false),

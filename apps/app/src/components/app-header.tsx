@@ -5,6 +5,7 @@ import Shield from "lucide-react/icons/shield";
 import { Link, useLocation } from "react-router";
 
 import { LanguageToggle } from "@/components/language-toggle";
+import { useLoginDialog } from "@/components/login-dialog";
 import { useTranslation } from "@/components/locale-provider";
 import { UserProfile } from "@/components/user-profile";
 
@@ -16,6 +17,7 @@ import { ThemeToggle } from "./theme-toggle";
 export function AppHeader() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { t, siteSettings } = useTranslation();
+  const { openLogin } = useLoginDialog();
   const location = useLocation();
   const isAdminSection = location.pathname.startsWith("/admin");
   const isSettingsSection = location.pathname.startsWith("/settings");
@@ -71,14 +73,15 @@ export function AppHeader() {
               )}
             </>
           ) : (
-            <NavLink
-              to="/login"
-              isActive={(pathname) => pathname === "/login"}
+            <button
+              type="button"
               className={navLinkClasses}
-              activeClassName={activeNavLinkClasses}
+              onClick={() =>
+                openLogin({ dismissible: true, goToConsole: false })
+              }
             >
-              {t("nav.login")}
-            </NavLink>
+              {t("landing.loginRegister")}
+            </button>
           )}
           <a
             href="https://github.com/tukeceshi/z3cz"

@@ -1,33 +1,22 @@
-import { Navigate, useLocation } from "react-router";
+import { Navigate } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
+import { useRequireLoginDialog } from "@/components/login-dialog";
 
 interface AdminProtectedRouteProps {
   children: React.ReactNode;
 }
 
-/**
- * Route component that only allows access to admin users.
- * Redirects to home for non-admin users and to login for unauthenticated users.
- */
 export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const waitingForLogin = useRequireLoginDialog();
 
-  if (isLoading) {
+  if (waitingForLogin || !isAuthenticated) {
     return <InsetLoading />;
   }
 
-  if (!isAuthenticated) {
-    const returnTo = encodeURIComponent(
-      `${location.pathname}${location.search}`
-    );
-    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
-  }
-
   if (user?.role !== "admin") {
-    // Non-admin users are redirected to home
     return <Navigate to="/" replace />;
   }
 

@@ -1,17 +1,13 @@
 import { mutate } from "swr";
 
 import { AUTH_USER_KEY } from "@/components/auth-context";
+import { requestLoginDialog } from "@/components/login-dialog-bridge";
 import { buildApiUrl } from "@/config/api";
 
 let isHandlingSessionExpired = false;
 
 export async function handleSessionExpired(): Promise<void> {
   if (isHandlingSessionExpired || typeof window === "undefined") {
-    return;
-  }
-
-  if (window.location.pathname.startsWith("/login")) {
-    mutate(AUTH_USER_KEY, null, { revalidate: false });
     return;
   }
 
@@ -25,11 +21,9 @@ export async function handleSessionExpired(): Promise<void> {
       credentials: "include",
     });
   } catch {
-    // Best-effort cookie cleanup before redirect.
+    // Best-effort cookie cleanup before showing login.
   }
 
-  const returnTo = encodeURIComponent(
-    `${window.location.pathname}${window.location.search}`
-  );
-  window.location.assign(`/login?returnTo=${returnTo}`);
+  requestLoginDialog({ dismissible: false, goToConsole: false });
+  isHandlingSessionExpired = false;
 }

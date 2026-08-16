@@ -12,6 +12,7 @@ import { LocaleProvider, useTranslation } from "@/components/locale-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
 import { AuthProvider } from "./components/auth-context";
+import { LoginDialogProvider } from "./components/login-dialog";
 import { Button } from "./components/ui/button";
 import { RouteHandle } from "./routes";
 
@@ -93,9 +94,11 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
       <LocaleProvider>
         <AuthProvider>
-          <CurrentRouteHead />
-          <Outlet />
-          <ScrollRestoration />
+          <LoginDialogProvider>
+            <CurrentRouteHead />
+            <Outlet />
+            <ScrollRestoration />
+          </LoginDialogProvider>
         </AuthProvider>
       </LocaleProvider>
     </ThemeProvider>

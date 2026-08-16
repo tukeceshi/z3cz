@@ -5,11 +5,12 @@ import Sparkles from "lucide-react/icons/sparkles";
 import SquareTerminal from "lucide-react/icons/square-terminal";
 import Users from "lucide-react/icons/users";
 import React, { useEffect } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
 import { AppLayout } from "@/components/layouts/app-layout";
+import { useRequireLoginDialog } from "@/components/login-dialog";
 import { useTranslation } from "@/components/locale-provider";
 import type { TranslationKey } from "@/i18n";
 import { TourProvider } from "@/components/tour";
@@ -127,6 +128,7 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({
   const navigate = useNavigate();
   const { organization, isAuthenticated, isLoading } = useAuth();
   const { t } = useTranslation();
+  const waitingForLogin = useRequireLoginDialog();
 
   useEffect(() => {
     if (
@@ -142,11 +144,24 @@ export const OrgLayout: React.FC<OrgLayoutProps> = ({
     return <InsetLoading />;
   }
 
-  if (!isAuthenticated) {
-    const returnTo = encodeURIComponent(
-      `${window.location.pathname}${window.location.search}`
+  if (!isAuthenticated || waitingForLogin) {
+    const orgId = params.organizationId ?? organization?.id;
+    return (
+      <AppLayout
+        sidebar={
+          orgId
+            ? {
+                title,
+                groups: getDashboardSidebarGroups(orgId, t),
+                footerItems: [],
+              }
+            : undefined
+        }
+        sidebarDefaultOpen={sidebarDefaultOpen}
+      >
+        <InsetLoading />
+      </AppLayout>
     );
-    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
   if (!organization?.id) {

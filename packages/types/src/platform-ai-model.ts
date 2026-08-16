@@ -106,6 +106,28 @@ export interface ImageModelParameterRules {
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
+export const VIDEO_PRICE_ESTIMATE_RESOLUTIONS = [
+  "480p",
+  "720p",
+  "1080p",
+  "4k",
+] as const;
+
+export type VideoPriceEstimateResolution =
+  (typeof VIDEO_PRICE_ESTIMATE_RESOLUTIONS)[number];
+
+export interface VideoModelPriceEstimateTier {
+  readonly resolution: string;
+  readonly enabled: boolean;
+  readonly priceWithoutVideo: number;
+  readonly priceWithVideo: number;
+}
+
+export interface VideoModelPriceEstimateConfig {
+  readonly enabled: boolean;
+  readonly tiers: readonly VideoModelPriceEstimateTier[];
+}
+
 export interface VideoModelParameterRules {
   readonly schemaVersion: typeof PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION;
   readonly sizePolicy?: GenerationSizePolicy;
@@ -119,6 +141,7 @@ export interface VideoModelParameterRules {
   readonly maxAudioReferenceSeconds: number;
   readonly promptMaxChars: number;
   readonly supportsTaskCancel?: boolean;
+  readonly priceEstimate?: VideoModelPriceEstimateConfig;
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 

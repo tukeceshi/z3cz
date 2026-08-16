@@ -2,7 +2,7 @@ import { JWTTokenPayload, type LegalDocumentType } from "@dafthunk/types";
 import { faGithub, faGoogle } from "@fortawesome/free-brands-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import useSWR, { mutate as mutateGlobal } from "swr";
 
 import { useAuth } from "@/components/auth-context";
@@ -30,6 +30,8 @@ import { cn } from "@/utils/utils";
 interface LoginFormProps extends React.ComponentPropsWithoutRef<"div"> {
   returnTo?: string;
   subAccountInvitationId?: string;
+  variant?: "page" | "dialog";
+  onAuthenticated?: (user: JWTTokenPayload) => void;
 }
 
 const noticeBannerClassName =
@@ -39,11 +41,14 @@ export function LoginForm({
   className,
   returnTo,
   subAccountInvitationId,
+  variant = "page",
+  onAuthenticated,
   ...props
 }: LoginFormProps) {
   const { login, refreshUser } = useAuth();
   const { t, siteSettings } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const clearedStaleSessionRef = useRef(false);
   const { data: setupStatus } = useSWR(
     "/auth/setup-status",
@@ -101,10 +106,20 @@ export function LoginForm({
   };
 
   const handleLoginClick = async (provider: "github" | "google") => {
-    await login(provider, returnTo);
+    const oauthReturnTo =
+      returnTo ??
+      (variant === "dialog"
+        ? `${location.pathname}${location.search}`
+        : undefined);
+    await login(provider, oauthReturnTo);
   };
 
   const navigateAfterAuth = (user: JWTTokenPayload) => {
+    if (onAuthenticated) {
+      onAuthenticated(user);
+      return;
+    }
+
     const dashboardPath = getDashboardPath(user);
     if (!dashboardPath) {
       setFormError(t("auth.missingOrgAfterLogin"));
@@ -249,11 +264,151 @@ export function LoginForm({
     );
   }
 
+  const isDialog = variant === "dialog";
+  const formBody = (
+    <div className="grid gap-6">
+      <form className="grid gap-4" onSubmit={handlePasswordSubmit}>
+        <div className="grid gap-2">
+          <Label htmlFor="email">{t("auth.email")}</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(event) => handleEmailChange(event.target.value)}
+            disabled={isSubAccountInvite}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="password">{t("auth.password")}</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete={
+              isBootstrap || pendingRegister || isSubAccountInvite
+                ? "new-password"
+                : "current-password"
+            }
+            required
+            minLength={8}
+            value={password}
+            onChange={(event) => handlePasswordChange(event.target.value)}
+          />
+        </div>
+        {showVerificationFields && (pendingRegister || isSubAccountInvite) && (
+          <div className="grid gap-2">
+            <Label htmlFor="verificationCode">{t("auth.verificationCode")}</Label>
+            <div className="flex gap-2">
+              <Input
+                id="verificationCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={verificationCode}
+                onChange={(event) => setVerificationCode(event.target.value)}
+                maxLength={6}
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSendingCode || !email.trim()}
+                onClick={handleSendVerificationCode}
+              >
+                {isSendingCode
+                  ? t("auth.processing")
+                  : codeSent
+                    ? t("auth.resendVerificationCode")
+                    : t("auth.sendVerificationCode")}
+              </Button>
+            </div>
+            {codeSent && (
+              <p className="text-xs text-muted-foreground">
+                {t("auth.verificationCodeSent")}
+              </p>
+            )}
+          </div>
+        )}
+        {formError && (
+          <p className="text-sm text-destructive">{formError}</p>
+        )}
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {submitButtonLabel}
+        </Button>
+        {showPendingRegisterNotice && (
+          <div className={noticeBannerClassName} role="status">
+            <p className="font-medium">{t("auth.pendingRegisterTitle")}</p>
+            <p className="mt-1 text-muted-foreground">
+              {t("auth.pendingRegisterDescription")}
+            </p>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="mt-2 h-auto p-0 text-muted-foreground"
+              disabled={isSubmitting}
+              onClick={handleCancelPendingRegister}
+            >
+              {t("common.cancel")}
+            </Button>
+          </div>
+        )}
+      </form>
+
+      {!isSubAccountInvite && showOAuthProviders && (
+        <>
+          <div className="relative text-center text-xs uppercase text-muted-foreground">
+            <span
+              className={cn(
+                "px-2 relative z-10",
+                isDialog ? "bg-background" : "bg-card"
+              )}
+            >
+              {t("auth.or")}
+            </span>
+            <div className="absolute inset-x-0 top-1/2 border-t" />
+          </div>
+          <div className="flex flex-col gap-4">
+            {authConfig?.google.enabled && (
+              <Button
+                onClick={() => handleLoginClick("google")}
+                variant="outline"
+                className="w-full"
+              >
+                <FontAwesomeIcon icon={faGoogle} className="w-5 h-5 mr-2" />
+                {t("auth.loginWithGoogle")}
+              </Button>
+            )}
+            {authConfig?.github.enabled && (
+              <Button
+                onClick={() => handleLoginClick("github")}
+                variant="outline"
+                className="w-full"
+              >
+                <FontAwesomeIcon icon={faGithub} className="w-5 h-5 mr-2" />
+                {t("auth.loginWithGithub")}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
-    <div className={cn("mx-auto flex w-full max-w-sm flex-col gap-4", className)} {...props}>
-      <div className="flex justify-end">
-        <LanguageToggle />
-      </div>
+    <div
+      className={cn(
+        "mx-auto flex w-full flex-col gap-4",
+        isDialog ? "max-w-none" : "max-w-sm",
+        className
+      )}
+      {...props}
+    >
+      {isDialog ? null : (
+        <div className="flex justify-end">
+          <LanguageToggle />
+        </div>
+      )}
       {showTopNoticeBanner && (
         <div className={noticeBannerClassName} role="status">
           {isBootstrap && (
@@ -277,158 +432,33 @@ export function LoginForm({
         </div>
       )}
 
-      <Card className="w-full">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl flex justify-center">
-            <a href="/" className="flex items-center gap-3">
-              <img
-                src="/icon.svg"
-                alt={siteSettings.siteName}
-                className="h-8 w-8 dark:invert"
-              />
-              <span className="text-2xl font-semibold text-foreground">
-                {siteSettings.siteName}
-              </span>
-            </a>
-          </CardTitle>
-          <CardDescription>{siteSettings.siteTagline}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6">
-            <form className="grid gap-4" onSubmit={handlePasswordSubmit}>
-              <div className="grid gap-2">
-                <Label htmlFor="email">{t("auth.email")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(event) => handleEmailChange(event.target.value)}
-                  disabled={isSubAccountInvite}
+      {isDialog ? (
+        formBody
+      ) : (
+        <Card className="w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl flex justify-center">
+              <a href="/" className="flex items-center gap-3">
+                <img
+                  src="/icon.svg"
+                  alt={siteSettings.siteName}
+                  className="h-8 w-8 dark:invert"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">{t("auth.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete={
-                    isBootstrap || pendingRegister || isSubAccountInvite
-                      ? "new-password"
-                      : "current-password"
-                  }
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(event) =>
-                    handlePasswordChange(event.target.value)
-                  }
-                />
-              </div>
-              {showVerificationFields && (pendingRegister || isSubAccountInvite) && (
-                <div className="grid gap-2">
-                  <Label htmlFor="verificationCode">{t("auth.verificationCode")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="verificationCode"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      value={verificationCode}
-                      onChange={(event) =>
-                        setVerificationCode(event.target.value)
-                      }
-                      maxLength={6}
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isSendingCode || !email.trim()}
-                      onClick={handleSendVerificationCode}
-                    >
-                      {isSendingCode
-                        ? t("auth.processing")
-                        : codeSent
-                          ? t("auth.resendVerificationCode")
-                          : t("auth.sendVerificationCode")}
-                    </Button>
-                  </div>
-                  {codeSent && (
-                    <p className="text-xs text-muted-foreground">
-                      {t("auth.verificationCodeSent")}
-                    </p>
-                  )}
-                </div>
-              )}
-              {formError && (
-                <p className="text-sm text-destructive">{formError}</p>
-              )}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting}
-              >
-                {submitButtonLabel}
-              </Button>
-              {showPendingRegisterNotice && (
-                <div className={noticeBannerClassName} role="status">
-                  <p className="font-medium">{t("auth.pendingRegisterTitle")}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {t("auth.pendingRegisterDescription")}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="mt-2 h-auto p-0 text-muted-foreground"
-                    disabled={isSubmitting}
-                    onClick={handleCancelPendingRegister}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </div>
-              )}
-            </form>
-
-            {!isSubAccountInvite && showOAuthProviders && (
-              <>
-            <div className="relative text-center text-xs uppercase text-muted-foreground">
-              <span className="bg-card px-2 relative z-10">{t("auth.or")}</span>
-              <div className="absolute inset-x-0 top-1/2 border-t" />
-            </div>
-            <div className="flex flex-col gap-4">
-              {authConfig?.google.enabled && (
-              <Button
-                onClick={() => handleLoginClick("google")}
-                variant="outline"
-                className="w-full"
-              >
-                <FontAwesomeIcon icon={faGoogle} className="w-5 h-5 mr-2" />
-                {t("auth.loginWithGoogle")}
-              </Button>
-              )}
-              {authConfig?.github.enabled && (
-              <Button
-                onClick={() => handleLoginClick("github")}
-                variant="outline"
-                className="w-full"
-              >
-                <FontAwesomeIcon icon={faGithub} className="w-5 h-5 mr-2" />
-                {t("auth.loginWithGithub")}
-              </Button>
-              )}
-            </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                <span className="text-2xl font-semibold text-foreground">
+                  {siteSettings.siteName}
+                </span>
+              </a>
+            </CardTitle>
+            <CardDescription>{siteSettings.siteTagline}</CardDescription>
+          </CardHeader>
+          <CardContent>{formBody}</CardContent>
+        </Card>
+      )}
       <div className="text-balance text-center text-xs text-muted-foreground">
         {t("auth.termsPrefix")}{" "}
         <button
           type="button"
-          className="underline hover:text-neutral-700"
+          className="underline hover:text-neutral-700 dark:hover:text-neutral-300"
           onClick={() => setLegalDialogType("terms")}
         >
           {t("auth.termsOfService")}
@@ -436,7 +466,7 @@ export function LoginForm({
         {t("auth.and")}{" "}
         <button
           type="button"
-          className="underline hover:text-neutral-700"
+          className="underline hover:text-neutral-700 dark:hover:text-neutral-300"
           onClick={() => setLegalDialogType("privacy")}
         >
           {t("auth.privacyPolicy")}

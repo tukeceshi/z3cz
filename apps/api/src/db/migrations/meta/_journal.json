@@ -526,6 +526,13 @@
       "when": 1789400000000,
       "tag": "0079_media_resource_failed",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1789480000000,
+      "tag": "0080_competitor_video_pricing",
+      "breakpoints": true
     }
   ]
 }

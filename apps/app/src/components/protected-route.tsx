@@ -1,27 +1,17 @@
-import { Navigate, useLocation } from "react-router";
-
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
+import { useRequireLoginDialog } from "@/components/login-dialog";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  redirectTo?: string;
 }
 
-export function ProtectedRoute({
-  children,
-  redirectTo = "/login",
-}: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated } = useAuth();
+  const waitingForLogin = useRequireLoginDialog();
 
-  if (isLoading) {
+  if (waitingForLogin || !isAuthenticated) {
     return <InsetLoading />;
-  }
-
-  if (!isAuthenticated) {
-    const returnTo = encodeURIComponent(location.pathname);
-    return <Navigate to={`${redirectTo}?returnTo=${returnTo}`} replace />;
   }
 
   return <>{children}</>;

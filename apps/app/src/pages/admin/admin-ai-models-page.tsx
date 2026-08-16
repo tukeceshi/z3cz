@@ -12,6 +12,9 @@ import {
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
+  normalizeVideoPriceEstimateResolution,
+  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
+  type VideoPriceEstimateResolution,
 } from "@dafthunk/types";
 import type {
   AudioModelParameterRules,
@@ -46,7 +49,9 @@ import {
   VideoDurationEditor,
   useGenerationOptionLabels,
 } from "./admin-generation-field-editors";
+import { Input } from "@/components/ui/input";
 import {
+  ADMIN_CONTROL_CLASS,
   ADMIN_PARAM_HINT_CLASS,
   AdminModelBasicFields,
   AdminModelList,
@@ -58,6 +63,41 @@ import {
 } from "./admin-ai-models-ui";
 import { DEFAULT_BRAND_ICON } from "@/components/model-brand-icon-picker";
 const BYTES_PER_MB = 1024 * 1024;
+
+interface VideoPriceTierDraft {
+  readonly enabled: boolean;
+  readonly priceWithoutVideo: string;
+  readonly priceWithVideo: string;
+}
+
+function readVideoPriceTierDrafts(
+  priceEstimate?: VideoModelParameterRules["priceEstimate"]
+): Record<VideoPriceEstimateResolution, VideoPriceTierDraft> {
+  const saved = new Map(
+    (priceEstimate?.tiers ?? []).map(
+      (tier) =>
+        [normalizeVideoPriceEstimateResolution(tier.resolution), tier] as const
+    )
+  );
+
+  return Object.fromEntries(
+    VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => {
+      const tier = saved.get(resolution);
+      return [
+        resolution,
+        {
+          enabled: tier?.enabled === true,
+          priceWithoutVideo:
+            tier?.priceWithoutVideo != null
+              ? String(tier.priceWithoutVideo)
+              : "",
+          priceWithVideo:
+            tier?.priceWithVideo != null ? String(tier.priceWithVideo) : "",
+        },
+      ] as const;
+    })
+  ) as Record<VideoPriceEstimateResolution, VideoPriceTierDraft>;
+}
 
 type AdminModelModality = "text" | "image" | "video" | "audio";
 
@@ -793,6 +833,12 @@ function VideoModelSettingsDialog({
   const [supportsTaskCancel, setSupportsTaskCancel] = useState(
     baseRules.supportsTaskCancel !== false
   );
+  const [priceEstimateEnabled, setPriceEstimateEnabled] = useState(
+    baseRules.priceEstimate?.enabled === true
+  );
+  const [priceTierDrafts, setPriceTierDrafts] = useState<
+    Record<VideoPriceEstimateResolution, VideoPriceTierDraft>
+  >(() => readVideoPriceTierDrafts(baseRules.priceEstimate));
   const durationApiName =
     generationFields.find((field) => field.name === "duration")?.apiName ??
     "duration";
@@ -848,6 +894,15 @@ function VideoModelSettingsDialog({
           Number(promptMaxChars) ||
           DEFAULT_VIDEO_MODEL_PARAMETER_RULES.promptMaxChars,
         supportsTaskCancel,
+        priceEstimate: {
+          enabled: priceEstimateEnabled,
+          tiers: VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => ({
+            resolution,
+            enabled: priceTierDrafts[resolution].enabled,
+            priceWithoutVideo: Number(priceTierDrafts[resolution].priceWithoutVideo) || 0,
+            priceWithVideo: Number(priceTierDrafts[resolution].priceWithVideo) || 0,
+          })),
+        },
         generationFields: ensureVideoGenerationFieldsForSave(generationFields),
       },
     });
@@ -948,6 +1003,88 @@ function VideoModelSettingsDialog({
           />
         }
       />
+
+      <SettingsSection
+        compact
+        columns={1}
+        title={t("pages.adminAiModels.priceEstimateLabel")}
+        action={
+          <Switch
+            checked={priceEstimateEnabled}
+            onCheckedChange={setPriceEstimateEnabled}
+          />
+        }
+      />
+
+      {priceEstimateEnabled ? (
+        <SettingsSection
+          compact
+          stacked
+          title={t("pages.adminAiModels.priceEstimatePricesTitle")}
+        >
+          <div className="overflow-hidden rounded-lg border border-border/60">
+            <div className="grid grid-cols-[3rem_5rem_1fr_1fr] gap-2 border-b border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              <span>{t("pages.adminAiModels.priceEstimateTierEnabled")}</span>
+              <span>{t("pages.adminAiModels.priceEstimateResolution")}</span>
+              <span>{t("pages.adminAiModels.priceWithoutVideo")}</span>
+              <span>{t("pages.adminAiModels.priceWithVideo")}</span>
+            </div>
+            {VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => (
+              <div
+                key={resolution}
+                className="grid grid-cols-[3rem_5rem_1fr_1fr] items-center gap-2 border-b border-border/40 px-3 py-2 last:border-b-0"
+              >
+                <Switch
+                  checked={priceTierDrafts[resolution].enabled}
+                  onCheckedChange={(checked) => {
+                    setPriceTierDrafts((current) => ({
+                      ...current,
+                      [resolution]: {
+                        ...current[resolution],
+                        enabled: checked,
+                      },
+                    }));
+                  }}
+                />
+                <span className="text-sm font-medium uppercase">{resolution}</span>
+                <Input
+                  className={ADMIN_CONTROL_CLASS}
+                  inputMode="decimal"
+                  value={priceTierDrafts[resolution].priceWithoutVideo}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setPriceTierDrafts((current) => ({
+                      ...current,
+                      [resolution]: {
+                        ...current[resolution],
+                        priceWithoutVideo: next,
+                      },
+                    }));
+                  }}
+                />
+                <Input
+                  className={ADMIN_CONTROL_CLASS}
+                  inputMode="decimal"
+                  value={priceTierDrafts[resolution].priceWithVideo}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setPriceTierDrafts((current) => ({
+                      ...current,
+                      [resolution]: {
+                        ...current[resolution],
+                        priceWithVideo: next,
+                      },
+                    }));
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <p className={ADMIN_PARAM_HINT_CLASS}>
+            {t("pages.adminAiModels.priceEstimateTierHint")}
+          </p>
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection
         compact
