@@ -17,7 +17,7 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import { ReactFlowProvider, getConnectedEdges } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
@@ -34,7 +34,6 @@ import {
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
-import { HttpRequestConfigDialog } from "./http-request-config-dialog";
 import { DeleteSelectionConfirmDialog } from "./delete-selection-confirm-dialog";
 import { UpgradeRequiredDialog } from "./upgrade-required-dialog";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
@@ -50,7 +49,6 @@ import {
   CreativeStudioProvider,
   useCreativeStudio,
 } from "./creative-studio-context";
-import { CreativeStudioView } from "./creative-studio-view";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
@@ -72,6 +70,17 @@ import type {
   WorkflowNodeType,
 } from "./workflow-types";
 
+const CreativeStudioView = lazy(() =>
+  import("./creative-studio-view").then((module) => ({
+    default: module.CreativeStudioView,
+  }))
+);
+
+const HttpRequestConfigDialog = lazy(() =>
+  import("./http-request-config-dialog").then((module) => ({
+    default: module.HttpRequestConfigDialog,
+  }))
+);
 
 /** Serialize a React Flow node into the backend Node shape (unsaved editor values). */
 function serializeNodeSnapshot(
@@ -957,11 +966,15 @@ export function WorkflowBuilder({
           onConfirm={execution.confirmRunConfig}
         />
 
-        <HttpRequestConfigDialog
-          isOpen={execution.isHttpRequestConfigDialogVisible}
-          onClose={execution.closeExecutionForm}
-          onSubmit={execution.submitHttpRequestConfig}
-        />
+        {execution.isHttpRequestConfigDialogVisible ? (
+          <Suspense fallback={null}>
+            <HttpRequestConfigDialog
+              isOpen={execution.isHttpRequestConfigDialogVisible}
+              onClose={execution.closeExecutionForm}
+              onSubmit={execution.submitHttpRequestConfig}
+            />
+          </Suspense>
+        ) : null}
 
         <Dialog
           open={execution.errorDialogOpen}
@@ -1085,7 +1098,9 @@ function WorkflowEditorMainArea(props: WorkflowEditorMainAreaProps) {
 
       {isStudio ? (
         <div className="absolute inset-0 z-50">
-          <CreativeStudioView />
+          <Suspense fallback={null}>
+            <CreativeStudioView />
+          </Suspense>
         </div>
       ) : null}
     </div>

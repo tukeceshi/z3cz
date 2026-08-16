@@ -5,7 +5,6 @@ import type {
   AppLocale,
   AuthConfig,
   BootstrapSettings,
-  HomepageMode,
   LegalDocumentType,
   LegalDocumentsConfig,
   PlatformFeatureConfig,
@@ -62,14 +61,9 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   siteTagline: "Build serverless workflows visually.",
   supportEmail: null,
   newUserTourEnabled: false,
-  homepageMode: "console",
   wsBootstrapEnabled: false,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
-
-function parseHomepageMode(value: string | null | undefined): HomepageMode {
-  return value === "marketing" ? "marketing" : "console";
-}
 
 function parseFeatureConfig(value: string | null): PlatformFeatureConfig {
   if (!value) {
@@ -98,7 +92,6 @@ function rowToPublicSettings(
     siteTagline: row.siteTagline,
     supportEmail: row.supportEmail,
     newUserTourEnabled: row.newUserTourEnabled,
-    homepageMode: parseHomepageMode(row.homepageMode),
     wsBootstrapEnabled: row.wsBootstrapEnabled,
     featureConfig: parseFeatureConfig(row.featureConfig),
   };
@@ -173,11 +166,6 @@ export async function updateSiteSettings(
       input.newUserTourEnabled ??
       existing?.newUserTourEnabled ??
       DEFAULT_PUBLIC_SETTINGS.newUserTourEnabled,
-    homepageMode:
-      input.homepageMode ??
-      (existing
-        ? parseHomepageMode(existing.homepageMode)
-        : DEFAULT_PUBLIC_SETTINGS.homepageMode),
     wsBootstrapEnabled:
       input.wsBootstrapEnabled ??
       existing?.wsBootstrapEnabled ??

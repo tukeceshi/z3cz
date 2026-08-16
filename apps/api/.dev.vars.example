@@ -1,5 +1,5 @@
 WEB_HOST=http://localhost:3101
-WEBSITE_URL=http://localhost:3100
+WEBSITE_URL=http://localhost:3101
 
 EMAIL_DOMAIN=mail.dafthunk.com
 
@@ -85,9 +85,6 @@ TWILIO_PHONE_NUMBER=CHANGE_ME
 # Cloudflare Email Service
 # Must be an address on a domain configured in Cloudflare Email Sending
 SEND_EMAIL_FROM=noreply@mail.dafthunk.com
-
-# Node inbound email webhook (optional in development; required in production)
-# INBOUND_EMAIL_SECRET=change-me-in-production
 
 # Support inbox local-part (routes to admin support inbox instead of org triggers)
 # SUPPORT_EMAIL_HANDLE=support

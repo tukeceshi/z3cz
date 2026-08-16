@@ -45,7 +45,6 @@ const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   siteTagline: "Build serverless workflows visually.",
   supportEmail: null,
   newUserTourEnabled: false,
-  homepageMode: "console",
   wsBootstrapEnabled: false,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };

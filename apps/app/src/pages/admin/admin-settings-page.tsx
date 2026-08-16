@@ -1,4 +1,4 @@
-import type { HomepageMode, UpdateSiteSettingsRequest } from "@dafthunk/types";
+import type { UpdateSiteSettingsRequest } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { mutate as mutateGlobal } from "swr";
@@ -18,13 +18,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   updateAdminSiteSettings,
@@ -41,7 +34,6 @@ export function AdminSettingsPage() {
   const [siteTagline, setSiteTagline] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [newUserTourEnabled, setNewUserTourEnabled] = useState(false);
-  const [homepageMode, setHomepageMode] = useState<HomepageMode>("console");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -57,7 +49,6 @@ export function AdminSettingsPage() {
     setSiteTagline(settings.siteTagline);
     setSupportEmail(settings.supportEmail ?? "");
     setNewUserTourEnabled(settings.newUserTourEnabled);
-    setHomepageMode(settings.homepageMode);
   }, [settings]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -69,7 +60,6 @@ export function AdminSettingsPage() {
       siteTagline: siteTagline.trim(),
       supportEmail: supportEmail.trim() ? supportEmail.trim() : null,
       newUserTourEnabled,
-      homepageMode,
     };
 
     try {
@@ -160,29 +150,6 @@ export function AdminSettingsPage() {
               />
               <p className="text-sm text-muted-foreground">
                 {t("siteSettings.supportEmailHelp")}
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="homepageMode">{t("siteSettings.homepageMode")}</Label>
-              <Select
-                value={homepageMode}
-                onValueChange={(value) => setHomepageMode(value as HomepageMode)}
-              >
-                <SelectTrigger id="homepageMode" className="max-w-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="console">
-                    {t("siteSettings.homepageModeConsole")}
-                  </SelectItem>
-                  <SelectItem value="marketing">
-                    {t("siteSettings.homepageModeMarketing")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                {t("siteSettings.homepageModeHelp")}
               </p>
             </div>
 

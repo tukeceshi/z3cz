@@ -141,7 +141,6 @@ docker compose up -d --build --wait   # 或 pnpm dev
 
 | 地址                                             | 服务                               |
 | ---------------------------------------------- | -------------------------------- |
-| [http://localhost:3100](http://localhost:3100) | 营销站 www                          |
 | [http://localhost:3101](http://localhost:3101) | 产品 app（`/api` 反代至 API）           |
 | [http://localhost:3102](http://localhost:3102) | API                              |
 | [http://localhost:8080](http://localhost:8080) | 可选同源 Gateway（`pnpm dev:gateway`） |
@@ -162,7 +161,7 @@ docker compose up -d --build --wait   # 或 pnpm dev
 ```bash
 docker compose up -d --build --wait    # 构建并启动
 docker compose up -d --wait            # 已构建过
-docker compose logs -f api www appt    # 查看日志，可以只带对应的桶
+docker compose logs -f api app         # 查看日志，可以只带对应的桶
 docker compose down                    # 停止容器
 ```
 
@@ -173,7 +172,6 @@ docker compose down                    # 停止容器
 ```
 apps/api/            Hono API（本地 Node / 可选 Workers）
 apps/app/            产品 UI（React + Vite）
-apps/www/            营销站（React Router SSR）
 packages/types/      共享类型
 packages/utils/      共享工具
 packages/runtime/    工作流节点运行时
@@ -185,7 +183,7 @@ docker/              开发 entrypoint、Nginx、Caddyfile.dev
 
 ## Cloudflare部署（未验证，本地化改动太大了）
 
-可用 GitHub Actions 将主分支部署为 Workers（API / app / www），库用 Supabase + Hyperdrive，对象用 R2。
+可用 GitHub Actions 将主分支部署为 Workers（API / app），库用 Supabase + Hyperdrive，对象用 R2。
 
 ```bash
 echo "ACCOUNT_ID" | pnpm wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production
@@ -199,7 +197,7 @@ echo "R2_SECRET"  | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env producti
 | ------------------------ | ------- |
 | `VITE_API_HOST`          | API 地址  |
 | `VITE_APP_URL`           | 应用地址    |
-| `VITE_WEBSITE_URL`       | 营销站地址   |
+| `VITE_WEBSITE_URL`       | 站点地址    |
 | `VITE_CONTACT_EMAIL`     | 联系邮箱    |
 | `VITE_GA_MEASUREMENT_ID` | GA4（可选） |
 
@@ -207,7 +205,6 @@ echo "R2_SECRET"  | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env producti
 ```bash
 pnpm --filter '@dafthunk/api' deploy
 pnpm --filter '@dafthunk/app' deploy
-pnpm --filter '@dafthunk/www' deploy
 
 DATABASE_URL="postgresql://..." pnpm --filter '@dafthunk/api' db:migrate
 ```

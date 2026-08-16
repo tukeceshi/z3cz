@@ -67,8 +67,6 @@ export interface Bindings {
   SEND_EMAIL_FROM?: string;
   /** Local outbox directory for Node outbound email (`.eml` files). */
   NODE_OUTBOX_DIR?: string;
-  /** Shared secret for POST /inbound-email on Node (optional in development). */
-  INBOUND_EMAIL_SECRET?: string;
   SUPPORT_EMAIL_HANDLE?: string;
   SUPPORT_EMAIL_FROM?: string;
   HUGGINGFACE_API_KEY?: string;

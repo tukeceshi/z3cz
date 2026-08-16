@@ -43,20 +43,15 @@ export const nodeLabelsZh: Record<
       video: "生成的视频",
     },
   },
-  "input-text": {
-    name: "文本输入",
-    description: "在工作流中提供文本输入。",
-  },
-  "text-output": {
-    name: "文本输出",
-    description: "输出文本结果。",
-  },
-  "image-output": {
-    name: "图片输出",
-    description: "输出图片结果。",
-  },
-  "manual-trigger": {
-    name: "手动触发",
-    description: "通过编辑器或 API 手动启动工作流。",
+  "ai-audio": {
+    name: "音频",
+    description: "使用组织配置的 AI 接口生成音频。",
+    inputs: {
+      prompt: "音频描述提示词",
+      model: "模型覆盖",
+    },
+    outputs: {
+      audio: "生成的音频",
+    },
   },
 };

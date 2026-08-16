@@ -43,8 +43,6 @@ const BLOB_TYPES = new Set([
   "audio",
   "video",
   "document",
-  "buffergeometry",
-  "gltf",
 ]);
 
 const VIRTUAL_REFERENCE_INPUTS: Readonly<

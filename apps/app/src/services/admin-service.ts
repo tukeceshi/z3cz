@@ -246,15 +246,6 @@ export interface AdminExecutionDetail extends AdminExecution {
   nodeExecutions: AdminNodeExecution[];
 }
 
-export interface AdminEmail {
-  id: string;
-  name: string;
-  organizationId: string;
-  organizationName: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface AdminQueue {
   id: string;
   name: string;
@@ -855,40 +846,6 @@ export const useAdminExecutionDetail = (
     executionError: error || null,
     isExecutionLoading: isLoading,
     mutateExecution: mutate,
-  };
-};
-
-/**
- * Hook to fetch admin emails list
- */
-export const useAdminEmails = (
-  page = 1,
-  limit = 20,
-  search?: string,
-  organizationId?: string
-) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-    ...(search && { search }),
-    ...(organizationId && { organizationId }),
-  });
-
-  const { data, error, isLoading, mutate } = useSWR<{
-    emails: AdminEmail[];
-    pagination: PaginationInfo;
-  }>(`${ADMIN_API_ENDPOINT}/emails?${params}`, async () =>
-    makeRequest<{ emails: AdminEmail[]; pagination: PaginationInfo }>(
-      `${ADMIN_API_ENDPOINT}/emails?${params}`
-    )
-  );
-
-  return {
-    emails: data?.emails || [],
-    pagination: data?.pagination || null,
-    emailsError: error || null,
-    isEmailsLoading: isLoading,
-    mutateEmails: mutate,
   };
 };
 

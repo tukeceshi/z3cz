@@ -1,6 +1,5 @@
 import type { ObjectReference } from "@dafthunk/types";
 import AsteriskIcon from "lucide-react/icons/asterisk";
-import BoxIcon from "lucide-react/icons/box";
 import BracesIcon from "lucide-react/icons/braces";
 import CalendarIcon from "lucide-react/icons/calendar";
 import CheckIcon from "lucide-react/icons/check";
@@ -17,7 +16,6 @@ import ImageIcon from "lucide-react/icons/image";
 import LayersIcon from "lucide-react/icons/layers";
 import LinkIcon from "lucide-react/icons/link";
 import LockIcon from "lucide-react/icons/lock";
-import MailIcon from "lucide-react/icons/mail";
 import MusicIcon from "lucide-react/icons/music";
 import TablePropertiesIcon from "lucide-react/icons/table-properties";
 import TypeIcon from "lucide-react/icons/type";
@@ -34,7 +32,7 @@ import { UnplugButton } from "./unplug-button";
 
 const getTypeIcon = (type: InputOutputType) => {
   const iconSize = "h-3.5 w-3.5";
-  const icons: Record<InputOutputType, React.ReactNode> = {
+  const icons: Partial<Record<InputOutputType, React.ReactNode>> = {
     string: <TypeIcon className={iconSize} />,
     number: <HashIcon className={iconSize} />,
     boolean: <CheckIcon className={iconSize} />,
@@ -43,8 +41,6 @@ const getTypeIcon = (type: InputOutputType) => {
     document: <FileTextIcon className={iconSize} />,
     audio: <MusicIcon className={iconSize} />,
     video: <VideoIcon className={iconSize} />,
-    gltf: <BoxIcon className={iconSize} />,
-    buffergeometry: <BoxIcon className={iconSize} />,
     json: <BracesIcon className={iconSize} />,
     date: <CalendarIcon className={iconSize} />,
     geojson: <GlobeIcon className={iconSize} />,
@@ -53,15 +49,10 @@ const getTypeIcon = (type: InputOutputType) => {
     database: <DatabaseIcon className={iconSize} />,
     dataset: <FolderSearchIcon className={iconSize} />,
     queue: <LayersIcon className={iconSize} />,
-    email: <MailIcon className={iconSize} />,
-    discord: <LinkIcon className={iconSize} />,
-    telegram: <LinkIcon className={iconSize} />,
-    whatsapp: <LinkIcon className={iconSize} />,
-    slack: <LinkIcon className={iconSize} />,
     integration: <LinkIcon className={iconSize} />,
     any: <AsteriskIcon className={iconSize} />,
   };
-  return icons[type] || icons.any;
+  return icons[type] ?? icons.any;
 };
 
 export interface PropertyFieldProps {
@@ -83,7 +74,6 @@ const FILE_TYPES: InputOutputType[] = [
   "image",
   "audio",
   "video",
-  "gltf",
   "blob",
   "document",
 ];
@@ -92,7 +82,6 @@ const FILE_TYPES: InputOutputType[] = [
 const NON_COPYABLE_TYPES: InputOutputType[] = [
   ...FILE_TYPES,
   "secret",
-  "buffergeometry",
 ];
 
 const toCopyableString = (value: unknown): string | null => {

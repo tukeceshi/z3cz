@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mainline must not reference archived legacy workflow nodes.
+ * Mainline must not reference removed legacy workflow nodes.
  * Run: node scripts/check-mainline-core-only.mjs
  */
 
@@ -60,8 +60,8 @@ function main() {
   }
 
   assert(
-    fs.existsSync(path.join(repoRoot, "archive/runtime-legacy")),
-    "legacy package archived under archive/runtime-legacy"
+    !fs.existsSync(path.join(repoRoot, "archive")),
+    "archive directory removed"
   );
 
   assert(
@@ -77,6 +77,7 @@ function main() {
     coreRegistry.includes("AiTextNode") &&
       coreRegistry.includes("AiImageNode") &&
       coreRegistry.includes("AiVideoNode") &&
+      coreRegistry.includes("AiAudioNode") &&
       !coreRegistry.includes("registerLegacy"),
     "core registry registers only generative nodes"
   );

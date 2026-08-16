@@ -99,7 +99,6 @@ export const en = {
     workflows: "Workflows",
     executions: "Executions",
     modelCalls: "Model Calls",
-    emails: "Emails",
     queues: "Queues",
     datasets: "Datasets",
     databases: "Databases",
@@ -119,10 +118,8 @@ export const en = {
     integrations: "Integrations",
     secrets: "Secrets",
     aiInterfaces: "AI & Resource APIs",
-    bots: "Bots",
     feedback: "Feedback",
     templates: "Templates",
-    playground: "Playground",
     apiKeys: "API Keys",
     members: "Sub-accounts",
     billing: "Billing",
@@ -206,11 +203,6 @@ export const en = {
     newUserTourToggle: "New user tour",
     newUserTourHint:
       "When enabled, new users with no workflows see the in-app guided tour on first visit.",
-    homepageMode: "Homepage",
-    homepageModeConsole: "Console",
-    homepageModeMarketing: "Marketing site",
-    homepageModeHelp:
-      "Controls where visitors land at /. Marketing opens /m/ on the same domain; console opens login or the dashboard.",
   },
   bootstrapAdmin: {
     title: "Bootstrap",
@@ -335,11 +327,8 @@ export const en = {
       integrations: "Third-party OAuth and API integrations.",
       secrets: "Encrypted secrets for workflows.",
       aiInterfaces: "Upstream AI and resource APIs for workflows and canvas nodes.",
-      emails: "Inbound and outbound email addresses.",
       queues: "Message queues for async workflows.",
-      bots: "Discord, Telegram, Slack, and WhatsApp bots.",
       templates: "Pre-built workflow templates gallery.",
-      playground: "Single-node test playground.",
     },
     env: {
       cloudflareAccountId: "Cloudflare account ID",
@@ -350,8 +339,6 @@ export const en = {
       integrationDiscordClientSecret: "Discord OAuth client secret",
       sendEmail: "Outbound email provider binding",
       sendEmailFrom: "Default sender address",
-      emailDomain: "Inbound email domain",
-      inboundEmailSecret: "Inbound email webhook secret",
     },
   },
   seo: {
@@ -369,7 +356,6 @@ export const en = {
       adminWorkflowDetail: "Workflow Details - Admin - {{siteName}}",
       adminExecutions: "Executions - Admin - {{siteName}}",
       adminExecutionDetail: "Execution Details - Admin - {{siteName}}",
-      adminEmails: "Emails - Admin - {{siteName}}",
       adminSupport: "Support - Admin - {{siteName}}",
       adminQueues: "Queues - Admin - {{siteName}}",
       adminDatasets: "Datasets - Admin - {{siteName}}",
@@ -409,13 +395,7 @@ export const en = {
       databaseExplorer: "Explorer - Database - {{siteName}}",
       schemas: "Schemas - {{siteName}}",
       queues: "Queues - Queues - {{siteName}}",
-      emails: "Emails - Emails - {{siteName}}",
-      emailInbox: "Inbox - Emails - {{siteName}}",
-      bots: "Bots - {{siteName}}",
-      botDetail: "Bot Details - {{siteName}}",
-      botAccountDetail: "Account Details - {{siteName}}",
       executionDetail: "Execution Details - Workflows - {{siteName}}",
-      playground: "Playground - Workflows - {{siteName}}",
       editor: "Edit Workflow - {{siteName}}",
       form: "Form - {{siteName}}",
       feedbackForm: "Feedback - {{siteName}}",
@@ -503,7 +483,6 @@ export const en = {
       organizations: "organizations",
       executions: "executions",
       queues: "queues",
-      emails: "emails",
       datasets: "datasets",
       databases: "databases",
     },
@@ -579,12 +558,6 @@ export const en = {
       emptyTitle: "No queues found",
       emptySearch: "No queues match your search.",
       emptyDefault: "No queues have been created yet.",
-    },
-    emails: {
-      title: "Emails",
-      emptyTitle: "No emails found",
-      emptySearch: "No emails match your search.",
-      emptyDefault: "No emails have been created yet.",
     },
     datasets: {
       title: "Datasets",
@@ -1251,24 +1224,6 @@ export const en = {
       notFound: "Template not found",
       createWorkflow: "Create Workflow",
     },
-    playground: {
-      title: "Playground",
-      searchPlaceholder: "Search nodes...",
-      empty: "No nodes found matching your search.",
-      count: "{{filtered}} of {{total}} nodes",
-    },
-    playgroundExecute: {
-      nodeNotFound: 'Node type "{{type}}" not found.',
-      help: "Help",
-      execute: "Execute",
-      executing: "Executing...",
-      inputs: "Inputs",
-      outputs: "Outputs",
-      error: "Error",
-      noInputs: "This node has no inputs.",
-      noOutputs: "This node has no outputs.",
-      executionFailed: "Execution failed",
-    },
     schemaForm: {
       enterJson: "Enter JSON...",
     },
@@ -1414,60 +1369,6 @@ export const en = {
         javascript: "JavaScript",
         python: "Python",
       },
-    },
-    emails: {
-      title: "Emails",
-      description: "Create and manage emails for sending and receiving in your workflows.",
-      createButton: "Create Email",
-      untitled: "Untitled Email",
-      email: "Email",
-      viewMessages: "View messages",
-      saveToAddressBook: "Save to Address Book",
-      emptyTitle: "No emails found",
-      emptyDescription: "Create a new email to get started.",
-      editDialogTitle: "Edit Email",
-      editDialogDescription: "Rename your email.",
-      renameWarning:
-        "Renaming will replace the email address (currently {{address}}). Senders using the old address will no longer reach this email.",
-      deleteTitle: "Delete Email",
-      deleteConfirm:
-        'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
-      createDialog: {
-        stepNameTitle: "Create an Email",
-        stepSetupTitle: "Email Created",
-        stepNameDescription:
-          "Give your email a name. An email address will be generated automatically.",
-        stepSetupDescription:
-          "Your email is ready. Use the address below in your workflows.",
-        createFailed: "Failed to create email",
-        nameLabel: "Name",
-        namePlaceholder: "e.g. Support Inbox",
-        nameHint: "A display name for this email in z3cz.com.",
-        createdBadge: "Created",
-        creating: "Creating...",
-        create: "Create Email",
-        done: "Done",
-      },
-    },
-    emailInbox: {
-      title: "Inbox",
-      searchPlaceholder: "Search by subject or sender…",
-      search: "Search",
-      clear: "Clear",
-      loadingConversations: "Loading conversations…",
-      loadConversationsFailed: "Failed to load conversations: {{message}}",
-      noConversations: "No conversations",
-      noSubject: "(no subject)",
-      loadingMore: "Loading more…",
-      loadingConversation: "Loading conversation…",
-      selectConversation: "Select a conversation to read it",
-      sentLabel: "{{email}} (sent)",
-      bodyUnavailable: "Message body unavailable",
-      noBody: "(no body)",
-      loading: "Loading…",
-      hideTrimmed: "‹ Hide trimmed content",
-      showTrimmed: "› Show trimmed content",
-      htmlBodyTitle: "Email HTML body",
     },
     databaseExplorer: {
       title: "Database Explorer",
@@ -2149,320 +2050,6 @@ export const en = {
       tabApiLogs: "API Logs",
       apiLogsEmpty: "No API logs for this invocation.",
     },
-    bots: {
-      title: "Bots",
-      description: "Connect bots to trigger your workflows from chat messages.",
-      addButton: "Add Bot",
-      type: "Type",
-      token: "Token",
-      emptyTitle: "No bots configured",
-      emptyDescription: "Add a bot to get started.",
-      deleteTitle: "Delete Bot",
-      deleteConfirm:
-        'Are you sure you want to delete "{{name}}"? Triggers using this bot will need to be reconfigured with a different bot.',
-      createTitle: "Add Bot",
-      createDescription: "Choose the platform for your bot.",
-      detailTitle: "Bot Details",
-      accountTitle: "Account Details",
-      notFound: "Bot not found",
-      accountNotFound: "Account not found",
-      edit: "Edit",
-      links: "Links",
-      setupInstructions: "Setup Instructions",
-      webhookConfig: "Webhook Configuration",
-      updateFailed: "Failed to update bot",
-      updateAccountFailed: "Failed to update account",
-      tokenKeepPlaceholder: "Leave empty to keep current token",
-      secretKeepPlaceholder: "Leave empty to keep current secret",
-      untitled: "Untitled Bot",
-      untitledAccount: "Untitled Account",
-      copiedToast: "{{label}} copied to clipboard",
-      saveChanges: "Save Changes",
-      applicationId: "Application ID",
-      publicKey: "Public Key",
-      botToken: "Bot Token",
-      signingSecret: "Signing Secret",
-      webhookUrl: "Webhook URL",
-      applicationIdImmutable: "Application ID cannot be changed.",
-      botUsername: "Bot Username",
-      workspace: "Workspace",
-      appId: "App ID",
-      phoneNumberId: "Phone Number ID",
-      wabaId: "WhatsApp Business Account ID",
-      accessToken: "Access Token",
-      appSecret: "App Secret",
-      callbackUrl: "Callback URL",
-      verifyToken: "Verify Token",
-      optional: "(optional)",
-      editDiscordTitle: "Edit Discord Bot",
-      editDiscordDescription: "Update your Discord bot settings.",
-      editTelegramTitle: "Edit Telegram Bot",
-      editTelegramDescription: "Update your Telegram bot settings.",
-      editSlackTitle: "Edit Slack Bot",
-      editSlackDescription: "Update your Slack bot settings.",
-      editWhatsAppTitle: "Edit WhatsApp Account",
-      editWhatsAppDescription: "Update your WhatsApp Business API settings.",
-      displayNameHint: "A display name for this account in z3cz.com.",
-      appSecretHint:
-        "Found at Apps > App Settings > Basic in the Meta Developer Portal.",
-      accessTokenHint:
-        "Found at Apps > Use cases > WhatsApp > API Setup, or via Business Settings > System Users for a permanent token.",
-      phoneNumberIdHint:
-        "Found at Apps > Use cases > WhatsApp > API Setup under the phone number dropdown.",
-      wabaIdHint:
-        "The WhatsApp Business Account ID, found on the same page. Stored for reference only.",
-      wabaIdPlaceholder: "WhatsApp Business Account ID",
-      inviteDiscordBot: "Invite Bot to a Server",
-      openDiscordDevPortal: "Open Discord Developer Portal",
-      discordDeveloperPortal: "Discord Developer Portal",
-      generalInformation: "General Information",
-      inviteTheBot: "Invite the bot",
-      openTelegramBot: "Open @{{username}} on Telegram",
-      openBotFather: "Open @BotFather on Telegram",
-      telegramApiDocs: "Telegram Bot API Documentation",
-      openSlackApiPortal: "Open Slack API Portal",
-      webhookMetaHint:
-        "Copy these values into your Meta Developer Portal webhook settings.",
-      metaDeveloperPortal: "Meta Developer Portal",
-      webhookGenerateHint:
-        "Create a workflow with a Receive WhatsApp Message trigger to generate webhook configuration.",
-      openMetaDevPortal: "Open Meta Developer Portal",
-      whatsappCloudApiDocs: "WhatsApp Cloud API Documentation",
-      yourBot: "your bot",
-      discordSetup1Before:
-        "Copy the Webhook URL above and paste it as the Interactions Endpoint URL in the",
-      discordSetup1After: "page.",
-      discordSetup2After: "to a Discord server.",
-      discordSetup3:
-        "Create a workflow with a Receive Discord Message trigger, select this bot, and enable it.",
-      telegramSetup1:
-        "Create a workflow with a Receive Telegram Message trigger and select this bot.",
-      telegramSetup2:
-        "Enable the workflow. The webhook will be registered automatically with Telegram.",
-      telegramSetup3Before: "Send a message to",
-      telegramSetup3After: "on Telegram to trigger the workflow.",
-      slackSetup1:
-        "Under Event Subscriptions, toggle Enable Events to On. Paste the Webhook URL above as the Request URL. Under Subscribe to bot events, add message.channels and message.groups, then save.",
-      slackSetup2:
-        "Under OAuth & Permissions, verify the bot has channels:history, groups:history, and chat:write scopes.",
-      slackSetup3: "Invite the bot to a channel with /invite @{{name}}.",
-      slackSetup4:
-        "Create a workflow with a Receive Slack Message trigger, select this bot, and enable it.",
-      whatsappSetup1Before:
-        "Copy the Callback URL and Verify Token above into the",
-      whatsappSetup1After:
-        "webhook settings. Subscribe to the messages field.",
-      whatsappSetup2:
-        "Create a workflow with a Receive WhatsApp Message trigger, select this account, and enable it.",
-      whatsappSetup3:
-        "Send a WhatsApp message to your business number to trigger the workflow.",
-      whatsappSetupInfoStep1:
-        "Create a workflow with a {{trigger}} trigger and select this account.",
-      whatsappSetupInfoStep2:
-        "After creating the workflow, the Callback URL and Verify Token will appear on the account details page. Copy them into the Meta Developer Portal webhook settings and subscribe to the messages field.",
-      whatsappSetupInfoStep3:
-        "Enable the workflow, then send a WhatsApp message to your business number to trigger it.",
-      wizard: {
-        createBotFailed: "Failed to create bot",
-        createAccountFailed: "Failed to create account",
-        botNameHint:
-          "A display name for this bot in z3cz.com. This is not visible to your {{platform}} users.",
-        accountNameHint:
-          "A display name for this account in z3cz.com. This is not visible to your WhatsApp users.",
-        triggers: {
-          receiveDiscordMessage: "Receive Discord Message",
-          receiveTelegramMessage: "Receive Telegram Message",
-          receiveSlackMessage: "Receive Slack Message",
-          receiveWhatsAppMessage: "Receive WhatsApp Message",
-        },
-        placeholders: {
-          discordBot: "My Discord Bot",
-          telegramBot: "My Telegram Bot",
-          slackBot: "My Slack Bot",
-          whatsappAccount: "My WhatsApp Bot",
-          applicationId: "123456789012345678",
-          publicKey: "abc123...",
-          botToken: "Paste your bot token here",
-          signingSecret: "Paste your signing secret here",
-          slackBotToken: "xoxb-...",
-          appSecret: "Paste your App Secret here",
-          accessToken: "Paste your access token here",
-          phoneNumberId: "123456789012345",
-          commandName: "ask",
-        },
-        discord: {
-          steps: {
-            name: {
-              title: "Create a Discord Bot",
-              description:
-                "Choose a display name to identify this Discord bot in z3cz.com.",
-            },
-            application: {
-              title: "Application Info",
-              description:
-                "Copy the Application ID and Public Key from the General Information page in the Discord Developer Portal.",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "Copy the token from the Bot page in the Discord Developer Portal.",
-            },
-            webhook: {
-              title: "Interactions Endpoint",
-              description:
-                "Copy the webhook URL below and paste it as the Interactions Endpoint URL in the Discord Developer Portal.",
-            },
-            command: {
-              title: "Slash Command",
-              description:
-                "Choose a name for the slash command that will trigger this workflow.",
-            },
-            invite: {
-              title: "Add Bot to Server",
-              description:
-                "Add the bot to a Discord server so it can receive slash commands.",
-            },
-          },
-          applicationIdHint:
-            "Copy from the General Information page in the Discord Developer Portal.",
-          publicKeyHint:
-            "Copy from the same General Information page. Used to verify interaction signatures.",
-          botTokenHint:
-            "Copy the token from the Bot page in the Discord Developer Portal.",
-          interactionsEndpointUrl: "Interactions Endpoint URL",
-          interactionsHintBefore:
-            "Paste this as the Interactions Endpoint URL in the",
-          interactionsHintAfter: ".",
-          webhookPasteHint:
-            "Paste this as the Interactions Endpoint URL in the General Information page of your Discord application.",
-          commandName: "Command Name",
-          commandHint:
-            "Users will type /{{command}} in Discord to trigger this workflow.",
-          addToServer: "Add {{name}} to a Server",
-          invitePermissionsHint:
-            "This will request the bot and slash commands permissions.",
-          botPage: "Bot",
-        },
-        telegram: {
-          steps: {
-            name: {
-              title: "Create a Telegram Bot",
-              description:
-                "Choose a display name to identify this Telegram bot in z3cz.com.",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "Create a new bot with @BotFather on Telegram, then copy the bot token it gives you.",
-            },
-            setup: {
-              title: "Setup",
-              description:
-                "Your bot is ready. The webhook will be auto-registered when you enable the workflow.",
-            },
-          },
-          botTokenHint:
-            "Copy the token from @BotFather on Telegram. Use /newbot to create one if needed.",
-          openBotFather: "Open @BotFather",
-        },
-        slack: {
-          steps: {
-            name: {
-              title: "Create a Slack Bot",
-              description:
-                "Choose a display name to identify this Slack bot in z3cz.com.",
-            },
-            signingSecret: {
-              title: "Signing Secret",
-              description:
-                "Copy the Signing Secret from the Basic Information page of your Slack app.",
-            },
-            botToken: {
-              title: "Bot Token",
-              description:
-                "Copy the Bot User OAuth Token from the OAuth & Permissions page of your Slack app.",
-            },
-            eventSubscriptions: {
-              title: "Event Subscriptions",
-              description:
-                "Copy the webhook URL below and paste it as the Request URL in the Event Subscriptions page of your Slack app.",
-            },
-            setup: {
-              title: "Invite Bot",
-              description:
-                "Verify permissions, invite the bot to a channel, and create a workflow.",
-            },
-          },
-          openSlackApi: "Open Slack API",
-          signingSecretHint:
-            "Find this under Basic Information in your Slack app settings. Used to verify that incoming webhook messages are genuinely from Slack.",
-          botUserOAuthToken: "Bot User OAuth Token",
-          botTokenHint:
-            "Find this under OAuth & Permissions in your Slack app settings.",
-          requestUrl: "Request URL",
-          eventSubscriptionsStep1:
-            "Go to Event Subscriptions and toggle Enable Events to On.",
-          eventSubscriptionsStep2:
-            "Paste the Request URL above and wait for Slack to verify it.",
-          eventSubscriptionsStep3:
-            "Under Subscribe to bot events, add message.channels and message.groups, then save.",
-          basicInformation: "Basic Information",
-          oauthPermissions: "OAuth & Permissions",
-          eventSubscriptions: "Event Subscriptions",
-          enableEvents: "Enable Events",
-          subscribeToBotEvents: "Subscribe to bot events",
-        },
-        whatsapp: {
-          steps: {
-            name: {
-              title: "Add a WhatsApp Account",
-              description:
-                "Choose a display name to identify this WhatsApp account in z3cz.com.",
-            },
-            appSecret: {
-              title: "App Secret",
-              description:
-                "Copy the App Secret from your Meta app. Navigate to Apps > App Settings > Basic in the Meta Developer Portal.",
-            },
-            apiCredentials: {
-              title: "WhatsApp API Credentials",
-              description:
-                "Copy your Access Token and Phone Number ID from the WhatsApp API Setup page in the Meta Developer Portal.",
-            },
-            webhook: {
-              title: "Webhook Configuration",
-              description:
-                "Copy the Callback URL and Verify Token below into the webhook settings of your Meta app.",
-            },
-            setup: {
-              title: "Setup",
-              description:
-                "Verify the webhook is configured and create a workflow to start receiving messages.",
-            },
-          },
-          openMetaPortal: "Open Meta Developer Portal",
-          appSecretFieldHint:
-            "Find this at Apps > App Settings > Basic in the Meta Developer Portal. Click Show next to the App Secret field. Used to verify that incoming webhook messages are genuinely from Meta.",
-          accessTokenFieldHint:
-            "Find this at Apps > Use cases > WhatsApp > API Setup under the temporary access token section, or generate a permanent token via Business > Settings > System Users.",
-          temporaryTokenWarning:
-            "Temporary tokens from API Setup expire in 24 hours. For production use, generate a permanent token from a System User in Business Settings.",
-          phoneNumberIdFieldHint:
-            "Find this at Apps > Use cases > WhatsApp > API Setup. Select your phone number from the dropdown — the numeric ID appears below it. This is not the phone number itself.",
-          webhookStep1:
-            "Go to Apps > Use cases > WhatsApp > API Setup and click Configure next to Webhooks.",
-          webhookStep2:
-            "Paste the Callback URL and Verify Token, then click Verify and save.",
-          webhookStep3: "Subscribe to the messages webhook field.",
-          setupStep2:
-            "Enable the workflow, then send a WhatsApp message to your business number to trigger it.",
-          configure: "Configure",
-          verifyAndSave: "Verify and save",
-          appsApiSetup: "Apps > Use cases > WhatsApp > API Setup",
-          appsSettingsBasic: "Apps > App Settings > Basic",
-        },
-      },
-    },
     members: {
       title: "Sub-accounts",
       loadingTitle: "Sub-accounts",
@@ -2778,17 +2365,6 @@ export const en = {
       yes: "Yes",
       no: "No",
     },
-    nodeBrowser: {
-      searchPlaceholder: "Search nodes by name, description, or tag...",
-      cards: "Cards",
-      list: "List",
-      loadError: "Failed to load node types. Please try again later.",
-      loading: "Loading nodes...",
-      showingAll: "Showing all {{count}} nodes",
-      showingFiltered: "Showing {{filtered}} of {{total}} nodes",
-      noResults: "No nodes found matching your search criteria.",
-      clearFilters: "Clear filters",
-    },
   },
   workflow: {
     error: {
@@ -3084,15 +2660,6 @@ export const en = {
       notNow: "Not now",
       upgrade: "Upgrade to Early Adopter",
     },
-    emailSetup: {
-      addressLabel: "Email Address",
-      nextSteps: "Next Steps",
-      receiveEmailTrigger: "Receive Email",
-      step1:
-        "Create a workflow with a {{trigger}} trigger and select this email.",
-      step2: "Enable the workflow.",
-      step3: "Send an email to the address above to trigger the workflow.",
-    },
     subscription: {
       required: "Subscription required",
     },
@@ -3190,12 +2757,9 @@ export const en = {
       invalidImageFile: "Please select a PNG or JPG image",
       invalidAudioFile: "Please select a valid audio file",
       invalidVideoFile: "Please select a valid video file",
-      invalidGltfFile: "Please select a valid GLTF (.gltf or .glb) file",
-      noGltf: "No 3D model",
       uploadFailedImage: "Failed to upload image",
       uploadFailedVideo: "Failed to upload video",
       uploadFailedDocument: "Failed to upload document",
-      uploadFailedGltf: "Failed to upload glTF model",
       noSecret: "No secret",
       selectDate: "Select date",
       uploadFailedFile: "Failed to upload file",
@@ -3208,11 +2772,6 @@ export const en = {
       secret: {
         empty: "No secrets",
         select: "Select secret",
-      },
-      email: {
-        none: "No email",
-        empty: "No emails",
-        select: "Select email",
       },
       queue: {
         none: "No queue",
@@ -3267,8 +2826,6 @@ export const en = {
       openDocs: "Open documentation",
       docsUnavailable: "Documentation unavailable",
       openDocsAria: "Open node documentation",
-      configureTool: "Configure tool",
-      removeTool: "Remove tool",
       editInput: "Edit Input",
       viewOutput: "View Output",
     },
@@ -3784,28 +3341,6 @@ export const en = {
             "Browse the [Cloudflare model catalog]({{url}}) to find another model.",
         },
       },
-      triggers: {
-        selectBot: "Select a bot",
-        newBot: "+ New Bot",
-        discord: {
-          commandPlaceholder: "command",
-          inviteBot: "Invite bot to server",
-          syncStale: "Command not synced with Discord — click to sync",
-          sync: "Sync slash command with Discord",
-          syncSuccess: "Slash command synced with Discord",
-          syncFailed: "Failed to sync slash command",
-        },
-        telegram: {
-          chatIdPlaceholder: "Chat ID (optional)",
-        },
-        slack: {
-          channelIdPlaceholder: "Channel ID (optional)",
-        },
-        whatsapp: {
-          selectAccount: "Select an account",
-          newAccount: "+ New Account",
-        },
-      },
       cron: {
         choosePreset: "Choose preset",
         everyMinute: "Every minute",
@@ -3843,19 +3378,6 @@ export const en = {
         startRecording: "Start recording",
         accessFailed: "Failed to access microphone",
       },
-      bufferGeometry: {
-        title: "Buffer Geometry",
-        noGeometry: "No geometry",
-      },
-      modelViewer: {
-        errorTitle: "3D Model Error",
-        loadViewerFailed: "Failed to load 3D viewer",
-        loadModelFailed: "Failed to load model",
-        loadingViewer: "Loading 3D Viewer...",
-        loadingModel: "Loading 3D Model...",
-        gltfModelLabel: "glTF Model ({{mimeType}})",
-        downloadGlb: "Download GLB File",
-      },
       switchFork: {
         removeCase: "Remove case",
         addCase: "Add case",
@@ -3863,18 +3385,6 @@ export const en = {
       dynamicInputs: {
         removeInput: "Remove input",
         addInput: "Add input",
-      },
-      executionEmail: {
-        title: "Simulate Email Trigger",
-        from: "From",
-        subject: "Subject",
-        body: "Body",
-        fromPlaceholder: "sender@example.com",
-        subjectPlaceholder: "Email Subject",
-        bodyPlaceholder: "Email body content...",
-        attachments: "Attachments",
-        addAttachments: "Add Attachments",
-        sendAndRun: "Send & Run",
       },
       file: {
         download: "Download file",

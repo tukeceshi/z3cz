@@ -1,13 +1,11 @@
 import { isObjectReference } from "@/services/object-service";
 
-import { BlobField } from "./blob-field";
-import { BooleanField } from "./boolean-field";
+import { GenericField } from "./generic-field";
+import { ImageField } from "./image-field";
 import { JsonField } from "./json-field";
-import { NumberField } from "./number-field";
 import { TextField } from "./text-field";
 import type { FieldProps, ObjectReference } from "./types";
 
-// AnyField is always read-only - it displays values of any type
 export function AnyField({
   className,
   connected,
@@ -18,14 +16,11 @@ export function AnyField({
   createObjectUrl?: (objectReference: ObjectReference) => string;
 }) {
   const noop = () => {};
-
-  // Any field accepts any type, so null and undefined are both considered "no value"
   const hasValue = value !== undefined && value !== null;
 
-  // Object references (files) - delegate to BlobField
   if (hasValue && isObjectReference(value)) {
     return (
-      <BlobField
+      <ImageField
         className={className}
         connected={connected}
         createObjectUrl={createObjectUrl}
@@ -38,7 +33,6 @@ export function AnyField({
     );
   }
 
-  // Array of object references (repeated blobs) - delegate to BlobField
   if (
     hasValue &&
     Array.isArray(value) &&
@@ -46,7 +40,7 @@ export function AnyField({
     value.every(isObjectReference)
   ) {
     return (
-      <BlobField
+      <ImageField
         className={className}
         connected={connected}
         createObjectUrl={createObjectUrl}
@@ -59,7 +53,6 @@ export function AnyField({
     );
   }
 
-  // Objects and arrays - delegate to JsonField
   if (hasValue && (Array.isArray(value) || typeof value === "object")) {
     return (
       <JsonField
@@ -74,10 +67,9 @@ export function AnyField({
     );
   }
 
-  // Booleans - delegate to BooleanField
-  if (typeof value === "boolean") {
+  if (typeof value === "boolean" || typeof value === "number") {
     return (
-      <BooleanField
+      <GenericField
         className={className}
         connected={connected}
         disabled
@@ -89,22 +81,6 @@ export function AnyField({
     );
   }
 
-  // Numbers - delegate to NumberField
-  if (typeof value === "number") {
-    return (
-      <NumberField
-        className={className}
-        connected={connected}
-        disabled
-        onChange={noop}
-        onClear={noop}
-        parameter={parameter}
-        value={value}
-      />
-    );
-  }
-
-  // Strings and everything else - delegate to TextField
   return (
     <TextField
       className={className}

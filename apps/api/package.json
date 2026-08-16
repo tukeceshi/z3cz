@@ -9,8 +9,6 @@
     "cloudflare:email": "./src/shims/cloudflare-email.ts"
   },
   "scripts": {
-    "extract-nodes": "pnpm --filter '@dafthunk/www' extract-nodes",
-    "predev": "pnpm run extract-nodes",
     "dev": "node scripts/dev-watch.mjs",
     "dev:docker:api": "node scripts/dev-watch.mjs",
     "dev:docker": "node scripts/dev-watch.mjs",

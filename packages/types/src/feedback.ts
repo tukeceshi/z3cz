@@ -1,8 +1,4 @@
-/**
- * Feedback sentiment types.
- * Mainline removed from product nav. Serves legacy create-feedback-form node.
- * See LEGACY_ARCHIVE.md.
- */
+/** Feedback sentiment types. */
 export const FeedbackSentiment = {
   POSITIVE: "positive",
   NEGATIVE: "negative",

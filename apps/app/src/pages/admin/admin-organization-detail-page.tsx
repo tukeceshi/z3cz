@@ -298,19 +298,6 @@ export function AdminOrganizationDetailPage() {
           </Card>
         </Link>
         <Link
-          to={`/admin/emails?organizationId=${organizationId}`}
-          className="block"
-        >
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="pb-2">
-              <CardDescription>{t("sidebar.emails")}</CardDescription>
-              <CardTitle className="text-2xl">
-                {entityCounts?.emailCount ?? "-"}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link
           to={`/admin/queues?organizationId=${organizationId}`}
           className="block"
         >

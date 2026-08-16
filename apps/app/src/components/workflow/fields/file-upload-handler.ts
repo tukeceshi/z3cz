@@ -62,12 +62,6 @@ export function createFileValidators(t: TranslateFn) {
         throw new Error(t("workflow.fields.invalidVideoFile"));
       }
     },
-    gltf: (file: File) => {
-      const fileName = file.name.toLowerCase();
-      if (!fileName.endsWith(".gltf") && !fileName.endsWith(".glb")) {
-        throw new Error(t("workflow.fields.invalidGltfFile"));
-      }
-    },
   };
 }
 
@@ -78,16 +72,6 @@ export const mimeTypeDetectors = {
     }
     if (file.name.endsWith(".xls")) {
       return "application/vnd.ms-excel";
-    }
-    return file.type;
-  },
-  gltf: (file: File): string => {
-    const fileName = file.name.toLowerCase();
-    if (fileName.endsWith(".gltf")) {
-      return "model/gltf+json";
-    }
-    if (fileName.endsWith(".glb")) {
-      return "model/gltf-binary";
     }
     return file.type;
   },

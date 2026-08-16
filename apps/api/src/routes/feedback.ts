@@ -1,5 +1,3 @@
-/** Mainline removed from product nav. Serves legacy create-feedback-form node. See LEGACY_ARCHIVE.md. */
-
 import type {
   BatchCreateFeedbackRequest,
   BatchCreateFeedbackResponse,

@@ -1,13 +1,9 @@
 /**
  * Public Feedback Form Routes
  *
- * Mainline removed from product nav. Serves legacy create-feedback-form node.
- * See LEGACY_ARCHIVE.md.
- *
  * These routes are unauthenticated — the signed token IS the authorization.
  * They allow reviewers to view a workflow execution's outputs and submit
- * per-criterion feedback via a shareable URL produced by the
- * `create-feedback-form` node.
+ * per-criterion feedback via a shareable URL.
  */
 
 import {

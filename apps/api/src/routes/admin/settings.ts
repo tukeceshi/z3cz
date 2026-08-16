@@ -19,7 +19,6 @@ const updateSiteSettingsSchema = z.object({
     .union([z.string().trim().email(), z.literal(""), z.null()])
     .optional(),
   newUserTourEnabled: z.boolean().optional(),
-  homepageMode: z.enum(["console", "marketing"]).optional(),
   wsBootstrapEnabled: z.boolean().optional(),
 });
 adminSettingsRoutes.get("/", async (c) => {
@@ -57,9 +56,6 @@ adminSettingsRoutes.patch(
         : {}),
       ...(body.newUserTourEnabled !== undefined
         ? { newUserTourEnabled: body.newUserTourEnabled }
-        : {}),
-      ...(body.homepageMode !== undefined
-        ? { homepageMode: body.homepageMode }
         : {}),
       ...(body.wsBootstrapEnabled !== undefined
         ? { wsBootstrapEnabled: body.wsBootstrapEnabled }

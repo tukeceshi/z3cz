@@ -562,25 +562,6 @@ html.dark .studio-mdx-table-frame table :is(th, td)[data-active="true"] {
   counter-increment: item;
 }
 
-/* GLTF Canvas Container - Prevent ReactFlow interference */
-.gltf-canvas-container {
-  contain: layout style size;
-  transform: none !important;
-}
-
-.gltf-canvas-container canvas {
-  transform: none !important;
-  image-rendering: auto;
-  transition: none !important;
-  animation: none !important;
-  display: block !important;
-  position: relative !important;
-  z-index: 10 !important;
-  background: #000 !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
 /* CodeMirror dark mode styling */
 html.dark .cm-editor {
   --cm-bg: #1a1a1a;

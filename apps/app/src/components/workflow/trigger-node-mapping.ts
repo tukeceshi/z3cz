@@ -1,27 +1,42 @@
 import type { Node, NodeType, WorkflowTrigger } from "@dafthunk/types";
 
 /**
- * Mainline canvas workflows no longer auto-insert trigger nodes.
- * Legacy trigger mappings are kept for archived workflows only.
+ * New workflows no longer auto-insert trigger nodes.
+ * Keep legacy type IDs so old graphs still recognize trigger nodes
+ * (delete guards) without mapping them onto the canvas.
  */
 const TRIGGER_TO_NODE_TYPES: Record<WorkflowTrigger, string[]> = {
   manual: [],
   http_request: [],
-  scheduled: ["receive-scheduled-trigger"],
-  http_webhook: ["http-webhook"],
-  form_webhook: ["form-webhook"],
-  form_request: ["form-request", "form-response"],
-  email_message: ["receive-email"],
-  queue_message: ["queue-message"],
-  discord_event: ["receive-discord-message"],
-  telegram_event: ["receive-telegram-message"],
-  whatsapp_event: ["receive-whatsapp-message"],
-  slack_event: ["receive-slack-message"],
+  scheduled: [],
+  http_webhook: [],
+  form_webhook: [],
+  form_request: [],
+  email_message: [],
+  queue_message: [],
+  discord_event: [],
+  telegram_event: [],
+  whatsapp_event: [],
+  slack_event: [],
 };
 
+const LEGACY_TRIGGER_NODE_TYPE_IDS = [
+  "receive-scheduled-trigger",
+  "http-webhook",
+  "form-webhook",
+  "form-request",
+  "form-response",
+  "queue-message",
+  "receive-email",
+  "receive-discord-message",
+  "receive-telegram-message",
+  "receive-whatsapp-message",
+  "receive-slack-message",
+] as const;
+
 /** All node type IDs that are trigger nodes. */
-export const ALL_TRIGGER_NODE_TYPE_IDS = new Set(
-  Object.values(TRIGGER_TO_NODE_TYPES).flat()
+export const ALL_TRIGGER_NODE_TYPE_IDS = new Set<string>(
+  LEGACY_TRIGGER_NODE_TYPE_IDS
 );
 
 /** Returns the node type IDs to add for a given trigger type. */

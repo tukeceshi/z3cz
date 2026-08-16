@@ -1,6 +1,5 @@
 # Shared Docker entrypoint helpers (sourced by entrypoint*.sh).
 # Scheme I 配套：lock 哈希写在各服务自己的 /app/node_modules 卷内，避免并行竞态误跳过。
-# Scheme II：nodes 源文件哈希未变则跳过 extract-nodes。
 # Scheme IV：pnpm-lock.yaml 哈希未变且依赖完整则跳过 pnpm install。
 
 dafthunk_ensure_dev_vars() {
@@ -26,14 +25,6 @@ dafthunk_deps_look_complete() {
         return 1
       fi
       ;;
-    www)
-      if [ ! -x node_modules/.bin/tsx ]; then
-        return 1
-      fi
-      if [ ! -d apps/www/node_modules ]; then
-        return 1
-      fi
-      ;;
     app)
       if [ ! -d apps/app/node_modules ]; then
         return 1
@@ -55,7 +46,6 @@ dafthunk_deps_look_complete() {
 dafthunk_is_interactive_dev_server() {
   case "$*" in
     *dev:docker*|*dev:docker:api*) return 0 ;;
-    *@dafthunk/www*dev*) return 0 ;;
     *@dafthunk/app*dev*) return 0 ;;
   esac
   return 1
@@ -131,37 +121,6 @@ dafthunk_patch_dev_vars() {
   fi
 }
 
-# 方案 II：仅当节点源或 extract 脚本变化时重跑 extract-nodes
-dafthunk_nodes_source_hash() {
-  find packages/runtime/src/nodes apps/www/scripts \
-    \( -name '*.ts' -o -name '*.tsx' \) ! -name '*.test.ts' -type f -print0 2>/dev/null \
-    | sort -z \
-    | xargs -0 sha256sum 2>/dev/null \
-    | sha256sum \
-    | awk '{print $1}'
-}
-
-dafthunk_maybe_extract_nodes() {
-  if [ "${SKIP_EXTRACT_NODES:-0}" = "1" ]; then
-    return 0
-  fi
-
-  NODES_JSON="apps/www/data/nodes.json"
-  NODES_HASH_FILE="apps/www/data/.nodes-source-hash"
-  mkdir -p apps/www/data
-
-  CURRENT_HASH="$(dafthunk_nodes_source_hash)"
-
-  if [ -f "$NODES_JSON" ] && [ -f "$NODES_HASH_FILE" ] && [ "$(cat "$NODES_HASH_FILE")" = "$CURRENT_HASH" ]; then
-    echo "[entrypoint] nodes 源未变，跳过 extract-nodes。"
-    return 0
-  fi
-
-  echo "[entrypoint] 正在生成 apps/www/data/nodes.json..."
-  pnpm --filter '@dafthunk/www' extract-nodes
-  echo "$CURRENT_HASH" > "$NODES_HASH_FILE"
-}
-
 dafthunk_strip_duplicate_secret_keys() {
   if [ ! -f /.dockerenv ]; then
     return 0
@@ -184,7 +143,6 @@ dafthunk_entrypoint_init() {
   dafthunk_strip_duplicate_secret_keys
   dafthunk_conditional_install "$@"
   dafthunk_patch_dev_vars
-  dafthunk_maybe_extract_nodes
 }
 
 dafthunk_apply_api_restart_mode() {

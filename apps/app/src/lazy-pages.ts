@@ -37,10 +37,6 @@ export const AdminExecutionDetailPage = lazyRoutePage(
   () => import("@/pages/admin/admin-execution-detail-page"),
   "AdminExecutionDetailPage"
 );
-export const AdminEmailsPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-emails-page"),
-  "AdminEmailsPage"
-);
 export const AdminSupportPage = lazyRoutePage(
   () => import("@/pages/admin/admin-support-page"),
   "AdminSupportPage"
@@ -179,41 +175,9 @@ export const QueuesPage = lazyRoutePage(
   () => import("@/pages/queues-page"),
   "QueuesPage"
 );
-export const EmailsPage = lazyRoutePage(
-  () => import("@/pages/emails-page"),
-  "EmailsPage"
-);
-export const BotsPage = lazyRoutePage(
-  () => import("@/pages/bots-page"),
-  "BotsPage"
-);
-export const BotDiscordDetailPage = lazyRoutePage(
-  () => import("@/pages/bot-discord-detail-page"),
-  "BotDiscordDetailPage"
-);
-export const BotTelegramDetailPage = lazyRoutePage(
-  () => import("@/pages/bot-telegram-detail-page"),
-  "BotTelegramDetailPage"
-);
-export const BotSlackDetailPage = lazyRoutePage(
-  () => import("@/pages/bot-slack-detail-page"),
-  "BotSlackDetailPage"
-);
-export const BotWhatsAppDetailPage = lazyRoutePage(
-  () => import("@/pages/bot-whatsapp-detail-page"),
-  "BotWhatsAppDetailPage"
-);
 export const ExecutionDetailPage = lazyRoutePage(
   () => import("@/pages/execution-detail-page"),
   "ExecutionDetailPage"
-);
-export const PlaygroundPage = lazyRoutePage(
-  () => import("@/pages/playground-page"),
-  "PlaygroundPage"
-);
-export const PlaygroundExecutePage = lazyRoutePage(
-  () => import("@/pages/playground-execute-page"),
-  "PlaygroundExecutePage"
 );
 export const EditorPage = lazyRoutePage(
   () => import("@/pages/editor-page"),

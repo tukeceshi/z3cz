@@ -34,17 +34,11 @@ import {
   AdminWorkflowsPage,
   ApiKeysPage,
   BillingPage,
-  BotDiscordDetailPage,
-  BotSlackDetailPage,
-  BotTelegramDetailPage,
-  BotWhatsAppDetailPage,
-  BotsPage,
   DashboardPage,
   DatabaseConsolePage,
   DatabaseExplorerPage,
   DatabasesPage,
   EditorPage,
-  EmailsPage,
   ExecutionDetailPage,
   ExecutionsPage,
   FormPage,
@@ -604,85 +598,6 @@ export const routes: AppRouteObject[] = [
     ),
     handle: { head: createRouteHead("seo.routes.queues") },
   },
-  {
-    path: "/emails",
-    element: <OrgRedirect to="/org/:organizationId/emails" />,
-  },
-  {
-    path: "/org/:organizationId/emails",
-    element: (
-      <OrgFeatureRoute feature="emails" title="Emails">
-        <EmailsPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.emails") },
-  },
-  {
-    path: "/bots",
-    element: <OrgRedirect to="/org/:organizationId/bots" />,
-  },
-  {
-    path: "/discord-bots",
-    element: <OrgRedirect to="/org/:organizationId/bots" />,
-  },
-  {
-    path: "/org/:organizationId/discord-bots",
-    element: <OrgRedirect to="/org/:organizationId/bots" />,
-  },
-  {
-    path: "/telegram-bots",
-    element: <OrgRedirect to="/org/:organizationId/bots" />,
-  },
-  {
-    path: "/org/:organizationId/telegram-bots",
-    element: <OrgRedirect to="/org/:organizationId/bots" />,
-  },
-  {
-    path: "/org/:organizationId/bots",
-    element: (
-      <OrgFeatureRoute feature="bots" title="Bots">
-        <BotsPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.bots") },
-  },
-  {
-    path: "/org/:organizationId/bots/discord/:id",
-    element: (
-      <OrgFeatureRoute feature="bots" title="Bots">
-        <BotDiscordDetailPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.botDetail") },
-  },
-  {
-    path: "/org/:organizationId/bots/telegram/:id",
-    element: (
-      <OrgFeatureRoute feature="bots" title="Bots">
-        <BotTelegramDetailPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.botDetail") },
-  },
-  {
-    path: "/org/:organizationId/bots/slack/:id",
-    element: (
-      <OrgFeatureRoute feature="bots" title="Bots">
-        <BotSlackDetailPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.botDetail") },
-  },
-  {
-    path: "/org/:organizationId/bots/whatsapp/:id",
-    element: (
-      <OrgFeatureRoute feature="bots" title="Bots">
-        <BotWhatsAppDetailPage />
-      </OrgFeatureRoute>
-    ),
-    handle: { head: createRouteHead("seo.routes.botAccountDetail") },
-  },
-
   {
     path: "/org/:organizationId/executions/:executionId",
     element: (

@@ -40,13 +40,14 @@ describe("archived-node-utils", () => {
     ).not.toThrow();
   });
 
-  it("treats ai-interface as allowed when omitted from panel catalog", () => {
+  it("treats ai-interface as archived when omitted from the catalog", () => {
     const result = detectArchivedWorkflow(
       [{ id: "1", type: "ai-interface" }],
       allowed
     );
 
-    expect(result.hasArchived).toBe(false);
+    expect(result.hasArchived).toBe(true);
+    expect(result.archivedNodes[0]?.nodeType).toBe("ai-interface");
   });
 
   it("rejects execution when archived nodes are present", () => {
