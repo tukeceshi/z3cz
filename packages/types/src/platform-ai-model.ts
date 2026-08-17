@@ -1,6 +1,7 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { OrgModelChannelKind } from "./org-model-label";
 import type { UpstreamParamProfileField } from "./upstream-param-profile";
+import type { VideoModelPricePromo } from "./video-price-promo";
 import {
   assignReferenceImagesToBody,
   mergeReferenceImageValues,
@@ -126,6 +127,7 @@ export interface VideoModelPriceEstimateTier {
 export interface VideoModelPriceEstimateConfig {
   readonly enabled: boolean;
   readonly tiers: readonly VideoModelPriceEstimateTier[];
+  readonly promos?: readonly VideoModelPricePromo[];
 }
 
 export interface VideoModelParameterRules {

@@ -65,9 +65,18 @@ const videoPriceEstimateTierSchema = z.object({
   priceWithVideo: z.number().nonnegative(),
 });
 
+const videoPricePromoSchema = z.object({
+  id: z.string().trim().min(1),
+  resolution: z.string().min(1),
+  startsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  discountFold: z.number().positive().max(10),
+});
+
 const videoPriceEstimateSchema = z.object({
   enabled: z.boolean(),
   tiers: z.array(videoPriceEstimateTierSchema),
+  promos: z.array(videoPricePromoSchema).optional(),
 });
 
 const videoRulesSchema = z.object({

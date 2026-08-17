@@ -1,5 +1,5 @@
 import type { LibtvComparisonConfig } from "@dafthunk/types";
-import { mergeLibtvComparisonConfig } from "@dafthunk/types";
+import { LIBTV_RATE_MODEL_IDS, mergeLibtvComparisonConfig } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -24,18 +24,43 @@ const seriesRatesSchema = z.object({
 });
 
 const planSchema = z.object({
-  id: z.enum(["standard-monthly", "supreme-monthly"]),
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1),
   credits: z.number().positive(),
   priceYuan: z.number().positive(),
+});
+
+const promoSchema = z.object({
+  id: z.string().trim().min(1),
+  canonicalId: z.enum(
+    LIBTV_RATE_MODEL_IDS as unknown as [
+      (typeof LIBTV_RATE_MODEL_IDS)[number],
+      ...(typeof LIBTV_RATE_MODEL_IDS)[number][],
+    ]
+  ),
+  resolution: z.string().min(1),
+  withReference: z.boolean(),
+  startsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  discountFold: z.number().positive().max(10),
 });
 
 const configSchema = z.object({
   config: z.object({
     series: z.object({
-      "2.0": seriesRatesSchema,
-      "2.5": seriesRatesSchema,
+      "doubao-seedance-2": seriesRatesSchema,
+      "doubao-seedance-2-fast": seriesRatesSchema,
+      "doubao-seedance-2-mini": seriesRatesSchema,
+      "doubao-seedance-2-5": seriesRatesSchema,
     }),
-    plans: z.array(planSchema).min(1),
+    plans: z
+      .array(planSchema)
+      .min(1)
+      .refine(
+        (plans) => new Set(plans.map((plan) => plan.id)).size === plans.length,
+        { message: "Plan ids must be unique" }
+      ),
+    promos: z.array(promoSchema).optional(),
   }),
 });
 
@@ -72,7 +97,10 @@ adminCompetitorVideoPricingRoutes.patch(
       return c.json({ config });
     } catch (error) {
       console.error("Error updating competitor video pricing:", error);
-      return c.json({ error: "Failed to update competitor video pricing" }, 500);
+      return c.json(
+        { error: "Failed to update competitor video pricing" },
+        500
+      );
     }
   }
 );

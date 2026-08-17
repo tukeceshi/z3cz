@@ -14,6 +14,12 @@ import {
   normalizeVideoModelParameterRules,
   normalizeVideoPriceEstimateResolution,
   VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
+  VIDEO_PRICE_PROMO_ANY_RESOLUTION,
+  createVideoPricePromoId,
+  formatVideoPricePromoDate,
+  isVideoPricePromoDate,
+  isVideoPricePromoFoldDraft,
+  normalizeVideoPricePromoFold,
   type VideoPriceEstimateResolution,
 } from "@dafthunk/types";
 import type {
@@ -28,6 +34,8 @@ import type {
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import Plus from "lucide-react/icons/plus";
+import Trash2 from "lucide-react/icons/trash-2";
 
 import { parseNonNegativeInt } from "@/components/workflow/generative-reference-metadata";
 import { InsetLayout } from "@/components/layouts/inset-layout";
@@ -50,6 +58,7 @@ import {
   useGenerationOptionLabels,
 } from "./admin-generation-field-editors";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   ADMIN_CONTROL_CLASS,
   ADMIN_PARAM_HINT_CLASS,
@@ -63,6 +72,56 @@ import {
 } from "./admin-ai-models-ui";
 import { DEFAULT_BRAND_ICON } from "@/components/model-brand-icon-picker";
 const BYTES_PER_MB = 1024 * 1024;
+
+type VideoPricePromoResolution =
+  | VideoPriceEstimateResolution
+  | typeof VIDEO_PRICE_PROMO_ANY_RESOLUTION;
+
+interface VideoPricePromoDraft {
+  readonly id: string;
+  readonly resolution: VideoPricePromoResolution;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly discountFold: string;
+}
+
+function asEstimateResolution(value: string): VideoPriceEstimateResolution {
+  return VIDEO_PRICE_ESTIMATE_RESOLUTIONS.includes(
+    value as VideoPriceEstimateResolution
+  )
+    ? (value as VideoPriceEstimateResolution)
+    : "720p";
+}
+
+function asPromoResolution(value: string): VideoPricePromoResolution {
+  if (value === VIDEO_PRICE_PROMO_ANY_RESOLUTION) {
+    return VIDEO_PRICE_PROMO_ANY_RESOLUTION;
+  }
+  return asEstimateResolution(value);
+}
+
+function readVideoPricePromoDrafts(
+  priceEstimate?: VideoModelParameterRules["priceEstimate"]
+): VideoPricePromoDraft[] {
+  return (priceEstimate?.promos ?? []).map((promo) => ({
+    id: promo.id,
+    resolution: asPromoResolution(promo.resolution),
+    startsAt: promo.startsAt,
+    endsAt: promo.endsAt,
+    discountFold: String(promo.discountFold),
+  }));
+}
+
+function createVideoPricePromoDraft(): VideoPricePromoDraft {
+  const today = formatVideoPricePromoDate(new Date());
+  return {
+    id: createVideoPricePromoId(),
+    resolution: "720p",
+    startsAt: today,
+    endsAt: today,
+    discountFold: "8",
+  };
+}
 
 interface VideoPriceTierDraft {
   readonly enabled: boolean;
@@ -839,6 +898,9 @@ function VideoModelSettingsDialog({
   const [priceTierDrafts, setPriceTierDrafts] = useState<
     Record<VideoPriceEstimateResolution, VideoPriceTierDraft>
   >(() => readVideoPriceTierDrafts(baseRules.priceEstimate));
+  const [pricePromoDrafts, setPricePromoDrafts] = useState<
+    VideoPricePromoDraft[]
+  >(() => readVideoPricePromoDrafts(baseRules.priceEstimate));
   const durationApiName =
     generationFields.find((field) => field.name === "duration")?.apiName ??
     "duration";
@@ -902,6 +964,27 @@ function VideoModelSettingsDialog({
             priceWithoutVideo: Number(priceTierDrafts[resolution].priceWithoutVideo) || 0,
             priceWithVideo: Number(priceTierDrafts[resolution].priceWithVideo) || 0,
           })),
+          promos: pricePromoDrafts.flatMap((draft) => {
+            const discountFold = Number(draft.discountFold);
+            if (
+              !isVideoPricePromoDate(draft.startsAt) ||
+              !isVideoPricePromoDate(draft.endsAt) ||
+              !Number.isFinite(discountFold) ||
+              discountFold <= 0 ||
+              discountFold > 10
+            ) {
+              return [];
+            }
+            return [
+              {
+                id: draft.id,
+                resolution: draft.resolution,
+                startsAt: draft.startsAt,
+                endsAt: draft.endsAt,
+                discountFold: normalizeVideoPricePromoFold(discountFold),
+              },
+            ];
+          }),
         },
         generationFields: ensureVideoGenerationFieldsForSave(generationFields),
       },
@@ -1083,6 +1166,158 @@ function VideoModelSettingsDialog({
           <p className={ADMIN_PARAM_HINT_CLASS}>
             {t("pages.adminAiModels.priceEstimateTierHint")}
           </p>
+        </SettingsSection>
+      ) : null}
+
+      {priceEstimateEnabled ? (
+        <SettingsSection
+          compact
+          stacked
+          title={t("pages.adminAiModels.priceEstimatePromosTitle")}
+        >
+          <div className="grid gap-2">
+            {pricePromoDrafts.map((draft) => (
+              <div
+                key={draft.id}
+                className="grid gap-2 rounded-lg border border-border/60 p-2 sm:grid-cols-[7rem_1fr_1fr_4.5rem_auto] sm:items-end"
+              >
+                <label className="grid gap-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {t("pages.adminAiModels.priceEstimateResolution")}
+                  </span>
+                  <select
+                    id={`video_price_promo_${draft.id}_resolution`}
+                    name={`video_price_promo_${draft.id}_resolution`}
+                    className={cn(
+                      ADMIN_CONTROL_CLASS,
+                      "rounded-md border border-input bg-background px-2 text-sm"
+                    )}
+                    value={draft.resolution}
+                    onChange={(event) => {
+                      const resolution = asPromoResolution(event.target.value);
+                      setPricePromoDrafts((current) =>
+                        current.map((entry) =>
+                          entry.id === draft.id
+                            ? { ...entry, resolution }
+                            : entry
+                        )
+                      );
+                    }}
+                  >
+                    <option value={VIDEO_PRICE_PROMO_ANY_RESOLUTION}>
+                      {t("pages.adminAiModels.priceEstimatePromoAnyResolution")}
+                    </option>
+                    {VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => (
+                      <option key={resolution} value={resolution}>
+                        {resolution === "4k" ? "4K" : resolution.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {t("pages.adminAiModels.priceEstimatePromoStartsAt")}
+                  </span>
+                  <Input
+                    id={`video_price_promo_${draft.id}_starts_at`}
+                    name={`video_price_promo_${draft.id}_starts_at`}
+                    type="date"
+                    className={ADMIN_CONTROL_CLASS}
+                    autoComplete="off"
+                    value={draft.startsAt}
+                    onChange={(event) => {
+                      const startsAt = event.target.value;
+                      setPricePromoDrafts((current) =>
+                        current.map((entry) =>
+                          entry.id === draft.id ? { ...entry, startsAt } : entry
+                        )
+                      );
+                    }}
+                  />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {t("pages.adminAiModels.priceEstimatePromoEndsAt")}
+                  </span>
+                  <Input
+                    id={`video_price_promo_${draft.id}_ends_at`}
+                    name={`video_price_promo_${draft.id}_ends_at`}
+                    type="date"
+                    className={ADMIN_CONTROL_CLASS}
+                    autoComplete="off"
+                    value={draft.endsAt}
+                    onChange={(event) => {
+                      const endsAt = event.target.value;
+                      setPricePromoDrafts((current) =>
+                        current.map((entry) =>
+                          entry.id === draft.id ? { ...entry, endsAt } : entry
+                        )
+                      );
+                    }}
+                  />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] text-muted-foreground">
+                    {t("pages.adminAiModels.priceEstimatePromoFold")}
+                  </span>
+                  <Input
+                    id={`video_price_promo_${draft.id}_fold`}
+                    name={`video_price_promo_${draft.id}_fold`}
+                    className={ADMIN_CONTROL_CLASS}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.discountFold}
+                    onChange={(event) => {
+                      const discountFold = event.target.value;
+                      if (!isVideoPricePromoFoldDraft(discountFold.trim())) {
+                        return;
+                      }
+                      setPricePromoDrafts((current) =>
+                        current.map((entry) =>
+                          entry.id === draft.id
+                            ? { ...entry, discountFold }
+                            : entry
+                        )
+                      );
+                    }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="justify-self-end"
+                  aria-label={t("pages.adminAiModels.priceEstimateRemovePromo")}
+                  onClick={() =>
+                    setPricePromoDrafts((current) =>
+                      current.filter((entry) => entry.id !== draft.id)
+                    )
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPricePromoDrafts((current) => [
+                    ...current,
+                    createVideoPricePromoDraft(),
+                  ])
+                }
+              >
+                <Plus className="h-4 w-4" />
+                {t("pages.adminAiModels.priceEstimateAddPromo")}
+              </Button>
+            </div>
+            <p className={ADMIN_PARAM_HINT_CLASS}>
+              {t("pages.adminAiModels.priceEstimatePromoHint")}
+            </p>
+          </div>
         </SettingsSection>
       ) : null}
 

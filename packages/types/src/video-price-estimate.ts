@@ -1,8 +1,3 @@
-import {
-  getSeedanceOutputPixels,
-  resolveSeedanceSeries,
-  type SeedanceSeries,
-} from "./seedance-output-pixels";
 import type { LibtvComparisonConfig } from "./competitor-video-points";
 import type {
   PlatformAiModelParameterRules,
@@ -12,9 +7,20 @@ import type {
   VideoPriceEstimateResolution,
 } from "./platform-ai-model";
 import {
-  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   isVideoModelParameterRules,
+  resolveDurationOptions,
+  VIDEO_DURATION_MAX,
+  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
 } from "./platform-ai-model";
+import {
+  getSeedanceOutputPixels,
+  resolveSeedanceSeries,
+  type SeedanceSeries,
+} from "./seedance-output-pixels";
+import {
+  readVideoModelPricePromos,
+  type VideoModelPricePromo,
+} from "./video-price-promo";
 
 export type {
   VideoModelPriceEstimateConfig,
@@ -35,9 +41,11 @@ export interface PublicVideoPriceEstimateModel {
   readonly canonicalId: string;
   readonly displayName: string;
   readonly tiers: readonly PublicVideoPriceEstimateTier[];
+  readonly promos: readonly VideoModelPricePromo[];
   readonly maxReferenceVideos: number;
   readonly maxVideoReferenceSeconds: number;
   readonly maxVideoReferenceBytes: number;
+  readonly maxOutputDurationSec: number;
 }
 
 export interface PublicVideoPriceEstimatesResponse {
@@ -93,10 +101,153 @@ export function toPublicVideoPriceEstimateModel(
     canonicalId: model.canonicalId,
     displayName: model.displayName,
     tiers,
+    promos: readVideoModelPricePromos(config.promos),
     maxReferenceVideos: model.parameterRules.maxReferenceVideos,
     maxVideoReferenceSeconds: model.parameterRules.maxVideoReferenceSeconds,
     maxVideoReferenceBytes: model.parameterRules.maxVideoReferenceBytes,
+    maxOutputDurationSec: readVideoModelMaxOutputDurationSec(
+      model.parameterRules
+    ),
   };
+}
+
+export function readVideoModelMaxOutputDurationSec(
+  rules: Pick<VideoModelParameterRules, "generationFields">
+): number {
+  const durationField = rules.generationFields.find(
+    (field) => field.name === "duration"
+  );
+  const parsed = resolveDurationOptions(durationField)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1);
+  if (parsed.length === 0) {
+    return VIDEO_DURATION_MAX;
+  }
+  return Math.max(...parsed);
+}
+
+export interface VideoClipPlan {
+  readonly clipCount: number;
+  readonly clipDurationSec: number;
+  readonly lastClipDurationSec: number;
+}
+
+export function planVideoEstimateClips(params: {
+  readonly totalDurationSec: number;
+  readonly maxOutputDurationSec: number;
+}): VideoClipPlan {
+  const clipDurationSec = Math.max(1, params.maxOutputDurationSec);
+  const totalDurationSec = Math.max(0, params.totalDurationSec);
+  if (totalDurationSec <= 0) {
+    return {
+      clipCount: 1,
+      clipDurationSec,
+      lastClipDurationSec: clipDurationSec,
+    };
+  }
+  const clipCount = Math.max(1, Math.ceil(totalDurationSec / clipDurationSec));
+  const lastClipDurationSec =
+    clipCount === 1
+      ? totalDurationSec
+      : totalDurationSec - (clipCount - 1) * clipDurationSec;
+  return {
+    clipCount,
+    clipDurationSec,
+    lastClipDurationSec,
+  };
+}
+
+export function splitClipOutputSeconds(
+  plan: VideoClipPlan,
+  referencedCount: number
+): {
+  readonly referencedOutputSec: number;
+  readonly plainOutputSec: number;
+} {
+  const used = Math.min(
+    Math.max(0, Math.floor(referencedCount)),
+    plan.clipCount
+  );
+  const totalOutputSec =
+    (plan.clipCount - 1) * plan.clipDurationSec + plan.lastClipDurationSec;
+  if (used <= 0) {
+    return { referencedOutputSec: 0, plainOutputSec: totalOutputSec };
+  }
+  if (used >= plan.clipCount) {
+    return { referencedOutputSec: totalOutputSec, plainOutputSec: 0 };
+  }
+  const referencedOutputSec = used * plan.clipDurationSec;
+  return {
+    referencedOutputSec,
+    plainOutputSec: totalOutputSec - referencedOutputSec,
+  };
+}
+
+export interface SplitVideoPriceEstimateResult {
+  readonly costYuan: number;
+  readonly billingTokens: number;
+  readonly outputDurationSec: number;
+}
+
+export function computeSplitVideoPriceEstimateForModel(params: {
+  readonly canonicalId: string;
+  readonly resolution: string;
+  readonly ratio: string;
+  readonly priceWithoutVideo: number;
+  readonly priceWithVideo: number;
+  readonly plan: VideoClipPlan;
+  readonly referencedCount: number;
+  readonly avgReferenceSec: number;
+}): SplitVideoPriceEstimateResult {
+  const used = Math.min(
+    Math.max(0, Math.floor(params.referencedCount)),
+    params.plan.clipCount
+  );
+  const avgReferenceSec = Math.max(0, params.avgReferenceSec);
+  const hasRef = used > 0 && avgReferenceSec > 0;
+  const effectiveUsed = hasRef ? used : 0;
+  const lastIsReferenced = effectiveUsed === params.plan.clipCount;
+  const fullCount = params.plan.clipCount - 1;
+  const fullReferencedCount = lastIsReferenced
+    ? fullCount
+    : Math.min(effectiveUsed, fullCount);
+  const fullPlainCount = fullCount - fullReferencedCount;
+  const base = {
+    canonicalId: params.canonicalId,
+    resolution: params.resolution,
+    ratio: params.ratio,
+    priceWithoutVideo: params.priceWithoutVideo,
+    priceWithVideo: params.priceWithVideo,
+  };
+
+  let costYuan = 0;
+  let billingTokens = 0;
+  let outputDurationSec = 0;
+
+  const addClips = (
+    count: number,
+    outputDurationSecOne: number,
+    withReference: boolean
+  ) => {
+    if (count <= 0 || outputDurationSecOne <= 0) {
+      return;
+    }
+    const one = computeVideoPriceEstimateForModel({
+      ...base,
+      outputDurationSec: outputDurationSecOne,
+      inputDurationSec: withReference ? avgReferenceSec : 0,
+      hasReferenceVideo: withReference,
+    });
+    costYuan += one.costYuan * count;
+    billingTokens += one.billingTokens * count;
+    outputDurationSec += one.outputDurationSec * count;
+  };
+
+  addClips(fullReferencedCount, params.plan.clipDurationSec, true);
+  addClips(fullPlainCount, params.plan.clipDurationSec, false);
+  addClips(1, params.plan.lastClipDurationSec, lastIsReferenced);
+
+  return { costYuan, billingTokens, outputDurationSec };
 }
 
 export interface VideoPriceEstimateTierPrices {
@@ -117,7 +268,9 @@ export interface VideoPriceEstimateResult {
   readonly costYuan: number;
 }
 
-export function normalizeVideoPriceEstimateResolution(resolution: string): string {
+export function normalizeVideoPriceEstimateResolution(
+  resolution: string
+): string {
   return resolution.trim().toLowerCase();
 }
 
@@ -188,7 +341,9 @@ export function computePackTokens(params: {
   ) {
     return null;
   }
-  return (params.unitPrice / params.baseline480pWithVideo) * params.billingTokens;
+  return (
+    (params.unitPrice / params.baseline480pWithVideo) * params.billingTokens
+  );
 }
 
 export function computeCostPerOutputSecond(

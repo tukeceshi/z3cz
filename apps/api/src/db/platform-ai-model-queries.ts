@@ -1,5 +1,3 @@
-import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
-
 import type {
   AiModelInvocation,
   AiModelModality,
@@ -10,10 +8,13 @@ import type {
   UpdatePlatformAiModelRequest,
 } from "@dafthunk/types";
 import {
+  type AudioModelParameterRules,
   DEFAULT_AUDIO_MODEL_PARAMETER_RULES,
   DEFAULT_IMAGE_MODEL_PARAMETER_RULES,
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  getSeedanceDefaultParameterRules,
+  type ImageModelParameterRules,
   isAudioModelParameterRules,
   isImageModelParameterRules,
   isTextModelParameterRules,
@@ -22,17 +23,13 @@ import {
   normalizeImageModelParameterRules,
   normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
-  type AudioModelParameterRules,
-  type ImageModelParameterRules,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import type { Database } from "./index";
 import { parseJsonColumn } from "./parse-json-column";
-import {
-  aiModelInvocations,
-  platformAiModels,
-} from "./schema";
+import { aiModelInvocations, platformAiModels } from "./schema";
 
 function mapPlatformModelRow(
   row: typeof platformAiModels.$inferSelect
@@ -449,7 +446,10 @@ export function getVideoParameterRules(
   if (isVideoModelParameterRules(model.parameterRules)) {
     return normalizeVideoModelParameterRules(model.parameterRules);
   }
-  return DEFAULT_VIDEO_MODEL_PARAMETER_RULES;
+  return (
+    getSeedanceDefaultParameterRules(model.canonicalId) ??
+    DEFAULT_VIDEO_MODEL_PARAMETER_RULES
+  );
 }
 
 export function getAudioParameterRules(
