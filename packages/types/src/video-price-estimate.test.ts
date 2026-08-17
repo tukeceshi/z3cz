@@ -1,16 +1,22 @@
-import { DEFAULT_VIDEO_MODEL_PARAMETER_RULES } from "./platform-ai-model";
+import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  VIDEO_DURATION_MAX,
+} from "./platform-ai-model";
 import {
   computeCostPerOutputSecond,
   computePackTokens,
+  computeSplitVideoPriceEstimateForModel,
   computeVideoBillingTokens,
   computeVideoPriceEstimateForModel,
   formatVideoPriceEstimateSummary,
   isVideoPriceEstimateEnabled,
+  planVideoEstimateClips,
   readVideoPriceEstimateBaseline480pWithVideo,
   readVideoPriceEstimateTier,
+  splitClipOutputSeconds,
   toPublicVideoPriceEstimateModel,
 } from "./video-price-estimate";
-import { describe, expect, it } from "vitest";
 
 describe("computeVideoBillingTokens", () => {
   it("rounds output-only tokens", () => {
@@ -50,7 +56,9 @@ describe("computeVideoPriceEstimateForModel", () => {
     });
 
     expect(result.billingTokens).toBe(Math.round(5 * result.tps));
-    expect(result.costYuan).toBeCloseTo((result.billingTokens / 1_000_000) * 1.44);
+    expect(result.costYuan).toBeCloseTo(
+      (result.billingTokens / 1_000_000) * 1.44
+    );
     expect(result.unitPrice).toBe(1.44);
   });
 
@@ -231,11 +239,14 @@ describe("toPublicVideoPriceEstimateModel", () => {
           priceWithVideo: 28,
         },
       ],
-      maxReferenceVideos: DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos,
+      promos: [],
+      maxReferenceVideos:
+        DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxReferenceVideos,
       maxVideoReferenceSeconds:
         DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceSeconds,
       maxVideoReferenceBytes:
         DEFAULT_VIDEO_MODEL_PARAMETER_RULES.maxVideoReferenceBytes,
+      maxOutputDurationSec: VIDEO_DURATION_MAX,
     });
   });
 
@@ -248,5 +259,98 @@ describe("toPublicVideoPriceEstimateModel", () => {
         parameterRules: DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
       })
     ).toBeNull();
+  });
+});
+
+describe("planVideoEstimateClips", () => {
+  it("splits total duration into max-length clips", () => {
+    expect(
+      planVideoEstimateClips({
+        totalDurationSec: 150,
+        maxOutputDurationSec: 15,
+      })
+    ).toEqual({
+      clipCount: 10,
+      clipDurationSec: 15,
+      lastClipDurationSec: 15,
+    });
+  });
+
+  it("puts the remainder on the last clip", () => {
+    expect(
+      planVideoEstimateClips({
+        totalDurationSec: 16,
+        maxOutputDurationSec: 15,
+      })
+    ).toEqual({
+      clipCount: 2,
+      clipDurationSec: 15,
+      lastClipDurationSec: 1,
+    });
+  });
+});
+
+describe("splitClipOutputSeconds", () => {
+  const plan = {
+    clipCount: 10,
+    clipDurationSec: 15,
+    lastClipDurationSec: 15,
+  };
+
+  it("splits referenced clips from the front", () => {
+    expect(splitClipOutputSeconds(plan, 5)).toEqual({
+      referencedOutputSec: 75,
+      plainOutputSec: 75,
+    });
+  });
+
+  it("treats zero referenced clips as all plain", () => {
+    expect(splitClipOutputSeconds(plan, 0)).toEqual({
+      referencedOutputSec: 0,
+      plainOutputSec: 150,
+    });
+  });
+});
+
+describe("computeSplitVideoPriceEstimateForModel", () => {
+  const prices = {
+    canonicalId: "doubao-seedance-2-5",
+    resolution: "720p",
+    ratio: "16:9",
+    priceWithoutVideo: 1.44,
+    priceWithVideo: 2.88,
+  };
+
+  it("adds per-clip with-reference cost times count plus unused clips", () => {
+    const plan = planVideoEstimateClips({
+      totalDurationSec: 150,
+      maxOutputDurationSec: 15,
+    });
+    const withRef = computeVideoPriceEstimateForModel({
+      ...prices,
+      outputDurationSec: 15,
+      inputDurationSec: 10,
+      hasReferenceVideo: true,
+    });
+    const withoutRef = computeVideoPriceEstimateForModel({
+      ...prices,
+      outputDurationSec: 15,
+      inputDurationSec: 0,
+      hasReferenceVideo: false,
+    });
+    const split = computeSplitVideoPriceEstimateForModel({
+      ...prices,
+      plan,
+      referencedCount: 5,
+      avgReferenceSec: 10,
+    });
+
+    expect(split.costYuan).toBeCloseTo(
+      withRef.costYuan * 5 + withoutRef.costYuan * 5
+    );
+    expect(split.billingTokens).toBe(
+      withRef.billingTokens * 5 + withoutRef.billingTokens * 5
+    );
+    expect(split.outputDurationSec).toBe(150);
   });
 });

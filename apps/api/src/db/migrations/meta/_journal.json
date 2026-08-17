@@ -533,6 +533,13 @@
       "when": 1789480000000,
       "tag": "0080_competitor_video_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1789560000000,
+      "tag": "0081_seedance_and_competitor_defaults",
+      "breakpoints": true
     }
   ]
 }

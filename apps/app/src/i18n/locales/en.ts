@@ -58,7 +58,8 @@ export const en = {
     heroStartCalc: "Start calculating",
     heroGuide: "See capabilities",
     valueOfficial: "Official models",
-    valueOfficialDesc: "Seedance and other platform models, billed as configured.",
+    valueOfficialDesc:
+      "Seedance and other platform models, billed as configured.",
     valueStorage: "Cloud storage",
     valueStorageDesc: "Keep generated videos in your workspace.",
     valuePayg: "Pay as you go",
@@ -73,13 +74,43 @@ export const en = {
     canvasItemLibrary: "Asset library",
     canvasItemExport: "High-resolution export",
     canvasItemCloud: "Cloud storage",
-    billingTitle: "Billing simulator",
+    billingTitle: "Cost estimate",
     billingSubtitle: "Based on current Seedance 2.0 prices.",
     modelLabel: "Model",
     resolutionLabel: "Resolution",
-    ratioLabel: "Aspect ratio",
-    durationLabel: "Duration",
+    ratioLabel: "Ratio",
+    durationLabel: "Generation duration",
     durationUnit: "{{seconds}}s",
+    durationUnitSec: "sec",
+    durationUnitMin: "min",
+    scenarioClip: "One video",
+    scenarioLearn: "Learning",
+    scenarioPersonal: "Personal",
+    scenarioPipeline: "Pipeline shorts",
+    scenarioRestyle: "Restyle",
+    scenarioPremium4k: "4K premium",
+    scenarioDrama25: "2.5 drama",
+    scenarioClipBody: "Seedance 2.0, 16:9, 720p, 15s",
+    scenarioLearnBody: "Seedance 2.0 mini, 16:9, 480p, 10 min",
+    scenarioPersonalBody: "Seedance 2.0, 16:9, 720p, 15*3 min",
+    scenarioPipelineBody: "Seedance 2.0, 9:16, 480p, 30*2 min",
+    scenarioRestyleBody: "Seedance 2.0, 9:16, 720p, 30*2 min",
+    scenarioPremium4kBody: "Seedance 2.0, 16:9, 4K, 20*3 min",
+    scenarioDrama25Body: "Seedance 2.5, 9:16, 1080p, 30*2 min",
+    platformOfficial: "火山引擎",
+    platformOfficialBadge: "Official",
+    planStandard: "Standard",
+    planSupreme: "Supreme",
+    planMonthly: "{{name}}·{{price}}/mo",
+    planOption: "{{name}} · {{credits}} credits · {{price}}/mo",
+    planPricePart: "·{{price}}/mo",
+    comparePointsPercent: "{{points}} credits ({{percent}}%)",
+    comparePointsBefore: "{{points}} credits (",
+    comparePointsPercentValue: "{{percent}}%",
+    comparePointsAfter: ")",
+    comparePointsTotal: "{{total}} credits total",
+    planAccounts: "*{{count}}",
+    planAccountsHint: "Assets cannot be shared across accounts",
     quantityLabel: "Quantity",
     modeLabel: "Generation mode",
     modeText: "Text to video",
@@ -90,15 +121,25 @@ export const en = {
     noPrice: "No price is configured for this model yet.",
     compareTitle: "Same settings on other platforms",
     compareOurs: "This platform",
-    compareLibtv: "LibTV",
+    compareLibtv: "L***V",
     compareJimeng: "Jimeng",
     comparePoints: "{{points}} credits",
     compareUnavailable: "—",
-    compareDisclaimer: "Other platforms are estimates for reference only.",
-    referenceTitle: "Reference",
+    compareDisclaimer: "Price estimate, for reference only.",
+    promoTitle: "Promo discounts",
+    promoNeedVideoReference: "Video reference required",
+    promoFoldHint: "{{fold}}折",
+    referenceTitle: "Video reference",
+    referenceClipSummary: "{{count}}*{{seconds}}s",
+    referenceClipPlan: "About {{count}} clips of {{seconds}}s",
+    referenceClipUsedPrefix: "Of which",
+    referenceClipUsedSuffix: "use video reference",
+    referenceClipAveragePrefix: "Avg",
+    referenceClipAverageSuffix: "s reference each",
     referenceDrop: "Drop videos here or click to upload",
     referenceSeconds: "Reference seconds",
-    referenceHint: "Up to {{max}} videos, {{seconds}}s each. Same formats as the canvas.",
+    referenceHint:
+      "Up to {{max}} videos, {{seconds}}s each. Same formats as the canvas.",
     referenceTooMany: "At most {{max}} reference videos.",
     referenceTooLarge: "A file is larger than this model allows.",
     referenceTooLong: "A video is longer than {{max}}s.",
@@ -106,13 +147,13 @@ export const en = {
     referenceReadFailed: "Could not read that video.",
     tablePlatform: "Platform",
     tableLevel: "Plan",
-    tableTokens: "Tokens / credits",
+    tableTokens: "Credits",
     tablePrice: "Converted price",
-    tableRate: "Per second",
+    tableRate: "Est. unit price",
     tableStorage: "Storage",
     tableGptSkill: "GPT skill",
     tableFirstCost: "First-time cost",
-    tableLevelNone: "None",
+    tableLevelNone: "Price shown",
     tableLibtvLevel: "Standard (monthly)",
     tableLibtvSupreme: "Supreme (monthly)",
     tableStorageUser: "Yours",
@@ -269,13 +310,13 @@ export const en = {
       emailNotFound: "This email is not registered",
       generic: "Something went wrong. Please try again.",
       invalidCredentials: "Invalid email or password",
-      emailAlreadyRegistered: "This email is already registered. Sign in instead.",
+      emailAlreadyRegistered:
+        "This email is already registered. Sign in instead.",
       registrationFailed: "Registration failed. Please try again.",
       loginFailed: "Sign in failed. Please try again.",
       authMisconfigured:
         "Authentication is misconfigured. Check JWT_SECRET in apps/api/.dev.vars.",
-      apiUnavailable:
-        "API is starting. Wait a few minutes and try again.",
+      apiUnavailable: "API is starting. Wait a few minutes and try again.",
       verificationRequired: "Enter the verification code sent to your email",
       invalidVerificationCode: "Invalid or expired verification code",
       sendCodeFailed: "Failed to send verification code. Try again later.",
@@ -283,7 +324,8 @@ export const en = {
   },
   error: {
     unexpectedTitle: "Unexpected Error",
-    unexpectedDescription: "Something went wrong. Please try refreshing the page.",
+    unexpectedDescription:
+      "Something went wrong. Please try refreshing the page.",
     refresh: "Refresh",
   },
   siteSettings: {
@@ -299,7 +341,8 @@ export const en = {
     saveSuccess: "Site settings saved.",
     saveError: "Failed to save site settings.",
     preview: "Preview",
-    previewHint: "After saving, the site name and tagline update in the header, login page, and browser tab.",
+    previewHint:
+      "After saving, the site name and tagline update in the header, login page, and browser tab.",
     newUserTourToggle: "New user tour",
     newUserTourHint:
       "When enabled, new users with no workflows see the in-app guided tour on first visit.",
@@ -307,21 +350,35 @@ export const en = {
   competitorPricing: {
     title: "Competitor pricing",
     plansTitle: "LibTV plans",
-    plansDescription: "Monthly credit packs used to convert credits into yuan.",
-    planStandard: "Standard (monthly)",
-    planSupreme: "Supreme (monthly)",
+    plansDescription:
+      "Add plans with a name, credits, and price. The homepage shows prices as monthly.",
+    planName: "Name",
+    addPlan: "Add plan",
+    removePlan: "Remove plan",
+    planNameRequired: "Every plan needs a name.",
     credits: "Credits",
     priceYuan: "Price (¥)",
-    seriesTitle: "Seedance {{series}} rates (credits/s)",
-    series20Hint:
-      "With a reference video, LibTV 2.0 uses the with-reference rate on output seconds only.",
-    series25Hint:
-      "With a reference video, LibTV 2.5 adds reference seconds to output seconds at the same rate.",
+    modelSeedance2: "Seedance 2.0",
+    modelSeedance2Fast: "Seedance 2.0 Fast",
+    modelSeedance2Mini: "Seedance 2.0 Mini",
+    modelSeedance25: "Seedance 2.5",
     addReferenceSeconds: "Add reference seconds to output seconds",
     withoutReference: "No reference (/s)",
     withReference: "With reference (/s)",
     saveSuccess: "Competitor pricing saved.",
     saveError: "Failed to save competitor pricing.",
+    promosTitle: "Promo discount",
+    promosDescription:
+      "Set by model, resolution, reference, and dates. 8 means 20% off.",
+    promoModel: "Model",
+    promoResolution: "Resolution",
+    promoAnyResolution: "Any",
+    promoWithReference: "With reference",
+    promoStartsAt: "Start",
+    promoEndsAt: "End",
+    promoFold: "Discount",
+    addPromo: "Add promo",
+    removePromo: "Remove promo",
   },
   bootstrapAdmin: {
     title: "Bootstrap",
@@ -370,7 +427,8 @@ export const en = {
       title: "Title",
       effectiveDate: "Effective date",
       body: "Body (Markdown)",
-      bodyHelp: "Supports Markdown headings and lists. Rendered in the login dialog.",
+      bodyHelp:
+        "Supports Markdown headings and lists. Rendered in the login dialog.",
     },
   },
   loginMethods: {
@@ -442,10 +500,12 @@ export const en = {
     descriptions: {
       schemas: "Structured data schemas for workflow nodes.",
       databases: "Organization SQL databases.",
-      datasets: "File datasets and AI search. Cloudflare credentials may be required.",
+      datasets:
+        "File datasets and AI search. Cloudflare credentials may be required.",
       integrations: "Third-party OAuth and API integrations.",
       secrets: "Encrypted secrets for workflows.",
-      aiInterfaces: "Upstream AI and resource APIs for workflows and canvas nodes.",
+      aiInterfaces:
+        "Upstream AI and resource APIs for workflows and canvas nodes.",
       queues: "Message queues for async workflows.",
       templates: "Pre-built workflow templates gallery.",
     },
@@ -487,8 +547,9 @@ export const en = {
       adminLegalDocuments: "Terms & Privacy - Admin - {{siteName}}",
       adminFeatureSettings: "Feature Settings - Admin - {{siteName}}",
       adminWorkflowSchemes: "Workflow Schemes - Admin - {{siteName}}",
-  adminApiForwarding: "Format Transform Templates - Admin - {{siteName}}",
-  adminApiForwardingDetail: "Format Transform Template Detail - Admin - {{siteName}}",
+      adminApiForwarding: "Format Transform Templates - Admin - {{siteName}}",
+      adminApiForwardingDetail:
+        "Format Transform Template Detail - Admin - {{siteName}}",
       adminPersistWorkers: "Load Balancing - Admin - {{siteName}}",
       adminAiTemplates: "AI Interface Templates - Admin - {{siteName}}",
       adminAiModels: "AI Models - Admin - {{siteName}}",
@@ -840,8 +901,7 @@ export const en = {
       dormant: "Dormant",
       stuck: "Stuck",
       stuckAt: "{{status}} at {{stage}} for {{days}} day(s).",
-      orgWorkflows:
-        "Workflows in workspace (may be teammates'): {{names}}",
+      orgWorkflows: "Workflows in workspace (may be teammates'): {{names}}",
       pastSupport: "Past support: {{count}} message(s) considered.",
       resendTitle: "Resend welcome email?",
       resendDescription:
@@ -865,8 +925,7 @@ export const en = {
       noSubAccounts: "No sub-accounts",
       noSubAccountsDesc: "This organization has no sub-accounts yet.",
       orgMemberships: "Organization Memberships",
-      orgMembershipsDesc:
-        "Organizations this user belongs to ({{count}})",
+      orgMembershipsDesc: "Organizations this user belongs to ({{count}})",
       noOrgs: "No organizations",
       noOrgsDesc: "This user is not a member of any organizations.",
       usage: "Usage",
@@ -945,7 +1004,8 @@ export const en = {
   workflowScheme: {
     createTitle: "Create Workflow",
     configureTitle: "Configure Workflow",
-    createDescription: "Choose a scheme first. It controls available triggers, execution modes, and nodes.",
+    createDescription:
+      "Choose a scheme first. It controls available triggers, execution modes, and nodes.",
     createDescriptionSimple:
       "Create a blank canvas workflow. Choose execution mode and run method when you run.",
     workflowName: "Workflow Name",
@@ -980,7 +1040,8 @@ export const en = {
       },
       form_request: {
         title: "Form Request",
-        description: "Public form that runs the workflow and waits for completion",
+        description:
+          "Public form that runs the workflow and waits for completion",
       },
       email_message: {
         title: "Email Message",
@@ -1022,7 +1083,8 @@ export const en = {
   },
   adminWorkflowSchemes: {
     title: "Workflow Schemes",
-    description: "Configure workflow schemes that control triggers, execution modes, and available nodes.",
+    description:
+      "Configure workflow schemes that control triggers, execution modes, and available nodes.",
     create: "New Scheme",
     createTitle: "Create Scheme",
     editTitle: "Edit Scheme",
@@ -1063,7 +1125,8 @@ export const en = {
     disabledBadge: "Disabled",
     saveSuccess: "Scheme saved.",
     saveError: "Failed to save scheme.",
-    deleteConfirm: "Delete this scheme? Workflows already using it will keep their assignment.",
+    deleteConfirm:
+      "Delete this scheme? Workflows already using it will keep their assignment.",
     deleteSuccess: "Scheme deleted.",
     deleteError: "Failed to delete scheme.",
     columns: {
@@ -1079,7 +1142,8 @@ export const en = {
     title: "Format Transform Templates",
     description:
       "Configure mappings from the platform standard video body to third-party upstream formats. Org interfaces select a template and submit directly to their upstream URL.",
-    detailDescription: "Configure upstream parameters and map them to the standard request structure.",
+    detailDescription:
+      "Configure upstream parameters and map them to the standard request structure.",
     create: "Add Template",
     createTitle: "Add Format Transform Template",
     createValidation: "Name is required.",
@@ -1137,19 +1201,20 @@ export const en = {
       upstreamParamsHelp:
         "Pick a standard field on the right, enter the upstream parameter name, then add.",
       paramName: "Parameter name",
-      paramNamePlaceholderSelectFirst: "Select a standard field on the right first",
+      paramNamePlaceholderSelectFirst:
+        "Select a standard field on the right first",
       paramNamePlaceholderExample: "Enter the third-party API parameter name",
       paramType: "Type",
       mappingTarget: "Mapping",
       addParam: "Add Parameter",
       noParams: "No upstream parameters yet.",
       unmapped: "Unmapped",
-      selectStandardHint:
-        "Select a standard field on the right before adding.",
+      selectStandardHint: "Select a standard field on the right before adding.",
       selectStandardFirst: "Select a standard field on the right first.",
       selectedStandard: "Selected standard field",
       mappingPath: "Mapping",
-      mappingPlaceholder: "Click here, then select a standard field on the right",
+      mappingPlaceholder:
+        "Click here, then select a standard field on the right",
       transformSize: "Ratio + resolution → size",
       standardSchema: "Standard Request Structure",
       standardSchemaHelp:
@@ -1175,7 +1240,8 @@ export const en = {
     workflowSaveFailed: "Workflow saving error: {{message}}",
     connectionFailed: "Connection error: {{message}}",
     nodeTypesLoadFailed: "Failed to load node types.",
-    workflowNotFound: 'Workflow with ID "{{id}}" not found, or could not be loaded.',
+    workflowNotFound:
+      'Workflow with ID "{{id}}" not found, or could not be loaded.',
   },
   pages: {
     workflows: {
@@ -1309,7 +1375,8 @@ export const en = {
       title: "Execution Details",
       notFound: "Execution not found or an error occurred.",
       loadingWorkflow: "Loading workflow data...",
-      noStructure: "No workflow structure available or still loading components.",
+      noStructure:
+        "No workflow structure available or still loading components.",
       fetchFailed: "Failed to fetch execution details: {{message}}",
       infoCard: {
         title: "Execution Information",
@@ -1413,7 +1480,8 @@ export const en = {
       createDialogTitle: "Create New Database",
       databaseName: "Database Name",
       databaseNamePlaceholder: "Enter database name",
-      nameValidation: "Letters, digits, and underscores only (e.g. my_database)",
+      nameValidation:
+        "Letters, digits, and underscores only (e.g. my_database)",
       createDatabase: "Create Database",
       deleteTitle: "Delete Database",
       deleteConfirm:
@@ -1542,7 +1610,7 @@ export const en = {
         getApiKey: "Get API Key",
         integrationName: "Integration Name",
         integrationNamePlaceholder: "e.g., Production Key",
-        savedAs: 'Will be saved as: {{provider}} - {{name}}',
+        savedAs: "Will be saved as: {{provider}} - {{name}}",
         apiKey: "API Key",
         apiKeyPlaceholder: "Enter your API key",
         processing: "Processing...",
@@ -1576,7 +1644,8 @@ export const en = {
       emptyTitle: "No secrets found",
       emptyDescription: "Create your first secret to get started.",
       createDialogTitle: "Create New Secret",
-      createDialogDescription: "Add a new encrypted secret to your organization.",
+      createDialogDescription:
+        "Add a new encrypted secret to your organization.",
       namePlaceholder: "Secret name",
       valuePlaceholder: "Secret value",
       createSecret: "Create Secret",
@@ -1608,7 +1677,8 @@ export const en = {
       noTemplates:
         "No enabled templates. Ask a platform admin to configure templates first.",
       addButton: "Add Interface",
-      empty: "No interfaces yet. Click Add Interface to connect an AI provider.",
+      empty:
+        "No interfaces yet. Click Add Interface to connect an AI provider.",
       addWizard: {
         title: "Add AI Interface",
         step0Title: "Select channel",
@@ -1655,7 +1725,8 @@ export const en = {
       singleModel: {
         step1Description:
           "Choose a model or feature. Filter by category above; All shows everything by default.",
-        step2Description: "Review connection parameters and credentials, then save.",
+        step2Description:
+          "Review connection parameters and credentials, then save.",
         defaultsHint:
           "Defaults are shown below. Leave them unchanged unless you know what they mean. List names default to the selected model card label.",
         categories: {
@@ -1719,7 +1790,8 @@ export const en = {
         editConfig: "Edit configuration",
         editConfigTitle: "Edit connection",
         applyFormatTemplate: "Apply template",
-        applyFormatTemplateRequired: "Apply the selected template before saving.",
+        applyFormatTemplateRequired:
+          "Apply the selected template before saving.",
         formatTemplate: "Format transform template",
         formatTemplatePlaceholder: "Select a template",
         formatTemplateRequired:
@@ -1829,7 +1901,8 @@ export const en = {
         secretAccessKey: "Secret Access Key",
         credentialsRequired: "Access Key ID and Secret are required",
         selectedModels: "{{count}} models selected",
-        autoKeyHint: "A temporary inference key will be issued via GetApiKey after save.",
+        autoKeyHint:
+          "A temporary inference key will be issued via GetApiKey after save.",
         setupStarted: "Interface created. Finishing setup in the background…",
         setupWaiting: "Finishing Volcano setup, please wait…",
         setupWaitingShort: "Setting up…",
@@ -1891,7 +1964,8 @@ export const en = {
         pricingModality: "Type",
         pricingPrice: "Price",
         pricingDisclaimer: "Prices are subject to Volcengine official rates.",
-        resourcePackHint: "Purchase resource packs in the Volcengine console. See",
+        resourcePackHint:
+          "Purchase resource packs in the Volcengine console. See",
         usageBreakdown: "Free {{free}} · Paid {{paid}}",
         usageQuotaUnknown: "No free quota configured; showing usage only",
         remainingQuota: "{{remaining}} remaining / {{total}}",
@@ -1924,8 +1998,7 @@ export const en = {
             "Could not load the model list. Refresh the page and try again.",
           catalogEmpty:
             "The model list is empty. Contact an administrator to check platform configuration.",
-          panelNotOpenHint:
-            "{{count}} model(s) are not activated yet. Go to",
+          panelNotOpenHint: "{{count}} model(s) are not activated yet. Go to",
           panelNotOpenHintAfterLink:
             " to activate. When done, click Refresh to sync status, then enable each model.",
           panelTosNotOpenHint: "Cloud storage (TOS) is not activated. Go to",
@@ -1946,7 +2019,8 @@ export const en = {
       tosStorage: {
         cardTitle: "Cloud storage",
         notConfigured: "Cloud storage is not configured",
-        optOutHint: "Skip cloud storage (you can configure it later in the interface panel)",
+        optOutHint:
+          "Skip cloud storage (you can configure it later in the interface panel)",
         requiresTosOpen: "Activate Volcano TOS in the console first",
         probing: "Checking cloud storage activation…",
         standardStoragePrice: "Standard storage",
@@ -1954,7 +2028,8 @@ export const en = {
         pricingDoc: "View official TOS pricing",
         setup: "Set up storage",
         reconfigure: "Change settings",
-        prefixHint: "Files are stored under {{prefix}}/ in the bucket (read-only)",
+        prefixHint:
+          "Files are stored under {{prefix}}/ in the bucket (read-only)",
         storagePack: "Storage pack",
         trafficPack: "Traffic pack",
         usageRemaining: "{{remaining}} / {{total}} remaining",
@@ -1985,12 +2060,13 @@ export const en = {
         setupConfirmTitle: "Confirm settings",
         createNewBucket: "Create new bucket",
         newBucketName: "Bucket name",
-        createOnEnableHint: "The bucket is created only when cloud storage is enabled.",
+        createOnEnableHint:
+          "The bucket is created only when cloud storage is enabled.",
         enableAfterSetup: "Enable cloud storage after saving",
         bucketRequired: "Enter a bucket name",
         confirmExistingTitle: "Use existing bucket?",
         confirmExistingDescription:
-          "When enabled, AI outputs will be written to bucket \"{{bucket}}\" under {{prefix}}/.",
+          'When enabled, AI outputs will be written to bucket "{{bucket}}" under {{prefix}}/.',
         switchToCreate: "Create a new bucket instead",
         confirmEnable: "Enable",
         disableTitle: "Disable cloud storage",
@@ -2000,12 +2076,14 @@ export const en = {
           "If workflows or AI generation tasks are still running, do not disable. Confirm the following:",
         disableAckImpact:
           "I understand how disabling cloud storage affects workflow canvas assets",
-        disableAckNoTasks: "There are no running workflows or AI generation tasks",
+        disableAckNoTasks:
+          "There are no running workflows or AI generation tasks",
         confirmDisable: "Disable",
         wizardStepTitle: "Cloud storage (optional)",
         wizardStepHint:
           "We recommend cloud storage to persist AI-generated images and videos. You can skip and configure later in the interface panel.",
-        wizardSaveHint: "Cloud storage settings will be saved with the interface.",
+        wizardSaveHint:
+          "Cloud storage settings will be saved with the interface.",
         wizardSkip: "Skip",
         regions: {
           guangzhou: "Guangzhou",
@@ -2076,12 +2154,23 @@ export const en = {
         "Configure each resolution separately. Unchecked tiers are hidden on the canvas.",
       priceWithoutVideo: "Without reference video",
       priceWithVideo: "With reference video",
+      priceEstimatePromosTitle: "Promo discount",
+      priceEstimatePromoHint:
+        "8 means 20% off. Applies with or without a reference video.",
+      priceEstimatePromoStartsAt: "Start",
+      priceEstimatePromoEndsAt: "End",
+      priceEstimatePromoFold: "Discount",
+      priceEstimatePromoAnyResolution: "Any",
+      priceEstimateAddPromo: "Add promo",
+      priceEstimateRemovePromo: "Remove promo",
       maxAudioReferences: "Max audio references",
       maxAudioReferenceBytes: "Max MB per audio reference",
       maxAudioReferenceSeconds: "Max audio duration (seconds)",
       allowPromptInjectText: "Allow inserting text references into the prompt",
-      allowPromptInjectImage: "Allow inserting image references into the prompt",
-      allowPromptInjectVideo: "Allow inserting video references into the prompt",
+      allowPromptInjectImage:
+        "Allow inserting image references into the prompt",
+      allowPromptInjectVideo:
+        "Allow inserting video references into the prompt",
       modelDisplayName: "Model name",
       modelCanonicalId: "Model ID",
       brandIcon: "Logo",
@@ -2093,8 +2182,7 @@ export const en = {
       groupsTitleFor: "{{type}} groups",
       groupsDescription:
         "Groups organize the model picker (icon, name, description).",
-      groupsDescriptionScoped:
-        "Manage groups for the current modality only.",
+      groupsDescriptionScoped: "Manage groups for the current modality only.",
       groupsEmpty: "No groups yet.",
       groupId: "Group id",
       groupName: "Group name",
@@ -2215,7 +2303,8 @@ export const en = {
       removeMember: "Remove Member",
       cancelInvitation: "Cancel invitation",
       emptyMembersTitle: "No members found",
-      emptyMembersDescription: "Invite members to your organization to get started.",
+      emptyMembersDescription:
+        "Invite members to your organization to get started.",
       emptyInvitationsTitle: "No pending invitations",
       emptyInvitationsDescription:
         "Invitations you send will appear here until they are accepted or expire.",
@@ -2258,7 +2347,8 @@ export const en = {
       currentPlan: "Current Plan",
       canceledDescription:
         "Your subscription has been canceled but you have access until the end of your billing period",
-      proDescription: "$10/month base + pay-as-you-go for usage beyond included credits",
+      proDescription:
+        "$10/month base + pay-as-you-go for usage beyond included credits",
       trialDescription:
         "Upgrade to Early Adopter plan for included monthly credits and usage-based billing",
       accessEnds: "Access ends {{date}}",
@@ -2275,12 +2365,14 @@ export const en = {
       changeLimit: "Change",
       setLimit: "Set Limit",
       planFeaturesTitle: "Early Adopter Plan",
-      planFeaturesDescription: "$10/month base subscription with usage-based billing",
+      planFeaturesDescription:
+        "$10/month base subscription with usage-based billing",
       includedUsageFeature: "Included monthly usage",
       includedUsageFeatureDesc:
         "Get a monthly allowance of compute usage with your subscription",
       overageFeature: "Pay-as-you-go overage",
-      overageFeatureDesc: "Only pay for additional usage beyond your included allowance",
+      overageFeatureDesc:
+        "Only pay for additional usage beyond your included allowance",
       checkoutSuccess: "Subscription activated! Welcome to Pro.",
       checkoutFailed: "Failed to start checkout. Please try again.",
       portalFailed: "Failed to open billing portal. Please try again.",
@@ -2395,7 +2487,8 @@ export const en = {
       deleteWarning:
         "This action is irreversible and will permanently delete all organization data.",
       nameRequired: "Organization name is required",
-      createdToast: "Organization created successfully and navigated to workflows",
+      createdToast:
+        "Organization created successfully and navigated to workflows",
       createFailed: "Failed to create organization. Please try again.",
       deletedToast: "Organization deleted successfully",
       deleteFailed: "Failed to delete organization. Please try again.",
@@ -2537,15 +2630,16 @@ export const en = {
       success: "Cancelled",
       upstreamSkipped:
         "Cancelled locally. Upstream cancel is not configured; the task may still be queued",
-      upstreamFailed: "Cancelled locally, but the upstream cancel request failed",
+      upstreamFailed:
+        "Cancelled locally, but the upstream cancel request failed",
     },
     generativeErrors: {
-      promptRequired: "Enter a prompt or add a reference image before generating",
+      promptRequired:
+        "Enter a prompt or add a reference image before generating",
       promptTooLong: "Prompt is too long. Shorten it and try again",
       timedOut: "Generation timed out. Please try again later",
       generationFailed: "Generation failed. Please try again later",
-      modelSelectionBlocked:
-        "Model selection is unavailable in read-only mode",
+      modelSelectionBlocked: "Model selection is unavailable in read-only mode",
       modelUnavailable:
         "This model is unavailable. Check your AI interface settings",
       historyModelUnavailable:
@@ -2558,8 +2652,7 @@ export const en = {
         "Generation parameters are invalid for this model. Adjust them and retry",
       localReferenceUnsupported:
         "Local browser-only references cannot be used in workflow runs. Generate from the canvas panel instead",
-      cloudUploadFailed:
-        "Cloud upload failed. Check bucket CORS and try again",
+      cloudUploadFailed: "Cloud upload failed. Check bucket CORS and try again",
       cloudUploadFailedSavedLocally:
         "Cloud upload failed. The file was saved locally in this browser",
       cloudStorageUnavailable:
@@ -2724,7 +2817,8 @@ export const en = {
         release: "Release to upload and create a node",
         multipleFiles: "Only one file can be uploaded at a time",
         invalidFile: "This file type is not supported",
-        missingWorkflow: "Could not resolve this workflow. Refresh the page and try again.",
+        missingWorkflow:
+          "Could not resolve this workflow. Refresh the page and try again.",
       },
       tabAll: "All",
       addNewNode: "Add node",
@@ -2751,8 +2845,7 @@ export const en = {
       agentDescription:
         "Coming soon. Node inputs and outputs are shown below the selected node on the canvas. Use the settings icon next to the workflow name to edit workflow properties.",
       multipleSelected: "Multiple Items Selected",
-      nodesAndEdges:
-        "{{nodeCount}} node(s) and {{edgeCount}} edge(s) selected",
+      nodesAndEdges: "{{nodeCount}} node(s) and {{edgeCount}} edge(s) selected",
       nodesSelected: "{{count}} node(s) selected",
       edgesSelected: "{{count}} edge(s) selected",
       selectSingleHint: "Select a single item to view and edit its properties.",
@@ -2998,7 +3091,8 @@ export const en = {
       promptOptionalWithRefs:
         "Optional when references are attached — describe how to use them…",
       promptFromUpstream: "Keywords from upstream connection",
-      editUpstreamHint: "Disconnect the keywords input to edit the prompt here.",
+      editUpstreamHint:
+        "Disconnect the keywords input to edit the prompt here.",
       selectModel: "Select model…",
       generate: "Generate",
       generating: "Generating…",
@@ -3128,16 +3222,20 @@ export const en = {
       browserQuota: "Browser quota ~{{quota}}",
       selectAll: "Select all",
       empty: "No cached files",
-      workflowCounts: "{{total}} items ({{images}} images · {{videos}} videos · {{audios}} audio) · {{size}}",
+      workflowCounts:
+        "{{total}} items ({{images}} images · {{videos}} videos · {{audios}} audio) · {{size}}",
       clearSelected: "Clear selected",
       clearAll: "Clear all",
       confirmTitle: "Clear local cache?",
       confirmDescription:
         "This removes local copies only. Files persisted in cloud storage (if configured) are not affected.",
       confirmAction: "Clear",
-      imageUnavailable: "Image unavailable (link expired or not cached locally)",
-      videoUnavailable: "Video unavailable (link expired or not cached locally)",
-      audioUnavailable: "Audio unavailable (link expired or not cached locally)",
+      imageUnavailable:
+        "Image unavailable (link expired or not cached locally)",
+      videoUnavailable:
+        "Video unavailable (link expired or not cached locally)",
+      audioUnavailable:
+        "Audio unavailable (link expired or not cached locally)",
       entryImage: "Image",
       entryVideo: "Video",
       entryAudio: "Audio",
@@ -3151,7 +3249,8 @@ export const en = {
       downloadConfirmAction: "Download anyway",
       usageBreakdown: "Original {{original}} · Thumbnails {{thumbs}}",
       resourceEmpty: "No cached items in this workflow",
-      resourceSizeBreakdown: "Original {{original}} · Thumbs {{thumbs}} · Total {{total}}",
+      resourceSizeBreakdown:
+        "Original {{original}} · Thumbs {{thumbs}} · Total {{total}}",
       tierThumb: "Thumb",
       tierCanvasS: "Small",
       tierCanvasM: "Medium",
@@ -3251,7 +3350,8 @@ export const en = {
     },
     aiVideoPanel: {
       promptTitle: "Prompt",
-      promptPlaceholder: "Describe the video you want to generate… Type @ to reference an image",
+      promptPlaceholder:
+        "Describe the video you want to generate… Type @ to reference an image",
       promptMentionEmpty: "Add an image reference first",
       promptMentionNoMatch: "No matching images",
       promptMentionBroken:
@@ -3311,8 +3411,7 @@ export const en = {
       pickCanvasNode: "Pick from canvas",
       noPickableNodes: "No compatible nodes on the canvas.",
       referenceRejected: "This reference is not allowed for the current model.",
-      referenceModeSwitched:
-        "References changed — switched to omni reference",
+      referenceModeSwitched: "References changed — switched to omni reference",
       frameRoleFirst: "First",
       frameRoleLast: "Last",
       referencesExceedModels:
