@@ -1,5 +1,7 @@
-import type { PlatformAiModelParameterRules } from "@dafthunk/types";
-import type { GenerationJobResultJson } from "@dafthunk/types";
+import type {
+  GenerationJobResultJson,
+  PlatformAiModelParameterRules,
+} from "@dafthunk/types";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -167,15 +169,17 @@ export const organizations = pgTable(
     subscriptionStatus: text(
       "subscription_status"
     ).$type<SubscriptionStatusType>(),
-    currentPeriodStart: timestamp("current_period_start", { withTimezone: true, mode: "date" }),
-    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true, mode: "date" }),
+    currentPeriodStart: timestamp("current_period_start", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    currentPeriodEnd: timestamp("current_period_end", {
+      withTimezone: true,
+      mode: "date",
+    }),
     overageLimit: integer("overage_limit"), // null = unlimited
-    unlimitedUsage: boolean("unlimited_usage")
-      .notNull()
-      .default(false),
-    creditsExhausted: boolean("credits_exhausted")
-      .notNull()
-      .default(false),
+    unlimitedUsage: boolean("unlimited_usage").notNull().default(false),
+    creditsExhausted: boolean("credits_exhausted").notNull().default(false),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -206,16 +210,26 @@ export const users = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     role: text("role").$type<UserRoleType>().notNull().default(UserRole.USER),
-    developerMode: boolean("developer_mode")
-      .notNull()
-      .default(false),
+    developerMode: boolean("developer_mode").notNull().default(false),
     // Onboarding stage timestamps. Null until the user first performs that
     // milestone, then stamped with CURRENT_TIMESTAMP. Powers the admin
     // onboarding funnel; tour_completed replaces the prior boolean column.
-    tourCompleted: timestamp("tour_completed", { withTimezone: true, mode: "date" }),
-    workflowCreated: timestamp("workflow_created", { withTimezone: true, mode: "date" }),
-    workflowExecuted: timestamp("workflow_executed", { withTimezone: true, mode: "date" }),
-    workflowExecutedOk: timestamp("workflow_executed_ok", { withTimezone: true, mode: "date" }),
+    tourCompleted: timestamp("tour_completed", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    workflowCreated: timestamp("workflow_created", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    workflowExecuted: timestamp("workflow_executed", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    workflowExecutedOk: timestamp("workflow_executed_ok", {
+      withTimezone: true,
+      mode: "date",
+    }),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -254,6 +268,7 @@ export const platformSettings = pgTable("platform_settings", {
   bootstrapConfig: text("bootstrap_config"),
   legalConfig: text("legal_config"),
   competitorVideoPricing: text("competitor_video_pricing"),
+  homepageVideoPriceCache: text("homepage_video_price_cache"),
   persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
     .notNull()
     .default(false),
@@ -327,7 +342,9 @@ export const formatTransformTemplates = pgTable(
         outputKey: "content.video_url",
       }),
     lockedResolution: text("locked_resolution"),
-    supportsTaskCancel: boolean("supports_task_cancel").notNull().default(false),
+    supportsTaskCancel: boolean("supports_task_cancel")
+      .notNull()
+      .default(false),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
@@ -452,7 +469,9 @@ export const aiModelInvocations = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     canonicalId: text("canonical_id").notNull(),
     displayName: text("display_name").notNull(),
     interfaceId: text("interface_id"),
@@ -472,9 +491,7 @@ export const aiModelInvocations = pgTable(
       table.organizationId,
       table.createdAt
     ),
-    index("ai_model_invocations_generation_job_idx").on(
-      table.generationJobId
-    ),
+    index("ai_model_invocations_generation_job_idx").on(table.generationJobId),
   ]
 );
 
@@ -570,7 +587,9 @@ export const generationJobs = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     workflowId: text("workflow_id"),
     nodeId: text("node_id"),
     modality: text("modality").notNull(),
@@ -616,7 +635,9 @@ export const mediaResources = pgTable(
     failed: boolean("failed").notNull().default(false),
     createdAt: createCreatedAt(),
   },
-  (table) => [index("media_resources_organization_id_idx").on(table.organizationId)]
+  (table) => [
+    index("media_resources_organization_id_idx").on(table.organizationId),
+  ]
 );
 
 // Workflows - Workflow definitions created and edited by users
@@ -958,7 +979,10 @@ export const threads = pgTable(
       onDelete: "set null",
     }),
     archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
-    lastMessageAt: timestamp("last_message_at", { withTimezone: true, mode: "date" }).notNull(),
+    lastMessageAt: timestamp("last_message_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -1020,7 +1044,10 @@ export const threadReads = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    lastReadAt: timestamp("last_read_at", { withTimezone: true, mode: "date" }).notNull(),
+    lastReadAt: timestamp("last_read_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.threadId, table.userId] }),
@@ -1152,7 +1179,10 @@ export const invitations = pgTable(
     invitedBy: text("invited_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -1185,7 +1215,10 @@ export const integrations = pgTable(
       .default(IntegrationStatus.ACTIVE),
     encryptedToken: text("encrypted_token").notNull(),
     encryptedRefreshToken: text("encrypted_refresh_token"),
-    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true, mode: "date" }),
+    tokenExpiresAt: timestamp("token_expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
     metadata: text("metadata"), // JSON for provider-specific data
     organizationId: text("organization_id")
       .notNull()

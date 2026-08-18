@@ -6,8 +6,16 @@ import {
   computeLibtvCreditsForClipSplit,
   computePlanAccountCount,
   DEFAULT_LIBTV_COMPARISON_CONFIG,
+  DEFAULT_VIDEO_PRICE_COMPETITOR_STORE,
+  defaultVideoPriceCompetitorStore,
+  isVideoPriceCompetitorHttpUrl,
+  LIBTV_COMPETITOR_ID,
+  libtvPlanCyclesWithPrice,
   matchLowestCoveringPlan,
   mergeLibtvComparisonConfig,
+  mergeVideoPriceCompetitorStore,
+  readLibtvPlanCyclePrice,
+  readVideoPriceCompetitorPublicUrl,
 } from "./competitor-video-points";
 
 describe("computeLibtvCredits", () => {
@@ -45,6 +53,52 @@ describe("computeLibtvCredits", () => {
         referenceDurationSec: 3,
       })
     ).toBe(368);
+  });
+
+  it("uses with-reference rate on generation plus reference seconds when both switches are on", () => {
+    const config = mergeLibtvComparisonConfig({
+      series: {
+        "doubao-seedance-2": {
+          addReferenceSecondsToOutput: true,
+          independentReferencePrice: true,
+          resolutions: {
+            "1080p": { withoutReferencePerSec: 68, withReferencePerSec: 110 },
+          },
+        },
+      },
+    });
+    expect(
+      computeLibtvCredits({
+        config,
+        canonicalId: "doubao-seedance-2",
+        resolution: "1080p",
+        outputDurationSec: 5,
+        referenceDurationSec: 12,
+      })
+    ).toBe(1870);
+  });
+
+  it("uses without-reference rate on output only when both switches are off", () => {
+    const config = mergeLibtvComparisonConfig({
+      series: {
+        "doubao-seedance-2": {
+          addReferenceSecondsToOutput: false,
+          independentReferencePrice: false,
+          resolutions: {
+            "1080p": { withoutReferencePerSec: 68, withReferencePerSec: 110 },
+          },
+        },
+      },
+    });
+    expect(
+      computeLibtvCredits({
+        config,
+        canonicalId: "doubao-seedance-2",
+        resolution: "1080p",
+        outputDurationSec: 5,
+        referenceDurationSec: 12,
+      })
+    ).toBe(340);
   });
 
   it("uses Fast rates separately from 2.0", () => {
@@ -152,6 +206,16 @@ describe("computeLibtvConvertedYuan", () => {
     const plan = DEFAULT_LIBTV_COMPARISON_CONFIG.plans[0];
     expect(computeLibtvConvertedYuan(1500, plan)).toBeCloseTo(59);
   });
+
+  it("uses quarterly monthly equivalent when that cycle is selected", () => {
+    const plan = {
+      ...DEFAULT_LIBTV_COMPARISON_CONFIG.plans[0],
+      quarterPriceYuan: 150,
+      yearPriceYuan: null,
+    };
+    expect(computeLibtvConvertedYuan(1500, plan, "quarterly")).toBeCloseTo(50);
+    expect(computeLibtvConvertedYuan(1500, plan, "yearly")).toBeNull();
+  });
 });
 
 describe("matchLowestCoveringPlan", () => {
@@ -182,6 +246,30 @@ describe("computePlanAccountCount", () => {
     expect(computePlanAccountCount(1501, 1500)).toBe(2);
     expect(computePlanAccountCount(145_800, 66_000)).toBe(3);
     expect(computePlanAccountCount(145_800, 1500)).toBe(98);
+  });
+});
+
+describe("readLibtvPlanCyclePrice", () => {
+  it("divides quarterly and yearly totals by month count", () => {
+    const plan = {
+      id: "standard-monthly",
+      name: "标准",
+      credits: 1500,
+      priceYuan: 59,
+      quarterPriceYuan: 150,
+      yearPriceYuan: 588,
+    };
+    expect(readLibtvPlanCyclePrice(plan, "monthly")).toEqual({
+      cycle: "monthly",
+      months: 1,
+      totalYuan: 59,
+      monthlyYuan: 59,
+    });
+    expect(readLibtvPlanCyclePrice(plan, "quarterly")?.monthlyYuan).toBe(50);
+    expect(readLibtvPlanCyclePrice(plan, "yearly")?.monthlyYuan).toBe(49);
+    expect(
+      libtvPlanCyclesWithPrice([{ ...plan, quarterPriceYuan: null }])
+    ).toEqual(["monthly", "yearly"]);
   });
 });
 
@@ -239,6 +327,31 @@ describe("mergeLibtvComparisonConfig", () => {
     ).toBeUndefined();
   });
 
+  it("maps missing independent-price flag from the old seconds switch", () => {
+    const merged = mergeLibtvComparisonConfig({
+      series: {
+        "doubao-seedance-2": {
+          addReferenceSecondsToOutput: false,
+          resolutions: {
+            "1080p": { withoutReferencePerSec: 68, withReferencePerSec: 110 },
+          },
+        },
+        "doubao-seedance-2-5": {
+          addReferenceSecondsToOutput: true,
+          resolutions: {
+            "720p": { withoutReferencePerSec: 46, withReferencePerSec: null },
+          },
+        },
+      },
+    });
+    expect(merged.series["doubao-seedance-2"].independentReferencePrice).toBe(
+      true
+    );
+    expect(merged.series["doubao-seedance-2-5"].independentReferencePrice).toBe(
+      false
+    );
+  });
+
   it("keeps a custom plan list instead of a fixed pair", () => {
     const merged = mergeLibtvComparisonConfig({
       plans: [
@@ -248,9 +361,30 @@ describe("mergeLibtvComparisonConfig", () => {
       ],
     });
     expect(merged.plans).toEqual([
-      { id: "starter", name: "入门", credits: 800, priceYuan: 29 },
-      { id: "pro", name: "专业", credits: 8000, priceYuan: 199 },
-      { id: "studio", name: "工作室", credits: 30000, priceYuan: 699 },
+      {
+        id: "starter",
+        name: "入门",
+        credits: 800,
+        priceYuan: 29,
+        quarterPriceYuan: null,
+        yearPriceYuan: null,
+      },
+      {
+        id: "pro",
+        name: "专业",
+        credits: 8000,
+        priceYuan: 199,
+        quarterPriceYuan: null,
+        yearPriceYuan: null,
+      },
+      {
+        id: "studio",
+        name: "工作室",
+        credits: 30000,
+        priceYuan: 699,
+        quarterPriceYuan: null,
+        yearPriceYuan: null,
+      },
     ]);
   });
 
@@ -259,7 +393,39 @@ describe("mergeLibtvComparisonConfig", () => {
       plans: [{ id: "standard-monthly", credits: 2000, priceYuan: 79 }],
     });
     expect(merged.plans).toEqual([
-      { id: "standard-monthly", name: "标准", credits: 2000, priceYuan: 79 },
+      {
+        id: "standard-monthly",
+        name: "标准",
+        credits: 2000,
+        priceYuan: 79,
+        quarterPriceYuan: null,
+        yearPriceYuan: null,
+      },
+    ]);
+  });
+
+  it("reads quarterly and yearly plan prices", () => {
+    const merged = mergeLibtvComparisonConfig({
+      plans: [
+        {
+          id: "standard-monthly",
+          name: "标准",
+          credits: 1500,
+          priceYuan: 59,
+          quarterPriceYuan: 150,
+          yearPriceYuan: 588,
+        },
+      ],
+    });
+    expect(merged.plans).toEqual([
+      {
+        id: "standard-monthly",
+        name: "标准",
+        credits: 1500,
+        priceYuan: 59,
+        quarterPriceYuan: 150,
+        yearPriceYuan: 588,
+      },
     ]);
   });
 
@@ -334,5 +500,166 @@ describe("mergeLibtvComparisonConfig", () => {
       merged.series["doubao-seedance-2-mini"].resolutions["480p"]
         ?.withoutReferencePerSec
     ).toBe(99);
+  });
+});
+
+describe("mergeVideoPriceCompetitorStore", () => {
+  it("wraps a legacy LibTV payload", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      series: DEFAULT_LIBTV_COMPARISON_CONFIG.series,
+      plans: DEFAULT_LIBTV_COMPARISON_CONFIG.plans,
+    });
+    expect(store.competitors).toHaveLength(1);
+    expect(store.competitors[0]?.id).toBe(LIBTV_COMPETITOR_ID);
+    expect(store.competitors[0]?.name).toBe("LibTV");
+    expect(store.competitors[0]?.kind).toBe("compare");
+    expect(
+      store.competitors[0]?.kind === "compare"
+        ? store.competitors[0].config.plans.length
+        : 0
+    ).toBeGreaterThan(0);
+  });
+
+  it("reads a custom competitor list", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      competitors: [
+        { id: LIBTV_COMPETITOR_ID, name: "LibTV", config: {} },
+        { id: "other", name: "Other", config: {} },
+      ],
+    });
+    expect(store.competitors.map((entry) => entry.id)).toEqual([
+      LIBTV_COMPETITOR_ID,
+      "other",
+    ]);
+    expect(store.competitors[1]?.name).toBe("Other");
+    expect(store.competitors[1]?.kind).toBe("compare");
+  });
+
+  it("reads a promo note competitor", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      competitors: [
+        {
+          id: "note-1",
+          name: "Other",
+          kind: "promoNote",
+          text: "8 折",
+          showDates: true,
+          startsAt: "2026-08-01",
+          endsAt: "2026-08-31",
+        },
+      ],
+    });
+    expect(store.competitors).toEqual([
+      {
+        id: "note-1",
+        name: "Other",
+        kind: "promoNote",
+        showUrl: false,
+        url: "",
+        text: "8 折",
+        showDates: true,
+        startsAt: "2026-08-01",
+        endsAt: "2026-08-31",
+      },
+    ]);
+  });
+
+  it("keeps invalid promo note dates empty", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      competitors: [
+        {
+          id: "note-1",
+          name: "Other",
+          kind: "promoNote",
+          text: "限时折扣",
+          showDates: false,
+          startsAt: "nope",
+          endsAt: "",
+        },
+      ],
+    });
+    expect(store.competitors[0]).toEqual({
+      id: "note-1",
+      name: "Other",
+      kind: "promoNote",
+      showUrl: false,
+      url: "",
+      text: "限时折扣",
+      showDates: false,
+      startsAt: "",
+      endsAt: "",
+    });
+  });
+
+  it("reads a competitor link", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      competitors: [
+        {
+          id: "other",
+          name: "Other",
+          showUrl: true,
+          url: "https://example.com/pricing",
+          config: {},
+        },
+      ],
+    });
+    expect(store.competitors[0]?.showUrl).toBe(true);
+    expect(store.competitors[0]?.url).toBe("https://example.com/pricing");
+    expect(
+      store.competitors[0]
+        ? readVideoPriceCompetitorPublicUrl(store.competitors[0])
+        : null
+    ).toBe("https://example.com/pricing");
+  });
+
+  it("drops non-http competitor urls", () => {
+    const store = mergeVideoPriceCompetitorStore({
+      competitors: [
+        {
+          id: "other",
+          name: "Other",
+          showUrl: true,
+          url: "javascript:alert(1)",
+          config: {},
+        },
+      ],
+    });
+    expect(store.competitors[0]?.showUrl).toBe(true);
+    expect(store.competitors[0]?.url).toBe("");
+    expect(
+      store.competitors[0]
+        ? readVideoPriceCompetitorPublicUrl(store.competitors[0])
+        : null
+    ).toBeNull();
+  });
+
+  it("hides a valid url when the link switch is off", () => {
+    expect(
+      readVideoPriceCompetitorPublicUrl({
+        showUrl: false,
+        url: "https://example.com",
+      })
+    ).toBeNull();
+    expect(isVideoPriceCompetitorHttpUrl("https://example.com")).toBe(true);
+    expect(isVideoPriceCompetitorHttpUrl("example.com")).toBe(false);
+  });
+
+  it("keeps an empty competitor list", () => {
+    expect(mergeVideoPriceCompetitorStore({ competitors: [] })).toEqual({
+      competitors: [],
+    });
+  });
+
+  it("falls back to default competitors when the payload is missing", () => {
+    expect(mergeVideoPriceCompetitorStore(null)).toEqual(
+      DEFAULT_VIDEO_PRICE_COMPETITOR_STORE
+    );
+  });
+
+  it("seeds four default competitors", () => {
+    expect(defaultVideoPriceCompetitorStore().competitors).toHaveLength(4);
+    expect(
+      defaultVideoPriceCompetitorStore().competitors.map((entry) => entry.name)
+    ).toEqual(["LibTV", "像塑", "即梦", "小云雀"]);
   });
 });

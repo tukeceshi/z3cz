@@ -540,6 +540,20 @@
       "when": 1789560000000,
       "tag": "0081_seedance_and_competitor_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1789640000000,
+      "tag": "0082_homepage_video_price_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1789720000000,
+      "tag": "0083_competitor_video_pricing_defaults",
+      "breakpoints": true
     }
   ]
 }

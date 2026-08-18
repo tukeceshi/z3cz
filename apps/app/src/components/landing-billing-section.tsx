@@ -7,24 +7,35 @@ import {
   computePlanAccountCount,
   computeSplitVideoPriceEstimateForModel,
   computeVideoPriceEstimateForModel,
-  DEFAULT_LIBTV_COMPARISON_CONFIG,
+  formatVideoPricePromoDateRange,
   formatVideoPricePromoFold,
   formatVideoTokenMillions,
+  isVideoPriceCompareCompetitor,
   isVideoPricePromoAnyResolution,
+  isVideoPricePromoDate,
+  isVideoPricePromoNoteCompetitor,
   LANDING_VIDEO_PRICE_MODEL_ID,
+  type LibtvComparisonConfig,
   type LibtvPlan,
+  type LibtvPlanCycle,
   type LibtvPricePromo,
   type LibtvRateModelId,
+  libtvPlanCyclesWithPrice,
+  libtvPlansForCycle,
   matchLibtvPricePromo,
   matchLowestCoveringPlan,
   matchVideoModelPricePromo,
-  mergeLibtvComparisonConfig,
+  type PublicVideoPriceEstimateModel,
   planVideoEstimateClips,
+  readLibtvPlanCyclePrice,
+  readVideoPriceCompetitorPublicUrl,
   readVideoPriceEstimateTier,
   resolveLibtvRateModelId,
   splitClipOutputSeconds,
   VIDEO_DURATION_MAX,
   VIDEO_RATIO_OPTIONS,
+  type VideoClipPlan,
+  type VideoPriceCompareCompetitor,
 } from "@dafthunk/types";
 import ChevronDown from "lucide-react/icons/chevron-down";
 import {
@@ -37,6 +48,16 @@ import {
 } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -50,6 +71,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { TranslationKey } from "@/i18n";
+import { DashedHintPopover } from "@/pages/organization-ai-interfaces/dashed-hint-popover";
 import { usePublicVideoPriceEstimates } from "@/services/video-price-estimates-service";
 import { cn } from "@/utils/utils";
 
@@ -511,6 +533,82 @@ function applyLibtvCreditsPromo(
   return Math.round(applyVideoPricePromoFold(credits, promo.discountFold));
 }
 
+function landingCompetitorCreditParts(params: {
+  readonly config: LibtvComparisonConfig;
+  readonly canonicalId: string;
+  readonly resolution: string;
+  readonly isSingleClipScenario: boolean;
+  readonly durationSec: number;
+  readonly referenceSec: number;
+  readonly clipPlan: VideoClipPlan;
+  readonly usedReferencedCount: number;
+  readonly usedAvgReferenceSec: number;
+}): { referencedCredits: number; plainCredits: number } | null {
+  if (params.isSingleClipScenario) {
+    const hasRef = params.referenceSec > 0;
+    const raw = computeLibtvCredits({
+      config: params.config,
+      canonicalId: params.canonicalId,
+      resolution: params.resolution,
+      outputDurationSec: params.durationSec,
+      referenceDurationSec: params.referenceSec,
+    });
+    if (raw == null) {
+      return null;
+    }
+    return {
+      referencedCredits: hasRef ? raw : 0,
+      plainCredits: hasRef ? 0 : raw,
+    };
+  }
+  const splitOutput = splitClipOutputSeconds(
+    params.clipPlan,
+    params.usedReferencedCount
+  );
+  return computeLibtvCreditsForClipSplit({
+    config: params.config,
+    canonicalId: params.canonicalId,
+    resolution: params.resolution,
+    referencedOutputSec: splitOutput.referencedOutputSec,
+    plainOutputSec: splitOutput.plainOutputSec,
+    referenceDurationSec:
+      params.usedReferencedCount > 0
+        ? params.usedReferencedCount * params.usedAvgReferenceSec
+        : 0,
+  });
+}
+
+function landingCompetitorPromoFolds(
+  config: LibtvComparisonConfig,
+  canonicalId: string,
+  resolution: string,
+  parts: { referencedCredits: number; plainCredits: number }
+): number[] {
+  const modelId = resolveLibtvRateModelId(canonicalId);
+  const folds: number[] = [];
+  if (parts.referencedCredits > 0) {
+    const promo = matchLibtvPricePromo(config.promos, {
+      canonicalId: modelId,
+      resolution,
+      withReference: true,
+    });
+    if (promo) {
+      folds.push(promo.discountFold);
+    }
+  }
+  if (parts.plainCredits > 0) {
+    const promo = matchLibtvPricePromo(config.promos, {
+      canonicalId: modelId,
+      resolution,
+      withReference: false,
+    });
+    if (promo && !folds.includes(promo.discountFold)) {
+      folds.push(promo.discountFold);
+    }
+  }
+  return folds;
+}
+
 function OptionMenu(props: {
   readonly label: string;
   readonly children: ReactNode;
@@ -547,33 +645,467 @@ function DiscountMark(props: { readonly label: string }) {
 interface PromoDisplayRow {
   readonly id: string;
   readonly platform: string;
+  readonly platformUrl: string | null;
   readonly model: string;
   readonly resolution: string | null;
   readonly needsVideoReference: boolean;
   readonly foldLabel: string;
-  readonly startsAt: string;
-  readonly endsAt: string;
+  readonly dateRange: string;
+}
+
+interface PromoDisplayGroup {
+  readonly platform: string;
+  readonly platformUrl: string | null;
+  readonly items: readonly PromoDisplayRow[];
+}
+
+function groupPromoRowsByPlatform(
+  rows: readonly PromoDisplayRow[]
+): readonly PromoDisplayGroup[] {
+  const groups: Array<{
+    platform: string;
+    platformUrl: string | null;
+    items: PromoDisplayRow[];
+  }> = [];
+  const indexByPlatform = new Map<string, number>();
+  for (const row of rows) {
+    const existing = indexByPlatform.get(row.platform);
+    if (existing === undefined) {
+      indexByPlatform.set(row.platform, groups.length);
+      groups.push({
+        platform: row.platform,
+        platformUrl: row.platformUrl,
+        items: [row],
+      });
+      continue;
+    }
+    const group = groups[existing];
+    if (!group) {
+      continue;
+    }
+    if (!group.platformUrl && row.platformUrl) {
+      group.platformUrl = row.platformUrl;
+    }
+    group.items.push(row);
+  }
+  return groups;
 }
 
 function PromoChip(props: {
   readonly children: ReactNode;
   readonly emphasis?: boolean;
+  readonly onClick?: () => void;
 }) {
+  const className = cn(
+    "text-xs",
+    props.emphasis ? "text-foreground" : "text-muted-foreground",
+    props.onClick
+      ? "cursor-pointer bg-transparent p-0 underline decoration-dotted underline-offset-2"
+      : undefined
+  );
+  if (props.onClick) {
+    return (
+      <button type="button" className={className} onClick={props.onClick}>
+        {props.children}
+      </button>
+    );
+  }
+  return <span className={className}>{props.children}</span>;
+}
+
+function LandingCompetitorCompareRow(props: {
+  readonly competitor: VideoPriceCompareCompetitor;
+  readonly bordered: boolean;
+  readonly model: PublicVideoPriceEstimateModel | undefined;
+  readonly activeResolution: string;
+  readonly isSingleClipScenario: boolean;
+  readonly durationSec: number;
+  readonly referenceSec: number;
+  readonly clipPlan: VideoClipPlan;
+  readonly usedReferencedCount: number;
+  readonly usedAvgReferenceSec: number;
+  readonly excludePromo: boolean;
+  readonly promoFoldLabel: (fold: number) => string;
+  readonly onOpenExternal: (next: { name: string; url: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const [planId, setPlanId] = useState(
+    props.competitor.config.plans[0]?.id ?? ""
+  );
+  const [planCycle, setPlanCycle] = useState<LibtvPlanCycle>("monthly");
+  const [planOpen, setPlanOpen] = useState(false);
+  const config = props.competitor.config;
+  const creditParts = useMemo(() => {
+    if (!props.model || !props.activeResolution) {
+      return null;
+    }
+    return landingCompetitorCreditParts({
+      config,
+      canonicalId: props.model.canonicalId,
+      resolution: props.activeResolution,
+      isSingleClipScenario: props.isSingleClipScenario,
+      durationSec: props.durationSec,
+      referenceSec: props.referenceSec,
+      clipPlan: props.clipPlan,
+      usedReferencedCount: props.usedReferencedCount,
+      usedAvgReferenceSec: props.usedAvgReferenceSec,
+    });
+  }, [
+    config,
+    props.activeResolution,
+    props.clipPlan,
+    props.durationSec,
+    props.isSingleClipScenario,
+    props.model,
+    props.referenceSec,
+    props.usedAvgReferenceSec,
+    props.usedReferencedCount,
+  ]);
+  const promoFolds = useMemo(() => {
+    if (!props.model || !props.activeResolution || creditParts == null) {
+      return [];
+    }
+    return landingCompetitorPromoFolds(
+      config,
+      props.model.canonicalId,
+      props.activeResolution,
+      creditParts
+    );
+  }, [config, creditParts, props.activeResolution, props.model]);
+  const credits = useMemo(() => {
+    if (!props.model || !props.activeResolution || creditParts == null) {
+      return null;
+    }
+    const modelId = resolveLibtvRateModelId(props.model.canonicalId);
+    const referencedPromo =
+      !props.excludePromo && creditParts.referencedCredits > 0
+        ? matchLibtvPricePromo(config.promos, {
+            canonicalId: modelId,
+            resolution: props.activeResolution,
+            withReference: true,
+          })
+        : null;
+    const plainPromo =
+      !props.excludePromo && creditParts.plainCredits > 0
+        ? matchLibtvPricePromo(config.promos, {
+            canonicalId: modelId,
+            resolution: props.activeResolution,
+            withReference: false,
+          })
+        : null;
+    return (
+      applyLibtvCreditsPromo(creditParts.referencedCredits, referencedPromo) +
+      applyLibtvCreditsPromo(creditParts.plainCredits, plainPromo)
+    );
+  }, [
+    config.promos,
+    creditParts,
+    props.activeResolution,
+    props.excludePromo,
+    props.model,
+  ]);
+  const availableCycles = useMemo(
+    () => libtvPlanCyclesWithPrice(config.plans),
+    [config.plans]
+  );
+  const cyclePlans = useMemo(
+    () => libtvPlansForCycle(config.plans, planCycle),
+    [config.plans, planCycle]
+  );
+
+  useEffect(() => {
+    if (!availableCycles.includes(planCycle)) {
+      setPlanCycle("monthly");
+    }
+  }, [availableCycles, planCycle]);
+
+  useEffect(() => {
+    if (credits == null) {
+      return;
+    }
+    const matched = matchLowestCoveringPlan(cyclePlans, credits);
+    if (matched) {
+      setPlanId(matched.id);
+    }
+  }, [cyclePlans, credits]);
+
+  const selectedPlan =
+    cyclePlans.find((plan) => plan.id === planId) ?? cyclePlans[0];
+  const selectedCyclePrice = selectedPlan
+    ? readLibtvPlanCyclePrice(selectedPlan, planCycle)
+    : null;
+  const accountCount =
+    credits != null && selectedPlan
+      ? computePlanAccountCount(credits, selectedPlan.credits)
+      : 1;
+  const percent =
+    credits != null && selectedPlan
+      ? creditSharePercent(credits, selectedPlan.credits * accountCount)
+      : null;
+  const planName = (plan: LibtvPlan): string => {
+    const custom = plan.name.trim();
+    if (custom) {
+      return custom;
+    }
+    if (plan.id === "supreme-monthly") {
+      return t("landing.planSupreme");
+    }
+    if (plan.id === "standard-monthly") {
+      return t("landing.planStandard");
+    }
+    return plan.id;
+  };
+  const planCycleLabel = (cycle: LibtvPlanCycle): string => {
+    if (cycle === "quarterly") {
+      return t("landing.planCycleQuarterly");
+    }
+    if (cycle === "yearly") {
+      return t("landing.planCycleYearly");
+    }
+    return t("landing.planCycleMonthly");
+  };
+  const planCycleUnit = (cycle: LibtvPlanCycle): string => {
+    if (cycle === "quarterly") {
+      return t("landing.planCycleQuarterUnit");
+    }
+    if (cycle === "yearly") {
+      return t("landing.planCycleYearUnit");
+    }
+    return "";
+  };
+  const planPricePart = (
+    plan: LibtvPlan,
+    cycle: LibtvPlanCycle,
+    count = 1
+  ): string => {
+    const priced = readLibtvPlanCyclePrice(plan, cycle);
+    if (!priced) {
+      return "";
+    }
+    const monthly = t("landing.planPricePart", {
+      price: (priced.monthlyYuan * count).toFixed(0),
+    });
+    if (cycle === "monthly") {
+      return monthly;
+    }
+    return `${monthly}·${t("landing.planCycleTotal", {
+      price: (priced.totalYuan * count).toFixed(0),
+      unit: planCycleUnit(cycle),
+    })}`;
+  };
+  const planOptionLabel = (plan: LibtvPlan): string =>
+    t("landing.planOption", {
+      name: planName(plan),
+      credits: plan.credits,
+      pricePart: planPricePart(plan, planCycle),
+    });
+  const planLabel = selectedPlan
+    ? `${planName(selectedPlan)}${planPricePart(
+        selectedPlan,
+        planCycle,
+        accountCount
+      )}`
+    : t("landing.compareUnavailable");
+  const convertedYuan =
+    credits == null || !selectedPlan
+      ? null
+      : computeLibtvConvertedYuan(credits, selectedPlan, planCycle);
+  const rate =
+    convertedYuan == null || props.durationSec <= 0
+      ? null
+      : convertedYuan / props.durationSec;
+  const platformLabel = props.competitor.name;
+  const platformUrl = readVideoPriceCompetitorPublicUrl(props.competitor);
+
   return (
-    <span
-      className={cn(
-        "text-xs",
-        props.emphasis ? "text-foreground" : "text-muted-foreground"
-      )}
-    >
-      {props.children}
-    </span>
+    <tr className={props.bordered ? "border-b" : undefined}>
+      <td className="overflow-hidden px-2 py-3 font-medium whitespace-nowrap">
+        {platformUrl ? (
+          <button
+            type="button"
+            className="cursor-pointer bg-transparent p-0 font-medium underline decoration-dotted underline-offset-2"
+            onClick={() =>
+              props.onOpenExternal({ name: platformLabel, url: platformUrl })
+            }
+          >
+            {platformLabel}
+          </button>
+        ) : (
+          platformLabel
+        )}
+      </td>
+      <td className="overflow-hidden px-2 py-3">
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
+          {selectedPlan && selectedCyclePrice ? (
+            <>
+              <span className="font-medium">{planName(selectedPlan)}</span>
+              {accountCount > 1 ? (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
+                      >
+                        {t("landing.planAccounts", {
+                          count: accountCount,
+                        })}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("landing.planAccountsHint")}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null}
+              <span className="text-muted-foreground">
+                {t("landing.planPricePart", {
+                  price: (
+                    selectedCyclePrice.monthlyYuan * accountCount
+                  ).toFixed(0),
+                })}
+                {planCycle === "monthly" ? null : (
+                  <>
+                    ·
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="border-b border-dashed border-muted-foreground"
+                          >
+                            {t("landing.planCycleTotal", {
+                              price: (
+                                selectedCyclePrice.totalYuan * accountCount
+                              ).toFixed(0),
+                              unit: planCycleUnit(planCycle),
+                            })}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("landing.planCycleRiskHint")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </>
+                )}
+              </span>
+            </>
+          ) : (
+            <span>{t("landing.compareUnavailable")}</span>
+          )}
+          <Popover open={planOpen} onOpenChange={setPlanOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label={planLabel}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="w-auto min-w-52 max-w-80 p-1"
+            >
+              {availableCycles.length > 1 ? (
+                <div className="mb-1 flex gap-0.5">
+                  {availableCycles.map((cycle) => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      className={cn(
+                        "flex-1 rounded-md px-2 py-1 text-xs transition-colors",
+                        cycle === planCycle
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                      )}
+                      onClick={() => {
+                        setPlanCycle(cycle);
+                      }}
+                    >
+                      {planCycleLabel(cycle)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="grid gap-0.5">
+                {cyclePlans.map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                      plan.id === selectedPlan?.id
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    )}
+                    onClick={() => {
+                      setPlanId(plan.id);
+                      setPlanOpen(false);
+                    }}
+                  >
+                    {planOptionLabel(plan)}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </span>
+      </td>
+      <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
+        {credits == null || percent == null || !selectedPlan ? (
+          t("landing.compareUnavailable")
+        ) : (
+          <span>
+            <span>
+              {t("landing.comparePointsBefore", {
+                points: credits,
+              })}
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="border-b border-dashed border-muted-foreground p-0 text-foreground"
+                    >
+                      {t("landing.comparePointsPercentValue", {
+                        percent,
+                      })}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t("landing.comparePointsTotal", {
+                      total: selectedPlan.credits * accountCount,
+                    })}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {t("landing.comparePointsAfter")}
+            </span>
+            {props.excludePromo
+              ? null
+              : promoFolds.map((fold) => (
+                  <DiscountMark key={fold} label={props.promoFoldLabel(fold)} />
+                ))}
+          </span>
+        )}
+      </td>
+      <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
+        {rate == null
+          ? t("landing.compareUnavailable")
+          : t("landing.rateValue", {
+              rate: rate.toFixed(3),
+            })}
+      </td>
+    </tr>
   );
 }
 
 export function LandingBillingSection() {
   const { t } = useTranslation();
-  const { models, libtv, isEstimatesLoading } = usePublicVideoPriceEstimates();
+  const { models, competitors, isEstimatesLoading } =
+    usePublicVideoPriceEstimates();
   const [canonicalId, setCanonicalId] = useState<string>(
     LANDING_VIDEO_PRICE_MODEL_ID
   );
@@ -594,13 +1126,14 @@ export function LandingBillingSection() {
   const [referencedClipCount, setReferencedClipCount] = useState(0);
   const [avgReferenceSec, setAvgReferenceSec] = useState(0);
   const [scenarioId, setScenarioId] = useState<ScenarioId>("clip");
-  const [libtvPlanId, setLibtvPlanId] = useState(
-    DEFAULT_LIBTV_COMPARISON_CONFIG.plans[0]?.id ?? ""
-  );
   const [ratioOpen, setRatioOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
+  const [excludePromo, setExcludePromo] = useState(false);
   const [referenceClipOpen, setReferenceClipOpen] = useState(false);
+  const [pendingExternal, setPendingExternal] = useState<{
+    name: string;
+    url: string;
+  } | null>(null);
   const isSingleClipScenario = scenarioId === "clip";
 
   const activeResolution =
@@ -704,169 +1237,53 @@ export function LandingBillingSection() {
     return matchVideoModelPricePromo(model.promos ?? [], activeResolution);
   }, [activeResolution, model]);
 
-  const libtvConfig = useMemo(
-    () => mergeLibtvComparisonConfig(libtv ?? DEFAULT_LIBTV_COMPARISON_CONFIG),
-    [libtv]
-  );
-  const libtvCreditParts = useMemo(() => {
+  const hasCompetitorPromo = useMemo(() => {
     if (!model || !activeResolution) {
-      return null;
+      return false;
     }
-    if (isSingleClipScenario) {
-      const hasRef = referenceSec > 0;
-      const raw = computeLibtvCredits({
-        config: libtvConfig,
+    return competitors.some((competitor) => {
+      if (!isVideoPriceCompareCompetitor(competitor)) {
+        return false;
+      }
+      const parts = landingCompetitorCreditParts({
+        config: competitor.config,
         canonicalId: model.canonicalId,
         resolution: activeResolution,
-        outputDurationSec: durationSec,
-        referenceDurationSec: referenceSec,
+        isSingleClipScenario,
+        durationSec,
+        referenceSec,
+        clipPlan,
+        usedReferencedCount,
+        usedAvgReferenceSec,
       });
-      if (raw == null) {
-        return null;
+      if (!parts) {
+        return false;
       }
-      return {
-        referencedCredits: hasRef ? raw : 0,
-        plainCredits: hasRef ? 0 : raw,
-      };
-    }
-    const splitOutput = splitClipOutputSeconds(clipPlan, usedReferencedCount);
-    return computeLibtvCreditsForClipSplit({
-      config: libtvConfig,
-      canonicalId: model.canonicalId,
-      resolution: activeResolution,
-      referencedOutputSec: splitOutput.referencedOutputSec,
-      plainOutputSec: splitOutput.plainOutputSec,
-      referenceDurationSec:
-        usedReferencedCount > 0 ? usedReferencedCount * usedAvgReferenceSec : 0,
+      return (
+        landingCompetitorPromoFolds(
+          competitor.config,
+          model.canonicalId,
+          activeResolution,
+          parts
+        ).length > 0
+      );
     });
   }, [
     activeResolution,
     clipPlan,
+    competitors,
     durationSec,
     isSingleClipScenario,
-    libtvConfig,
     model,
     referenceSec,
     usedAvgReferenceSec,
     usedReferencedCount,
   ]);
-  const libtvPromoFolds = useMemo(() => {
-    if (!model || !activeResolution || libtvCreditParts == null) {
-      return [];
-    }
-    const modelId = resolveLibtvRateModelId(model.canonicalId);
-    const folds: number[] = [];
-    if (libtvCreditParts.referencedCredits > 0) {
-      const promo = matchLibtvPricePromo(libtvConfig.promos, {
-        canonicalId: modelId,
-        resolution: activeResolution,
-        withReference: true,
-      });
-      if (promo) {
-        folds.push(promo.discountFold);
-      }
-    }
-    if (libtvCreditParts.plainCredits > 0) {
-      const promo = matchLibtvPricePromo(libtvConfig.promos, {
-        canonicalId: modelId,
-        resolution: activeResolution,
-        withReference: false,
-      });
-      if (promo && !folds.includes(promo.discountFold)) {
-        folds.push(promo.discountFold);
-      }
-    }
-    return folds;
-  }, [activeResolution, libtvConfig.promos, libtvCreditParts, model]);
-  const libtvCredits = useMemo(() => {
-    if (!model || !activeResolution || libtvCreditParts == null) {
-      return null;
-    }
-    const modelId = resolveLibtvRateModelId(model.canonicalId);
-    const referencedPromo =
-      libtvCreditParts.referencedCredits > 0
-        ? matchLibtvPricePromo(libtvConfig.promos, {
-            canonicalId: modelId,
-            resolution: activeResolution,
-            withReference: true,
-          })
-        : null;
-    const plainPromo =
-      libtvCreditParts.plainCredits > 0
-        ? matchLibtvPricePromo(libtvConfig.promos, {
-            canonicalId: modelId,
-            resolution: activeResolution,
-            withReference: false,
-          })
-        : null;
-    return (
-      applyLibtvCreditsPromo(
-        libtvCreditParts.referencedCredits,
-        referencedPromo
-      ) + applyLibtvCreditsPromo(libtvCreditParts.plainCredits, plainPromo)
-    );
-  }, [activeResolution, libtvConfig.promos, libtvCreditParts, model]);
-
-  useEffect(() => {
-    if (libtvCredits == null) {
-      return;
-    }
-    const matched = matchLowestCoveringPlan(libtvConfig.plans, libtvCredits);
-    if (matched) {
-      setLibtvPlanId(matched.id);
-    }
-  }, [libtvCredits, libtvConfig.plans]);
-
-  const selectedLibtvPlan =
-    libtvConfig.plans.find((plan) => plan.id === libtvPlanId) ??
-    libtvConfig.plans[0];
-  const libtvAccountCount =
-    libtvCredits != null && selectedLibtvPlan
-      ? computePlanAccountCount(libtvCredits, selectedLibtvPlan.credits)
-      : 1;
-  const libtvPercent =
-    libtvCredits != null && selectedLibtvPlan
-      ? creditSharePercent(
-          libtvCredits,
-          selectedLibtvPlan.credits * libtvAccountCount
-        )
-      : null;
-
-  const planName = (plan: LibtvPlan): string => {
-    const custom = plan.name.trim();
-    if (custom) {
-      return custom;
-    }
-    if (plan.id === "supreme-monthly") {
-      return t("landing.planSupreme");
-    }
-    if (plan.id === "standard-monthly") {
-      return t("landing.planStandard");
-    }
-    return plan.id;
-  };
-  const planMonthlyLabel = (plan: LibtvPlan, priceYuan: number): string =>
-    t("landing.planMonthly", {
-      name: planName(plan),
-      price: priceYuan.toFixed(0),
-    });
-  const planOptionLabel = (plan: LibtvPlan): string =>
-    t("landing.planOption", {
-      name: planName(plan),
-      credits: plan.credits,
-      price: plan.priceYuan.toFixed(0),
-    });
-  const libtvPlanLabel = selectedLibtvPlan
-    ? planMonthlyLabel(
-        selectedLibtvPlan,
-        selectedLibtvPlan.priceYuan * libtvAccountCount
-      )
-    : t("landing.compareUnavailable");
 
   const officialCostYuan =
     estimate == null
       ? null
-      : platformPromo
+      : !excludePromo && platformPromo
         ? applyVideoPricePromoFold(
             estimate.costYuan,
             platformPromo.discountFold
@@ -875,7 +1292,7 @@ export function LandingBillingSection() {
   const officialTokens =
     estimate == null
       ? null
-      : platformPromo
+      : !excludePromo && platformPromo
         ? Math.round(
             applyVideoPricePromoFold(
               estimate.billingTokens,
@@ -890,64 +1307,89 @@ export function LandingBillingSection() {
           officialCostYuan,
           estimate.outputDurationSec
         );
-  const libtvConvertedYuan =
-    libtvCredits == null || !selectedLibtvPlan
-      ? null
-      : computeLibtvConvertedYuan(libtvCredits, selectedLibtvPlan);
-  const libtvRate =
-    libtvConvertedYuan == null || durationSec <= 0
-      ? null
-      : libtvConvertedYuan / durationSec;
 
   const modelLabel = model?.displayName ?? t("landing.compareUnavailable");
   const promoFoldLabel = (fold: number): string =>
     t("landing.promoFoldHint", { fold: formatVideoPricePromoFold(fold) });
-  const promoRows = useMemo(() => {
+  const promoGroups = useMemo(() => {
     const rows: PromoDisplayRow[] = [];
     for (const entry of models) {
       for (const promo of entry.promos ?? []) {
         rows.push({
           id: `official-${entry.canonicalId}-${promo.id}`,
           platform: t("landing.platformOfficial"),
+          platformUrl: null,
           model: entry.displayName,
           resolution: billingResolutionLabel(promo.resolution),
           needsVideoReference: false,
           foldLabel: t("landing.promoFoldHint", {
             fold: formatVideoPricePromoFold(promo.discountFold),
           }),
-          startsAt: promo.startsAt,
-          endsAt: promo.endsAt,
+          dateRange: formatVideoPricePromoDateRange(
+            promo.startsAt,
+            promo.endsAt
+          ),
         });
       }
     }
-    for (const promo of libtvConfig.promos) {
-      const modelId = resolveLibtvRateModelId(promo.canonicalId);
-      const named = models.find(
-        (entry) => entry.canonicalId === promo.canonicalId
-      );
-      rows.push({
-        id: `libtv-${promo.id}`,
-        platform: t("landing.compareLibtv"),
-        model: named?.displayName ?? t(LIBTV_MODEL_LABEL_KEY[modelId]),
-        resolution: billingResolutionLabel(promo.resolution),
-        needsVideoReference: promo.withReference,
-        foldLabel: t("landing.promoFoldHint", {
-          fold: formatVideoPricePromoFold(promo.discountFold),
-        }),
-        startsAt: promo.startsAt,
-        endsAt: promo.endsAt,
-      });
+    for (const competitor of competitors) {
+      if (isVideoPricePromoNoteCompetitor(competitor)) {
+        if (!competitor.text) {
+          continue;
+        }
+        rows.push({
+          id: competitor.id,
+          platform: competitor.name,
+          platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
+          model: "",
+          resolution: null,
+          needsVideoReference: false,
+          foldLabel: competitor.text,
+          dateRange:
+            competitor.showDates &&
+            isVideoPricePromoDate(competitor.startsAt) &&
+            isVideoPricePromoDate(competitor.endsAt)
+              ? formatVideoPricePromoDateRange(
+                  competitor.startsAt,
+                  competitor.endsAt
+                )
+              : "",
+        });
+        continue;
+      }
+      if (!isVideoPriceCompareCompetitor(competitor)) {
+        continue;
+      }
+      for (const promo of competitor.config.promos) {
+        const modelId = resolveLibtvRateModelId(promo.canonicalId);
+        const named = models.find(
+          (entry) => entry.canonicalId === promo.canonicalId
+        );
+        rows.push({
+          id: `${competitor.id}-${promo.id}`,
+          platform: competitor.name,
+          platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
+          model: named?.displayName ?? t(LIBTV_MODEL_LABEL_KEY[modelId]),
+          resolution: billingResolutionLabel(promo.resolution),
+          needsVideoReference: promo.withReference,
+          foldLabel: t("landing.promoFoldHint", {
+            fold: formatVideoPricePromoFold(promo.discountFold),
+          }),
+          dateRange: formatVideoPricePromoDateRange(
+            promo.startsAt,
+            promo.endsAt
+          ),
+        });
+      }
     }
-    return rows;
-  }, [libtvConfig.promos, models, t]);
+    return groupPromoRowsByPlatform(rows);
+  }, [competitors, models, t]);
 
   return (
-    <section id="pricing" className="scroll-mt-20 py-8 md:py-12">
+    <section id="pricing" className="scroll-mt-20 pt-2 pb-8 md:pb-12">
       <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 md:px-6">
         <div className={cn("rounded-xl border p-4 md:p-5", LANDING_CARD_CLASS)}>
-          <h2 className="text-lg font-semibold">{t("landing.billingTitle")}</h2>
-
-          <div className="mt-4 flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <div className="flex flex-wrap justify-center gap-2">
               {SCENARIO_IDS.map((id) => (
                 <button
@@ -1085,7 +1527,10 @@ export function LandingBillingSection() {
 
           <div className="mt-5 border-t border-dashed border-border pt-4">
             <p className="text-sm text-muted-foreground">
-              {t("landing.compareDisclaimer")}
+              {t("landing.compareDisclaimer")}{" "}
+              <DashedHintPopover label={t("landing.compareFeedback")}>
+                <p className="text-sm">{t("landing.compareFeedbackQq")}</p>
+              </DashedHintPopover>
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
@@ -1104,7 +1549,22 @@ export function LandingBillingSection() {
                       {t("landing.tableLevel")}
                     </th>
                     <th className="px-2 py-2 font-medium">
-                      {t("landing.tableTokens")}
+                      <span className="inline-flex items-center gap-1.5">
+                        {t("landing.tableTokens")}
+                        {platformPromo || hasCompetitorPromo ? (
+                          <label className="inline-flex items-center gap-0.5 text-[10px] font-normal leading-none text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={excludePromo}
+                              onChange={(event) => {
+                                setExcludePromo(event.target.checked);
+                              }}
+                              className="h-3 w-3 accent-foreground"
+                            />
+                            {t("landing.tableExcludePromo")}
+                          </label>
+                        ) : null}
+                      </span>
                     </th>
                     <th className="px-2 py-2 font-medium">
                       {t("landing.tableRate")}
@@ -1131,8 +1591,10 @@ export function LandingBillingSection() {
                         t("landing.compareUnavailable")
                       ) : (
                         <span>
-                          {formatVideoTokenMillions(officialTokens)}
-                          {platformPromo ? (
+                          {t("landing.officialTokenValue", {
+                            tokens: formatVideoTokenMillions(officialTokens),
+                          })}
+                          {!excludePromo && platformPromo ? (
                             <DiscountMark
                               label={promoFoldLabel(platformPromo.discountFold)}
                             />
@@ -1148,172 +1610,127 @@ export function LandingBillingSection() {
                           })}
                     </td>
                   </tr>
-                  <tr>
-                    <td className="overflow-hidden px-2 py-3 font-medium whitespace-nowrap">
-                      {t("landing.compareLibtv")}
-                    </td>
-                    <td className="overflow-hidden px-2 py-3">
-                      <span className="inline-flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
-                        {selectedLibtvPlan ? (
-                          <>
-                            <span className="font-medium">
-                              {planName(selectedLibtvPlan)}
-                            </span>
-                            {libtvAccountCount > 1 ? (
-                              <TooltipProvider delayDuration={200}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
-                                    >
-                                      {t("landing.planAccounts", {
-                                        count: libtvAccountCount,
-                                      })}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {t("landing.planAccountsHint")}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : null}
-                            <span className="text-muted-foreground">
-                              {t("landing.planPricePart", {
-                                price: (
-                                  selectedLibtvPlan.priceYuan *
-                                  libtvAccountCount
-                                ).toFixed(0),
-                              })}
-                            </span>
-                          </>
-                        ) : (
-                          <span>{t("landing.compareUnavailable")}</span>
-                        )}
-                        <Popover open={planOpen} onOpenChange={setPlanOpen}>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                              aria-label={libtvPlanLabel}
-                            >
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            align="start"
-                            className="w-auto min-w-52 max-w-80 p-1"
-                          >
-                            <div className="grid gap-0.5">
-                              {libtvConfig.plans.map((plan) => (
-                                <button
-                                  key={plan.id}
-                                  type="button"
-                                  className={cn(
-                                    "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                                    plan.id === selectedLibtvPlan?.id
-                                      ? "bg-muted text-foreground"
-                                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                  )}
-                                  onClick={() => {
-                                    setLibtvPlanId(plan.id);
-                                    setPlanOpen(false);
-                                  }}
-                                >
-                                  {planOptionLabel(plan)}
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </span>
-                    </td>
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      {libtvCredits == null ||
-                      libtvPercent == null ||
-                      !selectedLibtvPlan ? (
-                        t("landing.compareUnavailable")
-                      ) : (
-                        <span>
-                          <span>
-                            {t("landing.comparePointsBefore", {
-                              points: libtvCredits,
-                            })}
-                            <TooltipProvider delayDuration={200}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="border-b border-dashed border-muted-foreground p-0 text-foreground"
-                                  >
-                                    {t("landing.comparePointsPercentValue", {
-                                      percent: libtvPercent,
-                                    })}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {t("landing.comparePointsTotal", {
-                                    total:
-                                      selectedLibtvPlan.credits *
-                                      libtvAccountCount,
-                                  })}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            {t("landing.comparePointsAfter")}
-                          </span>
-                          {libtvPromoFolds.map((fold) => (
-                            <DiscountMark
-                              key={fold}
-                              label={promoFoldLabel(fold)}
-                            />
-                          ))}
-                        </span>
-                      )}
-                    </td>
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      {libtvRate == null
-                        ? t("landing.compareUnavailable")
-                        : t("landing.rateValue", {
-                            rate: libtvRate.toFixed(3),
-                          })}
-                    </td>
-                  </tr>
+                  {competitors
+                    .filter(isVideoPriceCompareCompetitor)
+                    .map((competitor, index, rows) => (
+                      <LandingCompetitorCompareRow
+                        key={competitor.id}
+                        competitor={competitor}
+                        bordered={index < rows.length - 1}
+                        model={model}
+                        activeResolution={activeResolution}
+                        isSingleClipScenario={isSingleClipScenario}
+                        durationSec={durationSec}
+                        referenceSec={referenceSec}
+                        clipPlan={clipPlan}
+                        usedReferencedCount={usedReferencedCount}
+                        usedAvgReferenceSec={usedAvgReferenceSec}
+                        excludePromo={excludePromo}
+                        promoFoldLabel={promoFoldLabel}
+                        onOpenExternal={setPendingExternal}
+                      />
+                    ))}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-        {promoRows.length > 0 ? (
+        {promoGroups.length > 0 ? (
           <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 md:px-5">
             <h2 className="text-sm font-medium text-muted-foreground">
               {t("landing.promoTitle")}
             </h2>
             <div className="mt-2 grid gap-1.5">
-              {promoRows.map((row) => (
+              {promoGroups.map((group) => (
                 <div
-                  key={row.id}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1"
+                  key={group.platform}
+                  className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1"
                 >
-                  <PromoChip>{row.platform}</PromoChip>
-                  <PromoChip>{row.model}</PromoChip>
-                  {row.resolution ? (
-                    <PromoChip>{row.resolution}</PromoChip>
-                  ) : null}
-                  {row.needsVideoReference ? (
-                    <PromoChip>
-                      {t("landing.promoNeedVideoReference")}
-                    </PromoChip>
-                  ) : null}
-                  <PromoChip emphasis>{row.foldLabel}</PromoChip>
-                  <span className="text-xs text-muted-foreground">
-                    {row.startsAt}–{row.endsAt}
-                  </span>
+                  <PromoChip
+                    onClick={
+                      group.platformUrl
+                        ? () => {
+                            const url = group.platformUrl;
+                            if (!url) {
+                              return;
+                            }
+                            setPendingExternal({
+                              name: group.platform,
+                              url,
+                            });
+                          }
+                        : undefined
+                    }
+                  >
+                    {group.platform}
+                  </PromoChip>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {group.items.map((row) => (
+                      <span
+                        key={row.id}
+                        className="inline-flex max-w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1"
+                      >
+                        {row.model ? <PromoChip>{row.model}</PromoChip> : null}
+                        {row.resolution ? (
+                          <PromoChip>{row.resolution}</PromoChip>
+                        ) : null}
+                        {row.needsVideoReference ? (
+                          <PromoChip>
+                            {t("landing.promoNeedVideoReference")}
+                          </PromoChip>
+                        ) : null}
+                        <PromoChip emphasis>{row.foldLabel}</PromoChip>
+                        {row.dateRange ? (
+                          <span className="text-xs text-muted-foreground">
+                            {row.dateRange}
+                          </span>
+                        ) : null}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         ) : null}
+        <AlertDialog
+          open={pendingExternal != null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingExternal(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("landing.externalLinkTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("landing.externalLinkBody", {
+                  name: pendingExternal?.name ?? "",
+                })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (!pendingExternal) {
+                    return;
+                  }
+                  window.open(
+                    pendingExternal.url,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                }}
+              >
+                {t("landing.externalLinkContinue")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </section>
   );

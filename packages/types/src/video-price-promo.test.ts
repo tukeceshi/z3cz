@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyVideoPricePromoFold,
+  formatVideoPricePromoDateRange,
   formatVideoPricePromoFold,
   isVideoPricePromoActive,
   isVideoPricePromoFold,
@@ -21,6 +22,17 @@ describe("normalizeVideoPricePromoFold", () => {
     expect(isVideoPricePromoFold(8.5)).toBe(true);
     expect(formatVideoPricePromoFold(8.5)).toBe("8.5");
     expect(formatVideoPricePromoFold(8)).toBe("8");
+  });
+});
+
+describe("formatVideoPricePromoDateRange", () => {
+  it("formats month and day without year or padding", () => {
+    expect(formatVideoPricePromoDateRange("2026-08-07", "2026-09-07")).toBe(
+      "8月7日~9月7日"
+    );
+    expect(formatVideoPricePromoDateRange("2026-08-14", "2026-09-17")).toBe(
+      "8月14日~9月17日"
+    );
   });
 });
 
@@ -177,7 +189,12 @@ describe("readVideoModelPricePromos", () => {
           endsAt: "2026-08-31",
           discountFold: 8,
         },
-        { resolution: "720p", startsAt: "bad", endsAt: "2026-08-31", discountFold: 8 },
+        {
+          resolution: "720p",
+          startsAt: "bad",
+          endsAt: "2026-08-31",
+          discountFold: 8,
+        },
       ])
     ).toEqual([
       {

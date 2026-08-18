@@ -1,4 +1,7 @@
-import type { LibtvComparisonConfig } from "./competitor-video-points";
+import {
+  readVideoPriceCompetitors,
+  type VideoPriceCompetitor,
+} from "./competitor-video-points";
 import type {
   PlatformAiModelParameterRules,
   VideoModelParameterRules,
@@ -50,7 +53,109 @@ export interface PublicVideoPriceEstimateModel {
 
 export interface PublicVideoPriceEstimatesResponse {
   readonly models: readonly PublicVideoPriceEstimateModel[];
-  readonly libtv: LibtvComparisonConfig;
+  readonly competitors: readonly VideoPriceCompetitor[];
+}
+
+export const EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES: PublicVideoPriceEstimatesResponse =
+  {
+    models: [],
+    competitors: [],
+  };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readFiniteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readPublicVideoPriceEstimateTier(
+  value: unknown
+): PublicVideoPriceEstimateTier | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (typeof value.resolution !== "string") {
+    return null;
+  }
+  if (
+    typeof value.priceWithoutVideo !== "number" ||
+    !Number.isFinite(value.priceWithoutVideo) ||
+    typeof value.priceWithVideo !== "number" ||
+    !Number.isFinite(value.priceWithVideo)
+  ) {
+    return null;
+  }
+  return {
+    resolution: value.resolution,
+    priceWithoutVideo: value.priceWithoutVideo,
+    priceWithVideo: value.priceWithVideo,
+  };
+}
+
+function readPublicVideoPriceEstimateModel(
+  value: unknown
+): PublicVideoPriceEstimateModel | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    typeof value.canonicalId !== "string" ||
+    typeof value.displayName !== "string" ||
+    !Array.isArray(value.tiers)
+  ) {
+    return null;
+  }
+  const tiers = value.tiers.flatMap((entry) => {
+    const tier = readPublicVideoPriceEstimateTier(entry);
+    return tier ? [tier] : [];
+  });
+  if (tiers.length === 0) {
+    return null;
+  }
+  return {
+    canonicalId: value.canonicalId,
+    displayName: value.displayName,
+    tiers,
+    promos: readVideoModelPricePromos(value.promos),
+    maxReferenceVideos: readFiniteNumber(value.maxReferenceVideos, 0),
+    maxVideoReferenceSeconds: readFiniteNumber(
+      value.maxVideoReferenceSeconds,
+      0
+    ),
+    maxVideoReferenceBytes: readFiniteNumber(value.maxVideoReferenceBytes, 0),
+    maxOutputDurationSec: readFiniteNumber(
+      value.maxOutputDurationSec,
+      VIDEO_DURATION_MAX
+    ),
+  };
+}
+
+export function parsePublicVideoPriceEstimatesCache(
+  value: string | null | undefined
+): PublicVideoPriceEstimatesResponse {
+  if (!value) {
+    return EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES;
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!isRecord(parsed)) {
+      return EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES;
+    }
+    const models = Array.isArray(parsed.models)
+      ? parsed.models.flatMap((entry) => {
+          const model = readPublicVideoPriceEstimateModel(entry);
+          return model ? [model] : [];
+        })
+      : [];
+    return {
+      models,
+      competitors: readVideoPriceCompetitors(parsed.competitors),
+    };
+  } catch {
+    return EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES;
+  }
 }
 
 export interface PublicVideoPriceEstimateSource {
