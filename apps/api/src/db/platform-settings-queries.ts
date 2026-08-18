@@ -5,38 +5,30 @@ import type {
   AppLocale,
   AuthConfig,
   BootstrapSettings,
-  LegalDocumentType,
   LegalDocumentsConfig,
+  LegalDocumentType,
   PlatformFeatureConfig,
   PublicAuthConfig,
   PublicLegalDocumentResponse,
   PublicSiteSettings,
+  PublicVideoPriceEstimatesResponse,
   SiteSettings,
   UpdateAuthConfigRequest,
   UpdateBootstrapSettingsRequest,
   UpdateFeatureConfigRequest,
   UpdateLegalDocumentsRequest,
   UpdateSiteSettingsRequest,
-  LibtvComparisonConfig,
+  VideoPriceCompetitorStore,
 } from "@dafthunk/types";
 import {
   DEFAULT_PLATFORM_FEATURE_CONFIG,
-  mergeLibtvComparisonConfig,
   mergePlatformFeatureConfig,
-  parseLibtvComparisonConfig,
+  parsePublicVideoPriceEstimatesCache,
+  parseVideoPriceCompetitorStore,
 } from "@dafthunk/types";
 import { eq } from "drizzle-orm";
 
 import type { Bindings } from "../context";
-import type { Database } from "./index";
-import {
-  PLATFORM_SETTINGS_ID,
-  platformSettings,
-} from "./schema";
-import {
-  getWorkflowSchemeById,
-  setDefaultWorkflowSchemeById,
-} from "./workflow-scheme-queries";
 import {
   mergeAuthConfigUpdate,
   parseAuthConfig,
@@ -46,18 +38,24 @@ import {
   validateAuthConfigUpdate,
 } from "../services/auth-config";
 import {
-  getLegalDocument,
-  parseLegalConfig,
-  serializeLegalConfig,
-  toAdminLegalDocumentsConfig,
-} from "../services/legal-documents";
-import {
   applyBootstrapSecretUpdate,
   parseBootstrapSettings,
   serializeBootstrapSettings,
   toAdminBootstrapSettings,
   validateBootstrapSettingsUpdate,
 } from "../services/bootstrap-settings";
+import {
+  getLegalDocument,
+  parseLegalConfig,
+  serializeLegalConfig,
+  toAdminLegalDocumentsConfig,
+} from "../services/legal-documents";
+import type { Database } from "./index";
+import { PLATFORM_SETTINGS_ID, platformSettings } from "./schema";
+import {
+  getWorkflowSchemeById,
+  setDefaultWorkflowSchemeById,
+} from "./workflow-scheme-queries";
 
 const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   siteName: "z3cz.com",
@@ -156,7 +154,8 @@ export async function updateSiteSettings(
     .limit(1);
 
   const values = {
-    siteName: input.siteName ?? existing?.siteName ?? DEFAULT_PUBLIC_SETTINGS.siteName,
+    siteName:
+      input.siteName ?? existing?.siteName ?? DEFAULT_PUBLIC_SETTINGS.siteName,
     siteTagline:
       input.siteTagline ??
       existing?.siteTagline ??
@@ -256,7 +255,9 @@ export async function getAuthConfig(db: Database): Promise<AuthConfig> {
   return parseAuthConfig(row?.authConfig ?? null);
 }
 
-export async function getAdminAuthConfig(db: Database): Promise<AdminAuthConfig> {
+export async function getAdminAuthConfig(
+  db: Database
+): Promise<AdminAuthConfig> {
   const [row] = await db
     .select()
     .from(platformSettings)
@@ -271,7 +272,9 @@ export async function getAdminAuthConfig(db: Database): Promise<AdminAuthConfig>
   );
 }
 
-export async function getPublicAuthConfig(db: Database): Promise<PublicAuthConfig> {
+export async function getPublicAuthConfig(
+  db: Database
+): Promise<PublicAuthConfig> {
   const config = await getAuthConfig(db);
   return toPublicAuthConfig(config);
 }
@@ -538,27 +541,29 @@ export async function saveBootstrapSettingsState(
   });
 }
 
-export async function getLibtvComparisonConfig(
+export async function getVideoPriceCompetitorStore(
   db: Database
-): Promise<LibtvComparisonConfig> {
+): Promise<VideoPriceCompetitorStore> {
   const [row] = await db
-    .select()
+    .select({
+      competitorVideoPricing: platformSettings.competitorVideoPricing,
+    })
     .from(platformSettings)
     .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
     .limit(1);
 
-  return parseLibtvComparisonConfig(row?.competitorVideoPricing ?? null);
+  return parseVideoPriceCompetitorStore(row?.competitorVideoPricing ?? null);
 }
 
-export async function updateLibtvComparisonConfig(
+export async function updateVideoPriceCompetitorStore(
   db: Database,
-  config: LibtvComparisonConfig,
+  store: VideoPriceCompetitorStore,
   updatedBy: string
-): Promise<LibtvComparisonConfig> {
-  const next = mergeLibtvComparisonConfig(config);
+): Promise<VideoPriceCompetitorStore> {
+  const next = parseVideoPriceCompetitorStore(JSON.stringify(store));
   const serialized = JSON.stringify(next);
   const [existing] = await db
-    .select()
+    .select({ id: platformSettings.id })
     .from(platformSettings)
     .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
     .limit(1);
@@ -584,4 +589,55 @@ export async function updateLibtvComparisonConfig(
     updatedAt: values.updatedAt,
   });
   return next;
+}
+
+export async function getPublicVideoPriceEstimatesFromCache(
+  db: Database
+): Promise<PublicVideoPriceEstimatesResponse> {
+  const [row] = await db
+    .select({
+      homepageVideoPriceCache: platformSettings.homepageVideoPriceCache,
+    })
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  return parsePublicVideoPriceEstimatesCache(
+    row?.homepageVideoPriceCache ?? null
+  );
+}
+
+export async function updateHomepageVideoPriceCache(
+  db: Database,
+  payload: PublicVideoPriceEstimatesResponse,
+  updatedBy: string
+): Promise<PublicVideoPriceEstimatesResponse> {
+  const serialized = JSON.stringify(payload);
+  const [existing] = await db
+    .select({ id: platformSettings.id })
+    .from(platformSettings)
+    .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
+    .limit(1);
+
+  const values = {
+    homepageVideoPriceCache: serialized,
+    updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(platformSettings)
+      .set(values)
+      .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID));
+    return payload;
+  }
+
+  await db.insert(platformSettings).values({
+    id: PLATFORM_SETTINGS_ID,
+    homepageVideoPriceCache: serialized,
+    updatedBy,
+    updatedAt: values.updatedAt,
+  });
+  return payload;
 }

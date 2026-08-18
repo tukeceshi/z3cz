@@ -33,6 +33,24 @@ export function formatVideoPricePromoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function formatVideoPricePromoMonthDay(value: string): string {
+  if (!isVideoPricePromoDate(value)) {
+    return value;
+  }
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  return `${month}月${day}日`;
+}
+
+export function formatVideoPricePromoDateRange(
+  startsAt: string,
+  endsAt: string
+): string {
+  return `${formatVideoPricePromoMonthDay(startsAt)}~${formatVideoPricePromoMonthDay(
+    endsAt
+  )}`;
+}
+
 export function isVideoPricePromoDate(value: string): boolean {
   return VIDEO_PRICE_PROMO_DATE_PATTERN.test(value);
 }
@@ -123,7 +141,11 @@ function readPromoPeriod(
   if (!isVideoPricePromoDate(startsAt) || !isVideoPricePromoDate(endsAt)) {
     return null;
   }
-  if (!Number.isFinite(discountFold) || discountFold <= 0 || discountFold > 10) {
+  if (
+    !Number.isFinite(discountFold) ||
+    discountFold <= 0 ||
+    discountFold > 10
+  ) {
     return null;
   }
   return {

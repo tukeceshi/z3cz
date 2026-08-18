@@ -9,8 +9,10 @@ import {
   computeSplitVideoPriceEstimateForModel,
   computeVideoBillingTokens,
   computeVideoPriceEstimateForModel,
+  EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES,
   formatVideoPriceEstimateSummary,
   isVideoPriceEstimateEnabled,
+  parsePublicVideoPriceEstimatesCache,
   planVideoEstimateClips,
   readVideoPriceEstimateBaseline480pWithVideo,
   readVideoPriceEstimateTier,
@@ -352,5 +354,84 @@ describe("computeSplitVideoPriceEstimateForModel", () => {
       withRef.billingTokens * 5 + withoutRef.billingTokens * 5
     );
     expect(split.outputDurationSec).toBe(150);
+  });
+});
+
+describe("parsePublicVideoPriceEstimatesCache", () => {
+  it("returns empty when the cache is missing", () => {
+    expect(parsePublicVideoPriceEstimatesCache(null)).toEqual(
+      EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES
+    );
+  });
+
+  it("does not invent default competitors", () => {
+    expect(
+      parsePublicVideoPriceEstimatesCache(
+        JSON.stringify({ models: [], competitors: [] })
+      )
+    ).toEqual(EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES);
+  });
+
+  it("reads a snapshot payload", () => {
+    const parsed = parsePublicVideoPriceEstimatesCache(
+      JSON.stringify({
+        models: [
+          {
+            canonicalId: "doubao-seedance-2",
+            displayName: "Seedance 2.0",
+            tiers: [
+              {
+                resolution: "720p",
+                priceWithoutVideo: 46,
+                priceWithVideo: 28,
+              },
+            ],
+            promos: [],
+            maxReferenceVideos: 3,
+            maxVideoReferenceSeconds: 60,
+            maxVideoReferenceBytes: 1,
+            maxOutputDurationSec: 15,
+          },
+        ],
+        competitors: [{ id: "libtv", name: "LibTV", config: {} }],
+      })
+    );
+    expect(parsed.models).toHaveLength(1);
+    expect(parsed.models[0]?.canonicalId).toBe("doubao-seedance-2");
+    expect(parsed.competitors).toHaveLength(1);
+    expect(parsed.competitors[0]?.id).toBe("libtv");
+    expect(parsed.competitors[0]?.kind).toBe("compare");
+  });
+
+  it("reads promo notes from the snapshot", () => {
+    const parsed = parsePublicVideoPriceEstimatesCache(
+      JSON.stringify({
+        models: [],
+        competitors: [
+          {
+            id: "note-1",
+            name: "Other",
+            kind: "promoNote",
+            text: "8 折",
+            showDates: false,
+            startsAt: "",
+            endsAt: "",
+          },
+        ],
+      })
+    );
+    expect(parsed.competitors).toEqual([
+      {
+        id: "note-1",
+        name: "Other",
+        kind: "promoNote",
+        showUrl: false,
+        url: "",
+        text: "8 折",
+        showDates: false,
+        startsAt: "",
+        endsAt: "",
+      },
+    ]);
   });
 });

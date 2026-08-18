@@ -1,5 +1,13 @@
-import type { LibtvComparisonConfig } from "@dafthunk/types";
-import { LIBTV_RATE_MODEL_IDS, mergeLibtvComparisonConfig } from "@dafthunk/types";
+import type { VideoPriceCompetitor } from "@dafthunk/types";
+import {
+  createVideoPriceCompetitorId,
+  isVideoPriceCompetitorHttpUrl,
+  isVideoPricePromoDate,
+  isVideoPricePromoNoteCompetitor,
+  LIBTV_RATE_MODEL_IDS,
+  mergeLibtvComparisonConfig,
+  toPublicVideoPriceEstimateModel,
+} from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -7,9 +15,11 @@ import { z } from "zod";
 import { ApiContext } from "../../context";
 import {
   createDatabase,
-  getLibtvComparisonConfig,
-  updateLibtvComparisonConfig,
+  getVideoPriceCompetitorStore,
+  updateHomepageVideoPriceCache,
+  updateVideoPriceCompetitorStore,
 } from "../../db";
+import { listPlatformAiModels } from "../../db/platform-ai-model-queries";
 
 const adminCompetitorVideoPricingRoutes = new Hono<ApiContext>();
 
@@ -20,6 +30,7 @@ const resolutionRateSchema = z.object({
 
 const seriesRatesSchema = z.object({
   addReferenceSecondsToOutput: z.boolean(),
+  independentReferencePrice: z.boolean(),
   resolutions: z.record(z.string(), resolutionRateSchema),
 });
 
@@ -28,6 +39,8 @@ const planSchema = z.object({
   name: z.string().trim().min(1),
   credits: z.number().positive(),
   priceYuan: z.number().positive(),
+  quarterPriceYuan: z.number().positive().nullable().optional(),
+  yearPriceYuan: z.number().positive().nullable().optional(),
 });
 
 const promoSchema = z.object({
@@ -45,40 +58,166 @@ const promoSchema = z.object({
   discountFold: z.number().positive().max(10),
 });
 
-const configSchema = z.object({
-  config: z.object({
-    series: z.object({
-      "doubao-seedance-2": seriesRatesSchema,
-      "doubao-seedance-2-fast": seriesRatesSchema,
-      "doubao-seedance-2-mini": seriesRatesSchema,
-      "doubao-seedance-2-5": seriesRatesSchema,
-    }),
-    plans: z
-      .array(planSchema)
-      .min(1)
-      .refine(
-        (plans) => new Set(plans.map((plan) => plan.id)).size === plans.length,
-        { message: "Plan ids must be unique" }
-      ),
-    promos: z.array(promoSchema).optional(),
+const comparisonConfigSchema = z.object({
+  series: z.object({
+    "doubao-seedance-2": seriesRatesSchema,
+    "doubao-seedance-2-fast": seriesRatesSchema,
+    "doubao-seedance-2-mini": seriesRatesSchema,
+    "doubao-seedance-2-5": seriesRatesSchema,
   }),
+  plans: z
+    .array(planSchema)
+    .min(1)
+    .refine(
+      (plans) => new Set(plans.map((plan) => plan.id)).size === plans.length,
+      { message: "Plan ids must be unique" }
+    ),
+  promos: z.array(promoSchema).optional(),
+});
+
+function refineCompetitorLink(
+  value: { showUrl: boolean; url: string },
+  ctx: z.RefinementCtx
+) {
+  if (!value.showUrl) {
+    return;
+  }
+  if (!isVideoPriceCompetitorHttpUrl(value.url)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "A valid http(s) URL is required",
+      path: ["url"],
+    });
+  }
+}
+
+function readCompetitorLink(value: { showUrl: boolean; url: string }): {
+  showUrl: boolean;
+  url: string;
+} {
+  return {
+    showUrl: value.showUrl,
+    url: isVideoPriceCompetitorHttpUrl(value.url) ? value.url.trim() : "",
+  };
+}
+
+function nextCompetitorLink(
+  current: { showUrl: boolean; url: string },
+  body: { showUrl?: boolean; url?: string }
+): { showUrl: boolean; url: string } | { error: string } {
+  const showUrl = body.showUrl ?? current.showUrl;
+  const urlRaw = body.url ?? current.url;
+  const url = isVideoPriceCompetitorHttpUrl(urlRaw) ? urlRaw.trim() : "";
+  if (showUrl && !url) {
+    return { error: "A valid http(s) URL is required" };
+  }
+  return { showUrl, url };
+}
+
+const addCompareCompetitorSchema = z
+  .object({
+    kind: z.literal("compare"),
+    name: z.string().trim().min(1),
+    config: comparisonConfigSchema,
+    showUrl: z.boolean(),
+    url: z.string(),
+  })
+  .superRefine(refineCompetitorLink);
+
+const addPromoNoteCompetitorSchema = z
+  .object({
+    kind: z.literal("promoNote"),
+    name: z.string().trim().min(1),
+    text: z.string().trim().min(1),
+    showDates: z.boolean(),
+    startsAt: z.string(),
+    endsAt: z.string(),
+    showUrl: z.boolean(),
+    url: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.showDates &&
+      (!isVideoPricePromoDate(value.startsAt) ||
+        !isVideoPricePromoDate(value.endsAt))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Promo note dates are required",
+        path: ["startsAt"],
+      });
+    }
+    refineCompetitorLink(value, ctx);
+  });
+
+const addCompetitorSchema = z.union([
+  addCompareCompetitorSchema,
+  addPromoNoteCompetitorSchema,
+]);
+
+const updateCompetitorSchema = z.object({
+  competitorId: z.string().trim().min(1),
+  name: z.string().trim().min(1).optional(),
+  config: comparisonConfigSchema.optional(),
+  text: z.string().trim().min(1).optional(),
+  showDates: z.boolean().optional(),
+  startsAt: z.string().optional(),
+  endsAt: z.string().optional(),
+  showUrl: z.boolean().optional(),
+  url: z.string().optional(),
+});
+
+const deleteCompetitorSchema = z.object({
+  competitorId: z.string().trim().min(1),
 });
 
 adminCompetitorVideoPricingRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
 
   try {
-    const config: LibtvComparisonConfig = await getLibtvComparisonConfig(db);
-    return c.json({ config });
+    const store = await getVideoPriceCompetitorStore(db);
+    return c.json({ competitors: store.competitors });
   } catch (error) {
     console.error("Error fetching competitor video pricing:", error);
     return c.json({ error: "Failed to fetch competitor video pricing" }, 500);
   }
 });
 
-adminCompetitorVideoPricingRoutes.patch(
+adminCompetitorVideoPricingRoutes.post("/cache", async (c) => {
+  const jwtPayload = c.get("jwtPayload");
+  if (!jwtPayload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const db = createDatabase(c.env);
+
+  try {
+    const [models, store] = await Promise.all([
+      listPlatformAiModels(db, "video"),
+      getVideoPriceCompetitorStore(db),
+    ]);
+    const publicModels = models.flatMap((model) => {
+      const mapped = toPublicVideoPriceEstimateModel(model);
+      return mapped ? [mapped] : [];
+    });
+    const payload = await updateHomepageVideoPriceCache(
+      db,
+      {
+        models: publicModels,
+        competitors: store.competitors,
+      },
+      jwtPayload.sub
+    );
+    return c.json(payload);
+  } catch (error) {
+    console.error("Error caching homepage video prices:", error);
+    return c.json({ error: "Failed to cache homepage video prices" }, 500);
+  }
+});
+
+adminCompetitorVideoPricingRoutes.post(
   "/",
-  zValidator("json", configSchema),
+  zValidator("json", addCompetitorSchema),
   async (c) => {
     const jwtPayload = c.get("jwtPayload");
     if (!jwtPayload) {
@@ -89,16 +228,152 @@ adminCompetitorVideoPricingRoutes.patch(
     const db = createDatabase(c.env);
 
     try {
-      const config = await updateLibtvComparisonConfig(
+      const store = await getVideoPriceCompetitorStore(db);
+      const link = readCompetitorLink(body);
+      const competitor: VideoPriceCompetitor =
+        body.kind === "promoNote"
+          ? {
+              id: createVideoPriceCompetitorId(),
+              name: body.name,
+              kind: "promoNote",
+              ...link,
+              text: body.text,
+              showDates: body.showDates,
+              startsAt: isVideoPricePromoDate(body.startsAt)
+                ? body.startsAt
+                : "",
+              endsAt: isVideoPricePromoDate(body.endsAt) ? body.endsAt : "",
+            }
+          : {
+              id: createVideoPriceCompetitorId(),
+              name: body.name,
+              kind: "compare",
+              ...link,
+              config: mergeLibtvComparisonConfig(body.config),
+            };
+      await updateVideoPriceCompetitorStore(
         db,
-        mergeLibtvComparisonConfig(body.config),
+        { competitors: [...store.competitors, competitor] },
         jwtPayload.sub
       );
-      return c.json({ config });
+      return c.json({ competitor });
+    } catch (error) {
+      console.error("Error adding competitor video pricing:", error);
+      return c.json({ error: "Failed to add competitor video pricing" }, 500);
+    }
+  }
+);
+
+adminCompetitorVideoPricingRoutes.patch(
+  "/",
+  zValidator("json", updateCompetitorSchema),
+  async (c) => {
+    const jwtPayload = c.get("jwtPayload");
+    if (!jwtPayload) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+
+    try {
+      const store = await getVideoPriceCompetitorStore(db);
+      const current = store.competitors.find(
+        (entry) => entry.id === body.competitorId
+      );
+      if (!current) {
+        return c.json({ error: "Competitor not found" }, 404);
+      }
+      const link = nextCompetitorLink(current, body);
+      if ("error" in link) {
+        return c.json({ error: link.error }, 400);
+      }
+      let competitor: VideoPriceCompetitor;
+      if (isVideoPricePromoNoteCompetitor(current)) {
+        const nextName = body.name ?? current.name;
+        const nextText = body.text ?? current.text;
+        const nextShowDates = body.showDates ?? current.showDates;
+        const nextStartsAt = body.startsAt ?? current.startsAt;
+        const nextEndsAt = body.endsAt ?? current.endsAt;
+        if (
+          nextShowDates &&
+          (!isVideoPricePromoDate(nextStartsAt) ||
+            !isVideoPricePromoDate(nextEndsAt))
+        ) {
+          return c.json({ error: "Promo note dates are required" }, 400);
+        }
+        competitor = {
+          id: current.id,
+          name: nextName,
+          kind: "promoNote",
+          ...link,
+          text: nextText,
+          showDates: nextShowDates,
+          startsAt: isVideoPricePromoDate(nextStartsAt) ? nextStartsAt : "",
+          endsAt: isVideoPricePromoDate(nextEndsAt) ? nextEndsAt : "",
+        };
+      } else {
+        competitor = {
+          id: current.id,
+          name: body.name ?? current.name,
+          kind: "compare",
+          ...link,
+          config: body.config
+            ? mergeLibtvComparisonConfig(body.config)
+            : current.config,
+        };
+      }
+      const next = {
+        competitors: store.competitors.map((entry) =>
+          entry.id === competitor.id ? competitor : entry
+        ),
+      };
+      await updateVideoPriceCompetitorStore(db, next, jwtPayload.sub);
+      return c.json({ competitor });
     } catch (error) {
       console.error("Error updating competitor video pricing:", error);
       return c.json(
         { error: "Failed to update competitor video pricing" },
+        500
+      );
+    }
+  }
+);
+
+adminCompetitorVideoPricingRoutes.delete(
+  "/",
+  zValidator("json", deleteCompetitorSchema),
+  async (c) => {
+    const jwtPayload = c.get("jwtPayload");
+    if (!jwtPayload) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+
+    try {
+      const store = await getVideoPriceCompetitorStore(db);
+      const current = store.competitors.find(
+        (entry) => entry.id === body.competitorId
+      );
+      if (!current) {
+        return c.json({ error: "Competitor not found" }, 404);
+      }
+      await updateVideoPriceCompetitorStore(
+        db,
+        {
+          competitors: store.competitors.filter(
+            (entry) => entry.id !== body.competitorId
+          ),
+        },
+        jwtPayload.sub
+      );
+      return c.json({ ok: true as const });
+    } catch (error) {
+      console.error("Error deleting competitor video pricing:", error);
+      return c.json(
+        { error: "Failed to delete competitor video pricing" },
         500
       );
     }

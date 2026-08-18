@@ -8,10 +8,9 @@ import { useAuth } from "@/components/auth-context";
 import { LandingBillingSection } from "@/components/landing-billing-section";
 import { LanguageToggle } from "@/components/language-toggle";
 import { LegalDocumentDialog } from "@/components/legal-document-dialog";
-import { useLoginDialog } from "@/components/login-dialog";
 import { useTranslation } from "@/components/locale-provider";
+import { useLoginDialog } from "@/components/login-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { UserProfile } from "@/components/user-profile";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -20,33 +19,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { TranslationKey } from "@/i18n";
+import { UserProfile } from "@/components/user-profile";
 import { getDashboardPath } from "@/utils/auth-navigation";
 import { scheduleConsolePrefetch } from "@/utils/console-prefetch";
 
 const GITHUB_REPO_URL = "https://github.com/tukeceshi/z3cz";
-
-const VALUE_ITEMS: readonly {
-  readonly titleKey: TranslationKey;
-  readonly descKey: TranslationKey;
-}[] = [
-  {
-    titleKey: "landing.valueOfficial",
-    descKey: "landing.valueOfficialDesc",
-  },
-  {
-    titleKey: "landing.valueStorage",
-    descKey: "landing.valueStorageDesc",
-  },
-  {
-    titleKey: "landing.valueCollab",
-    descKey: "landing.valueCollabDesc",
-  },
-  {
-    titleKey: "landing.valueCanvas",
-    descKey: "landing.valueCanvasDesc",
-  },
-];
 
 function scrollToId(id: string): void {
   const el = document.getElementById(id);
@@ -61,8 +38,7 @@ export function LandingPage() {
   const [legalType, setLegalType] = useState<LegalDocumentType | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const dashboardPath =
-    isAuthenticated && user ? getDashboardPath(user) : null;
+  const dashboardPath = isAuthenticated && user ? getDashboardPath(user) : null;
 
   useEffect(() => {
     scheduleConsolePrefetch();
@@ -89,13 +65,6 @@ export function LandingPage() {
 
   const handleLogin = () => {
     openLogin({ goToConsole: false, dismissible: true });
-  };
-
-  const handleStart = () => {
-    if (dashboardPath) {
-      return;
-    }
-    openLogin({ goToConsole: true, dismissible: true });
   };
 
   const githubLink = (
@@ -131,16 +100,6 @@ export function LandingPage() {
         }}
       >
         {t("landing.navPricing")}
-      </button>
-      <button
-        type="button"
-        className="text-sm text-muted-foreground hover:text-foreground"
-        onClick={() => {
-          scrollToId("features");
-          setMenuOpen(false);
-        }}
-      >
-        {t("landing.navFeatures")}
       </button>
       {githubLink}
     </>
@@ -200,7 +159,7 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section id="intro" className="scroll-mt-20 py-8 md:py-12">
+        <section id="intro" className="scroll-mt-20 pt-8 pb-2 md:pt-10">
           <div className="mx-auto max-w-6xl px-4 text-center md:px-6">
             <h1 className="text-3xl font-bold tracking-tight md:text-5xl">
               {t("landing.heroTitle")}
@@ -208,31 +167,6 @@ export function LandingPage() {
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground md:text-lg">
               {t("landing.heroSubtitle")}
             </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              {dashboardPath ? (
-                <Button asChild>
-                  <Link to={dashboardPath}>{t("landing.heroStart")}</Link>
-                </Button>
-              ) : (
-                <Button onClick={handleStart}>{t("landing.heroStart")}</Button>
-              )}
-              <Button variant="outline" onClick={() => scrollToId("features")}>
-                {t("landing.heroGuide")}
-              </Button>
-            </div>
-            <div
-              id="features"
-              className="mt-8 grid scroll-mt-20 gap-4 text-left grid-cols-2 lg:grid-cols-4"
-            >
-              {VALUE_ITEMS.map((item) => (
-                <div key={item.titleKey}>
-                  <p className="text-sm font-medium">{t(item.titleKey)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t(item.descKey)}
-                  </p>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
@@ -246,7 +180,9 @@ export function LandingPage() {
                 <Link to={dashboardPath}>{t("landing.enterConsole")}</Link>
               </Button>
             ) : (
-              <Button onClick={handleLogin}>{t("landing.loginRegister")}</Button>
+              <Button onClick={handleLogin}>
+                {t("landing.loginRegister")}
+              </Button>
             )}
           </div>
         </section>
