@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -8,6 +7,15 @@ import {
   invalidateBootstrapAssetCache,
   resolveBootstrapAssetDiskPath,
 } from "./bootstrap-asset-store";
+
+function makeTempDir(): string {
+  const dir = path.join(
+    process.cwd(),
+    `.vitest-bootstrap-assets-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 describe("bootstrap-asset-store", () => {
   let tempDir = "";
@@ -22,7 +30,7 @@ describe("bootstrap-asset-store", () => {
   });
 
   it("loads shell manifest metadata", () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bootstrap-assets-"));
+    tempDir = makeTempDir();
     fs.writeFileSync(
       path.join(tempDir, "bootstrap-manifest.json"),
       JSON.stringify({
@@ -43,6 +51,41 @@ describe("bootstrap-asset-store", () => {
     expect(manifest?.shellHash).toBe("test");
   });
 
+  it("reloads the manifest when the file on disk changes", () => {
+    tempDir = makeTempDir();
+    const manifestPath = path.join(tempDir, "bootstrap-manifest.json");
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        entry: "/assets/entry.js",
+        css: [],
+        shell: "/assets/shell-old.gz",
+        shellHash: "old",
+        manifestVersion: "old",
+      })
+    );
+    process.env.BOOTSTRAP_ASSETS_DIR = tempDir;
+    expect(getBootstrapManifest()?.manifestVersion).toBe("old");
+
+    const previousMtime = fs.statSync(manifestPath).mtimeMs;
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        entry: "/assets/entry.js",
+        css: [],
+        shell: "/assets/shell-new.gz",
+        shellHash: "new",
+        manifestVersion: "new",
+      })
+    );
+    const nextMtime = previousMtime + 1000;
+    fs.utimeSync(manifestPath, new Date(nextMtime), new Date(nextMtime));
+
+    expect(getBootstrapManifest()?.manifestVersion).toBe("new");
+  });
+
   it("resolves disk paths for assets and landing files", () => {
     const root = path.join("app", "dist");
     expect(resolveBootstrapAssetDiskPath(root, "/assets/shell-test.gz")).toBe(
@@ -54,7 +97,7 @@ describe("bootstrap-asset-store", () => {
   });
 
   it("falls back to public/ when a landing file is missing from dist", () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bootstrap-assets-"));
+    tempDir = makeTempDir();
     const distDir = path.join(tempDir, "dist");
     const publicDir = path.join(tempDir, "public", "landing");
     fs.mkdirSync(distDir, { recursive: true });
