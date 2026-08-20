@@ -272,7 +272,7 @@ export function AdminHomepageVideoScenariosSection(
 
   const sortedScenarios = useMemo(
     () =>
-      props.scenarios.toSorted((left, right) => left.sortOrder - right.sortOrder),
+      [...props.scenarios].sort((left, right) => left.sortOrder - right.sortOrder),
     [props.scenarios]
   );
 

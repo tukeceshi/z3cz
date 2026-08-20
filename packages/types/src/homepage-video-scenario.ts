@@ -237,7 +237,7 @@ export function readHomepageVideoScenarios(
   if (scenarios.length === 0) {
     return DEFAULT_HOMEPAGE_VIDEO_SCENARIOS;
   }
-  return scenarios.toSorted((left, right) => left.sortOrder - right.sortOrder);
+  return [...scenarios].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
 export function mergeHomepageVideoScenarios(

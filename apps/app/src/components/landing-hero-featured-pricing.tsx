@@ -140,7 +140,7 @@ export function LandingHeroFeaturedPricing() {
   const allScenarios = useMemo(
     () =>
       loadedScenarios.length > 0
-        ? loadedScenarios.toSorted((left, right) => left.sortOrder - right.sortOrder)
+        ? [...loadedScenarios].sort((left, right) => left.sortOrder - right.sortOrder)
         : DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
     [loadedScenarios],
   );
