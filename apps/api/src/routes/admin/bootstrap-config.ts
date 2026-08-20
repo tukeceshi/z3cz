@@ -38,7 +38,7 @@ const optionalSecret = z
 const updateBootstrapSettingsSchema = z.object({
   r2Enabled: z.boolean().optional(),
   r2Only: z.boolean().optional(),
-  storageProvider: z.enum(["r2", "tos"]).optional(),
+  storageProvider: z.enum(["r2", "tos"]),
   accountId: z.string().optional(),
   accessKeyId: z.string().optional(),
   secretAccessKey: optionalSecret,
@@ -83,12 +83,12 @@ adminBootstrapConfigRoutes.patch(
         jwtPayload.sub
       );
       const settings = await getBootstrapSettingsRow(db);
-      const cors = await ensureBootstrapR2CorsIfConfigured(settings, c.env);
-      return c.json({
-        ...config,
-        corsApplied: cors.applied,
-        corsOrigins: [...cors.origins],
-      });
+      void ensureBootstrapR2CorsIfConfigured(settings, c.env).catch(
+        (corsError) => {
+          console.error("Bootstrap CORS after save failed:", corsError);
+        }
+      );
+      return c.json(config);
     } catch (error) {
       const message =
         error instanceof Error

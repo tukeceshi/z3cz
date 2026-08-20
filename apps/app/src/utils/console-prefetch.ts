@@ -5,6 +5,8 @@ import type {
   BootstrapStaticAssetConfig,
 } from "@dafthunk/types";
 
+import { shouldSeedBootstrapAssetCache } from "./bootstrap-asset-cache-policy";
+
 const ASSETS_CACHE_NAME = "z3cz-bootstrap-assets:v1";
 const ASSET_SW_URL = "/z3cz-asset-sw.js";
 const API_BASE = "/api";
@@ -228,6 +230,43 @@ async function fetchBufferFromSources(
   return Promise.any(attempts);
 }
 
+const landingVideoSrcPromises = new Map<string, Promise<string>>();
+
+export function resolveLandingVideoSrc(assetPath: string): Promise<string> {
+  const existing = landingVideoSrcPromises.get(assetPath);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = (async () => {
+    if (!isPrefetchActive()) {
+      return assetPath;
+    }
+
+    try {
+      const config = await fetchBootstrapConfig();
+      const asset = config?.staticAssets?.find(
+        (entry) => entry.path === assetPath
+      );
+      const sources =
+        asset && asset.sources.length > 0
+          ? asset.sources
+          : [{ url: assetPath, kind: "origin" as const }];
+      const buffer = await fetchBufferFromSources(
+        sources,
+        asset?.hash ?? "",
+        assetPath
+      );
+      return URL.createObjectURL(new Blob([buffer], { type: "video/mp4" }));
+    } catch {
+      return assetPath;
+    }
+  })();
+
+  landingVideoSrcPromises.set(assetPath, promise);
+  return promise;
+}
+
 async function fetchPackBuffer(
   pack: BootstrapPrefetchPackConfig
 ): Promise<ArrayBuffer> {
@@ -307,14 +346,16 @@ async function seedAssetCache(
 
   const cache = await caches.open(ASSETS_CACHE_NAME);
   await Promise.all(
-    Object.entries(fileBytes).map(([assetPath, bytes]) =>
-      cache.put(
-        assetPath,
-        new Response(bytes, {
-          headers: { "Content-Type": contentTypeForAssetPath(assetPath) },
-        })
+    Object.entries(fileBytes)
+      .filter(([assetPath]) => shouldSeedBootstrapAssetCache(assetPath))
+      .map(([assetPath, bytes]) =>
+        cache.put(
+          assetPath,
+          new Response(bytes, {
+            headers: { "Content-Type": contentTypeForAssetPath(assetPath) },
+          })
+        )
       )
-    )
   );
 }
 
@@ -364,6 +405,11 @@ function startPrefetchPack(packId: string): Promise<void> {
 async function downloadAndSeedStaticAsset(
   asset: BootstrapStaticAssetConfig
 ): Promise<void> {
+  if (!shouldSeedBootstrapAssetCache(asset.path)) {
+    await resolveLandingVideoSrc(asset.path);
+    return;
+  }
+
   const sources =
     asset.sources.length > 0
       ? asset.sources

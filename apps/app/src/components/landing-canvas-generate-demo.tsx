@@ -34,6 +34,11 @@ import {
   renderWorkflowEdgePath,
 } from "@/components/workflow/workflow-edge";
 import { WorkflowMediaVideoPlayer } from "@/components/workflow/workflow-media-video-player";
+import { resolveLandingVideoSrc } from "@/utils/console-prefetch";
+import {
+  applyInlineVideoPlayback,
+  canHoverVideoPlayback,
+} from "@/utils/inline-video-playback";
 import { cn } from "@/utils/utils";
 
 const IMAGE_MODEL_ID = "gpt-image-2";
@@ -488,7 +493,8 @@ function DemoVideoCover(props: {
   readonly generating: boolean;
   readonly onClipReady?: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [clipSrc, setClipSrc] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const onClipReadyRef = useRef(props.onClipReady);
   const { t } = useTranslation();
@@ -496,7 +502,19 @@ function DemoVideoCover(props: {
   onClipReadyRef.current = props.onClipReady;
 
   useEffect(() => {
-    if (!shouldLoad) {
+    let cancelled = false;
+    void resolveLandingVideoSrc(CLIP_SRC).then((src) => {
+      if (!cancelled) {
+        setClipSrc(src);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoad || !clipSrc) {
       return;
     }
     const el = videoRef.current;
@@ -506,6 +524,7 @@ function DemoVideoCover(props: {
     const notify = () => {
       onClipReadyRef.current?.();
     };
+    applyInlineVideoPlayback(el);
     el.preload = "auto";
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       notify();
@@ -518,14 +537,29 @@ function DemoVideoCover(props: {
       el.removeEventListener("canplay", notify);
       el.removeEventListener("error", notify);
     };
-  }, [shouldLoad]);
+  }, [shouldLoad, clipSrc]);
 
-  if (!shouldLoad) {
+  const handleActivate = () => {
+    if (props.ready) {
+      setPlaying(true);
+    }
+  };
+
+  const handleDeactivate = () => {
+    if (canHoverVideoPlayback()) {
+      setPlaying(false);
+    }
+  };
+
+  if (!shouldLoad || !clipSrc) {
     return (
       <GenerativeCardEmptyUploadSlot
         kind="video"
         size="canvas"
-        busy={false}
+        busy={shouldLoad}
+        busyMessage={
+          shouldLoad ? t("workflow.aiVideoPanel.cardGenerating") : undefined
+        }
         canUpload={false}
         onUploadClick={() => undefined}
       />
@@ -535,12 +569,17 @@ function DemoVideoCover(props: {
   return (
     <div
       className="relative size-full"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => {
+        if (canHoverVideoPlayback()) {
+          handleActivate();
+        }
+      }}
+      onMouseLeave={handleDeactivate}
+      onClick={handleActivate}
     >
-      {props.ready && hovered ? (
+      {props.ready && playing ? (
         <WorkflowMediaVideoPlayer
-          src={CLIP_SRC}
+          src={clipSrc}
           variant="card"
           objectFit="cover"
           initialHovered
@@ -550,7 +589,7 @@ function DemoVideoCover(props: {
         <>
           <video
             ref={videoRef}
-            src={CLIP_SRC}
+            src={clipSrc}
             className={cn(
               "size-full object-cover",
               !props.ready && "invisible"

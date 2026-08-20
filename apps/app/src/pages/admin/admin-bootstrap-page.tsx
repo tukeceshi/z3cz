@@ -1,4 +1,5 @@
 import type {
+  AdminBootstrapSettings,
   BootstrapStorageProvider,
   UpdateBootstrapSettingsRequest,
 } from "@dafthunk/types";
@@ -44,73 +45,57 @@ import {
   useAdminBootstrapConfig,
 } from "@/services/bootstrap-admin-service";
 
-export function AdminBootstrapPage() {
+function readStorageProvider(
+  value: BootstrapStorageProvider | undefined
+): BootstrapStorageProvider {
+  return value === "tos" ? "tos" : "r2";
+}
+
+interface BootstrapSettingsFormProps {
+  readonly config: AdminBootstrapSettings;
+  readonly onRefresh: () => Promise<void>;
+}
+
+function BootstrapSettingsForm({
+  config,
+  onRefresh,
+}: BootstrapSettingsFormProps) {
   const { t, locale } = useTranslation();
   const appToast = useAppToast();
-  const setBreadcrumbs = useBreadcrumbsSetter();
-  const {
-    bootstrapConfig,
-    bootstrapConfigError,
-    isBootstrapConfigLoading,
-    refreshBootstrapConfig,
-  } = useAdminBootstrapConfig();
 
-  const [r2Enabled, setR2Enabled] = useState(false);
-  const [r2Only, setR2Only] = useState(false);
-  const [storageProvider, setStorageProvider] =
-    useState<BootstrapStorageProvider>("r2");
-  const [accountId, setAccountId] = useState("");
-  const [accessKeyId, setAccessKeyId] = useState("");
-  const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [bucketName, setBucketName] = useState("");
-  const [publicBaseUrl, setPublicBaseUrl] = useState("");
-  const [tosRegion, setTosRegion] = useState("");
-  const [tosAccessKeyId, setTosAccessKeyId] = useState("");
-  const [tosSecretAccessKey, setTosSecretAccessKey] = useState("");
-  const [tosBucketName, setTosBucketName] = useState("");
+  const [r2Enabled, setR2Enabled] = useState(config.r2Enabled);
+  const [r2Only, setR2Only] = useState(config.r2Only);
+  const [storageProvider, setStorageProvider] = useState(
+    readStorageProvider(config.storageProvider)
+  );
+  const [accountId, setAccountId] = useState(config.accountId);
+  const [accessKeyId, setAccessKeyId] = useState(config.accessKeyId);
+  const [secretAccessKey, setSecretAccessKey] = useState(
+    config.secretAccessKeyConfigured ? AUTH_CONFIG_SECRET_MASK : ""
+  );
+  const [bucketName, setBucketName] = useState(config.bucketName);
+  const [publicBaseUrl, setPublicBaseUrl] = useState(config.publicBaseUrl);
+  const [tosRegion, setTosRegion] = useState(config.tosRegion);
+  const [tosAccessKeyId, setTosAccessKeyId] = useState(config.tosAccessKeyId);
+  const [tosSecretAccessKey, setTosSecretAccessKey] = useState(
+    config.tosSecretAccessKeyConfigured ? AUTH_CONFIG_SECRET_MASK : ""
+  );
+  const [tosBucketName, setTosBucketName] = useState(config.tosBucketName);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  useEffect(() => {
-    setBreadcrumbs([{ label: t("bootstrapAdmin.title") }]);
-    return () => setBreadcrumbs([]);
-  }, [setBreadcrumbs, t]);
-
-  useEffect(() => {
-    if (!bootstrapConfig) {
-      return;
-    }
-    setR2Enabled(bootstrapConfig.r2Enabled);
-    setR2Only(bootstrapConfig.r2Only);
-    setStorageProvider(
-      bootstrapConfig.storageProvider === "tos" ? "tos" : "r2"
-    );
-    setAccountId(bootstrapConfig.accountId);
-    setAccessKeyId(bootstrapConfig.accessKeyId);
-    setSecretAccessKey(
-      bootstrapConfig.secretAccessKeyConfigured ? AUTH_CONFIG_SECRET_MASK : ""
-    );
-    setBucketName(bootstrapConfig.bucketName);
-    setPublicBaseUrl(bootstrapConfig.publicBaseUrl);
-    setTosRegion(bootstrapConfig.tosRegion);
-    setTosAccessKeyId(bootstrapConfig.tosAccessKeyId);
-    setTosSecretAccessKey(
-      bootstrapConfig.tosSecretAccessKeyConfigured
-        ? AUTH_CONFIG_SECRET_MASK
-        : ""
-    );
-    setTosBucketName(bootstrapConfig.tosBucketName);
-  }, [bootstrapConfig]);
-
-  const storageOnlyAllowed = Boolean(bootstrapConfig?.storageOnlyAllowed);
+  const storageOnlyAllowed = config.storageOnlyAllowed;
   const storageOnlyEnabled = r2Enabled && storageOnlyAllowed;
-  const knownTosRegion = VOLCANO_TOS_REGIONS.some(
+  const selectedTosRegion = VOLCANO_TOS_REGIONS.find(
     (entry) => entry.code === tosRegion
   );
+  const knownTosRegion = Boolean(selectedTosRegion);
 
   const handleStorageProviderChange = (value: string) => {
-    const next: BootstrapStorageProvider = value === "tos" ? "tos" : "r2";
+    const next = readStorageProvider(
+      value === "tos" ? "tos" : "r2"
+    );
     setStorageProvider(next);
     setR2Only(false);
     if (next === "tos" && tosRegion.trim().length === 0) {
@@ -142,7 +127,7 @@ export function AdminBootstrapPage() {
     setIsSaving(true);
     try {
       await updateAdminBootstrapConfig(buildPayload());
-      await refreshBootstrapConfig();
+      await onRefresh();
       appToast.success(t("bootstrapAdmin.saveSuccess"));
     } catch (error) {
       appToast.error(
@@ -158,7 +143,7 @@ export function AdminBootstrapPage() {
     try {
       await updateAdminBootstrapConfig(buildPayload());
       const result = await testAdminBootstrapR2Connection();
-      await refreshBootstrapConfig();
+      await onRefresh();
       if (result.ok) {
         appToast.success(result.message);
       } else {
@@ -178,16 +163,258 @@ export function AdminBootstrapPage() {
     try {
       await updateAdminBootstrapConfig(buildPayload());
       const result = await syncAdminBootstrapShell();
-      await refreshBootstrapConfig();
+      await onRefresh();
       appToast.success(result.message);
     } catch (error) {
-      await refreshBootstrapConfig();
+      await onRefresh();
       appToast.error(
         error instanceof Error ? error.message : t("bootstrapAdmin.syncError")
       );
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  return (
+    <form className="grid gap-6" onSubmit={handleSave} autoComplete="off">
+      <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">{t("bootstrapAdmin.r2Enabled")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("bootstrapAdmin.r2EnabledHint")}
+          </p>
+        </div>
+        <Switch
+          checked={r2Enabled}
+          onCheckedChange={(checked) => {
+            setR2Enabled(checked);
+            if (!checked) {
+              setR2Only(false);
+            }
+          }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">{t("bootstrapAdmin.r2Only")}</p>
+          <p className="text-xs text-muted-foreground">
+            {r2Enabled && !storageOnlyAllowed
+              ? t("bootstrapAdmin.r2OnlyNeedsSync")
+              : t("bootstrapAdmin.r2OnlyHint")}
+          </p>
+        </div>
+        <Switch
+          checked={storageOnlyEnabled && r2Only}
+          disabled={!storageOnlyEnabled}
+          onCheckedChange={setR2Only}
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="bootstrap_storage_provider">
+          {t("bootstrapAdmin.storageProvider")}
+        </Label>
+        <Select value={storageProvider} onValueChange={handleStorageProviderChange}>
+          <SelectTrigger id="bootstrap_storage_provider">
+            <SelectValue>
+              {storageProvider === "tos"
+                ? t("bootstrapAdmin.storageProviderTos")
+                : t("bootstrapAdmin.storageProviderR2")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="r2">
+              {t("bootstrapAdmin.storageProviderR2")}
+            </SelectItem>
+            <SelectItem value="tos">
+              {t("bootstrapAdmin.storageProviderTos")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {t("bootstrapAdmin.storageProviderHint")}
+        </p>
+      </div>
+
+      {storageProvider === "tos" ? (
+        <div className="grid gap-4 rounded-lg border p-4">
+          <p className="text-sm font-medium">
+            {t("bootstrapAdmin.tosCredentials")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("bootstrapAdmin.tosSignedUrlHint")}
+          </p>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_tos_region">
+              {t("bootstrapAdmin.tosRegion")}
+            </Label>
+            <Select value={tosRegion || undefined} onValueChange={setTosRegion}>
+              <SelectTrigger id="bootstrap_tos_region">
+                <SelectValue placeholder={t("bootstrapAdmin.tosRegion")}>
+                  {selectedTosRegion
+                    ? t(selectedTosRegion.labelKey)
+                    : tosRegion || undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {VOLCANO_TOS_REGIONS.map((entry) => (
+                  <SelectItem key={entry.code} value={entry.code}>
+                    {t(entry.labelKey)}
+                  </SelectItem>
+                ))}
+                {tosRegion && !knownTosRegion ? (
+                  <SelectItem value={tosRegion}>{tosRegion}</SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_tos_access_key_id">
+              {t("bootstrapAdmin.tosAccessKeyId")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_tos_access_key_id"
+              name="bootstrap_tos_access_key_id"
+              value={tosAccessKeyId}
+              onChange={(event) => setTosAccessKeyId(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_tos_secret_access_key">
+              {t("bootstrapAdmin.tosSecretAccessKey")}
+            </Label>
+            <CredentialSecretInput
+              id="bootstrap_tos_secret_access_key"
+              name="bootstrap_tos_secret_access_key"
+              value={tosSecretAccessKey}
+              onChange={(event) => setTosSecretAccessKey(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_tos_bucket_name">
+              {t("bootstrapAdmin.tosBucketName")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_tos_bucket_name"
+              name="bootstrap_tos_bucket_name"
+              value={tosBucketName}
+              onChange={(event) => setTosBucketName(event.target.value)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 rounded-lg border p-4">
+          <p className="text-sm font-medium">
+            {t("bootstrapAdmin.r2Credentials")}
+          </p>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_r2_account_id">
+              {t("bootstrapAdmin.accountId")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_r2_account_id"
+              name="bootstrap_r2_account_id"
+              value={accountId}
+              onChange={(event) => setAccountId(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_r2_access_key_id">
+              {t("bootstrapAdmin.accessKeyId")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_r2_access_key_id"
+              name="bootstrap_r2_access_key_id"
+              value={accessKeyId}
+              onChange={(event) => setAccessKeyId(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_r2_secret_access_key">
+              {t("bootstrapAdmin.secretAccessKey")}
+            </Label>
+            <CredentialSecretInput
+              id="bootstrap_r2_secret_access_key"
+              name="bootstrap_r2_secret_access_key"
+              value={secretAccessKey}
+              onChange={(event) => setSecretAccessKey(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_r2_bucket_name">
+              {t("bootstrapAdmin.bucketName")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_r2_bucket_name"
+              name="bootstrap_r2_bucket_name"
+              value={bucketName}
+              onChange={(event) => setBucketName(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="bootstrap_r2_public_base_url">
+              {t("bootstrapAdmin.publicBaseUrl")}
+            </Label>
+            <CredentialPlainInput
+              id="bootstrap_r2_public_base_url"
+              name="bootstrap_r2_public_base_url"
+              value={publicBaseUrl}
+              onChange={(event) => setPublicBaseUrl(event.target.value)}
+              placeholder="https://cdn.example.com"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? t("common.saving") : t("common.save")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isTesting || !r2Enabled}
+          onClick={() => void handleTestConnection()}
+        >
+          {isTesting
+            ? t("bootstrapAdmin.testing")
+            : storageProvider === "tos"
+              ? t("bootstrapAdmin.testTos")
+              : t("bootstrapAdmin.testR2")}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={isSyncing || !r2Enabled}
+          onClick={() => void handleSync()}
+        >
+          {isSyncing
+            ? t("bootstrapAdmin.syncing")
+            : t("bootstrapAdmin.syncShell")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function AdminBootstrapPage() {
+  const { t } = useTranslation();
+  const setBreadcrumbs = useBreadcrumbsSetter();
+  const {
+    bootstrapConfig,
+    bootstrapConfigError,
+    isBootstrapConfigLoading,
+    refreshBootstrapConfig,
+  } = useAdminBootstrapConfig();
+
+  useEffect(() => {
+    setBreadcrumbs([{ label: t("bootstrapAdmin.title") }]);
+    return () => setBreadcrumbs([]);
+  }, [setBreadcrumbs, t]);
+
+  const handleRefresh = async () => {
+    await refreshBootstrapConfig();
   };
 
   if (isBootstrapConfigLoading) {
@@ -203,6 +430,10 @@ export function AdminBootstrapPage() {
     );
   }
 
+  if (!bootstrapConfig) {
+    return <InsetLoading title={t("bootstrapAdmin.title")} />;
+  }
+
   return (
     <InsetLayout title={t("bootstrapAdmin.title")}>
       <div className="grid max-w-2xl gap-6">
@@ -215,263 +446,35 @@ export function AdminBootstrapPage() {
             <CardDescription>{t("bootstrapAdmin.description")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <form
-              className="grid gap-6"
-              onSubmit={handleSave}
-              autoComplete="off"
-            >
-              <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.r2Enabled")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("bootstrapAdmin.r2EnabledHint")}
-                  </p>
-                </div>
-                <Switch
-                  checked={r2Enabled}
-                  onCheckedChange={(checked) => {
-                    setR2Enabled(checked);
-                    if (!checked) {
-                      setR2Only(false);
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.r2Only")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {r2Enabled && !storageOnlyAllowed
-                      ? t("bootstrapAdmin.r2OnlyNeedsSync")
-                      : t("bootstrapAdmin.r2OnlyHint")}
-                  </p>
-                </div>
-                <Switch
-                  checked={storageOnlyEnabled && r2Only}
-                  disabled={!storageOnlyEnabled}
-                  onCheckedChange={setR2Only}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="bootstrap_storage_provider">
-                  {t("bootstrapAdmin.storageProvider")}
-                </Label>
-                <Select
-                  value={storageProvider}
-                  onValueChange={handleStorageProviderChange}
-                >
-                  <SelectTrigger id="bootstrap_storage_provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="r2">
-                      {t("bootstrapAdmin.storageProviderR2")}
-                    </SelectItem>
-                    <SelectItem value="tos">
-                      {t("bootstrapAdmin.storageProviderTos")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t("bootstrapAdmin.storageProviderHint")}
-                </p>
-              </div>
-
-              {storageProvider === "tos" ? (
-                <div className="grid gap-4 rounded-lg border p-4">
-                  <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.tosCredentials")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("bootstrapAdmin.tosSignedUrlHint")}
-                  </p>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_tos_region">
-                      {t("bootstrapAdmin.tosRegion")}
-                    </Label>
-                    <Select
-                      value={tosRegion || undefined}
-                      onValueChange={setTosRegion}
-                    >
-                      <SelectTrigger id="bootstrap_tos_region">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VOLCANO_TOS_REGIONS.map((entry) => (
-                          <SelectItem key={entry.code} value={entry.code}>
-                            {t(entry.labelKey)}
-                          </SelectItem>
-                        ))}
-                        {tosRegion && !knownTosRegion ? (
-                          <SelectItem value={tosRegion}>{tosRegion}</SelectItem>
-                        ) : null}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_tos_access_key_id">
-                      {t("bootstrapAdmin.tosAccessKeyId")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_tos_access_key_id"
-                      name="bootstrap_tos_access_key_id"
-                      value={tosAccessKeyId}
-                      onChange={(event) =>
-                        setTosAccessKeyId(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_tos_secret_access_key">
-                      {t("bootstrapAdmin.tosSecretAccessKey")}
-                    </Label>
-                    <CredentialSecretInput
-                      id="bootstrap_tos_secret_access_key"
-                      name="bootstrap_tos_secret_access_key"
-                      value={tosSecretAccessKey}
-                      onChange={(event) =>
-                        setTosSecretAccessKey(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_tos_bucket_name">
-                      {t("bootstrapAdmin.tosBucketName")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_tos_bucket_name"
-                      name="bootstrap_tos_bucket_name"
-                      value={tosBucketName}
-                      onChange={(event) => setTosBucketName(event.target.value)}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-4 rounded-lg border p-4">
-                  <p className="text-sm font-medium">
-                    {t("bootstrapAdmin.r2Credentials")}
-                  </p>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_r2_account_id">
-                      {t("bootstrapAdmin.accountId")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_r2_account_id"
-                      name="bootstrap_r2_account_id"
-                      value={accountId}
-                      onChange={(event) => setAccountId(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_r2_access_key_id">
-                      {t("bootstrapAdmin.accessKeyId")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_r2_access_key_id"
-                      name="bootstrap_r2_access_key_id"
-                      value={accessKeyId}
-                      onChange={(event) => setAccessKeyId(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_r2_secret_access_key">
-                      {t("bootstrapAdmin.secretAccessKey")}
-                    </Label>
-                    <CredentialSecretInput
-                      id="bootstrap_r2_secret_access_key"
-                      name="bootstrap_r2_secret_access_key"
-                      value={secretAccessKey}
-                      onChange={(event) =>
-                        setSecretAccessKey(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_r2_bucket_name">
-                      {t("bootstrapAdmin.bucketName")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_r2_bucket_name"
-                      name="bootstrap_r2_bucket_name"
-                      value={bucketName}
-                      onChange={(event) => setBucketName(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bootstrap_r2_public_base_url">
-                      {t("bootstrapAdmin.publicBaseUrl")}
-                    </Label>
-                    <CredentialPlainInput
-                      id="bootstrap_r2_public_base_url"
-                      name="bootstrap_r2_public_base_url"
-                      value={publicBaseUrl}
-                      onChange={(event) => setPublicBaseUrl(event.target.value)}
-                      placeholder="https://cdn.example.com"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? t("common.saving") : t("common.save")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isTesting || !r2Enabled}
-                  onClick={() => void handleTestConnection()}
-                >
-                  {isTesting
-                    ? t("bootstrapAdmin.testing")
-                    : storageProvider === "tos"
-                      ? t("bootstrapAdmin.testTos")
-                      : t("bootstrapAdmin.testR2")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={isSyncing || !r2Enabled}
-                  onClick={() => void handleSync()}
-                >
-                  {isSyncing
-                    ? t("bootstrapAdmin.syncing")
-                    : t("bootstrapAdmin.syncShell")}
-                </Button>
-              </div>
-            </form>
+            <BootstrapSettingsForm
+              key={`${bootstrapConfig.updatedAt}:${bootstrapConfig.storageProvider}`}
+              config={bootstrapConfig}
+              onRefresh={handleRefresh}
+            />
           </CardContent>
         </Card>
 
-        {bootstrapConfig ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("bootstrapAdmin.syncStatusTitle")}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-sm">
-              <p>
-                {t("bootstrapAdmin.lastSyncAt")}:{" "}
-                {bootstrapConfig.lastSyncAt ?? t("bootstrapAdmin.never")}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("bootstrapAdmin.syncStatusTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm">
+            <p>
+              {t("bootstrapAdmin.lastSyncAt")}:{" "}
+              {bootstrapConfig.lastSyncAt ?? t("bootstrapAdmin.never")}
+            </p>
+            <p>
+              {t("bootstrapAdmin.lastSyncShellHash")}:{" "}
+              {bootstrapConfig.lastSyncShellHash ?? "—"}
+            </p>
+            {bootstrapConfig.lastSyncError ? (
+              <p className="text-destructive">
+                {t("bootstrapAdmin.lastSyncError")}:{" "}
+                {bootstrapConfig.lastSyncError}
               </p>
-              <p>
-                {t("bootstrapAdmin.lastSyncShellHash")}:{" "}
-                {bootstrapConfig.lastSyncShellHash ?? "—"}
-              </p>
-              {bootstrapConfig.lastSyncError ? (
-                <p className="text-destructive">
-                  {t("bootstrapAdmin.lastSyncError")}:{" "}
-                  {bootstrapConfig.lastSyncError}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : null}
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </InsetLayout>
   );

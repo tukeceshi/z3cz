@@ -12,15 +12,8 @@
   var SW_CONTROL_TIMEOUT_MS = 5000;
 
   var launcher = document.getElementById("z3cz-launcher");
-  var statusEl = document.getElementById("z3cz-launcher-status");
   var errorEl = document.getElementById("z3cz-launcher-error");
   var retryBtn = document.getElementById("z3cz-launcher-retry");
-
-  function setStatus(text) {
-    if (statusEl) {
-      statusEl.textContent = text;
-    }
-  }
 
   function showError(message) {
     if (errorEl) {
@@ -200,9 +193,6 @@
 
     function run() {
       attempt += 1;
-      setStatus(
-        attempt > 1 ? "Retrying download…" : "Downloading application…"
-      );
       return fetchShellFromSources(resolvedSources, expectedHash).catch(
         function (error) {
           if (attempt >= MAX_RETRIES) {
@@ -401,7 +391,6 @@
 
     return readCachedShell(shellUrl).then(function (cached) {
       if (cached) {
-        setStatus("Starting from cache…");
         return cached.arrayBuffer();
       }
       return fetchShell(shellUrl, sources, expectedHash).then(function (bytes) {
@@ -430,7 +419,6 @@
         return loadViaHttp(entry, css);
       }
 
-      setStatus("Starting application…");
       return seedAssetCache(archive.fileBytes).then(function () {
         return loadViaHttp(entry, css);
       });
@@ -484,7 +472,6 @@
 
   function start() {
     clearError();
-    setStatus("Loading…");
 
     fetchJson(API_BASE + "/bootstrap/config")
       .then(function (remote) {
@@ -496,7 +483,6 @@
       })
       .then(finishBootstrap)
       .catch(function (error) {
-        setStatus("Unable to load");
         showError(error && error.message ? error.message : "Load failed");
       });
   }

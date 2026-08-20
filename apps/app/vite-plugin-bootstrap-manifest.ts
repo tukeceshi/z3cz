@@ -423,19 +423,18 @@ export function bootstrapManifestPlugin(): Plugin {
           next = next.replace(
             "<body>",
             `<body>
-    <div id="z3cz-launcher" aria-live="polite">
+    <div id="z3cz-launcher" aria-busy="true" aria-label="Loading">
       <style>
         #z3cz-launcher{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:transparent;color:#737373;font:14px/1.4 system-ui,sans-serif;z-index:2147483647;pointer-events:none}
         #z3cz-launcher .panel{text-align:center;padding:24px;max-width:320px;pointer-events:none}
         #z3cz-launcher #z3cz-launcher-retry:not([hidden]){pointer-events:auto}
-        #z3cz-launcher .spinner{width:28px;height:28px;border:2px solid #e5e5e5;border-top-color:#737373;border-radius:50%;margin:0 auto 12px;animation:z3cz-spin .8s linear infinite}
-        #z3cz-launcher .error{color:#dc2626;margin-top:8px}
+        #z3cz-launcher .spinner{width:28px;height:28px;border:2px solid #e5e5e5;border-top-color:#737373;border-radius:50%;margin:0 auto;animation:z3cz-spin .8s linear infinite}
+        #z3cz-launcher .error{color:#dc2626;margin-top:12px}
         #z3cz-launcher button{margin-top:12px;padding:8px 14px;border:1px solid #d4d4d4;background:#fff;color:#171717;border-radius:6px;cursor:pointer}
         @keyframes z3cz-spin{to{transform:rotate(360deg)}}
       </style>
       <div class="panel">
         <div class="spinner" aria-hidden="true"></div>
-        <div id="z3cz-launcher-status">Loading…</div>
         <div id="z3cz-launcher-error" class="error" hidden></div>
         <button id="z3cz-launcher-retry" type="button" hidden>Retry</button>
       </div>

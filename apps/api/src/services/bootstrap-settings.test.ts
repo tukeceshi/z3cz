@@ -184,6 +184,45 @@ describe("bootstrap-settings", () => {
     ).toBe("r2");
   });
 
+  it("does not infer tos from leftover TOS credentials", () => {
+    const parsed = parseBootstrapSettings(
+      JSON.stringify({
+        r2Enabled: true,
+        tosRegion: "cn-guangzhou",
+        tosAccessKeyId: "key",
+        tosSecretAccessKeyEncrypted: "enc",
+        tosBucketName: "bucket",
+      })
+    );
+    expect(parsed.storageProvider).toBe("r2");
+  });
+
+  it("keeps an explicit r2 provider even when TOS credentials are present", () => {
+    const parsed = parseBootstrapSettings(
+      JSON.stringify({
+        storageProvider: "r2",
+        tosRegion: "cn-guangzhou",
+        tosAccessKeyId: "key",
+        tosSecretAccessKeyEncrypted: "enc",
+        tosBucketName: "bucket",
+      })
+    );
+    expect(parsed.storageProvider).toBe("r2");
+  });
+
+  it("reads an explicit tos provider back", () => {
+    const parsed = parseBootstrapSettings(
+      JSON.stringify({
+        storageProvider: "tos",
+        tosRegion: "cn-guangzhou",
+        tosAccessKeyId: "key",
+        tosSecretAccessKeyEncrypted: "enc",
+        tosBucketName: "bucket",
+      })
+    );
+    expect(parsed.storageProvider).toBe("tos");
+  });
+
   it("builds origin-only TOS sources until signed URLs are supplied", () => {
     const settings = mergeBootstrapSettings({
       r2Enabled: true,
@@ -254,5 +293,29 @@ describe("bootstrap-settings", () => {
     expect(next.lastSyncError).toBeNull();
     expect(next.r2Only).toBe(false);
     expect(next.accountId).toBe("acc");
+  });
+
+  it("records the selected storage provider on save", () => {
+    const existing = mergeBootstrapSettings({
+      ...R2_READY,
+      storageProvider: "r2",
+      tosRegion: "cn-guangzhou",
+      tosAccessKeyId: "key",
+      tosSecretAccessKeyEncrypted: "enc",
+      tosBucketName: "bucket",
+    });
+
+    const toTos = mergeBootstrapSettingsUpdate(existing, {
+      storageProvider: "tos",
+    });
+    expect(toTos.storageProvider).toBe("tos");
+    expect(toTos.accountId).toBe("acc");
+    expect(toTos.tosBucketName).toBe("bucket");
+
+    const backToR2 = mergeBootstrapSettingsUpdate(toTos, {
+      storageProvider: "r2",
+    });
+    expect(backToR2.storageProvider).toBe("r2");
+    expect(backToR2.tosBucketName).toBe("bucket");
   });
 });
