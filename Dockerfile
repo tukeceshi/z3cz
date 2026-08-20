@@ -108,8 +108,9 @@ EXPOSE 80
 # --- Node API 生产运行（tsx 直跑源码，无需 pnpm build）---
 FROM deps AS prod-api
 
-COPY --from=build-app-prod /app/apps/app/dist/bootstrap-manifest.json /app/data/bootstrap/bootstrap-manifest.json
-COPY --from=build-app-prod /app/apps/app/dist/assets /app/data/bootstrap/assets
+# Sync reads files listed in the manifest (shell/prefetch gz + landing media).
+# Copy the full dist — assets/ alone omits /landing/* and breaks production sync.
+COPY --from=build-app-prod /app/apps/app/dist /app/data/bootstrap
 
 COPY docker/prod-api-entrypoint.sh /usr/local/bin/prod-api-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/prod-api-entrypoint.sh \

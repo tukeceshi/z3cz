@@ -7,6 +7,15 @@ const MANIFEST_FILE = "bootstrap-manifest.json";
 
 let cachedManifest: BootstrapManifest | null = null;
 let cachedRoot: string | null = null;
+let cachedMtimeMs = 0;
+
+function manifestMtimeMs(root: string): number {
+  try {
+    return fs.statSync(path.join(root, MANIFEST_FILE)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
 
 function resolveBootstrapRoot(): string | null {
   const candidates = [
@@ -38,24 +47,33 @@ function readManifestFromDisk(root: string): BootstrapManifest {
 
 export function getBootstrapAssetsRoot(): string | null {
   if (cachedRoot && fs.existsSync(path.join(cachedRoot, MANIFEST_FILE))) {
-    return cachedRoot;
+    const mtimeMs = manifestMtimeMs(cachedRoot);
+    if (cachedManifest && mtimeMs === cachedMtimeMs) {
+      return cachedRoot;
+    }
   }
 
   cachedRoot = resolveBootstrapRoot();
-  cachedManifest = cachedRoot ? readManifestFromDisk(cachedRoot) : null;
+  if (!cachedRoot) {
+    cachedManifest = null;
+    cachedMtimeMs = 0;
+    return null;
+  }
+
+  cachedManifest = readManifestFromDisk(cachedRoot);
+  cachedMtimeMs = manifestMtimeMs(cachedRoot);
   return cachedRoot;
 }
 
 export function getBootstrapManifest(): BootstrapManifest | null {
-  if (!cachedManifest) {
-    getBootstrapAssetsRoot();
-  }
+  getBootstrapAssetsRoot();
   return cachedManifest;
 }
 
 export function invalidateBootstrapAssetCache(): void {
   cachedManifest = null;
   cachedRoot = null;
+  cachedMtimeMs = 0;
 }
 
 export function resolveBootstrapAssetDiskPath(
