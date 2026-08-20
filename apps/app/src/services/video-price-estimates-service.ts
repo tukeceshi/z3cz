@@ -20,6 +20,7 @@ export function usePublicVideoPriceEstimates() {
   return {
     models: data?.models ?? [],
     competitors: data?.competitors ?? [],
+    scenarios: data?.scenarios ?? [],
     estimatesError: error,
     isEstimatesLoading: isLoading,
   };

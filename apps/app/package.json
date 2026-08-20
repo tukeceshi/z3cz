@@ -55,6 +55,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@xyflow/react": "^12.10.2",
     "date-fns": "^4.1.0",
+    "gsap": "^3.13.0",
     "lucide-react": "^0.562.0",
     "mammoth": "^1.11.0",
     "@mdxeditor/editor": "^3.52.3",

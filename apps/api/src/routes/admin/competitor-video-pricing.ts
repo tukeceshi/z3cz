@@ -6,6 +6,7 @@ import {
   isVideoPricePromoNoteCompetitor,
   LIBTV_RATE_MODEL_IDS,
   mergeLibtvComparisonConfig,
+  readHomepageVideoScenarios,
   toPublicVideoPriceEstimateModel,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
@@ -171,12 +172,37 @@ const deleteCompetitorSchema = z.object({
   competitorId: z.string().trim().min(1),
 });
 
+const scenarioParamsSchema = z.object({
+  canonicalId: z.string().trim().min(1),
+  ratio: z.string().trim().min(1),
+  resolution: z.string().trim().min(1),
+  durationSec: z.number().positive(),
+  gachaCount: z.number().int().positive(),
+  referencedClipCount: z.number().int().min(0),
+  avgReferenceSec: z.number().int().min(0),
+});
+
+const scenarioSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string(),
+  sortOrder: z.number().int().min(0),
+  params: scenarioParamsSchema,
+});
+
+const updateScenariosSchema = z.object({
+  scenarios: z.array(scenarioSchema).min(1),
+});
+
 adminCompetitorVideoPricingRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
 
   try {
     const store = await getVideoPriceCompetitorStore(db);
-    return c.json({ competitors: store.competitors });
+    return c.json({
+      competitors: store.competitors,
+      scenarios: store.scenarios,
+    });
   } catch (error) {
     console.error("Error fetching competitor video pricing:", error);
     return c.json({ error: "Failed to fetch competitor video pricing" }, 500);
@@ -205,6 +231,7 @@ adminCompetitorVideoPricingRoutes.post("/cache", async (c) => {
       {
         models: publicModels,
         competitors: store.competitors,
+        scenarios: store.scenarios,
       },
       jwtPayload.sub
     );
@@ -253,7 +280,10 @@ adminCompetitorVideoPricingRoutes.post(
             };
       await updateVideoPriceCompetitorStore(
         db,
-        { competitors: [...store.competitors, competitor] },
+        {
+          competitors: [...store.competitors, competitor],
+          scenarios: store.scenarios,
+        },
         jwtPayload.sub
       );
       return c.json({ competitor });
@@ -327,6 +357,7 @@ adminCompetitorVideoPricingRoutes.patch(
         competitors: store.competitors.map((entry) =>
           entry.id === competitor.id ? competitor : entry
         ),
+        scenarios: store.scenarios,
       };
       await updateVideoPriceCompetitorStore(db, next, jwtPayload.sub);
       return c.json({ competitor });
@@ -366,6 +397,7 @@ adminCompetitorVideoPricingRoutes.delete(
           competitors: store.competitors.filter(
             (entry) => entry.id !== body.competitorId
           ),
+          scenarios: store.scenarios,
         },
         jwtPayload.sub
       );
@@ -376,6 +408,40 @@ adminCompetitorVideoPricingRoutes.delete(
         { error: "Failed to delete competitor video pricing" },
         500
       );
+    }
+  }
+);
+
+adminCompetitorVideoPricingRoutes.put(
+  "/scenarios",
+  zValidator("json", updateScenariosSchema),
+  async (c) => {
+    const jwtPayload = c.get("jwtPayload");
+    if (!jwtPayload) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+
+    try {
+      const store = await getVideoPriceCompetitorStore(db);
+      const scenarios = readHomepageVideoScenarios(body.scenarios);
+      if (scenarios.length === 0) {
+        return c.json({ error: "At least one scenario is required" }, 400);
+      }
+      const next = await updateVideoPriceCompetitorStore(
+        db,
+        {
+          competitors: store.competitors,
+          scenarios,
+        },
+        jwtPayload.sub
+      );
+      return c.json({ scenarios: next.scenarios });
+    } catch (error) {
+      console.error("Error updating homepage video scenarios:", error);
+      return c.json({ error: "Failed to update homepage video scenarios" }, 500);
     }
   }
 );

@@ -1,4 +1,5 @@
 import type {
+  HomepageVideoScenario,
   LibtvComparisonConfig,
   PublicVideoPriceEstimatesResponse,
   VideoPriceCompetitor,
@@ -9,17 +10,23 @@ import { makeRequest } from "./utils";
 
 export const COMPETITOR_VIDEO_PRICING_KEY = "/admin/competitor-video-pricing";
 
+interface AdminVideoPriceCompetitorStoreResponse {
+  readonly competitors: readonly VideoPriceCompetitor[];
+  readonly scenarios: readonly HomepageVideoScenario[];
+}
+
 export function useAdminVideoPriceCompetitors() {
   const { data, error, isLoading, mutate } = useSWR(
     COMPETITOR_VIDEO_PRICING_KEY,
     () =>
-      makeRequest<{ competitors: readonly VideoPriceCompetitor[] }>(
+      makeRequest<AdminVideoPriceCompetitorStoreResponse>(
         COMPETITOR_VIDEO_PRICING_KEY
       )
   );
 
   return {
     competitors: data?.competitors ?? [],
+    scenarios: data?.scenarios ?? [],
     competitorsError: error,
     isCompetitorsLoading: isLoading,
     refreshCompetitors: mutate,
@@ -89,6 +96,18 @@ export async function cacheAdminHomepageVideoPrices(): Promise<PublicVideoPriceE
     `${COMPETITOR_VIDEO_PRICING_KEY}/cache`,
     {
       method: "POST",
+    }
+  );
+}
+
+export async function updateAdminHomepageVideoScenarios(
+  scenarios: readonly HomepageVideoScenario[]
+): Promise<{ scenarios: readonly HomepageVideoScenario[] }> {
+  return makeRequest<{ scenarios: readonly HomepageVideoScenario[] }>(
+    `${COMPETITOR_VIDEO_PRICING_KEY}/scenarios`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ scenarios }),
     }
   );
 }

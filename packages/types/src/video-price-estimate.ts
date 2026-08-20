@@ -1,4 +1,9 @@
 import {
+  DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
+  readHomepageVideoScenarios,
+  type HomepageVideoScenario,
+} from "./homepage-video-scenario";
+import {
   readVideoPriceCompetitors,
   type VideoPriceCompetitor,
 } from "./competitor-video-points";
@@ -54,12 +59,14 @@ export interface PublicVideoPriceEstimateModel {
 export interface PublicVideoPriceEstimatesResponse {
   readonly models: readonly PublicVideoPriceEstimateModel[];
   readonly competitors: readonly VideoPriceCompetitor[];
+  readonly scenarios: readonly HomepageVideoScenario[];
 }
 
 export const EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES: PublicVideoPriceEstimatesResponse =
   {
     models: [],
     competitors: [],
+    scenarios: DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
   };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -152,6 +159,7 @@ export function parsePublicVideoPriceEstimatesCache(
     return {
       models,
       competitors: readVideoPriceCompetitors(parsed.competitors),
+      scenarios: readHomepageVideoScenarios(parsed.scenarios),
     };
   } catch {
     return EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES;

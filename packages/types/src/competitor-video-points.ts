@@ -1,4 +1,9 @@
 import {
+  DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
+  type HomepageVideoScenario,
+  readHomepageVideoScenarios,
+} from "./homepage-video-scenario";
+import {
   isVideoPricePromoDate,
   type LibtvPricePromo,
   readLibtvPricePromos,
@@ -190,6 +195,7 @@ export function readVideoPriceCompetitorPublicUrl(
 
 export interface VideoPriceCompetitorStore {
   readonly competitors: readonly VideoPriceCompetitor[];
+  readonly scenarios: readonly HomepageVideoScenario[];
 }
 
 export function createVideoPriceCompetitorId(): string {
@@ -797,6 +803,7 @@ export const DEFAULT_VIDEO_PRICE_COMPETITOR_STORE: VideoPriceCompetitorStore = {
       config: DEFAULT_XIAOYUNQUE_COMPARISON_CONFIG,
     },
   ],
+  scenarios: DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
 };
 
 export function defaultVideoPriceCompetitorStore(): VideoPriceCompetitorStore {
@@ -883,7 +890,10 @@ export function mergeVideoPriceCompetitorStore(
     return defaultVideoPriceCompetitorStore();
   }
   if (Array.isArray(value.competitors)) {
-    return { competitors: readVideoPriceCompetitors(value.competitors) };
+    return {
+      competitors: readVideoPriceCompetitors(value.competitors),
+      scenarios: readHomepageVideoScenarios(value.scenarios),
+    };
   }
   if (isRecord(value.series) || Array.isArray(value.plans)) {
     return {
@@ -897,6 +907,7 @@ export function mergeVideoPriceCompetitorStore(
           config: mergeLibtvComparisonConfig(value),
         },
       ],
+      scenarios: readHomepageVideoScenarios(value.scenarios),
     };
   }
   return defaultVideoPriceCompetitorStore();

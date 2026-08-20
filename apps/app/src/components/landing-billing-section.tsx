@@ -1,5 +1,6 @@
 import {
   applyVideoPricePromoFold,
+  type AppLocale,
   computeCostPerOutputSecond,
   computeLibtvConvertedYuan,
   computeLibtvCredits,
@@ -7,9 +8,11 @@ import {
   computePlanAccountCount,
   computeSplitVideoPriceEstimateForModel,
   computeVideoPriceEstimateForModel,
+  DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
   formatVideoPricePromoDateRange,
   formatVideoPricePromoFold,
   formatVideoTokenMillions,
+  type HomepageVideoScenario,
   isVideoPriceCompareCompetitor,
   isVideoPricePromoAnyResolution,
   isVideoPricePromoDate,
@@ -36,8 +39,10 @@ import {
   VIDEO_RATIO_OPTIONS,
   type VideoClipPlan,
   type VideoPriceCompareCompetitor,
+  type VideoPriceCompetitor,
 } from "@dafthunk/types";
 import ChevronDown from "lucide-react/icons/chevron-down";
+import TriangleAlert from "lucide-react/icons/triangle-alert";
 import {
   type ReactNode,
   useCallback,
@@ -48,6 +53,7 @@ import {
 } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import type { TranslationKey } from "@/i18n";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,8 +76,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { TranslationKey } from "@/i18n";
 import { DashedHintPopover } from "@/pages/organization-ai-interfaces/dashed-hint-popover";
+import {
+  landingMenuContentClass,
+  landingMenuItemClass,
+} from "@/components/landing-select-menu";
 import { usePublicVideoPriceEstimates } from "@/services/video-price-estimates-service";
 import { cn } from "@/utils/utils";
 
@@ -83,8 +92,9 @@ const LANDING_DEFAULT_RATIO = "16:9" as const;
 const LANDING_DEFAULT_RESOLUTION = "720p";
 const LANDING_DEFAULT_DURATION_SEC = 15;
 const LANDING_TIME_MAX_SEC = 24 * 60 * 60;
-const SEEDANCE_2_MINI_ID = "doubao-seedance-2-mini";
-const SEEDANCE_2_5_ID = "doubao-seedance-2-5";
+export { LANDING_TIME_MAX_SEC };
+type TimeUnit = "sec" | "min";
+export type LandingBillingTimeUnit = TimeUnit;
 const DURATION_INPUT_CLASS = cn(
   "h-7 w-16 rounded-md bg-muted/45 px-1.5 py-0.5 text-center text-xs outline-none transition-colors",
   "focus:bg-muted/65",
@@ -94,101 +104,44 @@ const LANDING_CARD_CLASS =
   "bg-white dark:bg-neutral-800 dark:border-neutral-700";
 const COMPACT_BUTTON_CLASS =
   "inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-muted/20 px-2 text-xs text-foreground hover:bg-muted/40";
-const SCENARIO_IDS = [
-  "clip",
-  "learn",
-  "personal",
-  "pipeline",
-  "restyle",
-  "premium4k",
-  "drama25",
-] as const;
-type ScenarioId = (typeof SCENARIO_IDS)[number];
-type TimeUnit = "sec" | "min";
-interface ScenarioPreset {
-  readonly canonicalId: string;
-  readonly ratio: BillingRatio;
-  readonly resolution: string;
-  readonly durationSec: number;
-  readonly referencedClipCount: number;
-  readonly avgReferenceSec: number;
+const COMPACT_CHIP_TRIGGER_CLASS =
+  "inline-flex h-full items-center gap-1 bg-transparent px-0 text-inherit hover:text-foreground";
+
+function readBillingRatio(value: string): BillingRatio {
+  return BILLING_RATIOS.includes(value as BillingRatio)
+    ? (value as BillingRatio)
+    : LANDING_DEFAULT_RATIO;
 }
-const SCENARIO_PRESETS: Record<ScenarioId, ScenarioPreset> = {
-  clip: {
-    canonicalId: LANDING_VIDEO_PRICE_MODEL_ID,
-    ratio: "16:9",
-    resolution: "720p",
-    durationSec: LANDING_DEFAULT_DURATION_SEC,
-    referencedClipCount: 0,
-    avgReferenceSec: 0,
-  },
-  learn: {
-    canonicalId: SEEDANCE_2_MINI_ID,
-    ratio: "16:9",
-    resolution: "480p",
-    durationSec: 10 * 60,
-    referencedClipCount: 5,
-    avgReferenceSec: 5,
-  },
-  personal: {
-    canonicalId: LANDING_VIDEO_PRICE_MODEL_ID,
-    ratio: "16:9",
-    resolution: "720p",
-    durationSec: 15 * 3 * 60,
-    referencedClipCount: 30,
-    avgReferenceSec: 10,
-  },
-  pipeline: {
-    canonicalId: LANDING_VIDEO_PRICE_MODEL_ID,
-    ratio: "9:16",
-    resolution: "480p",
-    durationSec: 30 * 2 * 60,
-    referencedClipCount: 0,
-    avgReferenceSec: 0,
-  },
-  restyle: {
-    canonicalId: LANDING_VIDEO_PRICE_MODEL_ID,
-    ratio: "9:16",
-    resolution: "720p",
-    durationSec: 30 * 2 * 60,
-    referencedClipCount: Math.ceil((30 * 2 * 60) / VIDEO_DURATION_MAX),
-    avgReferenceSec: VIDEO_DURATION_MAX,
-  },
-  premium4k: {
-    canonicalId: LANDING_VIDEO_PRICE_MODEL_ID,
-    ratio: "16:9",
-    resolution: "4k",
-    durationSec: 20 * 3 * 60,
-    referencedClipCount: 60,
-    avgReferenceSec: 10,
-  },
-  drama25: {
-    canonicalId: SEEDANCE_2_5_ID,
-    ratio: "9:16",
-    resolution: "1080p",
-    durationSec: 30 * 2 * 60,
-    referencedClipCount: 20,
-    avgReferenceSec: 5,
-  },
-};
-const SCENARIO_LABEL_KEY: Record<ScenarioId, TranslationKey> = {
-  clip: "landing.scenarioClip",
-  learn: "landing.scenarioLearn",
-  personal: "landing.scenarioPersonal",
-  pipeline: "landing.scenarioPipeline",
-  restyle: "landing.scenarioRestyle",
-  premium4k: "landing.scenarioPremium4k",
-  drama25: "landing.scenarioDrama25",
-};
-const SCENARIO_BODY_KEY: Record<ScenarioId, TranslationKey> = {
-  clip: "landing.scenarioClipBody",
-  learn: "landing.scenarioLearnBody",
-  personal: "landing.scenarioPersonalBody",
-  pipeline: "landing.scenarioPipelineBody",
-  restyle: "landing.scenarioRestyleBody",
-  premium4k: "landing.scenarioPremium4kBody",
-  drama25: "landing.scenarioDrama25Body",
-};
+
+export function applyScenarioPreset(
+  scenario: HomepageVideoScenario,
+  setters: {
+    readonly setScenarioId: (id: string) => void;
+    readonly setCanonicalId: (id: string) => void;
+    readonly setRatio: (ratio: BillingRatio) => void;
+    readonly setResolution: (resolution: string) => void;
+    readonly setDurationSec: (seconds: number) => void;
+    readonly setDurationUnit: (unit: TimeUnit) => void;
+    readonly setReferencedClipCount: (count: number) => void;
+    readonly setAvgReferenceSec: (seconds: number) => void;
+    readonly setReferenceSec: (seconds: number) => void;
+    readonly setReferenceClipOpen: (open: boolean) => void;
+  }
+): void {
+  const { params } = scenario;
+  setters.setScenarioId(scenario.id);
+  setters.setCanonicalId(params.canonicalId);
+  setters.setRatio(readBillingRatio(params.ratio));
+  setters.setResolution(params.resolution);
+  setters.setDurationSec(params.durationSec);
+  setters.setDurationUnit(scenarioTimeUnit(params.durationSec));
+  setters.setReferencedClipCount(params.referencedClipCount);
+  setters.setAvgReferenceSec(params.avgReferenceSec);
+  if (scenario.id === "clip") {
+    setters.setReferenceSec(0);
+  }
+  setters.setReferenceClipOpen(false);
+}
 const LIBTV_MODEL_LABEL_KEY: Readonly<
   Record<LibtvRateModelId, TranslationKey>
 > = {
@@ -233,6 +186,78 @@ function creditSharePercent(credits: number, total: number): number {
     return 0;
   }
   return Math.round((credits / total) * 100);
+}
+
+function formatCompactUnit(
+  value: number,
+  divisor: number,
+  suffix: string,
+): string {
+  const scaled = value / divisor;
+  if (Number.isInteger(scaled)) {
+    return `${scaled}${suffix}`;
+  }
+  const fixed = scaled.toFixed(1);
+  return fixed.endsWith(".0")
+    ? `${Math.round(scaled)}${suffix}`
+    : `${fixed}${suffix}`;
+}
+
+export function formatLandingCompareCredits(
+  value: number,
+  locale: AppLocale,
+): string {
+  const rounded = Math.round(value);
+  if (locale === "en") {
+    if (rounded >= 1000) {
+      return formatCompactUnit(rounded, 1000, "K");
+    }
+    return String(rounded);
+  }
+  if (rounded >= 10000) {
+    return formatCompactUnit(rounded, 10000, "W");
+  }
+  return String(rounded);
+}
+
+export const LANDING_COMPARE_COMPETITOR_ROW_CLASS = "h-14";
+export const LANDING_COMPARE_COMPETITOR_CELL_CLASS =
+  "px-2 align-middle whitespace-nowrap";
+export const LANDING_COMPARE_PLAN_SLOT_CLASS =
+  "grid h-10 grid-rows-2 items-center gap-0.5";
+export const LANDING_COMPARE_PLAN_PRIMARY_CLASS =
+  "inline-flex min-w-0 items-center gap-x-0.5 leading-tight";
+export const LANDING_COMPARE_PLAN_PRIMARY_CENTERED_CLASS =
+  "row-span-2 flex items-center";
+
+export function LandingComparePlanTableHeader() {
+  const { t } = useTranslation();
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      {t("landing.tableLevel")}
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-red-400/70 transition-colors hover:text-red-500/85"
+              aria-label={t("landing.tableLevelBillingHint")}
+            >
+              <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[16rem] text-xs leading-relaxed">
+            <div className="grid gap-1">
+              <p>{t("landing.tableLevelBillingHintLine1")}</p>
+              <p>{t("landing.tableLevelBillingHintLine2")}</p>
+              <p>{t("landing.tableLevelBillingHintLine3")}</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </span>
+  );
 }
 
 function scenarioTimeUnit(durationSec: number): TimeUnit {
@@ -318,8 +343,9 @@ function SegmentedControl(props: {
   );
 }
 
-function TimeAmountControl(props: {
-  readonly title: string;
+export function TimeAmountControl(props: {
+  readonly title?: string;
+  readonly hideTitle?: boolean;
   readonly seconds: number;
   readonly unit: TimeUnit;
   readonly minSeconds: number;
@@ -352,9 +378,11 @@ function TimeAmountControl(props: {
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="shrink-0 text-xs font-medium text-foreground">
-        {props.title}
-      </span>
+      {!props.hideTitle && props.title ? (
+        <span className="shrink-0 text-xs font-medium text-foreground">
+          {props.title}
+        </span>
+      ) : null}
       <Input
         type="text"
         inputMode="decimal"
@@ -453,7 +481,7 @@ function ClipNumberInput(props: {
   );
 }
 
-function ReferenceClipControl(props: {
+export function ReferenceClipControl(props: {
   readonly clipCount: number;
   readonly clipDurationSec: number;
   readonly referencedCount: number;
@@ -463,62 +491,95 @@ function ReferenceClipControl(props: {
   readonly onOpenChange: (open: boolean) => void;
   readonly onReferencedCountChange: (next: number) => void;
   readonly onAvgReferenceSecChange: (next: number) => void;
+  readonly variant?: "default" | "chip";
+  readonly modal?: boolean;
+  readonly triggerClassName?: string;
+  readonly hideChevron?: boolean;
+  readonly popoverTitle?: string;
+  readonly contentClassName?: string;
+  readonly triggerLabel?: string;
 }) {
   const { t } = useTranslation();
   const clipSeconds = Math.round(props.clipDurationSec);
+  const triggerClassName =
+    props.triggerClassName ??
+    (props.variant === "chip" ? COMPACT_CHIP_TRIGGER_CLASS : COMPACT_BUTTON_CLASS);
+
+  const popover = (
+    <Popover
+      modal={props.modal ?? true}
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+    >
+      <PopoverTrigger asChild>
+        <button type="button" className={triggerClassName}>
+          <span>
+            {props.triggerLabel ??
+              t("landing.referenceClipSummary", {
+                count: props.referencedCount,
+                seconds: props.avgReferenceSec,
+              })}
+          </span>
+          {props.hideChevron ? null : (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className={props.contentClassName ?? "w-auto min-w-56 p-2.5"}
+      >
+        <div className="grid gap-2 text-xs">
+          {props.popoverTitle ? (
+            <p className="block w-full font-medium text-foreground">
+              {props.popoverTitle}
+            </p>
+          ) : null}
+          <p className="text-muted-foreground">
+            {t("landing.referenceClipPlan", {
+              count: props.clipCount,
+              seconds: clipSeconds,
+            })}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0">
+              {t("landing.referenceClipUsedPrefix")}
+            </span>
+            <ClipNumberInput
+              value={props.referencedCount}
+              min={0}
+              max={props.clipCount}
+              onChange={props.onReferencedCountChange}
+            />
+            <span>{t("landing.referenceClipUsedSuffix")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0">
+              {t("landing.referenceClipAveragePrefix")}
+            </span>
+            <ClipNumberInput
+              value={props.avgReferenceSec}
+              min={0}
+              max={props.maxAvgReferenceSec}
+              onChange={props.onAvgReferenceSecChange}
+            />
+            <span>{t("landing.referenceClipAverageSuffix")}</span>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  if (props.variant === "chip") {
+    return popover;
+  }
 
   return (
     <div className="flex items-center gap-1.5">
       <span className="shrink-0 text-xs font-medium">
         {t("landing.referenceTitle")}
       </span>
-      <Popover open={props.open} onOpenChange={props.onOpenChange}>
-        <PopoverTrigger asChild>
-          <button type="button" className={COMPACT_BUTTON_CLASS}>
-            <span>
-              {t("landing.referenceClipSummary", {
-                count: props.referencedCount,
-                seconds: props.avgReferenceSec,
-              })}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto min-w-56 p-2.5">
-          <div className="grid gap-2 text-xs">
-            <p className="text-muted-foreground">
-              {t("landing.referenceClipPlan", {
-                count: props.clipCount,
-                seconds: clipSeconds,
-              })}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span className="shrink-0">
-                {t("landing.referenceClipUsedPrefix")}
-              </span>
-              <ClipNumberInput
-                value={props.referencedCount}
-                min={0}
-                max={props.clipCount}
-                onChange={props.onReferencedCountChange}
-              />
-              <span>{t("landing.referenceClipUsedSuffix")}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="shrink-0">
-                {t("landing.referenceClipAveragePrefix")}
-              </span>
-              <ClipNumberInput
-                value={props.avgReferenceSec}
-                min={0}
-                max={props.maxAvgReferenceSec}
-                onChange={props.onAvgReferenceSecChange}
-              />
-              <span>{t("landing.referenceClipAverageSuffix")}</span>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+      {popover}
     </div>
   );
 }
@@ -691,29 +752,203 @@ function groupPromoRowsByPlatform(
   return groups;
 }
 
-function PromoChip(props: {
-  readonly children: ReactNode;
-  readonly emphasis?: boolean;
-  readonly onClick?: () => void;
-}) {
-  const className = cn(
-    "text-xs",
-    props.emphasis ? "text-foreground" : "text-muted-foreground",
-    props.onClick
-      ? "cursor-pointer bg-transparent p-0 underline decoration-dotted underline-offset-2"
-      : undefined
-  );
-  if (props.onClick) {
-    return (
-      <button type="button" className={className} onClick={props.onClick}>
-        {props.children}
-      </button>
-    );
+export function buildLandingPromoGroups(
+  models: readonly PublicVideoPriceEstimateModel[],
+  competitors: readonly VideoPriceCompetitor[],
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): readonly PromoDisplayGroup[] {
+  const rows: PromoDisplayRow[] = [];
+  for (const entry of models) {
+    for (const promo of entry.promos ?? []) {
+      rows.push({
+        id: `official-${entry.canonicalId}-${promo.id}`,
+        platform: t("landing.platformOfficial"),
+        platformUrl: null,
+        model: entry.displayName,
+        resolution: billingResolutionLabel(promo.resolution),
+        needsVideoReference: false,
+        foldLabel: t("landing.promoFoldHint", {
+          fold: formatVideoPricePromoFold(promo.discountFold),
+        }),
+        dateRange: formatVideoPricePromoDateRange(promo.startsAt, promo.endsAt),
+      });
+    }
   }
-  return <span className={className}>{props.children}</span>;
+  for (const competitor of competitors) {
+    if (isVideoPricePromoNoteCompetitor(competitor)) {
+      if (!competitor.text) {
+        continue;
+      }
+      rows.push({
+        id: competitor.id,
+        platform: competitor.name,
+        platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
+        model: "",
+        resolution: null,
+        needsVideoReference: false,
+        foldLabel: competitor.text,
+        dateRange:
+          competitor.showDates &&
+          isVideoPricePromoDate(competitor.startsAt) &&
+          isVideoPricePromoDate(competitor.endsAt)
+            ? formatVideoPricePromoDateRange(
+                competitor.startsAt,
+                competitor.endsAt,
+              )
+            : "",
+      });
+      continue;
+    }
+    if (!isVideoPriceCompareCompetitor(competitor)) {
+      continue;
+    }
+    for (const promo of competitor.config.promos) {
+      const modelId = resolveLibtvRateModelId(promo.canonicalId);
+      const named = models.find(
+        (entry) => entry.canonicalId === promo.canonicalId,
+      );
+      rows.push({
+        id: `${competitor.id}-${promo.id}`,
+        platform: competitor.name,
+        platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
+        model: named?.displayName ?? t(LIBTV_MODEL_LABEL_KEY[modelId]),
+        resolution: billingResolutionLabel(promo.resolution),
+        needsVideoReference: promo.withReference,
+        foldLabel: t("landing.promoFoldHint", {
+          fold: formatVideoPricePromoFold(promo.discountFold),
+        }),
+        dateRange: formatVideoPricePromoDateRange(promo.startsAt, promo.endsAt),
+      });
+    }
+  }
+  return groupPromoRowsByPlatform(rows);
 }
 
-function LandingCompetitorCompareRow(props: {
+function formatPromoItemTags(
+  row: PromoDisplayRow,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
+  const parts: string[] = [];
+  if (row.model) {
+    parts.push(row.model);
+  }
+  if (row.resolution) {
+    parts.push(row.resolution);
+  }
+  if (row.needsVideoReference) {
+    parts.push(t("landing.promoNeedVideoReference"));
+  }
+  parts.push(row.foldLabel);
+  if (row.dateRange) {
+    parts.push(row.dateRange);
+  }
+  return parts.join(" · ");
+}
+
+function PromoPlatformCard(props: {
+  readonly group: PromoDisplayGroup;
+  readonly onOpenExternal: (next: { name: string; url: string }) => void;
+}) {
+  const { t } = useTranslation();
+
+  const handleOpenPlatform = () => {
+    const url = props.group.platformUrl;
+    if (!url) {
+      return;
+    }
+    props.onOpenExternal({
+      name: props.group.platform,
+      url,
+    });
+  };
+
+  return (
+    <article className="landing-promo-card">
+      <div className="landing-promo-card-head">
+        {props.group.platformUrl ? (
+          <button
+            type="button"
+            className="landing-promo-card-title landing-promo-card-title-link truncate"
+            onClick={handleOpenPlatform}
+          >
+            {props.group.platform}
+          </button>
+        ) : (
+          <h3 className="landing-promo-card-title truncate">
+            {props.group.platform}
+          </h3>
+        )}
+        <span className="landing-promo-badge">
+          {t("landing.promoItemCount", { count: props.group.items.length })}
+        </span>
+      </div>
+      <div className="landing-promo-card-body">
+        {props.group.items.map((row) => (
+          <p key={row.id} className="landing-promo-card-desc">
+            {formatPromoItemTags(row, t)}
+          </p>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function LandingPromoDiscountSection(props: {
+  readonly id?: string;
+  readonly groups: readonly PromoDisplayGroup[];
+  readonly className?: string;
+  readonly onOpenExternal: (next: { name: string; url: string }) => void;
+}) {
+  const { t } = useTranslation();
+  if (props.groups.length === 0) {
+    return null;
+  }
+
+  const handleBackToCalc = () => {
+    document
+      .getElementById("landing-demo")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return (
+    <div
+      id={props.id}
+      className={cn("landing-promo scroll-mt-24", props.className)}
+    >
+      <div className="landing-promo-header">
+        <div className="landing-promo-header-copy">
+          <h2 className="landing-promo-heading">
+            {t("landing.promoSectionTitle")}
+          </h2>
+          <p className="landing-promo-subheading">
+            {t("landing.promoSectionDesc")}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="landing-promo-link"
+          onClick={handleBackToCalc}
+        >
+          {t("landing.promoBackToCalc")}
+          <span aria-hidden>↗</span>
+        </button>
+      </div>
+      <div className="landing-promo-grid-shell">
+        <div className="landing-promo-grid">
+          {props.groups.map((group) => (
+            <PromoPlatformCard
+              key={group.platform}
+              group={group}
+              onOpenExternal={props.onOpenExternal}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LandingCompetitorCompareRow(props: {
   readonly competitor: VideoPriceCompareCompetitor;
   readonly bordered: boolean;
   readonly model: PublicVideoPriceEstimateModel | undefined;
@@ -727,8 +962,9 @@ function LandingCompetitorCompareRow(props: {
   readonly excludePromo: boolean;
   readonly promoFoldLabel: (fold: number) => string;
   readonly onOpenExternal: (next: { name: string; url: string }) => void;
+  readonly useLandingMenu?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [planId, setPlanId] = useState(
     props.competitor.config.plans[0]?.id ?? ""
   );
@@ -918,8 +1154,13 @@ function LandingCompetitorCompareRow(props: {
   const platformUrl = readVideoPriceCompetitorPublicUrl(props.competitor);
 
   return (
-    <tr className={props.bordered ? "border-b" : undefined}>
-      <td className="overflow-hidden px-2 py-3 font-medium whitespace-nowrap">
+    <tr
+      className={cn(
+        LANDING_COMPARE_COMPETITOR_ROW_CLASS,
+        props.bordered ? "border-b" : undefined,
+      )}
+    >
+      <td className={cn(LANDING_COMPARE_COMPETITOR_CELL_CLASS, "font-medium")}>
         {platformUrl ? (
           <button
             type="button"
@@ -934,10 +1175,17 @@ function LandingCompetitorCompareRow(props: {
           platformLabel
         )}
       </td>
-      <td className="overflow-hidden px-2 py-3">
-        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
-          {selectedPlan && selectedCyclePrice ? (
-            <>
+      <td className="px-2 align-middle">
+        {selectedPlan && selectedCyclePrice ? (
+          <div className={LANDING_COMPARE_PLAN_SLOT_CLASS}>
+            <span
+              className={cn(
+                LANDING_COMPARE_PLAN_PRIMARY_CLASS,
+                planCycle === "monthly"
+                  ? LANDING_COMPARE_PLAN_PRIMARY_CENTERED_CLASS
+                  : undefined,
+              )}
+            >
               <span className="font-medium">{planName(selectedPlan)}</span>
               {accountCount > 1 ? (
                 <TooltipProvider delayDuration={200}>
@@ -964,104 +1212,127 @@ function LandingCompetitorCompareRow(props: {
                     selectedCyclePrice.monthlyYuan * accountCount
                   ).toFixed(0),
                 })}
-                {planCycle === "monthly" ? null : (
-                  <>
-                    ·
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="border-b border-dashed border-muted-foreground"
-                          >
-                            {t("landing.planCycleTotal", {
-                              price: (
-                                selectedCyclePrice.totalYuan * accountCount
-                              ).toFixed(0),
-                              unit: planCycleUnit(planCycle),
-                            })}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {t("landing.planCycleRiskHint")}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </>
-                )}
               </span>
-            </>
-          ) : (
-            <span>{t("landing.compareUnavailable")}</span>
-          )}
-          <Popover open={planOpen} onOpenChange={setPlanOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label={planLabel}
+              <Popover
+                modal={!props.useLandingMenu}
+                open={planOpen}
+                onOpenChange={setPlanOpen}
               >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              className="w-auto min-w-52 max-w-80 p-1"
-            >
-              {availableCycles.length > 1 ? (
-                <div className="mb-1 flex gap-0.5">
-                  {availableCycles.map((cycle) => (
-                    <button
-                      key={cycle}
-                      type="button"
-                      className={cn(
-                        "flex-1 rounded-md px-2 py-1 text-xs transition-colors",
-                        cycle === planCycle
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                      )}
-                      onClick={() => {
-                        setPlanCycle(cycle);
-                      }}
-                    >
-                      {planCycleLabel(cycle)}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="grid gap-0.5">
-                {cyclePlans.map((plan) => (
+                <PopoverTrigger asChild>
                   <button
-                    key={plan.id}
                     type="button"
                     className={cn(
-                      "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                      plan.id === selectedPlan?.id
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                      "inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground",
+                      props.useLandingMenu
+                        ? "hover:bg-[#f0ede6] dark:hover:bg-neutral-800"
+                        : "hover:bg-muted",
                     )}
-                    onClick={() => {
-                      setPlanId(plan.id);
-                      setPlanOpen(false);
-                    }}
+                    aria-label={planLabel}
                   >
-                    {planOptionLabel(plan)}
+                    <ChevronDown className="h-3.5 w-3.5" />
                   </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </span>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className={
+                    props.useLandingMenu
+                      ? landingMenuContentClass("min-w-52 max-w-80")
+                      : "w-auto min-w-52 max-w-80 p-1"
+                  }
+                >
+                  {availableCycles.length > 1 ? (
+                    <div className="mb-1 flex gap-0.5">
+                      {availableCycles.map((cycle) => (
+                        <button
+                          key={cycle}
+                          type="button"
+                          className={cn(
+                            "flex-1 px-2 py-1 text-xs transition-colors",
+                            props.useLandingMenu
+                              ? cn(
+                                  landingMenuItemClass(cycle === planCycle),
+                                  "text-center",
+                                )
+                              : cn(
+                                  "rounded-md",
+                                  cycle === planCycle
+                                    ? "bg-muted text-foreground"
+                                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                                ),
+                          )}
+                          onClick={() => {
+                            setPlanCycle(cycle);
+                          }}
+                        >
+                          {planCycleLabel(cycle)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="grid gap-0.5">
+                    {cyclePlans.map((plan) => (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        className={
+                          props.useLandingMenu
+                            ? landingMenuItemClass(plan.id === selectedPlan?.id)
+                            : cn(
+                                "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                                plan.id === selectedPlan?.id
+                                  ? "bg-muted text-foreground"
+                                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                              )
+                        }
+                        onClick={() => {
+                          setPlanId(plan.id);
+                          setPlanOpen(false);
+                        }}
+                      >
+                        {planOptionLabel(plan)}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </span>
+            {planCycle === "monthly" ? null : (
+              <span className="leading-none">
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-fit border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
+                      >
+                        {t("landing.planCycleTotal", {
+                          price: (
+                            selectedCyclePrice.totalYuan * accountCount
+                          ).toFixed(0),
+                          unit: planCycleUnit(planCycle),
+                        })}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("landing.planCycleRiskHint")}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
+            )}
+          </div>
+        ) : (
+          <span>{t("landing.compareUnavailable")}</span>
+        )}
       </td>
-      <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
+      <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
         {credits == null || percent == null || !selectedPlan ? (
           t("landing.compareUnavailable")
         ) : (
           <span>
             <span>
-              {t("landing.comparePointsBefore", {
-                points: credits,
-              })}
+              {formatLandingCompareCredits(credits, locale)}
+              {" ("}
               <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1075,13 +1346,22 @@ function LandingCompetitorCompareRow(props: {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {t("landing.comparePointsTotal", {
-                      total: selectedPlan.credits * accountCount,
-                    })}
+                    <div className="grid gap-0.5">
+                      <p>
+                        {t("landing.comparePointsTotal", {
+                          total: selectedPlan.credits * accountCount,
+                        })}
+                      </p>
+                      <p>
+                        {t("landing.comparePointsUsage", {
+                          points: credits,
+                        })}
+                      </p>
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {t("landing.comparePointsAfter")}
+              {")"}
             </span>
             {props.excludePromo
               ? null
@@ -1091,7 +1371,7 @@ function LandingCompetitorCompareRow(props: {
           </span>
         )}
       </td>
-      <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
+      <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
         {rate == null
           ? t("landing.compareUnavailable")
           : t("landing.rateValue", {
@@ -1104,595 +1384,28 @@ function LandingCompetitorCompareRow(props: {
 
 export function LandingBillingSection() {
   const { t } = useTranslation();
-  const { models, competitors, isEstimatesLoading } =
-    usePublicVideoPriceEstimates();
-  const [canonicalId, setCanonicalId] = useState<string>(
-    LANDING_VIDEO_PRICE_MODEL_ID
-  );
-  const model =
-    models.find((entry) => entry.canonicalId === canonicalId) ??
-    models.find(
-      (entry) => entry.canonicalId === LANDING_VIDEO_PRICE_MODEL_ID
-    ) ??
-    models[0];
-
-  const resolutions = model?.tiers.map((tier) => tier.resolution) ?? [];
-  const [resolution, setResolution] = useState(LANDING_DEFAULT_RESOLUTION);
-  const [ratio, setRatio] = useState<BillingRatio>(LANDING_DEFAULT_RATIO);
-  const [durationSec, setDurationSec] = useState(LANDING_DEFAULT_DURATION_SEC);
-  const [durationUnit, setDurationUnit] = useState<TimeUnit>("sec");
-  const [referenceSec, setReferenceSec] = useState(0);
-  const [referenceUnit, setReferenceUnit] = useState<TimeUnit>("sec");
-  const [referencedClipCount, setReferencedClipCount] = useState(0);
-  const [avgReferenceSec, setAvgReferenceSec] = useState(0);
-  const [scenarioId, setScenarioId] = useState<ScenarioId>("clip");
-  const [ratioOpen, setRatioOpen] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
-  const [excludePromo, setExcludePromo] = useState(false);
-  const [referenceClipOpen, setReferenceClipOpen] = useState(false);
+  const { models, competitors } = usePublicVideoPriceEstimates();
   const [pendingExternal, setPendingExternal] = useState<{
     name: string;
     url: string;
   } | null>(null);
-  const isSingleClipScenario = scenarioId === "clip";
-
-  const activeResolution =
-    resolution && resolutions.includes(resolution)
-      ? resolution
-      : resolutions.includes(LANDING_DEFAULT_RESOLUTION)
-        ? LANDING_DEFAULT_RESOLUTION
-        : (resolutions[0] ?? "");
-
-  const handleSelectScenario = (id: ScenarioId) => {
-    const preset = SCENARIO_PRESETS[id];
-    setScenarioId(id);
-    setCanonicalId(preset.canonicalId);
-    setRatio(preset.ratio);
-    setResolution(preset.resolution);
-    setDurationSec(preset.durationSec);
-    setDurationUnit(scenarioTimeUnit(preset.durationSec));
-    setReferencedClipCount(preset.referencedClipCount);
-    setAvgReferenceSec(preset.avgReferenceSec);
-    if (id === "clip") {
-      setReferenceSec(0);
-    }
-    setReferenceClipOpen(false);
-  };
-
-  const clipPlan = useMemo(
-    () =>
-      planVideoEstimateClips({
-        totalDurationSec: durationSec,
-        maxOutputDurationSec: model?.maxOutputDurationSec ?? VIDEO_DURATION_MAX,
-      }),
-    [durationSec, model?.maxOutputDurationSec]
-  );
-  const usedReferencedCount = Math.min(
-    Math.max(0, referencedClipCount),
-    clipPlan.clipCount
-  );
-  const usedAvgReferenceSec = Math.min(
-    Math.max(0, avgReferenceSec),
-    model?.maxVideoReferenceSeconds ?? avgReferenceSec
+  const promoGroups = useMemo(
+    () => buildLandingPromoGroups(models, competitors, t),
+    [competitors, models, t],
   );
 
-  const estimate = useMemo(() => {
-    if (!model || !activeResolution) {
-      return null;
-    }
-    const tier = readVideoPriceEstimateTier(
-      {
-        priceEstimate: {
-          enabled: true,
-          tiers: model.tiers.map((entry) => ({
-            ...entry,
-            enabled: true,
-          })),
-        },
-      },
-      activeResolution
-    );
-    if (!tier) {
-      return null;
-    }
-    if (isSingleClipScenario) {
-      const hasReferenceVideo = referenceSec > 0;
-      return computeVideoPriceEstimateForModel({
-        canonicalId: model.canonicalId,
-        resolution: activeResolution,
-        ratio,
-        outputDurationSec: durationSec,
-        inputDurationSec: hasReferenceVideo ? referenceSec : 0,
-        hasReferenceVideo,
-        priceWithoutVideo: tier.priceWithoutVideo,
-        priceWithVideo: tier.priceWithVideo,
-      });
-    }
-    return computeSplitVideoPriceEstimateForModel({
-      canonicalId: model.canonicalId,
-      resolution: activeResolution,
-      ratio,
-      priceWithoutVideo: tier.priceWithoutVideo,
-      priceWithVideo: tier.priceWithVideo,
-      plan: clipPlan,
-      referencedCount: usedReferencedCount,
-      avgReferenceSec: usedAvgReferenceSec,
-    });
-  }, [
-    activeResolution,
-    clipPlan,
-    durationSec,
-    isSingleClipScenario,
-    model,
-    ratio,
-    referenceSec,
-    usedAvgReferenceSec,
-    usedReferencedCount,
-  ]);
-
-  const platformPromo = useMemo(() => {
-    if (!model || !activeResolution) {
-      return null;
-    }
-    return matchVideoModelPricePromo(model.promos ?? [], activeResolution);
-  }, [activeResolution, model]);
-
-  const hasCompetitorPromo = useMemo(() => {
-    if (!model || !activeResolution) {
-      return false;
-    }
-    return competitors.some((competitor) => {
-      if (!isVideoPriceCompareCompetitor(competitor)) {
-        return false;
-      }
-      const parts = landingCompetitorCreditParts({
-        config: competitor.config,
-        canonicalId: model.canonicalId,
-        resolution: activeResolution,
-        isSingleClipScenario,
-        durationSec,
-        referenceSec,
-        clipPlan,
-        usedReferencedCount,
-        usedAvgReferenceSec,
-      });
-      if (!parts) {
-        return false;
-      }
-      return (
-        landingCompetitorPromoFolds(
-          competitor.config,
-          model.canonicalId,
-          activeResolution,
-          parts
-        ).length > 0
-      );
-    });
-  }, [
-    activeResolution,
-    clipPlan,
-    competitors,
-    durationSec,
-    isSingleClipScenario,
-    model,
-    referenceSec,
-    usedAvgReferenceSec,
-    usedReferencedCount,
-  ]);
-
-  const officialCostYuan =
-    estimate == null
-      ? null
-      : !excludePromo && platformPromo
-        ? applyVideoPricePromoFold(
-            estimate.costYuan,
-            platformPromo.discountFold
-          )
-        : estimate.costYuan;
-  const officialTokens =
-    estimate == null
-      ? null
-      : !excludePromo && platformPromo
-        ? Math.round(
-            applyVideoPricePromoFold(
-              estimate.billingTokens,
-              platformPromo.discountFold
-            )
-          )
-        : estimate.billingTokens;
-  const officialRate =
-    officialCostYuan == null || estimate == null
-      ? null
-      : computeCostPerOutputSecond(
-          officialCostYuan,
-          estimate.outputDurationSec
-        );
-
-  const modelLabel = model?.displayName ?? t("landing.compareUnavailable");
-  const promoFoldLabel = (fold: number): string =>
-    t("landing.promoFoldHint", { fold: formatVideoPricePromoFold(fold) });
-  const promoGroups = useMemo(() => {
-    const rows: PromoDisplayRow[] = [];
-    for (const entry of models) {
-      for (const promo of entry.promos ?? []) {
-        rows.push({
-          id: `official-${entry.canonicalId}-${promo.id}`,
-          platform: t("landing.platformOfficial"),
-          platformUrl: null,
-          model: entry.displayName,
-          resolution: billingResolutionLabel(promo.resolution),
-          needsVideoReference: false,
-          foldLabel: t("landing.promoFoldHint", {
-            fold: formatVideoPricePromoFold(promo.discountFold),
-          }),
-          dateRange: formatVideoPricePromoDateRange(
-            promo.startsAt,
-            promo.endsAt
-          ),
-        });
-      }
-    }
-    for (const competitor of competitors) {
-      if (isVideoPricePromoNoteCompetitor(competitor)) {
-        if (!competitor.text) {
-          continue;
-        }
-        rows.push({
-          id: competitor.id,
-          platform: competitor.name,
-          platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
-          model: "",
-          resolution: null,
-          needsVideoReference: false,
-          foldLabel: competitor.text,
-          dateRange:
-            competitor.showDates &&
-            isVideoPricePromoDate(competitor.startsAt) &&
-            isVideoPricePromoDate(competitor.endsAt)
-              ? formatVideoPricePromoDateRange(
-                  competitor.startsAt,
-                  competitor.endsAt
-                )
-              : "",
-        });
-        continue;
-      }
-      if (!isVideoPriceCompareCompetitor(competitor)) {
-        continue;
-      }
-      for (const promo of competitor.config.promos) {
-        const modelId = resolveLibtvRateModelId(promo.canonicalId);
-        const named = models.find(
-          (entry) => entry.canonicalId === promo.canonicalId
-        );
-        rows.push({
-          id: `${competitor.id}-${promo.id}`,
-          platform: competitor.name,
-          platformUrl: readVideoPriceCompetitorPublicUrl(competitor),
-          model: named?.displayName ?? t(LIBTV_MODEL_LABEL_KEY[modelId]),
-          resolution: billingResolutionLabel(promo.resolution),
-          needsVideoReference: promo.withReference,
-          foldLabel: t("landing.promoFoldHint", {
-            fold: formatVideoPricePromoFold(promo.discountFold),
-          }),
-          dateRange: formatVideoPricePromoDateRange(
-            promo.startsAt,
-            promo.endsAt
-          ),
-        });
-      }
-    }
-    return groupPromoRowsByPlatform(rows);
-  }, [competitors, models, t]);
+  if (promoGroups.length === 0) {
+    return null;
+  }
 
   return (
-    <section id="pricing" className="scroll-mt-20 pt-2 pb-8 md:pb-12">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 md:px-6">
-        <div className={cn("rounded-xl border p-4 md:p-5", LANDING_CARD_CLASS)}>
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap justify-center gap-2">
-              {SCENARIO_IDS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={cn(
-                    "h-9 rounded-md border px-3 text-sm transition-colors",
-                    scenarioId === id
-                      ? "border-foreground/20 bg-background text-foreground shadow-sm dark:bg-neutral-900"
-                      : "border-border/70 bg-muted/20 text-muted-foreground hover:text-foreground"
-                  )}
-                  onClick={() => handleSelectScenario(id)}
-                >
-                  {t(SCENARIO_LABEL_KEY[id])}
-                </button>
-              ))}
-            </div>
-            <div className="rounded-lg border border-dashed border-border px-3 py-2 text-sm leading-6 text-muted-foreground">
-              {t(SCENARIO_BODY_KEY[scenarioId])}
-            </div>
-          </div>
-
-          <div className="mt-4">
-            {isEstimatesLoading ? (
-              <p className="text-sm text-muted-foreground">
-                {t("common.loading")}
-              </p>
-            ) : !model || resolutions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("landing.noPrice")}
-              </p>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-xs font-medium">
-                    {t("landing.modelLabel")}
-                  </span>
-                  <OptionMenu
-                    label={modelLabel}
-                    open={modelOpen}
-                    onOpenChange={setModelOpen}
-                    contentClassName="min-w-52"
-                  >
-                    <div className="grid gap-0.5">
-                      {models.map((entry) => (
-                        <button
-                          key={entry.canonicalId}
-                          type="button"
-                          className={cn(
-                            "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                            entry.canonicalId === model.canonicalId
-                              ? "bg-muted text-foreground"
-                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                          )}
-                          onClick={() => {
-                            setCanonicalId(entry.canonicalId);
-                            setModelOpen(false);
-                          }}
-                        >
-                          {entry.displayName}
-                        </button>
-                      ))}
-                    </div>
-                  </OptionMenu>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-xs font-medium">
-                    {t("landing.ratioLabel")}
-                  </span>
-                  <OptionMenu
-                    label={ratio}
-                    open={ratioOpen}
-                    onOpenChange={setRatioOpen}
-                    contentClassName="min-w-72 border-0 bg-transparent p-0 shadow-none"
-                  >
-                    <RatioTiles
-                      value={ratio}
-                      onSelect={(option) => {
-                        setRatio(option);
-                        setRatioOpen(false);
-                      }}
-                    />
-                  </OptionMenu>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-xs font-medium">
-                    {t("landing.resolutionLabel")}
-                  </span>
-                  <SegmentedControl
-                    options={resolutions}
-                    value={activeResolution}
-                    formatOption={(option) => option.toUpperCase()}
-                    onSelect={setResolution}
-                  />
-                </div>
-                {isSingleClipScenario ? (
-                  <TimeAmountControl
-                    title={t("landing.referenceTitle")}
-                    seconds={referenceSec}
-                    unit={referenceUnit}
-                    minSeconds={0}
-                    maxSeconds={LANDING_TIME_MAX_SEC}
-                    unitSecLabel={t("landing.durationUnitSec")}
-                    unitMinLabel={t("landing.durationUnitMin")}
-                    onSecondsChange={setReferenceSec}
-                    onUnitChange={setReferenceUnit}
-                  />
-                ) : (
-                  <ReferenceClipControl
-                    clipCount={clipPlan.clipCount}
-                    clipDurationSec={clipPlan.clipDurationSec}
-                    referencedCount={usedReferencedCount}
-                    avgReferenceSec={usedAvgReferenceSec}
-                    maxAvgReferenceSec={model.maxVideoReferenceSeconds}
-                    open={referenceClipOpen}
-                    onOpenChange={setReferenceClipOpen}
-                    onReferencedCountChange={setReferencedClipCount}
-                    onAvgReferenceSecChange={setAvgReferenceSec}
-                  />
-                )}
-                <TimeAmountControl
-                  title={t("landing.durationLabel")}
-                  seconds={durationSec}
-                  unit={durationUnit}
-                  minSeconds={1}
-                  maxSeconds={LANDING_TIME_MAX_SEC}
-                  unitSecLabel={t("landing.durationUnitSec")}
-                  unitMinLabel={t("landing.durationUnitMin")}
-                  onSecondsChange={setDurationSec}
-                  onUnitChange={setDurationUnit}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 border-t border-dashed border-border pt-4">
-            <p className="text-sm text-muted-foreground">
-              {t("landing.compareDisclaimer")}{" "}
-              <DashedHintPopover label={t("landing.compareFeedback")}>
-                <p className="text-sm">{t("landing.compareFeedbackQq")}</p>
-              </DashedHintPopover>
-            </p>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
-                <colgroup>
-                  <col className="w-[18%]" />
-                  <col className="w-[36%]" />
-                  <col className="w-[28%]" />
-                  <col className="w-[18%]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="px-2 py-2 font-medium">
-                      {t("landing.tablePlatform")}
-                    </th>
-                    <th className="px-2 py-2 font-medium">
-                      {t("landing.tableLevel")}
-                    </th>
-                    <th className="px-2 py-2 font-medium">
-                      <span className="inline-flex items-center gap-1.5">
-                        {t("landing.tableTokens")}
-                        {platformPromo || hasCompetitorPromo ? (
-                          <label className="inline-flex items-center gap-0.5 text-[10px] font-normal leading-none text-muted-foreground">
-                            <input
-                              type="checkbox"
-                              checked={excludePromo}
-                              onChange={(event) => {
-                                setExcludePromo(event.target.checked);
-                              }}
-                              className="h-3 w-3 accent-foreground"
-                            />
-                            {t("landing.tableExcludePromo")}
-                          </label>
-                        ) : null}
-                      </span>
-                    </th>
-                    <th className="px-2 py-2 font-medium">
-                      {t("landing.tableRate")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b">
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      <span className="font-medium">
-                        {t("landing.platformOfficial")}
-                      </span>
-                      <span className="ml-1 align-middle text-[10px] text-muted-foreground">
-                        {t("landing.platformOfficialBadge")}
-                      </span>
-                    </td>
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      {officialCostYuan == null
-                        ? t("landing.compareUnavailable")
-                        : officialCostYuan.toFixed(2)}
-                    </td>
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      {officialTokens == null ? (
-                        t("landing.compareUnavailable")
-                      ) : (
-                        <span>
-                          {t("landing.officialTokenValue", {
-                            tokens: formatVideoTokenMillions(officialTokens),
-                          })}
-                          {!excludePromo && platformPromo ? (
-                            <DiscountMark
-                              label={promoFoldLabel(platformPromo.discountFold)}
-                            />
-                          ) : null}
-                        </span>
-                      )}
-                    </td>
-                    <td className="overflow-hidden px-2 py-3 whitespace-nowrap">
-                      {officialRate == null
-                        ? t("landing.compareUnavailable")
-                        : t("landing.rateValue", {
-                            rate: officialRate.toFixed(3),
-                          })}
-                    </td>
-                  </tr>
-                  {competitors
-                    .filter(isVideoPriceCompareCompetitor)
-                    .map((competitor, index, rows) => (
-                      <LandingCompetitorCompareRow
-                        key={competitor.id}
-                        competitor={competitor}
-                        bordered={index < rows.length - 1}
-                        model={model}
-                        activeResolution={activeResolution}
-                        isSingleClipScenario={isSingleClipScenario}
-                        durationSec={durationSec}
-                        referenceSec={referenceSec}
-                        clipPlan={clipPlan}
-                        usedReferencedCount={usedReferencedCount}
-                        usedAvgReferenceSec={usedAvgReferenceSec}
-                        excludePromo={excludePromo}
-                        promoFoldLabel={promoFoldLabel}
-                        onOpenExternal={setPendingExternal}
-                      />
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        {promoGroups.length > 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 md:px-5">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              {t("landing.promoTitle")}
-            </h2>
-            <div className="mt-2 grid gap-1.5">
-              {promoGroups.map((group) => (
-                <div
-                  key={group.platform}
-                  className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1"
-                >
-                  <PromoChip
-                    onClick={
-                      group.platformUrl
-                        ? () => {
-                            const url = group.platformUrl;
-                            if (!url) {
-                              return;
-                            }
-                            setPendingExternal({
-                              name: group.platform,
-                              url,
-                            });
-                          }
-                        : undefined
-                    }
-                  >
-                    {group.platform}
-                  </PromoChip>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {group.items.map((row) => (
-                      <span
-                        key={row.id}
-                        className="inline-flex max-w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1"
-                      >
-                        {row.model ? <PromoChip>{row.model}</PromoChip> : null}
-                        {row.resolution ? (
-                          <PromoChip>{row.resolution}</PromoChip>
-                        ) : null}
-                        {row.needsVideoReference ? (
-                          <PromoChip>
-                            {t("landing.promoNeedVideoReference")}
-                          </PromoChip>
-                        ) : null}
-                        <PromoChip emphasis>{row.foldLabel}</PromoChip>
-                        {row.dateRange ? (
-                          <span className="text-xs text-muted-foreground">
-                            {row.dateRange}
-                          </span>
-                        ) : null}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+    <section id="pricing" className="scroll-mt-20 py-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <LandingPromoDiscountSection
+          id="landing-promo"
+          groups={promoGroups}
+          onOpenExternal={setPendingExternal}
+        />
         <AlertDialog
           open={pendingExternal != null}
           onOpenChange={(open) => {
@@ -1722,7 +1435,7 @@ export function LandingBillingSection() {
                   window.open(
                     pendingExternal.url,
                     "_blank",
-                    "noopener,noreferrer"
+                    "noopener,noreferrer",
                   );
                 }}
               >

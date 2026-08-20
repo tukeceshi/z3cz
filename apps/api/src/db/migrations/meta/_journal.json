@@ -554,6 +554,13 @@
       "when": 1789720000000,
       "tag": "0083_competitor_video_pricing_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1789800000000,
+      "tag": "0084_homepage_video_scenario_defaults",
+      "breakpoints": true
     }
   ]
 }

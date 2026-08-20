@@ -17,6 +17,7 @@ import {
   readLibtvPlanCyclePrice,
   readVideoPriceCompetitorPublicUrl,
 } from "./competitor-video-points";
+import { DEFAULT_HOMEPAGE_VIDEO_SCENARIOS } from "./homepage-video-scenario";
 
 describe("computeLibtvCredits", () => {
   it("uses 2.0 without-reference rate on output seconds only", () => {
@@ -647,6 +648,7 @@ describe("mergeVideoPriceCompetitorStore", () => {
   it("keeps an empty competitor list", () => {
     expect(mergeVideoPriceCompetitorStore({ competitors: [] })).toEqual({
       competitors: [],
+      scenarios: DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
     });
   });
 
