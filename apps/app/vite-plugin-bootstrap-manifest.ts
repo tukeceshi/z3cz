@@ -189,20 +189,21 @@ function buildManifestVersion(
 
 function collectStaticAssets(
   projectRoot: string,
+  outDir: string,
   assetPaths: readonly string[]
 ): BootstrapStaticAsset[] {
   return assetPaths.map((assetPath) => {
-    const absolutePath = path.join(
-      projectRoot,
-      "public",
-      assetPath.replace(/^\/+/, "")
-    );
-    if (!fs.existsSync(absolutePath)) {
+    const relative = assetPath.replace(/^\/+/, "");
+    const sourcePath = path.join(projectRoot, "public", relative);
+    if (!fs.existsSync(sourcePath)) {
       throw new Error(
         `[bootstrap-manifest] Missing static asset: ${assetPath}`
       );
     }
-    const bytes = fs.readFileSync(absolutePath);
+    const destPath = path.join(outDir, relative);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.copyFileSync(sourcePath, destPath);
+    const bytes = fs.readFileSync(sourcePath);
     const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
     return { path: assetPath, hash };
   });
@@ -341,6 +342,7 @@ export function bootstrapManifestPlugin(): Plugin {
 
       const staticAssets = collectStaticAssets(
         projectRoot,
+        outDir,
         LANDING_STATIC_ASSET_PATHS
       );
 

@@ -62,5 +62,14 @@ export function resolveBootstrapAssetDiskPath(
   root: string,
   assetPath: string
 ): string {
-  return path.join(root, assetPath.replace(/^\/+/, ""));
+  const relative = assetPath.replace(/^\/+/, "");
+  const distPath = path.join(root, relative);
+  if (fs.existsSync(distPath)) {
+    return distPath;
+  }
+  const publicPath = path.join(root, "..", "public", relative);
+  if (fs.existsSync(publicPath)) {
+    return publicPath;
+  }
+  return distPath;
 }

@@ -52,4 +52,18 @@ describe("bootstrap-asset-store", () => {
       path.join(root, "landing", "clip.mp4")
     );
   });
+
+  it("falls back to public/ when a landing file is missing from dist", () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bootstrap-assets-"));
+    const distDir = path.join(tempDir, "dist");
+    const publicDir = path.join(tempDir, "public", "landing");
+    fs.mkdirSync(distDir, { recursive: true });
+    fs.mkdirSync(publicDir, { recursive: true });
+    const publicFile = path.join(publicDir, "dollface.jpg");
+    fs.writeFileSync(publicFile, "landing-bytes");
+
+    expect(
+      resolveBootstrapAssetDiskPath(distDir, "/landing/dollface.jpg")
+    ).toBe(publicFile);
+  });
 });
