@@ -1,7 +1,7 @@
 import type { LegalDocumentType } from "@dafthunk/types";
 import Github from "lucide-react/icons/github";
 import Menu from "lucide-react/icons/menu";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -26,6 +26,7 @@ import {
   scheduleConsolePrefetch,
   scheduleLandingAssetPrefetch,
 } from "@/utils/console-prefetch";
+import { logoFitScale } from "@/utils/logo-fit-scale";
 import { cn } from "@/utils/utils";
 
 const LANDING_HEADER_CHIP = "rounded-md border border-border bg-transparent";
@@ -45,6 +46,50 @@ const GITHUB_REPO_URL = "https://github.com/tukeceshi/z3cz";
 function scrollToId(id: string): void {
   const el = document.getElementById(id);
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function LandingHeaderLogo({ siteName }: { readonly siteName: string }) {
+  const slotRef = useRef<HTMLAnchorElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const slot = slotRef.current;
+    const inner = innerRef.current;
+    if (!slot || !inner) {
+      return;
+    }
+
+    const update = (): void => {
+      const next =
+        Math.round(logoFitScale(slot.clientWidth, inner.scrollWidth) * 1000) /
+        1000;
+      setScale((prev) => (prev === next ? prev : next));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(slot);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [siteName]);
+
+  return (
+    <a
+      ref={slotRef}
+      href="#intro"
+      className="flex min-w-0 w-full flex-1 items-center overflow-hidden"
+    >
+      <span
+        ref={innerRef}
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap origin-left"
+        style={scale === 1 ? undefined : { transform: `scale(${scale})` }}
+      >
+        <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0 dark:invert" />
+        <span className="text-lg font-bold">{siteName}</span>
+      </span>
+    </a>
+  );
 }
 
 export function LandingPage() {
@@ -171,19 +216,7 @@ export function LandingPage() {
       >
         <div className="mx-auto max-w-[94rem] px-6 lg:px-12">
           <div className="flex items-center justify-between gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-4">
-            <a
-              href="#intro"
-              className="flex min-w-0 items-center gap-2 justify-self-start"
-            >
-              <img
-                src="/icon.svg"
-                alt=""
-                className="h-8 w-8 shrink-0 dark:invert"
-              />
-              <span className="truncate text-lg font-bold">
-                {siteSettings.siteName}
-              </span>
-            </a>
+            <LandingHeaderLogo siteName={siteSettings.siteName} />
             <nav
               className={cn(
                 "hidden h-[42px] items-stretch overflow-hidden lg:flex justify-self-center",
@@ -192,7 +225,7 @@ export function LandingPage() {
             >
               {desktopNavLinks}
             </nav>
-            <div className="flex items-center gap-1 sm:gap-2 justify-self-end">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2 justify-self-end">
               <LanguageToggle
                 variant="landing"
                 className={cn(
@@ -209,22 +242,26 @@ export function LandingPage() {
                   LANDING_HEADER_HOVER
                 )}
               />
-              {dashboardPath ? (
-                <>
-                  <Button asChild size="sm">
-                    <Link to={dashboardPath}>{t("landing.enterConsole")}</Link>
+              <div className="hidden items-center gap-2 lg:flex">
+                {dashboardPath ? (
+                  <>
+                    <Button asChild size="sm">
+                      <Link to={dashboardPath}>
+                        {t("landing.enterConsole")}
+                      </Link>
+                    </Button>
+                    <UserProfile />
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    className={LANDING_LOGIN_BUTTON}
+                    onClick={handleLogin}
+                  >
+                    {t("landing.loginRegister")}
                   </Button>
-                  <UserProfile />
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  className={LANDING_LOGIN_BUTTON}
-                  onClick={handleLogin}
-                >
-                  {t("landing.loginRegister")}
-                </Button>
-              )}
+                )}
+              </div>
               <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -243,6 +280,32 @@ export function LandingPage() {
                   </SheetHeader>
                   <div className="mt-6 flex flex-col gap-4">
                     {mobileNavLinks}
+                    <div className="flex flex-col items-center gap-3 border-t border-border pt-4">
+                      {dashboardPath ? (
+                        <>
+                          <Button asChild size="sm" className="w-full">
+                            <Link
+                              to={dashboardPath}
+                              onClick={() => setMenuOpen(false)}
+                            >
+                              {t("landing.enterConsole")}
+                            </Link>
+                          </Button>
+                          <UserProfile />
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className={cn("w-full", LANDING_LOGIN_BUTTON)}
+                          onClick={() => {
+                            setMenuOpen(false);
+                            handleLogin();
+                          }}
+                        >
+                          {t("landing.loginRegister")}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
