@@ -181,11 +181,15 @@ function parseTimeInput(raw: string, unit: TimeUnit): number | null {
   return unit === "sec" ? parsed : parsed * 60;
 }
 
-function creditSharePercent(credits: number, total: number): number {
+function creditSharePercent(credits: number, total: number): string {
   if (total <= 0) {
-    return 0;
+    return "0";
   }
-  return Math.round((credits / total) * 100);
+  const raw = (credits / total) * 100;
+  if (raw < 1) {
+    return raw.toFixed(1);
+  }
+  return String(Math.round(raw));
 }
 
 function formatCompactUnit(

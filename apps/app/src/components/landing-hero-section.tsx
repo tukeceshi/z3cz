@@ -90,6 +90,15 @@ export function LandingHeroSection() {
               </button>
             </div>
 
+            <div className="mt-16 text-center">
+              <h2 className="font-serif text-3xl font-semibold tracking-[-0.03em] text-balance text-foreground md:text-4xl md:leading-[1.25]">
+                {t("landing.billingTitle")}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {t("landing.billingSubtitle")}
+              </p>
+            </div>
+
             <LandingHeroFeaturedPricing />
           </div>
         </div>

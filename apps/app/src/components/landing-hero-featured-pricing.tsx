@@ -8,15 +8,20 @@ import {
   formatVideoTokenMillions,
   type HomepageVideoScenario,
   isVideoPriceCompareCompetitor,
+  isVideoPricePromoFold,
+  isVideoPricePromoFoldDraft,
   LANDING_VIDEO_PRICE_MODEL_ID,
   matchVideoModelPricePromo,
+  normalizeVideoPricePromoFold,
   planVideoEstimateClips,
   readVideoPriceEstimateTier,
   VIDEO_DURATION_MAX,
   VIDEO_RATIO_OPTIONS,
 } from "@dafthunk/types";
 import ArrowRight from "lucide-react/icons/arrow-right";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import ArrowUp from "lucide-react/icons/arrow-up";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyScenarioPreset,
@@ -52,6 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -76,6 +82,35 @@ const LANDING_PROMO_CHECKBOX_CLASS =
   "landing-promo-checkbox size-2.5 shrink-0 rounded-[2px] border border-foreground/35 bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5b66de]/30";
 const LANDING_POPOVER_TITLE_CLASS =
   "mb-2 block w-full text-xs font-medium text-foreground";
+const YEAR_CONTRACT_FOLD_INPUT_CLASS = cn(
+  "h-7 w-16 rounded-md bg-muted/45 px-1.5 py-0.5 text-center text-xs outline-none transition-colors",
+  "focus:bg-muted/65",
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+);
+const YEAR_CONTRACT_FOLD_MARK_CLASS =
+  "ml-0.5 text-[10px] leading-none text-muted-foreground";
+const FEATURED_PARAM_TRIGGER_CLASS = cn(
+  LANDING_PARAM_TRIGGER_CLASS,
+  LANDING_PARAM_CHIP_CLASS,
+);
+
+function parseYearContractFoldDraft(raw: string): number | null {
+  if (raw.trim() === "") {
+    return null;
+  }
+  const value = Number(raw);
+  if (!isVideoPricePromoFold(value)) {
+    return null;
+  }
+  return normalizeVideoPricePromoFold(value);
+}
+
+function applyYearContractFold(costYuan: number, fold: number | null): number {
+  if (fold == null) {
+    return costYuan;
+  }
+  return applyVideoPricePromoFold(costYuan, fold);
+}
 
 function formatScenarioTabIndex(index: number): string {
   return String(index + 1).padStart(2, "0");
@@ -96,11 +131,60 @@ function createScenarioSetters(state: {
   return state;
 }
 
-function FeaturedParamChip(props: {
-  readonly children: ReactNode;
+function OfficialPaidPriceCell(props: {
+  readonly costYuan: number | null;
+  readonly unavailableLabel: string;
+  readonly title: string;
+  readonly foldUnit: string;
+  readonly foldLabel: string | null;
+  readonly draft: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onDraftChange: (raw: string) => void;
 }) {
+  if (props.costYuan == null) {
+    return props.unavailableLabel;
+  }
+
   return (
-    <span className={LANDING_PARAM_CHIP_CLASS}>{props.children}</span>
+    <span className="inline-flex items-center gap-x-0.5">
+      <span>{props.costYuan.toFixed(2)}</span>
+      {props.foldLabel ? (
+        <sup className={YEAR_CONTRACT_FOLD_MARK_CLASS}>{props.foldLabel}</sup>
+      ) : null}
+      <LandingMenuPopover
+        open={props.open}
+        onOpenChange={props.onOpenChange}
+        contentClassName="p-2.5"
+        trigger={
+          <button
+            type="button"
+            aria-label={props.title}
+            className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-[#f0ede6] hover:text-foreground dark:hover:bg-neutral-800"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        }
+      >
+        <p className={LANDING_POPOVER_TITLE_CLASS}>{props.title}</p>
+        <div className="flex items-center gap-1">
+          <Input
+            id="landing_year_contract_fold"
+            name="landing_year_contract_fold"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            autoFocus
+            value={props.draft}
+            className={YEAR_CONTRACT_FOLD_INPUT_CLASS}
+            onChange={(event) => {
+              props.onDraftChange(event.target.value);
+            }}
+          />
+          <span className="text-xs text-muted-foreground">{props.foldUnit}</span>
+        </div>
+      </LandingMenuPopover>
+    </span>
   );
 }
 
@@ -166,6 +250,10 @@ export function LandingHeroFeaturedPricing() {
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceClipOpen, setReferenceClipOpen] = useState(false);
   const [excludePromo, setExcludePromo] = useState(false);
+  const [yearContractFold, setYearContractFold] = useState<number | null>(null);
+  const [yearContractFoldDraft, setYearContractFoldDraft] = useState("");
+  const [yearContractOpen, setYearContractOpen] = useState(false);
+  const [showParamHint, setShowParamHint] = useState(true);
   const [pendingExternal, setPendingExternal] = useState<{
     name: string;
     url: string;
@@ -239,6 +327,13 @@ export function LandingHeroFeaturedPricing() {
 
   const handleSelectScenario = (scenario: HomepageVideoScenario) => {
     applyScenarioPreset(scenario, scenarioSetters);
+    setShowParamHint(false);
+  };
+
+  const hideParamHintOnButton = (event: { readonly target: EventTarget | null }) => {
+    if (event.target instanceof Element && event.target.closest("button")) {
+      setShowParamHint(false);
+    }
   };
 
   const clipPlan = useMemo(
@@ -336,12 +431,16 @@ export function LandingHeroFeaturedPricing() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const officialCostYuan =
+  const billedCostYuan =
     estimate == null
       ? null
       : !excludePromo && platformPromo
         ? applyVideoPricePromoFold(estimate.costYuan, platformPromo.discountFold)
         : estimate.costYuan;
+  const officialCostYuan =
+    billedCostYuan == null
+      ? null
+      : applyYearContractFold(billedCostYuan, yearContractFold);
   const officialTokens =
     estimate == null
       ? null
@@ -375,9 +474,10 @@ export function LandingHeroFeaturedPricing() {
       <div
         id="landing-demo"
         className={cn(
-          "landing-featured mx-auto mt-16 flex min-h-0 w-full max-w-4xl flex-col overflow-hidden border bg-[#f7f5f1] text-left dark:bg-neutral-900 md:h-[350px]",
+          "landing-featured mx-auto mt-10 flex min-h-0 w-full max-w-4xl flex-col overflow-hidden border bg-[#f7f5f1] text-left dark:bg-neutral-900 md:h-[350px]",
           LANDING_BORDER,
         )}
+        onClickCapture={hideParamHintOnButton}
       >
         <div
           className={cn(
@@ -397,7 +497,7 @@ export function LandingHeroFeaturedPricing() {
         </div>
 
         <div className="grid min-h-0 flex-1 md:grid-cols-[2fr_3fr]">
-          <div className="flex flex-col items-start gap-4 p-6 lg:p-8">
+          <div className="flex h-full min-h-0 flex-col items-start gap-4 p-6 lg:p-8">
           <div className="flex w-full items-baseline justify-between gap-3">
             <span className="landing-featured-title font-mono font-bold text-foreground">
               {selectedScenario?.name ?? t("common.loading")}
@@ -433,153 +533,153 @@ export function LandingHeroFeaturedPricing() {
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
-              <FeaturedParamChip>
-                <LandingSelectPopover
-                  label={model.displayName}
-                  open={modelOpen}
-                  onOpenChange={setModelOpen}
-                  contentClassName="min-w-52"
-                >
-                  {models.map((entry) => (
-                    <LandingMenuOptionButton
-                      key={entry.canonicalId}
-                      active={entry.canonicalId === model.canonicalId}
-                      onSelect={() => {
-                        setCanonicalId(entry.canonicalId);
-                        setModelOpen(false);
-                      }}
-                    >
-                      {entry.displayName}
-                    </LandingMenuOptionButton>
-                  ))}
-                </LandingSelectPopover>
-              </FeaturedParamChip>
+              <LandingSelectPopover
+                label={model.displayName}
+                open={modelOpen}
+                onOpenChange={setModelOpen}
+                triggerClassName={FEATURED_PARAM_TRIGGER_CLASS}
+                contentClassName="min-w-52"
+              >
+                {models.map((entry) => (
+                  <LandingMenuOptionButton
+                    key={entry.canonicalId}
+                    active={entry.canonicalId === model.canonicalId}
+                    onSelect={() => {
+                      setCanonicalId(entry.canonicalId);
+                      setModelOpen(false);
+                    }}
+                  >
+                    {entry.displayName}
+                  </LandingMenuOptionButton>
+                ))}
+              </LandingSelectPopover>
 
-              <FeaturedParamChip>
-                <LandingSelectPopover
-                  label={ratio}
-                  open={ratioOpen}
-                  onOpenChange={setRatioOpen}
-                >
-                  {BILLING_RATIOS.map((option) => (
-                    <LandingMenuOptionButton
-                      key={option}
-                      active={option === ratio}
-                      onSelect={() => {
-                        setRatio(option);
-                        setRatioOpen(false);
-                      }}
-                    >
-                      {option}
-                    </LandingMenuOptionButton>
-                  ))}
-                </LandingSelectPopover>
-              </FeaturedParamChip>
+              <LandingSelectPopover
+                label={ratio}
+                open={ratioOpen}
+                onOpenChange={setRatioOpen}
+                triggerClassName={FEATURED_PARAM_TRIGGER_CLASS}
+              >
+                {BILLING_RATIOS.map((option) => (
+                  <LandingMenuOptionButton
+                    key={option}
+                    active={option === ratio}
+                    onSelect={() => {
+                      setRatio(option);
+                      setRatioOpen(false);
+                    }}
+                  >
+                    {option}
+                  </LandingMenuOptionButton>
+                ))}
+              </LandingSelectPopover>
 
-              <FeaturedParamChip>
-                <LandingSelectPopover
-                  label={activeResolution.toUpperCase()}
-                  open={resolutionOpen}
-                  onOpenChange={setResolutionOpen}
-                >
-                  {resolutions.map((option) => (
-                    <LandingMenuOptionButton
-                      key={option}
-                      active={option === activeResolution}
-                      onSelect={() => {
-                        setResolution(option);
-                        setResolutionOpen(false);
-                      }}
-                    >
-                      {option.toUpperCase()}
-                    </LandingMenuOptionButton>
-                  ))}
-                </LandingSelectPopover>
-              </FeaturedParamChip>
+              <LandingSelectPopover
+                label={activeResolution.toUpperCase()}
+                open={resolutionOpen}
+                onOpenChange={setResolutionOpen}
+                triggerClassName={FEATURED_PARAM_TRIGGER_CLASS}
+              >
+                {resolutions.map((option) => (
+                  <LandingMenuOptionButton
+                    key={option}
+                    active={option === activeResolution}
+                    onSelect={() => {
+                      setResolution(option);
+                      setResolutionOpen(false);
+                    }}
+                  >
+                    {option.toUpperCase()}
+                  </LandingMenuOptionButton>
+                ))}
+              </LandingSelectPopover>
 
-              <FeaturedParamChip>
+              <LandingMenuPopover
+                open={durationOpen}
+                onOpenChange={setDurationOpen}
+                contentClassName="p-2.5"
+                trigger={
+                  <button type="button" className={FEATURED_PARAM_TRIGGER_CLASS}>
+                    {durationLabel}
+                  </button>
+                }
+              >
+                <p className={LANDING_POPOVER_TITLE_CLASS}>
+                  {t("landing.durationLabel")}
+                </p>
+                <TimeAmountControl
+                  hideTitle
+                  seconds={durationSec}
+                  unit={durationUnit}
+                  minSeconds={1}
+                  maxSeconds={LANDING_TIME_MAX_SEC}
+                  unitSecLabel={t("landing.durationUnitSec")}
+                  unitMinLabel={t("landing.durationUnitMin")}
+                  onSecondsChange={setDurationSec}
+                  onUnitChange={setDurationUnit}
+                />
+              </LandingMenuPopover>
+
+              {isSingleClipScenario ? (
                 <LandingMenuPopover
-                  open={durationOpen}
-                  onOpenChange={setDurationOpen}
+                  open={referenceOpen}
+                  onOpenChange={setReferenceOpen}
                   contentClassName="p-2.5"
                   trigger={
-                    <button type="button" className={LANDING_PARAM_TRIGGER_CLASS}>
-                      {durationLabel}
+                    <button type="button" className={FEATURED_PARAM_TRIGGER_CLASS}>
+                      {referenceLabel}
                     </button>
                   }
                 >
                   <p className={LANDING_POPOVER_TITLE_CLASS}>
-                    {t("landing.durationLabel")}
+                    {t("landing.referenceVideoDurationLabel")}
                   </p>
                   <TimeAmountControl
                     hideTitle
-                    seconds={durationSec}
-                    unit={durationUnit}
-                    minSeconds={1}
+                    seconds={referenceSec}
+                    unit={referenceUnit}
+                    minSeconds={0}
                     maxSeconds={LANDING_TIME_MAX_SEC}
                     unitSecLabel={t("landing.durationUnitSec")}
                     unitMinLabel={t("landing.durationUnitMin")}
-                    onSecondsChange={setDurationSec}
-                    onUnitChange={setDurationUnit}
+                    onSecondsChange={setReferenceSec}
+                    onUnitChange={setReferenceUnit}
                   />
                 </LandingMenuPopover>
-              </FeaturedParamChip>
-
-              <FeaturedParamChip>
-                {isSingleClipScenario ? (
-                  <LandingMenuPopover
-                    open={referenceOpen}
-                    onOpenChange={setReferenceOpen}
-                    contentClassName="p-2.5"
-                    trigger={
-                      <button type="button" className={LANDING_PARAM_TRIGGER_CLASS}>
-                        {referenceLabel}
-                      </button>
-                    }
-                  >
-                    <p className={LANDING_POPOVER_TITLE_CLASS}>
-                      {t("landing.referenceVideoDurationLabel")}
-                    </p>
-                    <TimeAmountControl
-                      hideTitle
-                      seconds={referenceSec}
-                      unit={referenceUnit}
-                      minSeconds={0}
-                      maxSeconds={LANDING_TIME_MAX_SEC}
-                      unitSecLabel={t("landing.durationUnitSec")}
-                      unitMinLabel={t("landing.durationUnitMin")}
-                      onSecondsChange={setReferenceSec}
-                      onUnitChange={setReferenceUnit}
-                    />
-                  </LandingMenuPopover>
-                ) : (
-                  <ReferenceClipControl
-                    variant="chip"
-                    modal={false}
-                    hideChevron
-                    popoverTitle={t("landing.referenceVideoDurationLabel")}
-                    triggerLabel={formatLandingParamReferenceSummary(
-                      usedReferencedCount,
-                      usedAvgReferenceSec,
-                    )}
-                    contentClassName={landingMenuContentClass("min-w-56 p-2.5")}
-                    triggerClassName={LANDING_PARAM_TRIGGER_CLASS}
-                    clipCount={clipPlan.clipCount}
-                    clipDurationSec={clipPlan.clipDurationSec}
-                    referencedCount={usedReferencedCount}
-                    avgReferenceSec={usedAvgReferenceSec}
-                    maxAvgReferenceSec={
-                      model.maxVideoReferenceSeconds ?? usedAvgReferenceSec
-                    }
-                    open={referenceClipOpen}
-                    onOpenChange={setReferenceClipOpen}
-                    onReferencedCountChange={setReferencedClipCount}
-                    onAvgReferenceSecChange={setAvgReferenceSec}
-                  />
-                )}
-              </FeaturedParamChip>
+              ) : (
+                <ReferenceClipControl
+                  variant="chip"
+                  modal={false}
+                  hideChevron
+                  popoverTitle={t("landing.referenceVideoDurationLabel")}
+                  triggerLabel={formatLandingParamReferenceSummary(
+                    usedReferencedCount,
+                    usedAvgReferenceSec,
+                  )}
+                  contentClassName={landingMenuContentClass("min-w-56 p-2.5")}
+                  triggerClassName={FEATURED_PARAM_TRIGGER_CLASS}
+                  clipCount={clipPlan.clipCount}
+                  clipDurationSec={clipPlan.clipDurationSec}
+                  referencedCount={usedReferencedCount}
+                  avgReferenceSec={usedAvgReferenceSec}
+                  maxAvgReferenceSec={
+                    model.maxVideoReferenceSeconds ?? usedAvgReferenceSec
+                  }
+                  open={referenceClipOpen}
+                  onOpenChange={setReferenceClipOpen}
+                  onReferencedCountChange={setReferencedClipCount}
+                  onAvgReferenceSecChange={setAvgReferenceSec}
+                />
+              )}
             </div>
           )}
+
+          {showParamHint ? (
+            <p className="landing-param-hint-shake mt-auto flex flex-col items-center gap-0.5 self-center font-mono text-sm text-muted-foreground">
+              <ArrowUp aria-hidden className="size-4" strokeWidth={2} />
+              <span>{t("landing.paramAdjustHint")}</span>
+            </p>
+          ) : null}
 
           </div>
 
@@ -623,14 +723,50 @@ export function LandingHeroFeaturedPricing() {
                           {t("landing.platformOfficial")}
                         </td>
                         <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
-                          {officialCostYuan == null
-                            ? t("landing.compareUnavailable")
-                            : officialCostYuan.toFixed(2)}
+                          <OfficialPaidPriceCell
+                            costYuan={officialCostYuan}
+                            unavailableLabel={t("landing.compareUnavailable")}
+                            title={t("landing.yearContractDiscount")}
+                            foldUnit={t("landing.yearContractFoldUnit")}
+                            foldLabel={
+                              yearContractFold == null
+                                ? null
+                                : promoFoldLabel(yearContractFold)
+                            }
+                            draft={yearContractFoldDraft}
+                            open={yearContractOpen}
+                            onOpenChange={(open) => {
+                              setYearContractOpen(open);
+                              if (!open) {
+                                setYearContractFoldDraft(
+                                  yearContractFold == null
+                                    ? ""
+                                    : formatVideoPricePromoFold(yearContractFold),
+                                );
+                              }
+                            }}
+                            onDraftChange={(raw) => {
+                              if (!isVideoPricePromoFoldDraft(raw)) {
+                                return;
+                              }
+                              setYearContractFoldDraft(raw);
+                              setYearContractFold(parseYearContractFoldDraft(raw));
+                            }}
+                          />
                         </td>
                         <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
-                          {officialTokens == null
-                            ? t("landing.compareUnavailable")
-                            : formatVideoTokenMillions(officialTokens)}
+                          {officialTokens == null ? (
+                            t("landing.compareUnavailable")
+                          ) : (
+                            <span>
+                              {formatVideoTokenMillions(officialTokens)}
+                              {!excludePromo && platformPromo ? (
+                                <sup className={YEAR_CONTRACT_FOLD_MARK_CLASS}>
+                                  {promoFoldLabel(platformPromo.discountFold)}
+                                </sup>
+                              ) : null}
+                            </span>
+                          )}
                         </td>
                         <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
                           {officialRate == null
@@ -698,7 +834,10 @@ export function LandingHeroFeaturedPricing() {
         </div>
       </div>
 
-      <div className="landing-featured mx-auto mt-4 w-full max-w-4xl">
+      <div
+        className="landing-featured mx-auto mt-4 w-full max-w-4xl"
+        onClickCapture={hideParamHintOnButton}
+      >
         <div
           className={cn(
             "grid grid-cols-3 border-t border-l md:grid-cols-6",
