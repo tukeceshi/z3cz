@@ -18,6 +18,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  applyInlineVideoPlayback,
+  canHoverVideoPlayback,
+  startMutedInlinePlayback,
+} from "@/utils/inline-video-playback";
 import { cn } from "@/utils/utils";
 
 import { videoSrcAllowsCrossOrigin } from "./video-src-cross-origin";
@@ -113,7 +118,7 @@ export function WorkflowMediaVideoPlayer({
   );
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => isCardVariant);
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -149,10 +154,16 @@ export function WorkflowMediaVideoPlayer({
     if (!video) return;
 
     video.volume = DEFAULT_VOLUME;
-    video.muted = false;
+    applyInlineVideoPlayback(video);
+    if (isCardVariant) {
+      video.muted = true;
+      setIsMuted(true);
+    } else {
+      video.muted = false;
+      setIsMuted(false);
+    }
 
     setIsPlaying(!video.paused);
-    setIsMuted(false);
     setVolume(DEFAULT_VOLUME);
     lastVolumeBeforeMuteRef.current = DEFAULT_VOLUME;
     syncTimeState();
@@ -211,15 +222,9 @@ export function WorkflowMediaVideoPlayer({
     if (!video) return;
 
     video.volume = DEFAULT_VOLUME;
-    video.muted = false;
     setVolume(DEFAULT_VOLUME);
-    setIsMuted(false);
-
-    void video.play().catch(() => {
-      video.muted = true;
-      setIsMuted(true);
-      void video.play().catch(() => {});
-    });
+    setIsMuted(true);
+    startMutedInlinePlayback(video);
   }, [videoRef]);
 
   const handleCardMouseEnter = useCallback(() => {
@@ -235,7 +240,7 @@ export function WorkflowMediaVideoPlayer({
   }, [initialHovered, isCardVariant, src, tryCardAutoplay]);
 
   const handleCardMouseLeave = useCallback(() => {
-    if (!isCardVariant) return;
+    if (!isCardVariant || !canHoverVideoPlayback()) return;
     setIsHovered(false);
     setIsVolumeHovered(false);
     resetVideoToStart();

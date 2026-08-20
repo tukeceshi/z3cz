@@ -98,6 +98,12 @@ export const DEFAULT_BOOTSTRAP_SETTINGS: BootstrapSettings = {
   lastSyncError: null,
 };
 
+export function resolveBootstrapStorageProvider(
+  value: string | null | undefined
+): BootstrapStorageProvider {
+  return value === "tos" ? "tos" : "r2";
+}
+
 export function mergeBootstrapSettings(
   partial: Partial<BootstrapSettings> | null | undefined
 ): BootstrapSettings {
@@ -117,6 +123,6 @@ export function mergeBootstrapSettings(
   return {
     ...DEFAULT_BOOTSTRAP_SETTINGS,
     ...rest,
-    storageProvider: rest.storageProvider === "tos" ? "tos" : "r2",
+    storageProvider: resolveBootstrapStorageProvider(rest.storageProvider),
   };
 }

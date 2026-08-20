@@ -169,7 +169,7 @@ export function toAdminBootstrapSettings(
     r2Enabled: settings.r2Enabled,
     r2Only: settings.r2Only,
     storageOnlyAllowed: canUseStorageOnly(settings, currentVersion),
-    storageProvider: getBootstrapStorageProvider(settings),
+    storageProvider: settings.storageProvider,
     accountId: settings.accountId,
     accessKeyId: settings.accessKeyId,
     secretAccessKey: settings.secretAccessKeyEncrypted.trim()

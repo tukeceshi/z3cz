@@ -30,6 +30,10 @@
     ) {
       return;
     }
+    // iPhone cannot play videos served from Cache Storage.
+    if (pathname.slice(-4) === ".mp4") {
+      return;
+    }
 
     event.respondWith(
       caches.open(ASSETS_CACHE).then(function (cache) {
