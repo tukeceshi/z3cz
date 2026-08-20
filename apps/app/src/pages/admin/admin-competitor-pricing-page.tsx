@@ -68,6 +68,8 @@ import {
 } from "@/services/competitor-video-pricing-service";
 import { cn } from "@/utils/utils";
 
+import { AdminHomepageVideoScenariosSection } from "./admin-homepage-video-scenarios-section";
+
 function RateField(props: {
   readonly id: string;
   readonly label: string;
@@ -205,6 +207,7 @@ export function AdminCompetitorPricingPage() {
   const setBreadcrumbs = useBreadcrumbsSetter();
   const {
     competitors,
+    scenarios,
     competitorsError,
     isCompetitorsLoading,
     refreshCompetitors,
@@ -926,6 +929,10 @@ export function AdminCompetitorPricingPage() {
             </TableBody>
           </Table>
         </div>
+        <AdminHomepageVideoScenariosSection
+          scenarios={scenarios}
+          onSaved={refreshCompetitors}
+        />
       </InsetLayout>
     );
   }

@@ -51,11 +51,13 @@ export const WORKFLOW_ADD_NODE_MENU_SHELL = cn(
 export interface WorkflowAddNodeMenuPanelProps {
   readonly onSelect: (nodeType: AiGenerativeNodeType) => void;
   readonly className?: string;
+  readonly highlightedType?: AiGenerativeNodeType;
 }
 
 export function WorkflowAddNodeMenuPanel({
   onSelect,
   className,
+  highlightedType,
 }: WorkflowAddNodeMenuPanelProps) {
   const { t } = useTranslation();
 
@@ -72,7 +74,8 @@ export function WorkflowAddNodeMenuPanel({
             className={cn(
               "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm",
               "text-neutral-900 hover:bg-neutral-100",
-              "dark:text-neutral-100 dark:hover:bg-neutral-800"
+              "dark:text-neutral-100 dark:hover:bg-neutral-800",
+              highlightedType === item.type && "bg-neutral-100 dark:bg-neutral-800"
             )}
             onClick={() => onSelect(item.type)}
           >

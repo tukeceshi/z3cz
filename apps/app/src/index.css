@@ -778,3 +778,359 @@ html.studio-reference-dragging * {
   cursor: grabbing !important;
 }
 
+@layer utilities {
+  .landing-glow-hero-top {
+    background-image: radial-gradient(
+      ellipse 62% 52% at 50% 36%,
+      rgb(91 102 222 / 0.2),
+      transparent 72%
+    );
+  }
+
+  .landing-hero-brand {
+    position: relative;
+    z-index: 0;
+    white-space: nowrap;
+  }
+
+  .landing-hero-brand::after {
+    content: "";
+    position: absolute;
+    inset: -0.05em -0.12em -0.1em;
+    z-index: -1;
+    border-radius: 0.15em;
+    background: currentcolor;
+    opacity: 0.12;
+    transform: scaleX(0);
+    transform-origin: 0 center;
+    animation: landing-brand-highlight 0.85s cubic-bezier(0.22, 1, 0.36, 1)
+      0.45s both;
+  }
+
+  .landing-page-scroll {
+    scrollbar-gutter: stable;
+  }
+
+  .landing-canvas-demo-dots {
+    background-image: radial-gradient(
+      circle,
+      rgb(0 0 0 / 0.28) 0.7px,
+      transparent 0.8px
+    );
+    -webkit-mask-image: radial-gradient(
+      ellipse 80% 78% at 50% 50%,
+      #000 55%,
+      transparent 92%
+    );
+    mask-image: radial-gradient(
+      ellipse 80% 78% at 50% 50%,
+      #000 55%,
+      transparent 92%
+    );
+  }
+
+  .dark .landing-canvas-demo-dots {
+    background-image: radial-gradient(
+      circle,
+      rgb(255 255 255 / 0.42) 0.7px,
+      transparent 0.8px
+    );
+  }
+
+  .landing-featured {
+    font-family:
+      "TASA Orbiter",
+      -apple-system,
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .landing-featured-bar {
+    padding: 8px 12px;
+  }
+
+  .landing-featured-bar-title {
+    font-family:
+      "TASA Orbiter",
+      -apple-system,
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+    letter-spacing: 0.02em;
+    color: #6b6a63;
+  }
+
+  .landing-featured-bar-mark {
+    font-family: "Space Mono", ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 15px;
+    letter-spacing: 0.16em;
+    color: rgb(107 106 99 / 0.42);
+    text-transform: uppercase;
+  }
+
+  .landing-featured-title {
+    font-size: 1.125rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .landing-featured-tab-index {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .landing-featured-tab {
+    font-size: 12px;
+    letter-spacing: -0.01em;
+  }
+
+  .landing-featured-param {
+    font-family: "Space Mono", ui-monospace, Menlo, monospace;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .landing-promo {
+    font-family:
+      "TASA Orbiter",
+      -apple-system,
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .landing-promo-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .landing-promo-header {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+  }
+
+  .landing-promo-header-copy {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .landing-promo-heading {
+    font-family:
+      "TASA Orbiter",
+      -apple-system,
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: clamp(2rem, 3vw, 2.5rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #1a1a18;
+  }
+
+  .landing-promo-subheading {
+    margin-top: 0.875rem;
+    max-width: 42rem;
+    font-size: 1rem;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    color: #6b6a63;
+  }
+
+  .landing-promo-link {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+    align-self: flex-start;
+    border: 1px solid #e2ded4;
+    border-radius: 0.5rem;
+    background: transparent;
+    padding: 0.375rem 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: #6b6a63;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  @media (min-width: 640px) {
+    .landing-promo-link {
+      align-self: auto;
+    }
+  }
+
+  .landing-promo-link:hover {
+    color: #1a1a18;
+    border-color: #cfc9bc;
+  }
+
+  .landing-promo-grid-shell {
+    margin-top: 3rem;
+    overflow: hidden;
+    border: 1px solid #e2ded4;
+    border-radius: 0.75rem;
+    background: transparent;
+  }
+
+  .landing-promo-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 640px) {
+    .landing-promo-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .landing-promo-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .landing-promo-card {
+    margin-top: -1px;
+    margin-left: -1px;
+    border-top: 1px solid #e2ded4;
+    border-left: 1px solid #e2ded4;
+    padding: 1.5rem;
+    background: transparent;
+  }
+
+  .landing-promo-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .landing-promo-card-title {
+    min-width: 0;
+    font-family:
+      "TASA Orbiter",
+      -apple-system,
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: 1.1875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: #1a1a18;
+  }
+
+  .landing-promo-card-title-link {
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .landing-promo-card-title-link:hover {
+    color: #000;
+  }
+
+  .landing-promo-badge {
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: rgb(91 102 222 / 0.1);
+    padding: 0.25rem 0.625rem;
+    font-family: "Space Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4a55cf;
+  }
+
+  .landing-promo-card-desc {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    color: #6b6a63;
+  }
+
+  .landing-promo-card-body .landing-promo-card-desc + .landing-promo-card-desc {
+    margin-top: 0.375rem;
+  }
+
+  .dark .landing-promo-heading,
+  .dark .landing-promo-card-title,
+  .dark .landing-promo-card-title-link:hover {
+    color: #f5f5f4;
+  }
+
+  .dark .landing-promo-subheading,
+  .dark .landing-promo-card-desc {
+    color: #a8a29e;
+  }
+
+  .dark .landing-promo-link {
+    border-color: rgb(255 255 255 / 0.12);
+    background: transparent;
+    color: #a8a29e;
+  }
+
+  .dark .landing-promo-link:hover {
+    border-color: rgb(255 255 255 / 0.2);
+    color: #fafaf9;
+  }
+
+  .dark .landing-promo-grid-shell,
+  .dark .landing-promo-card {
+    border-color: rgb(255 255 255 / 0.12);
+    background: transparent;
+  }
+
+  .dark .landing-promo-badge {
+    background: rgb(91 102 222 / 0.18);
+    color: #a5adf0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-hero-brand::after {
+      animation: none;
+      transform: scaleX(1);
+    }
+  }
+
+  .dark .landing-glow-hero-top {
+    background-image: radial-gradient(
+      ellipse 62% 52% at 50% 36%,
+      rgb(91 102 222 / 0.09),
+      transparent 72%
+    );
+  }
+}
+
+@keyframes landing-brand-highlight {
+  100% {
+    transform: scaleX(1);
+  }
+}
+

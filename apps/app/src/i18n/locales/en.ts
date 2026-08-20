@@ -45,13 +45,42 @@ export const en = {
   },
   landing: {
     navIntro: "Overview",
-    navPricing: "Pricing",
-    navFeatures: "Capabilities",
+    navPricing: "Cost estimate",
+    navFeatures: "Freeform canvas",
     login: "Log in",
     loginRegister: "Log in / Sign up",
     joinNow: "Get started",
     enterConsole: "Open console",
+    heroHeadlineSuffix: "All-in-one AI creation, storage & collaboration hub",
+    heroDescription:
+      "Create without limits — use any model API you choose, connect your own cloud storage, and keep full ownership of your data. Every project is a venture; start with a cost estimate to find the best path. We support Volcengine and bring work from other platforms together for easier team collaboration.",
+    heroFeatureCanvas: "Infinite canvas",
+    heroFeatureView: "Creation view",
+    heroFeatureApi: "API access",
+    heroFeatureStorage: "Cloud storage",
+    heroFeatureCollab: "Team collaboration",
+    heroDemoCta: "Feature demo",
     heroTitle: "Estimate production cost",
+    canvasDemoSectionLabel: "Feature demo",
+    canvasDemoSectionTitle: "Infinite canvas. Creation goes beyond generate.",
+    canvasDemoSectionBody: "Create / Manage / Collaborate / Produce",
+    canvasDemoLabel: "Infinite canvas",
+    canvasDemoTitle: "Create nodes, make work",
+    canvasDemoBody:
+      "Drag nodes and the canvas, scroll to zoom. Auto-layout keeps the view clear. Draw a line to add nodes and link references. Even with lots of assets, dragging and zooming stay smooth.",
+    canvasDemoPrompt:
+      "身材娇小纤细，圆润的娃娃脸，大眼睛，鼻梁小巧，长相甜美可爱。",
+    canvasDemoModel: "GPT Image 2",
+    canvasDemoVideoModel: "Seedance 2 Fast",
+    canvasDemoText1Name: "文字 1",
+    canvasDemoText3Name: "文字 3",
+    canvasDemoDollfaceName: "形象设计 A：娃娃脸的娇弱形象",
+    canvasDemoSurvivorName: "形象设计 A：荒岛求生主形象",
+    canvasDemoVideoName: "第1段｜00:00-00:15｜黑夜里的第二堆火",
+    canvasDemoText1Excerpt:
+      "下面按原文中出现的主要人物整理了可直接投喂给 GPT image2 的人物设计图生成词。为了保证同一故事中的人物形象统一，建议每张图都保留“原创角色、写实电影感、人物设定图、全身立绘、同一角色固定五官”的要求。\n\n## 统一风格词\n\n可添加到每一条提示词末尾：\n\n## 1. 林枫\n\n### 形象设计 A：荒岛求生主形象\n\n林枫，二十七岁左右的中国男性，身材高挑结实但不过分健壮，肩膀宽阔，短黑发略微凌乱，眉骨清晰，眼神冷静警惕，肤色被海风和阳光晒成健康的小麦色，下颌线利落，脸上有轻微擦伤和疲惫感。他穿着被海水浸湿后晾干的深灰色短袖T恤、破损的深色工装长裤、磨损严重的户外运动鞋，手臂和小腿有细小划伤，腰间系着简易绳索，手里握着一块锋利的防身石头。",
+    canvasDemoText3Excerpt:
+      "### 第1段｜00:00-00:15｜黑夜里的第二堆火\n\n| 镜头｜时间线｜时长｜景别 / 机位 / 运镜｜画面内容和人物表情与微动作｜自然眨眼动作｜台词 / 语气｜音效 |\n|---|---:|---:|---|---|---|---|---|\n| 1｜00:00-00:03｜3秒｜远景，高机位下摇后前推｜16:9夜景，岩壁凹处的营地内篝火燃烧。林枫站在画面右侧，身体朝左对着灌木丛，右手攥石头贴在腿侧。｜林枫听见灌木响动后自然眨眼1次｜林枫旁白，压低声音：“夜幕彻底沉下来，海风顺着沙滩往骨头缝里钻。”｜海风声、木柴爆裂声、远处海浪声 |\n| 2｜00:03-00:07｜4秒｜中近景，林枫右侧低机位前压｜林枫侧身面向镜头左前方，石头缓慢抬到胸前；火光扫过他紧绷的下颌。他盯死灌木丛，脚尖向后撤半步。｜林枫攥紧石头后自然眨眼1次｜林枫旁白：“我以为是闻着烤肉味摸过来的野物。”｜灌木摩擦声、林枫衣料摩擦声、火焰声 |\n| 3｜00:07-00:11.5｜4.5秒｜中景，手持跟拍，镜头从灌木后横移出来｜沈小棠从画面左侧灌木钻出，身体朝右对着林枫；她看见石头，脚步猛停，双手抬到胸前，嘴唇微张。｜沈小棠停步看向林枫后自然眨眼1次｜林枫旁白：“结果先钻出来的是沈小棠。”｜枝条刮衣服声、脚踩砂石声、海风声 |",
     heroSubtitle:
       "Multiple platforms, multiple angles — not the cheapest, just the right fit.",
     heroStart: "Get started",
@@ -71,6 +100,10 @@ export const en = {
     canvasTitle: "Canvas",
     canvasItemEdit: "Multi-track editing",
     canvasItemGenerate: "AI generation",
+    canvasItemGenerateDesc:
+      "Chain model nodes on the canvas for generation and editing.",
+    canvasSectionDesc:
+      "Drag to build workflows, collaborate in real time, keep work in the cloud.",
     canvasItemLibrary: "Asset library",
     canvasItemExport: "High-resolution export",
     canvasItemCloud: "Cloud storage",
@@ -90,13 +123,20 @@ export const en = {
     scenarioRestyle: "Restyle",
     scenarioPremium4k: "4K premium",
     scenarioDrama25: "2.5 drama",
-    scenarioClipBody: "Seedance 2.0, 16:9, 720p, 15s",
-    scenarioLearnBody: "Seedance 2.0 mini, 16:9, 480p, 10 min",
-    scenarioPersonalBody: "Seedance 2.0, 16:9, 720p, 15*3 min",
-    scenarioPipelineBody: "Seedance 2.0, 9:16, 480p, 30*2 min",
-    scenarioRestyleBody: "Seedance 2.0, 9:16, 720p, 30*2 min",
-    scenarioPremium4kBody: "Seedance 2.0, 16:9, 4K, 20*3 min",
-    scenarioDrama25Body: "Seedance 2.5, 9:16, 1080p, 30*2 min",
+    scenarioClipBody:
+      "Try one 15-second main clip first. One pull is enough; no reference needed.",
+    scenarioLearnBody:
+      "Follow a tutorial to build 10 minutes of main footage. Usually 2 pulls (~2× output); about 13% use reference clips (~5s each).",
+    scenarioPersonalBody:
+      "One episode in a series, 45 minutes of main footage. Estimate 2 pulls (~2× output); about 17% with reference (~10s each) to keep character and style consistent.",
+    scenarioPipelineBody:
+      "Batch vertical shorts, 60 minutes of main footage. One pull, output matches main footage, no reference.",
+    scenarioRestyleBody:
+      "Restyle existing footage, 60 minutes of main footage. One pull per shot; 100% use original reference (~15s each).",
+    scenarioPremium4kBody:
+      "Premium horizontal episode, 60 minutes of main footage. Estimate 2 pulls (~2× output); about 25% with reference (~10s each).",
+    scenarioDrama25Body:
+      "Vertical shorts with a new model, 60 minutes of main footage. Estimate 2 pulls (~2× output); about 8% with short reference (~5s each) for shot transitions.",
     platformOfficial: "火山引擎",
     platformOfficialBadge: "Official",
     planStandard: "Standard",
@@ -116,6 +156,7 @@ export const en = {
     comparePointsPercentValue: "{{percent}}%",
     comparePointsAfter: ")",
     comparePointsTotal: "{{total}} credits total",
+    comparePointsUsage: "Uses {{points}} credits",
     planAccounts: "*{{count}}",
     planAccountsHint: "Assets cannot be shared across accounts",
     quantityLabel: "Quantity",
@@ -132,10 +173,20 @@ export const en = {
     comparePoints: "{{points}} credits",
     compareUnavailable: "—",
     compareDisclaimer: "Price estimate, for reference only.",
+    priceEstimateHint: "Price estimate",
     compareFeedback: "Data correction / feedback",
     compareFeedbackQq: "QQ: 949016888",
     officialTokenValue: "{{tokens}} token",
     promoTitle: "Promo discounts",
+    promoSectionTitle: "Platform promos",
+    promoSectionDesc:
+      "Discounts are reflected in the calculator; listed here by platform.",
+    promoItemCount: "{{count}} items",
+    promoBackToCalc: "Back to calculator",
+    featuredPromoHintPrefix: "Some platforms have ",
+    featuredPromoHintCan: "; you can ",
+    featuredPromoHintSuffix: " to view regular pricing.",
+    featuredPromoLink: "promo discounts",
     promoNeedVideoReference: "Video reference required",
     promoFoldHint: "{{fold}}折",
     externalLinkTitle: "You are leaving this site",
@@ -143,6 +194,7 @@ export const en = {
       "You will open {{name}} in a new window. Check the destination before you continue.",
     externalLinkContinue: "Continue",
     referenceTitle: "Video reference",
+    referenceVideoDurationLabel: "Reference video duration",
     referenceClipSummary: "{{count}}*{{seconds}}s",
     referenceClipPlan: "About {{count}} clips of {{seconds}}s",
     referenceClipUsedPrefix: "Of which",
@@ -160,6 +212,13 @@ export const en = {
     referenceReadFailed: "Could not read that video.",
     tablePlatform: "Platform",
     tableLevel: "Plan",
+    tableLevelBillingHint:
+      "All listed fees are auto-renewing monthly/quarterly/yearly subscriptions. Cancel immediately after subscribing to avoid charges in the next billing cycle.",
+    tableLevelBillingHintLine1:
+      "All listed fees are auto-renewing monthly/quarterly/yearly subscriptions.",
+    tableLevelBillingHintLine2: "Cancel immediately after subscribing.",
+    tableLevelBillingHintLine3:
+      "Avoid charges in the next billing cycle.",
     tableTokens: "Credits/token",
     tableExcludePromo: "Remove discount",
     tablePrice: "Converted price",
@@ -176,7 +235,7 @@ export const en = {
     tableGptSkillDev: "In development",
     tableGptSkillUnavailable: "Not available",
     tableGptSkillSupported: "Supported",
-    rateValue: "¥{{rate}}/s",
+    rateValue: "{{rate}}/s",
     rechargeTitle: "First-time cost",
     rechargeBody:
       "¥200 is the minimum Volcengine top-up required to activate models.",
