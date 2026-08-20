@@ -8,6 +8,11 @@ import PlayIcon from "lucide-react/icons/play";
 import VideoIcon from "lucide-react/icons/video";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import {
+  LANDING_CLIP_SRC as CLIP_SRC,
+  LANDING_DOLLFACE_SRC as DOLLFACE_SRC,
+  LANDING_SURVIVOR_SRC as SURVIVOR_SRC,
+} from "@/bootstrap/landing-static-assets";
 import { useTranslation } from "@/components/locale-provider";
 import { ModelBrandIcon } from "@/components/model-brand-icon";
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
@@ -16,13 +21,13 @@ import { AI_BOTTOM_CHIP_CLASS } from "@/components/workflow/ai-bottom-chip";
 import { AiGenerateButton } from "@/components/workflow/ai-generate-button";
 import { GenerativeCardEmptyUploadSlot } from "@/components/workflow/generative-card-empty-upload-slot";
 import {
-  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
-  GENERATIVE_EDGE_PLUS_PX,
-} from "@/components/workflow/generative-edge-connection-config";
-import {
   GENERATIVE_NODE_CARD_CLASS,
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "@/components/workflow/generative-card-styles";
+import {
+  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
+  GENERATIVE_EDGE_PLUS_PX,
+} from "@/components/workflow/generative-edge-connection-config";
 import { WorkflowAddNodeMenuPanel } from "@/components/workflow/workflow-add-node-menu-panel";
 import {
   buildWorkflowSmoothStepPath,
@@ -59,11 +64,10 @@ const ADD_NODE_MENU_W = 168;
 const ADD_NODE_MENU_H = 220;
 const ADD_NODE_MENU_VIDEO_X = 56;
 const ADD_NODE_MENU_VIDEO_Y = 128;
-const PLUS_OUT = GENERATIVE_EDGE_PLUS_BORDER_GAP_PX + GENERATIVE_EDGE_PLUS_PX / 2;
-const DOLLFACE_SRC = "/landing/dollface.jpg";
-const SURVIVOR_SRC = "/landing/survivor.jpg";
-const CLIP_SRC = "/landing/clip.mp4";
+const PLUS_OUT =
+  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX + GENERATIVE_EDGE_PLUS_PX / 2;
 const VIEW_H = 500;
+const DEMO_SPAN_W = 720;
 const LAYOUT_BTN_SCREEN_X = 30;
 const LAYOUT_BTN_SCREEN_Y = VIEW_H - 30;
 const LAYOUT_BTN_CLASS =
@@ -211,10 +215,7 @@ function videoPromptBoxScreen(
 function videoPromptGenBtnScreen(promptBox: ScreenPoint): ScreenPoint {
   return {
     left:
-      promptBox.left +
-      VIDEO_PROMPT_W -
-      VIDEO_PROMPT_PAD_X -
-      GEN_BTN_SIZE / 2,
+      promptBox.left + VIDEO_PROMPT_W - VIDEO_PROMPT_PAD_X - GEN_BTN_SIZE / 2,
     top:
       promptBox.top +
       VIDEO_PROMPT_PAD_Y +
@@ -418,7 +419,7 @@ function DemoCanvasNode(props: {
       >
         <div className="absolute -top-5 left-0 z-10 flex max-w-full items-center gap-1 rounded-sm bg-card/40 px-1 py-0.5 backdrop-blur-sm">
           <Icon className="h-2.5 w-2.5 shrink-0 text-blue-500/70" />
-          <span className="max-w-[140px] truncate text-[10px] font-medium text-muted-foreground/70">
+          <span className="max-w-[140px] truncate text-[10px] font-medium text-muted-foreground">
             {props.title}
           </span>
         </div>
@@ -667,7 +668,9 @@ function layoutBoxes(motion: DemoMotion): {
 export function LandingCanvasGenerateDemo() {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [spanScale, setSpanScale] = useState(1);
   const motionRef = useRef<DemoMotion>(initialMotion(520));
   const [scene, setScene] = useState<DemoScene>("wait");
   const [motion, setMotion] = useState<DemoMotion>(() => initialMotion(520));
@@ -696,8 +699,7 @@ export function LandingCanvasGenerateDemo() {
   const typedText = prompt.slice(0, Math.round(motion.typedCount));
   const hasTyped = Math.round(motion.typedCount) >= 1;
   const videoSolo = scene === "videoDone";
-  const showImage =
-    scene !== "wait" && scene !== "type" && !videoSolo;
+  const showImage = scene !== "wait" && scene !== "type" && !videoSolo;
   const showStack =
     scene === "messy" ||
     scene === "createVideo" ||
@@ -723,6 +725,21 @@ export function LandingCanvasGenerateDemo() {
       : plusNode === "survivor"
         ? plusRight(boxes.survivor)
         : plusRight(boxes.dollface);
+
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    if (!wrap) {
+      return;
+    }
+    const updateScale = () => {
+      const width = wrap.clientWidth;
+      setSpanScale(width > 0 ? Math.min(1, width / DEMO_SPAN_W) : 1);
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -770,8 +787,18 @@ export function LandingCanvasGenerateDemo() {
 
       const closeX = Math.max(16, (vw - IMAGE_CLOSE_W) / 2);
       const messyBoxes: DemoBox[] = [
-        { x: MESSY.text1.x, y: MESSY.text1.y, w: TEXT_MESSY_W, h: TEXT_MESSY_H },
-        { x: MESSY.text3.x, y: MESSY.text3.y, w: TEXT_MESSY_W, h: TEXT_MESSY_H },
+        {
+          x: MESSY.text1.x,
+          y: MESSY.text1.y,
+          w: TEXT_MESSY_W,
+          h: TEXT_MESSY_H,
+        },
+        {
+          x: MESSY.text3.x,
+          y: MESSY.text3.y,
+          w: TEXT_MESSY_W,
+          h: TEXT_MESSY_H,
+        },
         {
           x: MESSY.dollface.x,
           y: MESSY.dollface.y,
@@ -816,8 +843,7 @@ export function LandingCanvasGenerateDemo() {
         VIEW_H
       );
       const focusCam = lookAt(videoBoxLaid, 1.2, vw, VIEW_H);
-      const showX =
-        (vw / 2 - focusCam.camX) / focusCam.zoom - VIDEO_SHOW_W / 2;
+      const showX = (vw / 2 - focusCam.camX) / focusCam.zoom - VIDEO_SHOW_W / 2;
       const showY =
         (VIEW_H / 2 - focusCam.camY) / focusCam.zoom - VIDEO_SHOW_H / 2;
       const videoDrop = cardLeft(videoBoxLaid);
@@ -936,19 +962,31 @@ export function LandingCanvasGenerateDemo() {
       timeline.call(() => {
         setGenHover("image");
       });
-      timeline.call(() => {
-        setGenPressed("image");
-      }, [], "+=0.12");
-      timeline.call(() => {
-        setGenPressed(null);
-        setGenHover(null);
-        setScene("generateImage");
-        motionRef.current.cursorOn = 0;
-        syncMotion();
-      }, [], "+=0.1");
-      timeline.call(() => {
-        setScene("imageReady");
-      }, [], "+=1.2");
+      timeline.call(
+        () => {
+          setGenPressed("image");
+        },
+        [],
+        "+=0.12"
+      );
+      timeline.call(
+        () => {
+          setGenPressed(null);
+          setGenHover(null);
+          setScene("generateImage");
+          motionRef.current.cursorOn = 0;
+          syncMotion();
+        },
+        [],
+        "+=0.1"
+      );
+      timeline.call(
+        () => {
+          setScene("imageReady");
+        },
+        [],
+        "+=1.2"
+      );
       timeline.to(motionRef.current, {
         dollfaceW: IMAGE_CLOSE_W,
         dollfaceH: IMAGE_CLOSE_H,
@@ -974,9 +1012,13 @@ export function LandingCanvasGenerateDemo() {
         motionRef.current.camY = cam.camY;
         syncMotion();
       });
-      timeline.call(() => {
-        setScene("messy");
-      }, [], "+=0.45");
+      timeline.call(
+        () => {
+          setScene("messy");
+        },
+        [],
+        "+=0.45"
+      );
       timeline.to(motionRef.current, {
         dollfaceX: MESSY.dollface.x,
         dollfaceY: MESSY.dollface.y,
@@ -1004,12 +1046,16 @@ export function LandingCanvasGenerateDemo() {
       timeline.call(() => {
         setLayoutPressed(true);
       });
-      timeline.call(() => {
-        setLayoutPressed(false);
-        setScene("relayout");
-        motionRef.current.cursorOn = 0;
-        syncMotion();
-      }, [], "+=0.12");
+      timeline.call(
+        () => {
+          setLayoutPressed(false);
+          setScene("relayout");
+          motionRef.current.cursorOn = 0;
+          syncMotion();
+        },
+        [],
+        "+=0.12"
+      );
       timeline.to(motionRef.current, {
         text1X: LAYOUT.text1.x,
         text1Y: LAYOUT.text1.y,
@@ -1076,19 +1122,23 @@ export function LandingCanvasGenerateDemo() {
       timeline.call(() => {
         setAddMenuHover(true);
       });
-      timeline.call(() => {
-        setAddMenuHover(false);
-        setShowAddNodeMenu(false);
-        setShowVideo(true);
-        setHighlightVideo(true);
-        setPlusNode("video");
-        setPlusSide("left");
-        motionRef.current.cursorX = videoDrop.x;
-        motionRef.current.cursorY = videoDrop.y;
-        motionRef.current.dragX2 = videoDrop.x;
-        motionRef.current.dragY2 = videoDrop.y;
-        syncMotion();
-      }, [], "+=0.22");
+      timeline.call(
+        () => {
+          setAddMenuHover(false);
+          setShowAddNodeMenu(false);
+          setShowVideo(true);
+          setHighlightVideo(true);
+          setPlusNode("video");
+          setPlusSide("left");
+          motionRef.current.cursorX = videoDrop.x;
+          motionRef.current.cursorY = videoDrop.y;
+          motionRef.current.dragX2 = videoDrop.x;
+          motionRef.current.dragY2 = videoDrop.y;
+          syncMotion();
+        },
+        [],
+        "+=0.22"
+      );
       timeline.to(motionRef.current, {
         zoom: promptCam.zoom,
         camX: promptCam.camX,
@@ -1180,10 +1230,14 @@ export function LandingCanvasGenerateDemo() {
         setPlusNode(null);
         syncMotion();
       });
-      timeline.call(() => {
-        setFlowEdge(null);
-        setScene("videoFocus");
-      }, [], "+=0.2");
+      timeline.call(
+        () => {
+          setFlowEdge(null);
+          setScene("videoFocus");
+        },
+        [],
+        "+=0.2"
+      );
       timeline.to(motionRef.current, {
         zoom: focusCam.zoom,
         camX: focusCam.camX,
@@ -1204,16 +1258,24 @@ export function LandingCanvasGenerateDemo() {
       timeline.call(() => {
         setGenHover("video");
       });
-      timeline.call(() => {
-        setGenPressed("video");
-      }, [], "+=0.12");
-      timeline.call(() => {
-        setGenPressed(null);
-        setGenHover(null);
-        setScene("videoGenerate");
-        motionRef.current.cursorOn = 0;
-        syncMotion();
-      }, [], "+=0.1");
+      timeline.call(
+        () => {
+          setGenPressed("video");
+        },
+        [],
+        "+=0.12"
+      );
+      timeline.call(
+        () => {
+          setGenPressed(null);
+          setGenHover(null);
+          setScene("videoGenerate");
+          motionRef.current.cursorOn = 0;
+          syncMotion();
+        },
+        [],
+        "+=0.1"
+      );
       timeline.addPause("+=0", () => {
         const seq = timeline;
         const minWait = new Promise<void>((resolve) => {
@@ -1268,9 +1330,12 @@ export function LandingCanvasGenerateDemo() {
     };
   }, [prompt]);
 
-  const promptReferenceHint = t("workflow.aiVideoPanel.promptReferenceEditHint", {
-    nodeName: t("landing.canvasDemoText3Name"),
-  });
+  const promptReferenceHint = t(
+    "workflow.aiVideoPanel.promptReferenceEditHint",
+    {
+      nodeName: t("landing.canvasDemoText3Name"),
+    }
+  );
 
   const videoScreen = {
     left: motion.camX + boxes.video.x * motion.zoom,
@@ -1313,318 +1378,346 @@ export function LandingCanvasGenerateDemo() {
         </div>
 
         <div
-          ref={canvasRef}
-          className="relative h-[500px] w-full overflow-hidden md:col-span-3"
+          ref={canvasWrapRef}
+          className="relative w-full overflow-hidden md:col-span-3"
+          style={{ height: VIEW_H * spanScale }}
         >
-          <LandingCanvasDemoDots />
           <div
-            className="pointer-events-none absolute origin-top-left"
+            ref={canvasRef}
+            className="relative overflow-hidden"
             style={{
-              left: 0,
-              top: 0,
-              width: 720,
-              height: 560,
-              transform: `translate(${motion.camX}px, ${motion.camY}px) scale(${motion.zoom})`,
+              width: spanScale < 1 ? DEMO_SPAN_W : "100%",
+              height: VIEW_H,
+              transform: spanScale < 1 ? `scale(${spanScale})` : undefined,
+              transformOrigin: "top left",
             }}
           >
-            <svg className="pointer-events-none absolute inset-0 size-full overflow-visible">
-              {edges.includes("dollface") && showVideo && !videoSolo ? (
-                <DemoEdge
-                  from={boxes.dollface}
-                  to={boxes.video}
-                  flowing={flowEdge === "dollface"}
-                />
+            <LandingCanvasDemoDots />
+            <div
+              className="pointer-events-none absolute origin-top-left"
+              style={{
+                left: 0,
+                top: 0,
+                width: 720,
+                height: 560,
+                transform: `translate(${motion.camX}px, ${motion.camY}px) scale(${motion.zoom})`,
+              }}
+            >
+              <svg className="pointer-events-none absolute inset-0 size-full overflow-visible">
+                {edges.includes("dollface") && showVideo && !videoSolo ? (
+                  <DemoEdge
+                    from={boxes.dollface}
+                    to={boxes.video}
+                    flowing={flowEdge === "dollface"}
+                  />
+                ) : null}
+                {edges.includes("text3") && showVideo && !videoSolo ? (
+                  <DemoEdge
+                    from={boxes.text3}
+                    to={boxes.video}
+                    flowing={flowEdge === "text3"}
+                  />
+                ) : null}
+                {edges.includes("survivor") && showVideo && !videoSolo ? (
+                  <DemoEdge
+                    from={boxes.survivor}
+                    to={boxes.video}
+                    flowing={flowEdge === "survivor"}
+                  />
+                ) : null}
+                {motion.dragOn > 0 ? (
+                  <g>
+                    {renderWorkflowEdgePath(
+                      buildWorkflowSmoothStepPath({
+                        sourceX: dragFrom.x,
+                        sourceY: dragFrom.y,
+                        targetX: motion.dragX2,
+                        targetY: motion.dragY2,
+                        sourcePosition: Position.Right,
+                        targetPosition: Position.Left,
+                      }),
+                      dragPreviewGreen ? "#16a34a" : "#d4d4d4",
+                      {
+                        isSelectionFlow: dragPreviewGreen,
+                      }
+                    )}
+                  </g>
+                ) : null}
+              </svg>
+
+              {showStack ? (
+                <DemoCanvasNode
+                  title={t("landing.canvasDemoText1Name")}
+                  icon="text"
+                  box={boxes.text1}
+                  nativeSize={{ w: TEXT_MESSY_W, h: TEXT_MESSY_H }}
+                  zIndex={12}
+                >
+                  <p className="h-full whitespace-pre-wrap break-words p-2.5 text-[10px] leading-4 text-foreground">
+                    {t("landing.canvasDemoText1Excerpt")}
+                  </p>
+                </DemoCanvasNode>
               ) : null}
-              {edges.includes("text3") && showVideo && !videoSolo ? (
-                <DemoEdge
-                  from={boxes.text3}
-                  to={boxes.video}
-                  flowing={flowEdge === "text3"}
-                />
+
+              {showStack ? (
+                <DemoCanvasNode
+                  title={t("landing.canvasDemoText3Name")}
+                  icon="text"
+                  box={boxes.text3}
+                  nativeSize={{ w: TEXT_MESSY_W, h: TEXT_MESSY_H }}
+                  plus={
+                    plusNode === "text3" ? (plusSide ?? undefined) : undefined
+                  }
+                  zIndex={12}
+                >
+                  <p className="h-full whitespace-pre-wrap break-words p-2.5 text-[10px] leading-4 text-foreground">
+                    {t("landing.canvasDemoText3Excerpt")}
+                  </p>
+                </DemoCanvasNode>
               ) : null}
-              {edges.includes("survivor") && showVideo && !videoSolo ? (
-                <DemoEdge
-                  from={boxes.survivor}
-                  to={boxes.video}
-                  flowing={flowEdge === "survivor"}
-                />
-              ) : null}
-              {motion.dragOn > 0 ? (
-                <g>
-                  {renderWorkflowEdgePath(
-                    buildWorkflowSmoothStepPath({
-                      sourceX: dragFrom.x,
-                      sourceY: dragFrom.y,
-                      targetX: motion.dragX2,
-                      targetY: motion.dragY2,
-                      sourcePosition: Position.Right,
-                      targetPosition: Position.Left,
-                    }),
-                    dragPreviewGreen ? "#16a34a" : "#d4d4d4",
-                    {
-                      isSelectionFlow: dragPreviewGreen,
-                    }
+
+              {showImage ? (
+                <DemoCanvasNode
+                  title={t("landing.canvasDemoDollfaceName")}
+                  icon="image"
+                  box={boxes.dollface}
+                  nativeSize={
+                    showStack
+                      ? { w: IMAGE_CLOSE_W, h: IMAGE_CLOSE_H }
+                      : undefined
+                  }
+                  plus={
+                    plusNode === "dollface"
+                      ? (plusSide ?? undefined)
+                      : undefined
+                  }
+                  zIndex={14}
+                >
+                  {showImageResult ? (
+                    <img
+                      src={DOLLFACE_SRC}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <GenerativeCardEmptyUploadSlot
+                      kind="image"
+                      size="canvas"
+                      busy={isImageLoading}
+                      busyMessage={
+                        isImageLoading
+                          ? t("workflow.aiImagePanel.cardGenerating")
+                          : undefined
+                      }
+                      canUpload={false}
+                      onUploadClick={() => undefined}
+                    />
                   )}
-                </g>
+                </DemoCanvasNode>
               ) : null}
-            </svg>
 
-            {showStack ? (
-              <DemoCanvasNode
-                title={t("landing.canvasDemoText1Name")}
-                icon="text"
-                box={boxes.text1}
-                nativeSize={{ w: TEXT_MESSY_W, h: TEXT_MESSY_H }}
-                zIndex={12}
-              >
-                <p className="h-full whitespace-pre-wrap break-words p-2.5 text-[10px] leading-4 text-foreground/80">
-                  {t("landing.canvasDemoText1Excerpt")}
-                </p>
-              </DemoCanvasNode>
-            ) : null}
-
-            {showStack ? (
-              <DemoCanvasNode
-                title={t("landing.canvasDemoText3Name")}
-                icon="text"
-                box={boxes.text3}
-                nativeSize={{ w: TEXT_MESSY_W, h: TEXT_MESSY_H }}
-                plus={plusNode === "text3" ? plusSide ?? undefined : undefined}
-                zIndex={12}
-              >
-                <p className="h-full whitespace-pre-wrap break-words p-2.5 text-[10px] leading-4 text-foreground/80">
-                  {t("landing.canvasDemoText3Excerpt")}
-                </p>
-              </DemoCanvasNode>
-            ) : null}
-
-            {showImage ? (
-              <DemoCanvasNode
-                title={t("landing.canvasDemoDollfaceName")}
-                icon="image"
-                box={boxes.dollface}
-                nativeSize={
-                  showStack
-                    ? { w: IMAGE_CLOSE_W, h: IMAGE_CLOSE_H }
-                    : undefined
-                }
-                plus={plusNode === "dollface" ? plusSide ?? undefined : undefined}
-                zIndex={14}
-              >
-                {showImageResult ? (
+              {showStack ? (
+                <DemoCanvasNode
+                  title={t("landing.canvasDemoSurvivorName")}
+                  icon="image"
+                  box={boxes.survivor}
+                  nativeSize={{ w: IMAGE_CLOSE_W, h: IMAGE_CLOSE_H }}
+                  plus={
+                    plusNode === "survivor"
+                      ? (plusSide ?? undefined)
+                      : undefined
+                  }
+                  zIndex={12}
+                >
                   <img
-                    src={DOLLFACE_SRC}
+                    src={SURVIVOR_SRC}
                     alt=""
                     className="size-full object-cover"
                   />
-                ) : (
-                  <GenerativeCardEmptyUploadSlot
-                    kind="image"
-                    size="canvas"
-                    busy={isImageLoading}
-                    busyMessage={
-                      isImageLoading
-                        ? t("workflow.aiImagePanel.cardGenerating")
-                        : undefined
-                    }
-                    canUpload={false}
-                    onUploadClick={() => undefined}
+                </DemoCanvasNode>
+              ) : null}
+
+              {showVideo ? (
+                <DemoCanvasNode
+                  title={t("landing.canvasDemoVideoName")}
+                  icon="video"
+                  box={boxes.video}
+                  highlight={highlightVideo}
+                  plus={
+                    plusNode === "video" ? (plusSide ?? undefined) : undefined
+                  }
+                  zIndex={videoReady || isVideoLoading ? 24 : 16}
+                  interactive={videoReady}
+                >
+                  <DemoVideoCover
+                    ready={videoReady}
+                    generating={isVideoLoading}
+                    onClipReady={handleClipReady}
                   />
+                </DemoCanvasNode>
+              ) : null}
+            </div>
+
+            {motion.cursorOn > 0 ? (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute z-50 size-4 -translate-x-0.5 -translate-y-0.5"
+                style={{ left: cursorScreen.left, top: cursorScreen.top }}
+              >
+                <svg viewBox="0 0 24 24" className="size-4 drop-shadow-sm">
+                  <path
+                    d="M4 3l14 8-6 1.5L10 21z"
+                    className="fill-foreground stroke-background"
+                    strokeWidth="1.2"
+                  />
+                </svg>
+              </div>
+            ) : null}
+
+            {showAddNodeMenu ? (
+              <div
+                className="pointer-events-none absolute z-40"
+                style={{ left: addMenuPos.left, top: addMenuPos.top }}
+              >
+                <WorkflowAddNodeMenuPanel
+                  onSelect={() => undefined}
+                  highlightedType={
+                    addMenuHover ? AI_VIDEO_NODE_TYPE : undefined
+                  }
+                />
+              </div>
+            ) : null}
+
+            {showLayoutBtn ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute bottom-3 left-3 z-20 transition-transform",
+                  layoutPressed && "translate-y-px scale-95"
                 )}
-              </DemoCanvasNode>
+              >
+                <ActionBarGroup>
+                  <ActionBarButton
+                    onClick={() => undefined}
+                    className={LAYOUT_BTN_CLASS}
+                  >
+                    <Network className="size-4" />
+                  </ActionBarButton>
+                </ActionBarGroup>
+              </div>
             ) : null}
 
-            {showStack ? (
-              <DemoCanvasNode
-                title={t("landing.canvasDemoSurvivorName")}
-                icon="image"
-                box={boxes.survivor}
-                nativeSize={{ w: IMAGE_CLOSE_W, h: IMAGE_CLOSE_H }}
-                plus={plusNode === "survivor" ? plusSide ?? undefined : undefined}
-                zIndex={12}
+            {showTypeInput ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute top-1/2 left-1/2 z-20 flex w-[320px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg px-3.5 py-3",
+                  SURFACE_CARD
+                )}
               >
-                <img
-                  src={SURVIVOR_SRC}
-                  alt=""
-                  className="size-full object-cover"
-                />
-              </DemoCanvasNode>
+                <p className="min-h-8 text-left text-[15px] leading-5 text-foreground">
+                  {typedText}
+                  {scene === "type" ? (
+                    <span
+                      aria-hidden
+                      className="ml-px inline-block h-[1em] w-px translate-y-0.5 bg-foreground/70"
+                    />
+                  ) : null}
+                </p>
+                <div className="mt-1.5 flex items-end justify-between gap-2">
+                  <span className={cn(AI_BOTTOM_CHIP_CLASS, "opacity-100")}>
+                    <ModelBrandIcon
+                      canonicalId={IMAGE_MODEL_ID}
+                      className="size-4"
+                    />
+                    <span className="truncate">
+                      {t("landing.canvasDemoModel")}
+                    </span>
+                  </span>
+                  <AiGenerateButton
+                    disabled={!hasTyped}
+                    isGenerating={isImageLoading}
+                    className={cn(
+                      genHover === "image" &&
+                        "bg-neutral-500 dark:bg-neutral-200",
+                      genPressed === "image" && "scale-95"
+                    )}
+                    label={
+                      isImageLoading
+                        ? t("workflow.aiImagePanel.generating")
+                        : t("workflow.aiImagePanel.generate")
+                    }
+                    onClick={() => undefined}
+                  />
+                </div>
+              </div>
             ) : null}
 
-            {showVideo ? (
-              <DemoCanvasNode
-                title={t("landing.canvasDemoVideoName")}
-                icon="video"
-                box={boxes.video}
-                highlight={highlightVideo}
-                plus={plusNode === "video" ? plusSide ?? undefined : undefined}
-                zIndex={videoReady || isVideoLoading ? 24 : 16}
-                interactive={videoReady}
+            {showVideoInput ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute z-20 flex flex-col overflow-hidden rounded-lg px-3 py-2",
+                  SURFACE_CARD
+                )}
+                style={{
+                  left:
+                    videoScreen.left +
+                    videoScreen.width / 2 -
+                    VIDEO_PROMPT_W / 2,
+                  top: videoScreen.top + boxes.video.h * motion.zoom + 10,
+                  width: VIDEO_PROMPT_W,
+                }}
               >
-                <DemoVideoCover
-                  ready={videoReady}
-                  generating={isVideoLoading}
-                  onClipReady={handleClipReady}
-                />
-              </DemoCanvasNode>
+                <div className="relative min-h-[72px] overflow-hidden">
+                  {hasVideoTextRef ? (
+                    <>
+                      <p className="line-clamp-4 px-2 py-3 text-[11px] leading-4 text-foreground">
+                        {t("landing.canvasDemoText3Excerpt")}
+                      </p>
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+                        <p
+                          className={cn(
+                            "max-w-[92%] truncate rounded-lg border px-3 py-2 text-center text-xs leading-4 shadow-sm backdrop-blur-[2px]",
+                            "border-border/40 bg-background/50 text-muted-foreground"
+                          )}
+                        >
+                          {promptReferenceHint}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="px-1 py-2 text-[11px] leading-4 text-muted-foreground">
+                      {t("workflow.aiVideoPanel.promptPlaceholder")}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-1.5 flex items-end justify-between gap-2">
+                  <span className={cn(AI_BOTTOM_CHIP_CLASS, "opacity-100")}>
+                    <ModelBrandIcon
+                      canonicalId={VIDEO_MODEL_ID}
+                      className="size-4"
+                    />
+                    <span className="truncate">
+                      {t("landing.canvasDemoVideoModel")}
+                    </span>
+                  </span>
+                  <AiGenerateButton
+                    disabled={!hasVideoTextRef}
+                    isGenerating={isVideoLoading}
+                    className={cn(
+                      genHover === "video" &&
+                        "bg-neutral-500 dark:bg-neutral-200",
+                      genPressed === "video" && "scale-95"
+                    )}
+                    label={
+                      isVideoLoading
+                        ? t("workflow.aiVideoPanel.generating")
+                        : t("workflow.aiVideoPanel.generate")
+                    }
+                    onClick={() => undefined}
+                  />
+                </div>
+              </div>
             ) : null}
           </div>
-
-          {motion.cursorOn > 0 ? (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute z-50 size-4 -translate-x-0.5 -translate-y-0.5"
-              style={{ left: cursorScreen.left, top: cursorScreen.top }}
-            >
-              <svg viewBox="0 0 24 24" className="size-4 drop-shadow-sm">
-                <path
-                  d="M4 3l14 8-6 1.5L10 21z"
-                  className="fill-foreground stroke-background"
-                  strokeWidth="1.2"
-                />
-              </svg>
-            </div>
-          ) : null}
-
-          {showAddNodeMenu ? (
-            <div
-              className="pointer-events-none absolute z-40"
-              style={{ left: addMenuPos.left, top: addMenuPos.top }}
-            >
-              <WorkflowAddNodeMenuPanel
-                onSelect={() => undefined}
-                highlightedType={
-                  addMenuHover ? AI_VIDEO_NODE_TYPE : undefined
-                }
-              />
-            </div>
-          ) : null}
-
-          {showLayoutBtn ? (
-            <div
-              className={cn(
-                "pointer-events-none absolute bottom-3 left-3 z-20 transition-transform",
-                layoutPressed && "translate-y-px scale-95"
-              )}
-            >
-              <ActionBarGroup>
-                <ActionBarButton
-                  onClick={() => undefined}
-                  className={LAYOUT_BTN_CLASS}
-                >
-                  <Network className="size-4" />
-                </ActionBarButton>
-              </ActionBarGroup>
-            </div>
-          ) : null}
-
-          {showTypeInput ? (
-            <div
-              className={cn(
-                "pointer-events-none absolute top-1/2 left-1/2 z-20 flex w-[320px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg px-3.5 py-3",
-                SURFACE_CARD
-              )}
-            >
-              <p className="min-h-8 text-left text-[15px] leading-5 text-foreground/90">
-                {typedText}
-                {scene === "type" ? (
-                  <span
-                    aria-hidden
-                    className="ml-px inline-block h-[1em] w-px translate-y-0.5 bg-foreground/70"
-                  />
-                ) : null}
-              </p>
-              <div className="mt-1.5 flex items-end justify-between gap-2">
-                <span className={cn(AI_BOTTOM_CHIP_CLASS, "opacity-100")}>
-                  <ModelBrandIcon
-                    canonicalId={IMAGE_MODEL_ID}
-                    className="size-4"
-                  />
-                  <span className="truncate">{t("landing.canvasDemoModel")}</span>
-                </span>
-                <AiGenerateButton
-                  disabled={!hasTyped}
-                  isGenerating={isImageLoading}
-                  className={cn(
-                    genHover === "image" && "bg-neutral-500 dark:bg-neutral-200",
-                    genPressed === "image" && "scale-95"
-                  )}
-                  label={
-                    isImageLoading
-                      ? t("workflow.aiImagePanel.generating")
-                      : t("workflow.aiImagePanel.generate")
-                  }
-                  onClick={() => undefined}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {showVideoInput ? (
-            <div
-              className={cn(
-                "pointer-events-none absolute z-20 flex flex-col overflow-hidden rounded-lg px-3 py-2",
-                SURFACE_CARD
-              )}
-              style={{
-                left:
-                  videoScreen.left +
-                  videoScreen.width / 2 -
-                  VIDEO_PROMPT_W / 2,
-                top: videoScreen.top + boxes.video.h * motion.zoom + 10,
-                width: VIDEO_PROMPT_W,
-              }}
-            >
-              <div className="relative min-h-[72px] overflow-hidden">
-                {hasVideoTextRef ? (
-                  <>
-                    <p className="line-clamp-4 px-2 py-3 text-[11px] leading-4 text-foreground/80">
-                      {t("landing.canvasDemoText3Excerpt")}
-                    </p>
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
-                      <p
-                        className={cn(
-                          "max-w-[92%] truncate rounded-lg border px-3 py-2 text-center text-xs leading-4 shadow-sm backdrop-blur-[2px]",
-                          "border-border/40 bg-background/50 text-muted-foreground"
-                        )}
-                      >
-                        {promptReferenceHint}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="px-1 py-2 text-[11px] leading-4 text-muted-foreground/70">
-                    {t("workflow.aiVideoPanel.promptPlaceholder")}
-                  </p>
-                )}
-              </div>
-              <div className="mt-1.5 flex items-end justify-between gap-2">
-                <span className={cn(AI_BOTTOM_CHIP_CLASS, "opacity-100")}>
-                  <ModelBrandIcon
-                    canonicalId={VIDEO_MODEL_ID}
-                    className="size-4"
-                  />
-                  <span className="truncate">
-                    {t("landing.canvasDemoVideoModel")}
-                  </span>
-                </span>
-                <AiGenerateButton
-                  disabled={!hasVideoTextRef}
-                  isGenerating={isVideoLoading}
-                  className={cn(
-                    genHover === "video" && "bg-neutral-500 dark:bg-neutral-200",
-                    genPressed === "video" && "scale-95"
-                  )}
-                  label={
-                    isVideoLoading
-                      ? t("workflow.aiVideoPanel.generating")
-                      : t("workflow.aiVideoPanel.generate")
-                  }
-                  onClick={() => undefined}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

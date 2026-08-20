@@ -5,7 +5,7 @@ import { LandingHeroFeaturedPricing } from "@/components/landing-hero-featured-p
 import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
-const LANDING_BORDER = "border-[#e2ded4]";
+const LANDING_BORDER = "border-[#e2ded4] dark:border-[#35363e]";
 const REAPI_BRAND = "text-[#5b66de]";
 const HERO_BRAND_CLASS =
   "landing-hero-brand inline-flex items-end font-mono font-bold leading-none lining-nums text-[#5b66de]";
@@ -77,14 +77,14 @@ export function LandingHeroSection() {
             <div className="mt-12 flex justify-center">
               <button
                 type="button"
-                className="inline-flex h-11 items-center gap-3 rounded-md bg-[#5b66de] px-8 font-mono text-xs uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#4a55cf]"
+                className="inline-flex h-11 items-center gap-3 rounded-md bg-[#5b66de] px-8 font-mono text-xs uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#4a55cf] dark:text-neutral-950"
                 onClick={() => {
                   document
                     .getElementById("landing-canvas-demo")
                     ?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
               >
-                <span aria-hidden className="size-1.5 bg-white/80" />
+                <span aria-hidden className="size-1.5 bg-white/80 dark:bg-neutral-950" />
                 {t("landing.heroDemoCta")}
                 <ArrowRight className="size-3.5" />
               </button>

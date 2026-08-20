@@ -811,6 +811,11 @@ html.studio-reference-dragging * {
     scrollbar-gutter: stable;
   }
 
+  .dark .landing-page-scroll {
+    --foreground: 224 17% 75%;
+    --muted-foreground: 224 10% 51%;
+  }
+
   .landing-canvas-demo-dots {
     background-image: radial-gradient(
       circle,
@@ -877,6 +882,11 @@ html.studio-reference-dragging * {
     text-transform: uppercase;
   }
 
+  .dark .landing-featured-bar-title,
+  .dark .landing-featured-bar-mark {
+    color: #767d90;
+  }
+
   .landing-featured-title {
     font-size: 1.125rem;
     line-height: 1.2;
@@ -896,6 +906,20 @@ html.studio-reference-dragging * {
   .landing-featured-param {
     font-family: "Space Mono", ui-monospace, Menlo, monospace;
     font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .landing-promo-checkbox {
+    appearance: none;
+    background-color: transparent;
+  }
+
+  .landing-promo-checkbox:checked {
+    border-color: #5b66de;
+    background-color: #5b66de;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.2 5 8.7 9.5 3.5'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 9px 9px;
   }
 
   .landing-promo {
@@ -994,12 +1018,6 @@ html.studio-reference-dragging * {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  @media (min-width: 640px) {
-    .landing-promo-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
   @media (min-width: 1024px) {
     .landing-promo-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1082,23 +1100,23 @@ html.studio-reference-dragging * {
   .dark .landing-promo-heading,
   .dark .landing-promo-card-title,
   .dark .landing-promo-card-title-link:hover {
-    color: #f5f5f4;
+    color: #b3b9c9;
   }
 
   .dark .landing-promo-subheading,
   .dark .landing-promo-card-desc {
-    color: #a8a29e;
+    color: #767d90;
   }
 
   .dark .landing-promo-link {
     border-color: rgb(255 255 255 / 0.12);
     background: transparent;
-    color: #a8a29e;
+    color: #767d90;
   }
 
   .dark .landing-promo-link:hover {
     border-color: rgb(255 255 255 / 0.2);
-    color: #fafaf9;
+    color: #b3b9c9;
   }
 
   .dark .landing-promo-grid-shell,

@@ -3,9 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 
-import type { BootstrapManifest, BootstrapPrefetchPack } from "@dafthunk/types";
+import type {
+  BootstrapManifest,
+  BootstrapPrefetchPack,
+  BootstrapStaticAsset,
+} from "@dafthunk/types";
 import type { OutputBundle, OutputChunk, Plugin } from "vite";
 
+import { LANDING_STATIC_ASSET_PATHS } from "./src/bootstrap/landing-static-assets";
 import {
   ALL_PREFETCH_PACK_IDS,
   PREFETCH_PACK_DEFINITIONS,
@@ -132,7 +137,10 @@ function writeCompressedPack(
 
   const archive = buildShellArchive(assetPaths, entry, css, assetsDir);
   const compressed = gzipSync(archive, { level: 9 });
-  const hash = createHash("sha256").update(compressed).digest("hex").slice(0, 16);
+  const hash = createHash("sha256")
+    .update(compressed)
+    .digest("hex")
+    .slice(0, 16);
   const fileName = `prefetch-${packId}-${hash}.gz`;
   fs.writeFileSync(path.join(outAssetsDir, fileName), compressed);
 
@@ -153,7 +161,10 @@ function buildShellAsset(
 ): { shell: string; shellHash: string } {
   const archive = buildShellArchive(shellPaths, entry, css, assetsDir);
   const compressed = gzipSync(archive, { level: 9 });
-  const shellHash = createHash("sha256").update(compressed).digest("hex").slice(0, 16);
+  const shellHash = createHash("sha256")
+    .update(compressed)
+    .digest("hex")
+    .slice(0, 16);
   const shellFileName = `shell-${shellHash}.gz`;
   fs.writeFileSync(path.join(outAssetsDir, shellFileName), compressed);
 
@@ -163,9 +174,38 @@ function buildShellAsset(
   };
 }
 
-function buildManifestVersion(shellHash: string, packs: readonly BootstrapPrefetchPack[]): string {
-  const payload = [shellHash, ...packs.map((pack) => `${pack.id}:${pack.hash}`)].join("|");
+function buildManifestVersion(
+  shellHash: string,
+  packs: readonly BootstrapPrefetchPack[],
+  staticAssets: readonly BootstrapStaticAsset[]
+): string {
+  const payload = [
+    shellHash,
+    ...packs.map((pack) => `${pack.id}:${pack.hash}`),
+    ...staticAssets.map((asset) => `${asset.path}:${asset.hash}`),
+  ].join("|");
   return createHash("sha256").update(payload).digest("hex").slice(0, 16);
+}
+
+function collectStaticAssets(
+  projectRoot: string,
+  assetPaths: readonly string[]
+): BootstrapStaticAsset[] {
+  return assetPaths.map((assetPath) => {
+    const absolutePath = path.join(
+      projectRoot,
+      "public",
+      assetPath.replace(/^\/+/, "")
+    );
+    if (!fs.existsSync(absolutePath)) {
+      throw new Error(
+        `[bootstrap-manifest] Missing static asset: ${assetPath}`
+      );
+    }
+    const bytes = fs.readFileSync(absolutePath);
+    const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
+    return { path: assetPath, hash };
+  });
 }
 
 function normalizeModuleKey(moduleId: string): string {
@@ -180,7 +220,9 @@ function normalizeModuleKey(moduleId: string): string {
   return normalized;
 }
 
-function buildManifestFromBundle(bundle: OutputBundle): Record<string, ViteManifestChunk> {
+function buildManifestFromBundle(
+  bundle: OutputBundle
+): Record<string, ViteManifestChunk> {
   const chunks = Object.values(bundle).filter(
     (item): item is OutputChunk => item.type === "chunk"
   );
@@ -226,6 +268,7 @@ export function bootstrapManifestPlugin(): Plugin {
   let capturedEntry: string | undefined;
   let capturedCss: string[] = [];
   let outDir = path.resolve(process.cwd(), "dist");
+  let projectRoot = process.cwd();
   let manifestEmitted = false;
 
   return {
@@ -233,6 +276,7 @@ export function bootstrapManifestPlugin(): Plugin {
     apply: "build",
     enforce: "post",
     configResolved(config) {
+      projectRoot = config.root;
       outDir = path.resolve(config.root, config.build.outDir);
     },
     writeBundle(_options, bundle) {
@@ -295,14 +339,24 @@ export function bootstrapManifestPlugin(): Plugin {
         assetsDir
       );
 
+      const staticAssets = collectStaticAssets(
+        projectRoot,
+        LANDING_STATIC_ASSET_PATHS
+      );
+
       const manifest: BootstrapManifest = {
         version: 1,
         entry,
         css: capturedCss,
         shell,
         shellHash,
-        manifestVersion: buildManifestVersion(shellHash, prefetchPacks),
+        manifestVersion: buildManifestVersion(
+          shellHash,
+          prefetchPacks,
+          staticAssets
+        ),
         prefetchPacks,
+        staticAssets,
         routeToPacks: ROUTE_TO_PREFETCH_PACKS,
       };
 

@@ -7,6 +7,11 @@ export interface BootstrapPrefetchPack {
   readonly assets: readonly string[];
 }
 
+export interface BootstrapStaticAsset {
+  readonly path: string;
+  readonly hash: string;
+}
+
 export interface BootstrapManifest {
   readonly version: 1;
   readonly entry: string;
@@ -15,10 +20,15 @@ export interface BootstrapManifest {
   readonly shellHash: string;
   readonly manifestVersion: string;
   readonly prefetchPacks: readonly BootstrapPrefetchPack[];
+  readonly staticAssets: readonly BootstrapStaticAsset[];
   readonly routeToPacks: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface BootstrapPrefetchPackConfig extends BootstrapPrefetchPack {
+  readonly sources: readonly BootstrapShellSource[];
+}
+
+export interface BootstrapStaticAssetConfig extends BootstrapStaticAsset {
   readonly sources: readonly BootstrapShellSource[];
 }
 
@@ -30,5 +40,6 @@ export interface BootstrapConfigResponse {
   readonly manifestVersion: string;
   readonly shellSources: readonly BootstrapShellSource[];
   readonly prefetchPacks: readonly BootstrapPrefetchPackConfig[];
+  readonly staticAssets: readonly BootstrapStaticAssetConfig[];
   readonly routeToPacks: Readonly<Record<string, readonly string[]>>;
 }
