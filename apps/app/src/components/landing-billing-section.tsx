@@ -1,6 +1,6 @@
 import {
-  applyVideoPricePromoFold,
   type AppLocale,
+  applyVideoPricePromoFold,
   computeCostPerOutputSecond,
   computeLibtvConvertedYuan,
   computeLibtvCredits,
@@ -51,9 +51,11 @@ import {
   useRef,
   useState,
 } from "react";
-
+import {
+  landingMenuContentClass,
+  landingMenuItemClass,
+} from "@/components/landing-select-menu";
 import { useTranslation } from "@/components/locale-provider";
-import type { TranslationKey } from "@/i18n";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,17 +72,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { TranslationKey } from "@/i18n";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { DashedHintPopover } from "@/pages/organization-ai-interfaces/dashed-hint-popover";
-import {
-  landingMenuContentClass,
-  landingMenuItemClass,
-} from "@/components/landing-select-menu";
+  HINT_TOOLTIP_CONTENT_CLASS,
+  HoverClickHint,
+} from "@/pages/organization-ai-interfaces/dashed-hint-popover";
 import { usePublicVideoPriceEstimates } from "@/services/video-price-estimates-service";
 import { cn } from "@/utils/utils";
 
@@ -195,7 +191,7 @@ function creditSharePercent(credits: number, total: number): string {
 function formatCompactUnit(
   value: number,
   divisor: number,
-  suffix: string,
+  suffix: string
 ): string {
   const scaled = value / divisor;
   if (Number.isInteger(scaled)) {
@@ -209,7 +205,7 @@ function formatCompactUnit(
 
 export function formatLandingCompareCredits(
   value: number,
-  locale: AppLocale,
+  locale: AppLocale
 ): string {
   const rounded = Math.round(value);
   if (locale === "en") {
@@ -240,26 +236,24 @@ export function LandingComparePlanTableHeader() {
   return (
     <span className="inline-flex items-center gap-1">
       {t("landing.tableLevel")}
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-red-400/70 transition-colors hover:text-red-500/85"
-              aria-label={t("landing.tableLevelBillingHint")}
-            >
-              <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-[16rem] text-xs leading-relaxed">
-            <div className="grid gap-1">
-              <p>{t("landing.tableLevelBillingHintLine1")}</p>
-              <p>{t("landing.tableLevelBillingHintLine2")}</p>
-              <p>{t("landing.tableLevelBillingHintLine3")}</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <HoverClickHint
+        content={
+          <div className="grid gap-1">
+            <p>{t("landing.tableLevelBillingHintLine1")}</p>
+            <p>{t("landing.tableLevelBillingHintLine2")}</p>
+            <p>{t("landing.tableLevelBillingHintLine3")}</p>
+          </div>
+        }
+        contentClassName={HINT_TOOLTIP_CONTENT_CLASS}
+      >
+        <button
+          type="button"
+          className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-red-400/70 transition-colors hover:text-red-500/85"
+          aria-label={t("landing.tableLevelBillingHint")}
+        >
+          <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} />
+        </button>
+      </HoverClickHint>
     </span>
   );
 }
@@ -507,7 +501,9 @@ export function ReferenceClipControl(props: {
   const clipSeconds = Math.round(props.clipDurationSec);
   const triggerClassName =
     props.triggerClassName ??
-    (props.variant === "chip" ? COMPACT_CHIP_TRIGGER_CLASS : COMPACT_BUTTON_CLASS);
+    (props.variant === "chip"
+      ? COMPACT_CHIP_TRIGGER_CLASS
+      : COMPACT_BUTTON_CLASS);
 
   const popover = (
     <Popover
@@ -759,7 +755,7 @@ function groupPromoRowsByPlatform(
 export function buildLandingPromoGroups(
   models: readonly PublicVideoPriceEstimateModel[],
   competitors: readonly VideoPriceCompetitor[],
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 ): readonly PromoDisplayGroup[] {
   const rows: PromoDisplayRow[] = [];
   for (const entry of models) {
@@ -797,7 +793,7 @@ export function buildLandingPromoGroups(
           isVideoPricePromoDate(competitor.endsAt)
             ? formatVideoPricePromoDateRange(
                 competitor.startsAt,
-                competitor.endsAt,
+                competitor.endsAt
               )
             : "",
       });
@@ -809,7 +805,7 @@ export function buildLandingPromoGroups(
     for (const promo of competitor.config.promos) {
       const modelId = resolveLibtvRateModelId(promo.canonicalId);
       const named = models.find(
-        (entry) => entry.canonicalId === promo.canonicalId,
+        (entry) => entry.canonicalId === promo.canonicalId
       );
       rows.push({
         id: `${competitor.id}-${promo.id}`,
@@ -830,7 +826,7 @@ export function buildLandingPromoGroups(
 
 function formatPromoItemTags(
   row: PromoDisplayRow,
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 ): string {
   const parts: string[] = [];
   if (row.model) {
@@ -1161,7 +1157,7 @@ export function LandingCompetitorCompareRow(props: {
     <tr
       className={cn(
         LANDING_COMPARE_COMPETITOR_ROW_CLASS,
-        props.bordered ? "border-b" : undefined,
+        props.bordered ? "border-b" : undefined
       )}
     >
       <td className={cn(LANDING_COMPARE_COMPETITOR_CELL_CLASS, "font-medium")}>
@@ -1187,28 +1183,24 @@ export function LandingCompetitorCompareRow(props: {
                 LANDING_COMPARE_PLAN_PRIMARY_CLASS,
                 planCycle === "monthly"
                   ? LANDING_COMPARE_PLAN_PRIMARY_CENTERED_CLASS
-                  : undefined,
+                  : undefined
               )}
             >
               <span className="font-medium">{planName(selectedPlan)}</span>
               {accountCount > 1 ? (
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
-                      >
-                        {t("landing.planAccounts", {
-                          count: accountCount,
-                        })}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {t("landing.planAccountsHint")}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <HoverClickHint
+                  content={t("landing.planAccountsHint")}
+                  contentClassName={HINT_TOOLTIP_CONTENT_CLASS}
+                >
+                  <button
+                    type="button"
+                    className="border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
+                  >
+                    {t("landing.planAccounts", {
+                      count: accountCount,
+                    })}
+                  </button>
+                </HoverClickHint>
               ) : null}
               <span className="text-muted-foreground">
                 {t("landing.planPricePart", {
@@ -1229,7 +1221,7 @@ export function LandingCompetitorCompareRow(props: {
                       "inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground",
                       props.useLandingMenu
                         ? "hover:bg-[#f0ede6] dark:hover:bg-neutral-800"
-                        : "hover:bg-muted",
+                        : "hover:bg-muted"
                     )}
                     aria-label={planLabel}
                   >
@@ -1255,14 +1247,14 @@ export function LandingCompetitorCompareRow(props: {
                             props.useLandingMenu
                               ? cn(
                                   landingMenuItemClass(cycle === planCycle),
-                                  "text-center",
+                                  "text-center"
                                 )
                               : cn(
                                   "rounded-md",
                                   cycle === planCycle
                                     ? "bg-muted text-foreground"
-                                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                                ),
+                                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                )
                           )}
                           onClick={() => {
                             setPlanCycle(cycle);
@@ -1285,7 +1277,7 @@ export function LandingCompetitorCompareRow(props: {
                                 "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                                 plan.id === selectedPlan?.id
                                   ? "bg-muted text-foreground"
-                                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                               )
                         }
                         onClick={() => {
@@ -1302,26 +1294,22 @@ export function LandingCompetitorCompareRow(props: {
             </span>
             {planCycle === "monthly" ? null : (
               <span className="leading-none">
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="w-fit border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
-                      >
-                        {t("landing.planCycleTotal", {
-                          price: (
-                            selectedCyclePrice.totalYuan * accountCount
-                          ).toFixed(0),
-                          unit: planCycleUnit(planCycle),
-                        })}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {t("landing.planCycleRiskHint")}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <HoverClickHint
+                  content={t("landing.planCycleRiskHint")}
+                  contentClassName={HINT_TOOLTIP_CONTENT_CLASS}
+                >
+                  <button
+                    type="button"
+                    className="w-fit border-b border-dashed border-muted-foreground text-[11px] leading-none text-muted-foreground"
+                  >
+                    {t("landing.planCycleTotal", {
+                      price: (
+                        selectedCyclePrice.totalYuan * accountCount
+                      ).toFixed(0),
+                      unit: planCycleUnit(planCycle),
+                    })}
+                  </button>
+                </HoverClickHint>
               </span>
             )}
           </div>
@@ -1337,34 +1325,32 @@ export function LandingCompetitorCompareRow(props: {
             <span>
               {formatLandingCompareCredits(credits, locale)}
               {" ("}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="border-b border-dashed border-muted-foreground p-0 text-foreground"
-                    >
-                      {t("landing.comparePointsPercentValue", {
-                        percent,
+              <HoverClickHint
+                content={
+                  <div className="grid gap-0.5">
+                    <p>
+                      {t("landing.comparePointsTotal", {
+                        total: selectedPlan.credits * accountCount,
                       })}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="grid gap-0.5">
-                      <p>
-                        {t("landing.comparePointsTotal", {
-                          total: selectedPlan.credits * accountCount,
-                        })}
-                      </p>
-                      <p>
-                        {t("landing.comparePointsUsage", {
-                          points: credits,
-                        })}
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    </p>
+                    <p>
+                      {t("landing.comparePointsUsage", {
+                        points: credits,
+                      })}
+                    </p>
+                  </div>
+                }
+                contentClassName={HINT_TOOLTIP_CONTENT_CLASS}
+              >
+                <button
+                  type="button"
+                  className="border-b border-dashed border-muted-foreground p-0 text-foreground"
+                >
+                  {t("landing.comparePointsPercentValue", {
+                    percent,
+                  })}
+                </button>
+              </HoverClickHint>
               {")"}
             </span>
             {props.excludePromo
@@ -1395,7 +1381,7 @@ export function LandingBillingSection() {
   } | null>(null);
   const promoGroups = useMemo(
     () => buildLandingPromoGroups(models, competitors, t),
-    [competitors, models, t],
+    [competitors, models, t]
   );
 
   if (promoGroups.length === 0) {
@@ -1439,7 +1425,7 @@ export function LandingBillingSection() {
                   window.open(
                     pendingExternal.url,
                     "_blank",
-                    "noopener,noreferrer",
+                    "noopener,noreferrer"
                   );
                 }}
               >
