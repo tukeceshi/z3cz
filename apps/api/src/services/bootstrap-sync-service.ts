@@ -1,22 +1,25 @@
-import type { BootstrapSettings, BootstrapSyncResult } from "@dafthunk/types";
 import fs from "node:fs";
-import path from "node:path";
+import type { BootstrapSettings, BootstrapSyncResult } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import {
   getBootstrapAssetsRoot,
   getBootstrapManifest,
   invalidateBootstrapAssetCache,
+  resolveBootstrapAssetDiskPath,
 } from "./bootstrap-asset-store";
 import {
   buildBootstrapR2ObjectKey,
   buildBootstrapR2PublicUrl,
+  contentTypeForBootstrapAsset,
   uploadBootstrapShellToR2,
 } from "./bootstrap-r2-client";
 import {
-  isBootstrapR2Configured,
+  getBootstrapStorageProvider,
+  isBootstrapStorageConfigured,
   resolveBootstrapR2SecretAccessKey,
 } from "./bootstrap-settings";
+import { createBootstrapTosClient } from "./bootstrap-storage-sources";
 
 async function uploadBootstrapAssetToR2(
   settings: BootstrapSettings,
@@ -28,14 +31,16 @@ async function uploadBootstrapAssetToR2(
     throw new Error("Bootstrap assets root unavailable");
   }
 
-  const fileName = assetPath.replace(/^\/assets\//, "");
-  const absolutePath = path.join(root, "assets", fileName);
+  const absolutePath = resolveBootstrapAssetDiskPath(root, assetPath);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Bootstrap asset missing on server: ${assetPath}`);
   }
 
   const body = new Uint8Array(fs.readFileSync(absolutePath));
-  const secretAccessKey = await resolveBootstrapR2SecretAccessKey(settings, env);
+  const secretAccessKey = await resolveBootstrapR2SecretAccessKey(
+    settings,
+    env
+  );
   const key = buildBootstrapR2ObjectKey(assetPath);
 
   await uploadBootstrapShellToR2({
@@ -47,6 +52,7 @@ async function uploadBootstrapAssetToR2(
     },
     key,
     body,
+    contentType: contentTypeForBootstrapAsset(assetPath),
   });
 
   return {
@@ -54,6 +60,48 @@ async function uploadBootstrapAssetToR2(
     r2Url: buildBootstrapR2PublicUrl(settings.publicBaseUrl, assetPath),
     bytes: body.byteLength,
   };
+}
+
+async function uploadBootstrapAssetToTos(
+  settings: BootstrapSettings,
+  env: Bindings,
+  assetPath: string
+): Promise<{ r2Key: string; r2Url: string; bytes: number }> {
+  const root = getBootstrapAssetsRoot();
+  if (!root) {
+    throw new Error("Bootstrap assets root unavailable");
+  }
+
+  const absolutePath = resolveBootstrapAssetDiskPath(root, assetPath);
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error(`Bootstrap asset missing on server: ${assetPath}`);
+  }
+
+  const body = new Uint8Array(fs.readFileSync(absolutePath));
+  const key = buildBootstrapR2ObjectKey(assetPath);
+  const client = await createBootstrapTosClient(settings, env);
+  await client.putObject({
+    key,
+    body,
+    mimeType: contentTypeForBootstrapAsset(assetPath),
+  });
+
+  return {
+    r2Key: key,
+    r2Url: "",
+    bytes: body.byteLength,
+  };
+}
+
+async function uploadBootstrapAsset(
+  settings: BootstrapSettings,
+  env: Bindings,
+  assetPath: string
+): Promise<{ r2Key: string; r2Url: string; bytes: number }> {
+  if (getBootstrapStorageProvider(settings) === "tos") {
+    return uploadBootstrapAssetToTos(settings, env, assetPath);
+  }
+  return uploadBootstrapAssetToR2(settings, env, assetPath);
 }
 
 export async function syncBootstrapShellToR2(
@@ -72,24 +120,29 @@ export async function syncBootstrapShellToR2(
   }
 
   if (!settings.r2Enabled) {
-    throw new Error("Enable R2 acceleration before syncing");
+    throw new Error("Enable storage acceleration before syncing");
   }
 
-  if (!isBootstrapR2Configured(settings)) {
+  if (!isBootstrapStorageConfigured(settings)) {
     throw new Error(
-      "Complete R2 credentials and public base URL before syncing"
+      getBootstrapStorageProvider(settings) === "tos"
+        ? "Complete TOS region, access key, secret, and bucket before syncing"
+        : "Complete R2 credentials and public base URL before syncing"
     );
   }
 
-  const shellUpload = await uploadBootstrapAssetToR2(
-    settings,
-    env,
-    manifest.shell
-  );
+  const shellUpload = await uploadBootstrapAsset(settings, env, manifest.shell);
 
   for (const pack of manifest.prefetchPacks ?? []) {
-    await uploadBootstrapAssetToR2(settings, env, pack.path);
+    await uploadBootstrapAsset(settings, env, pack.path);
   }
+
+  for (const asset of manifest.staticAssets ?? []) {
+    await uploadBootstrapAsset(settings, env, asset.path);
+  }
+
+  const storageLabel =
+    getBootstrapStorageProvider(settings) === "tos" ? "TOS" : "R2";
 
   return {
     ok: true,
@@ -98,7 +151,7 @@ export async function syncBootstrapShellToR2(
     shellBytes: shellUpload.bytes,
     r2Key: shellUpload.r2Key,
     r2Url: shellUpload.r2Url,
-    message: `Shell and ${manifest.prefetchPacks?.length ?? 0} prefetch pack(s) synced to R2`,
+    message: `Shell, ${manifest.prefetchPacks?.length ?? 0} prefetch pack(s), and ${manifest.staticAssets?.length ?? 0} static asset(s) synced to ${storageLabel}`,
   };
 }
 

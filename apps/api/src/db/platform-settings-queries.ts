@@ -39,6 +39,9 @@ import {
 } from "../services/auth-config";
 import {
   applyBootstrapSecretUpdate,
+  applyStorageOnlyUpdateGuards,
+  currentBootstrapManifestVersion,
+  disableStaleStorageOnly,
   parseBootstrapSettings,
   serializeBootstrapSettings,
   toAdminBootstrapSettings,
@@ -448,11 +451,18 @@ export async function getAdminBootstrapSettings(
     .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))
     .limit(1);
 
-  const settings = parseBootstrapSettings(row?.bootstrapConfig ?? null);
+  const currentVersion = currentBootstrapManifestVersion();
+  const parsed = parseBootstrapSettings(row?.bootstrapConfig ?? null);
+  const { settings, changed } = disableStaleStorageOnly(parsed, currentVersion);
+  if (changed) {
+    await saveBootstrapSettingsState(db, settings, row?.updatedBy ?? null);
+  }
+
   return toAdminBootstrapSettings(
     settings,
     row?.updatedAt.toISOString() ?? new Date(0).toISOString(),
-    row?.updatedBy ?? null
+    row?.updatedBy ?? null,
+    currentVersion
   );
 }
 
@@ -469,8 +479,10 @@ export async function updateBootstrapSettings(
     .limit(1);
 
   const current = parseBootstrapSettings(existing?.bootstrapConfig ?? null);
-  const next = await applyBootstrapSecretUpdate(current, input, env);
-  validateBootstrapSettingsUpdate(next);
+  const currentVersion = currentBootstrapManifestVersion();
+  const withSecrets = await applyBootstrapSecretUpdate(current, input, env);
+  const next = applyStorageOnlyUpdateGuards(withSecrets, input, currentVersion);
+  validateBootstrapSettingsUpdate(next, currentVersion);
 
   const values = {
     bootstrapConfig: serializeBootstrapSettings(next),
@@ -487,7 +499,8 @@ export async function updateBootstrapSettings(
     return toAdminBootstrapSettings(
       parseBootstrapSettings(row.bootstrapConfig),
       row.updatedAt.toISOString(),
-      row.updatedBy
+      row.updatedBy,
+      currentVersion
     );
   }
 
@@ -504,7 +517,8 @@ export async function updateBootstrapSettings(
   return toAdminBootstrapSettings(
     parseBootstrapSettings(row.bootstrapConfig),
     row.updatedAt.toISOString(),
-    row.updatedBy
+    row.updatedBy,
+    currentVersion
   );
 }
 

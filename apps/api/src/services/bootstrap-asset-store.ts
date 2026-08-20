@@ -13,7 +13,9 @@ function resolveBootstrapRoot(): string | null {
     process.env.BOOTSTRAP_ASSETS_DIR,
     path.resolve(process.cwd(), "../app/dist"),
     path.resolve(process.cwd(), "apps/app/dist"),
-  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+  ].filter(
+    (value): value is string => typeof value === "string" && value.length > 0
+  );
 
   for (const candidate of candidates) {
     const manifestPath = path.join(candidate, MANIFEST_FILE);
@@ -54,4 +56,11 @@ export function getBootstrapManifest(): BootstrapManifest | null {
 export function invalidateBootstrapAssetCache(): void {
   cachedManifest = null;
   cachedRoot = null;
+}
+
+export function resolveBootstrapAssetDiskPath(
+  root: string,
+  assetPath: string
+): string {
+  return path.join(root, assetPath.replace(/^\/+/, ""));
 }

@@ -5,9 +5,8 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
-import { LandingHeroSection } from "@/components/landing-hero-section";
 import { LandingBillingSection } from "@/components/landing-billing-section";
-import { LandingCanvasSection } from "@/components/landing-canvas-section";
+import { LandingHeroSection } from "@/components/landing-hero-section";
 import { LanguageToggle } from "@/components/language-toggle";
 import { LegalDocumentDialog } from "@/components/legal-document-dialog";
 import { useTranslation } from "@/components/locale-provider";
@@ -23,15 +22,23 @@ import {
 } from "@/components/ui/sheet";
 import { UserProfile } from "@/components/user-profile";
 import { getDashboardPath } from "@/utils/auth-navigation";
-import { scheduleConsolePrefetch } from "@/utils/console-prefetch";
+import {
+  scheduleConsolePrefetch,
+  scheduleLandingAssetPrefetch,
+} from "@/utils/console-prefetch";
 import { cn } from "@/utils/utils";
 
-const LANDING_HEADER_CHIP =
-  "rounded-md border border-border bg-transparent";
+const LANDING_HEADER_CHIP = "rounded-md border border-border bg-transparent";
+const LANDING_HEADER_HOVER =
+  "transition-colors hover:bg-[#f0ede6] hover:text-foreground dark:hover:bg-neutral-800 data-[state=open]:bg-[#f0ede6] dark:data-[state=open]:bg-neutral-800";
+const LANDING_LOGIN_BUTTON =
+  "dark:bg-[#5b66de] dark:text-white dark:hover:bg-[#4a55cf]";
 const LANDING_LIGHT_PAGE_BG = "bg-[#f7f5f1]";
 const LANDING_LIGHT_HEADER_BG = "bg-[#f7f5f1]/80";
-const LANDING_NAV_ITEM =
-  "inline-flex h-full items-center bg-transparent px-3.5 font-mono text-xs uppercase text-foreground transition-colors hover:bg-transparent hover:text-foreground";
+const LANDING_NAV_ITEM = cn(
+  "inline-flex h-full items-center justify-center bg-transparent px-3.5 font-mono text-xs uppercase text-foreground",
+  LANDING_HEADER_HOVER
+);
 
 const GITHUB_REPO_URL = "https://github.com/tukeceshi/z3cz";
 
@@ -52,6 +59,7 @@ export function LandingPage() {
   const dashboardPath = isAuthenticated && user ? getDashboardPath(user) : null;
 
   useEffect(() => {
+    scheduleLandingAssetPrefetch();
     scheduleConsolePrefetch();
   }, []);
 
@@ -104,7 +112,7 @@ export function LandingPage() {
       <button
         type="button"
         className={cn(LANDING_NAV_ITEM, "border-r border-border")}
-        onClick={() => scrollToId("canvas")}
+        onClick={() => scrollToId("landing-canvas-demo")}
       >
         {t("landing.navFeatures")}
       </button>
@@ -123,9 +131,9 @@ export function LandingPage() {
     <>
       <button
         type="button"
-        className="text-sm text-muted-foreground hover:text-foreground"
+        className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
         onClick={() => {
-          scrollToId("canvas");
+          scrollToId("landing-canvas-demo");
           setMenuOpen(false);
         }}
       >
@@ -133,7 +141,7 @@ export function LandingPage() {
       </button>
       <button
         type="button"
-        className="text-sm text-muted-foreground hover:text-foreground"
+        className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
         onClick={() => {
           scrollToId("pricing");
           setMenuOpen(false);
@@ -141,7 +149,9 @@ export function LandingPage() {
       >
         {t("landing.navPricing")}
       </button>
-      {githubLink("inline-flex items-center text-sm text-muted-foreground hover:text-foreground")}
+      {githubLink(
+        "inline-flex w-full items-center justify-center text-sm text-muted-foreground hover:text-foreground"
+      )}
     </>
   );
 
@@ -149,14 +159,14 @@ export function LandingPage() {
     <div
       className={cn(
         "landing-page-scroll min-h-svh text-foreground dark:bg-neutral-900",
-        LANDING_LIGHT_PAGE_BG,
+        LANDING_LIGHT_PAGE_BG
       )}
     >
       <header
         className={cn(
           "sticky top-0 z-40 py-4 backdrop-blur transition-[border-color] duration-300 dark:bg-neutral-900/80",
           LANDING_LIGHT_HEADER_BG,
-          headerScrolled && "border-b border-border",
+          headerScrolled && "border-b border-border"
         )}
       >
         <div className="mx-auto max-w-[94rem] px-6 lg:px-12">
@@ -177,7 +187,7 @@ export function LandingPage() {
             <nav
               className={cn(
                 "hidden h-[42px] items-stretch overflow-hidden lg:flex justify-self-center",
-                LANDING_HEADER_CHIP,
+                LANDING_HEADER_CHIP
               )}
             >
               {desktopNavLinks}
@@ -186,15 +196,17 @@ export function LandingPage() {
               <LanguageToggle
                 variant="landing"
                 className={cn(
-                  "h-8 text-foreground/80 bg-transparent hover:bg-transparent",
+                  "h-8 bg-transparent text-foreground/80",
                   LANDING_HEADER_CHIP,
+                  LANDING_HEADER_HOVER
                 )}
               />
               <ThemeToggle
                 variant="landing"
                 className={cn(
-                  "h-8 w-8 items-center justify-center rounded-md text-foreground bg-transparent hover:bg-transparent",
+                  "h-8 w-8 items-center justify-center rounded-md bg-transparent text-foreground",
                   LANDING_HEADER_CHIP,
+                  LANDING_HEADER_HOVER
                 )}
               />
               {dashboardPath ? (
@@ -205,7 +217,11 @@ export function LandingPage() {
                   <UserProfile />
                 </>
               ) : (
-                <Button size="sm" onClick={handleLogin}>
+                <Button
+                  size="sm"
+                  className={LANDING_LOGIN_BUTTON}
+                  onClick={handleLogin}
+                >
                   {t("landing.loginRegister")}
                 </Button>
               )}
@@ -225,7 +241,9 @@ export function LandingPage() {
                   <SheetHeader>
                     <SheetTitle>{siteSettings.siteName}</SheetTitle>
                   </SheetHeader>
-                  <div className="mt-6 flex flex-col gap-4">{mobileNavLinks}</div>
+                  <div className="mt-6 flex flex-col gap-4">
+                    {mobileNavLinks}
+                  </div>
                 </SheetContent>
               </Sheet>
             </div>
@@ -238,8 +256,6 @@ export function LandingPage() {
 
         <LandingBillingSection />
 
-        <LandingCanvasSection />
-
         <section className="py-4">
           <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 md:flex-row md:items-center md:px-6">
             <h2 className="text-2xl font-semibold">{t("landing.ctaTitle")}</h2>
@@ -248,7 +264,7 @@ export function LandingPage() {
                 <Link to={dashboardPath}>{t("landing.enterConsole")}</Link>
               </Button>
             ) : (
-              <Button onClick={handleLogin}>
+              <Button className={LANDING_LOGIN_BUTTON} onClick={handleLogin}>
                 {t("landing.loginRegister")}
               </Button>
             )}

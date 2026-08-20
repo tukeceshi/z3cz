@@ -1,6 +1,8 @@
 import type {
   BootstrapConfigResponse,
   BootstrapPrefetchPackConfig,
+  BootstrapShellSource,
+  BootstrapStaticAssetConfig,
 } from "@dafthunk/types";
 
 const ASSETS_CACHE_NAME = "z3cz-bootstrap-assets:v1";
@@ -98,11 +100,17 @@ function waitForServiceWorkerControl(): Promise<boolean> {
       finish(Boolean(navigator.serviceWorker.controller));
     }, SW_CONTROL_TIMEOUT_MS);
 
-    navigator.serviceWorker.addEventListener("controllerchange", function onChange() {
-      globalThis.clearTimeout(timer);
-      navigator.serviceWorker.removeEventListener("controllerchange", onChange);
-      finish(true);
-    });
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      function onChange() {
+        globalThis.clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener(
+          "controllerchange",
+          onChange
+        );
+        finish(true);
+      }
+    );
   });
 }
 
@@ -140,10 +148,19 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  const externalSignal = init.signal;
+  const onAbort = () => {
+    controller.abort();
+  };
+  externalSignal?.addEventListener("abort", onAbort);
+  if (externalSignal?.aborted) {
+    controller.abort();
+  }
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     globalThis.clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -158,59 +175,48 @@ async function digestHash(buffer: ArrayBuffer): Promise<string> {
     .slice(0, 16);
 }
 
-async function fetchPackBuffer(
-  pack: BootstrapPrefetchPackConfig
+async function fetchBufferFromSources(
+  sources: readonly BootstrapShellSource[],
+  expectedHash: string,
+  label: string
 ): Promise<ArrayBuffer> {
-  const sources =
-    pack.sources.length > 0
-      ? pack.sources
-      : [{ url: pack.path, kind: "origin" as const }];
+  const resolvedSources =
+    sources.length > 0 ? sources : [{ url: label, kind: "origin" as const }];
 
-  if (sources.length === 1) {
-    const response = await fetchWithTimeout(
-      sources[0].url,
-      {
-        credentials: sources[0].url.startsWith("http") ? "omit" : "same-origin",
-        cache: "no-store",
-        mode: sources[0].url.startsWith("http") ? "cors" : "same-origin",
-      },
-      FETCH_TIMEOUT_MS
-    );
-    if (!response.ok) {
-      throw new Error(`Prefetch download failed for ${pack.id}`);
-    }
-    const buffer = await response.arrayBuffer();
-    if (pack.hash) {
-      const actual = await digestHash(buffer);
-      if (actual && actual !== pack.hash) {
-        throw new Error(`Prefetch hash mismatch for ${pack.id}`);
-      }
-    }
-    return buffer;
-  }
-
-  const controllers = sources.map(() => new AbortController());
-  const attempts = sources.map(async (source, index) => {
+  const download = async (
+    source: BootstrapShellSource,
+    signal?: AbortSignal
+  ): Promise<ArrayBuffer> => {
     const response = await fetchWithTimeout(
       source.url,
       {
         credentials: source.url.startsWith("http") ? "omit" : "same-origin",
         cache: "no-store",
         mode: source.url.startsWith("http") ? "cors" : "same-origin",
-        signal: controllers[index].signal,
+        signal,
       },
       FETCH_TIMEOUT_MS
     );
     if (!response.ok) {
-      throw new Error(`Prefetch download failed for ${pack.id}`);
+      throw new Error(`Prefetch download failed for ${label}`);
     }
     const buffer = await response.arrayBuffer();
-    if (pack.hash) {
+    if (expectedHash) {
       const actual = await digestHash(buffer);
-      if (actual && actual !== pack.hash) {
-        throw new Error(`Prefetch hash mismatch for ${pack.id}`);
+      if (actual && actual !== expectedHash) {
+        throw new Error(`Prefetch hash mismatch for ${label}`);
       }
     }
+    return buffer;
+  };
+
+  if (resolvedSources.length === 1) {
+    return download(resolvedSources[0]);
+  }
+
+  const controllers = resolvedSources.map(() => new AbortController());
+  const attempts = resolvedSources.map(async (source, index) => {
+    const buffer = await download(source, controllers[index].signal);
     controllers.forEach((controller, controllerIndex) => {
       if (controllerIndex !== index) {
         controller.abort();
@@ -220,6 +226,16 @@ async function fetchPackBuffer(
   });
 
   return Promise.any(attempts);
+}
+
+async function fetchPackBuffer(
+  pack: BootstrapPrefetchPackConfig
+): Promise<ArrayBuffer> {
+  const sources =
+    pack.sources.length > 0
+      ? pack.sources
+      : [{ url: pack.path, kind: "origin" as const }];
+  return fetchBufferFromSources(sources, pack.hash, pack.id);
 }
 
 async function gunzipBytes(compressed: ArrayBuffer): Promise<ArrayBuffer> {
@@ -238,6 +254,12 @@ function contentTypeForAssetPath(path: string): string {
   if (path.endsWith(".css")) {
     return "text/css";
   }
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (path.endsWith(".mp4")) {
+    return "video/mp4";
+  }
   return "application/octet-stream";
 }
 
@@ -255,7 +277,9 @@ function parseShellArchive(raw: ArrayBuffer): Record<string, Uint8Array> {
     throw new Error("Invalid prefetch header");
   }
 
-  const headerText = new TextDecoder().decode(bytes.subarray(headerStart, headerEnd));
+  const headerText = new TextDecoder().decode(
+    bytes.subarray(headerStart, headerEnd)
+  );
   const header = JSON.parse(headerText) as ShellHeader;
   if (!header || !Array.isArray(header.files)) {
     throw new Error("Invalid prefetch manifest");
@@ -274,7 +298,9 @@ function parseShellArchive(raw: ArrayBuffer): Record<string, Uint8Array> {
   return fileBytes;
 }
 
-async function seedAssetCache(fileBytes: Record<string, Uint8Array>): Promise<void> {
+async function seedAssetCache(
+  fileBytes: Record<string, Uint8Array>
+): Promise<void> {
   if (typeof caches === "undefined") {
     return;
   }
@@ -292,7 +318,9 @@ async function seedAssetCache(fileBytes: Record<string, Uint8Array>): Promise<vo
   );
 }
 
-async function downloadAndSeedPack(pack: BootstrapPrefetchPackConfig): Promise<void> {
+async function downloadAndSeedPack(
+  pack: BootstrapPrefetchPackConfig
+): Promise<void> {
   await ensureAssetServiceWorker();
   const compressed = await fetchPackBuffer(pack);
   const raw = await gunzipBytes(compressed);
@@ -333,6 +361,46 @@ function startPrefetchPack(packId: string): Promise<void> {
   return state.promise;
 }
 
+async function downloadAndSeedStaticAsset(
+  asset: BootstrapStaticAssetConfig
+): Promise<void> {
+  const sources =
+    asset.sources.length > 0
+      ? asset.sources
+      : [{ url: asset.path, kind: "origin" as const }];
+  const buffer = await fetchBufferFromSources(sources, asset.hash, asset.path);
+  await seedAssetCache({ [asset.path]: new Uint8Array(buffer) });
+}
+
+let landingPrefetchStarted = false;
+
+export async function startLandingAssetPrefetch(): Promise<void> {
+  if (!isPrefetchActive() || landingPrefetchStarted) {
+    return;
+  }
+
+  landingPrefetchStarted = true;
+  const config = await fetchBootstrapConfig();
+  if (!config?.staticAssets?.length) {
+    return;
+  }
+
+  await ensureAssetServiceWorker();
+  await Promise.all(
+    config.staticAssets.map((asset) =>
+      downloadAndSeedStaticAsset(asset).catch(() => undefined)
+    )
+  );
+}
+
+export function scheduleLandingAssetPrefetch(): void {
+  if (!isPrefetchActive() || typeof window === "undefined") {
+    return;
+  }
+
+  void startLandingAssetPrefetch();
+}
+
 export async function startConsolePrefetch(): Promise<void> {
   if (!isPrefetchActive()) {
     return;
@@ -369,7 +437,9 @@ export function scheduleConsolePrefetch(): void {
   globalThis.setTimeout(run, 300);
 }
 
-export async function ensureConsolePageReady(exportName: string): Promise<void> {
+export async function ensureConsolePageReady(
+  exportName: string
+): Promise<void> {
   if (!isPrefetchActive()) {
     return;
   }

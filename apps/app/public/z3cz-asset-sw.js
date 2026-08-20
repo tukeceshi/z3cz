@@ -17,8 +17,17 @@
       return;
     }
 
-    var pathname = new URL(request.url).pathname;
-    if (pathname.indexOf("/assets/") !== 0) {
+    var url = new URL(request.url);
+    // R2 public URLs can share the /landing/ path; only cache same-origin page requests.
+    if (url.origin !== self.location.origin) {
+      return;
+    }
+
+    var pathname = url.pathname;
+    if (
+      pathname.indexOf("/assets/") !== 0 &&
+      pathname.indexOf("/landing/") !== 0
+    ) {
       return;
     }
 

@@ -1,8 +1,8 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
-import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(scriptDir, "../dist");
@@ -104,6 +104,34 @@ function validateShell(shellPath, shellHash) {
   };
 }
 
+function distFilePath(assetPath) {
+  return path.join(distDir, assetPath.replace(/^\/+/, ""));
+}
+
+function hashFile(buffer) {
+  return createHash("sha256").update(buffer).digest("hex").slice(0, 16);
+}
+
+function validateStaticAsset(asset) {
+  const diskPath = distFilePath(asset.path);
+  if (!fs.existsSync(diskPath)) {
+    throw new Error(`Missing static asset: ${asset.path}`);
+  }
+
+  const bytes = fs.readFileSync(diskPath);
+  const actualHash = hashFile(bytes);
+  if (asset.hash && actualHash !== asset.hash) {
+    throw new Error(
+      `Hash mismatch for static asset "${asset.path}": expected ${asset.hash}, got ${actualHash}`
+    );
+  }
+
+  return {
+    path: asset.path,
+    bytes: bytes.byteLength,
+  };
+}
+
 if (!fs.existsSync(manifestPath)) {
   console.error("bootstrap-manifest.json not found — run pnpm build first");
   process.exit(1);
@@ -112,6 +140,7 @@ if (!fs.existsSync(manifestPath)) {
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const shell = validateShell(manifest.shell, manifest.shellHash);
 const packs = (manifest.prefetchPacks ?? []).map(validatePack);
+const staticAssets = (manifest.staticAssets ?? []).map(validateStaticAsset);
 
 console.log(
   JSON.stringify(
@@ -120,6 +149,7 @@ console.log(
       entry: manifest.entry,
       shell,
       packs,
+      staticAssets,
       routeMappings: Object.keys(manifest.routeToPacks ?? {}).length,
     },
     null,

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   getBootstrapManifest,
   invalidateBootstrapAssetCache,
+  resolveBootstrapAssetDiskPath,
 } from "./bootstrap-asset-store";
 
 describe("bootstrap-asset-store", () => {
@@ -40,5 +41,15 @@ describe("bootstrap-asset-store", () => {
     expect(manifest?.entry).toBe("/assets/entry.js");
     expect(manifest?.shell).toBe("/assets/shell-test.gz");
     expect(manifest?.shellHash).toBe("test");
+  });
+
+  it("resolves disk paths for assets and landing files", () => {
+    const root = path.join("app", "dist");
+    expect(resolveBootstrapAssetDiskPath(root, "/assets/shell-test.gz")).toBe(
+      path.join(root, "assets", "shell-test.gz")
+    );
+    expect(resolveBootstrapAssetDiskPath(root, "/landing/clip.mp4")).toBe(
+      path.join(root, "landing", "clip.mp4")
+    );
   });
 });

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/utils/utils";
 
-export const LANDING_MENU_BORDER = "border-[#e2ded4]";
+export const LANDING_MENU_BORDER = "border-[#e2ded4] dark:border-[#35363e]";
 
 export function formatLandingParamDuration(seconds: number): string {
   if (seconds >= 60) {
@@ -42,8 +42,9 @@ export const LANDING_PARAM_TRIGGER_CLASS =
 
 export function landingMenuContentClass(className?: string): string {
   return cn(
-    "w-auto min-w-32 border-[#e2ded4] bg-[#f7f5f1] p-1 text-foreground shadow-sm",
-    "dark:border-neutral-700 dark:bg-neutral-900",
+    "w-auto min-w-32 bg-[#f7f5f1] p-1 text-foreground shadow-sm",
+    LANDING_MENU_BORDER,
+    "dark:bg-neutral-900",
     className,
   );
 }

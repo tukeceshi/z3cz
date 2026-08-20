@@ -22,7 +22,9 @@ function buildR2ObjectUrl(
   return `${buildR2Endpoint(credentials)}/${credentials.bucketName.trim()}/${encodedKey}`;
 }
 
-export function createAwsClient(credentials: BootstrapR2Credentials): AwsClient {
+export function createAwsClient(
+  credentials: BootstrapR2Credentials
+): AwsClient {
   return new AwsClient({
     accessKeyId: credentials.accessKeyId.trim(),
     secretAccessKey: credentials.secretAccessKey,
@@ -48,10 +50,34 @@ export async function testBootstrapR2Connection(
   }
 }
 
+export function bootstrapR2ObjectName(assetPath: string): string {
+  return assetPath.replace(/^\/assets\//, "").replace(/^\/+/, "");
+}
+
+export function contentTypeForBootstrapAsset(assetPath: string): string {
+  if (assetPath.endsWith(".gz")) {
+    return "application/gzip";
+  }
+  if (assetPath.endsWith(".js")) {
+    return "application/javascript";
+  }
+  if (assetPath.endsWith(".css")) {
+    return "text/css";
+  }
+  if (assetPath.endsWith(".jpg") || assetPath.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (assetPath.endsWith(".mp4")) {
+    return "video/mp4";
+  }
+  return "application/octet-stream";
+}
+
 export async function uploadBootstrapShellToR2(params: {
   credentials: BootstrapR2Credentials;
   key: string;
   body: Uint8Array;
+  contentType?: string;
 }): Promise<void> {
   const client = createAwsClient(params.credentials);
   const url = buildR2ObjectUrl(params.credentials, params.key);
@@ -59,7 +85,7 @@ export async function uploadBootstrapShellToR2(params: {
     method: "PUT",
     body: params.body,
     headers: {
-      "Content-Type": "application/gzip",
+      "Content-Type": params.contentType ?? "application/gzip",
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });
@@ -76,13 +102,12 @@ export async function uploadBootstrapShellToR2(params: {
 
 export function buildBootstrapR2PublicUrl(
   publicBaseUrl: string,
-  shellPath: string
+  assetPath: string
 ): string {
   const base = publicBaseUrl.trim().replace(/\/$/, "");
-  const fileName = shellPath.replace(/^\/assets\//, "");
-  return `${base}/${fileName}`;
+  return `${base}/${bootstrapR2ObjectName(assetPath)}`;
 }
 
-export function buildBootstrapR2ObjectKey(shellPath: string): string {
-  return shellPath.replace(/^\/assets\//, "");
+export function buildBootstrapR2ObjectKey(assetPath: string): string {
+  return bootstrapR2ObjectName(assetPath);
 }

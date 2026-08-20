@@ -61,7 +61,7 @@ import {
 import { usePublicVideoPriceEstimates } from "@/services/video-price-estimates-service";
 import { cn } from "@/utils/utils";
 
-const LANDING_BORDER = "border-[#e2ded4]";
+const LANDING_BORDER = "border-[#e2ded4] dark:border-[#35363e]";
 const REAPI_BRAND_INK = "text-[#4a55cf]";
 const CLIP_SCENARIO_ID = "clip";
 
@@ -73,7 +73,7 @@ const LANDING_DEFAULT_RATIO = "16:9" as const;
 const LANDING_DEFAULT_RESOLUTION = "720p";
 const LANDING_DEFAULT_DURATION_SEC = 15;
 const LANDING_PROMO_CHECKBOX_CLASS =
-  "size-2.5 shrink-0 rounded-[2px] border border-foreground/35 bg-transparent accent-[#5b66de] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5b66de]/30";
+  "landing-promo-checkbox size-2.5 shrink-0 rounded-[2px] border border-foreground/35 bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5b66de]/30";
 const LANDING_POPOVER_TITLE_CLASS =
   "mb-2 block w-full text-xs font-medium text-foreground";
 
@@ -375,7 +375,7 @@ export function LandingHeroFeaturedPricing() {
       <div
         id="landing-demo"
         className={cn(
-          "landing-featured mx-auto mt-16 flex h-[350px] min-h-0 w-full max-w-4xl flex-col overflow-hidden border bg-[#f7f5f1] text-left dark:bg-neutral-900",
+          "landing-featured mx-auto mt-16 flex min-h-0 w-full max-w-4xl flex-col overflow-hidden border bg-[#f7f5f1] text-left dark:bg-neutral-900 md:h-[350px]",
           LANDING_BORDER,
         )}
       >
@@ -698,10 +698,10 @@ export function LandingHeroFeaturedPricing() {
         </div>
       </div>
 
-      <div className="landing-featured mx-auto mt-4 w-full max-w-4xl overflow-x-auto">
+      <div className="landing-featured mx-auto mt-4 w-full max-w-4xl">
         <div
           className={cn(
-            "grid min-w-[42rem] grid-cols-6 border-t border-l",
+            "grid grid-cols-3 border-t border-l md:grid-cols-6",
             LANDING_BORDER,
           )}
         >
