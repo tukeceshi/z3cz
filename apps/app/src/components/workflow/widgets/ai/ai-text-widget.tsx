@@ -108,8 +108,6 @@ function AiTextWidget({
   const hasOutput = isGenerating
     ? hasStreamOutput || resolvedOutput.length > 0
     : resolvedOutput.length > 0;
-  const showTextLoading =
-    resolvedText.loading && !hasOutput && !isGenerating;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
@@ -119,8 +117,9 @@ function AiTextWidget({
     historyItems.items[0];
   const selectedFailed =
     Boolean(selectedHistoryItem) &&
-    !selectedHistoryItem.resourceId &&
+    !selectedHistoryItem.contentSha256 &&
     !selectedHistoryItem.text &&
+    Boolean(selectedHistoryItem.invocationId) &&
     !isGenerating;
   useGenerativeRecordErrorDisplay({
     orgId,
@@ -134,6 +133,12 @@ function AiTextWidget({
     updateNodeData,
   });
   const generateError = readGenerativeCardError(metadata);
+  const showTextLoading =
+    resolvedText.loading &&
+    !hasOutput &&
+    !isGenerating &&
+    !generateError &&
+    !selectedFailed;
   const showGeneratingMask =
     isAiTextAwaitingStream(metadata) && !generateError;
   const generatingMessage = t("workflow.aiTextPanel.generating");

@@ -18,6 +18,7 @@ import {
 import { cloudUploadToResourceId } from "@/services/stage-generative-media";
 import {
   readGenerativeStagingBlob,
+  writeGenerativeStaging,
   writeGenerativeStagingWithNewId,
 } from "@/services/generative-media-staging";
 import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
@@ -32,10 +33,26 @@ export async function stageAiTextContent(params: {
   readonly workflowId: string;
   readonly workflowName?: string;
   readonly text: string;
+  readonly mediaId?: string;
 }): Promise<LocalMediaReference> {
   const mimeType = inferAiTextMimeType(params.text);
   const blob = new Blob([params.text], { type: mimeType });
-  const { mediaId } = await writeGenerativeStagingWithNewId({
+  const mediaId = params.mediaId?.trim();
+  if (mediaId) {
+    await writeGenerativeStaging({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      workflowName: params.workflowName,
+      mediaId,
+      blob,
+      mimeType,
+      nodeType: AI_TEXT_NODE_TYPE,
+    });
+    notifyAiMediaCacheChanged();
+    return { kind: "local", mediaId, mimeType };
+  }
+
+  const staged = await writeGenerativeStagingWithNewId({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
@@ -44,7 +61,7 @@ export async function stageAiTextContent(params: {
     nodeType: AI_TEXT_NODE_TYPE,
   });
   notifyAiMediaCacheChanged();
-  return { kind: "local", mediaId, mimeType };
+  return { kind: "local", mediaId: staged.mediaId, mimeType };
 }
 
 export async function readAiTextContent(params: {
@@ -129,6 +146,7 @@ export async function promoteAiTextLocalToCloud(params: {
     mediaId: params.media.mediaId,
     mimeType: params.media.mimeType,
     mediaKind: "reference",
+    objectId: params.media.mediaId,
   });
 
   const resource = cloudUploadToResourceId(object);

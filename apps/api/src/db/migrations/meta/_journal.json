@@ -561,6 +561,13 @@
       "when": 1789800000000,
       "tag": "0084_homepage_video_scenario_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1789880000000,
+      "tag": "0085_allow_duplicate_ai_interface_names",
+      "breakpoints": true
     }
   ]
 }

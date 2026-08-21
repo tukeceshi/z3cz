@@ -588,6 +588,7 @@ export function applyVideoPriceEstimateDisplayFolds(
 export function readVideoPriceEstimateDisplayFolds(params: {
   readonly promos?: readonly VideoModelPricePromo[];
   readonly orgDiscountFold?: number;
+  readonly applyOfficialDiscount?: boolean;
   readonly resolution: string;
   readonly now?: Date;
 }): readonly number[] {
@@ -597,7 +598,7 @@ export function readVideoPriceEstimateDisplayFolds(params: {
     params.resolution,
     params.now
   );
-  if (promo) {
+  if (params.applyOfficialDiscount !== false && promo) {
     folds.push(promo.discountFold);
   }
   const orgFold = readVideoPricePromoFold(params.orgDiscountFold);

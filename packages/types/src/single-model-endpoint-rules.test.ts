@@ -248,6 +248,20 @@ describe("single-model-capability-limits", () => {
         priceEstimateEnabled: false,
       })
     ).toBeNull();
+
+    expect(
+      normalizeCapabilityLimitsForSave({
+        platformBaseline,
+        limits: { applyOfficialPriceDiscount: false },
+      })
+    ).toEqual({ applyOfficialPriceDiscount: false });
+
+    expect(
+      normalizeCapabilityLimitsForSave({
+        platformBaseline,
+        limits: { applyOfficialPriceDiscount: true },
+      })
+    ).toBeNull();
   });
 
   it("copies org price discount onto resolved rules without changing unit prices", () => {
@@ -271,7 +285,18 @@ describe("single-model-capability-limits", () => {
     });
 
     expect(limited.orgPriceDiscountFold).toBe(8);
+    expect(limited.orgApplyOfficialPriceDiscount).toBeUndefined();
     expect(limited.priceEstimate).toEqual(platformRules.priceEstimate);
+  });
+
+  it("turns off official promo overlay when org disables it", () => {
+    const platformRules = normalizeVideoModelParameterRules(
+      DEFAULT_VIDEO_MODEL_PARAMETER_RULES
+    );
+    const limited = applyVideoCapabilityLimits(platformRules, {
+      applyOfficialPriceDiscount: false,
+    });
+    expect(limited.orgApplyOfficialPriceDiscount).toBe(false);
   });
 
   it("org cannot enable cancel when platform disallows", () => {

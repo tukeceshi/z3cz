@@ -13,8 +13,6 @@ import useSWR from "swr";
 import { makeRequest } from "./utils";
 
 export const VOLCANO_ARK_NOT_OPENED_CODE = "volcano_ark_not_opened" as const;
-export const AI_INTERFACE_NAME_CONFLICT_CODE =
-  "ai_interface_name_conflict" as const;
 export const VOLCANO_INTERFACE_EXISTS_CODE =
   "volcano_interface_exists" as const;
 export const VOLCANO_TOS_NOT_OPENED_CODE = "volcano_tos_not_opened" as const;

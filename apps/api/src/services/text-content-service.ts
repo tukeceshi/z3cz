@@ -137,6 +137,7 @@ export async function registerTextContentUpload(
     readonly contentLength: number;
     readonly workflowId?: string;
     readonly replacesResourceId?: string;
+    readonly objectId?: string;
   }
 ): Promise<TextContentRegisterResponse | null> {
   const presigned = await presignTosMediaUpload(env, {
@@ -146,6 +147,7 @@ export async function registerTextContentUpload(
     contentLength: params.contentLength,
     mediaKind: "reference",
     replacesResourceId: params.replacesResourceId,
+    objectId: params.objectId,
   });
 
   if (!presigned) {
@@ -178,6 +180,7 @@ export async function persistGeneratedTextContent(
     readonly workflowId?: string;
     readonly text: string;
     readonly mimeType: string;
+    readonly resourceId?: string;
   }
 ): Promise<{ readonly resourceId: string; readonly contentSha256: string } | null> {
   const contentSha256 = sha256HexFromText(params.text);
@@ -188,6 +191,7 @@ export async function persistGeneratedTextContent(
     mimeType: params.mimeType,
     contentLength: bytes.byteLength,
     workflowId: params.workflowId,
+    objectId: params.resourceId,
   });
 
   if (!registered) {

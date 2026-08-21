@@ -14,9 +14,11 @@ import {
 } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
+import type { Database } from "../db";
 import { nodeWorkflowSessionHub } from "../runtime/node-workflow-session-hub";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
+import { registerGeneratingPlaceholderResources } from "./register-generating-placeholder-resources";
 
 export type PersistGeneratingNodeContentParams =
   | {
@@ -115,4 +117,43 @@ export async function persistGeneratingNodeContentToWorkflow(
   }
 
   return patch;
+}
+
+export async function persistTextGeneratingPlaceholder(
+  env: Bindings,
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly invocationId: string;
+    readonly platformModelId: string;
+    readonly aiInterfaceId: string;
+    readonly modelDisplayName: string;
+  }
+): Promise<{
+  readonly resourceId: string;
+  readonly workflowNodeContent: WorkflowNodeContentPatch | null;
+}> {
+  const [resourceId] = await registerGeneratingPlaceholderResources(db, {
+    organizationId: params.organizationId,
+    mimeType: "text/plain",
+  });
+  const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+    env,
+    {
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      nodeId: params.nodeId,
+      modality: "text",
+      entry: {
+        invocationId: params.invocationId,
+        resourceId: resourceId!,
+        platformModelId: params.platformModelId,
+        aiInterfaceId: params.aiInterfaceId,
+        modelDisplayName: params.modelDisplayName,
+      },
+    }
+  );
+  return { resourceId: resourceId!, workflowNodeContent };
 }

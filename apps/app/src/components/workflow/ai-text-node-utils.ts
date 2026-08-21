@@ -4,6 +4,7 @@ import {
   AI_VIDEO_NODE_TYPE,
   buildAiTextExcerpt,
   DEEPSEEK_V4_FLASH_CANONICAL_ID,
+  isResourceIdReference,
   normalizeTextModelParameterRules,
   type AiTextResultHistory,
   type AiTextResultHistoryItem,
@@ -20,6 +21,7 @@ import {
   applyHistoryItemSettingsToNode,
   type GenerativeHistorySelectionResult,
 } from "./apply-history-item-settings";
+import { markResourceRefFailed } from "./generative-resource-ref-utils";
 
 export const AI_TEXT_RESULT_INPUT_ID = "result" as const;
 export const AI_TEXT_RESULT_HISTORY_INPUT_ID = "result_history" as const;
@@ -458,7 +460,6 @@ export function withAiTextGeneratingHistoryFailed(
   const nextItems = history.items.map((item) => {
     const isPending =
       item.id === selectedId &&
-      !item.resourceId &&
       !item.text &&
       !item.contentSha256;
     if (!isPending) {
@@ -469,14 +470,24 @@ export function withAiTextGeneratingHistoryFailed(
       ...(invocationId ? { invocationId } : {}),
     };
   });
-  return {
-    inputs: upsertInputValue(
-      current.inputs,
-      AI_TEXT_RESULT_HISTORY_INPUT_ID,
-      { items: nextItems, selectedId },
+  let inputs = upsertInputValue(
+    current.inputs,
+    AI_TEXT_RESULT_HISTORY_INPUT_ID,
+    { items: nextItems, selectedId },
+    "json"
+  );
+  const resultValue = inputs.find(
+    (input) => input.id === AI_TEXT_RESULT_INPUT_ID
+  )?.value;
+  if (isResourceIdReference(resultValue) && resultValue.generating) {
+    inputs = upsertInputValue(
+      inputs,
+      AI_TEXT_RESULT_INPUT_ID,
+      markResourceRefFailed(resultValue),
       "json"
-    ),
-  };
+    );
+  }
+  return { inputs };
 }
 
 /** Mark history selection; caller should then commit item text via the text buffer. */
