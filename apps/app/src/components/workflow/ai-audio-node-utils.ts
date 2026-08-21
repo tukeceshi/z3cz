@@ -439,6 +439,18 @@ export function appendAiAudioGeneratedHistoryItems(
   };
 }
 
+export function readAiAudioGeneratingJobId(
+  inputs: readonly WorkflowParameter[]
+): string | undefined {
+  const history = readAiAudioResultHistory(inputs);
+  for (const item of history.items) {
+    if (item.jobId && hasGeneratingResource(item.audios)) {
+      return item.jobId;
+    }
+  }
+  return undefined;
+}
+
 export function withAiAudioGeneratingHistory(
   current: WorkflowNodeType,
   params: {

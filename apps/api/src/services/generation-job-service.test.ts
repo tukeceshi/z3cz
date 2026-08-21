@@ -9,7 +9,11 @@ import {
   shouldDeferClientPersistToServer,
 } from "@dafthunk/types";
 
-import { resolveGenerationJobDisplayPhase } from "./generation-job-service";
+import {
+  buildVideoPendingMedia,
+  persistObjectIdForPendingMedia,
+  resolveGenerationJobDisplayPhase,
+} from "./generation-job-service";
 
 function makeJob(
   overrides: Partial<GenerationJobRecord> = {}
@@ -138,5 +142,27 @@ describe("video upstream poll scheduling", () => {
     expect(nextVideoUpstreamPollAt("queued", nowMs)).toBe(
       "2026-01-01T00:00:15.000Z"
     );
+  });
+});
+
+describe("stable persist resource ids", () => {
+  it("puts the placeholder id on video pending media", () => {
+    const pending = buildVideoPendingMedia(
+      {
+        resultJson: {
+          placeholderResourceIds: ["res-placeholder"],
+        },
+      },
+      "https://example.com/out.mp4"
+    );
+    expect(pending.resourceId).toBe("res-placeholder");
+    expect(pending.mediaKind).toBe("ai-video");
+    expect(persistObjectIdForPendingMedia(pending)).toBe("res-placeholder");
+  });
+
+  it("keeps persist object id equal to pending resource id", () => {
+    expect(
+      persistObjectIdForPendingMedia({ resourceId: "res-1" })
+    ).toBe("res-1");
   });
 });

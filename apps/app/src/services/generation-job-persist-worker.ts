@@ -106,6 +106,7 @@ async function uploadFromAiStaging(params: {
   readonly workflowId?: string;
   readonly localRef: LocalMediaReference;
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
+  readonly objectId?: string;
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
 }): Promise<ObjectReference> {
   params.onPhase?.("uploading");
@@ -115,6 +116,7 @@ async function uploadFromAiStaging(params: {
     mediaId: params.localRef.mediaId,
     mimeType: params.localRef.mimeType,
     mediaKind: params.mediaKind,
+    objectId: params.objectId,
   });
 }
 
@@ -322,6 +324,7 @@ export async function runGenerationJobPersistWorker(params: {
           workflowId: params.workflowId,
           localRef: localRefs[index]!,
           mediaKind: pendingMedia[index]!.mediaKind,
+          objectId: pendingMedia[index]!.resourceId,
           onPhase: params.onPhase,
         });
       } catch {

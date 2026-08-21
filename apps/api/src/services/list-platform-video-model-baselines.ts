@@ -42,6 +42,8 @@ export async function listPlatformVideoModelBaselines(
 
         ...baseline,
 
+        priceEstimate: rules.priceEstimate,
+
       };
 
     });

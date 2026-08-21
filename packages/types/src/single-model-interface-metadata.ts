@@ -2,7 +2,10 @@ import type { AiModelModality } from "./ai-model-catalog";
 import type { OrgModelInstanceConfig } from "./org-model-instance";
 import type { SingleModelFormatTransform } from "./format-transform-template";
 import { resolveTransformPollMapping } from "./format-transform-template";
-import type { SingleModelCapabilityLimits } from "./single-model-capability-limits";
+import {
+  capabilityLimitsHasStoredValues,
+  type SingleModelCapabilityLimits,
+} from "./single-model-capability-limits";
 import type { SingleModelEndpointRules } from "./single-model-endpoint-rules";
 import {
   findEnabledSingleModelInstanceByCanonicalId,
@@ -780,13 +783,7 @@ export function mergeSingleModelCapabilityLimits(
 
   const models = { ...metadata.models };
   const hasLimits =
-    capabilityLimits &&
-    (capabilityLimits.supportsTaskCancel !== undefined ||
-      capabilityLimits.resolution !== undefined ||
-      capabilityLimits.duration !== undefined ||
-      capabilityLimits.maxReferenceImages !== undefined ||
-      capabilityLimits.maxReferenceVideos !== undefined ||
-      capabilityLimits.maxReferenceAudios !== undefined);
+    capabilityLimits != null && capabilityLimitsHasStoredValues(capabilityLimits);
 
   if (!hasLimits) {
     const { capabilityLimits: _removed, ...rest } = existing;

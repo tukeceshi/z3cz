@@ -47,6 +47,7 @@ export async function presignTosMediaUpload(
     readonly contentLength: number;
     readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
     readonly replacesResourceId?: string;
+    readonly objectId?: string;
   }
 ): Promise<TosPresignUploadResult | null> {
   const db = createDatabase(env);
@@ -56,7 +57,7 @@ export async function presignTosMediaUpload(
   const client = await createOrgTosClient(env, params.organizationId);
   if (!client) return null;
 
-  const objectId = uuid();
+  const objectId = params.objectId?.trim() || uuid();
   const workflowId = params.workflowId?.trim() || "uploads";
   const storageKey = client.buildObjectKey({
     prefix: cloud.tosStorage.prefix,
@@ -80,15 +81,19 @@ export async function presignTosMediaUpload(
     storageBackend: "volcengine_tos",
   };
 
-  await registerMediaResourceTransitions(db, {
-    organizationId: params.organizationId,
-    transitions: [
-      {
-        fromResourceId: params.replacesResourceId,
-        reference,
-      },
-    ],
-  });
+  // In-place persist reuses the placeholder id as the object name. Registering
+  // here would flip generating off before the PUT succeeds.
+  if (!params.objectId?.trim()) {
+    await registerMediaResourceTransitions(db, {
+      organizationId: params.organizationId,
+      transitions: [
+        {
+          fromResourceId: params.replacesResourceId,
+          reference,
+        },
+      ],
+    });
+  }
 
   return {
     uploadUrl: signed.url,

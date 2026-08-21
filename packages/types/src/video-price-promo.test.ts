@@ -11,6 +11,7 @@ import {
   normalizeVideoPricePromoFold,
   readLibtvPricePromos,
   readVideoModelPricePromos,
+  readVideoPricePromoFold,
 } from "./video-price-promo";
 
 const NOW = new Date(2026, 7, 17);
@@ -60,6 +61,20 @@ describe("applyVideoPricePromoFold", () => {
 
   it("supports one decimal fold", () => {
     expect(applyVideoPricePromoFold(100, 8.5)).toBe(85);
+  });
+});
+
+describe("readVideoPricePromoFold", () => {
+  it("returns undefined for invalid values", () => {
+    expect(readVideoPricePromoFold(undefined)).toBeUndefined();
+    expect(readVideoPricePromoFold(0)).toBeUndefined();
+    expect(readVideoPricePromoFold(11)).toBeUndefined();
+    expect(readVideoPricePromoFold(8.55)).toBeUndefined();
+  });
+
+  it("normalizes a valid fold", () => {
+    expect(readVideoPricePromoFold(8)).toBe(8);
+    expect(readVideoPricePromoFold(8.5)).toBe(8.5);
   });
 });
 

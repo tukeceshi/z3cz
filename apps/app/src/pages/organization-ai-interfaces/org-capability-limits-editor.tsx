@@ -2,7 +2,17 @@ import type {
   PlatformVideoModelBaseline,
   SingleModelCapabilityLimits,
   UpstreamParamProfileField,
+  VideoModelPriceEstimateTier,
 } from "@dafthunk/types";
+import {
+  applyVideoPriceEstimateDisplayFolds,
+  formatVideoPricePromoFold,
+  isVideoPricePromoFold,
+  isVideoPricePromoFoldDraft,
+  normalizeVideoPricePromoFold,
+  readVideoPriceEstimateDisplayFolds,
+} from "@dafthunk/types";
+import { useEffect, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { CredentialPlainInput } from "@/components/credential-secret-input";
@@ -19,7 +29,10 @@ import {
   VideoDurationEditor,
   type GenerationOptionLabels,
 } from "../admin/admin-generation-field-editors";
-import { SettingsSection } from "../admin/admin-ai-models-ui";
+import {
+  ADMIN_PARAM_HINT_CLASS,
+  SettingsSection,
+} from "../admin/admin-ai-models-ui";
 
 interface OrgCapabilityLimitsEditorProps {
   readonly platformBaseline: PlatformVideoModelBaseline | null;
@@ -110,16 +123,184 @@ function OrgGenerationEnumChips(props: {
   );
 }
 
-function parseReferenceCountInput(
-  value: string,
-  fallback: number,
-  max: number
-): number {
-  const parsed = Number.parseInt(value.trim(), 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return fallback;
+function withoutPriceEstimateDiscountFold(
+  limits: SingleModelCapabilityLimits
+): SingleModelCapabilityLimits {
+  const { priceEstimateDiscountFold: _removed, ...rest } = limits;
+  return rest;
+}
+
+function formatEstimateYuan(value: number): string {
+  if (Number.isInteger(value)) {
+    return String(value);
   }
-  return Math.min(parsed, max);
+  return (Math.round(value * 100) / 100).toString();
+}
+
+function OrgPriceEstimateTierRow(props: {
+  readonly tier: VideoModelPriceEstimateTier;
+  readonly folds: readonly number[];
+  readonly foldedLabel: string;
+}) {
+  const foldedWithout = applyVideoPriceEstimateDisplayFolds(
+    props.tier.priceWithoutVideo,
+    props.folds
+  );
+  const foldedWith = applyVideoPriceEstimateDisplayFolds(
+    props.tier.priceWithVideo,
+    props.folds
+  );
+  const showFolded = props.folds.length > 0;
+
+  return (
+    <div className="grid grid-cols-[4.5rem_1fr_1fr] items-start gap-2 border-b border-border/40 px-3 py-2 last:border-b-0">
+      <span className="text-sm font-medium uppercase">
+        {props.tier.resolution === "4k" ? "4K" : props.tier.resolution}
+      </span>
+      <span className="text-sm tabular-nums">
+        {formatEstimateYuan(props.tier.priceWithoutVideo)}
+        {showFolded ? (
+          <span className="text-muted-foreground block text-[11px]">
+            {props.foldedLabel} {formatEstimateYuan(foldedWithout)}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-sm tabular-nums">
+        {formatEstimateYuan(props.tier.priceWithVideo)}
+        {showFolded ? (
+          <span className="text-muted-foreground block text-[11px]">
+            {props.foldedLabel} {formatEstimateYuan(foldedWith)}
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function OrgPriceEstimateDiscountInput(props: {
+  readonly fold: number;
+  readonly onCommit: (fold: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(() => formatVideoPricePromoFold(props.fold));
+
+  useEffect(() => {
+    setDraft(formatVideoPricePromoFold(props.fold));
+  }, [props.fold]);
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="org_cap_price_discount_fold">
+        {t("pages.adminAiModels.priceEstimatePromoFold")}
+      </Label>
+      <CredentialPlainInput
+        id="org_cap_price_discount_fold"
+        name="org_cap_price_discount_fold"
+        inputMode="decimal"
+        value={draft}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (!isVideoPricePromoFoldDraft(next.trim())) {
+            return;
+          }
+          setDraft(next);
+          const parsed = Number(next);
+          if (isVideoPricePromoFold(parsed)) {
+            props.onCommit(normalizeVideoPricePromoFold(parsed));
+          }
+        }}
+        onBlur={() => {
+          if (isVideoPricePromoFold(Number(draft))) {
+            setDraft(formatVideoPricePromoFold(Number(draft)));
+            return;
+          }
+          setDraft(formatVideoPricePromoFold(props.fold));
+        }}
+      />
+    </div>
+  );
+}
+
+function OrgPriceEstimateSection(props: {
+  readonly platformBaseline: PlatformVideoModelBaseline;
+  readonly capabilityLimits: SingleModelCapabilityLimits;
+  readonly onCapabilityLimitsChange: (limits: SingleModelCapabilityLimits) => void;
+}) {
+  const { t } = useTranslation();
+  const config = props.platformBaseline.priceEstimate;
+  if (config?.enabled !== true) {
+    return null;
+  }
+
+  const enabledTiers = config.tiers.filter((tier) => tier.enabled);
+  const orgFold = props.capabilityLimits.priceEstimateDiscountFold;
+  const discountEnabled = orgFold !== undefined;
+
+  return (
+    <SettingsSection
+      compact
+      stacked
+      title={t("pages.aiInterfaces.singleModel.priceEstimateTitle")}
+      action={
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-xs">
+            {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscount")}
+          </span>
+          <Switch
+            checked={discountEnabled}
+            onCheckedChange={(checked) => {
+              if (!checked) {
+                props.onCapabilityLimitsChange(
+                  withoutPriceEstimateDiscountFold(props.capabilityLimits)
+                );
+                return;
+              }
+              props.onCapabilityLimitsChange({
+                ...props.capabilityLimits,
+                priceEstimateDiscountFold: 8,
+              });
+            }}
+          />
+        </div>
+      }
+    >
+      {enabledTiers.length > 0 ? (
+        <div className="overflow-hidden rounded-lg border border-border/60">
+          <div className="grid grid-cols-[4.5rem_1fr_1fr] gap-2 border-b border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+            <span>{t("pages.adminAiModels.priceEstimateResolution")}</span>
+            <span>{t("pages.adminAiModels.priceWithoutVideo")}</span>
+            <span>{t("pages.adminAiModels.priceWithVideo")}</span>
+          </div>
+          {enabledTiers.map((tier) => (
+            <OrgPriceEstimateTierRow
+              key={tier.resolution}
+              tier={tier}
+              foldedLabel={t("pages.aiInterfaces.singleModel.priceEstimateFolded")}
+              folds={readVideoPriceEstimateDisplayFolds({
+                promos: config.promos,
+                orgDiscountFold: orgFold,
+                resolution: tier.resolution,
+              })}
+            />
+          ))}
+        </div>
+      ) : null}
+      {discountEnabled && orgFold !== undefined ? (
+        <OrgPriceEstimateDiscountInput
+          fold={orgFold}
+          onCommit={(priceEstimateDiscountFold) =>
+            props.onCapabilityLimitsChange({
+              ...props.capabilityLimits,
+              priceEstimateDiscountFold,
+            })
+          }
+        />
+      ) : null}
+      <p className={ADMIN_PARAM_HINT_CLASS}>
+        {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscountHint")}
+      </p>
+    </SettingsSection>
+  );
 }
 
 function OrgReferenceCountInput(props: {
@@ -305,6 +486,12 @@ export function OrgCapabilityLimitsEditor({
           />
         </SettingsSection>
       ) : null}
+
+      <OrgPriceEstimateSection
+        platformBaseline={platformBaseline}
+        capabilityLimits={capabilityLimits}
+        onCapabilityLimitsChange={onCapabilityLimitsChange}
+      />
     </div>
   );
 }

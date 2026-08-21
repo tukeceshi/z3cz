@@ -515,6 +515,18 @@ export function appendAiVideoGeneratedHistoryItems(
   };
 }
 
+export function readAiVideoGeneratingJobId(
+  inputs: readonly WorkflowParameter[]
+): string | undefined {
+  const history = readAiVideoResultHistory(inputs);
+  for (const item of history.items) {
+    if (item.jobId && hasGeneratingResource(item.videos)) {
+      return item.jobId;
+    }
+  }
+  return undefined;
+}
+
 export function withAiVideoGeneratingHistory(
   current: WorkflowNodeType,
   params: {

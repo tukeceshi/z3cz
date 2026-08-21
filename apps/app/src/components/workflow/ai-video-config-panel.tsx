@@ -7,6 +7,7 @@ import {
   normalizeVideoModelParameterRules,
   readVideoPriceEstimateTier,
   readVideoPriceEstimateBaseline480pWithVideo,
+  readVideoPriceEstimateDisplayFolds,
   VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   type LocalMediaReference,
   type MediaReference,
@@ -1500,6 +1501,19 @@ export function AiVideoConfigPanel({
     return readVideoPriceEstimateTier(modelRules, resolution);
   }, [generationValuesForEstimate, modelRules]);
 
+  const priceEstimateDisplayFolds = useMemo(() => {
+    const resolution =
+      typeof generationValuesForEstimate.resolution === "string" &&
+      generationValuesForEstimate.resolution.trim().length > 0
+        ? generationValuesForEstimate.resolution
+        : "720p";
+    return readVideoPriceEstimateDisplayFolds({
+      promos: modelRules.priceEstimate?.promos,
+      orgDiscountFold: modelRules.orgPriceDiscountFold,
+      resolution,
+    });
+  }, [generationValuesForEstimate, modelRules]);
+
   const canGenerate =
     modelReady &&
     !disabled &&
@@ -1706,6 +1720,7 @@ export function AiVideoConfigPanel({
                   baseline480pWithVideo={baseline480pWithVideo}
                   generationValues={generationValuesForEstimate}
                   referenceVideoMedia={referenceVideoMedia}
+                  displayFolds={priceEstimateDisplayFolds}
                   disabled={disabled}
                 />
               ) : null}

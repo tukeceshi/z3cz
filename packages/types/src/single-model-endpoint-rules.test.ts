@@ -227,6 +227,51 @@ describe("single-model-capability-limits", () => {
         },
       })
     ).toEqual({ maxReferenceImages: 1 });
+
+    expect(
+      normalizeCapabilityLimitsForSave({
+        platformBaseline,
+        limits: {
+          ...resolveEffectiveCapabilityLimitsForEdit({
+            platformBaseline,
+            storedLimits: null,
+          }),
+          priceEstimateDiscountFold: 8,
+        },
+      })
+    ).toEqual({ priceEstimateDiscountFold: 8 });
+
+    expect(
+      normalizeCapabilityLimitsForSave({
+        platformBaseline,
+        limits: { priceEstimateDiscountFold: 8 },
+        priceEstimateEnabled: false,
+      })
+    ).toBeNull();
+  });
+
+  it("copies org price discount onto resolved rules without changing unit prices", () => {
+    const platformRules = normalizeVideoModelParameterRules({
+      ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+      priceEstimate: {
+        enabled: true,
+        tiers: [
+          {
+            resolution: "720p",
+            enabled: true,
+            priceWithoutVideo: 46,
+            priceWithVideo: 28,
+          },
+        ],
+      },
+    });
+
+    const limited = applyVideoCapabilityLimits(platformRules, {
+      priceEstimateDiscountFold: 8,
+    });
+
+    expect(limited.orgPriceDiscountFold).toBe(8);
+    expect(limited.priceEstimate).toEqual(platformRules.priceEstimate);
   });
 
   it("org cannot enable cancel when platform disallows", () => {

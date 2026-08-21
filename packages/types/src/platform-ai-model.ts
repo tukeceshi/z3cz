@@ -144,6 +144,8 @@ export interface VideoModelParameterRules {
   readonly promptMaxChars: number;
   readonly supportsTaskCancel?: boolean;
   readonly priceEstimate?: VideoModelPriceEstimateConfig;
+  /** Org-only overlay from capability limits. Not stored on platform models. */
+  readonly orgPriceDiscountFold?: number;
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
@@ -238,6 +240,7 @@ export interface PlatformVideoModelBaseline {
   readonly maxReferenceImages: number;
   readonly maxReferenceVideos: number;
   readonly maxReferenceAudios: number;
+  readonly priceEstimate?: VideoModelPriceEstimateConfig;
 }
 
 export interface ListPlatformVideoModelBaselinesResponse {

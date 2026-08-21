@@ -26,7 +26,10 @@ import {
   type SeedanceSeries,
 } from "./seedance-output-pixels";
 import {
+  applyVideoPricePromoFold,
+  matchVideoModelPricePromo,
   readVideoModelPricePromos,
+  readVideoPricePromoFold,
   type VideoModelPricePromo,
 } from "./video-price-promo";
 
@@ -570,6 +573,38 @@ export function computeVideoPriceEstimateForModel(params: {
     priceWithoutVideo: params.priceWithoutVideo,
     priceWithVideo: params.priceWithVideo,
   });
+}
+
+export function applyVideoPriceEstimateDisplayFolds(
+  value: number,
+  folds: readonly number[]
+): number {
+  return folds.reduce(
+    (current, fold) => applyVideoPricePromoFold(current, fold),
+    value
+  );
+}
+
+export function readVideoPriceEstimateDisplayFolds(params: {
+  readonly promos?: readonly VideoModelPricePromo[];
+  readonly orgDiscountFold?: number;
+  readonly resolution: string;
+  readonly now?: Date;
+}): readonly number[] {
+  const folds: number[] = [];
+  const promo = matchVideoModelPricePromo(
+    params.promos ?? [],
+    params.resolution,
+    params.now
+  );
+  if (promo) {
+    folds.push(promo.discountFold);
+  }
+  const orgFold = readVideoPricePromoFold(params.orgDiscountFold);
+  if (orgFold !== undefined) {
+    folds.push(orgFold);
+  }
+  return folds;
 }
 
 export function formatVideoPriceEstimateParts(

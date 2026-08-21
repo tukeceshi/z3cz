@@ -5,6 +5,7 @@ import type {
 } from "@dafthunk/types";
 import {
   describeFormatTransformTemplateRules,
+  formatVideoPricePromoFold,
   resolveEffectiveDurationField,
   resolveEffectiveReferenceCounts,
   resolveEffectiveResolutionField,
@@ -136,6 +137,15 @@ export function SingleModelCapabilityLimitsPreview(
         {durationPreview ? (
           <li>
             {t("pages.adminAiModels.videoDurationLabel")}：{durationPreview}
+          </li>
+        ) : null}
+        {props.capabilityLimits?.priceEstimateDiscountFold !== undefined ? (
+          <li>
+            {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscountPreview", {
+              fold: formatVideoPricePromoFold(
+                props.capabilityLimits.priceEstimateDiscountFold
+              ),
+            })}
           </li>
         ) : null}
       </ul>

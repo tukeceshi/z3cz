@@ -62,6 +62,13 @@ export function isVideoPricePromoFold(value: number): boolean {
   return Math.abs(value - normalizeVideoPricePromoFold(value)) < 1e-8;
 }
 
+export function readVideoPricePromoFold(value: unknown): number | undefined {
+  if (typeof value !== "number" || !isVideoPricePromoFold(value)) {
+    return undefined;
+  }
+  return normalizeVideoPricePromoFold(value);
+}
+
 export function normalizeVideoPricePromoFold(value: number): number {
   return Math.round(value * 10) / 10;
 }

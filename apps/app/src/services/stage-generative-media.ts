@@ -241,6 +241,7 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
   readonly mediaId: string;
   readonly mimeType: string;
   readonly mediaKind?: "ai-image" | "ai-video" | "ai-audio" | "reference";
+  readonly objectId?: string;
 }): Promise<ObjectReference> {
   const entry = await readGenerativeStagingBlob({
     mediaId: params.mediaId,
@@ -265,6 +266,7 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
     mediaKind: params.mediaKind ?? "reference",
     nodeType,
     existingLocalMediaId: params.mediaId,
+    objectId: params.objectId,
   });
 
   return result.object;

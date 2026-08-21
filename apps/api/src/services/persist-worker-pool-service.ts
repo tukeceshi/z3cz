@@ -224,7 +224,7 @@ export async function presignPersistJobUploadsForWorker(
       mimeType: item.mimeType || pending.mimeType,
       contentLength: item.contentLength,
       mediaKind: pending.mediaKind,
-      replacesResourceId: pending.resourceId,
+      objectId: pending.resourceId,
     });
 
     if (!presigned) {

@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-context";
 import { readAiAudioGenerationParams } from "@/components/workflow/ai-audio-params-popover";
 import {
   appendAiAudioGeneratedHistoryItems,
+  readAiAudioGeneratingJobId,
   readAiAudioResult,
   readAiAudioResultHistory,
   withAiAudioGeneratingHistoryFailed,
@@ -27,6 +28,7 @@ import {
 import { readAiVideoGenerationParams } from "@/components/workflow/ai-video-params-popover";
 import {
   appendAiVideoGeneratedHistoryItems,
+  readAiVideoGeneratingJobId,
   readAiVideoResult,
   readAiVideoResultHistory,
   withAiVideoGeneratingHistoryFailed,
@@ -63,6 +65,21 @@ export interface GenerativeCloudJobResumeHostProps {
   readonly nodeId: string;
   readonly modality: GenerativeCloudJobResumeModality;
   readonly data: WorkflowNodeType;
+}
+
+function readResumeJobId(
+  modality: GenerativeCloudJobResumeModality,
+  metadata: Record<string, string> | undefined,
+  inputs: WorkflowNodeType["inputs"]
+): string | undefined {
+  return (
+    readGenerativeProgressJobId(metadata) ??
+    (modality === "image"
+      ? readAiImageGeneratingJobId(inputs)
+      : modality === "video"
+        ? readAiVideoGeneratingJobId(inputs)
+        : readAiAudioGeneratingJobId(inputs))
+  );
 }
 
 export function GenerativeCloudJobResumeHost({
@@ -151,11 +168,7 @@ export function GenerativeCloudJobResumeHost({
         return;
       }
 
-        const jobId =
-          readGenerativeProgressJobId(data.metadata) ??
-          (modality === "image"
-            ? readAiImageGeneratingJobId(data.inputs)
-            : undefined);
+        const jobId = readResumeJobId(modality, data.metadata, data.inputs);
         const canWriteHistory = !jobId || tryClaimGenerativeJobFinalize(jobId);
 
         if (!canWriteHistory) {
@@ -204,9 +217,11 @@ export function GenerativeCloudJobResumeHost({
                   params,
                   platformModelId: result.modelCanonicalId,
                   requestSnapshot: result.requestSnapshot,
-                  jobId:
-                    readGenerativeProgressJobId(current.metadata) ??
-                    readAiImageGeneratingJobId(current.inputs),
+                  jobId: readResumeJobId(
+                    modality,
+                    current.metadata,
+                    current.inputs
+                  ),
                 })
               : modality === "video"
                 ? appendAiVideoGeneratedHistoryItems(
@@ -215,6 +230,11 @@ export function GenerativeCloudJobResumeHost({
                     {
                       prompt,
                       params,
+                      jobId: readResumeJobId(
+                        modality,
+                        current.metadata,
+                        current.inputs
+                      ),
                     }
                   )
                 : appendAiAudioGeneratedHistoryItems(
@@ -223,6 +243,11 @@ export function GenerativeCloudJobResumeHost({
                     {
                       prompt,
                       params,
+                      jobId: readResumeJobId(
+                        modality,
+                        current.metadata,
+                        current.inputs
+                      ),
                     }
                   );
 
@@ -285,7 +310,11 @@ export function GenerativeCloudJobResumeHost({
             : modality === "video"
               ? withAiVideoGenerateError(withBusy, cardError)
               : withAiAudioGenerateError(withBusy, cardError);
-        const failedJobId = readGenerativeProgressJobId(current.metadata);
+        const failedJobId = readResumeJobId(
+          modality,
+          current.metadata,
+          current.inputs
+        );
         if (modality === "image") {
           return {
             ...withAiImageGeneratingHistoryFailed(
@@ -352,11 +381,7 @@ export function GenerativeCloudJobResumeHost({
     isGenerating: isResuming,
     persistPhase,
     autoResume: !disabled,
-    resumeJobId:
-      modality === "image"
-        ? readGenerativeProgressJobId(data.metadata) ??
-          readAiImageGeneratingJobId(data.inputs)
-        : readGenerativeProgressJobId(data.metadata),
+    resumeJobId: readResumeJobId(modality, data.metadata, data.inputs),
     updateNodeData,
     setPersistPhase,
     setIsGenerating: setIsResuming,
