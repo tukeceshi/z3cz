@@ -2,15 +2,12 @@ import type {
   PlatformVideoModelBaseline,
   SingleModelCapabilityLimits,
   UpstreamParamProfileField,
-  VideoModelPriceEstimateTier,
 } from "@dafthunk/types";
 import {
-  applyVideoPriceEstimateDisplayFolds,
   formatVideoPricePromoFold,
   isVideoPricePromoFold,
   isVideoPricePromoFoldDraft,
   normalizeVideoPricePromoFold,
-  readVideoPriceEstimateDisplayFolds,
 } from "@dafthunk/types";
 import { useEffect, useState } from "react";
 
@@ -130,51 +127,11 @@ function withoutPriceEstimateDiscountFold(
   return rest;
 }
 
-function formatEstimateYuan(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-  return (Math.round(value * 100) / 100).toString();
-}
-
-function OrgPriceEstimateTierRow(props: {
-  readonly tier: VideoModelPriceEstimateTier;
-  readonly folds: readonly number[];
-  readonly foldedLabel: string;
-}) {
-  const foldedWithout = applyVideoPriceEstimateDisplayFolds(
-    props.tier.priceWithoutVideo,
-    props.folds
-  );
-  const foldedWith = applyVideoPriceEstimateDisplayFolds(
-    props.tier.priceWithVideo,
-    props.folds
-  );
-  const showFolded = props.folds.length > 0;
-
-  return (
-    <div className="grid grid-cols-[4.5rem_1fr_1fr] items-start gap-2 border-b border-border/40 px-3 py-2 last:border-b-0">
-      <span className="text-sm font-medium uppercase">
-        {props.tier.resolution === "4k" ? "4K" : props.tier.resolution}
-      </span>
-      <span className="text-sm tabular-nums">
-        {formatEstimateYuan(props.tier.priceWithoutVideo)}
-        {showFolded ? (
-          <span className="text-muted-foreground block text-[11px]">
-            {props.foldedLabel} {formatEstimateYuan(foldedWithout)}
-          </span>
-        ) : null}
-      </span>
-      <span className="text-sm tabular-nums">
-        {formatEstimateYuan(props.tier.priceWithVideo)}
-        {showFolded ? (
-          <span className="text-muted-foreground block text-[11px]">
-            {props.foldedLabel} {formatEstimateYuan(foldedWith)}
-          </span>
-        ) : null}
-      </span>
-    </div>
-  );
+function withoutApplyOfficialPriceDiscount(
+  limits: SingleModelCapabilityLimits
+): SingleModelCapabilityLimits {
+  const { applyOfficialPriceDiscount: _removed, ...rest } = limits;
+  return rest;
 }
 
 function OrgPriceEstimateDiscountInput(props: {
@@ -232,9 +189,10 @@ function OrgPriceEstimateSection(props: {
     return null;
   }
 
-  const enabledTiers = config.tiers.filter((tier) => tier.enabled);
   const orgFold = props.capabilityLimits.priceEstimateDiscountFold;
   const discountEnabled = orgFold !== undefined;
+  const officialEnabled =
+    props.capabilityLimits.applyOfficialPriceDiscount !== false;
 
   return (
     <SettingsSection
@@ -242,49 +200,50 @@ function OrgPriceEstimateSection(props: {
       stacked
       title={t("pages.aiInterfaces.singleModel.priceEstimateTitle")}
       action={
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">
-            {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscount")}
-          </span>
-          <Switch
-            checked={discountEnabled}
-            onCheckedChange={(checked) => {
-              if (!checked) {
-                props.onCapabilityLimitsChange(
-                  withoutPriceEstimateDiscountFold(props.capabilityLimits)
-                );
-                return;
-              }
-              props.onCapabilityLimitsChange({
-                ...props.capabilityLimits,
-                priceEstimateDiscountFold: 8,
-              });
-            }}
-          />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs">
+              {t("pages.aiInterfaces.singleModel.priceEstimateOfficialDiscount")}
+            </span>
+            <Switch
+              checked={officialEnabled}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  props.onCapabilityLimitsChange(
+                    withoutApplyOfficialPriceDiscount(props.capabilityLimits)
+                  );
+                  return;
+                }
+                props.onCapabilityLimitsChange({
+                  ...props.capabilityLimits,
+                  applyOfficialPriceDiscount: false,
+                });
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs">
+              {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscount")}
+            </span>
+            <Switch
+              checked={discountEnabled}
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  props.onCapabilityLimitsChange(
+                    withoutPriceEstimateDiscountFold(props.capabilityLimits)
+                  );
+                  return;
+                }
+                props.onCapabilityLimitsChange({
+                  ...props.capabilityLimits,
+                  priceEstimateDiscountFold: 8,
+                });
+              }}
+            />
+          </div>
         </div>
       }
     >
-      {enabledTiers.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-border/60">
-          <div className="grid grid-cols-[4.5rem_1fr_1fr] gap-2 border-b border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-            <span>{t("pages.adminAiModels.priceEstimateResolution")}</span>
-            <span>{t("pages.adminAiModels.priceWithoutVideo")}</span>
-            <span>{t("pages.adminAiModels.priceWithVideo")}</span>
-          </div>
-          {enabledTiers.map((tier) => (
-            <OrgPriceEstimateTierRow
-              key={tier.resolution}
-              tier={tier}
-              foldedLabel={t("pages.aiInterfaces.singleModel.priceEstimateFolded")}
-              folds={readVideoPriceEstimateDisplayFolds({
-                promos: config.promos,
-                orgDiscountFold: orgFold,
-                resolution: tier.resolution,
-              })}
-            />
-          ))}
-        </div>
-      ) : null}
       {discountEnabled && orgFold !== undefined ? (
         <OrgPriceEstimateDiscountInput
           fold={orgFold}

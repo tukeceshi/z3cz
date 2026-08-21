@@ -146,6 +146,8 @@ export interface VideoModelParameterRules {
   readonly priceEstimate?: VideoModelPriceEstimateConfig;
   /** Org-only overlay from capability limits. Not stored on platform models. */
   readonly orgPriceDiscountFold?: number;
+  /** Org-only overlay. Absent = apply official promo. False = skip it. */
+  readonly orgApplyOfficialPriceDiscount?: boolean;
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 

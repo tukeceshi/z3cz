@@ -16,6 +16,8 @@ export interface SingleModelCapabilityLimits {
   readonly duration?: UpstreamParamProfileField;
   /** Org extra price-estimate discount. 8 means 80%. Absent = off. */
   readonly priceEstimateDiscountFold?: number;
+  /** Include platform promo in the org price estimate. Absent = on. */
+  readonly applyOfficialPriceDiscount?: boolean;
 }
 
 export interface PlatformVideoCapabilityBaseline {
@@ -266,6 +268,7 @@ export function applyVideoCapabilityLimits(
 ): VideoModelParameterRules {
   const {
     orgPriceDiscountFold: _platformOrgFold,
+    orgApplyOfficialPriceDiscount: _platformOfficialDiscount,
     ...normalized
   } = normalizeVideoModelParameterRules(platformRules);
   if (!capabilityLimits) {
@@ -278,6 +281,7 @@ export function applyVideoCapabilityLimits(
   const orgPriceDiscountFold = readVideoPricePromoFold(
     migrated.priceEstimateDiscountFold
   );
+  const applyOfficialPriceDiscount = migrated.applyOfficialPriceDiscount !== false;
 
   let generationFields = normalized.generationFields;
   if (migrated.resolution) {
@@ -308,6 +312,9 @@ export function applyVideoCapabilityLimits(
       ? { maxReferenceAudios: migrated.maxReferenceAudios }
       : {}),
     ...(orgPriceDiscountFold !== undefined ? { orgPriceDiscountFold } : {}),
+    ...(applyOfficialPriceDiscount
+      ? {}
+      : { orgApplyOfficialPriceDiscount: false }),
     generationFields,
   };
 }
@@ -355,7 +362,8 @@ export function capabilityLimitsHasStoredValues(
     limits.maxReferenceVideos !== undefined ||
     limits.maxReferenceAudios !== undefined ||
     limits.duration !== undefined ||
-    limits.priceEstimateDiscountFold !== undefined
+    limits.priceEstimateDiscountFold !== undefined ||
+    limits.applyOfficialPriceDiscount === false
   );
 }
 
@@ -422,6 +430,13 @@ export function normalizeCapabilityLimitsForSave(params: {
   );
   if (params.priceEstimateEnabled !== false && priceEstimateDiscountFold !== undefined) {
     result = { ...result, priceEstimateDiscountFold };
+  }
+
+  if (
+    params.priceEstimateEnabled !== false &&
+    params.limits.applyOfficialPriceDiscount === false
+  ) {
+    result = { ...result, applyOfficialPriceDiscount: false };
   }
 
   if (!capabilityLimitsHasStoredValues(result)) {

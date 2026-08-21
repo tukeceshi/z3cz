@@ -67,6 +67,7 @@ export interface AppendMediaGeneratingContentParams
 
 export interface AppendTextGeneratingContentParams {
   readonly invocationId: string;
+  readonly resourceId: string;
   readonly platformModelId?: string;
   readonly aiInterfaceId?: string;
   readonly modelDisplayName?: string;
@@ -475,8 +476,14 @@ export function appendTextGeneratingContent(
     return null;
   }
 
+  const generatingRef: ResourceIdReference = {
+    resourceId: params.resourceId,
+    mimeType: "text/plain",
+    generating: true,
+  };
   const item: AiTextResultHistoryItem = {
     id: createHistoryItemId(Date.now(), 0),
+    resourceId: params.resourceId,
     platformModelId: params.platformModelId,
     aiInterfaceId: params.aiInterfaceId,
     modelDisplayName: params.modelDisplayName,
@@ -488,14 +495,15 @@ export function appendTextGeneratingContent(
     selectedId: item.id,
   };
 
-  return {
-    inputs: upsertNodeInput(
-      node.inputs,
-      AI_TEXT_HISTORY_INPUT,
-      nextHistory,
-      "json"
-    ),
-  };
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_TEXT_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
+  inputs = upsertNodeInput(inputs, AI_TEXT_RESULT_INPUT, generatingRef, "json");
+
+  return { inputs };
 }
 
 export function buildWorkflowNodeContentPatch(
@@ -568,12 +576,7 @@ function collectInFlightHistoryItemIds(node: Node): readonly string[] {
     }
     case AI_TEXT_NODE_TYPE: {
       return readTextHistory(node.inputs).items
-        .filter(
-          (item) =>
-            !item.resourceId &&
-            !item.text &&
-            !item.contentSha256
-        )
+        .filter((item) => !item.text && !item.contentSha256)
         .map((item) => item.id);
     }
     default:
@@ -729,7 +732,7 @@ export function mergeGenerativeNodeContentOnSave(
         missing,
         incomingHistory.items
       ) as AiTextResultHistoryItem[];
-      const inputs = upsertNodeInput(
+      let inputs = upsertNodeInput(
         incoming.inputs,
         AI_TEXT_HISTORY_INPUT,
         {
@@ -738,6 +741,18 @@ export function mergeGenerativeNodeContentOnSave(
         },
         "json"
       );
+      const persistedResult = readJsonInput<ResourceIdReference>(
+        persisted.inputs,
+        AI_TEXT_RESULT_INPUT
+      );
+      if (persistedResult && isResourceIdReference(persistedResult) && persistedResult.generating) {
+        inputs = upsertNodeInput(
+          inputs,
+          AI_TEXT_RESULT_INPUT,
+          persistedResult,
+          "json"
+        );
+      }
       return { ...incoming, inputs };
     }
     default:

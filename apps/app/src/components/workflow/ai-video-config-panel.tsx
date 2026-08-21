@@ -1510,6 +1510,7 @@ export function AiVideoConfigPanel({
     return readVideoPriceEstimateDisplayFolds({
       promos: modelRules.priceEstimate?.promos,
       orgDiscountFold: modelRules.orgPriceDiscountFold,
+      applyOfficialDiscount: modelRules.orgApplyOfficialPriceDiscount,
       resolution,
     });
   }, [generationValuesForEstimate, modelRules]);

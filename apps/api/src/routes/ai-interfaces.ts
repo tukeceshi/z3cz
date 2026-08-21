@@ -58,10 +58,8 @@ import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { getVolcanoArkApiKey } from "../integrations/volcengine/get-api-key";
 import {
   isVolcanoArkNotOpenedError,
-  isAiInterfaceNameConflictError,
   isVolcanoInterfaceExistsError,
   VOLCANO_ARK_NOT_OPENED_CODE,
-  AI_INTERFACE_NAME_CONFLICT_CODE,
   VOLCANO_INTERFACE_EXISTS_CODE,
 } from "../integrations/volcengine/errors";
 import { ensureVolcanoApiKey } from "../integrations/volcengine/ensure-api-key";
@@ -296,6 +294,7 @@ const singleModelCapabilityLimitsSchema = z.object({
   maxReferenceVideos: z.number().int().min(0).optional(),
   maxReferenceAudios: z.number().int().min(0).optional(),
   priceEstimateDiscountFold: z.number().positive().max(10).optional(),
+  applyOfficialPriceDiscount: z.boolean().optional(),
   resolutions: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -1151,15 +1150,6 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
         {
           error: "A Volcano interface already exists in this organization",
           code: VOLCANO_INTERFACE_EXISTS_CODE,
-        },
-        409
-      );
-    }
-    if (isAiInterfaceNameConflictError(error)) {
-      return c.json(
-        {
-          error: "An AI interface with this name already exists in the organization",
-          code: AI_INTERFACE_NAME_CONFLICT_CODE,
         },
         409
       );

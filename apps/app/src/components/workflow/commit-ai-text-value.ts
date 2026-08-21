@@ -1,5 +1,6 @@
 import type { OrgTextModelOption } from "@dafthunk/types";
 import {
+  getResourceIdFromValue,
   inferAiTextMimeType,
   isResourceIdReference,
   type ResourceIdReference,
@@ -121,7 +122,27 @@ export async function commitAiTextValue(
   const previousText =
     readAiTextResult(params.current.inputs, params.current.outputs) ?? "";
   const existingReference = readAiTextResultReference(params.current.inputs);
+  const existingId = existingReference
+    ? getResourceIdFromValue(existingReference)
+    : undefined;
   const baseSha256 = readAiTextResultContentSha256(params.current.inputs);
+
+  const stageFallback = async (): Promise<WorkflowMediaValue> => {
+    const local = await stageAiTextContent({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      text: params.value,
+      mediaId: existingId,
+    });
+    if (existingId && isResourceIdReference(existingReference)) {
+      return buildResourceIdReference({
+        resourceId: existingId,
+        contentSha256,
+        mimeType,
+      });
+    }
+    return local;
+  };
 
   let reference: WorkflowMediaValue;
   let contentSha256 = await sha256HexFromText(params.value);
@@ -141,11 +162,7 @@ export async function commitAiTextValue(
         reference = cloudRef;
         contentSha256 = cloudRef.contentSha256 ?? contentSha256;
       } else {
-        reference = await stageAiTextContent({
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          text: params.value,
-        });
+        reference = await stageFallback();
       }
     } catch (error) {
       if (error instanceof TextContentConflictError) {
@@ -153,18 +170,10 @@ export async function commitAiTextValue(
         return;
       }
       console.warn("[ai-text] cloud persist failed", error);
-      reference = await stageAiTextContent({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        text: params.value,
-      });
+      reference = await stageFallback();
     }
   } else {
-    reference = await stageAiTextContent({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      text: params.value,
-    });
+    reference = await stageFallback();
   }
 
   const staged: AiTextStagedResultPatch = {

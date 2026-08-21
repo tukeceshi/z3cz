@@ -66,7 +66,7 @@ import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-pat
 import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
 import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
-import { buildResourceIdReference } from "./ai-text-persist-utils";
+import { buildResourceIdReference, readAiTextGeneratingResourceId } from "./ai-text-persist-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
@@ -119,6 +119,7 @@ export function AiTextConfigPanel({
   const generateAbortRef = useRef<AbortController | null>(null);
   const streamPreviewRafRef = useRef<number | null>(null);
   const streamPreviewPendingRef = useRef<string | null>(null);
+  const generatingResourceIdRef = useRef<string | undefined>(undefined);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
 
@@ -456,6 +457,7 @@ export function AiTextConfigPanel({
     generateInFlightRef.current = true;
     const abortController = new AbortController();
     generateAbortRef.current = abortController;
+    generatingResourceIdRef.current = undefined;
     setIsGenerating(true);
     updateNodeData?.(nodeId, (current) => {
       const preview = withAiTextStreamingPreview(current, "");
@@ -520,6 +522,8 @@ export function AiTextConfigPanel({
                 current,
                 workflowNodeContent
               );
+              generatingResourceIdRef.current =
+                readAiTextGeneratingResourceId(patched.inputs ?? current.inputs);
               return {
                 ...patched,
                 metadata: withAiTextGeneratingFlag(
@@ -531,6 +535,19 @@ export function AiTextConfigPanel({
           },
           onDelta: (_delta, fullText) => {
             streamPreviewPendingRef.current = fullText;
+            const hungResourceId = generatingResourceIdRef.current;
+            if (hungResourceId && orgId && workflowId && fullText.trim()) {
+              hangAiTextDisplayFromReference({
+                organizationId: orgId,
+                workflowId,
+                reference: {
+                  resourceId: hungResourceId,
+                  mimeType: "text/plain",
+                  generating: true,
+                },
+                body: fullText,
+              });
+            }
             if (streamPreviewRafRef.current !== null) {
               return;
             }
@@ -564,19 +581,29 @@ export function AiTextConfigPanel({
       const mimeType = inferAiTextMimeType(response.text);
       const contentSha256 =
         response.contentSha256 ?? (await sha256HexFromText(response.text));
+      const resourceId =
+        response.resourceId ?? generatingResourceIdRef.current;
 
-      const reference =
-        response.resourceId && response.contentSha256
-          ? buildResourceIdReference({
-              resourceId: response.resourceId,
-              contentSha256: response.contentSha256,
-              mimeType,
-            })
-          : await stageAiTextContent({
-              organizationId: orgId,
-              workflowId,
-              text: response.text,
-            });
+      const reference = resourceId
+        ? buildResourceIdReference({
+            resourceId,
+            contentSha256,
+            mimeType,
+          })
+        : await stageAiTextContent({
+            organizationId: orgId,
+            workflowId,
+            text: response.text,
+          });
+
+      if (resourceId) {
+        await stageAiTextContent({
+          organizationId: orgId,
+          workflowId,
+          text: response.text,
+          mediaId: resourceId,
+        });
+      }
 
       const staged = {
         reference,

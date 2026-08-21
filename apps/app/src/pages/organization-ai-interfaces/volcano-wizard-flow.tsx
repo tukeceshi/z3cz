@@ -61,8 +61,6 @@ import {
 
   retryVolcanoInterfaceSetup,
 
-  AI_INTERFACE_NAME_CONFLICT_CODE,
-
   VOLCANO_ARK_NOT_OPENED_CODE,
 
   VOLCANO_INTERFACE_EXISTS_CODE,
@@ -888,14 +886,6 @@ export function VolcanoWizardFlow({
       appToast.success("pages.aiInterfaces.created");
       await finishWizard();
     } catch (error) {
-      if (
-        error instanceof ApiRequestError &&
-        error.code === AI_INTERFACE_NAME_CONFLICT_CODE
-      ) {
-        appToast.error("pages.aiInterfaces.duplicateName");
-        setSetupWaitPhase("idle");
-        return;
-      }
       if (
         error instanceof ApiRequestError &&
         error.code === VOLCANO_INTERFACE_EXISTS_CODE

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
 } from "./ai-interface";
 import {
   appendImageGeneratingContent,
+  appendTextGeneratingContent,
   appendVideoGeneratingContent,
   buildGeneratingResourceRefs,
   mergeGenerativeNodeContentOnSave,
@@ -146,5 +148,40 @@ describe("mergeGenerativeNodeContentOnSave", () => {
     const result = merged.inputs.find((input) => input.name === "images_result")
       ?.value as { resourceId: string; generating?: boolean }[];
     expect(result[0]?.generating).toBe(true);
+  });
+});
+
+describe("appendTextGeneratingContent", () => {
+  it("writes the placeholder resource id on history and result", () => {
+    const node: Node = {
+      id: "node-text",
+      name: "Text",
+      type: AI_TEXT_NODE_TYPE,
+      position: { x: 0, y: 0 },
+      inputs: [],
+      outputs: [{ name: "text", type: "string" }],
+    };
+    const patch = appendTextGeneratingContent(node, {
+      invocationId: "inv-1",
+      resourceId: "text-res-1",
+      platformModelId: "model-1",
+    });
+    expect(patch).not.toBeNull();
+
+    const history = (patch!.inputs!.find((input) => input.name === "result_history")
+      ?.value ?? null) as {
+      items: { resourceId?: string; invocationId?: string }[];
+    };
+    const result = patch!.inputs!.find((input) => input.name === "result")?.value as
+      | { resourceId: string; generating?: boolean }
+      | undefined;
+
+    expect(history.items[0]?.resourceId).toBe("text-res-1");
+    expect(history.items[0]?.invocationId).toBe("inv-1");
+    expect(result).toEqual({
+      resourceId: "text-res-1",
+      mimeType: "text/plain",
+      generating: true,
+    });
   });
 });

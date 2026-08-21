@@ -128,6 +128,26 @@ describe("readVideoPriceEstimateDisplayFolds", () => {
     ).toEqual([8, 8]);
   });
 
+  it("omits official promo when applyOfficialDiscount is false", () => {
+    expect(
+      readVideoPriceEstimateDisplayFolds({
+        promos: [
+          {
+            id: "a",
+            resolution: "any",
+            startsAt: "2026-08-01",
+            endsAt: "2026-08-31",
+            discountFold: 8,
+          },
+        ],
+        orgDiscountFold: 8,
+        applyOfficialDiscount: false,
+        resolution: "720p",
+        now: new Date(2026, 7, 17),
+      })
+    ).toEqual([8]);
+  });
+
   it("omits inactive promos and invalid org folds", () => {
     expect(
       readVideoPriceEstimateDisplayFolds({

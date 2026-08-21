@@ -40,6 +40,26 @@ export function readAiTextResultReference(
   return undefined;
 }
 
+export function readAiTextGeneratingResourceId(
+  inputs: readonly WorkflowParameter[]
+): string | undefined {
+  const history = readAiTextResultHistory(inputs);
+  for (const item of history.items) {
+    if (item.resourceId && !item.contentSha256 && !item.text) {
+      return item.resourceId;
+    }
+  }
+  const reference = readAiTextResultReference(inputs);
+  if (
+    reference &&
+    isResourceIdReference(reference) &&
+    (reference.generating || !reference.contentSha256)
+  ) {
+    return reference.resourceId;
+  }
+  return undefined;
+}
+
 export function readAiTextResultContentSha256(
   inputs: readonly WorkflowParameter[]
 ): string | undefined {
@@ -142,13 +162,15 @@ export function withAiTextStagedGeneratedResult(
 ): Partial<WorkflowNodeType> {
   const history = readAiTextResultHistory(current.inputs);
   const resourceId = getResourceIdFromValue(staged.reference);
-  const pendingIndex = history.items.findIndex(
-    (entry) =>
-      entry.id === history.selectedId &&
-      !entry.resourceId &&
-      !entry.text &&
-      !entry.contentSha256
-  );
+  const pendingIndex = history.items.findIndex((entry) => {
+    if (entry.contentSha256 || entry.text) {
+      return false;
+    }
+    if (resourceId && entry.resourceId === resourceId) {
+      return true;
+    }
+    return entry.id === history.selectedId;
+  });
   const item: AiTextResultHistoryItem =
     pendingIndex >= 0
       ? {

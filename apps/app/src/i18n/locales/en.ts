@@ -1930,10 +1930,12 @@ export const en = {
         durationLimitRequired: "Select at least one allowed duration.",
         durationLimitsPreview: "{{min}}–{{max}}s, default {{default}}",
         priceEstimateTitle: "Price estimate",
+        priceEstimateOfficialDiscount: "Official discount",
+        priceEstimateOfficialDiscountPreviewOn: "Official discount: on",
+        priceEstimateOfficialDiscountPreviewOff: "Official discount: off",
         priceEstimateExtraDiscount: "Extra discount",
         priceEstimateExtraDiscountHint:
-          "8 means 20% off. Applies to estimated price only, not tokens. Stacks with an active promo.",
-        priceEstimateFolded: "After discount",
+          "8 means 20% off. Applies to estimated price only, not tokens. Stacks when both official and extra discounts are on.",
         priceEstimateExtraDiscountPreview: "Extra discount {{fold}}",
         formatTemplateRulesTitle: "Template rules",
         formatTemplateRulesSupportsTaskCancel: "Supports task cancellation",
@@ -1966,8 +1968,6 @@ export const en = {
       apiKeyRequired: "API key is required",
       updated: "AI interface updated",
       created: "AI interface created",
-      duplicateName:
-        "An AI interface with this name already exists in this organization. Choose a different name.",
       saveFailed: "Failed to save AI interface",
       deleteConfirm: 'Delete "{{name}}"? This cannot be undone.',
       deleteTitle: "Delete AI interface",

@@ -118,7 +118,7 @@ import {
   runCanvasImageGenerationJob,
 } from "../services/canvas-image-generation-job";
 import { runAfterResponse } from "../utils/run-after-response";
-import { persistGeneratingNodeContentToWorkflow } from "../services/persist-generating-node-content";
+import { persistGeneratingNodeContentToWorkflow, persistTextGeneratingPlaceholder } from "../services/persist-generating-node-content";
 import { markMediaResourcesFailed } from "../services/mark-media-resources-failed";
 import { registerGeneratingPlaceholderResources } from "../services/register-generating-placeholder-resources";
 import {
@@ -617,21 +617,16 @@ platformAiRoutes.post(
       nodeId: body.nodeId,
     });
 
-    const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
-      c.env,
-      {
+    const { resourceId: textResourceId, workflowNodeContent } =
+      await persistTextGeneratingPlaceholder(c.env, db, {
         organizationId,
         workflowId: body.workflowId,
         nodeId: body.nodeId,
-        modality: "text",
-        entry: {
-          invocationId,
-          platformModelId: modelOption.canonicalId,
-          aiInterfaceId: body.aiInterfaceId,
-          modelDisplayName: modelOption.displayName,
-        },
-      }
-    );
+        invocationId,
+        platformModelId: modelOption.canonicalId,
+        aiInterfaceId: body.aiInterfaceId,
+        modelDisplayName: modelOption.displayName,
+      });
 
     const upstreamLog = createUpstreamRequestLogger(db, {
       organizationId,
@@ -661,6 +656,11 @@ platformAiRoutes.post(
         status: "failed",
         error: result.invocationError ?? result.error ?? "Generation failed",
       });
+      await markMediaResourcesFailed(db, {
+        organizationId,
+        resourceIds: [textResourceId],
+        mimeType: "text/plain",
+      });
       return c.json({ error: result.error ?? "Generation failed" }, 502);
     }
 
@@ -674,10 +674,21 @@ platformAiRoutes.post(
       error: null,
     });
 
+    const mimeType = inferAiTextMimeType(result.text);
+    const persisted = await persistGeneratedTextContent(c.env, {
+      organizationId,
+      workflowId: body.workflowId,
+      text: result.text,
+      mimeType,
+      resourceId: textResourceId,
+    });
+
     return c.json({
       text: result.text,
       invocationId,
       aiInterfaceId: result.interfaceId,
+      resourceId: persisted?.resourceId ?? textResourceId,
+      ...(persisted ? { contentSha256: persisted.contentSha256 } : {}),
       ...(workflowNodeContent ? { workflowNodeContent } : {}),
     });
   }
@@ -754,21 +765,16 @@ platformAiRoutes.post(
       nodeId: body.nodeId,
     });
 
-    const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
-      c.env,
-      {
+    const { resourceId: textResourceId, workflowNodeContent } =
+      await persistTextGeneratingPlaceholder(c.env, db, {
         organizationId,
         workflowId: body.workflowId,
         nodeId: body.nodeId,
-        modality: "text",
-        entry: {
-          invocationId,
-          platformModelId: modelOption.canonicalId,
-          aiInterfaceId: body.aiInterfaceId,
-          modelDisplayName: modelOption.displayName,
-        },
-      }
-    );
+        invocationId,
+        platformModelId: modelOption.canonicalId,
+        aiInterfaceId: body.aiInterfaceId,
+        modelDisplayName: modelOption.displayName,
+      });
 
     const prepared = await prepareTextModelStream({
       env: c.env,
@@ -789,6 +795,11 @@ platformAiRoutes.post(
         organizationId,
         status: "failed",
         error: prepared.invocationError ?? prepared.error,
+      });
+      await markMediaResourcesFailed(db, {
+        organizationId,
+        resourceIds: [textResourceId],
+        mimeType: "text/plain",
       });
       return c.json({ error: prepared.error }, 502);
     }
@@ -822,6 +833,11 @@ platformAiRoutes.post(
             organizationId,
             status: "failed",
             error: "Generation cancelled",
+          });
+          await markMediaResourcesFailed(db, {
+            organizationId,
+            resourceIds: [textResourceId],
+            mimeType: "text/plain",
           });
         };
 
@@ -866,6 +882,7 @@ platformAiRoutes.post(
                 workflowId: body.workflowId,
                 text: event.text,
                 mimeType,
+                resourceId: textResourceId,
               });
 
               send({
@@ -873,12 +890,8 @@ platformAiRoutes.post(
                 text: event.text,
                 invocationId,
                 aiInterfaceId: prepared.prepared.candidate.interfaceId,
-                ...(persisted
-                  ? {
-                      resourceId: persisted.resourceId,
-                      contentSha256: persisted.contentSha256,
-                    }
-                  : {}),
+                resourceId: persisted?.resourceId ?? textResourceId,
+                ...(persisted ? { contentSha256: persisted.contentSha256 } : {}),
               });
               continue;
             }
@@ -899,6 +912,11 @@ platformAiRoutes.post(
                 organizationId,
                 status: "failed",
                 error: failure.invocationError || failure.error,
+              });
+              await markMediaResourcesFailed(db, {
+                organizationId,
+                resourceIds: [textResourceId],
+                mimeType: "text/plain",
               });
             }
             send({ type: "error", error: failure.error });
@@ -928,6 +946,11 @@ platformAiRoutes.post(
                 organizationId,
                 status: "failed",
                 error: failure.invocationError || failure.error,
+              });
+              await markMediaResourcesFailed(db, {
+                organizationId,
+                resourceIds: [textResourceId],
+                mimeType: "text/plain",
               });
               try {
                 send({ type: "error", error: failure.error });

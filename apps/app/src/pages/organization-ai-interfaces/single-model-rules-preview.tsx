@@ -139,6 +139,17 @@ export function SingleModelCapabilityLimitsPreview(
             {t("pages.adminAiModels.videoDurationLabel")}：{durationPreview}
           </li>
         ) : null}
+        {props.platformBaseline?.priceEstimate?.enabled === true ? (
+          <li>
+            {props.capabilityLimits?.applyOfficialPriceDiscount === false
+              ? t(
+                  "pages.aiInterfaces.singleModel.priceEstimateOfficialDiscountPreviewOff"
+                )
+              : t(
+                  "pages.aiInterfaces.singleModel.priceEstimateOfficialDiscountPreviewOn"
+                )}
+          </li>
+        ) : null}
         {props.capabilityLimits?.priceEstimateDiscountFold !== undefined ? (
           <li>
             {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscountPreview", {
