@@ -15,7 +15,6 @@ interface UseKeyboardShortcutsProps {
   copySelected: () => void;
   cutSelected: () => void;
   pasteFromClipboard: () => void;
-  duplicateSelected: () => void;
   requestDeleteSelected?: () => void;
   hasStudioNodeSelected?: boolean;
 }
@@ -34,7 +33,7 @@ export function hasDomTextSelection(
 
 /**
  * Side-effect-only hook that registers global keyboard shortcuts
- * for clipboard (Cmd+C/X/V/D) and delete (Delete).
+ * for clipboard (Cmd+C/X/V) and delete (Delete).
  */
 export function useKeyboardShortcuts({
   disabled,
@@ -45,7 +44,6 @@ export function useKeyboardShortcuts({
   copySelected,
   cutSelected,
   pasteFromClipboard,
-  duplicateSelected,
   requestDeleteSelected,
   hasStudioNodeSelected = false,
 }: UseKeyboardShortcutsProps): void {
@@ -109,12 +107,6 @@ export function useKeyboardShortcuts({
             pasteFromClipboard();
           }
           break;
-        case "d":
-          if (!clipboardDisabled && hasSelection) {
-            event.preventDefault();
-            duplicateSelected();
-          }
-          break;
       }
     };
 
@@ -129,7 +121,6 @@ export function useKeyboardShortcuts({
     copySelected,
     cutSelected,
     pasteFromClipboard,
-    duplicateSelected,
     requestDeleteSelected,
     hasStudioNodeSelected,
   ]);
