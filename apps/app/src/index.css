@@ -639,6 +639,18 @@ html.dark .workflow-canvas .react-flow__background pattern circle {
   fill: rgba(255, 255, 255, 0.25);
 }
 
+/* Shift / multi-select: card internals must not steal clicks from node selection. */
+html[data-wf-shift-held] .workflow-canvas .wf-node-card-interact,
+.wf-multi-selected .wf-node-card-interact {
+  pointer-events: none;
+}
+
+html[data-wf-shift-held] .workflow-canvas .wf-node-bottom-panel,
+.wf-multi-selected .wf-node-bottom-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Generative nodes (AI text / AI image): connect-target border light */
 @property --generative-connect-angle {
   syntax: "<angle>";

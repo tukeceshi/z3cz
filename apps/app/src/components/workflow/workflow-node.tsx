@@ -64,6 +64,8 @@ import {
 import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
 import { WorkflowNodeGenerativeBusyOverlay } from "./generative-busy-overlay";
 import {
+  WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS,
+  WORKFLOW_NODE_CARD_INTERACT_CLASS,
   WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
   WORKFLOW_NODE_SELECTED_BORDER_CLASS,
 } from "./workflow-canvas-styles";
@@ -438,7 +440,7 @@ export const WorkflowNode = memo(
 
     return (
       <TooltipProvider>
-        <div className="relative">
+        <div className={cn("relative", WORKFLOW_NODE_CARD_INTERACT_CLASS)}>
         {/* Floating mini header — icon + name */}
         <div
           className={cn(
@@ -716,6 +718,7 @@ export const WorkflowNode = memo(
         {showBottomPanelHost ? (
           <div
             className={cn(
+              WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS,
               (!showBottomPanel || isDragging || isViewportMovingCanvas) &&
                 "invisible pointer-events-none"
             )}

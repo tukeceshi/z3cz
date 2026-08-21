@@ -303,7 +303,6 @@ export function WorkflowBuilder({
     deleteSelected,
     deselectAll,
     selectNode,
-    duplicateSelected,
     applyLayout,
     copySelected,
     cutSelected,
@@ -409,7 +408,7 @@ export function WorkflowBuilder({
     [appToast, handleNodeSelect, nodeTypes]
   );
 
-  // Keyboard shortcuts (Cmd+C/X/V/D, Delete)
+  // Keyboard shortcuts (Cmd+C/X/V, Delete)
   const handleActionButtonClick =
     !readOnly && executeWorkflow
       ? execution.handleActionButtonClick
@@ -810,7 +809,6 @@ export function WorkflowBuilder({
             copySelected={copySelected}
             cutSelected={cutSelected}
             pasteFromClipboard={pasteFromClipboard}
-            duplicateSelected={duplicateSelected}
             requestDeleteSelected={requestDeleteSelected}
             requestDeleteStudioNode={requestDeleteStudioNode}
           />
@@ -877,7 +875,6 @@ export function WorkflowBuilder({
                   selectedNodes={selectedNodes}
                   selectedEdges={selectedEdges}
                   onDeleteSelected={readOnly ? undefined : requestDeleteSelected}
-                  onDuplicateSelected={readOnly ? undefined : duplicateSelected}
                   onApplyLayout={readOnly ? undefined : applyLayout}
                   onCopySelected={readOnly ? undefined : copySelected}
                   onCutSelected={readOnly ? undefined : cutSelected}
@@ -1015,7 +1012,6 @@ function WorkflowStudioKeyboardShortcuts({
   copySelected,
   cutSelected,
   pasteFromClipboard,
-  duplicateSelected,
   requestDeleteSelected,
   requestDeleteStudioNode,
 }: {
@@ -1026,7 +1022,6 @@ function WorkflowStudioKeyboardShortcuts({
   readonly copySelected: () => void;
   readonly cutSelected: () => void;
   readonly pasteFromClipboard: () => void;
-  readonly duplicateSelected: () => void;
   readonly requestDeleteSelected: () => void;
   readonly requestDeleteStudioNode: (nodeId: string) => void;
 }) {
@@ -1057,7 +1052,6 @@ function WorkflowStudioKeyboardShortcuts({
     copySelected,
     cutSelected,
     pasteFromClipboard,
-    duplicateSelected,
     requestDeleteSelected: requestDeleteActive,
     hasStudioNodeSelected,
   });

@@ -16,3 +16,15 @@ export const WORKFLOW_NODE_SELECTED_BORDER_CLASS =
 
 export const WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS =
   "border-blue-500! dark:border-[#959595]!" as const;
+
+/** Set on <html> while Shift is held (native, so the first click is already gated). */
+export const WORKFLOW_SHIFT_HELD_ATTR = "data-wf-shift-held" as const;
+
+/** Canvas wrapper class while 2+ nodes stay selected after Shift is released. */
+export const WORKFLOW_MULTI_SELECTED_CLASS = "wf-multi-selected" as const;
+
+/** Node internals that must not receive clicks during Shift / multi-select. */
+export const WORKFLOW_NODE_CARD_INTERACT_CLASS = "wf-node-card-interact" as const;
+
+export const WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS =
+  "wf-node-bottom-panel" as const;

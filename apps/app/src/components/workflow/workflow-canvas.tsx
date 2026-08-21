@@ -28,7 +28,6 @@ import ClipboardPaste from "lucide-react/icons/clipboard-paste";
 import Clock from "lucide-react/icons/clock";
 import Copy from "lucide-react/icons/copy";
 import Image from "lucide-react/icons/image";
-import Layers2 from "lucide-react/icons/layers-2";
 import Maximize from "lucide-react/icons/maximize";
 import Network from "lucide-react/icons/network";
 import Play from "lucide-react/icons/play";
@@ -48,6 +47,7 @@ import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
+import { CanvasShortcutHint } from "./canvas-shortcut-hint";
 import {
   buildConnectedHandleKeysByNode,
 } from "./workflow-connected-handles";
@@ -57,9 +57,11 @@ import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
+import { useShiftSelectGate } from "./use-shift-select-gate";
 import {
   WORKFLOW_CANVAS_CLASS,
   WORKFLOW_CANVAS_DOT_GAP_PX,
+  WORKFLOW_MULTI_SELECTED_CLASS,
 } from "./workflow-canvas-styles";
 import type {
   ConnectionValidationState,
@@ -198,7 +200,6 @@ export interface WorkflowCanvasProps {
   selectedNodes: ReactFlowNode<WorkflowNodeType>[];
   selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
   onDeleteSelected?: (e: React.MouseEvent) => void;
-  onDuplicateSelected?: (e: React.MouseEvent) => void;
   onApplyLayout?: () => void;
   onCopySelected?: () => void;
   onCutSelected?: () => void;
@@ -388,47 +389,13 @@ function DeleteButton({
           <span>{t("workflow.canvas.delete")}</span>
           <div className="flex items-center gap-1">
             <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
-              Del
+              Delete
             </kbd>
           </div>
         </div>
       }
     >
       <Trash2 className="size-4!" />
-    </ActionBarButton>
-  );
-}
-
-function DuplicateButton({
-  onClick,
-  disabled,
-}: {
-  onClick: (e: React.MouseEvent) => void;
-  disabled?: boolean;
-}) {
-  const { t } = useTranslation();
-  const modifierKey = getModifierKey();
-  return (
-    <ActionBarButton
-      onClick={onClick}
-      disabled={disabled}
-      className={actionBarButtonOutlineClassName}
-      tooltipSide="top"
-      tooltip={
-        <div className="flex items-center gap-2">
-          <span>{t("workflow.canvas.duplicate")}</span>
-          <div className="flex items-center gap-1">
-            <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
-              {modifierKey}
-            </kbd>
-            <kbd className="px-1 py-0.25 text-xs rounded border font-mono">
-              D
-            </kbd>
-          </div>
-        </div>
-      }
-    >
-      <Layers2 className="size-4!" />
     </ActionBarButton>
   );
 }
@@ -638,7 +605,6 @@ export function WorkflowCanvas({
   selectedNodes,
   selectedEdges,
   onDeleteSelected,
-  onDuplicateSelected,
   onApplyLayout,
   onCopySelected,
   onCutSelected,
@@ -663,6 +629,7 @@ export function WorkflowCanvas({
   const { zoom } = useViewport();
   const [displayNodes, setDisplayNodes] =
     useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
+  const blockCardInteraction = useShiftSelectGate(selectedNodes.length);
 
   useEffect(() => {
     if (!isDraggingRef?.current) {
@@ -722,7 +689,12 @@ export function WorkflowCanvas({
 
   return (
     <TooltipProvider>
-      <div className="h-full w-full min-h-0">
+      <div
+        className={cn(
+          "relative h-full w-full min-h-0",
+          selectedNodes.length > 1 && WORKFLOW_MULTI_SELECTED_CLASS
+        )}
+      >
         <ReactFlow
         nodes={renderNodes}
         edges={edges}
@@ -733,7 +705,9 @@ export function WorkflowCanvas({
         onConnectEnd={onConnectEnd}
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
-        onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDoubleClick={
+          blockCardInteraction ? undefined : onNodeDoubleClick
+        }
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onMoveStart={onMoveStart}
@@ -765,7 +739,7 @@ export function WorkflowCanvas({
           addNodeMenu && "cursor-default"
         )}
         nodesDraggable={!disabled && showControls}
-        nodesConnectable={!disabled && showControls}
+        nodesConnectable={!disabled && showControls && !blockCardInteraction}
         elementsSelectable={showControls}
         selectNodesOnDrag={!disabled && showControls}
         multiSelectionKeyCode={showControls ? "Shift" : undefined}
@@ -812,6 +786,8 @@ export function WorkflowCanvas({
         {!disabled && (
           <AiEditorOverlays nodes={displayNodes} />
         )}
+
+        {showControls && !disabled && <CanvasShortcutHint />}
 
         {/* Action Bars */}
         {showControls &&
@@ -903,9 +879,6 @@ export function WorkflowCanvas({
               )}
               {onPasteFromClipboard && (
                 <PasteButton onClick={onPasteFromClipboard} disabled={disabled || !hasClipboardData} />
-              )}
-              {onDuplicateSelected && (
-                <DuplicateButton onClick={onDuplicateSelected} disabled={disabled || !hasSelectedNodes} />
               )}
               {onDeleteSelected && (
                 <DeleteButton onClick={onDeleteSelected} disabled={disabled || !hasSelectedElements} />
