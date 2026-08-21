@@ -75,6 +75,7 @@ export function CapabilityLimitsSettingsDialog({
       normalizeCapabilityLimitsForSave({
         platformBaseline,
         limits: capabilityLimits,
+        priceEstimateEnabled: platformBaseline.priceEstimate?.enabled === true,
       })
     );
     onOpenChange(false);

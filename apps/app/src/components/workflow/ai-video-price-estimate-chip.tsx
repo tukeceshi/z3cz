@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  applyVideoPriceEstimateDisplayFolds,
   computeCostPerOutputSecond,
   computePackTokens,
   computeVideoPriceEstimateForModel,
@@ -113,6 +114,7 @@ export interface AiVideoPriceEstimateChipProps {
   readonly baseline480pWithVideo: number | null;
   readonly generationValues: Readonly<Record<string, unknown>>;
   readonly referenceVideoMedia: readonly WorkflowMediaValue[];
+  readonly displayFolds?: readonly number[];
   readonly disabled?: boolean;
 }
 
@@ -163,14 +165,16 @@ function PackTokenLabel({ label }: { readonly label: string }) {
 
 function PriceEstimateDetail({
   estimate,
+  displayCostYuan,
   packTokens,
 }: {
   readonly estimate: VideoPriceEstimateResult;
+  readonly displayCostYuan: number;
   readonly packTokens: number | null;
 }) {
   const { t } = useTranslation();
   const costPerSecond = computeCostPerOutputSecond(
-    estimate.costYuan,
+    displayCostYuan,
     estimate.outputDurationSec
   );
 
@@ -194,7 +198,7 @@ function PriceEstimateDetail({
       <PriceEstimateDetailRow
         label={t("workflow.aiVideoPanel.priceEstimateCost")}
         value={t("workflow.aiVideoPanel.priceEstimateCostValue", {
-          cost: estimate.costYuan.toFixed(2),
+          cost: displayCostYuan.toFixed(2),
         })}
       />
       <PriceEstimateDetailRow
@@ -217,6 +221,7 @@ export function AiVideoPriceEstimateChip({
   baseline480pWithVideo,
   generationValues,
   referenceVideoMedia,
+  displayFolds = [],
   disabled = false,
 }: AiVideoPriceEstimateChipProps) {
   const { t } = useTranslation();
@@ -260,6 +265,11 @@ export function AiVideoPriceEstimateChip({
     ]
   );
 
+  const displayCostYuan = useMemo(
+    () => applyVideoPriceEstimateDisplayFolds(estimate.costYuan, displayFolds),
+    [displayFolds, estimate.costYuan]
+  );
+
   const packTokens = useMemo(() => {
     if (baseline480pWithVideo == null) {
       return null;
@@ -272,7 +282,7 @@ export function AiVideoPriceEstimateChip({
   }, [baseline480pWithVideo, estimate.billingTokens, estimate.unitPrice]);
 
   const summaryParts = formatVideoPriceEstimateParts(
-    estimate.costYuan,
+    displayCostYuan,
     estimate.billingTokens
   );
   const summary = t("workflow.aiVideoPanel.priceEstimateSummary", summaryParts);
@@ -295,7 +305,11 @@ export function AiVideoPriceEstimateChip({
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <PriceEstimateDetail estimate={estimate} packTokens={packTokens} />
+        <PriceEstimateDetail
+          estimate={estimate}
+          displayCostYuan={displayCostYuan}
+          packTokens={packTokens}
+        />
       </PopoverContent>
     </Popover>
   );

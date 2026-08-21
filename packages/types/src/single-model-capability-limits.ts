@@ -1,6 +1,7 @@
 import type { VideoModelParameterRules } from "./platform-ai-model";
 import { normalizeVideoModelParameterRules } from "./platform-ai-model";
 import type { UpstreamParamProfileField } from "./upstream-param-profile";
+import { readVideoPricePromoFold } from "./video-price-promo";
 
 /** Org-side restrictions on platform video model capabilities. */
 export interface SingleModelCapabilityLimits {
@@ -13,6 +14,8 @@ export interface SingleModelCapabilityLimits {
   readonly maxReferenceAudios?: number;
   /** Full duration field copied from platform baseline, then narrowed in org UI. */
   readonly duration?: UpstreamParamProfileField;
+  /** Org extra price-estimate discount. 8 means 80%. Absent = off. */
+  readonly priceEstimateDiscountFold?: number;
 }
 
 export interface PlatformVideoCapabilityBaseline {
@@ -261,7 +264,10 @@ export function applyVideoCapabilityLimits(
   platformRules: VideoModelParameterRules,
   capabilityLimits?: SingleModelCapabilityLimits | null
 ): VideoModelParameterRules {
-  const normalized = normalizeVideoModelParameterRules(platformRules);
+  const {
+    orgPriceDiscountFold: _platformOrgFold,
+    ...normalized
+  } = normalizeVideoModelParameterRules(platformRules);
   if (!capabilityLimits) {
     return normalized;
   }
@@ -269,6 +275,9 @@ export function applyVideoCapabilityLimits(
   const migrated = normalizeStoredCapabilityLimits(capabilityLimits, {
     resolution: readResolutionFieldFromVideoRules(normalized),
   });
+  const orgPriceDiscountFold = readVideoPricePromoFold(
+    migrated.priceEstimateDiscountFold
+  );
 
   let generationFields = normalized.generationFields;
   if (migrated.resolution) {
@@ -298,6 +307,7 @@ export function applyVideoCapabilityLimits(
     ...(migrated.maxReferenceAudios !== undefined
       ? { maxReferenceAudios: migrated.maxReferenceAudios }
       : {}),
+    ...(orgPriceDiscountFold !== undefined ? { orgPriceDiscountFold } : {}),
     generationFields,
   };
 }
@@ -335,7 +345,7 @@ export function capabilityLimitsFromLegacyFormatTransform(params: {
   return limits;
 }
 
-function hasCapabilityLimitValues(
+export function capabilityLimitsHasStoredValues(
   limits: SingleModelCapabilityLimits
 ): boolean {
   return (
@@ -344,13 +354,15 @@ function hasCapabilityLimitValues(
     limits.maxReferenceImages !== undefined ||
     limits.maxReferenceVideos !== undefined ||
     limits.maxReferenceAudios !== undefined ||
-    limits.duration !== undefined
+    limits.duration !== undefined ||
+    limits.priceEstimateDiscountFold !== undefined
   );
 }
 
 export function normalizeCapabilityLimitsForSave(params: {
   readonly platformBaseline: PlatformVideoCapabilityBaseline;
   readonly limits: SingleModelCapabilityLimits;
+  readonly priceEstimateEnabled?: boolean;
 }): SingleModelCapabilityLimits | null {
   let result: SingleModelCapabilityLimits = {};
 
@@ -405,7 +417,14 @@ export function normalizeCapabilityLimitsForSave(params: {
     result = { ...result, maxReferenceAudios: params.limits.maxReferenceAudios };
   }
 
-  if (!hasCapabilityLimitValues(result)) {
+  const priceEstimateDiscountFold = readVideoPricePromoFold(
+    params.limits.priceEstimateDiscountFold
+  );
+  if (params.priceEstimateEnabled !== false && priceEstimateDiscountFold !== undefined) {
+    result = { ...result, priceEstimateDiscountFold };
+  }
+
+  if (!capabilityLimitsHasStoredValues(result)) {
     return null;
   }
 
@@ -435,6 +454,10 @@ export function resolveEffectiveCapabilityLimitsForEdit(params: {
       ? cloneGenerationProfileField(params.platformBaseline.duration)
       : undefined;
 
+  const priceEstimateDiscountFold = readVideoPricePromoFold(
+    stored?.priceEstimateDiscountFold
+  );
+
   return {
     supportsTaskCancel:
       stored?.supportsTaskCancel ?? params.platformBaseline.supportsTaskCancel,
@@ -446,6 +469,9 @@ export function resolveEffectiveCapabilityLimitsForEdit(params: {
       stored?.maxReferenceAudios ?? params.platformBaseline.maxReferenceAudios,
     ...(resolution ? { resolution } : {}),
     ...(duration ? { duration } : {}),
+    ...(priceEstimateDiscountFold !== undefined
+      ? { priceEstimateDiscountFold }
+      : {}),
   };
 }
 
@@ -521,6 +547,12 @@ export function isCapabilityLimitsSubsetOfPlatform(params: {
         platformField: platformBaseline.duration,
       })
     ) {
+      return false;
+    }
+  }
+
+  if (migrated.priceEstimateDiscountFold !== undefined) {
+    if (readVideoPricePromoFold(migrated.priceEstimateDiscountFold) === undefined) {
       return false;
     }
   }

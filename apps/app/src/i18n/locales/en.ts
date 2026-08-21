@@ -1929,6 +1929,12 @@ export const en = {
         resolutionLimitRequired: "Select at least one allowed resolution.",
         durationLimitRequired: "Select at least one allowed duration.",
         durationLimitsPreview: "{{min}}–{{max}}s, default {{default}}",
+        priceEstimateTitle: "Price estimate",
+        priceEstimateExtraDiscount: "Extra discount",
+        priceEstimateExtraDiscountHint:
+          "8 means 20% off. Applies to estimated price only, not tokens. Stacks with an active promo.",
+        priceEstimateFolded: "After discount",
+        priceEstimateExtraDiscountPreview: "Extra discount {{fold}}",
         formatTemplateRulesTitle: "Template rules",
         formatTemplateRulesSupportsTaskCancel: "Supports task cancellation",
         formatTemplateRulesLockedResolution: "Locked resolution",

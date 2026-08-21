@@ -203,6 +203,7 @@ const tosPresignUploadSchema = z.object({
   contentLength: z.number().int().positive(),
   workflowId: z.string().optional(),
   mediaKind: z.enum(["ai-image", "ai-video", "ai-audio", "reference"]).optional(),
+  objectId: z.string().min(1).optional(),
 });
 
 platformAiRoutes.post(
@@ -235,6 +236,7 @@ platformAiRoutes.post(
         mimeType: body.mimeType,
         contentLength: body.contentLength,
         mediaKind,
+        objectId: body.objectId,
       });
 
       if (!result) {
@@ -1428,7 +1430,7 @@ platformAiRoutes.post(
         kind: "ephemeral" as const,
         url: ephemeralUrl,
         mimeType,
-        mediaId: crypto.randomUUID(),
+        mediaId: audioResourceIds[0] ?? crypto.randomUUID(),
         expiresAt: createEphemeralMediaExpiresAt(),
       };
 

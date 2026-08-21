@@ -149,6 +149,8 @@ export async function uploadBlobToCloudStorage(params: {
 
   readonly existingLocalMediaId?: string;
 
+  readonly objectId?: string;
+
 }): Promise<CloudUploadResult> {
 
   const workflowId = requireStagingWorkflowId(params.workflowId);
@@ -198,6 +200,8 @@ export async function uploadBlobToCloudStorage(params: {
         workflowId,
 
         mediaKind: params.mediaKind,
+
+        objectId: params.objectId,
 
       }),
 
@@ -302,6 +306,8 @@ export async function uploadBlobToCloudWorkflow(params: {
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
 
   readonly existingLocalMediaId?: string;
+
+  readonly objectId?: string;
 
 }): Promise<WorkflowMediaValue> {
 

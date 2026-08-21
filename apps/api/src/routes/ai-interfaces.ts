@@ -295,6 +295,7 @@ const singleModelCapabilityLimitsSchema = z.object({
   maxReferenceImages: z.number().int().min(0).optional(),
   maxReferenceVideos: z.number().int().min(0).optional(),
   maxReferenceAudios: z.number().int().min(0).optional(),
+  priceEstimateDiscountFold: z.number().positive().max(10).optional(),
   resolutions: z.array(z.string().trim().min(1)).optional(),
 });
 

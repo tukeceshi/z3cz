@@ -9,12 +9,14 @@ import {
   computeSplitVideoPriceEstimateForModel,
   computeVideoBillingTokens,
   computeVideoPriceEstimateForModel,
+  applyVideoPriceEstimateDisplayFolds,
   EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES,
   formatVideoPriceEstimateSummary,
   isVideoPriceEstimateEnabled,
   parsePublicVideoPriceEstimatesCache,
   planVideoEstimateClips,
   readVideoPriceEstimateBaseline480pWithVideo,
+  readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
   splitClipOutputSeconds,
   toPublicVideoPriceEstimateModel,
@@ -77,6 +79,72 @@ describe("computeVideoPriceEstimateForModel", () => {
     });
 
     expect(result.unitPrice).toBe(2.88);
+  });
+});
+
+describe("applyVideoPriceEstimateDisplayFolds", () => {
+  it("stacks folds as successive discounts", () => {
+    expect(applyVideoPriceEstimateDisplayFolds(10, [8, 8])).toBe(6.4);
+  });
+
+  it("returns the original value when there are no folds", () => {
+    expect(applyVideoPriceEstimateDisplayFolds(10, [])).toBe(10);
+  });
+
+  it("changes cost without affecting computed tokens", () => {
+    const result = computeVideoPriceEstimateForModel({
+      canonicalId: "doubao-seedance-2-5",
+      resolution: "720p",
+      ratio: "16:9",
+      outputDurationSec: 5,
+      inputDurationSec: 0,
+      hasReferenceVideo: false,
+      priceWithoutVideo: 1.44,
+      priceWithVideo: 2.88,
+    });
+    const folded = applyVideoPriceEstimateDisplayFolds(result.costYuan, [8]);
+    expect(folded).toBeCloseTo(result.costYuan * 0.8);
+    expect(result.billingTokens).toBe(Math.round(5 * result.tps));
+  });
+});
+
+describe("readVideoPriceEstimateDisplayFolds", () => {
+  it("applies an active promo then the org fold", () => {
+    expect(
+      readVideoPriceEstimateDisplayFolds({
+        promos: [
+          {
+            id: "a",
+            resolution: "any",
+            startsAt: "2026-08-01",
+            endsAt: "2026-08-31",
+            discountFold: 8,
+          },
+        ],
+        orgDiscountFold: 8,
+        resolution: "720p",
+        now: new Date(2026, 7, 17),
+      })
+    ).toEqual([8, 8]);
+  });
+
+  it("omits inactive promos and invalid org folds", () => {
+    expect(
+      readVideoPriceEstimateDisplayFolds({
+        promos: [
+          {
+            id: "a",
+            resolution: "720p",
+            startsAt: "2026-09-01",
+            endsAt: "2026-09-30",
+            discountFold: 8,
+          },
+        ],
+        orgDiscountFold: 11,
+        resolution: "720p",
+        now: new Date(2026, 7, 17),
+      })
+    ).toEqual([]);
   });
 });
 

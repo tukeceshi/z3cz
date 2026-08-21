@@ -133,11 +133,7 @@ export async function markVideoGenerationJobReadyToPersist(
   const resultJson: GenerationJobResultJson = {
     ...(params.job.resultJson ?? {}),
     pendingMedia: [
-      {
-        sourceUrl: params.videoUrl,
-        mimeType: inferVideoMimeType(params.videoUrl),
-        mediaKind: "ai-video",
-      },
+      buildVideoPendingMedia(params.job, params.videoUrl),
     ],
     upstreamTaskId: params.job.upstreamTaskId ?? undefined,
     aiInterfaceId: params.job.interfaceId,
@@ -179,6 +175,26 @@ function toGetGenerationJobResponse(
     finalMedia: toWorkflowFinalMedia(extractFinalMediaFromJob(job)),
     displayPhase: resolveGenerationJobDisplayPhase(job),
     deferClientPersistToServer: shouldDeferClientPersistToServer(job),
+  };
+}
+
+export function persistObjectIdForPendingMedia(
+  item: Pick<GenerationJobPendingMedia, "resourceId">
+): string {
+  const resourceId = item.resourceId?.trim();
+  return resourceId ? resourceId : crypto.randomUUID();
+}
+
+export function buildVideoPendingMedia(
+  job: Pick<GenerationJobRecord, "resultJson">,
+  videoUrl: string
+): GenerationJobPendingMedia {
+  const resourceId = job.resultJson?.placeholderResourceIds?.[0];
+  return {
+    sourceUrl: videoUrl,
+    mimeType: inferVideoMimeType(videoUrl),
+    mediaKind: "ai-video",
+    ...(resourceId ? { resourceId } : {}),
   };
 }
 
@@ -247,7 +263,7 @@ async function persistPendingMediaOnServer(
           workflowId,
           data,
           mimeType,
-          objectId: crypto.randomUUID(),
+          objectId: persistObjectIdForPendingMedia(item),
         })
       );
       continue;
@@ -269,7 +285,7 @@ async function persistPendingMediaOnServer(
           workflowId,
           data,
           mimeType,
-          objectId: crypto.randomUUID(),
+          objectId: persistObjectIdForPendingMedia(item),
         })
       );
       continue;
@@ -290,7 +306,7 @@ async function persistPendingMediaOnServer(
         workflowId,
         data,
         mimeType,
-        objectId: crypto.randomUUID(),
+        objectId: persistObjectIdForPendingMedia(item),
       })
     );
   }
@@ -504,11 +520,7 @@ export async function pollVideoGenerationJob(
   const resultJson: GenerationJobResultJson = {
     ...restResult,
     pendingMedia: [
-      {
-        sourceUrl: pollResult.videoUrl,
-        mimeType: inferVideoMimeType(pollResult.videoUrl),
-        mediaKind: "ai-video",
-      },
+      buildVideoPendingMedia(job, pollResult.videoUrl),
     ],
     upstreamTaskId: job.upstreamTaskId,
     aiInterfaceId: job.interfaceId,
@@ -1034,14 +1046,26 @@ export async function createReadyToPersistAudioJob(
     readonly invocationId?: string;
   }
 ): Promise<GenerationJobRecord> {
-  const { readyAt, resultJson } = buildReadyToPersistJobPayload({
+  const existing = await getGenerationJob(db, params.id, params.organizationId);
+  const { readyAt, resultJson: readyJson } = buildReadyToPersistJobPayload({
     images: params.audios,
     mediaKind: "ai-audio",
     aiInterfaceId: params.interfaceId,
     invocationId: params.invocationId,
   });
+  const placeholderResourceIds =
+    existing?.resultJson?.placeholderResourceIds ??
+    readyJson.pendingMedia
+      ?.map((item) => item.resourceId)
+      .filter((id): id is string => Boolean(id));
+  const resultJson: GenerationJobResultJson = {
+    ...(existing?.resultJson ?? {}),
+    ...readyJson,
+    ...(placeholderResourceIds && placeholderResourceIds.length > 0
+      ? { placeholderResourceIds }
+      : {}),
+  };
 
-  const existing = await getGenerationJob(db, params.id, params.organizationId);
   const job = existing
     ? await updateGenerationJob(db, {
         id: params.id,
