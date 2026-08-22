@@ -46,6 +46,8 @@ export interface WorkflowMediaVideoPlayerProps {
   readonly onLoadedMetadata?: (video: HTMLVideoElement) => void;
   readonly videoRef?: RefObject<HTMLVideoElement | null>;
   readonly onExpandView?: () => void;
+  /** Raised z-index for menus opened inside high-layer overlays (e.g. lightbox). */
+  readonly menuContentClassName?: string;
 }
 
 function NativeStylePlayIcon() {
@@ -99,6 +101,7 @@ export function WorkflowMediaVideoPlayer({
   onLoadedMetadata,
   videoRef: externalVideoRef,
   onExpandView,
+  menuContentClassName,
 }: WorkflowMediaVideoPlayerProps) {
   const { t } = useTranslation();
   const internalVideoRef = useRef<HTMLVideoElement>(null);
@@ -660,7 +663,10 @@ export function WorkflowMediaVideoPlayer({
                 <CameraIcon className="h-4 w-4" strokeWidth={2} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuContent
+              align="end"
+              className={cn("w-36", menuContentClassName)}
+            >
               <DropdownMenuItem onClick={() => handleFrameCapture("first")}>
                 {t("workflow.aiVideoPanel.captureFirstFrame")}
               </DropdownMenuItem>

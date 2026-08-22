@@ -3567,6 +3567,7 @@ export const en = {
       captureLastFrame: "Last frame",
       captureCurrentFrame: "Current frame",
       captureFrameSuccess: "Created image node “{{nodeName}}”",
+      captureFrameSuccessInSecondary: "Opened “{{nodeName}}” in the secondary editor",
       captureFrameFailed: "Failed to capture frame",
     },
     aiAudioPanel: {

@@ -36,6 +36,8 @@ import {
 
   type StudioBoardTab,
 
+  studioBoardTabForNodeType,
+
 } from "./creative-studio-board-tabs";
 
 import { useCreativeStudio } from "./creative-studio-context";
@@ -63,6 +65,30 @@ function scrollStudioNodeIntoView(nodeId: string): void {
       .querySelector(`[data-studio-focus-id="${nodeId}"]`)
 
       ?.scrollIntoView({ block: "nearest" });
+
+  });
+
+}
+
+
+
+function scrollStudioListToTop(section: StudioBoardTab): void {
+
+  requestAnimationFrame(() => {
+
+    requestAnimationFrame(() => {
+
+      document
+
+        .querySelectorAll(`[data-studio-list-scroll="${section}"]`)
+
+        .forEach((element) => {
+
+          element.scrollTop = 0;
+
+        });
+
+    });
 
   });
 
@@ -105,6 +131,10 @@ export function CreativeStudioView() {
     isPendingStudioNode,
 
     resolvePendingStudioNode,
+
+    isPendingSecondaryNode,
+
+    resolvePendingSecondaryNode,
 
   } = useCreativeStudio();
 
@@ -242,7 +272,25 @@ export function CreativeStudioView() {
 
     setBoardTab("all");
     resolvePendingStudioNode(detailNodeId);
+    scrollStudioListToTop("all");
   }, [detailNodeId, isPendingStudioNode, nodes, resolvePendingStudioNode]);
+
+  useEffect(() => {
+    if (!secondaryNodeId || !isPendingSecondaryNode(secondaryNodeId)) return;
+    if (!nodes.some((node) => node.id === secondaryNodeId)) return;
+
+    const node = generativeNodes.find((item) => item.id === secondaryNodeId);
+    const tab = studioBoardTabForNodeType(node?.data.nodeType);
+    setBoardTab(tab);
+    resolvePendingSecondaryNode(secondaryNodeId);
+    scrollStudioListToTop(tab);
+  }, [
+    generativeNodes,
+    isPendingSecondaryNode,
+    nodes,
+    resolvePendingSecondaryNode,
+    secondaryNodeId,
+  ]);
 
 
 
@@ -287,18 +335,19 @@ export function CreativeStudioView() {
 
 
   useEffect(() => {
-
     if (!secondaryNodeId || nodes.length === 0) return;
 
-
+    if (isPendingSecondaryNode(secondaryNodeId)) return;
 
     if (!nodes.some((node) => node.id === secondaryNodeId)) {
-
       closeSecondaryDetail();
-
     }
-
-  }, [closeSecondaryDetail, nodes, secondaryNodeId]);
+  }, [
+    closeSecondaryDetail,
+    isPendingSecondaryNode,
+    nodes,
+    secondaryNodeId,
+  ]);
 
 
 
@@ -315,6 +364,10 @@ export function CreativeStudioView() {
   useEffect(() => {
 
     if (!studioNodeId || nodes.length === 0) return;
+
+    if (isPendingStudioNode(studioNodeId)) return;
+
+    if (secondaryNodeId && isPendingSecondaryNode(secondaryNodeId)) return;
 
 
 
@@ -354,9 +407,13 @@ export function CreativeStudioView() {
 
     generativeNodes,
 
+    isPendingSecondaryNode,
+
     isPendingStudioNode,
 
     nodes,
+
+    secondaryNodeId,
 
     studioNodeId,
 

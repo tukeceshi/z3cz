@@ -6,7 +6,6 @@ import {
   isWorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
-import { addEdge, type Connection } from "@xyflow/react";
 
 import { readAiAudioCardAudios } from "./ai-audio-node-utils";
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
@@ -239,27 +238,4 @@ export function studioReferenceDropPreviewFromVerdict(verdict: {
   if (verdict.ok) return "valid";
   if (verdict.reason === "already_connected") return "already_connected";
   return "rejected";
-}
-
-export function connectGenerativeReferenceEdge(
-  setEdges: (updater: (edges: ReactFlowEdge[]) => ReactFlowEdge[]) => void,
-  connection: Connection
-): void {
-  setEdges((current) =>
-    addEdge(
-      {
-        ...connection,
-        id: `${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}-${Date.now()}`,
-        type: "workflowEdge",
-        data: {
-          isValid: true,
-          isActive: false,
-          sourceType: connection.sourceHandle ?? undefined,
-          targetType: connection.targetHandle ?? undefined,
-        },
-        zIndex: 0,
-      },
-      current
-    )
-  );
 }

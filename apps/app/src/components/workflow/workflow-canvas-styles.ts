@@ -23,6 +23,9 @@ export const WORKFLOW_SHIFT_HELD_ATTR = "data-wf-shift-held" as const;
 /** Canvas wrapper class while 2+ nodes stay selected after Shift is released. */
 export const WORKFLOW_MULTI_SELECTED_CLASS = "wf-multi-selected" as const;
 
+/** Outward padding for the multi-select drag rect (see index.css). */
+export const WORKFLOW_MULTI_SELECT_OVERFLOW_PX = 30 as const;
+
 /** Node internals that must not receive clicks during Shift / multi-select. */
 export const WORKFLOW_NODE_CARD_INTERACT_CLASS = "wf-node-card-interact" as const;
 

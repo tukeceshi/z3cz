@@ -404,6 +404,7 @@ function AiVideoWidget({
           <CanvasMediaCover
             media={coverVideo}
             nodeType="ai-video"
+            nodeId={nodeId}
             cardWidthPx={cardSize.width}
             cardHeightPx={cardSize.height}
             fitMode="cover"
@@ -478,6 +479,7 @@ function AiVideoWidget({
         <StudioVideoLightbox
           open={videoLightboxOpen}
           src={videoDisplayUrl}
+          nodeId={nodeId}
           onClose={() => setVideoLightboxOpen(false)}
         />
       ) : null}

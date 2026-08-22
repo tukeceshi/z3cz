@@ -74,9 +74,9 @@ import {
 } from "./generative-pick-node-dialog";
 import {
   collectGenerativeReferenceMedia,
-  connectGenerativeReferenceEdge,
   studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
+import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import { AiGenerateButton } from "./ai-generate-button";
 import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
@@ -141,6 +141,7 @@ import {
   collectAiVideoUnifiedReferenceChips,
 } from "./ai-video-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
+import { ReferenceThumbUrlsProvider } from "./reference-thumb-urls-provider";
 import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
 import {
   appendVideoPromptRefToken,
@@ -690,12 +691,8 @@ export function AiVideoConfigPanel({
     ]
   );
 
-  const connectReferenceEdge = useCallback(
-    (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
-      connectGenerativeReferenceEdge(setEdges, connection);
-    },
-    [setEdges]
-  );
+  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
+    useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
     const edge = edges.find((entry) => entry.id === edgeId);
@@ -706,32 +703,9 @@ export function AiVideoConfigPanel({
   };
 
   const canAcceptStudioReference = useCallback(
-    (sourceNodeId: string, sourceHandle: string) => {
-      const source = typedNodes.find((node) => node.id === sourceNodeId);
-      if (!source) return false;
-
-      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-        return evaluateAiVideoPromptReferenceStructural({
-          targetNodeId: nodeId,
-          targetNodeMetadata: data.metadata,
-          sourceNodeId,
-          sourceNodeType: source.data.nodeType,
-          edges,
-        }).ok;
-      }
-
-      return evaluateAiVideoReferenceStructural({
-        targetNodeId: nodeId,
-        sourceNodeId,
-        sourceHandle,
-        sourceNodeType: source.data.nodeType,
-        targetNodeData: data,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-        models: videoModelCatalog,
-      }).ok;
-    },
-    [data, edges, nodeId, typedNodes, videoModelCatalog]
+    (sourceNodeId: string, sourceHandle: string) =>
+      canConnectReference(sourceNodeId, sourceHandle, nodeId),
+    [canConnectReference, nodeId]
   );
 
   const previewStudioReferenceDrop = useCallback(
@@ -776,23 +750,15 @@ export function AiVideoConfigPanel({
       return;
     }
 
-    if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-      connectReferenceEdge({
-        source: sourceNodeId,
-        sourceHandle,
-        target: nodeId,
-        targetHandle: AI_VIDEO_PROMPT_HANDLE_ID,
-      });
-      setPickNodeOpen(false);
+    const connection = buildReferenceConnection(
+      sourceNodeId,
+      sourceHandle,
+      nodeId
+    );
+    if (!connection || !appendReferenceConnection(connection)) {
+      toast.error("workflow.aiVideoPanel.referenceRejected");
       return;
     }
-
-    connectReferenceEdge({
-      source: sourceNodeId,
-      sourceHandle,
-      target: nodeId,
-      targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
-    });
     setPickNodeOpen(false);
   };
 
@@ -878,39 +844,46 @@ export function AiVideoConfigPanel({
               : param.value,
         }));
 
-        setNodes((current) => [
-          ...current,
-          {
-            id: newId,
-            type: "workflowNode",
-            position,
-            data: {
-              name: resolveGenerativeNodeDisplayName({
-                nodeType: catalog.type,
-                baseName: resolveGenerativeNodeDefaultBaseName(
-                  catalog.type,
-                  catalog.name,
-                  t
-                ),
-                existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
-                additionalSameTypeCount: offset,
-              }),
+        const newNode = {
+          id: newId,
+          type: "workflowNode" as const,
+          position,
+          data: {
+            name: resolveGenerativeNodeDisplayName({
               nodeType: catalog.type,
-              icon: catalog.icon,
-              inputs: catalogInputs,
-              outputs: catalogOutputs,
-              executionState: "idle" as const,
-              createObjectUrl,
-            },
+              baseName: resolveGenerativeNodeDefaultBaseName(
+                catalog.type,
+                catalog.name,
+                t
+              ),
+              existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
+              additionalSameTypeCount: offset,
+            }),
+            nodeType: catalog.type,
+            icon: catalog.icon,
+            inputs: catalogInputs,
+            outputs: catalogOutputs,
+            executionState: "idle" as const,
+            createObjectUrl,
           },
-        ]);
+        };
 
-        connectReferenceEdge({
-          source: newId,
-          sourceHandle: AI_IMAGE_OUTPUT_ID,
-          target: nodeId,
-          targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
-        });
+        setNodes((current) => [...current, newNode]);
+
+        if (
+          !appendReferenceConnection(
+            {
+              source: newId,
+              sourceHandle: AI_IMAGE_OUTPUT_ID,
+              target: nodeId,
+              targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+            },
+            { nodes: [...nodes, newNode] }
+          )
+        ) {
+          toast.error("workflow.aiVideoPanel.referenceRejected");
+          continue;
+        }
         added += 1;
         offset += 1;
       } catch {
@@ -1600,88 +1573,96 @@ export function AiVideoConfigPanel({
           layout === "studio-dock" ? handlePickNode : undefined
         }
       >
-        <div>
-          <AiTextReferenceBar
-            chips={referenceChips}
-            disabled={disabled}
-            showStudioReferenceHints={layout === "studio-dock"}
-            detailRole={detailRole}
-            allowUpload={allowUpload && !disabled}
-            addReferenceDisabled={!canAddReference}
-            canPickCanvasNode={pickableOutputs.length > 0}
-            onDisconnect={handleDisconnectEdge}
-            onPickCanvasNode={() => {
-              setPickNodeOpen(true);
-            }}
-            onUploadFiles={(files) => {
-              void handleUploadFiles(files);
-            }}
-            onInjectChip={handleInjectChip}
-          />
-        </div>
+        <ReferenceThumbUrlsProvider chips={referenceChips}>
+          {(thumbUrls) => (
+            <>
+              <div>
+                <AiTextReferenceBar
+                  chips={referenceChips}
+                  thumbUrls={thumbUrls}
+                  disabled={disabled}
+                  showStudioReferenceHints={layout === "studio-dock"}
+                  detailRole={detailRole}
+                  allowUpload={allowUpload && !disabled}
+                  addReferenceDisabled={!canAddReference}
+                  canPickCanvasNode={pickableOutputs.length > 0}
+                  onDisconnect={handleDisconnectEdge}
+                  onPickCanvasNode={() => {
+                    setPickNodeOpen(true);
+                  }}
+                  onUploadFiles={(files) => {
+                    void handleUploadFiles(files);
+                  }}
+                  onInjectChip={handleInjectChip}
+                />
+              </div>
 
-        <div
-          className={cn(
-            "relative mt-2 min-h-0",
-            layout === "studio-dock" ? "flex-1" : undefined
-          )}
-          style={
-            layout === "studio-dock"
-              ? undefined
-              : { minHeight: AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX }
-          }
-        >
-          <VideoPromptMentionEditor
-            value={displayPrompt}
-            readOnly={hasPromptReference || disabled}
-            disabled={disabled}
-            imageChips={imageReferenceChips}
-            onChange={promptBuffer.onChange}
-            onFocus={promptBuffer.onFocus}
-            onBlur={promptBuffer.onBlur}
-            onCompositionStart={promptBuffer.onCompositionStart}
-            onCompositionEnd={promptBuffer.onCompositionEnd}
-            placeholder={
-              hasPromptReference
-                ? ""
-                : t("workflow.aiVideoPanel.promptPlaceholder")
-            }
-            className={cn(
-              "pr-7",
-              hasPromptReference &&
-                "read-only:cursor-default read-only:text-foreground"
-            )}
-          />
-          {hasPromptReference ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
               <div
                 className={cn(
-                  "max-w-[92%] rounded-lg border px-3 py-2 text-center text-xs leading-relaxed shadow-sm backdrop-blur-[2px]",
-                  promptOverLimit
-                    ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
-                    : "border-border/40 bg-background/50 text-muted-foreground"
+                  "relative mt-2 min-h-0",
+                  layout === "studio-dock" ? "flex-1" : undefined
                 )}
+                style={
+                  layout === "studio-dock"
+                    ? undefined
+                    : { minHeight: AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX }
+                }
               >
-                {promptOverLimit
-                  ? t("workflow.aiVideoPanel.referencedPromptTooLong", {
-                      max: promptMaxLength,
-                    })
-                  : promptReferenceEditHint}
+                <VideoPromptMentionEditor
+                  value={displayPrompt}
+                  readOnly={hasPromptReference || disabled}
+                  disabled={disabled}
+                  imageChips={imageReferenceChips}
+                  thumbUrls={thumbUrls}
+                  onChange={promptBuffer.onChange}
+                  onFocus={promptBuffer.onFocus}
+                  onBlur={promptBuffer.onBlur}
+                  onCompositionStart={promptBuffer.onCompositionStart}
+                  onCompositionEnd={promptBuffer.onCompositionEnd}
+                  placeholder={
+                    hasPromptReference
+                      ? ""
+                      : t("workflow.aiVideoPanel.promptPlaceholder")
+                  }
+                  className={cn(
+                    "pr-7",
+                    hasPromptReference &&
+                      "read-only:cursor-default read-only:text-foreground"
+                  )}
+                />
+                {hasPromptReference ? (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+                    <div
+                      className={cn(
+                        "max-w-[92%] rounded-lg border px-3 py-2 text-center text-xs leading-relaxed shadow-sm backdrop-blur-[2px]",
+                        promptOverLimit
+                          ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
+                          : "border-border/40 bg-background/50 text-muted-foreground"
+                      )}
+                    >
+                      {promptOverLimit
+                        ? t("workflow.aiVideoPanel.referencedPromptTooLong", {
+                            max: promptMaxLength,
+                          })
+                        : promptReferenceEditHint}
+                    </div>
+                  </div>
+                ) : null}
+                {hasBrokenPromptRefs ? (
+                  <p className="pointer-events-none absolute inset-x-0 bottom-0 px-0 pb-0 text-[11px] text-destructive">
+                    {t("workflow.aiVideoPanel.promptMentionBroken")}
+                  </p>
+                ) : null}
+                {layout === "attached" ? (
+                  <AiTextExpandButton
+                    className="absolute right-1 top-1"
+                    onClick={openCreativeStudio}
+                  />
+                ) : null}
               </div>
-            </div>
-          ) : null}
-          {hasBrokenPromptRefs ? (
-            <p className="pointer-events-none absolute inset-x-0 bottom-0 px-0 pb-0 text-[11px] text-destructive">
-              {t("workflow.aiVideoPanel.promptMentionBroken")}
-            </p>
-          ) : null}
-          {layout === "attached" ? (
-            <AiTextExpandButton
-              className="absolute right-1 top-1"
-              onClick={openCreativeStudio}
-            />
-          ) : null}
-        </div>
+            </>
+          )}
+        </ReferenceThumbUrlsProvider>
 
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0 flex-1">

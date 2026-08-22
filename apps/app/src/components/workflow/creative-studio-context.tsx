@@ -54,6 +54,9 @@ interface CreativeStudioContextValue {
   readonly isListNodeRenaming: (nodeId: string) => boolean;
   readonly isPendingStudioNode: (nodeId: string) => boolean;
   readonly resolvePendingStudioNode: (nodeId: string) => void;
+  readonly markPendingSecondaryNode: (nodeId: string) => void;
+  readonly isPendingSecondaryNode: (nodeId: string) => boolean;
+  readonly resolvePendingSecondaryNode: (nodeId: string) => void;
 }
 
 const CreativeStudioContext = createContext<CreativeStudioContextValue | null>(
@@ -101,6 +104,7 @@ export function CreativeStudioProvider({
   const [secondaryNodeId, setSecondaryNodeId] = useState<string | null>(null);
   /** Guards cleanup until a newly added node appears in the graph. */
   const pendingStudioNodeIdRef = useRef<string | null>(null);
+  const pendingSecondaryNodeIdRef = useRef<string | null>(null);
 
   const isPendingStudioNode = useCallback((nodeId: string) => {
     return pendingStudioNodeIdRef.current === nodeId;
@@ -109,6 +113,20 @@ export function CreativeStudioProvider({
   const resolvePendingStudioNode = useCallback((nodeId: string) => {
     if (pendingStudioNodeIdRef.current === nodeId) {
       pendingStudioNodeIdRef.current = null;
+    }
+  }, []);
+
+  const markPendingSecondaryNode = useCallback((nodeId: string) => {
+    pendingSecondaryNodeIdRef.current = nodeId;
+  }, []);
+
+  const isPendingSecondaryNode = useCallback((nodeId: string) => {
+    return pendingSecondaryNodeIdRef.current === nodeId;
+  }, []);
+
+  const resolvePendingSecondaryNode = useCallback((nodeId: string) => {
+    if (pendingSecondaryNodeIdRef.current === nodeId) {
+      pendingSecondaryNodeIdRef.current = null;
     }
   }, []);
 
@@ -178,7 +196,12 @@ export function CreativeStudioProvider({
   );
 
   const closeSecondaryDetail = useCallback(() => {
-    setSecondaryNodeId(null);
+    setSecondaryNodeId((current) => {
+      if (current && pendingSecondaryNodeIdRef.current === current) {
+        pendingSecondaryNodeIdRef.current = null;
+      }
+      return null;
+    });
   }, []);
 
   const promoteSecondaryToPrimary = useCallback((nodeId: string) => {
@@ -313,6 +336,9 @@ export function CreativeStudioProvider({
       isListNodeRenaming,
       isPendingStudioNode,
       resolvePendingStudioNode,
+      markPendingSecondaryNode,
+      isPendingSecondaryNode,
+      resolvePendingSecondaryNode,
     }),
     [
       workflowId,
@@ -344,6 +370,9 @@ export function CreativeStudioProvider({
       isListNodeRenaming,
       isPendingStudioNode,
       resolvePendingStudioNode,
+      markPendingSecondaryNode,
+      isPendingSecondaryNode,
+      resolvePendingSecondaryNode,
     ]
   );
 

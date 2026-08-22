@@ -1,6 +1,4 @@
-import type { WorkflowMediaValue } from "@dafthunk/types";
-import { isWorkflowMediaValue } from "@dafthunk/types";
-import ImageOffIcon from "lucide-react/icons/image-off";
+import ImageIcon from "lucide-react/icons/image";
 import {
   useCallback,
   useEffect,
@@ -9,26 +7,38 @@ import {
   useState,
   type CompositionEvent,
   type FocusEvent,
+  type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
 
 import { useTranslation } from "@/components/locale-provider";
-import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
 import {
+  ReferenceChipMediaThumb,
   ReferenceHoverPreview,
   type AiTextReferenceChip,
 } from "./ai-text-reference-bar";
 import { VIDEO_PROMPT_REF_TOKEN_PATTERN } from "./video-prompt-compile";
+import {
+  applyMentionPick,
+  detectMention,
+  domRangeToFlatIndex,
+  resolveMentionPickerAnchor,
+  setDomCaretToFlatIndex,
+} from "./video-prompt-mention-utils";
 
 const MENTION_PICKER_GAP_PX = 6;
 const MENTION_PICKER_MAX_HEIGHT_PX = 200;
+const VIDEO_PROMPT_EDITOR_TEXT_CLASS =
+  "text-sm leading-6" as const;
 
 interface MentionPickerState {
   readonly query: string;
   readonly anchor: DOMRect;
-  readonly mentionRange: Range;
+  readonly mentionStartStored: number;
+  readonly mentionEndStored: number;
+  readonly mentionStartFlat: number;
 }
 
 interface HoverPreviewState {
@@ -43,32 +53,12 @@ export interface VideoPromptMentionEditorProps {
   readonly placeholder?: string;
   readonly className?: string;
   readonly imageChips: readonly AiTextReferenceChip[];
+  readonly thumbUrls?: ReadonlyMap<string, string | null>;
   readonly onChange: (value: string) => void;
   readonly onFocus?: () => void;
   readonly onBlur?: () => void;
   readonly onCompositionStart?: () => void;
   readonly onCompositionEnd?: (event: CompositionEvent<HTMLDivElement>) => void;
-}
-
-function mediaNodeTypeForChip(
-  chip: AiTextReferenceChip
-): "ai-image" | "ai-video" | undefined {
-  if (chip.kind === "image") return "ai-image";
-  if (chip.kind === "video") return "ai-video";
-  return undefined;
-}
-
-function chipMedia(chip: AiTextReferenceChip): WorkflowMediaValue | null {
-  return chip.media && isWorkflowMediaValue(chip.media) ? chip.media : null;
-}
-
-function listStoredRefEdgeIds(stored: string): readonly string[] {
-  const ids: string[] = [];
-  for (const match of stored.matchAll(VIDEO_PROMPT_REF_TOKEN_PATTERN)) {
-    const edgeId = match[1];
-    if (edgeId) ids.push(edgeId);
-  }
-  return ids;
 }
 
 function serializeEditorRoot(root: HTMLElement): string {
@@ -93,34 +83,34 @@ function serializeEditorRoot(root: HTMLElement): string {
   return result;
 }
 
-function flattenNodeToMentionScanText(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? "";
+function appendChipFrameContent(
+  frame: HTMLSpanElement,
+  chip: AiTextReferenceChip | undefined,
+  thumbUrl: string | null | undefined
+): void {
+  frame.replaceChildren();
+  if (chip && thumbUrl) {
+    const img = document.createElement("img");
+    img.src = thumbUrl;
+    img.alt = chip.label;
+    img.className = "h-full w-full object-cover";
+    frame.appendChild(img);
+    return;
   }
-  if (!(node instanceof HTMLElement)) return "";
-  if (node.dataset.refEdgeId) return "";
-  let text = "";
-  for (const child of node.childNodes) {
-    text += flattenNodeToMentionScanText(child);
-  }
-  return text;
-}
 
-function getTextBeforeCursor(root: HTMLElement): string {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return "";
-  const cursorRange = selection.getRangeAt(0);
-  if (!root.contains(cursorRange.startContainer)) return "";
-
-  const preRange = document.createRange();
-  preRange.selectNodeContents(root);
-  preRange.setEnd(cursorRange.startContainer, cursorRange.startOffset);
-  return flattenNodeToMentionScanText(preRange.cloneContents());
+  const icon = document.createElement("span");
+  icon.className =
+    "flex h-full w-full items-center justify-center text-muted-foreground";
+  icon.innerHTML = chip
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><path d="M18 12l-4.5-4.5"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/></svg>';
+  frame.appendChild(icon);
 }
 
 function createChipElement(
   edgeId: string,
-  chip: AiTextReferenceChip | undefined
+  chip: AiTextReferenceChip | undefined,
+  thumbUrl: string | null | undefined
 ): HTMLSpanElement {
   const span = document.createElement("span");
   span.contentEditable = "false";
@@ -131,16 +121,17 @@ function createChipElement(
   );
 
   const at = document.createElement("span");
-  at.className = "text-[10px] leading-none text-muted-foreground";
+  at.className = "inline-flex shrink-0 items-center self-center text-[10px] leading-none text-muted-foreground";
   at.textContent = "@";
   span.appendChild(at);
 
   const frame = document.createElement("span");
   frame.className = cn(
-    "inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md border",
+    "inline-flex h-5 w-5 shrink-0 items-center justify-center self-center overflow-hidden rounded-md border",
     chip ? "border-border" : "border-dashed border-muted-foreground/40"
   );
   frame.dataset.chipFrame = "true";
+  appendChipFrameContent(frame, chip, thumbUrl);
   span.appendChild(frame);
 
   return span;
@@ -149,7 +140,8 @@ function createChipElement(
 function renderStoredPromptToEditor(
   root: HTMLElement,
   stored: string,
-  chipByEdgeId: ReadonlyMap<string, AiTextReferenceChip>
+  chipByEdgeId: ReadonlyMap<string, AiTextReferenceChip>,
+  thumbUrls: ReadonlyMap<string, string | null> | undefined
 ): void {
   root.replaceChildren();
   const pattern = new RegExp(VIDEO_PROMPT_REF_TOKEN_PATTERN.source, "g");
@@ -161,7 +153,13 @@ function renderStoredPromptToEditor(
       root.appendChild(document.createTextNode(stored.slice(lastIndex, start)));
     }
     const edgeId = match[1] ?? "";
-    root.appendChild(createChipElement(edgeId, chipByEdgeId.get(edgeId)));
+    root.appendChild(
+      createChipElement(
+        edgeId,
+        chipByEdgeId.get(edgeId),
+        thumbUrls?.get(edgeId)
+      )
+    );
     lastIndex = start + match[0].length;
   }
 
@@ -170,39 +168,22 @@ function renderStoredPromptToEditor(
   }
 }
 
-function insertChipAtRange(
-  range: Range,
-  edgeId: string,
-  chip?: AiTextReferenceChip
+function updateChipThumbsInEditor(
+  root: HTMLElement,
+  chipByEdgeId: ReadonlyMap<string, AiTextReferenceChip>,
+  thumbUrls: ReadonlyMap<string, string | null> | undefined
 ): void {
-  range.deleteContents();
-  const chipNode = createChipElement(edgeId, chip);
-  range.insertNode(chipNode);
-  range.setStartAfter(chipNode);
-  range.collapse(true);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function MentionPickerThumb({ chip }: { readonly chip: AiTextReferenceChip }) {
-  const media = chipMedia(chip);
-  const thumbUrl = useReferenceThumbUrl({
-    media,
-    nodeType: mediaNodeTypeForChip(chip),
-  });
-
-  if (thumbUrl) {
-    return (
-      <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+  for (const chipEl of root.querySelectorAll<HTMLElement>("[data-ref-edge-id]")) {
+    const edgeId = chipEl.dataset.refEdgeId;
+    if (!edgeId) continue;
+    const frame = chipEl.querySelector<HTMLElement>('[data-chip-frame="true"]');
+    if (!(frame instanceof HTMLSpanElement)) continue;
+    appendChipFrameContent(
+      frame,
+      chipByEdgeId.get(edgeId),
+      thumbUrls?.get(edgeId)
     );
   }
-
-  return (
-    <span className="flex h-full w-full items-center justify-center text-muted-foreground">
-      <ImageOffIcon className="h-3.5 w-3.5" />
-    </span>
-  );
 }
 
 function chipMatchesQuery(chip: AiTextReferenceChip, query: string): boolean {
@@ -211,24 +192,45 @@ function chipMatchesQuery(chip: AiTextReferenceChip, query: string): boolean {
   return chip.label.toLowerCase().includes(normalized);
 }
 
+function filterChipsByQuery(
+  chips: readonly AiTextReferenceChip[],
+  query: string
+): readonly AiTextReferenceChip[] {
+  return chips.filter((chip) => chipMatchesQuery(chip, query));
+}
+
 function MentionPicker({
   visible,
   anchor,
   query,
   chips,
+  activeIndex,
+  thumbUrls,
   onPick,
+  onActiveIndexChange,
 }: {
   readonly visible: boolean;
   readonly anchor: DOMRect | null;
   readonly query: string;
   readonly chips: readonly AiTextReferenceChip[];
+  readonly activeIndex: number;
+  readonly thumbUrls?: ReadonlyMap<string, string | null>;
   readonly onPick: (chip: AiTextReferenceChip) => void;
+  readonly onActiveIndexChange: (index: number) => void;
 }) {
   const { t } = useTranslation();
-  const matchCount = useMemo(
-    () => chips.filter((chip) => chipMatchesQuery(chip, query)).length,
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const filteredChips = useMemo(
+    () => filterChipsByQuery(chips, query),
     [chips, query]
   );
+
+  useEffect(() => {
+    if (!visible || filteredChips.length === 0) return;
+    const chip = filteredChips[activeIndex];
+    if (!chip) return;
+    itemRefs.current.get(chip.edgeId)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, filteredChips, visible]);
 
   const style = {
     left: anchor?.left ?? 0,
@@ -239,29 +241,46 @@ function MentionPicker({
     <div
       hidden={!visible}
       aria-hidden={!visible}
+      role="listbox"
       className="nodrag nopan nowheel fixed z-[250] w-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
       style={{ ...style, maxHeight: MENTION_PICKER_MAX_HEIGHT_PX }}
       onMouseDown={(event) => {
         event.preventDefault();
       }}
     >
-      {visible && matchCount === 0 ? (
+      {visible && filteredChips.length === 0 ? (
         <p className="px-3 py-2 text-xs text-muted-foreground">
           {chips.length === 0
             ? t("workflow.aiVideoPanel.promptMentionEmpty")
             : t("workflow.aiVideoPanel.promptMentionNoMatch")}
         </p>
       ) : null}
-      {chips.map((chip) => (
+      {filteredChips.map((chip, index) => (
         <button
           key={chip.edgeId}
+          ref={(element) => {
+            if (element) {
+              itemRefs.current.set(chip.edgeId, element);
+              return;
+            }
+            itemRefs.current.delete(chip.edgeId);
+          }}
           type="button"
-          hidden={!chipMatchesQuery(chip, query)}
-          className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent"
+          role="option"
+          aria-selected={index === activeIndex}
+          className={cn(
+            "flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent",
+            index === activeIndex && "bg-accent"
+          )}
+          onMouseEnter={() => onActiveIndexChange(index)}
           onClick={() => onPick(chip)}
         >
-          <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-border">
-            <MentionPickerThumb chip={chip} />
+          <span className="relative inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-border">
+            <ReferenceChipMediaThumb
+              chip={chip}
+              fallbackIcon={<ImageIcon className="h-3.5 w-3.5" />}
+              thumbUrl={thumbUrls?.get(chip.edgeId)}
+            />
           </span>
           <span className="min-w-0 truncate text-xs">{chip.label}</span>
         </button>
@@ -271,86 +290,6 @@ function MentionPicker({
   );
 }
 
-function EditorChipThumbHydrator({
-  edgeId,
-  chip,
-  editorRef,
-  onHover,
-  onHoverEnd,
-}: {
-  readonly edgeId: string;
-  readonly chip: AiTextReferenceChip | undefined;
-  readonly editorRef: React.RefObject<HTMLDivElement | null>;
-  readonly onHover: (chip: AiTextReferenceChip, anchor: DOMRect) => void;
-  readonly onHoverEnd: () => void;
-}) {
-  const media = chip ? chipMedia(chip) : null;
-  const thumbUrl = useReferenceThumbUrl({
-    media,
-    nodeType: chip ? mediaNodeTypeForChip(chip) : undefined,
-  });
-
-  useEffect(() => {
-    const root = editorRef.current;
-    if (!root) return;
-    const chipEl = root.querySelector<HTMLElement>(`[data-ref-edge-id="${edgeId}"]`);
-    const frame = chipEl?.querySelector<HTMLElement>('[data-chip-frame="true"]');
-    if (!frame) return;
-
-    const existingImg = frame.querySelector("img");
-    if (chip && thumbUrl) {
-      if (existingImg?.getAttribute("data-thumb-url") === thumbUrl) {
-        return;
-      }
-      if (existingImg) {
-        existingImg.src = thumbUrl;
-        existingImg.alt = chip.label;
-        existingImg.setAttribute("data-thumb-url", thumbUrl);
-        return;
-      }
-      frame.replaceChildren();
-      const img = document.createElement("img");
-      img.src = thumbUrl;
-      img.alt = chip.label;
-      img.className = "h-full w-full object-cover";
-      img.setAttribute("data-thumb-url", thumbUrl);
-      frame.appendChild(img);
-      return;
-    }
-
-    if (frame.querySelector("[data-chip-fallback='true']")) {
-      return;
-    }
-    frame.replaceChildren();
-    const icon = document.createElement("span");
-    icon.dataset.chipFallback = "true";
-    icon.className =
-      "flex h-full w-full items-center justify-center text-muted-foreground";
-    icon.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><path d="M18 12l-4.5-4.5"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/><path d="M3 15v4a2 2 0 0 0 2 2h4"/></svg>';
-    frame.appendChild(icon);
-  }, [chip, edgeId, editorRef, thumbUrl]);
-
-  useEffect(() => {
-    const root = editorRef.current;
-    if (!root) return;
-    const chipEl = root.querySelector<HTMLElement>(`[data-ref-edge-id="${edgeId}"]`);
-    if (!chipEl) return;
-    const handleEnter = () => {
-      if (!chip) return;
-      onHover(chip, chipEl.getBoundingClientRect());
-    };
-    chipEl.addEventListener("mouseenter", handleEnter);
-    chipEl.addEventListener("mouseleave", onHoverEnd);
-    return () => {
-      chipEl.removeEventListener("mouseenter", handleEnter);
-      chipEl.removeEventListener("mouseleave", onHoverEnd);
-    };
-  }, [chip, edgeId, editorRef, onHover, onHoverEnd]);
-
-  return null;
-}
-
 export function VideoPromptMentionEditor({
   value,
   disabled = false,
@@ -358,6 +297,7 @@ export function VideoPromptMentionEditor({
   placeholder,
   className,
   imageChips,
+  thumbUrls,
   onChange,
   onFocus,
   onBlur,
@@ -369,12 +309,39 @@ export function VideoPromptMentionEditor({
   const [isFocused, setIsFocused] = useState(false);
   const composingRef = useRef(false);
   const lastRenderedValueRef = useRef(value);
+  const flatCaretIndexRef = useRef(0);
   const [mentionPicker, setMentionPicker] = useState<MentionPickerState | null>(
     null
   );
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
   const [hoverPreview, setHoverPreview] = useState<HoverPreviewState | null>(
     null
   );
+
+  const filteredMentionChips = useMemo(
+    () =>
+      mentionPicker
+        ? filterChipsByQuery(imageChips, mentionPicker.query)
+        : [],
+    [imageChips, mentionPicker]
+  );
+
+  useEffect(() => {
+    setMentionActiveIndex(0);
+  }, [
+    mentionPicker?.mentionEndStored,
+    mentionPicker?.mentionStartStored,
+    mentionPicker?.query,
+  ]);
+
+  useEffect(() => {
+    if (mentionActiveIndex < filteredMentionChips.length) {
+      return;
+    }
+    setMentionActiveIndex(
+      Math.max(0, filteredMentionChips.length - 1)
+    );
+  }, [filteredMentionChips.length, mentionActiveIndex]);
 
   const chipByEdgeId = useMemo(() => {
     const map = new Map<string, AiTextReferenceChip>();
@@ -384,16 +351,14 @@ export function VideoPromptMentionEditor({
     return map;
   }, [imageChips]);
 
-  const storedEdgeIds = useMemo(() => listStoredRefEdgeIds(value), [value]);
-
   const syncDomFromValue = useCallback(
     (stored: string) => {
       const root = editorRef.current;
       if (!root) return;
-      renderStoredPromptToEditor(root, stored, chipByEdgeId);
+      renderStoredPromptToEditor(root, stored, chipByEdgeId, thumbUrls);
       lastRenderedValueRef.current = stored;
     },
-    [chipByEdgeId]
+    [chipByEdgeId, thumbUrls]
   );
 
   useEffect(() => {
@@ -404,29 +369,48 @@ export function VideoPromptMentionEditor({
     if (!isFocusedRef.current) {
       syncDomFromValue(value);
     }
-  }, [chipByEdgeId, syncDomFromValue, value]);
+  }, [chipByEdgeId, syncDomFromValue, thumbUrls, value]);
 
-  const emitChange = useCallback(() => {
+  useEffect(() => {
     const root = editorRef.current;
     if (!root) return;
-    const next = serializeEditorRoot(root);
+    updateChipThumbsInEditor(root, chipByEdgeId, thumbUrls);
+  }, [chipByEdgeId, thumbUrls, value]);
+
+  const readStoredFromEditor = useCallback((): string => {
+    const root = editorRef.current;
+    if (!root) return value;
+    return serializeEditorRoot(root);
+  }, [value]);
+
+  const syncFlatCaretFromSelection = useCallback(() => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const selection = window.getSelection();
+    if (
+      !selection ||
+      !selection.isCollapsed ||
+      selection.rangeCount === 0 ||
+      !root.contains(selection.anchorNode)
+    ) {
+      return;
+    }
+
+    flatCaretIndexRef.current = domRangeToFlatIndex(
+      root,
+      selection.getRangeAt(0)
+    );
+  }, []);
+
+  const emitChange = useCallback(() => {
+    const next = readStoredFromEditor();
     lastRenderedValueRef.current = next;
     onChange(next);
-  }, [onChange]);
+  }, [onChange, readStoredFromEditor]);
 
   const closeMentionPicker = useCallback(() => {
     setMentionPicker(null);
-  }, []);
-
-  const handleHoverChip = useCallback(
-    (chip: AiTextReferenceChip, anchor: DOMRect) => {
-      setHoverPreview({ chip, anchor });
-    },
-    []
-  );
-
-  const handleHoverEnd = useCallback(() => {
-    setHoverPreview(null);
   }, []);
 
   const updateMentionPicker = useCallback(() => {
@@ -440,57 +424,134 @@ export function VideoPromptMentionEditor({
       return;
     }
 
-    const selection = window.getSelection();
-    if (!selection || !selection.isCollapsed || selection.rangeCount === 0) {
+    syncFlatCaretFromSelection();
+    const stored = readStoredFromEditor();
+    const mention = detectMention(stored, flatCaretIndexRef.current);
+    if (!mention) {
       closeMentionPicker();
       return;
     }
 
-    const before = getTextBeforeCursor(root);
-    const match = before.match(/@([^\s@]*)$/);
-    if (!match) {
-      closeMentionPicker();
-      return;
-    }
+    const anchor = resolveMentionPickerAnchor(root, mention.mentionEndFlat);
 
-    const query = match[1] ?? "";
-    const cursorRange = selection.getRangeAt(0);
-    if (cursorRange.startContainer.nodeType !== Node.TEXT_NODE) {
-      closeMentionPicker();
-      return;
-    }
+    setMentionPicker({
+      query: mention.query,
+      anchor,
+      mentionStartStored: mention.mentionStartStored,
+      mentionEndStored: mention.mentionEndStored,
+      mentionStartFlat: mention.mentionStartFlat,
+    });
+  }, [
+    closeMentionPicker,
+    disabled,
+    imageChips.length,
+    readOnly,
+    readStoredFromEditor,
+    syncFlatCaretFromSelection,
+  ]);
 
-    const textNode = cursorRange.startContainer as Text;
-    const mentionStart = cursorRange.startOffset - query.length - 1;
-    if (mentionStart < 0 || textNode.data[mentionStart] !== "@") {
-      closeMentionPicker();
-      return;
-    }
-
-    const mentionRange = document.createRange();
-    mentionRange.setStart(textNode, mentionStart);
-    mentionRange.setEnd(textNode, cursorRange.startOffset);
-
-    const anchor = cursorRange.getBoundingClientRect();
-    setMentionPicker({ query, anchor, mentionRange });
-  }, [closeMentionPicker, disabled, imageChips.length, readOnly]);
+  const scheduleMentionPickerUpdate = useCallback(() => {
+    requestAnimationFrame(() => {
+      updateMentionPicker();
+    });
+  }, [updateMentionPicker]);
 
   const handleInput = useCallback(() => {
     emitChange();
-    updateMentionPicker();
-  }, [emitChange, updateMentionPicker]);
+    scheduleMentionPickerUpdate();
+  }, [emitChange, scheduleMentionPickerUpdate]);
 
   const handlePickMention = useCallback(
     (chip: AiTextReferenceChip) => {
       const root = editorRef.current;
       if (!root || !mentionPicker) return;
 
-      insertChipAtRange(mentionPicker.mentionRange, chip.edgeId, chip);
+      const stored = readStoredFromEditor();
+      const next = applyMentionPick(
+        stored,
+        mentionPicker.mentionStartStored,
+        mentionPicker.mentionEndStored,
+        chip.edgeId
+      );
+      const caretFlatIndex = mentionPicker.mentionStartFlat + 1;
+
+      lastRenderedValueRef.current = next;
+      onChange(next);
+      renderStoredPromptToEditor(root, next, chipByEdgeId, thumbUrls);
       closeMentionPicker();
-      emitChange();
-      root.focus();
+
+      requestAnimationFrame(() => {
+        setDomCaretToFlatIndex(root, caretFlatIndex);
+        flatCaretIndexRef.current = caretFlatIndex;
+        root.focus();
+      });
     },
-    [closeMentionPicker, emitChange, mentionPicker]
+    [
+      chipByEdgeId,
+      closeMentionPicker,
+      mentionPicker,
+      onChange,
+      readStoredFromEditor,
+      thumbUrls,
+    ]
+  );
+
+  const handleMentionKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (!mentionPicker) {
+        if (event.key === "Escape") {
+          closeMentionPicker();
+        }
+        return;
+      }
+
+      if (filteredMentionChips.length === 0) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeMentionPicker();
+        }
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionActiveIndex(
+          (current) => (current + 1) % filteredMentionChips.length
+        );
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionActiveIndex(
+          (current) =>
+            (current - 1 + filteredMentionChips.length) %
+            filteredMentionChips.length
+        );
+        return;
+      }
+
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const chip = filteredMentionChips[mentionActiveIndex];
+        if (chip) {
+          handlePickMention(chip);
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMentionPicker();
+      }
+    },
+    [
+      closeMentionPicker,
+      filteredMentionChips,
+      handlePickMention,
+      mentionActiveIndex,
+      mentionPicker,
+    ]
   );
 
   const handleFocus = useCallback(
@@ -498,9 +559,10 @@ export function VideoPromptMentionEditor({
       isFocusedRef.current = true;
       setIsFocused(true);
       onFocus?.();
+      syncFlatCaretFromSelection();
       event.currentTarget.focus();
     },
-    [onFocus]
+    [onFocus, syncFlatCaretFromSelection]
   );
 
   const handleBlur = useCallback(
@@ -529,10 +591,64 @@ export function VideoPromptMentionEditor({
       composingRef.current = false;
       onCompositionEnd?.(event);
       emitChange();
-      updateMentionPicker();
+      scheduleMentionPickerUpdate();
     },
-    [emitChange, onCompositionEnd, updateMentionPicker]
+    [emitChange, onCompositionEnd, scheduleMentionPickerUpdate]
   );
+
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const handleSelectionChange = () => {
+      if (!isFocusedRef.current || composingRef.current) return;
+      syncFlatCaretFromSelection();
+      scheduleMentionPickerUpdate();
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [scheduleMentionPickerUpdate, syncFlatCaretFromSelection]);
+
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const handleMouseOver = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const chipEl = target.closest<HTMLElement>("[data-ref-edge-id]");
+      if (!chipEl || !root.contains(chipEl)) return;
+      const edgeId = chipEl.dataset.refEdgeId;
+      if (!edgeId) return;
+      const chip = chipByEdgeId.get(edgeId);
+      if (!chip) return;
+      setHoverPreview({ chip, anchor: chipEl.getBoundingClientRect() });
+    };
+
+    const handleMouseOut = (event: MouseEvent) => {
+      const related = event.relatedTarget;
+      if (related instanceof Node) {
+        const relatedChip =
+          related instanceof HTMLElement
+            ? related.closest("[data-ref-edge-id]")
+            : null;
+        if (relatedChip && root.contains(relatedChip)) {
+          return;
+        }
+      }
+      setHoverPreview(null);
+    };
+
+    root.addEventListener("mouseover", handleMouseOver);
+    root.addEventListener("mouseout", handleMouseOut);
+    return () => {
+      root.removeEventListener("mouseover", handleMouseOver);
+      root.removeEventListener("mouseout", handleMouseOut);
+    };
+  }, [chipByEdgeId]);
 
   const showPlaceholder = !readOnly && value.length === 0 && !isFocused;
 
@@ -540,7 +656,12 @@ export function VideoPromptMentionEditor({
     <>
       <div className="relative h-full min-h-0">
         {placeholder && showPlaceholder ? (
-          <p className="pointer-events-none absolute inset-0 select-none text-sm leading-4 text-muted-foreground">
+          <p
+            className={cn(
+              "pointer-events-none absolute inset-0 select-none text-muted-foreground",
+              VIDEO_PROMPT_EDITOR_TEXT_CLASS
+            )}
+          >
             {placeholder}
           </p>
         ) : null}
@@ -551,7 +672,8 @@ export function VideoPromptMentionEditor({
           contentEditable={!disabled && !readOnly}
           suppressContentEditableWarning
           className={cn(
-            "h-full min-h-0 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-4 outline-none thin-scrollbar",
+            "h-full min-h-0 overflow-y-auto whitespace-pre-wrap break-words outline-none thin-scrollbar",
+            VIDEO_PROMPT_EDITOR_TEXT_CLASS,
             (disabled || readOnly) && "cursor-default",
             className
           )}
@@ -560,24 +682,12 @@ export function VideoPromptMentionEditor({
           onBlur={handleBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              closeMentionPicker();
-            }
+          onKeyDown={handleMentionKeyDown}
+          onKeyUp={() => {
+            scheduleMentionPickerUpdate();
           }}
         />
       </div>
-
-      {storedEdgeIds.map((edgeId) => (
-        <EditorChipThumbHydrator
-          key={edgeId}
-          edgeId={edgeId}
-          chip={chipByEdgeId.get(edgeId)}
-          editorRef={editorRef}
-          onHover={handleHoverChip}
-          onHoverEnd={handleHoverEnd}
-        />
-      ))}
 
       {imageChips.length > 0 ? (
         <MentionPicker
@@ -585,7 +695,10 @@ export function VideoPromptMentionEditor({
           anchor={mentionPicker?.anchor ?? null}
           query={mentionPicker?.query ?? ""}
           chips={imageChips}
+          activeIndex={mentionActiveIndex}
+          thumbUrls={thumbUrls}
           onPick={handlePickMention}
+          onActiveIndexChange={setMentionActiveIndex}
         />
       ) : null}
 
@@ -593,6 +706,7 @@ export function VideoPromptMentionEditor({
         <ReferenceHoverPreview
           chip={hoverPreview.chip}
           anchor={hoverPreview.anchor}
+          thumbUrl={thumbUrls?.get(hoverPreview.chip.edgeId)}
         />
       ) : null}
     </>

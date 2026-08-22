@@ -42,18 +42,7 @@ import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
 import { collectAiAudioFirstDegreeEdgeIds } from "./ai-audio-edge-selection";
 import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
 import { shouldSuppressGenerativePanelDeselect } from "./generative-panel-pointer-guard";
-import {
-  buildAiTextReferenceConnectionFromCardDrop,
-} from "./ai-text-reference-policy";
-import {
-  buildAiImageReferenceConnectionFromCardDrop,
-} from "./ai-image-reference-policy";
-import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-prompt-reference";
-import {
-  buildAiVideoReferenceConnectionFromCardDrop,
-} from "./ai-video-reference-policy";
-import { buildAiAudioPromptReferenceConnectionFromCardDrop } from "./ai-audio-prompt-reference";
-import { buildAiVideoPromptReferenceConnectionFromCardDrop } from "./ai-video-prompt-reference";
+import { buildGenerativeReferenceConnectionFromCardDrop } from "./generative-reference-connection";
 import {
   mergeAiTextNodeCatalogInputs,
 } from "./ai-text-node-utils";
@@ -869,43 +858,12 @@ export function useGraphOperations({
             id: node.id,
             data: node.data,
           }));
-          const drop =
-            buildAiTextReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            }) ??
-            buildAiImagePromptReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            }) ??
-            buildAiImageReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            }) ??
-            buildAiVideoPromptReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            }) ??
-            buildAiVideoReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            }) ??
-            buildAiAudioPromptReferenceConnectionFromCardDrop({
-              dragFromNodeId: connectionState.fromNode.id,
-              dragFromHandle: connectionState.fromHandle,
-              hoveredNodeId,
-              nodes: policyNodes,
-            });
+          const drop = buildGenerativeReferenceConnectionFromCardDrop({
+            dragFromNodeId: connectionState.fromNode.id,
+            dragFromHandle: connectionState.fromHandle,
+            hoveredNodeId,
+            nodes: policyNodes,
+          });
           if (
             drop &&
             validateWorkflowConnection({

@@ -50,9 +50,9 @@ import {
 import {
   collectGenerativeReferenceChips,
   collectImageReferenceMedia,
-  connectGenerativeReferenceEdge,
   studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
+import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import { AiGenerateButton } from "./ai-generate-button";
 import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
@@ -409,12 +409,8 @@ export function AiImageConfigPanel({
     ]
   );
 
-  const connectReferenceEdge = useCallback(
-    (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
-      connectGenerativeReferenceEdge(setEdges, connection);
-    },
-    [setEdges]
-  );
+  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
+    useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
     const edge = edges.find((entry) => entry.id === edgeId);
@@ -425,32 +421,9 @@ export function AiImageConfigPanel({
   };
 
   const canAcceptStudioReference = useCallback(
-    (sourceNodeId: string, sourceHandle: string) => {
-      const source = typedNodes.find((node) => node.id === sourceNodeId);
-      if (!source) return false;
-
-      if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-        return evaluateAiImagePromptReferenceStructural({
-          targetNodeId: nodeId,
-          targetNodeMetadata: data.metadata,
-          sourceNodeId,
-          sourceNodeType: source.data.nodeType,
-          edges,
-        }).ok;
-      }
-
-      return evaluateAiImageReferenceStructural({
-        targetNodeId: nodeId,
-        sourceNodeId,
-        sourceHandle,
-        sourceNodeType: source.data.nodeType,
-        targetNodeData: data,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-        models: imageModelCatalog,
-      }).ok;
-    },
-    [data, edges, imageModelCatalog, nodeId, typedNodes]
+    (sourceNodeId: string, sourceHandle: string) =>
+      canConnectReference(sourceNodeId, sourceHandle, nodeId),
+    [canConnectReference, nodeId]
   );
 
   const previewStudioReferenceDrop = useCallback(
@@ -495,23 +468,15 @@ export function AiImageConfigPanel({
       return;
     }
 
-    if (source.data.nodeType === AI_TEXT_NODE_TYPE) {
-      connectReferenceEdge({
-        source: sourceNodeId,
-        sourceHandle,
-        target: nodeId,
-        targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
-      });
-      setPickNodeOpen(false);
+    const connection = buildReferenceConnection(
+      sourceNodeId,
+      sourceHandle,
+      nodeId
+    );
+    if (!connection || !appendReferenceConnection(connection)) {
+      toast.error("workflow.aiImagePanel.referenceRejected");
       return;
     }
-
-    connectReferenceEdge({
-      source: sourceNodeId,
-      sourceHandle,
-      target: nodeId,
-      targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
-    });
     setPickNodeOpen(false);
   };
 
@@ -591,39 +556,46 @@ export function AiImageConfigPanel({
               : param.value,
         }));
 
-        setNodes((current) => [
-          ...current,
-          {
-            id: newId,
-            type: "workflowNode",
-            position,
-            data: {
-              name: resolveGenerativeNodeDisplayName({
-                nodeType: catalog.type,
-                baseName: resolveGenerativeNodeDefaultBaseName(
-                  catalog.type,
-                  catalog.name,
-                  t
-                ),
-                existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
-                additionalSameTypeCount: offset,
-              }),
+        const newNode = {
+          id: newId,
+          type: "workflowNode" as const,
+          position,
+          data: {
+            name: resolveGenerativeNodeDisplayName({
               nodeType: catalog.type,
-              icon: catalog.icon,
-              inputs: catalogInputs,
-              outputs: catalogOutputs,
-              executionState: "idle" as const,
-              createObjectUrl,
-            },
+              baseName: resolveGenerativeNodeDefaultBaseName(
+                catalog.type,
+                catalog.name,
+                t
+              ),
+              existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
+              additionalSameTypeCount: offset,
+            }),
+            nodeType: catalog.type,
+            icon: catalog.icon,
+            inputs: catalogInputs,
+            outputs: catalogOutputs,
+            executionState: "idle" as const,
+            createObjectUrl,
           },
-        ]);
+        };
 
-        connectReferenceEdge({
-          source: newId,
-          sourceHandle: AI_IMAGE_OUTPUT_ID,
-          target: nodeId,
-          targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
-        });
+        setNodes((current) => [...current, newNode]);
+
+        if (
+          !appendReferenceConnection(
+            {
+              source: newId,
+              sourceHandle: AI_IMAGE_OUTPUT_ID,
+              target: nodeId,
+              targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
+            },
+            { nodes: [...nodes, newNode] }
+          )
+        ) {
+          toast.error("workflow.aiImagePanel.referenceRejected");
+          continue;
+        }
         added += 1;
         offset += 1;
       } catch {
