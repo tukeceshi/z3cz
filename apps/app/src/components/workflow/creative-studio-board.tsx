@@ -107,7 +107,10 @@ function AudioListSection({
         labelKey="workflow.canvas.aiAudio"
         count={nodes.length}
       />
-      <div className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}>
+      <div
+        className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}
+        data-studio-list-scroll="audio"
+      >
         {nodes.length === 0 ? (
           <EmptySection />
         ) : (
@@ -145,6 +148,7 @@ function NodeListSection({
   className,
   itemVariant = "default",
   mediaGrid = false,
+  listScrollSection,
 }: {
   readonly labelKey: TranslationKey;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
@@ -154,6 +158,7 @@ function NodeListSection({
   readonly className?: string;
   readonly itemVariant?: "default" | "text" | "media" | "mediaPlain";
   readonly mediaGrid?: boolean;
+  readonly listScrollSection: "text" | "image" | "video";
 }) {
   const isActive = (nodeId: string) =>
     isStudioListNodeActive(nodeId, primaryNodeId, secondaryNodeId);
@@ -161,7 +166,10 @@ function NodeListSection({
   return (
     <section className={cn(STUDIO_PANEL, "min-h-0 flex-1", className)}>
       <SectionHeader labelKey={labelKey} count={nodes.length} />
-      <div className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}>
+      <div
+        className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}
+        data-studio-list-scroll={listScrollSection}
+      >
         {nodes.length === 0 ? (
           <EmptySection />
         ) : (
@@ -272,6 +280,7 @@ export function CreativeStudioBoard({
         className="min-w-0 flex-[2]"
         itemVariant="media"
         mediaGrid
+        listScrollSection="text"
       />
       <NodeListSection
         labelKey="workflow.canvas.aiImage"
@@ -282,6 +291,7 @@ export function CreativeStudioBoard({
         className="min-w-0 flex-[2]"
         mediaGrid
         itemVariant="media"
+        listScrollSection="image"
       />
       <NodeListSection
         labelKey="workflow.canvas.aiVideo"
@@ -292,6 +302,7 @@ export function CreativeStudioBoard({
         className="min-h-0 min-w-0 flex-[2]"
         mediaGrid
         itemVariant="media"
+        listScrollSection="video"
       />
     </div>
   );

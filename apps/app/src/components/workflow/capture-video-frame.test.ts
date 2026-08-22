@@ -22,10 +22,20 @@ describe("formatVideoFrameSuffix", () => {
 });
 
 describe("resolveVideoFrameAiImageNodeName", () => {
+  it("places frame info before source node name", () => {
+    expect(
+      resolveVideoFrameAiImageNodeName({
+        sourceNodeName: "视频节点 3",
+        frameSuffix: "首帧",
+        existingNodes: [],
+      })
+    ).toBe("首帧-视频节点 3");
+  });
+
   it("deduplicates repeated frame node names", () => {
     const existingNodes = [
-      { data: { name: "视频节点 3-首帧" } },
-      { data: { name: "视频节点 3-首帧-2" } },
+      { data: { name: "首帧-视频节点 3" } },
+      { data: { name: "首帧-视频节点 3-2" } },
     ];
 
     expect(
@@ -34,6 +44,6 @@ describe("resolveVideoFrameAiImageNodeName", () => {
         frameSuffix: "首帧",
         existingNodes,
       })
-    ).toBe("视频节点 3-首帧-3");
+    ).toBe("首帧-视频节点 3-3");
   });
 });

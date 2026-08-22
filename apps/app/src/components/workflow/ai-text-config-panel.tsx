@@ -5,13 +5,11 @@ import {
   type GenerateAiTextResponse,
   isClientCancelledTextModelError,
   type MediaReference,
-  type ObjectReference,
   type OrgTextModelOption,
   type TextModelParameterRules,
 } from "@dafthunk/types";
 import {
   useNodes,
-  useReactFlow,
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
@@ -56,7 +54,6 @@ import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
   AI_TEXT_PANEL_PROMPT_MIN_HEIGHT_PX,
   classifyReferenceFromNodeType,
-  probeVideoUrlDurationSeconds,
   referencesFitModelLimits,
   withAiTextGeneratingFlag,
   withAiTextGeneratingHistoryFailed,
@@ -77,7 +74,9 @@ import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
-import { connectGenerativeReferenceEdge, studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
+import { studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
+import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
+import { validateGenerativeReferenceContentLimits } from "./validate-generative-reference-content";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
@@ -102,13 +101,12 @@ export function AiTextConfigPanel({
     deleteEdge,
   } = useWorkflow();
   const nodes = useNodes();
-  const { setEdges } = useReactFlow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
   const toast = useAppToast();
   const { getOrgUrl } = useOrgUrl();
-  const { createObjectUrl, getObjectMetadata } = useObjectService();
+  const { createObjectUrl } = useObjectService();
   const orgId = organization?.id;
   const { id: workflowId } = useParams<{ id: string }>();
   const { configured: cloudConfigured } = useCloudStorageCanvasContext();
@@ -253,85 +251,13 @@ export function AiTextConfigPanel({
 
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
-  const connectReferenceEdge = useCallback(
-    (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
-      connectGenerativeReferenceEdge(setEdges, connection);
-    },
-    [setEdges]
-  );
-
-  const validateReferenceContent = async (params: {
-    readonly kind: "text" | "image" | "video";
-    readonly rules: TextModelParameterRules;
-    readonly textValue?: string;
-    readonly objectRef?: ObjectReference;
-  }): Promise<boolean> => {
-    const rules = normalizeTextModelParameterRules(params.rules);
-
-    if (params.kind === "text") {
-      const text = params.textValue ?? "";
-      if (text.length > rules.maxTextReferenceChars) {
-        toast.error("workflow.aiTextPanel.referenceTooLarge");
-        return false;
-      }
-      return true;
-    }
-
-    if (params.objectRef && orgId) {
-      try {
-        const meta = await getObjectMetadata(
-          params.objectRef.id,
-          params.objectRef.mimeType
-        );
-        if (
-          params.kind === "image" &&
-          meta.size > rules.maxImageReferenceBytes
-        ) {
-          toast.error("workflow.aiTextPanel.referenceTooLarge");
-          return false;
-        }
-        if (
-          params.kind === "video" &&
-          meta.size > rules.maxVideoReferenceBytes
-        ) {
-          toast.error("workflow.aiTextPanel.referenceTooLarge");
-          return false;
-        }
-        if (params.kind === "video") {
-          const url = createObjectUrl(params.objectRef);
-          const seconds = await probeVideoUrlDurationSeconds(url);
-          if (seconds > rules.maxVideoReferenceSeconds) {
-            toast.error("workflow.aiTextPanel.referenceTooLong");
-            return false;
-          }
-        }
-      } catch {
-        toast.error("workflow.aiTextPanel.referenceProbeFailed");
-        return false;
-      }
-    }
-
-    return true;
-  };
+  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
+    useGenerativeReferenceConnection();
 
   const canAcceptStudioReference = useCallback(
-    (sourceNodeId: string, sourceHandle: string) => {
-      const source = typedNodes.find((node) => node.id === sourceNodeId);
-      if (!source) return false;
-      const kind = classifyReferenceFromNodeType(source.data.nodeType);
-      if (!kind) return false;
-      return evaluateAiTextReferenceStructural({
-        targetNodeId: nodeId,
-        sourceNodeId,
-        sourceHandle,
-        sourceNodeType: source.data.nodeType,
-        targetNodeData: data,
-        edges,
-        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
-        models: textModelCatalog,
-      }).ok;
-    },
-    [data, edges, nodeId, textModelCatalog, typedNodes]
+    (sourceNodeId: string, sourceHandle: string) =>
+      canConnectReference(sourceNodeId, sourceHandle, nodeId),
+    [canConnectReference, nodeId]
   );
 
   const previewStudioReferenceDrop = useCallback(
@@ -372,41 +298,36 @@ export function AiTextConfigPanel({
       return;
     }
 
-    const output = sourceData.outputs?.find((entry) => entry.id === sourceHandle);
-    if (kind === "text") {
-      const text =
-        (typeof output?.value === "string" && output.value) ||
-        (typeof sourceData.inputs.find((i) => i.id === "result")?.value ===
-          "string"
-          ? (sourceData.inputs.find((i) => i.id === "result")?.value as string)
-          : "");
-      const ok = await validateReferenceContent({
-        kind: "text",
-        rules: modelRules,
-        textValue: text,
-      });
-      if (!ok) return;
-    } else {
-      const value = output?.value;
-      const ref = Array.isArray(value)
-        ? (value[0] as ObjectReference | undefined)
-        : (value as ObjectReference | undefined);
-      if (ref && typeof ref === "object" && "id" in ref) {
-        const ok = await validateReferenceContent({
-          kind,
-          rules: modelRules,
-          objectRef: ref,
-        });
-        if (!ok) return;
+    const limitVerdict = await validateGenerativeReferenceContentLimits({
+      kind,
+      rules: modelRules,
+      sourceData,
+      targetNodeType: AI_TEXT_NODE_TYPE,
+      targetHandleId: AI_TEXT_KEYWORDS_HANDLE_ID,
+      organizationId: orgId,
+    });
+    if (!limitVerdict.ok) {
+      if (limitVerdict.reason === "too_long") {
+        toast.error("workflow.aiTextPanel.referenceTooLong");
+      } else if (limitVerdict.reason === "too_large") {
+        toast.error("workflow.aiTextPanel.referenceTooLarge");
+      } else if (limitVerdict.reason === "probe_failed") {
+        toast.error("workflow.aiTextPanel.referenceProbeFailed");
+      } else {
+        toast.error("workflow.aiTextPanel.referenceRejected");
       }
+      return;
     }
 
-    connectReferenceEdge({
-      source: sourceNodeId,
+    const connection = buildReferenceConnection(
+      sourceNodeId,
       sourceHandle,
-      target: nodeId,
-      targetHandle: AI_TEXT_KEYWORDS_HANDLE_ID,
-    });
+      nodeId
+    );
+    if (!connection || !appendReferenceConnection(connection)) {
+      toast.error("workflow.aiTextPanel.referenceRejected");
+      return;
+    }
     setPickNodeOpen(false);
   };
 

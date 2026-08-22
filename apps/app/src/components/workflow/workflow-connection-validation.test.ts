@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
-import { AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
+import {
+  AI_VIDEO_OUTPUT_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+  AI_VIDEO_RESULT_INPUT_ID,
+} from "./ai-video-node-utils";
 import { AI_TEXT_KEYWORDS_HANDLE_ID, AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import {
   edgeTouchesInputHandle,
@@ -214,5 +218,78 @@ describe("validateWorkflowConnection generative catalogs", () => {
       },
     });
     expect(withCatalog).toBe(true);
+  });
+
+  it("allows video output into reference_images when stored input type is image", () => {
+    const sourceVideo = makeNode("src-video", {
+      nodeType: AI_VIDEO_NODE_TYPE,
+      inputs: [
+        {
+          id: AI_VIDEO_RESULT_INPUT_ID,
+          name: AI_VIDEO_RESULT_INPUT_ID,
+          type: "json",
+          value: [{ resourceId: "res-1", mimeType: "video/mp4" }],
+        },
+      ],
+      outputs: [
+        {
+          id: AI_VIDEO_OUTPUT_ID,
+          name: AI_VIDEO_OUTPUT_ID,
+          type: "video",
+          repeated: true,
+        },
+      ],
+    });
+    const targetVideo = makeNode("tgt-video", {
+      nodeType: AI_VIDEO_NODE_TYPE,
+      inputs: [
+        { id: "model", name: "model", type: "string", value: "seedance-fast" },
+        {
+          id: AI_VIDEO_REFERENCE_HANDLE_ID,
+          name: AI_VIDEO_REFERENCE_HANDLE_ID,
+          type: "image",
+          repeated: true,
+        },
+      ],
+      metadata: {
+        refMaxImages: "9",
+        refMaxVideos: "3",
+        refMaxAudios: "3",
+      },
+    });
+
+    const ok = validateWorkflowConnection({
+      connection: {
+        source: "src-video",
+        target: "tgt-video",
+        sourceHandle: AI_VIDEO_OUTPUT_ID,
+        targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+      },
+      nodes: [sourceVideo, targetVideo],
+      edges: [],
+      generativeReferenceCatalogs: {
+        imageModels: [],
+        videoModels: [
+          {
+            canonicalId: "seedance-fast",
+            parameterRules: {
+              schemaVersion: 1,
+              maxReferenceImages: 9,
+              maxImageReferenceBytes: 1,
+              maxReferenceVideos: 3,
+              maxVideoReferenceBytes: 1,
+              maxVideoReferenceSeconds: 60,
+              maxReferenceAudios: 3,
+              maxAudioReferenceBytes: 1,
+              maxAudioReferenceSeconds: 15,
+              promptMaxChars: 1000,
+              generationFields: [],
+            },
+          },
+        ],
+      },
+    });
+
+    expect(ok).toBe(true);
   });
 });

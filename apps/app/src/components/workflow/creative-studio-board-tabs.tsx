@@ -297,7 +297,10 @@ export function CreativeStudioBoardTabs({
         </div>
       ) : null}
 
-      <div className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}>
+      <div
+        className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}
+        data-studio-list-scroll={activeTab}
+      >
         {activeNodes.length === 0 ? (
           <div className="py-8 text-center text-xs italic text-muted-foreground/50">
             {t("workflow.studio.empty")}

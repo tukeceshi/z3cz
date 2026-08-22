@@ -5,7 +5,6 @@ import {
 } from "@dafthunk/types";
 import {
   useNodes,
-  useReactFlow,
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
@@ -43,7 +42,8 @@ import {
   GenerativePickNodeDialog,
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
-import { connectGenerativeReferenceEdge, studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
+import { studioReferenceDropPreviewFromVerdict } from "./generative-reference-utils";
+import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import { AiGenerateButton } from "./ai-generate-button";
 import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
 import {
@@ -112,7 +112,6 @@ export function AiAudioConfigPanel({
     onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
-  const { setEdges } = useReactFlow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
@@ -334,12 +333,8 @@ export function AiAudioConfigPanel({
     ]
   );
 
-  const connectReferenceEdge = useCallback(
-    (connection: Parameters<typeof connectGenerativeReferenceEdge>[1]) => {
-      connectGenerativeReferenceEdge(setEdges, connection);
-    },
-    [setEdges]
-  );
+  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
+    useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
     const edge = edges.find((entry) => entry.id === edgeId);
@@ -350,18 +345,9 @@ export function AiAudioConfigPanel({
   };
 
   const canAcceptStudioReference = useCallback(
-    (sourceNodeId: string, sourceHandle: string) => {
-      const source = typedNodes.find((node) => node.id === sourceNodeId);
-      if (!source) return false;
-      return evaluateAiAudioPromptReferenceStructural({
-        targetNodeId: nodeId,
-        targetNodeMetadata: data.metadata,
-        sourceNodeId,
-        sourceNodeType: source.data.nodeType,
-        edges,
-      }).ok;
-    },
-    [data.metadata, edges, nodeId, typedNodes]
+    (sourceNodeId: string, sourceHandle: string) =>
+      canConnectReference(sourceNodeId, sourceHandle, nodeId),
+    [canConnectReference, nodeId]
   );
 
   const previewStudioReferenceDrop = useCallback(
@@ -390,12 +376,15 @@ export function AiAudioConfigPanel({
       return;
     }
 
-    connectReferenceEdge({
-      source: sourceNodeId,
+    const connection = buildReferenceConnection(
+      sourceNodeId,
       sourceHandle,
-      target: nodeId,
-      targetHandle: AI_AUDIO_PROMPT_HANDLE_ID,
-    });
+      nodeId
+    );
+    if (!connection || !appendReferenceConnection(connection)) {
+      toast.error("workflow.aiAudioPanel.referenceRejected");
+      return;
+    }
     setPickNodeOpen(false);
   };
 

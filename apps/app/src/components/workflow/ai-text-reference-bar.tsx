@@ -73,15 +73,19 @@ function chipMedia(chip: AiTextReferenceChip): WorkflowMediaValue | null {
 export function ReferenceChipMediaThumb({
   chip,
   fallbackIcon,
+  thumbUrl: thumbUrlOverride,
 }: {
   readonly chip: AiTextReferenceChip;
   readonly fallbackIcon: ReactNode;
+  readonly thumbUrl?: string | null;
 }) {
   const media = chipMedia(chip);
-  const thumbUrl = useReferenceThumbUrl({
+  const hookThumbUrl = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
+    paused: thumbUrlOverride !== undefined,
   });
+  const thumbUrl = thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
 
   const mediaContent =
     thumbUrl && (chip.kind === "image" || chip.kind === "video") ? (
@@ -109,15 +113,19 @@ export function ReferenceChipMediaThumb({
 export function ReferenceHoverPreview({
   chip,
   anchor,
+  thumbUrl: thumbUrlOverride,
 }: {
   readonly chip: AiTextReferenceChip;
   readonly anchor: DOMRect;
+  readonly thumbUrl?: string | null;
 }) {
   const media = chipMedia(chip);
-  const thumbUrl = useReferenceThumbUrl({
+  const hookThumbUrl = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
+    paused: thumbUrlOverride !== undefined,
   });
+  const thumbUrl = thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
 
   const style = {
     left: anchor.left + anchor.width / 2,
@@ -178,6 +186,7 @@ export function collectAiTextReferenceChips(params: {
 
 export interface AiTextReferenceBarProps {
   readonly chips: readonly AiTextReferenceChip[];
+  readonly thumbUrls?: ReadonlyMap<string, string | null>;
   readonly disabled?: boolean;
   readonly allowUpload?: boolean;
   readonly addReferenceDisabled?: boolean;
@@ -193,6 +202,7 @@ export interface AiTextReferenceBarProps {
 
 export function AiTextReferenceBar({
   chips,
+  thumbUrls,
   disabled = false,
   allowUpload = false,
   addReferenceDisabled = false,
@@ -386,6 +396,7 @@ export function AiTextReferenceBar({
               <ReferenceChipMediaThumb
                 chip={chip}
                 fallbackIcon={iconForKind[chip.kind]}
+                thumbUrl={thumbUrls?.get(chip.edgeId)}
               />
             </button>
           ) : (
@@ -396,6 +407,7 @@ export function AiTextReferenceBar({
               <ReferenceChipMediaThumb
                 chip={chip}
                 fallbackIcon={iconForKind[chip.kind]}
+                thumbUrl={thumbUrls?.get(chip.edgeId)}
               />
             </div>
           )}

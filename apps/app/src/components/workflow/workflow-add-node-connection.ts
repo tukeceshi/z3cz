@@ -1,11 +1,6 @@
 import type { Connection, Node as ReactFlowNode } from "@xyflow/react";
 
-import { buildAiAudioPromptReferenceConnectionFromCardDrop } from "./ai-audio-prompt-reference";
-import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-prompt-reference";
-import { buildAiImageReferenceConnectionFromCardDrop } from "./ai-image-reference-policy";
-import { buildAiTextReferenceConnectionFromCardDrop } from "./ai-text-reference-policy";
-import { buildAiVideoPromptReferenceConnectionFromCardDrop } from "./ai-video-prompt-reference";
-import { buildAiVideoReferenceConnectionFromCardDrop } from "./ai-video-reference-policy";
+import { buildGenerativeReferenceConnectionFromCardDrop } from "./generative-reference-connection";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AddNodeConnectionDragHandle {
@@ -27,43 +22,10 @@ export function buildReferenceConnectionToNewNode(params: {
     return null;
   }
 
-  const drop =
-    buildAiTextReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    }) ??
-    buildAiImagePromptReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    }) ??
-    buildAiImageReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    }) ??
-    buildAiVideoPromptReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    }) ??
-    buildAiVideoReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    }) ??
-    buildAiAudioPromptReferenceConnectionFromCardDrop({
-      dragFromNodeId: params.dragFromNodeId,
-      dragFromHandle: params.dragFromHandle,
-      hoveredNodeId: params.targetNodeId,
-      nodes: params.nodes,
-    });
-
-  return drop;
+  return buildGenerativeReferenceConnectionFromCardDrop({
+    dragFromNodeId: params.dragFromNodeId,
+    dragFromHandle: params.dragFromHandle,
+    hoveredNodeId: params.targetNodeId,
+    nodes: params.nodes,
+  });
 }

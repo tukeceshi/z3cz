@@ -1,17 +1,9 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import type { Connection, Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import {
-  AI_IMAGE_PROMPT_HANDLE_ID,
-  AI_IMAGE_REFERENCE_HANDLE_ID,
-} from "./ai-image-node-utils";
-import {
-  AI_VIDEO_PROMPT_HANDLE_ID,
-  AI_VIDEO_REFERENCE_HANDLE_ID,
-} from "./ai-video-node-utils";
-import {
   edgeTouchesInputHandle,
+  normalizeGenerativeConnection,
   resolveConnectionEndpoints,
   validateWorkflowConnection,
   type ValidateWorkflowConnectionParams,
@@ -35,47 +27,10 @@ export interface PreparedWorkflowConnectionAppend {
   readonly acceptsMultipleConnections: boolean;
 }
 
-function normalizeGenerativeConnection(
-  connection: Connection,
-  sourceNode: ReactFlowNode<WorkflowNodeType>,
-  targetNode: ReactFlowNode<WorkflowNodeType>
-): Connection {
-  if (
-    targetNode.data.nodeType === AI_IMAGE_NODE_TYPE &&
-    connection.targetHandle === AI_IMAGE_REFERENCE_HANDLE_ID &&
-    sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
-  ) {
-    return { ...connection, targetHandle: AI_IMAGE_PROMPT_HANDLE_ID };
-  }
-
-  if (
-    targetNode.data.nodeType === AI_VIDEO_NODE_TYPE &&
-    connection.targetHandle === AI_VIDEO_REFERENCE_HANDLE_ID &&
-    sourceNode.data.nodeType === AI_TEXT_NODE_TYPE
-  ) {
-    return { ...connection, targetHandle: AI_VIDEO_PROMPT_HANDLE_ID };
-  }
-
-  return connection;
-}
-
 /** Validate and build a workflow edge using an explicit node/edge snapshot. */
 export function prepareWorkflowConnectionAppend(
   params: PrepareWorkflowConnectionAppendParams
 ): PreparedWorkflowConnectionAppend | null {
-  if (
-    !validateWorkflowConnection({
-      connection: params.connection,
-      nodes: params.nodes,
-      edges: params.edges,
-      generativeReferenceCatalogs: params.generativeReferenceCatalogs,
-      extraValidate: params.extraValidate,
-      disabled: params.disabled,
-    })
-  ) {
-    return null;
-  }
-
   const sourceNode = params.nodes.find(
     (node) => node.id === params.connection.source
   );
@@ -91,6 +46,19 @@ export function prepareWorkflowConnectionAppend(
     sourceNode,
     targetNode
   );
+
+  if (
+    !validateWorkflowConnection({
+      connection: normalizedConnection,
+      nodes: params.nodes,
+      edges: params.edges,
+      generativeReferenceCatalogs: params.generativeReferenceCatalogs,
+      extraValidate: params.extraValidate,
+      disabled: params.disabled,
+    })
+  ) {
+    return null;
+  }
 
   const endpoints = resolveConnectionEndpoints(
     normalizedConnection,

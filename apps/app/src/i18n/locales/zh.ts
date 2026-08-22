@@ -3398,6 +3398,7 @@ export const zh: TranslationDictionary = {
       captureLastFrame: "截取尾帧",
       captureCurrentFrame: "截取当前帧",
       captureFrameSuccess: "已创建图片节点「{{nodeName}}」",
+      captureFrameSuccessInSecondary: "已在副编辑器打开「{{nodeName}}」",
       captureFrameFailed: "截取帧失败",
     },
     aiAudioPanel: {

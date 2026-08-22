@@ -6,10 +6,12 @@ import { useMediaDisplayUrlSet } from "@/hooks/use-media-display-url-set";
 export function useReferenceThumbUrl(params: {
   readonly media: WorkflowMediaValue | null;
   readonly nodeType?: "ai-image" | "ai-video";
+  readonly paused?: boolean;
 }): string | null {
   const { urlSet } = useMediaDisplayUrlSet({
     media: params.media,
     nodeType: params.nodeType,
+    paused: params.paused,
   });
 
   return useMemo(() => {

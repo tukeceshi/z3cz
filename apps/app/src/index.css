@@ -651,6 +651,27 @@ html[data-wf-shift-held] .workflow-canvas .wf-node-bottom-panel,
   pointer-events: none;
 }
 
+/* Shift box-select: expand multi-drag rect 30px beyond node bounds (visual + hit area). */
+.workflow-canvas .react-flow__nodesselection-rect {
+  box-sizing: content-box;
+  padding: 30px;
+  margin: -30px;
+  background: transparent !important;
+  border: none !important;
+}
+
+.workflow-canvas .react-flow__nodesselection-rect::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(
+    --xy-selection-background-color,
+    var(--xy-selection-background-color-default)
+  );
+  border: var(--xy-selection-border, var(--xy-selection-border-default));
+}
+
 /* Generative nodes (AI text / AI image): connect-target border light */
 @property --generative-connect-angle {
   syntax: "<angle>";

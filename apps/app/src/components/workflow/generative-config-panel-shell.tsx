@@ -177,8 +177,8 @@ export function GenerativeConfigPanelShell({
   return (
     <div
       className={cn(
-        "nodrag nopan nowheel absolute top-full left-1/2 z-20 -mt-px",
-        "overflow-hidden border border-t-0 border-border/70",
+        "nodrag nopan nowheel absolute top-full left-1/2 z-20 mt-2",
+        "overflow-hidden border border-border/70",
         "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
         GENERATIVE_NODE_PANEL_CLASS
       )}

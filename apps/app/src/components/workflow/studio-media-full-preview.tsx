@@ -11,6 +11,7 @@ import {
   type GenerativeBusyModality,
 } from "./generative-busy-overlay";
 import { useStudioDetailMediaFrameSize } from "./use-studio-detail-media-frame-size";
+import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 export const STUDIO_DETAIL_MEDIA_FRAME =
@@ -38,16 +39,21 @@ function readModality(nodeType: "ai-image" | "ai-video"): GenerativeBusyModality
 function StudioMediaFullItem({
   media,
   nodeType,
+  nodeId,
   onNaturalSize,
   onExpandView,
   displayUrl: displayUrlOverride,
 }: {
   readonly media: MediaReference;
   readonly nodeType: "ai-image" | "ai-video";
+  readonly nodeId: string;
   readonly onNaturalSize?: (width: number, height: number) => void;
   readonly onExpandView?: () => void;
   readonly displayUrl?: string | null;
 }) {
+  const frameCapture = useWorkflowVideoFrameCapture(
+    nodeType === "ai-video" ? nodeId : undefined
+  );
   const resolved = useMediaDisplayUrl({
     media: displayUrlOverride === undefined ? media : null,
     nodeType,
@@ -68,6 +74,10 @@ function StudioMediaFullItem({
         objectFit="contain"
         initialHovered
         className="size-full"
+        showFrameCapture={frameCapture.showFrameCapture}
+        frameCaptureDisabled={frameCapture.frameCaptureDisabled}
+        videoRef={frameCapture.videoRef}
+        onFrameCapture={frameCapture.onFrameCapture}
         onExpandView={onExpandView}
         onLoadedMetadata={(video) => {
           onNaturalSize?.(video.videoWidth, video.videoHeight);
@@ -134,6 +144,7 @@ export function StudioMediaFullPreview({
           <StudioMediaFullItem
             media={media}
             nodeType={nodeType}
+            nodeId={nodeId}
             onNaturalSize={applyPrimaryNaturalSize}
             onExpandView={
               nodeType === "ai-video" ? onVideoExpandView : undefined

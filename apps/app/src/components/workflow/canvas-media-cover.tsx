@@ -15,6 +15,7 @@ import { deleteCachedMediaEntry } from "@/services/ai-media-cache-service";
 import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
+import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 const UNAVAILABLE_DEBOUNCE_MS = 300;
@@ -145,6 +146,8 @@ interface CanvasMediaCoverBaseProps {
   /** When true, video shows s-tier poster only (no hover playback). */
   readonly staticCover?: boolean;
   readonly onExpandView?: () => void;
+  /** Canvas AI video node id — enables frame capture on hover preview. */
+  readonly nodeId?: string;
 }
 
 function CanvasImageCover({
@@ -215,8 +218,10 @@ function CanvasVideoCover({
   onNaturalSize,
   staticCover = false,
   onExpandView,
+  nodeId,
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
+  const frameCapture = useWorkflowVideoFrameCapture(nodeId);
   const [isHovered, setIsHovered] = useState(false);
   const { displayUrl, isCanvasOnScreen, retry } = useCanvasMediaCoverUrl({
     media,
@@ -299,6 +304,10 @@ function CanvasVideoCover({
           objectFit={objectFit}
           initialHovered
           className="absolute inset-0 z-10"
+          showFrameCapture={frameCapture.showFrameCapture}
+          frameCaptureDisabled={frameCapture.frameCaptureDisabled}
+          videoRef={frameCapture.videoRef}
+          onFrameCapture={frameCapture.onFrameCapture}
           onExpandView={onExpandView}
         />
       ) : null}
@@ -338,6 +347,7 @@ export function CanvasMediaCover({
   onNaturalSize,
   staticCover = false,
   onExpandView,
+  nodeId,
 }: CanvasMediaCoverProps) {
   if (nodeType === "ai-video") {
     return (
@@ -350,6 +360,7 @@ export function CanvasMediaCover({
         onNaturalSize={onNaturalSize}
         staticCover={staticCover}
         onExpandView={onExpandView}
+        nodeId={nodeId}
       />
     );
   }

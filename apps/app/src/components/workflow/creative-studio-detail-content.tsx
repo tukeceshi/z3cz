@@ -1146,6 +1146,7 @@ function StudioVideoDetail({
         <StudioVideoLightbox
           open={videoLightboxOpen}
           src={videoDisplayUrl}
+          nodeId={nodeId}
           onClose={() => setVideoLightboxOpen(false)}
         />
       ) : null}
