@@ -19,7 +19,7 @@ import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-e
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
@@ -73,6 +73,10 @@ import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASS
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasMediaCover } from "../../canvas-media-cover";
+import { useWorkflow } from "../../workflow-context";
+import type { BaseWidgetProps } from "../widget";
+import { createWidget } from "../widget";
+
 const StudioImagePhotoProvider = lazy(() =>
   import("../../studio-image-lightbox").then((module) => ({
     default: module.StudioImagePhotoProvider,
@@ -83,9 +87,6 @@ const StudioImageZoomHiddenTrigger = lazy(() =>
     default: module.StudioImageZoomHiddenTrigger,
   }))
 );
-import { useWorkflow } from "../../workflow-context";
-import type { BaseWidgetProps } from "../widget";
-import { createWidget } from "../widget";
 
 interface AiImageWidgetProps extends BaseWidgetProps {
   cardDisplay: GenerativeCardCoverRead<MediaReference>;
@@ -162,12 +163,13 @@ function AiImageWidget({
     coverImage && hasImage ? getResourceIdFromValue(coverImage) : null;
   const canDownloadPrimaryImage =
     Boolean(coverImage) && !primaryImageExpired && hasImage;
-  const { displayUrl: imageDisplayUrl } = useMediaDisplayUrl({
-    media: canDownloadPrimaryImage && coverImage ? coverImage : null,
-    nodeType: "ai-image",
-    size: "full",
-    localOnly: true,
-  });
+  const coverMediaRef =
+    canDownloadPrimaryImage && coverImage ? coverImage : null;
+  const { sharedUrlSet, fullDisplayUrl: imageDisplayUrl } =
+    useGenerativeCardMediaDisplay({
+      media: coverMediaRef,
+      nodeType: "ai-image",
+    });
   const { cardSize, onNaturalSize } = useCanvasCardSize({
     kind: "image",
     hasMedia: hasImage,
@@ -403,6 +405,7 @@ function AiImageWidget({
               fitMode="cover"
               className="h-full w-full rounded-none border-0"
               onNaturalSize={onNaturalSize}
+              sharedUrlSet={sharedUrlSet}
             />
           ) : null}
 

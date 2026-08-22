@@ -31,7 +31,7 @@ export function MediaImageField({
   const mediaKey = media ? getResourceIdFromValue(media) : null;
   const [useFullFallback, setUseFullFallback] = useState(false);
   const effectiveSize = size === "thumb" && useFullFallback ? "full" : size;
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media,
     nodeType: "ai-image",
     size: effectiveSize,
@@ -51,7 +51,20 @@ export function MediaImageField({
     return null;
   }
 
-  if (stale || !displayUrl || imgError) {
+  if (phase === "loading") {
+    return (
+      <div
+        className={cn(
+          "flex h-full min-h-[72px] w-full items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900",
+          className
+        )}
+      >
+        <div className="h-full w-full animate-pulse bg-muted/30" />
+      </div>
+    );
+  }
+
+  if (phase !== "ready" || !displayUrl || imgError) {
     return (
       <div
         className={cn(

@@ -7,16 +7,23 @@ import {
   useStore,
   useViewport,
 } from "@xyflow/react";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useWorkflowGraph } from "@/components/workflow/workflow-context";
+import type { SharedMediaDisplayUrlSet } from "@/hooks/use-media-display-url";
+import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
 import {
+  CANVAS_MEDIA_TIER_SETTLE_MS,
   canvasTierToDisplaySize,
   computeCanvasScreenShortEdge,
   pickCanvasMediaTierWithHysteresis,
   type CanvasMediaTier,
 } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
-import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
+import {
+  resolveMediaDisplayReadiness,
+  type MediaDisplayPhase,
+} from "@/services/media-display-readiness";
 
 import { useMediaDisplayUrlSet } from "./use-media-display-url-set";
 
@@ -105,16 +112,86 @@ function useCanvasMediaTier(): {
   return { tierSize: canvasTierToDisplaySize(tier) };
 }
 
+function resolveLivePickSize(params: {
+  readonly media: WorkflowMediaValue | null;
+  readonly isOffCanvasContext: boolean;
+  readonly isCanvasOnScreen: boolean;
+  readonly tierSize: MediaDisplaySize;
+}): MediaDisplaySize | null {
+  if (!params.media) {
+    return null;
+  }
+
+  if (params.isOffCanvasContext || !params.isCanvasOnScreen) {
+    return "canvas-s";
+  }
+
+  return params.tierSize;
+}
+
+/** Debounced pick size — frozen while panning/zooming, applied after gesture settles. */
+function useSettledCanvasPickSize(
+  livePickSize: MediaDisplaySize | null
+): MediaDisplaySize {
+  const { isViewportMoving } = useWorkflowGraph();
+  const [effectivePickSize, setEffectivePickSize] =
+    useState<MediaDisplaySize>("canvas-s");
+  const settleTimerRef = useRef<number | null>(null);
+  const hadGestureRef = useRef(false);
+
+  useEffect(() => {
+    if (livePickSize == null) {
+      return;
+    }
+
+    if (isViewportMoving) {
+      hadGestureRef.current = true;
+      if (settleTimerRef.current !== null) {
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (!hadGestureRef.current) {
+      setEffectivePickSize(livePickSize);
+      return;
+    }
+
+    hadGestureRef.current = false;
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+    }
+
+    settleTimerRef.current = window.setTimeout(() => {
+      settleTimerRef.current = null;
+      setEffectivePickSize(livePickSize);
+    }, CANVAS_MEDIA_TIER_SETTLE_MS);
+
+    return () => {
+      if (settleTimerRef.current !== null) {
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+    };
+  }, [isViewportMoving, livePickSize]);
+
+  return effectivePickSize;
+}
+
 export function useCanvasMediaCoverUrl(params: {
   readonly media: WorkflowMediaValue | null;
   readonly nodeType: "ai-image" | "ai-video";
   readonly cardWidthPx: number;
   readonly cardHeightPx?: number;
+  readonly sharedUrlSet?: SharedMediaDisplayUrlSet;
 }): {
   readonly displayUrl: string | null;
+  readonly phase: MediaDisplayPhase;
   readonly stale: boolean;
   readonly tierSize: MediaDisplaySize;
   readonly isCanvasOnScreen: boolean;
+  readonly urlSet: MediaDisplayUrlSet;
   readonly retry: () => void;
 } {
   const cardHeightPx = params.cardHeightPx ?? params.cardWidthPx;
@@ -125,36 +202,45 @@ export function useCanvasMediaCoverUrl(params: {
     cardHeightPx
   );
   const { tierSize } = useCanvasMediaTier();
-  const { urlSet, stale, retry } = useMediaDisplayUrlSet({
-    media: params.media,
+  const internalUrlSet = useMediaDisplayUrlSet({
+    media: params.sharedUrlSet ? null : params.media,
     nodeType: params.nodeType,
   });
+  const urlSet = params.sharedUrlSet?.urlSet ?? internalUrlSet.urlSet;
+  const stale = params.sharedUrlSet?.stale ?? internalUrlSet.stale;
+  const retry = params.sharedUrlSet?.retry ?? internalUrlSet.retry;
 
-  const displayUrl = useMemo(() => {
-    if (!params.media) {
-      return null;
-    }
+  const livePickSize = useMemo(
+    () =>
+      resolveLivePickSize({
+        media: params.media,
+        isOffCanvasContext,
+        isCanvasOnScreen,
+        tierSize,
+      }),
+    [isCanvasOnScreen, isOffCanvasContext, params.media, tierSize]
+  );
 
-    const pickSize = (
-      isOffCanvasContext || !isCanvasOnScreen
-        ? "canvas-s"
-        : tierSize
-    ) as MediaDisplaySize;
+  const effectivePickSize = useSettledCanvasPickSize(livePickSize);
 
-    return pickMediaDisplayUrl(urlSet, pickSize);
-  }, [
-    isCanvasOnScreen,
-    isOffCanvasContext,
-    params.media,
-    tierSize,
-    urlSet,
-  ]);
+  const readiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media: params.media,
+        urlSet,
+        size: effectivePickSize,
+        stale,
+      }),
+    [effectivePickSize, params.media, stale, urlSet]
+  );
 
   return {
-    displayUrl,
+    displayUrl: readiness.displayUrl,
+    phase: readiness.phase,
     stale,
-    tierSize,
+    tierSize: effectivePickSize,
     isCanvasOnScreen,
+    urlSet,
     retry,
   };
 }

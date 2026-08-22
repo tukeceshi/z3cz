@@ -3,6 +3,7 @@ import type { GenerativeCardError } from "@dafthunk/types";
 
 import { getResourceIdFromValue } from "@dafthunk/types";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { cn } from "@/utils/utils";
 
 import { GenerativeCardErrorBlock } from "./generative-card-error-block";
@@ -54,15 +55,20 @@ function StudioMediaFullItem({
   const frameCapture = useWorkflowVideoFrameCapture(
     nodeType === "ai-video" ? nodeId : undefined
   );
+  const hasDisplayOverride = displayUrlOverride !== undefined;
   const resolved = useMediaDisplayUrl({
-    media: displayUrlOverride === undefined ? media : null,
+    media: hasDisplayOverride ? null : media,
     nodeType,
     size: "full",
   });
   const displayUrl = displayUrlOverride ?? resolved.displayUrl;
-  const stale = displayUrlOverride === undefined ? resolved.stale : false;
+  const phase: MediaDisplayPhase = hasDisplayOverride
+    ? displayUrlOverride
+      ? "ready"
+      : "missing"
+    : resolved.phase;
 
-  if (stale || !displayUrl) {
+  if (phase !== "ready" || !displayUrl) {
     return null;
   }
 

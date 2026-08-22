@@ -5,9 +5,53 @@ import {
 import { useMemo } from "react";
 
 import type { MediaDisplaySize } from "@/services/media-display-size";
-import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
+import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
+import {
+  resolveMediaDisplayReadiness,
+  type MediaDisplayPhase,
+} from "@/services/media-display-readiness";
 
 import { useMediaDisplayUrlSet } from "./use-media-display-url-set";
+
+export interface SharedMediaDisplayUrlSet {
+  readonly urlSet: MediaDisplayUrlSet;
+  readonly stale: boolean;
+  readonly retry: () => void;
+}
+
+/** One fetch layer + full-size readiness for generative canvas cards. */
+export function useGenerativeCardMediaDisplay(params: {
+  readonly media: WorkflowMediaValue | null;
+  readonly nodeType: "ai-image" | "ai-video";
+}): {
+  readonly sharedUrlSet: SharedMediaDisplayUrlSet;
+  readonly fullDisplayUrl: string | null;
+} {
+  const { urlSet, stale, retry } = useMediaDisplayUrlSet({
+    media: params.media,
+    nodeType: params.nodeType,
+  });
+  const sharedUrlSet = useMemo(
+    () => ({ urlSet, stale, retry }),
+    [urlSet, stale, retry]
+  );
+  const fullReadiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media: params.media,
+        urlSet,
+        size: "full",
+        stale,
+      }),
+    [params.media, stale, urlSet]
+  );
+
+  return {
+    sharedUrlSet,
+    fullDisplayUrl:
+      fullReadiness.phase === "ready" ? fullReadiness.displayUrl : null,
+  };
+}
 
 interface UseMediaDisplayUrlParams {
   readonly media: WorkflowMediaValue | null;
@@ -26,6 +70,7 @@ export function useMediaDisplayUrl({
   paused = false,
 }: UseMediaDisplayUrlParams): {
   readonly displayUrl: string | null;
+  readonly phase: MediaDisplayPhase;
   readonly stale: boolean;
   readonly retry: () => void;
 } {
@@ -35,14 +80,23 @@ export function useMediaDisplayUrl({
     paused,
   });
 
-  const displayUrl = useMemo(() => {
-    if (!media) {
-      return null;
-    }
-    return pickMediaDisplayUrl(urlSet, size);
-  }, [media, size, urlSet]);
+  const readiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media,
+        urlSet,
+        size,
+        stale,
+      }),
+    [media, size, stale, urlSet]
+  );
 
-  return { displayUrl, stale, retry };
+  return {
+    displayUrl: readiness.displayUrl,
+    phase: readiness.phase,
+    stale,
+    retry,
+  };
 }
 
 export function resolveMediaFromValue(

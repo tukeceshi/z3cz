@@ -8,6 +8,7 @@ import Play from "lucide-react/icons/play";
 import Video from "lucide-react/icons/video";
 import { useState, type ReactNode } from "react";
 
+import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { cn } from "@/utils/utils";
 
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
@@ -54,7 +55,7 @@ function CreativeStudioMediaPreviewSlot({
 export interface CreativeStudioMediaPreviewFrameProps {
   readonly media: MediaReference | null;
   readonly displayUrl: string | null;
-  readonly stale: boolean;
+  readonly phase: MediaDisplayPhase;
   readonly isVideo: boolean;
   readonly referenceDragEnabled?: boolean;
   readonly fallbackMessage?: string;
@@ -189,7 +190,7 @@ export function StudioMediaEmptyPreview({
 export function CreativeStudioMediaPreviewFrame({
   media,
   displayUrl,
-  stale,
+  phase,
   isVideo,
   referenceDragEnabled = false,
   fallbackMessage,
@@ -197,12 +198,12 @@ export function CreativeStudioMediaPreviewFrame({
 }: CreativeStudioMediaPreviewFrameProps) {
   const [aspectRatio, setAspectRatio] = useState(DEFAULT_ASPECT_RATIO);
 
-  if (!media || stale || !displayUrl) {
+  if (!media || phase !== "ready" || !displayUrl) {
     return (
       <CreativeStudioMediaPreviewPlaceholder
         isVideo={isVideo}
         message={fallbackMessage}
-        busy={fallbackBusy}
+        busy={fallbackBusy || phase === "loading"}
       />
     );
   }
