@@ -124,8 +124,9 @@ export function LoginDialogProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // /login then sends admins to /admin and everyone else to the org console
   const oauthReturnTo = state.goToConsole
-    ? "/org"
+    ? "/login"
     : state.returnTo ??
       (typeof window === "undefined"
         ? undefined

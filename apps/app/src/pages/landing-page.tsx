@@ -125,7 +125,7 @@ export function LandingPage() {
     }
     if (!isAuthenticated) {
       openLogin({
-        goToConsole: false,
+        goToConsole: !invitation,
         dismissible: true,
         subAccountInvitationId: invitation ?? undefined,
       });
@@ -137,7 +137,7 @@ export function LandingPage() {
   }, [isAuthenticated, openLogin, searchParams, setSearchParams]);
 
   const handleLogin = () => {
-    openLogin({ goToConsole: false, dismissible: true });
+    openLogin({ goToConsole: true, dismissible: true });
   };
 
   const githubLink = (className: string) => (
