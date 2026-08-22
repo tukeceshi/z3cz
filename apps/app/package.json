@@ -54,7 +54,7 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-table": "^8.21.3",
-    "@xyflow/react": "^12.10.2",
+    "@xyflow/react": "^12.11.3",
     "date-fns": "^4.1.0",
     "gsap": "^3.13.0",
     "lucide-react": "^0.562.0",
