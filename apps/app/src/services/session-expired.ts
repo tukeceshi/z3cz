@@ -1,5 +1,7 @@
 import { mutate } from "swr";
 
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
+
 import { AUTH_USER_KEY } from "@/components/auth-context";
 import { requestLoginDialog } from "@/components/login-dialog-bridge";
 import { buildApiUrl } from "@/config/api";
@@ -7,6 +9,10 @@ import { buildApiUrl } from "@/config/api";
 let isHandlingSessionExpired = false;
 
 export async function handleSessionExpired(): Promise<void> {
+  if (getCanvasMaintenanceFrozen()) {
+    return;
+  }
+
   if (isHandlingSessionExpired || typeof window === "undefined") {
     return;
   }

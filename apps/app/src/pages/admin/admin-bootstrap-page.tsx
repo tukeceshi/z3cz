@@ -164,7 +164,19 @@ function BootstrapSettingsForm({
       await updateAdminBootstrapConfig(buildPayload());
       const result = await syncAdminBootstrapShell();
       await onRefresh();
-      appToast.success(result.message);
+      const syncMessage =
+        result.uploadedCount === 0 &&
+        result.prunedCount === 0 &&
+        result.skippedCount > 0
+          ? t("bootstrapAdmin.syncUpToDate", {
+              skipped: result.skippedCount,
+            })
+          : t("bootstrapAdmin.syncComplete", {
+              uploaded: result.uploadedCount,
+              skipped: result.skippedCount,
+              pruned: result.prunedCount,
+            });
+      appToast.success(syncMessage);
     } catch (error) {
       await onRefresh();
       appToast.error(
@@ -234,6 +246,9 @@ function BootstrapSettingsForm({
         </Select>
         <p className="text-xs text-muted-foreground">
           {t("bootstrapAdmin.storageProviderHint")}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {t("bootstrapAdmin.bucketDedicatedHint")}
         </p>
       </div>
 

@@ -40,6 +40,7 @@ import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
+import { useOptionalCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
 import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
 import { InlineAiTextMigrationHost } from "./inline-ai-text-migration-host";
 import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
@@ -266,6 +267,8 @@ export function WorkflowBuilder({
   const { t } = useTranslation();
   const appToast = useAppToast();
   const readOnly = mode !== "edit";
+  const canvasMaintenance = useOptionalCanvasMaintenance();
+  const isCanvasFrozen = canvasMaintenance?.isCanvasFrozen ?? false;
   const interactive = mode !== "preview";
   const sidebarEnabled = showSidebar ?? interactive;
 
@@ -337,6 +340,7 @@ export function WorkflowBuilder({
     organizationId: orgId,
     workflowId,
     graphReady,
+    enabled: !isCanvasFrozen,
     nodes,
     setNodes,
   });
@@ -823,7 +827,7 @@ export function WorkflowBuilder({
             />
           ) : null}
           <div className="w-full h-full min-h-0 flex flex-col">
-          <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly}>
+          <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
             <InlineAiTextMigrationHost
               organizationId={orgId}
               workflowId={workflowId}

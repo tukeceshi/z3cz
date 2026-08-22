@@ -211,9 +211,9 @@ export class VolcengineTosClient {
     }
   }
 
-  async getObject(params: {
+  async tryGetObject(params: {
     readonly key: string;
-  }): Promise<{ readonly data: Uint8Array; readonly mimeType: string }> {
+  }): Promise<{ readonly data: Uint8Array; readonly mimeType: string } | null> {
     const bucket = this.requireBucket();
     const { endpoint, path } = buildBucketObjectRequestPath(
       this.credentials.region,
@@ -226,8 +226,13 @@ export class VolcengineTosClient {
       path,
     });
 
+    if (response.status === 404) {
+      return null;
+    }
+
     if (!response.ok) {
-      throw new Error(`TOS read failed (${response.status})`);
+      const text = await response.text();
+      throwTosRequestError(response.status, text, "get object");
     }
 
     const mimeType =
@@ -235,6 +240,60 @@ export class VolcengineTosClient {
       "application/octet-stream";
     const data = new Uint8Array(await response.arrayBuffer());
     return { data, mimeType };
+  }
+
+  async getObject(params: {
+    readonly key: string;
+  }): Promise<{ readonly data: Uint8Array; readonly mimeType: string }> {
+    const result = await this.tryGetObject(params);
+    if (!result) {
+      throw new Error(`TOS read failed (404)`);
+    }
+    return result;
+  }
+
+  async deleteObject(params: { readonly key: string }): Promise<void> {
+    const bucket = this.requireBucket();
+    const { endpoint, path } = buildBucketObjectRequestPath(
+      this.credentials.region,
+      bucket,
+      params.key
+    );
+    const response = await this.signedFetch({
+      method: "DELETE",
+      endpoint,
+      path,
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const text = await response.text();
+      throwTosRequestError(response.status, text, "delete object");
+    }
+  }
+
+  async listObjectKeys(): Promise<readonly string[]> {
+    const bucket = this.requireBucket();
+    const response = await this.signedFetch({
+      method: "GET",
+      endpoint: buildTosBucketEndpoint(this.credentials.region, bucket),
+      path: "/",
+      queryEntries: [["list-type", "2"]],
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throwTosRequestError(response.status, text, "list objects");
+    }
+
+    const payload = await response.text();
+    const keys: string[] = [];
+    const regex = /<Key>([^<]+)<\/Key>/g;
+    let match = regex.exec(payload);
+    while (match) {
+      keys.push(match[1]!);
+      match = regex.exec(payload);
+    }
+    return keys;
   }
 
   buildObjectKey(params: {

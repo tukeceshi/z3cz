@@ -20,6 +20,10 @@ const updateSiteSettingsSchema = z.object({
     .optional(),
   newUserTourEnabled: z.boolean().optional(),
   wsBootstrapEnabled: z.boolean().optional(),
+  maintenanceEnabled: z.boolean().optional(),
+  maintenanceMessage: z
+    .union([z.string().trim().max(2000), z.literal(""), z.null()])
+    .optional(),
 });
 adminSettingsRoutes.get("/", async (c) => {
   const db = createDatabase(c.env);
@@ -59,6 +63,15 @@ adminSettingsRoutes.patch(
         : {}),
       ...(body.wsBootstrapEnabled !== undefined
         ? { wsBootstrapEnabled: body.wsBootstrapEnabled }
+        : {}),
+      ...(body.maintenanceEnabled !== undefined
+        ? { maintenanceEnabled: body.maintenanceEnabled }
+        : {}),
+      ...(body.maintenanceMessage !== undefined
+        ? {
+            maintenanceMessage:
+              body.maintenanceMessage === "" ? null : body.maintenanceMessage,
+          }
         : {}),
     };
 

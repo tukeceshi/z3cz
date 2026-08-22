@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   updateAdminSiteSettings,
   useAdminSiteSettings,
@@ -34,6 +35,8 @@ export function AdminSettingsPage() {
   const [siteTagline, setSiteTagline] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [newUserTourEnabled, setNewUserTourEnabled] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -49,6 +52,8 @@ export function AdminSettingsPage() {
     setSiteTagline(settings.siteTagline);
     setSupportEmail(settings.supportEmail ?? "");
     setNewUserTourEnabled(settings.newUserTourEnabled);
+    setMaintenanceEnabled(settings.maintenanceEnabled);
+    setMaintenanceMessage(settings.maintenanceMessage ?? "");
   }, [settings]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -60,6 +65,10 @@ export function AdminSettingsPage() {
       siteTagline: siteTagline.trim(),
       supportEmail: supportEmail.trim() ? supportEmail.trim() : null,
       newUserTourEnabled,
+      maintenanceEnabled,
+      maintenanceMessage: maintenanceMessage.trim()
+        ? maintenanceMessage.trim()
+        : null,
     };
 
     try {
@@ -166,6 +175,38 @@ export function AdminSettingsPage() {
                 checked={newUserTourEnabled}
                 onCheckedChange={setNewUserTourEnabled}
               />
+            </div>
+
+            <div className="rounded-lg border px-4 py-3 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    {t("siteSettings.maintenanceToggle")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("siteSettings.maintenanceHint")}
+                  </p>
+                </div>
+                <Switch
+                  checked={maintenanceEnabled}
+                  onCheckedChange={setMaintenanceEnabled}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="maintenanceMessage">
+                  {t("siteSettings.maintenanceMessage")}
+                </Label>
+                <Textarea
+                  id="maintenanceMessage"
+                  value={maintenanceMessage}
+                  onChange={(event) => setMaintenanceMessage(event.target.value)}
+                  placeholder={t("siteSettings.maintenanceMessagePlaceholder")}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("siteSettings.maintenanceMessageHelp")}
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end">

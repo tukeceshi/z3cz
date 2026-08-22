@@ -568,6 +568,13 @@
       "when": 1789880000000,
       "tag": "0085_allow_duplicate_ai_interface_names",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1789960000000,
+      "tag": "0086_maintenance_mode",
+      "breakpoints": true
     }
   ]
 }

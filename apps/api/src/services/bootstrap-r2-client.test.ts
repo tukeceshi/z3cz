@@ -5,6 +5,8 @@ import {
   buildBootstrapR2ObjectKey,
   buildBootstrapR2PublicUrl,
   contentTypeForBootstrapAsset,
+  findNonBootstrapAccelerationObjectKeys,
+  isBootstrapAccelerationObjectKey,
 } from "./bootstrap-r2-client";
 
 describe("bootstrap-r2-client path helpers", () => {
@@ -40,5 +42,26 @@ describe("bootstrap-r2-client path helpers", () => {
       "image/jpeg"
     );
     expect(contentTypeForBootstrapAsset("/landing/clip.mp4")).toBe("video/mp4");
+  });
+
+  it("recognizes bootstrap acceleration object keys", () => {
+    expect(isBootstrapAccelerationObjectKey("bootstrap-manifest.json")).toBe(
+      true
+    );
+    expect(isBootstrapAccelerationObjectKey("shell-deadbeef.gz")).toBe(true);
+    expect(
+      isBootstrapAccelerationObjectKey("prefetch-shared-deadbeef.gz")
+    ).toBe(true);
+    expect(isBootstrapAccelerationObjectKey("landing/dollface.jpg")).toBe(true);
+    expect(isBootstrapAccelerationObjectKey("other/file.txt")).toBe(false);
+  });
+
+  it("finds foreign bucket keys", () => {
+    expect(
+      findNonBootstrapAccelerationObjectKeys([
+        "shell-deadbeef.gz",
+        "other/file.txt",
+      ])
+    ).toEqual(["other/file.txt"]);
   });
 });

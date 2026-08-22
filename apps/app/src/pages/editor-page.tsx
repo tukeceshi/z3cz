@@ -19,6 +19,8 @@ import { readInitialViewportOneToOne } from "@/components/workflow/workflow-edit
 import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-editor-sidebar-effect";
 import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
+import { CanvasMaintenanceProvider, useCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -46,6 +48,14 @@ export function EditorPage() {
 }
 
 function EditorPageContent() {
+  return (
+    <CanvasMaintenanceProvider>
+      <EditorPageCanvas />
+    </CanvasMaintenanceProvider>
+  );
+}
+
+function EditorPageCanvas() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,6 +65,7 @@ function EditorPageContent() {
   const { organization } = useAuth();
   const workflowReadOnly = !canEditWorkflows(organization);
   const { t } = useTranslation();
+  const { refreshMaintenanceStatus } = useCanvasMaintenance();
   const appToast = useAppToast();
   const orgId = organization?.id || "";
   const { getOrgUrl } = useOrgUrl();
@@ -118,6 +129,9 @@ function EditorPageContent() {
       } else {
         setLatestExecution(execution);
       }
+    },
+    onWorkflowSync: () => {
+      void refreshMaintenanceStatus();
     },
   });
 
@@ -211,6 +225,9 @@ function EditorPageContent() {
   );
 
   useEffect(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
     if (workflowSavingError) {
       appToast.error("errors.workflowSaveFailed", {
         message: workflowSavingError,
@@ -219,6 +236,9 @@ function EditorPageContent() {
   }, [workflowSavingError, appToast]);
 
   useEffect(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
     if (workflowConnectionError) {
       appToast.error("errors.connectionFailed", {
         message: workflowConnectionError,

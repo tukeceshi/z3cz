@@ -405,6 +405,22 @@ export const en = {
     newUserTourToggle: "New user tour",
     newUserTourHint:
       "When enabled, new users with no workflows see the in-app guided tour on first visit.",
+    maintenanceToggle: "Maintenance mode",
+    maintenanceHint:
+      "When enabled, homepage visitors see a maintenance page and open canvas sessions show a blocking overlay.",
+    maintenanceMessage: "Maintenance message",
+    maintenanceMessagePlaceholder: "The system is under maintenance. Please try again later.",
+    maintenanceMessageHelp: "Leave empty to use the default maintenance message.",
+  },
+  maintenance: {
+    canvasTitle: "System maintenance",
+    canvasDefaultMessage: "The system is under maintenance. Canvas editing is paused.",
+    canvasStatusRefresh: "Refresh status",
+    canvasStatusFetchFailed:
+      "Unable to reach the service. Maintenance may still be in progress. Please try again.",
+    homepageTitle: "System maintenance",
+    homepageDefaultMessage: "The system is under maintenance. Please try again later.",
+    homepageRefresh: "Refresh",
   },
   competitorPricing: {
     title: "Competitor pricing",
@@ -481,6 +497,8 @@ export const en = {
     storageProvider: "Storage",
     storageProviderHint:
       "Choose R2 or TOS. Switching clears the last sync and turns off storage-only until you sync again.",
+    bucketDedicatedHint:
+      "Use a dedicated bucket for bootstrap acceleration only. Old synced files are removed automatically.",
     storageProviderR2: "Cloudflare R2",
     storageProviderTos: "Volcengine TOS",
     r2Credentials: "R2 credentials",
@@ -505,6 +523,9 @@ export const en = {
     syncShell: "Sync now",
     syncing: "Syncing…",
     syncError: "Sync failed.",
+    syncUpToDate: "Already up to date ({{skipped}} skipped).",
+    syncComplete:
+      "Sync complete: {{uploaded}} uploaded, {{skipped}} skipped, {{pruned}} pruned.",
     syncStatusTitle: "Last sync",
     lastSyncAt: "Last sync",
     lastSyncShellHash: "Shell hash",

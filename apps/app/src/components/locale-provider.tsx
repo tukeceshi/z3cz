@@ -46,6 +46,8 @@ const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   supportEmail: null,
   newUserTourEnabled: false,
   wsBootstrapEnabled: false,
+  maintenanceEnabled: false,
+  maintenanceMessage: null,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 

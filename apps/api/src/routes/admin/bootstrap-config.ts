@@ -24,10 +24,21 @@ import {
   resolveBootstrapR2SecretAccessKey,
 } from "../../services/bootstrap-settings";
 import { createBootstrapTosClient } from "../../services/bootstrap-storage-sources";
+import { inspectBootstrapBucketContent } from "../../services/bootstrap-storage-check";
 import {
   markBootstrapSyncResult,
   syncBootstrapShellToR2,
 } from "../../services/bootstrap-sync-service";
+
+function appendBootstrapMessage(
+  baseMessage: string,
+  extra: string | null
+): string {
+  if (!extra) {
+    return baseMessage;
+  }
+  return `${baseMessage} ${extra}`;
+}
 
 const adminBootstrapConfigRoutes = new Hono<ApiContext>();
 
@@ -125,10 +136,17 @@ adminBootstrapConfigRoutes.post("/test-r2", async (c) => {
       const client = await createBootstrapTosClient(settings, c.env);
       await client.headBucket();
       const cors = await ensureBootstrapR2CorsIfConfigured(settings, c.env);
+      const bucketWarning = await inspectBootstrapBucketContent(
+        settings,
+        c.env
+      ).catch(() => null);
 
       return c.json({
         ok: true,
-        message: formatBootstrapCorsMessage("TOS connection successful", cors),
+        message: appendBootstrapMessage(
+          formatBootstrapCorsMessage("TOS connection successful", cors),
+          bucketWarning
+        ),
       });
     }
 
@@ -156,10 +174,17 @@ adminBootstrapConfigRoutes.post("/test-r2", async (c) => {
     });
 
     const cors = await ensureBootstrapR2CorsIfConfigured(settings, c.env);
+    const bucketWarning = await inspectBootstrapBucketContent(
+      settings,
+      c.env
+    ).catch(() => null);
 
     return c.json({
       ok: true,
-      message: formatBootstrapCorsMessage("R2 connection successful", cors),
+      message: appendBootstrapMessage(
+        formatBootstrapCorsMessage("R2 connection successful", cors),
+        bucketWarning
+      ),
     });
   } catch (error) {
     const message =

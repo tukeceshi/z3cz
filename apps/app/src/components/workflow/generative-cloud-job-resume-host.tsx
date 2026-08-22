@@ -36,6 +36,7 @@ import {
   withAiVideoGeneratingFlag,
   withAiVideoStagingPreview,
 } from "@/components/workflow/ai-video-node-utils";
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { prepareGenerativeCardError } from "@/components/workflow/prepare-generative-card-error";
 import { readGenerativePrompt } from "@/components/workflow/generative-card-upload-utils";
@@ -114,7 +115,7 @@ export function GenerativeCloudJobResumeHost({
   }, [nodeId, updateNodeData]);
 
   const shouldAbortJobPoll = useCallback(
-    () => isNodeGenerationCancelled(nodeId),
+    () => isNodeGenerationCancelled(nodeId) || getCanvasMaintenanceFrozen(),
     [nodeId]
   );
 
@@ -293,6 +294,9 @@ export function GenerativeCloudJobResumeHost({
 
   const handleResumeError = useCallback(
     (error: unknown) => {
+      if (getCanvasMaintenanceFrozen()) {
+        return;
+      }
       if (
         isGenerativeGenerationCancelled(error) ||
         isNodeGenerationCancelled(nodeId)
@@ -365,7 +369,7 @@ export function GenerativeCloudJobResumeHost({
                 (item) => item.audios
               ),
             ],
-    enabled: !disabled,
+    enabled: !disabled && !getCanvasMaintenanceFrozen(),
     holdClear: isGenerativePersistPhase(
       readGenerativeProgressPhase(data.metadata)
     ),
@@ -380,7 +384,7 @@ export function GenerativeCloudJobResumeHost({
     metadata: data.metadata,
     isGenerating: isResuming,
     persistPhase,
-    autoResume: !disabled,
+    autoResume: !disabled && !getCanvasMaintenanceFrozen(),
     resumeJobId: readResumeJobId(modality, data.metadata, data.inputs),
     updateNodeData,
     setPersistPhase,
@@ -389,7 +393,7 @@ export function GenerativeCloudJobResumeHost({
     onStaged: handleStaged,
     onResumeSuccess: handleResumeSuccess,
     onResumeError: handleResumeError,
-    shouldAbortJobPoll: modality === "video" ? shouldAbortJobPoll : undefined,
+    shouldAbortJobPoll,
   });
 
   return null;

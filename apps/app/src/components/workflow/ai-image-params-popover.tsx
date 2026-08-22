@@ -2,12 +2,10 @@ import {
   applyAiImageRatioToPrompt as applyAiImageRatioToPromptFromTypes,
   formatImageGenerationOptionLabel,
   mergeImageGenerationParams,
-  resolveDurationOptions,
   resolveGenerateCountOptions,
   resolveImageGenerateCount,
+  resolveNumericEnumBounds,
   sanitizeImageGenerationParams,
-  VIDEO_DURATION_MAX,
-  VIDEO_DURATION_MIN,
   type UpstreamParamProfileField,
 } from "@dafthunk/types";
 import Volume2Icon from "lucide-react/icons/volume-2";
@@ -298,19 +296,6 @@ function coerceFieldValue(
   return raw;
 }
 
-function resolveDurationBounds(field: UpstreamParamProfileField): {
-  readonly min: number;
-  readonly max: number;
-} {
-  const options = resolveDurationOptions(field)
-    .map((entry) => Number(entry))
-    .filter((entry) => Number.isFinite(entry));
-  if (options.length === 0) {
-    return { min: VIDEO_DURATION_MIN, max: VIDEO_DURATION_MAX };
-  }
-  return { min: Math.min(...options), max: Math.max(...options) };
-}
-
 function clampDuration(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -349,7 +334,7 @@ function DurationFieldSection({
   disabled = false,
   onChange,
 }: DurationFieldSectionProps) {
-  const { min: durationMin, max: durationMax } = resolveDurationBounds(field);
+  const { min: durationMin, max: durationMax } = resolveNumericEnumBounds(field);
   const committed = readCommittedDuration(
     value,
     field,
