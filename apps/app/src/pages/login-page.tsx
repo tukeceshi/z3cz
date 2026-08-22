@@ -52,7 +52,7 @@ export function LoginPage() {
     }
     openLogin({
       dismissible: true,
-      goToConsole: false,
+      goToConsole: !subAccountInvitation,
       subAccountInvitationId: subAccountInvitation ?? undefined,
     });
   }, [
