@@ -28,6 +28,9 @@ export const CANVAS_TIER_RATIO = {
 /** Skip loading when on-screen edge is smaller than this. */
 export const CANVAS_MEDIA_MIN_DISPLAY_PX = 40;
 
+/** Wait after pan/zoom ends before swapping canvas cover tiers. */
+export const CANVAS_MEDIA_TIER_SETTLE_MS = 250;
+
 export function computeCanvasScreenShortEdge(
   viewportZoom: number,
   devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio : 1

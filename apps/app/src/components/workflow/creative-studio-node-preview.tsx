@@ -17,6 +17,7 @@ import { useMemo } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
@@ -76,13 +77,13 @@ function StudioVideoPreview({
   readonly variant: "card" | "detail";
   readonly className?: string;
 }) {
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media,
     nodeType: "ai-video",
     size: variant === "card" ? "thumb" : "full",
   });
 
-  if (stale || !displayUrl) {
+  if (phase !== "ready" || !displayUrl) {
     return (
       <div
         className={cn(
@@ -142,9 +143,16 @@ function StudioAudioPreview({
     size: variant === "card" ? "thumb" : "full",
   });
   const displayUrl = displayUrlOverride ?? resolved.displayUrl;
-  const stale = staleOverride ?? resolved.stale;
+  const phase: MediaDisplayPhase =
+    displayUrlOverride !== undefined
+      ? staleOverride
+        ? "loading"
+        : displayUrlOverride
+          ? "ready"
+          : "missing"
+      : resolved.phase;
 
-  if (stale || !displayUrl) {
+  if (phase !== "ready" || !displayUrl) {
     return (
       <div
         className={cn(
@@ -222,8 +230,15 @@ function StudioDetailMediaPreview({
     size: "full",
   });
   const displayUrl = detailDisplayUrl ?? resolved.displayUrl;
-  const stale = detailDisplayStale ?? resolved.stale;
-  const canPreview = media != null && displayUrl != null && !stale;
+  const phase: MediaDisplayPhase =
+    detailDisplayUrl !== undefined
+      ? detailDisplayStale
+        ? "loading"
+        : detailDisplayUrl
+          ? "ready"
+          : "missing"
+      : resolved.phase;
+  const canPreview = media != null && phase === "ready" && displayUrl != null;
   const isBusy = cardState.isBusy || uploading;
 
   const busyOverlay = (

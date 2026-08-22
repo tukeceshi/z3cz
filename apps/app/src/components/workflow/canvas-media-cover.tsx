@@ -4,14 +4,15 @@ import {
 } from "@dafthunk/types";
 import MusicIcon from "lucide-react/icons/music";
 import PlayIcon from "lucide-react/icons/play";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useCanvasMediaCoverUrl } from "@/hooks/use-canvas-media-cover-url";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import type { SharedMediaDisplayUrlSet } from "@/hooks/use-media-display-url";
 import { deleteCachedMediaEntry } from "@/services/ai-media-cache-service";
+import { resolveMediaDisplayReadiness } from "@/services/media-display-readiness";
 import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
@@ -22,6 +23,22 @@ const UNAVAILABLE_DEBOUNCE_MS = 300;
 const BROKEN_MEDIA_RETRY_BEFORE_PURGE = 2;
 
 const decodedDisplayUrlCache = new Set<string>();
+
+function prefetchDecodedDisplayUrls(
+  urls: readonly (string | null | undefined)[]
+): void {
+  for (const url of urls) {
+    if (!url || decodedDisplayUrlCache.has(url)) {
+      continue;
+    }
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      decodedDisplayUrlCache.add(url);
+    };
+    img.src = url;
+  }
+}
 
 function useBrokenMediaRecovery(params: {
   readonly media: MediaReference;
@@ -64,52 +81,210 @@ function useBrokenMediaRecovery(params: {
   }, [displayUrl, media, orgId, retry, workflowId]);
 }
 
+const CANVAS_TIER_CROSSFADE_MS = 200;
+
+function decodeDisplayUrl(
+  url: string,
+  onReady: () => void,
+  onError: () => void
+): () => void {
+  if (decodedDisplayUrlCache.has(url)) {
+    onReady();
+    return () => {};
+  }
+
+  let cancelled = false;
+  const img = new Image();
+  img.decoding = "async";
+  img.onload = () => {
+    if (cancelled) {
+      return;
+    }
+    decodedDisplayUrlCache.add(url);
+    onReady();
+  };
+  img.onerror = () => {
+    if (!cancelled) {
+      onError();
+    }
+  };
+  img.src = url;
+
+  return () => {
+    cancelled = true;
+    img.onload = null;
+    img.onerror = null;
+  };
+}
+
 function useDecodedDisplayUrl(params: {
   readonly displayUrl: string | null;
   readonly onBroken: () => void;
+  /** Keep showing the last decoded frame while displayUrl is temporarily null. */
+  readonly retainOnNull?: boolean;
 }): {
-  readonly imgSrc: string | null;
-  readonly imageReady: boolean;
+  readonly baseSrc: string | null;
+  readonly overlaySrc: string | null;
+  readonly overlayVisible: boolean;
+  readonly hasImage: boolean;
+  readonly onOverlayTransitionEnd: () => void;
 } {
-  const { displayUrl, onBroken } = params;
-  const [imageReady, setImageReady] = useState(() =>
-    Boolean(displayUrl && decodedDisplayUrlCache.has(displayUrl))
-  );
+  const { displayUrl, onBroken, retainOnNull = false } = params;
+  const [baseSrc, setBaseSrc] = useState<string | null>(() => {
+    if (displayUrl && decodedDisplayUrlCache.has(displayUrl)) {
+      return displayUrl;
+    }
+    return null;
+  });
+  const [overlaySrc, setOverlaySrc] = useState<string | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const targetUrlRef = useRef<string | null>(displayUrl);
+  const baseSrcRef = useRef(baseSrc);
+  baseSrcRef.current = baseSrc;
 
   useEffect(() => {
+    targetUrlRef.current = displayUrl;
+
     if (!displayUrl) {
-      setImageReady(false);
+      if (!retainOnNull) {
+        setBaseSrc(null);
+        setOverlaySrc(null);
+        setOverlayVisible(false);
+      }
       return;
     }
 
-    if (decodedDisplayUrlCache.has(displayUrl)) {
-      setImageReady(true);
+    const reveal = (url: string) => {
+      if (targetUrlRef.current !== url) {
+        return;
+      }
+
+      const currentBase = baseSrcRef.current;
+      if (!currentBase) {
+        setOverlaySrc(null);
+        setOverlayVisible(false);
+        setBaseSrc(url);
+        return;
+      }
+
+      if (currentBase === url) {
+        setOverlaySrc(null);
+        setOverlayVisible(false);
+        return;
+      }
+
+      setOverlaySrc(url);
+      setOverlayVisible(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (targetUrlRef.current === url) {
+            setOverlayVisible(true);
+          }
+        });
+      });
+    };
+
+    return decodeDisplayUrl(displayUrl, () => reveal(displayUrl), onBroken);
+  }, [displayUrl, onBroken, retainOnNull]);
+
+  const onOverlayTransitionEnd = useCallback(() => {
+    if (!overlayVisible) {
       return;
     }
+    setOverlaySrc((currentOverlay) => {
+      if (!currentOverlay) {
+        return null;
+      }
+      setBaseSrc(currentOverlay);
+      return null;
+    });
+    setOverlayVisible(false);
+  }, [overlayVisible]);
 
-    setImageReady(false);
-    let cancelled = false;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-      if (cancelled) return;
-      decodedDisplayUrlCache.add(displayUrl);
-      setImageReady(true);
-    };
-    img.onerror = () => {
-      if (cancelled) return;
-      onBroken();
-    };
-    img.src = displayUrl;
+  return {
+    baseSrc,
+    overlaySrc,
+    overlayVisible,
+    hasImage: baseSrc != null || overlaySrc != null,
+    onOverlayTransitionEnd,
+  };
+}
 
-    return () => {
-      cancelled = true;
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [displayUrl, onBroken]);
+function handleCoverImageLoad(
+  event: SyntheticEvent<HTMLImageElement>,
+  onNaturalSize?: (width: number, height: number) => void
+): void {
+  const img = event.currentTarget;
+  const loadedSrc = img.currentSrc || img.src;
+  if (loadedSrc) {
+    decodedDisplayUrlCache.add(loadedSrc);
+  }
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    onNaturalSize?.(img.naturalWidth, img.naturalHeight);
+  }
+}
 
-  return { imgSrc: displayUrl, imageReady };
+function CanvasTierCoverImage({
+  baseSrc,
+  overlaySrc,
+  overlayVisible,
+  onOverlayTransitionEnd,
+  fitClassName,
+  onNaturalSize,
+  onBroken,
+  className,
+}: {
+  readonly baseSrc: string | null;
+  readonly overlaySrc: string | null;
+  readonly overlayVisible: boolean;
+  readonly onOverlayTransitionEnd: () => void;
+  readonly fitClassName: string;
+  readonly onNaturalSize?: (width: number, height: number) => void;
+  readonly onBroken: () => void;
+  readonly className?: string;
+}) {
+  const imageClassName = cn(
+    "absolute inset-0 block h-full w-full",
+    fitClassName,
+    className
+  );
+
+  return (
+    <>
+      {baseSrc ? (
+        <img
+          src={baseSrc}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className={imageClassName}
+          onLoad={(event) => handleCoverImageLoad(event, onNaturalSize)}
+          onError={onBroken}
+        />
+      ) : null}
+      {overlaySrc ? (
+        <img
+          src={overlaySrc}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className={cn(
+            imageClassName,
+            "transition-opacity ease-out",
+            overlayVisible ? "opacity-100" : "opacity-0"
+          )}
+          style={{ transitionDuration: `${CANVAS_TIER_CROSSFADE_MS}ms` }}
+          onLoad={(event) => handleCoverImageLoad(event, onNaturalSize)}
+          onTransitionEnd={(event) => {
+            if (event.propertyName === "opacity") {
+              onOverlayTransitionEnd();
+            }
+          }}
+          onError={onBroken}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function useDebouncedUnavailable(
@@ -148,6 +323,23 @@ interface CanvasMediaCoverBaseProps {
   readonly onExpandView?: () => void;
   /** Canvas AI video node id — enables frame capture on hover preview. */
   readonly nodeId?: string;
+  readonly sharedUrlSet?: SharedMediaDisplayUrlSet;
+}
+
+function CanvasMediaLoadingPlaceholder({
+  className,
+}: {
+  readonly className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 bg-muted/30 animate-pulse",
+        className
+      )}
+      aria-hidden
+    />
+  );
 }
 
 function CanvasImageCover({
@@ -157,46 +349,51 @@ function CanvasImageCover({
   fitMode = "cover",
   className,
   onNaturalSize,
+  sharedUrlSet,
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
-  const { displayUrl, isCanvasOnScreen, retry } = useCanvasMediaCoverUrl({
+  const { displayUrl, phase, isCanvasOnScreen, urlSet, retry } = useCanvasMediaCoverUrl({
     media,
     nodeType: "ai-image",
     cardWidthPx,
     cardHeightPx,
+    sharedUrlSet,
   });
+
+  useEffect(() => {
+    prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
+  }, [urlSet.l, urlSet.m, urlSet.s]);
+
   const handleBroken = useBrokenMediaRecovery({ media, displayUrl, retry });
-  const { imgSrc, imageReady } = useDecodedDisplayUrl({
-    displayUrl,
+  const {
+    baseSrc,
+    overlaySrc,
+    overlayVisible,
+    hasImage,
+    onOverlayTransitionEnd,
+  } = useDecodedDisplayUrl({
+    displayUrl: phase === "ready" ? displayUrl : null,
+    retainOnNull: phase === "loading",
     onBroken: handleBroken,
   });
-  const showUnavailable = useDebouncedUnavailable(!imgSrc && isCanvasOnScreen);
+  const showUnavailable = useDebouncedUnavailable(
+    phase === "missing" && isCanvasOnScreen
+  );
   const fitClassName = fitMode === "contain" ? "object-contain" : "object-cover";
 
   return (
     <div className={cn("relative h-full w-full overflow-hidden", className)}>
-      {imgSrc ? (
-        <img
-          src={imgSrc}
-          alt=""
-          draggable={false}
-          decoding="async"
-          className={cn(
-            "block h-full w-full transition-opacity duration-100",
-            fitClassName,
-            imageReady ? "opacity-100" : "opacity-0"
-          )}
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            const loadedSrc = img.currentSrc || img.src;
-            if (loadedSrc) {
-              decodedDisplayUrlCache.add(loadedSrc);
-            }
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-              onNaturalSize?.(img.naturalWidth, img.naturalHeight);
-            }
-          }}
-          onError={handleBroken}
+      {phase === "loading" && !hasImage ? <CanvasMediaLoadingPlaceholder /> : null}
+
+      {hasImage ? (
+        <CanvasTierCoverImage
+          baseSrc={baseSrc}
+          overlaySrc={overlaySrc}
+          overlayVisible={overlayVisible}
+          onOverlayTransitionEnd={onOverlayTransitionEnd}
+          fitClassName={fitClassName}
+          onNaturalSize={onNaturalSize}
+          onBroken={handleBroken}
         />
       ) : null}
 
@@ -219,25 +416,43 @@ function CanvasVideoCover({
   staticCover = false,
   onExpandView,
   nodeId,
+  sharedUrlSet,
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
   const frameCapture = useWorkflowVideoFrameCapture(nodeId);
   const [isHovered, setIsHovered] = useState(false);
-  const { displayUrl, isCanvasOnScreen, retry } = useCanvasMediaCoverUrl({
+  const {
+    displayUrl,
+    phase,
+    isCanvasOnScreen,
+    urlSet,
+    stale,
+    retry,
+  } = useCanvasMediaCoverUrl({
     media,
     nodeType: "ai-video",
     cardWidthPx,
     cardHeightPx,
+    sharedUrlSet,
   });
   const hoverPreviewEnabled =
     !staticCover && isHovered && isCanvasOnScreen;
-  const { displayUrl: videoUrl } = useMediaDisplayUrl({
-    media,
-    nodeType: "ai-video",
-    size: "full",
-    localOnly: true,
-    paused: !hoverPreviewEnabled,
-  });
+  const fullVideoReadiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media: hoverPreviewEnabled ? media : null,
+        urlSet,
+        size: "full",
+        stale,
+      }),
+    [hoverPreviewEnabled, media, stale, urlSet]
+  );
+  const videoUrl =
+    fullVideoReadiness.phase === "ready" ? fullVideoReadiness.displayUrl : null;
+
+  useEffect(() => {
+    prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
+  }, [urlSet.l, urlSet.m, urlSet.s]);
 
   useEffect(() => {
     if (staticCover || !isCanvasOnScreen) {
@@ -246,14 +461,23 @@ function CanvasVideoCover({
   }, [isCanvasOnScreen, staticCover]);
 
   const handleBroken = useBrokenMediaRecovery({ media, displayUrl, retry });
-  const { imgSrc, imageReady } = useDecodedDisplayUrl({
-    displayUrl,
+  const {
+    baseSrc,
+    overlaySrc,
+    overlayVisible,
+    hasImage,
+    onOverlayTransitionEnd,
+  } = useDecodedDisplayUrl({
+    displayUrl: phase === "ready" ? displayUrl : null,
+    retainOnNull: phase === "loading",
     onBroken: handleBroken,
   });
 
   const showVideoPlayer = hoverPreviewEnabled && Boolean(videoUrl);
-  const showPlayIcon = !showVideoPlayer && Boolean(imgSrc) && imageReady;
-  const showUnavailable = useDebouncedUnavailable(!imgSrc && isCanvasOnScreen);
+  const showPlayIcon = !showVideoPlayer && hasImage && Boolean(baseSrc);
+  const showUnavailable = useDebouncedUnavailable(
+    phase === "missing" && isCanvasOnScreen
+  );
   const fitClassName = fitMode === "contain" ? "object-contain" : "object-cover";
   const objectFit = fitMode === "contain" ? "contain" : "cover";
 
@@ -267,33 +491,25 @@ function CanvasVideoCover({
         staticCover ? undefined : () => setIsHovered(false)
       }
     >
-      {imgSrc ? (
-        <img
-          src={imgSrc}
-          alt=""
-          draggable={false}
-          decoding="async"
+      {phase === "loading" && !hasImage ? <CanvasMediaLoadingPlaceholder /> : null}
+
+      {hasImage ? (
+        <div
           className={cn(
-            "block h-full w-full transition-opacity duration-100",
-            fitClassName,
-            showVideoPlayer
-              ? "pointer-events-none absolute inset-0 opacity-0"
-              : imageReady
-                ? "opacity-100"
-                : "opacity-0"
+            "absolute inset-0",
+            showVideoPlayer && "pointer-events-none opacity-0"
           )}
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            const loadedSrc = img.currentSrc || img.src;
-            if (loadedSrc) {
-              decodedDisplayUrlCache.add(loadedSrc);
-            }
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-              onNaturalSize?.(img.naturalWidth, img.naturalHeight);
-            }
-          }}
-          onError={handleBroken}
-        />
+        >
+          <CanvasTierCoverImage
+            baseSrc={baseSrc}
+            overlaySrc={overlaySrc}
+            overlayVisible={overlayVisible}
+            onOverlayTransitionEnd={onOverlayTransitionEnd}
+            fitClassName={fitClassName}
+            onNaturalSize={onNaturalSize}
+            onBroken={handleBroken}
+          />
+        </div>
       ) : null}
 
       {showVideoPlayer && videoUrl ? (
@@ -348,6 +564,7 @@ export function CanvasMediaCover({
   staticCover = false,
   onExpandView,
   nodeId,
+  sharedUrlSet,
 }: CanvasMediaCoverProps) {
   if (nodeType === "ai-video") {
     return (
@@ -361,6 +578,7 @@ export function CanvasMediaCover({
         staticCover={staticCover}
         onExpandView={onExpandView}
         nodeId={nodeId}
+        sharedUrlSet={sharedUrlSet}
       />
     );
   }
@@ -373,6 +591,7 @@ export function CanvasMediaCover({
       fitMode={fitMode}
       className={className}
       onNaturalSize={onNaturalSize}
+      sharedUrlSet={sharedUrlSet}
     />
   );
 }

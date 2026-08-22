@@ -17,7 +17,7 @@ import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-e
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
-import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
+import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
@@ -161,12 +161,13 @@ function AiVideoWidget({
   const hasVideo = cardDisplay.hasCover;
   const activeVideoExpired = hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;
   const activeVideoKey = hasVideo && coverVideo ? getResourceIdFromValue(coverVideo) : null;
-  const { displayUrl: videoDisplayUrl } = useMediaDisplayUrl({
-    media: hasVideo && !activeVideoExpired && coverVideo ? coverVideo : null,
-    nodeType: "ai-video",
-    size: "full",
-    localOnly: true,
-  });
+  const coverMediaRef =
+    hasVideo && !activeVideoExpired && coverVideo ? coverVideo : null;
+  const { sharedUrlSet, fullDisplayUrl: videoDisplayUrl } =
+    useGenerativeCardMediaDisplay({
+      media: coverMediaRef,
+      nodeType: "ai-video",
+    });
   const canDownloadActiveVideo = hasVideo && !activeVideoExpired;
   const { cardSize, onNaturalSize } = useCanvasCardSize({
     kind: "video",
@@ -413,6 +414,7 @@ function AiVideoWidget({
             onExpandView={
               videoDisplayUrl ? handleOpenVideoLightbox : undefined
             }
+            sharedUrlSet={sharedUrlSet}
           />
         ) : null}
 

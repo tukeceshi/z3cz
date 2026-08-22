@@ -1238,10 +1238,10 @@ export function pickMediaDisplayUrl(
     return set.s ?? set.full;
   }
   if (size === "canvas-m") {
-    return set.m ?? set.full ?? set.l ?? set.s;
+    return set.m ?? set.s;
   }
   if (size === "canvas-l") {
-    return set.l ?? set.full ?? set.m ?? set.s;
+    return set.l ?? set.m ?? set.s;
   }
   return set.full;
 }

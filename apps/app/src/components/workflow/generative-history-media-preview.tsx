@@ -155,7 +155,7 @@ export function GenerativeHistoryImagePreview({
   const failed = isFailedResourceRef(value);
   const mediaKey = getResourceIdFromValue(value) ?? "image";
   const expired = isMediaReference(value) ? isMediaExpired(value) : false;
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media:
       expired || generating || failed || !isWorkflowMediaValue(value)
         ? null
@@ -185,7 +185,7 @@ export function GenerativeHistoryImagePreview({
     );
   }
 
-  if (!expired && !stale && !displayUrl) {
+  if (phase === "loading") {
     return (
       <GenerativeHistoryPreviewLoading
         className={className}
@@ -194,7 +194,7 @@ export function GenerativeHistoryImagePreview({
     );
   }
 
-  if (stale || !displayUrl || imgError) {
+  if (phase !== "ready" || !displayUrl || imgError) {
     return (
       <div
         className={cn(
@@ -238,7 +238,7 @@ export function GenerativeHistoryVideoPreview({
   const { t } = useTranslation();
   const mediaKey = getResourceIdFromValue(value) ?? "video";
   const expired = isMediaExpired(value);
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media: expired ? null : value,
     nodeType: "ai-video",
   });
@@ -254,7 +254,7 @@ export function GenerativeHistoryVideoPreview({
     setNaturalSize(readMediaIntrinsicSize(video.videoWidth, video.videoHeight));
   }, []);
 
-  if (!expired && !stale && !displayUrl) {
+  if (phase === "loading") {
     return (
       <GenerativeHistoryPreviewLoading
         className={className}
@@ -263,7 +263,7 @@ export function GenerativeHistoryVideoPreview({
     );
   }
 
-  if (stale || !displayUrl || mediaError) {
+  if (phase !== "ready" || !displayUrl || mediaError) {
     return (
       <div
         className={cn(
@@ -305,7 +305,7 @@ export function GenerativeHistoryAudioPreview({
   const { t } = useTranslation();
   const mediaKey = getResourceIdFromValue(value) ?? "audio";
   const expired = isMediaExpired(value);
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media: expired ? null : value,
     nodeType: "ai-audio",
   });
@@ -315,7 +315,7 @@ export function GenerativeHistoryAudioPreview({
     setMediaError(false);
   }, [mediaKey]);
 
-  if (!expired && !stale && !displayUrl) {
+  if (phase === "loading") {
     return (
       <GenerativeHistoryPreviewLoading
         className={className}
@@ -324,7 +324,7 @@ export function GenerativeHistoryAudioPreview({
     );
   }
 
-  if (stale || !displayUrl || mediaError) {
+  if (phase !== "ready" || !displayUrl || mediaError) {
     return (
       <div
         className={cn(

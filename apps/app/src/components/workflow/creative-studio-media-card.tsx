@@ -6,7 +6,7 @@ import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useRef, useState } from "react";
 
 import { useMediaDisplayUrlSet } from "@/hooks/use-media-display-url-set";
-import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
+import { resolveMediaDisplayReadiness } from "@/services/media-display-readiness";
 import { cn } from "@/utils/utils";
 
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
@@ -17,7 +17,6 @@ import {
 } from "./creative-studio-media-meta";
 import {
   CreativeStudioMediaPreviewFrame,
-  CreativeStudioMediaPreviewPlaceholder,
 } from "./creative-studio-media-preview-frame";
 import {
   STUDIO_MEDIA_CARD,
@@ -73,16 +72,32 @@ export function CreativeStudioMediaCard({
     nodeType: isVideo ? "ai-video" : "ai-image",
   });
 
-  const displayUrl = pickMediaDisplayUrl(urlSet, "full");
-  const fullImageUrl = displayUrl;
+  const previewReadiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media: mediaRef,
+        urlSet,
+        size: "thumb",
+        stale,
+      }),
+    [mediaRef, stale, urlSet]
+  );
+  const fullReadiness = useMemo(
+    () =>
+      resolveMediaDisplayReadiness({
+        media: mediaRef,
+        urlSet,
+        size: "full",
+        stale,
+      }),
+    [mediaRef, stale, urlSet]
+  );
 
-  const canPreview =
-    mediaRef != null && displayUrl != null && !stale;
+  const metaProbeUrl =
+    fullReadiness.phase === "ready" ? fullReadiness.displayUrl : null;
 
-  const mediaUrl = canPreview ? displayUrl : null;
-
-  const imageSize = useStudioImageFileSize(isVideo ? null : fullImageUrl);
-  const videoDuration = useStudioVideoFileDuration(isVideo ? mediaUrl : null);
+  const imageSize = useStudioImageFileSize(isVideo ? null : metaProbeUrl);
+  const videoDuration = useStudioVideoFileDuration(isVideo ? metaProbeUrl : null);
   const modelLabel = readStudioModelLabel(node.data);
   const videoResolution = isVideo
     ? readStudioVideoResolution(node.data)
@@ -142,21 +157,14 @@ export function CreativeStudioMediaCard({
         className="relative w-full text-left"
         onClick={onOpenDetail}
       >
-        {canPreview ? (
-          <CreativeStudioMediaPreviewFrame
-            media={mediaRef}
-            displayUrl={displayUrl}
-            stale={stale}
-            isVideo={isVideo}
-            referenceDragEnabled={referenceDragEnabled}
-            fallbackBusy={cardState.isBusy}
-          />
-        ) : (
-          <CreativeStudioMediaPreviewPlaceholder
-            isVideo={isVideo}
-            busy={cardState.isBusy || (mediaRef != null && stale)}
-          />
-        )}
+        <CreativeStudioMediaPreviewFrame
+          media={mediaRef}
+          displayUrl={previewReadiness.displayUrl}
+          phase={previewReadiness.phase}
+          isVideo={isVideo}
+          referenceDragEnabled={referenceDragEnabled}
+          fallbackBusy={cardState.isBusy}
+        />
         {cardState.generateError ? (
           <GenerativeCardErrorBlock error={cardState.generateError} />
         ) : null}

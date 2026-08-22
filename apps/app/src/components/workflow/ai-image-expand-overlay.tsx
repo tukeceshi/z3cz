@@ -28,7 +28,7 @@ function ExpandMediaPreview({
 }: ExpandMediaPreviewProps) {
   const { t } = useTranslation();
   const expired = isMediaExpired(media);
-  const { displayUrl, stale } = useMediaDisplayUrl({
+  const { displayUrl, phase } = useMediaDisplayUrl({
     media: expired ? null : media,
     nodeType: isVideoMedia(media) ? "ai-video" : "ai-image",
     size: "full",
@@ -39,7 +39,15 @@ function ExpandMediaPreview({
     setMediaError(false);
   }, [displayUrl]);
 
-  if (stale || !displayUrl || mediaError) {
+  if (phase === "loading") {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center rounded-md bg-muted/40">
+        <span className="text-xs text-muted-foreground">…</span>
+      </div>
+    );
+  }
+
+  if (phase !== "ready" || !displayUrl || mediaError) {
     return (
       <div className="flex min-h-[200px] items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 px-3 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
         {t("workflow.aiMediaCache.imageUnavailable")}
