@@ -1231,6 +1231,54 @@ export function resolveGenerateCountOptions(
   return buildGenerateCountOptions(max);
 }
 
+const GENERATE_COUNT_NUMERIC_FIELD_NAMES = new Set([
+  "generate_count",
+  "batch_count",
+]);
+
+/** Numeric fields with discrete options: duration, generate_count, or enumValues. */
+export function resolveNumericEnumOptions(
+  field: UpstreamParamProfileField | undefined
+): readonly string[] {
+  if (!field) {
+    return [];
+  }
+  if (field.name === "duration") {
+    return resolveDurationOptions(field);
+  }
+  if (GENERATE_COUNT_NUMERIC_FIELD_NAMES.has(field.name)) {
+    return resolveGenerateCountOptions(field);
+  }
+  return (field.enumValues ?? []).map((value) => String(value));
+}
+
+export function resolveNumericEnumBounds(
+  field: UpstreamParamProfileField | undefined
+): { readonly min: number; readonly max: number } {
+  const parsed = resolveNumericEnumOptions(field)
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isFinite(entry));
+  if (parsed.length === 0) {
+    if (field?.name === "duration") {
+      return { min: VIDEO_DURATION_MIN, max: VIDEO_DURATION_MAX };
+    }
+    return { min: 1, max: 1 };
+  }
+  return { min: Math.min(...parsed), max: Math.max(...parsed) };
+}
+
+export function resolveMinDurationFromField(
+  field: UpstreamParamProfileField
+): number {
+  return resolveNumericEnumBounds(field).min;
+}
+
+export function resolveMaxDurationFromField(
+  field: UpstreamParamProfileField
+): number {
+  return resolveNumericEnumBounds(field).max;
+}
+
 /** Resolve UI generate count (1–15); drives sequential group generation. */
 export function resolveImageGenerateCount(
   params: Readonly<Record<string, unknown>> | undefined,
@@ -1285,6 +1333,33 @@ function isStoredGenerationValuePresent(stored: unknown): boolean {
   return stored !== undefined && stored !== null && stored !== "";
 }
 
+function coerceNumericEnumValue(
+  field: UpstreamParamProfileField,
+  stored: unknown
+): unknown {
+  const options = resolveNumericEnumOptions(field);
+  if (options.length === 0) {
+    if (isStoredGenerationValuePresent(stored)) {
+      const numeric = typeof stored === "number" ? stored : Number(stored);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+    }
+    return field.default;
+  }
+
+  if (isStoredGenerationValuePresent(stored)) {
+    const numeric = typeof stored === "number" ? stored : Number(stored);
+    if (Number.isFinite(numeric)) {
+      const asString = String(Math.floor(numeric));
+      if (options.includes(asString)) {
+        return numeric;
+      }
+    }
+  }
+  return field.default;
+}
+
 function resolveImageGenerationFieldValue(
   field: UpstreamParamProfileField,
   stored: unknown
@@ -1301,21 +1376,7 @@ function resolveImageGenerationFieldValue(
   }
 
   if (field.type === "number") {
-    if (isStoredGenerationValuePresent(stored)) {
-      const numeric = typeof stored === "number" ? stored : Number(stored);
-      if (Number.isFinite(numeric)) {
-        const options = resolveGenerateCountOptions(field);
-        if (options.length > 0) {
-          const asString = String(Math.floor(numeric));
-          if (options.includes(asString)) {
-            return numeric;
-          }
-        } else {
-          return numeric;
-        }
-      }
-    }
-    return field.default;
+    return coerceNumericEnumValue(field, stored);
   }
 
   if (field.enumValues?.length) {

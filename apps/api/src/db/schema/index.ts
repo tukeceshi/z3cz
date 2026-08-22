@@ -265,6 +265,8 @@ export const platformSettings = pgTable("platform_settings", {
     .notNull()
     .default("console"),
   wsBootstrapEnabled: boolean("ws_bootstrap_enabled").notNull().default(false),
+  maintenanceEnabled: boolean("maintenance_enabled").notNull().default(false),
+  maintenanceMessage: text("maintenance_message"),
   bootstrapConfig: text("bootstrap_config"),
   legalConfig: text("legal_config"),
   competitorVideoPricing: text("competitor_video_pricing"),

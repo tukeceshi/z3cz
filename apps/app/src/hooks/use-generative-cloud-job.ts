@@ -10,6 +10,7 @@ import {
   type GenerativeProgressPhase,
 } from "@/components/workflow/generative-progress-utils";
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import {
   releaseGenerativeJobResume,
@@ -140,6 +141,9 @@ export function useGenerativeCloudJobProgress(
       readonly phase?: GenerativeProgressPhase | null;
       readonly stagingMediaIds?: readonly string[] | null;
     }) => {
+      if (getCanvasMaintenanceFrozen()) {
+        return;
+      }
       options.updateNodeData?.(options.nodeId, (current) => {
         let metadata = withGenerativeProgress(current.metadata, params);
         if (options.applyBusyMetadata) {
@@ -156,6 +160,9 @@ export function useGenerativeCloudJobProgress(
   );
 
   const clearProgress = useCallback(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
     options.updateNodeData?.(options.nodeId, (current) => {
       let metadata = clearGenerativeProgress(current.metadata);
       if (options.applyBusyMetadata) {

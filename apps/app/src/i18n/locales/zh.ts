@@ -390,6 +390,20 @@ export const zh: TranslationDictionary = {
     previewHint: "保存后，站点名称与标语会同步更新到页头、登录页和浏览器标签。",
     newUserTourToggle: "新用户引导",
     newUserTourHint: "开启后，新用户首次进入组织时会自动展示应用内引导。",
+    maintenanceToggle: "维护模式",
+    maintenanceHint: "开启后，首页访问者会看到维护页；已打开画布的用户会看到维护遮罩。",
+    maintenanceMessage: "维护提示文案",
+    maintenanceMessagePlaceholder: "系统维护中，请稍后再试。",
+    maintenanceMessageHelp: "留空则使用默认维护提示。",
+  },
+  maintenance: {
+    canvasTitle: "系统维护中",
+    canvasDefaultMessage: "系统正在维护，画布已暂停编辑。",
+    canvasStatusRefresh: "状态刷新",
+    canvasStatusFetchFailed: "无法连接服务，系统可能正在维护，请稍后重试。",
+    homepageTitle: "系统维护中",
+    homepageDefaultMessage: "系统正在维护，请稍后再试。",
+    homepageRefresh: "刷新",
   },
   competitorPricing: {
     title: "竞品计费",
@@ -463,6 +477,8 @@ export const zh: TranslationDictionary = {
     storageProvider: "存储方式",
     storageProviderHint:
       "R2 与 TOS 二选一。切换后会清空上次同步并关闭「只使用存储」，必须重新同步。",
+    bucketDedicatedHint:
+      "请使用专用 bucket 存放首屏加速内容；同步时会自动清理旧文件。",
     storageProviderR2: "Cloudflare R2",
     storageProviderTos: "火山引擎 TOS",
     r2Credentials: "R2 凭证",
@@ -486,6 +502,9 @@ export const zh: TranslationDictionary = {
     syncShell: "一键同步",
     syncing: "同步中…",
     syncError: "同步失败。",
+    syncUpToDate: "已是最新（跳过 {{skipped}} 个）。",
+    syncComplete:
+      "同步完成：上传 {{uploaded}}，跳过 {{skipped}}，清理 {{pruned}}。",
     syncStatusTitle: "同步状态",
     lastSyncAt: "上次同步",
     lastSyncShellHash: "Shell hash",

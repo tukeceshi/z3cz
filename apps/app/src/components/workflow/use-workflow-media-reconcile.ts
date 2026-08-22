@@ -24,6 +24,7 @@ interface UseWorkflowMediaReconcileParams {
   readonly organizationId: string | undefined;
   readonly workflowId: string | undefined;
   readonly graphReady: boolean;
+  readonly enabled?: boolean;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly setNodes: React.Dispatch<
     React.SetStateAction<ReactFlowNode<WorkflowNodeType>[]>
@@ -53,6 +54,7 @@ export function useWorkflowMediaReconcile({
   organizationId,
   workflowId,
   graphReady,
+  enabled = true,
   nodes,
   setNodes,
 }: UseWorkflowMediaReconcileParams): void {
@@ -77,6 +79,7 @@ export function useWorkflowMediaReconcile({
 
   useEffect(() => {
     if (
+      !enabled ||
       !graphReady ||
       !organizationId ||
       !workflowId ||
@@ -158,6 +161,7 @@ export function useWorkflowMediaReconcile({
       cancelled = true;
     };
   }, [
+    enabled,
     graphReady,
     organizationId,
     workflowId,
@@ -166,7 +170,7 @@ export function useWorkflowMediaReconcile({
   ]);
 
   useEffect(() => {
-    if (!organizationId || !workflowId) {
+    if (!enabled || !organizationId || !workflowId) {
       return;
     }
 
@@ -192,5 +196,5 @@ export function useWorkflowMediaReconcile({
 
     window.addEventListener(MEDIA_RESOURCE_REKEYED_EVENT, handler);
     return () => window.removeEventListener(MEDIA_RESOURCE_REKEYED_EVENT, handler);
-  }, [organizationId, workflowId, setNodes]);
+  }, [enabled, organizationId, workflowId, setNodes]);
 }

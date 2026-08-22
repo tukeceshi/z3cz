@@ -66,6 +66,8 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   supportEmail: null,
   newUserTourEnabled: false,
   wsBootstrapEnabled: false,
+  maintenanceEnabled: false,
+  maintenanceMessage: null,
   featureConfig: DEFAULT_PLATFORM_FEATURE_CONFIG,
 };
 
@@ -97,6 +99,8 @@ function rowToPublicSettings(
     supportEmail: row.supportEmail,
     newUserTourEnabled: row.newUserTourEnabled,
     wsBootstrapEnabled: row.wsBootstrapEnabled,
+    maintenanceEnabled: row.maintenanceEnabled,
+    maintenanceMessage: row.maintenanceMessage,
     featureConfig: parseFeatureConfig(row.featureConfig),
   };
 }
@@ -175,6 +179,14 @@ export async function updateSiteSettings(
       input.wsBootstrapEnabled ??
       existing?.wsBootstrapEnabled ??
       DEFAULT_PUBLIC_SETTINGS.wsBootstrapEnabled,
+    maintenanceEnabled:
+      input.maintenanceEnabled ??
+      existing?.maintenanceEnabled ??
+      DEFAULT_PUBLIC_SETTINGS.maintenanceEnabled,
+    maintenanceMessage:
+      input.maintenanceMessage !== undefined
+        ? input.maintenanceMessage
+        : (existing?.maintenanceMessage ?? null),
     updatedBy,
     updatedAt: new Date(),
   };

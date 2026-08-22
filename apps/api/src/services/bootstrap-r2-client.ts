@@ -1,5 +1,7 @@
 import { AwsClient } from "aws4fetch";
 
+export const BOOTSTRAP_REMOTE_MANIFEST_KEY = "bootstrap-manifest.json";
+
 export interface BootstrapR2Credentials {
   accountId: string;
   accessKeyId: string;
@@ -110,4 +112,90 @@ export function buildBootstrapR2PublicUrl(
 
 export function buildBootstrapR2ObjectKey(assetPath: string): string {
   return bootstrapR2ObjectName(assetPath);
+}
+
+export function isBootstrapAccelerationObjectKey(key: string): boolean {
+  if (key === BOOTSTRAP_REMOTE_MANIFEST_KEY) {
+    return true;
+  }
+  if (/^shell-[a-f0-9]+\.gz$/.test(key)) {
+    return true;
+  }
+  if (/^prefetch-[a-z0-9-]+-[a-f0-9]+\.gz$/.test(key)) {
+    return true;
+  }
+  return key.startsWith("landing/");
+}
+
+function parseListObjectsXml(payload: string): readonly string[] {
+  const keys: string[] = [];
+  const regex = /<Key>([^<]+)<\/Key>/g;
+  let match = regex.exec(payload);
+  while (match) {
+    keys.push(match[1]!);
+    match = regex.exec(payload);
+  }
+  return keys;
+}
+
+export async function getBootstrapObjectFromR2(params: {
+  credentials: BootstrapR2Credentials;
+  key: string;
+}): Promise<Uint8Array | null> {
+  const client = createAwsClient(params.credentials);
+  const url = buildR2ObjectUrl(params.credentials, params.key);
+  const response = await client.fetch(url, { method: "GET" });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      body.trim().length > 0
+        ? `R2 read failed (${response.status}): ${body}`
+        : `R2 read failed (${response.status})`
+    );
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+export async function deleteBootstrapObjectFromR2(params: {
+  credentials: BootstrapR2Credentials;
+  key: string;
+}): Promise<void> {
+  const client = createAwsClient(params.credentials);
+  const url = buildR2ObjectUrl(params.credentials, params.key);
+  const response = await client.fetch(url, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      body.trim().length > 0
+        ? `R2 delete failed (${response.status}): ${body}`
+        : `R2 delete failed (${response.status})`
+    );
+  }
+}
+
+export async function listBootstrapBucketObjectKeys(
+  credentials: BootstrapR2Credentials
+): Promise<readonly string[]> {
+  const client = createAwsClient(credentials);
+  const url = `${buildR2Endpoint(credentials)}/${credentials.bucketName.trim()}?list-type=2`;
+  const response = await client.fetch(url, { method: "GET" });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      body.trim().length > 0
+        ? `R2 list failed (${response.status}): ${body}`
+        : `R2 list failed (${response.status})`
+    );
+  }
+  const payload = await response.text();
+  return parseListObjectsXml(payload);
+}
+
+export function findNonBootstrapAccelerationObjectKeys(
+  keys: readonly string[]
+): readonly string[] {
+  return keys.filter((key) => !isBootstrapAccelerationObjectKey(key));
 }

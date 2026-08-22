@@ -2,6 +2,8 @@ import { JWTTokenPayload } from "@dafthunk/types";
 
 import { buildApiUrl } from "@/config/api";
 
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
+
 import { handleSessionExpired } from "./session-expired";
 import {
   isCloudStorageApiErrorCode,
@@ -150,6 +152,9 @@ export const makeRequest = async <T>(
 
   if (!response.ok) {
     if (response.status === 401 && !skipRefresh) {
+      if (getCanvasMaintenanceFrozen()) {
+        throw new ApiRequestError("Request failed during maintenance", 401);
+      }
       const refreshResult = await refreshAccessToken();
       if (refreshResult.status === "success") {
         const retryResponse = await fetch(fullUrl, requestOptions);

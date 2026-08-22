@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { stripTransientGenerativeMetadata, preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 import { normalizeAiTextNodeDataForPersist } from "@/components/workflow/ai-text-persist-utils";
 import type {
@@ -51,6 +52,7 @@ interface UseEditableWorkflowProps {
   /** True after getWorkflow (or prefetch) has supplied workflow metadata for this open. */
   httpMetadataLoaded?: boolean;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
+  onWorkflowSync?: () => void;
 }
 
 /**
@@ -133,6 +135,7 @@ export function useEditableWorkflow({
   fallbackWorkflow = null,
   httpMetadataLoaded = false,
   onExecutionUpdate,
+  onWorkflowSync,
 }: UseEditableWorkflowProps) {
   const [nodes, setNodes] = useState<Node<WorkflowNodeType>[]>([]);
   const [edges, setEdges] = useState<Edge<WorkflowEdgeType>[]>([]);
@@ -161,6 +164,12 @@ export function useEditableWorkflow({
 
   const { organization } = useAuth();
   const { t } = useTranslation();
+  const onWorkflowSyncRef = useRef(onWorkflowSync);
+  onWorkflowSyncRef.current = onWorkflowSync;
+
+  const notifyWorkflowSync = useCallback(() => {
+    onWorkflowSyncRef.current?.();
+  }, []);
 
   // Canonical "latest local graph" — always reflects what the editor shows,
   // independent of the `nodes`/`edges` state (which only changes on remote
@@ -210,6 +219,10 @@ export function useEditableWorkflow({
   const flushSave = useCallback(() => {
     saveScheduledRef.current = false;
 
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
+
     if (!hasInitializedRef.current || !workflowId) return;
 
     const payload = buildWorkflowPayload(nodesRef.current, edgesRef.current, {
@@ -228,11 +241,12 @@ export function useEditableWorkflow({
         lastSavedSerializedRef.current = serialized;
         lastRemoteTimestampRef.current = Date.now();
         setSavingError(null);
+        notifyWorkflowSync();
       }
     } catch (error) {
       console.error("Error saving via WebSocket:", error);
     }
-  }, [workflowId]);
+  }, [notifyWorkflowSync, workflowId]);
 
   // Keep a stable handle so the once-only connection effect can flush on
   // cleanup without capturing a stale `flushSave`.
@@ -240,6 +254,10 @@ export function useEditableWorkflow({
   flushSaveRef.current = flushSave;
 
   const flushViewportSave = useCallback(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
+
     const viewport = editorViewportRef.current;
     if (!viewport || !hasInitializedRef.current || !workflowId) {
       return;
@@ -259,6 +277,10 @@ export function useEditableWorkflow({
   }, [workflowId]);
 
   const flushGenerativeDefaultsSave = useCallback(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
+
     const defaults = generativeDefaultsRef.current;
     if (!hasInitializedRef.current || !workflowId) {
       return;
@@ -283,6 +305,10 @@ export function useEditableWorkflow({
   flushGenerativeDefaultsSaveRef.current = flushGenerativeDefaultsSave;
 
   const scheduleSave = useCallback(() => {
+    if (getCanvasMaintenanceFrozen()) {
+      return;
+    }
+
     if (saveScheduledRef.current) return;
     saveScheduledRef.current = true;
 
@@ -567,6 +593,9 @@ export function useEditableWorkflow({
         state: WorkflowState,
         options?: ApplyEditorViewportOptions
       ) => {
+        if (getCanvasMaintenanceFrozen()) {
+          return;
+        }
         try {
           applyRemoteState(state, options);
         } catch (error) {
@@ -578,11 +607,21 @@ export function useEditableWorkflow({
       void (async () => {
         const ws = await connectWorkflowWS(organization.id, workflowId, {
           onInit: (state: WorkflowState) => {
+            notifyWorkflowSync();
             if (!hasInitializedRef.current) {
-              handleStateUpdate(state, { syncToCanvas: true });
+              try {
+                applyRemoteState(state, { syncToCanvas: true });
+              } catch (error) {
+                console.error("Error processing WebSocket init:", error);
+                wsRef.current?.disconnect();
+              }
               hasInitializedRef.current = true;
               setIsGraphReady(true);
               setIsInitializing(false);
+              return;
+            }
+
+            if (getCanvasMaintenanceFrozen()) {
               return;
             }
 
@@ -601,6 +640,10 @@ export function useEditableWorkflow({
             }
           },
           onUpdate: (state: WorkflowState) => {
+            notifyWorkflowSync();
+            if (getCanvasMaintenanceFrozen()) {
+              return;
+            }
             if (
               state.timestamp == null ||
               state.timestamp <= lastRemoteTimestampRef.current
@@ -613,6 +656,9 @@ export function useEditableWorkflow({
             handleStateUpdate(state, { syncToCanvas: true });
           },
           onPatchGraph: (patch: WorkflowGraphPatchBroadcast) => {
+            if (getCanvasMaintenanceFrozen()) {
+              return;
+            }
             if (
               patch.timestamp == null ||
               patch.timestamp <= lastRemoteTimestampRef.current
@@ -659,6 +705,9 @@ export function useEditableWorkflow({
             onExecutionUpdate?.(execution);
           },
           onWorkflowError: (error) => {
+            if (getCanvasMaintenanceFrozen()) {
+              return;
+            }
             if (error.message) {
               setSavingError(error.message);
             }
@@ -672,6 +721,9 @@ export function useEditableWorkflow({
             setIsInitializing(false);
             if (!hasInitializedRef.current) {
               applyFallbackFromHttpRef.current();
+            }
+            if (getCanvasMaintenanceFrozen()) {
+              return;
             }
             if (
               !willReconnect &&
@@ -688,6 +740,10 @@ export function useEditableWorkflow({
             console.error("Connection error:", event);
             if (!hasInitializedRef.current) {
               applyFallbackFromHttpRef.current();
+            }
+            if (getCanvasMaintenanceFrozen()) {
+              setIsInitializing(false);
+              return;
             }
             if (!hasInitializedRef.current) {
               setConnectionError("Connection error occurred");
@@ -851,6 +907,9 @@ export function useEditableWorkflow({
       trigger?: WorkflowTrigger;
       runtime?: WorkflowRuntime;
     }) => {
+      if (getCanvasMaintenanceFrozen()) {
+        return;
+      }
       if (!wsRef.current?.isConnected()) {
         console.warn("WebSocket is not connected, cannot update metadata");
         return;

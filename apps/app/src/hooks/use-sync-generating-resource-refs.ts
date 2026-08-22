@@ -7,6 +7,7 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 
 import { resolveMediaResourceEntry } from "@/services/resolve-media-resource-fetch-url";
+import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 
 import {
   withAiAudioGeneratingFlag,
@@ -110,6 +111,9 @@ export function useSyncGeneratingResourceRefs(params: {
 
     const run = async (): Promise<void> => {
       while (!cancelled) {
+        if (getCanvasMaintenanceFrozen()) {
+          return;
+        }
         const current = mediaRef.current;
         const generatingIds = current
           .filter(isGeneratingResourceRef)
@@ -132,6 +136,9 @@ export function useSyncGeneratingResourceRefs(params: {
           return entry?.failed === true;
         });
         if (failedIds.length > 0) {
+          if (getCanvasMaintenanceFrozen()) {
+            return;
+          }
           updateNodeData(nodeId, (node) =>
             applyGeneratingResourceSync(node, modality, generatingIds, failedIds)
           );
@@ -145,6 +152,10 @@ export function useSyncGeneratingResourceRefs(params: {
         if (stillGenerating || resolveFailed || holdClearRef.current) {
           await sleep(POLL_INTERVAL_MS);
           continue;
+        }
+
+        if (getCanvasMaintenanceFrozen()) {
+          return;
         }
 
         updateNodeData(nodeId, (node) =>

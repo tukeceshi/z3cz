@@ -14,6 +14,13 @@ import {
   type GenerationSizeEffectMode,
   type UpstreamParamProfileField,
   normalizeGenerationCountEffectMode,
+  resolveMaxDurationFromField,
+  resolveMinDurationFromField,
+} from "@dafthunk/types";
+
+export {
+  resolveMaxDurationFromField,
+  resolveMinDurationFromField,
 } from "@dafthunk/types";
 
 import { useCallback } from "react";
@@ -564,30 +571,6 @@ export function ImageCountEditor({
       </div>
     </div>
   );
-}
-
-export function resolveMinDurationFromField(
-  field: UpstreamParamProfileField
-): number {
-  const fromEnum = (field.enumValues ?? [])
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value >= 1);
-  if (fromEnum.length > 0) {
-    return Math.min(...fromEnum);
-  }
-  return VIDEO_DURATION_MIN;
-}
-
-export function resolveMaxDurationFromField(
-  field: UpstreamParamProfileField
-): number {
-  const fromEnum = (field.enumValues ?? [])
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value >= 1);
-  if (fromEnum.length > 0) {
-    return Math.max(...fromEnum);
-  }
-  return VIDEO_DURATION_MAX;
 }
 
 export function resolveDefaultDurationFromField(

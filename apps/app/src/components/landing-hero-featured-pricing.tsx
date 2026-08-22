@@ -120,10 +120,18 @@ function LandingCompareTableScale({
         inner.style.zoom = "";
         return;
       }
+      if (slot.clientWidth <= 0 || slot.clientHeight <= 0) {
+        inner.style.zoom = "";
+        return;
+      }
       const table = inner.querySelector("table");
       const applied = inner.style.zoom;
       inner.style.zoom = "";
       const natural = Math.max(table?.offsetWidth ?? 0, inner.offsetWidth);
+      if (natural <= 0) {
+        inner.style.zoom = "";
+        return;
+      }
       const next =
         Math.round(contentFitScale(slot.clientWidth, natural) * 1000) / 1000;
       const nextZoom = next === 1 ? "" : String(next);
@@ -138,20 +146,32 @@ function LandingCompareTableScale({
     const observer = new ResizeObserver(update);
     observer.observe(slot);
     observer.observe(inner);
-    const table = inner.querySelector("table");
-    if (table) {
+    const observedTables = new Set<Element>();
+    const observeTable = (): void => {
+      const table = inner.querySelector("table");
+      if (!table || observedTables.has(table)) {
+        return;
+      }
+      observedTables.add(table);
       observer.observe(table);
-    }
+    };
+    observeTable();
+    const mutations = new MutationObserver(() => {
+      observeTable();
+      update();
+    });
+    mutations.observe(inner, { childList: true, subtree: true });
     window.addEventListener("resize", update);
     return () => {
       observer.disconnect();
+      mutations.disconnect();
       window.removeEventListener("resize", update);
       inner.style.zoom = "";
     };
   }, []);
 
   return (
-    <div ref={slotRef} className="min-h-0 min-w-0 flex-1 overflow-hidden">
+    <div ref={slotRef} className="min-h-0 min-w-0 overflow-hidden md:flex-1">
       <div
         ref={innerRef}
         className="w-max min-w-max origin-top-left md:w-full md:min-w-0"
@@ -598,6 +618,10 @@ export function LandingHeroFeaturedPricing() {
     () => buildLandingPromoGroups(models, competitors, t),
     [competitors, models, t]
   );
+  const compareCompetitors = useMemo(
+    () => competitors.filter(isVideoPriceCompareCompetitor),
+    [competitors]
+  );
   const showPromoControls =
     promoGroups.length > 0 && (platformPromo != null || hasCompetitorPromo);
 
@@ -884,163 +908,145 @@ export function LandingHeroFeaturedPricing() {
               LANDING_BORDER
             )}
           >
-            {isEstimatesLoading ? (
-              <p className="font-mono text-xs text-muted-foreground">
-                {t("common.loading")}
-              </p>
-            ) : !model || !activeResolution ? (
-              <p className="font-mono text-xs text-muted-foreground">
-                {t("landing.noPrice")}
-              </p>
-            ) : (
-              <>
-                <LandingCompareTableScale>
-                  <table className="w-max min-w-max table-auto text-left text-sm md:w-full md:min-w-0">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="px-2 py-2 font-medium whitespace-nowrap">
-                          {t("landing.tablePlatform")}
-                        </th>
-                        <th className="px-2 py-2 font-medium whitespace-nowrap">
-                          <LandingComparePlanTableHeader />
-                        </th>
-                        <th className="px-2 py-2 font-medium whitespace-nowrap">
-                          {t("landing.tableTokens")}
-                        </th>
-                        <th className="px-2 py-2 font-medium whitespace-nowrap">
-                          {t("landing.tableRate")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        className={cn(
-                          "border-b",
-                          LANDING_COMPARE_COMPETITOR_ROW_CLASS
-                        )}
-                      >
-                        <td
-                          className={cn(
-                            LANDING_COMPARE_COMPETITOR_CELL_CLASS,
-                            "font-medium"
-                          )}
-                        >
-                          {t("landing.platformOfficial")}
-                        </td>
-                        <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
-                          <OfficialPaidPriceCell
-                            costYuan={officialCostYuan}
-                            unavailableLabel={t("landing.compareUnavailable")}
-                            title={t("landing.yearContractDiscount")}
-                            foldUnit={t("landing.yearContractFoldUnit")}
-                            foldLabel={
-                              yearContractFold == null
-                                ? null
-                                : promoFoldLabel(yearContractFold)
-                            }
-                            draft={yearContractFoldDraft}
-                            open={yearContractOpen}
-                            onOpenChange={(open) => {
-                              setYearContractOpen(open);
-                              if (!open) {
-                                setYearContractFoldDraft(
-                                  yearContractFold == null
-                                    ? ""
-                                    : formatVideoPricePromoFold(
-                                        yearContractFold
-                                      )
-                                );
-                              }
-                            }}
-                            onDraftChange={(raw) => {
-                              if (!isVideoPricePromoFoldDraft(raw)) {
-                                return;
-                              }
-                              setYearContractFoldDraft(raw);
-                              setYearContractFold(
-                                parseYearContractFoldDraft(raw)
-                              );
-                            }}
-                          />
-                        </td>
-                        <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
-                          {officialTokens == null ? (
-                            t("landing.compareUnavailable")
-                          ) : (
-                            <span>
-                              {formatVideoTokenMillions(officialTokens)}
-                              {!excludePromo && platformPromo ? (
-                                <sup className={YEAR_CONTRACT_FOLD_MARK_CLASS}>
-                                  {promoFoldLabel(platformPromo.discountFold)}
-                                </sup>
-                              ) : null}
-                            </span>
-                          )}
-                        </td>
-                        <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
-                          {officialRate == null
-                            ? t("landing.compareUnavailable")
-                            : t("landing.rateValue", {
-                                rate: officialRate.toFixed(3),
-                              })}
-                        </td>
-                      </tr>
-                      {competitors
-                        .filter(isVideoPriceCompareCompetitor)
-                        .map((competitor, index, rows) => (
-                          <LandingCompetitorCompareRow
-                            key={competitor.id}
-                            competitor={competitor}
-                            bordered={index < rows.length - 1}
-                            model={model}
-                            activeResolution={activeResolution}
-                            isSingleClipScenario={isSingleClipScenario}
-                            durationSec={durationSec}
-                            referenceSec={referenceSec}
-                            clipPlan={clipPlan}
-                            usedReferencedCount={usedReferencedCount}
-                            usedAvgReferenceSec={usedAvgReferenceSec}
-                            excludePromo={excludePromo}
-                            promoFoldLabel={promoFoldLabel}
-                            onOpenExternal={setPendingExternal}
-                            useLandingMenu
-                          />
-                        ))}
-                    </tbody>
-                  </table>
-                </LandingCompareTableScale>
-                {showPromoControls ? (
-                  <p className="shrink-0 pt-2 text-[11px] leading-[11px] text-muted-foreground">
-                    <span>{t("landing.featuredPromoHintPrefix")}</span>
-                    <button
-                      type="button"
-                      className="inline align-baseline border-0 bg-transparent p-0 font-[inherit] text-[inherit] leading-[inherit] underline decoration-dashed decoration-muted-foreground underline-offset-[2px] text-foreground/80 hover:text-foreground"
-                      onClick={handleScrollToLandingPromo}
+            <LandingCompareTableScale>
+              <table className="w-max min-w-max table-auto text-left text-sm md:w-full md:min-w-0">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="px-2 py-2 font-medium whitespace-nowrap">
+                      {t("landing.tablePlatform")}
+                    </th>
+                    <th className="px-2 py-2 font-medium whitespace-nowrap">
+                      <LandingComparePlanTableHeader />
+                    </th>
+                    <th className="px-2 py-2 font-medium whitespace-nowrap">
+                      {t("landing.tableTokens")}
+                    </th>
+                    <th className="px-2 py-2 font-medium whitespace-nowrap">
+                      {t("landing.tableRate")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    className={cn(
+                      "border-b",
+                      LANDING_COMPARE_COMPETITOR_ROW_CLASS
+                    )}
+                  >
+                    <td
+                      className={cn(
+                        LANDING_COMPARE_COMPETITOR_CELL_CLASS,
+                        "font-medium"
+                      )}
                     >
-                      {t("landing.featuredPromoLink")}
-                    </button>
-                    <span className="mx-0.5">
-                      {t("landing.featuredPromoHintCan")}
-                    </span>
-                    <label className="mx-0.5 cursor-pointer whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={excludePromo}
-                        onChange={(event) => {
-                          setExcludePromo(event.target.checked);
+                      {t("landing.platformOfficial")}
+                    </td>
+                    <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
+                      <OfficialPaidPriceCell
+                        costYuan={officialCostYuan}
+                        unavailableLabel={t("landing.compareUnavailable")}
+                        title={t("landing.yearContractDiscount")}
+                        foldUnit={t("landing.yearContractFoldUnit")}
+                        foldLabel={
+                          yearContractFold == null
+                            ? null
+                            : promoFoldLabel(yearContractFold)
+                        }
+                        draft={yearContractFoldDraft}
+                        open={yearContractOpen}
+                        onOpenChange={(open) => {
+                          setYearContractOpen(open);
+                          if (!open) {
+                            setYearContractFoldDraft(
+                              yearContractFold == null
+                                ? ""
+                                : formatVideoPricePromoFold(yearContractFold)
+                            );
+                          }
                         }}
-                        className={cn(
-                          LANDING_PROMO_CHECKBOX_CLASS,
-                          "mr-0.5 align-text-bottom"
-                        )}
+                        onDraftChange={(raw) => {
+                          if (!isVideoPricePromoFoldDraft(raw)) {
+                            return;
+                          }
+                          setYearContractFoldDraft(raw);
+                          setYearContractFold(parseYearContractFoldDraft(raw));
+                        }}
                       />
-                      {t("landing.tableExcludePromo")}
-                    </label>
-                    <span>{t("landing.featuredPromoHintSuffix")}</span>
-                  </p>
-                ) : null}
-              </>
-            )}
+                    </td>
+                    <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
+                      {officialTokens == null ? (
+                        t("landing.compareUnavailable")
+                      ) : (
+                        <span>
+                          {formatVideoTokenMillions(officialTokens)}
+                          {!excludePromo && platformPromo ? (
+                            <sup className={YEAR_CONTRACT_FOLD_MARK_CLASS}>
+                              {promoFoldLabel(platformPromo.discountFold)}
+                            </sup>
+                          ) : null}
+                        </span>
+                      )}
+                    </td>
+                    <td className={LANDING_COMPARE_COMPETITOR_CELL_CLASS}>
+                      {officialRate == null
+                        ? t("landing.compareUnavailable")
+                        : t("landing.rateValue", {
+                            rate: officialRate.toFixed(3),
+                          })}
+                    </td>
+                  </tr>
+                  {compareCompetitors.map((competitor, index, rows) => (
+                    <LandingCompetitorCompareRow
+                      key={competitor.id}
+                      competitor={competitor}
+                      bordered={index < rows.length - 1}
+                      model={model}
+                      activeResolution={activeResolution}
+                      isSingleClipScenario={isSingleClipScenario}
+                      durationSec={durationSec}
+                      referenceSec={referenceSec}
+                      clipPlan={clipPlan}
+                      usedReferencedCount={usedReferencedCount}
+                      usedAvgReferenceSec={usedAvgReferenceSec}
+                      excludePromo={excludePromo}
+                      promoFoldLabel={promoFoldLabel}
+                      onOpenExternal={setPendingExternal}
+                      useLandingMenu
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </LandingCompareTableScale>
+            {showPromoControls ? (
+              <p className="shrink-0 pt-2 text-[11px] leading-[11px] text-muted-foreground">
+                <span>{t("landing.featuredPromoHintPrefix")}</span>
+                <button
+                  type="button"
+                  className="inline align-baseline border-0 bg-transparent p-0 font-[inherit] text-[inherit] leading-[inherit] underline decoration-dashed decoration-muted-foreground underline-offset-[2px] text-foreground/80 hover:text-foreground"
+                  onClick={handleScrollToLandingPromo}
+                >
+                  {t("landing.featuredPromoLink")}
+                </button>
+                <span className="mx-0.5">
+                  {t("landing.featuredPromoHintCan")}
+                </span>
+                <label className="mx-0.5 cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={excludePromo}
+                    onChange={(event) => {
+                      setExcludePromo(event.target.checked);
+                    }}
+                    className={cn(
+                      LANDING_PROMO_CHECKBOX_CLASS,
+                      "mr-0.5 align-text-bottom"
+                    )}
+                  />
+                  {t("landing.tableExcludePromo")}
+                </label>
+                <span>{t("landing.featuredPromoHintSuffix")}</span>
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

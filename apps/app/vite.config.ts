@@ -1,11 +1,12 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
-import path from "path";
+import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { defineConfig, type Plugin } from "vite";
 
 import { bootstrapManifestPlugin } from "./vite-plugin-bootstrap-manifest";
+import { handleMaintenanceHomepageRequest } from "./maintenance-page";
 
 const ReactCompilerConfig = {};
 
@@ -70,6 +71,32 @@ function bootstrapArchivePreviewPlugin(): Plugin {
   };
 }
 
+function maintenanceHomepagePlugin(apiTarget: string): Plugin {
+  return {
+    name: "maintenance-homepage",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleMaintenanceHomepageRequest(req, res, next, apiTarget).catch(
+          (error: unknown) => {
+            console.error("[vite] maintenance homepage middleware failed:", error);
+            next();
+          }
+        );
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleMaintenanceHomepageRequest(req, res, next, apiTarget).catch(
+          (error: unknown) => {
+            console.error("[vite] maintenance homepage middleware failed:", error);
+            next();
+          }
+        );
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   build: {
@@ -87,6 +114,7 @@ export default defineConfig(({ mode }) => ({
     }),
     bootstrapManifestPlugin(),
     bootstrapArchivePreviewPlugin(),
+    maintenanceHomepagePlugin(apiProxyTarget),
   ],
   server: {
     host: true,

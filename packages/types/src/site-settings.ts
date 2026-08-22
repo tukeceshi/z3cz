@@ -11,6 +11,8 @@ export interface PublicSiteSettings {
   newUserTourEnabled: boolean;
   /** Experimental: load app JS over WebSocket instead of HTTP script tags. */
   wsBootstrapEnabled: boolean;
+  maintenanceEnabled: boolean;
+  maintenanceMessage: string | null;
   featureConfig: PlatformFeatureConfig;
 }
 
@@ -25,6 +27,8 @@ export interface UpdateSiteSettingsRequest {
   supportEmail?: string | null;
   newUserTourEnabled?: boolean;
   wsBootstrapEnabled?: boolean;
+  maintenanceEnabled?: boolean;
+  maintenanceMessage?: string | null;
 }
 
 export interface UpdateFeatureConfigRequest {

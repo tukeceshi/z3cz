@@ -72,6 +72,9 @@ export interface BootstrapSyncResult {
   readonly shellBytes: number;
   readonly r2Key: string | null;
   readonly r2Url: string | null;
+  readonly uploadedCount: number;
+  readonly skippedCount: number;
+  readonly prunedCount: number;
   readonly message: string;
 }
 

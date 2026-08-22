@@ -897,12 +897,10 @@ export function LandingPromoDiscountSection(props: {
   readonly id?: string;
   readonly groups: readonly PromoDisplayGroup[];
   readonly className?: string;
+  readonly isLoading?: boolean;
   readonly onOpenExternal: (next: { name: string; url: string }) => void;
 }) {
   const { t } = useTranslation();
-  if (props.groups.length === 0) {
-    return null;
-  }
 
   const handleBackToCalc = () => {
     document
@@ -935,13 +933,21 @@ export function LandingPromoDiscountSection(props: {
       </div>
       <div className="landing-promo-grid-shell">
         <div className="landing-promo-grid">
-          {props.groups.map((group) => (
-            <PromoPlatformCard
-              key={group.platform}
-              group={group}
-              onOpenExternal={props.onOpenExternal}
-            />
-          ))}
+          {props.groups.length === 0 ? (
+            <p className="font-mono text-xs text-muted-foreground">
+              {props.isLoading
+                ? t("common.loading")
+                : t("landing.compareUnavailable")}
+            </p>
+          ) : (
+            props.groups.map((group) => (
+              <PromoPlatformCard
+                key={group.platform}
+                group={group}
+                onOpenExternal={props.onOpenExternal}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -1374,7 +1380,8 @@ export function LandingCompetitorCompareRow(props: {
 
 export function LandingBillingSection() {
   const { t } = useTranslation();
-  const { models, competitors } = usePublicVideoPriceEstimates();
+  const { models, competitors, isEstimatesLoading } =
+    usePublicVideoPriceEstimates();
   const [pendingExternal, setPendingExternal] = useState<{
     name: string;
     url: string;
@@ -1384,16 +1391,13 @@ export function LandingBillingSection() {
     [competitors, models, t]
   );
 
-  if (promoGroups.length === 0) {
-    return null;
-  }
-
   return (
     <section id="pricing" className="scroll-mt-20 py-8 md:py-12">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <LandingPromoDiscountSection
           id="landing-promo"
           groups={promoGroups}
+          isLoading={isEstimatesLoading}
           onOpenExternal={setPendingExternal}
         />
         <AlertDialog
