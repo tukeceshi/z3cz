@@ -2889,6 +2889,16 @@ export const en = {
       deleteConfirmEdges: "Delete {{count}} selected edge(s)?",
       deleteConfirmNodesAndEdges:
         "Delete {{nodeCount}} selected node(s) and {{edgeCount}} edge(s)?",
+      detachConfirm: {
+        title: "Remove nodes",
+        delete:
+          "{{count}} node(s) contain generation records. You can restore them with Ctrl+Z after removal.",
+        undo:
+          "Undo will remove {{count}} node(s) with generation records from the canvas.",
+        redo:
+          "Redo will remove {{count}} node(s) with generation records from the canvas.",
+        dontAskAgain: "Don't show this confirmation again",
+      },
       themeTipTitle: "Background theme",
       themeTipBody:
         "Switch light, dark, or system — selection applies immediately. You can also change it anytime from the top-right control.",
@@ -2901,9 +2911,24 @@ export const en = {
         title: "Shortcuts",
         collapse: "Collapse",
         expand: "Show shortcuts",
+        undo: "Undo",
+        redo: "Redo",
+        undoRedo: "Undo/Redo",
         copyCutPaste: "Copy/Cut/Paste",
         multiSelect: "Multi-select",
+        clickAction: "Click",
+        dragAction: "drag",
+        deleteKey: "Delete",
         click: "Click/drag",
+        sectionNewNode: "New node",
+        sectionOperations: "Node actions",
+        sectionLayout: "Layout",
+        layoutReorganizeLine1: "Reorg",
+        layoutReorganizeLine2: "Layout",
+        layoutFitLine1: "Fit",
+        layoutFitLine2: "screen",
+        layoutOriginalLine1: "Original",
+        layoutOriginalLine2: "scale",
       },
       setSchedule: "Set Schedule",
       execute: "Execute Workflow",

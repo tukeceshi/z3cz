@@ -1,7 +1,11 @@
+import { useCallback, useState } from "react";
 import RefreshCw from "lucide-react/icons/refresh-cw";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/utils/utils";
+
+const REFRESH_SPIN_MS = 600;
 
 interface CanvasMaintenanceOverlayProps {
   readonly message: string | null;
@@ -15,12 +19,25 @@ export function CanvasMaintenanceOverlay({
   onRefreshStatus,
 }: CanvasMaintenanceOverlayProps) {
   const { t } = useTranslation();
+  const [isSpinning, setIsSpinning] = useState(false);
   const description =
     message?.trim() || t("maintenance.canvasDefaultMessage");
 
+  const handleRefreshClick = useCallback(() => {
+    if (isSpinning) {
+      return;
+    }
+
+    setIsSpinning(true);
+    window.setTimeout(() => {
+      onRefreshStatus();
+      setIsSpinning(false);
+    }, REFRESH_SPIN_MS);
+  }, [isSpinning, onRefreshStatus]);
+
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-6"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-background/20 backdrop-blur-sm p-6"
       role="alertdialog"
       aria-modal="true"
       aria-describedby="canvas-maintenance-description"
@@ -43,9 +60,15 @@ export function CanvasMaintenanceOverlay({
           size="icon"
           className="mt-4 opacity-70 hover:opacity-100"
           aria-label={t("maintenance.canvasStatusRefresh")}
-          onClick={onRefreshStatus}
+          disabled={isSpinning}
+          onClick={handleRefreshClick}
         >
-          <RefreshCw className="size-5" />
+          <RefreshCw
+            className={cn(
+              "size-5",
+              isSpinning && "animate-[spin_0.6s_ease-in-out_1]"
+            )}
+          />
         </Button>
       </div>
     </div>

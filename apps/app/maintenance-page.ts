@@ -9,7 +9,9 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-const REFRESH_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>`;
+const REFRESH_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>`;
+
+const REFRESH_SPIN_MS = 600;
 
 export interface MaintenancePageOptions {
   readonly message?: string | null;
@@ -67,16 +69,32 @@ export function renderMaintenancePageHtml(
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.72;
+    opacity: 0.7;
   }
   button:hover { opacity: 1; }
-  button:active { opacity: 0.56; }
+  button:disabled { cursor: default; opacity: 0.7; }
+  @keyframes refresh-spin {
+    to { transform: rotate(360deg); }
+  }
+  button.spinning svg {
+    animation: refresh-spin ${REFRESH_SPIN_MS}ms ease-in-out;
+  }
 </style>
+<script>
+function handleMaintenanceRefresh(button) {
+  if (button.disabled) return;
+  button.disabled = true;
+  button.classList.add("spinning");
+  window.setTimeout(function () {
+    location.reload();
+  }, ${REFRESH_SPIN_MS});
+}
+</script>
 </head>
 <body>
   <div class="panel">
     <p>${bodyMessage}</p>
-    <button type="button" onclick="location.reload()" aria-label="${refreshAriaLabel}">${REFRESH_ICON_SVG}</button>
+    <button type="button" onclick="handleMaintenanceRefresh(this)" aria-label="${refreshAriaLabel}">${REFRESH_ICON_SVG}</button>
   </div>
 </body>
 </html>`;

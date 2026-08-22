@@ -1,5 +1,4 @@
 import type {
-  Parameter,
   Edge as WorkflowBackendEdge,
   Node as WorkflowBackendNode,
   WorkflowEditorViewport,
@@ -10,7 +9,7 @@ import type {
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { applyWorkflowGraphPatch, mergeGenerativeNodeContentOnSave } from "@dafthunk/types";
+import { applyWorkflowGraphPatch } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -18,7 +17,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { stripTransientGenerativeMetadata, preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
-import { normalizeAiTextNodeDataForPersist } from "@/components/workflow/ai-text-persist-utils";
+import { buildWorkflowPayload } from "@/components/workflow/build-workflow-payload";
 import type {
   NodeType,
   WorkflowEdgeType,
@@ -53,80 +52,6 @@ interface UseEditableWorkflowProps {
   httpMetadataLoaded?: boolean;
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
   onWorkflowSync?: () => void;
-}
-
-/**
- * Convert the editor's ReactFlow graph into the backend wire format.
- *
- * This is the single source of truth for what gets persisted, so the same
- * function can both build the payload to send AND fingerprint a graph for
- * change detection (see `lastSavedSerializedRef`). It deliberately omits
- * transient/UI-only fields (execution state, object-url callbacks, ids) so
- * that a server round-trip produces a byte-identical serialization.
- */
-function buildWorkflowPayload(
-  nodes: Node<WorkflowNodeType>[],
-  edges: Edge<WorkflowEdgeType>[],
-  options?: {
-    readonly mergeFromPersisted?: readonly WorkflowBackendNode[];
-  }
-): { nodes: WorkflowBackendNode[]; edges: WorkflowBackendEdge[] } {
-  const persistedById = new Map(
-    (options?.mergeFromPersisted ?? []).map((node) => [node.id, node])
-  );
-  const workflowNodes = nodes.map((node) => {
-    const incomingEdges = edges.filter((edge) => edge.target === node.id);
-    const persistableData = normalizeAiTextNodeDataForPersist(node.data);
-    const built = {
-      id: node.id,
-      name: persistableData.name,
-      type: persistableData.nodeType || "default",
-      position: node.position,
-      icon: persistableData.icon,
-      functionCalling: persistableData.functionCalling,
-      ...(() => {
-        const metadata = stripTransientGenerativeMetadata(persistableData.metadata);
-        return metadata ? { metadata } : {};
-      })(),
-      inputs: persistableData.inputs.map((input) => {
-        const isConnected = incomingEdges.some(
-          (edge) => edge.targetHandle === input.id
-        );
-        const { id: _id, value: inputValue, ...rest } = input;
-        const parameter = {
-          ...rest,
-          name: input.id,
-          description: input.name,
-        } as Parameter & { value?: unknown };
-        if (!isConnected && typeof inputValue !== "undefined") {
-          parameter.value = inputValue;
-        }
-        return parameter as Parameter;
-      }),
-      outputs: node.data.outputs.map((output) => {
-        const { id: _id, value: _value, ...rest } = output;
-        return {
-          ...rest,
-          name: output.id,
-          description: output.name,
-        } as Parameter;
-      }),
-    } as WorkflowBackendNode;
-    const persisted = persistedById.get(node.id);
-    if (persisted) {
-      return mergeGenerativeNodeContentOnSave(persisted, built);
-    }
-    return built;
-  }) as WorkflowBackendNode[];
-
-  const workflowEdges = edges.map((edge) => ({
-    source: edge.source,
-    target: edge.target,
-    sourceOutput: edge.sourceHandle || "",
-    targetInput: edge.targetHandle || "",
-  })) as WorkflowBackendEdge[];
-
-  return { nodes: workflowNodes, edges: workflowEdges };
 }
 
 export function useEditableWorkflow({

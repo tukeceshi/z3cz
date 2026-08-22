@@ -102,6 +102,10 @@ import type {
   WorkflowNodeType,
   WorkflowParameter,
 } from "./workflow-types";
+import {
+  useGraphHistory,
+  type PendingDetachConfirm,
+} from "./use-graph-history";
 
 // --- Pure helper functions ---
 
@@ -333,6 +337,7 @@ export interface UseGraphOperationsProps {
   generativeDefaults?: WorkflowGenerativeDefaults;
   commitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
   suppressViewportPersistEndRef?: RefObject<boolean>;
+  requestDetachConfirm?: (pending: PendingDetachConfirm) => void;
 }
 
 export interface UseGraphOperationsReturn {
@@ -414,6 +419,14 @@ export interface UseGraphOperationsReturn {
     menu: WorkflowAddNodeMenuState
   ) => void;
   generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  clearHistory: () => void;
+  captureHistory: () => void;
+  commitRemoveNodes: (nodeIds: readonly string[]) => void;
+  removeNodesWithoutConfirm: (nodeIds: readonly string[]) => void;
 }
 
 const NOOP = () => {};
@@ -430,6 +443,7 @@ export function useGraphOperations({
   generativeDefaults,
   commitEditorViewport,
   suppressViewportPersistEndRef,
+  requestDetachConfirm,
 }: UseGraphOperationsProps): UseGraphOperationsReturn {
   const { t } = useTranslation();
   const toast = useAppToast();
@@ -495,6 +509,72 @@ export function useGraphOperations({
   const nodesRef = useRef(initialNodes);
   const edgesRef = useRef(initialEdges);
   const isDraggingRef = useRef(false);
+
+  const noopDetachConfirm = useCallback((pending: PendingDetachConfirm) => {
+    pending.proceed();
+  }, []);
+
+  const graphHistory = useGraphHistory({
+    disabled: readOnlyDisabled,
+    nodeTypes,
+    createObjectUrl,
+    nodesRef,
+    edgesRef,
+    setNodes,
+    setEdges,
+    requestDetachConfirm: requestDetachConfirm ?? noopDetachConfirm,
+  });
+
+  const filterRemovableNodeIds = useCallback(
+    (nodeIds: readonly string[]): string[] => {
+      return nodeIds.filter((nodeId) => {
+        const node = nodesRef.current.find((entry) => entry.id === nodeId);
+        if (!node) {
+          return false;
+        }
+        if (
+          node.data.nodeType &&
+          ALL_TRIGGER_NODE_TYPE_IDS.has(node.data.nodeType)
+        ) {
+          return false;
+        }
+        return true;
+      });
+    },
+    [nodesRef]
+  );
+
+  const removeNodesWithoutConfirm = useCallback(
+    (nodeIds: readonly string[]) => {
+      const idsToDelete = filterRemovableNodeIds(nodeIds);
+      if (idsToDelete.length === 0) {
+        return;
+      }
+      graphHistory.captureHistory();
+      const idSet = new Set(idsToDelete);
+      const nodesToDelete = nodesRef.current.filter((node) =>
+        idSet.has(node.id)
+      );
+      const nodeEdges = getConnectedEdges(nodesToDelete, edgesRef.current);
+      const edgeIdsToRemove = new Set(nodeEdges.map((edge) => edge.id));
+      if (edgeIdsToRemove.size > 0) {
+        setEdges((eds) => eds.filter((edge) => !edgeIdsToRemove.has(edge.id)));
+      }
+      setNodes((nds) => nds.filter((node) => !idSet.has(node.id)));
+    },
+    [edgesRef, filterRemovableNodeIds, graphHistory, nodesRef, setEdges, setNodes]
+  );
+
+  const commitRemoveNodes = useCallback(
+    (nodeIds: readonly string[]) => {
+      const idsToDelete = filterRemovableNodeIds(nodeIds);
+      if (idsToDelete.length === 0) {
+        return;
+      }
+      graphHistory.commitRemoveNodes(idsToDelete);
+    },
+    [filterRemovableNodeIds, graphHistory]
+  );
 
   const selectionFingerprint = useMemo(() => {
     const parts: string[] = [];
@@ -789,6 +869,7 @@ export function useGraphOperations({
       nextNodes: ReactFlowNode<WorkflowNodeType>[],
       connection: Connection | null
     ) => {
+      graphHistory.captureHistory();
       nodesRef.current = nextNodes;
       setNodes(nextNodes);
 
@@ -798,16 +879,17 @@ export function useGraphOperations({
 
       appendWorkflowConnection(connection, nextNodes, edgesRef.current);
     },
-    [appendWorkflowConnection, setNodes]
+    [appendWorkflowConnection, graphHistory, setNodes]
   );
 
   const onConnect = useCallback(
     (connection: Connection) => {
       if (graphEditBlocked) return;
       if (!connection.source || !connection.target) return;
+      graphHistory.captureHistory();
       appendWorkflowConnection(connection, nodes, edges);
     },
-    [appendWorkflowConnection, edges, graphEditBlocked, nodes]
+    [appendWorkflowConnection, edges, graphEditBlocked, graphHistory, nodes]
   );
 
   const onConnectEnd = useCallback<OnConnectEnd>(
@@ -1079,6 +1161,8 @@ export function useGraphOperations({
     ): string | null => {
       if (!reactFlowInstance) return null;
 
+      graphHistory.captureHistory();
+
       const placement = findOpenNodePosition({
         reactFlowInstance,
         nodeType: nodeType.type,
@@ -1144,6 +1228,7 @@ export function useGraphOperations({
     },
     [
       reactFlowInstance,
+      graphHistory,
       setNodes,
       createObjectUrl,
       nodesRef,
@@ -1292,32 +1377,9 @@ export function useGraphOperations({
   // Delete nodes and their connected edges (trigger nodes are protected)
   const deleteNodes = useCallback(
     (nodeIds: string[]) => {
-      if (readOnlyDisabled || nodeIds.length === 0) return;
-
-      const nodesToDelete = nodesRef.current.filter((n) => {
-        if (!nodeIds.includes(n.id)) {
-          return false;
-        }
-        if (n.data.nodeType && ALL_TRIGGER_NODE_TYPE_IDS.has(n.data.nodeType)) {
-          return false;
-        }
-        return true;
-      });
-      if (nodesToDelete.length === 0) return;
-
-      const idsToDelete = nodesToDelete.map((node) => node.id);
-      const nodeEdges = getConnectedEdges(nodesToDelete, edgesRef.current);
-      const edgeIdsToRemove = nodeEdges.map((edge) => edge.id);
-
-      if (edgeIdsToRemove.length > 0) {
-        setEdges((eds) =>
-          eds.filter((edge) => !edgeIdsToRemove.includes(edge.id))
-        );
-      }
-
-      setNodes((nds) => nds.filter((node) => !idsToDelete.includes(node.id)));
+      commitRemoveNodes(nodeIds);
     },
-    [edgesRef, nodesRef, readOnlyDisabled, setEdges, setNodes]
+    [commitRemoveNodes]
   );
 
   const deleteNode = useCallback(
@@ -1328,21 +1390,30 @@ export function useGraphOperations({
   const deleteEdge = useCallback(
     (edgeId: string) => {
       if (graphEditBlocked) return;
+      graphHistory.captureHistory();
       setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
     },
-    [graphEditBlocked, setEdges]
+    [graphEditBlocked, graphHistory, setEdges]
   );
 
   const deleteSelected = useCallback(() => {
     if (readOnlyDisabled) return;
 
     if (selectedNodes.length > 0) {
-      deleteNodes(selectedNodes.map((n) => n.id));
+      commitRemoveNodes(selectedNodes.map((n) => n.id));
     } else if (selectedEdges.length > 0) {
+      graphHistory.captureHistory();
       const edgeIds = selectedEdges.map((e) => e.id);
       setEdges((eds) => eds.filter((edge) => !edgeIds.includes(edge.id)));
     }
-  }, [deleteNodes, readOnlyDisabled, selectedEdges, selectedNodes, setEdges]);
+  }, [
+    commitRemoveNodes,
+    graphHistory,
+    readOnlyDisabled,
+    selectedEdges,
+    selectedNodes,
+    setEdges,
+  ]);
 
   const deselectAll = useCallback(() => {
     setNodes((nds) => nds.map((node) => ({ ...node, selected: false })));
@@ -1368,6 +1439,8 @@ export function useGraphOperations({
     );
     if (triggerNodes.length === 0) return;
 
+    graphHistory.captureHistory();
+
     const triggerNodeIds = new Set(triggerNodes.map((n) => n.id));
     const edgeIdsToRemove = getConnectedEdges(
       triggerNodes,
@@ -1378,12 +1451,14 @@ export function useGraphOperations({
       setEdges((eds) => eds.filter((e) => !edgeIdsToRemove.includes(e.id)));
     }
     setNodes((nds) => nds.filter((n) => !triggerNodeIds.has(n.id)));
-  }, [nodesRef, edgesRef, setNodes, setEdges]);
+  }, [graphHistory, nodesRef, edgesRef, setNodes, setEdges]);
 
   const addTriggerNodes = useCallback(
     (trigger: WorkflowTrigger) => {
       const nodeTypeIds = getTriggerNodeTypes(trigger);
       if (nodeTypeIds.length === 0) return;
+
+      graphHistory.captureHistory();
 
       const newNodes = nodeTypeIds.flatMap((nodeTypeId, i) => {
         const nodeType = nodeTypes.find((nt) => nt.type === nodeTypeId);
@@ -1405,7 +1480,7 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults, paramCatalog]
+    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults, paramCatalog, graphHistory]
   );
 
   return {
@@ -1428,7 +1503,8 @@ export function useGraphOperations({
     onConnectEnd,
     onNodeDragStart: useCallback(() => {
       isDraggingRef.current = true;
-    }, []),
+      graphHistory.captureDragStartSnapshot();
+    }, [graphHistory]),
     onNodeDragStop: useCallback(() => {
       isDraggingRef.current = false;
       if (!reactFlowInstance) return;
@@ -1444,7 +1520,8 @@ export function useGraphOperations({
         nodesRef.current = updated;
         return updated;
       });
-    }, [reactFlowInstance, setNodes, nodesRef]),
+      graphHistory.commitDragStopIfChanged();
+    }, [graphHistory, reactFlowInstance, setNodes, nodesRef]),
     isDraggingRef,
     isValidConnection,
     handleNodeSelect,
@@ -1465,5 +1542,13 @@ export function useGraphOperations({
     handlePaneContextMenu: graphEditBlocked ? NOOP : handlePaneContextMenu,
     handleAddNodeMenuSelect: graphEditBlocked ? NOOP : handleAddNodeMenuSelect,
     generativeReferenceCatalogs,
+    undo: readOnlyDisabled ? NOOP : graphHistory.undo,
+    redo: readOnlyDisabled ? NOOP : graphHistory.redo,
+    canUndo: graphHistory.canUndo,
+    canRedo: graphHistory.canRedo,
+    clearHistory: graphHistory.clearHistory,
+    captureHistory: graphHistory.captureHistory,
+    commitRemoveNodes: readOnlyDisabled ? NOOP : commitRemoveNodes,
+    removeNodesWithoutConfirm: readOnlyDisabled ? NOOP : removeNodesWithoutConfirm,
   };
 }

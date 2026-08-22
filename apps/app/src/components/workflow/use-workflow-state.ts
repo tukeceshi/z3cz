@@ -14,6 +14,7 @@ import type {
 import type { RefObject, MouseEvent } from "react";
 import { useMemo } from "react";
 
+import type { PendingDetachConfirm } from "./use-graph-history";
 import { useClipboard } from "./use-clipboard";
 import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
 import { useGraphOperations } from "./use-graph-operations";
@@ -42,6 +43,7 @@ interface UseWorkflowStateProps {
   generativeDefaults?: WorkflowGenerativeDefaults;
   commitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
   suppressViewportPersistEndRef?: RefObject<boolean>;
+  requestDetachConfirm?: (pending: PendingDetachConfirm) => void;
 }
 
 interface UseWorkflowStateReturn {
@@ -111,6 +113,11 @@ interface UseWorkflowStateReturn {
     menu: WorkflowAddNodeMenuState
   ) => void;
   generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  captureHistory: () => void;
 }
 
 const NOOP = () => {};
@@ -129,6 +136,7 @@ export function useWorkflowState({
   generativeDefaults,
   commitEditorViewport,
   suppressViewportPersistEndRef,
+  requestDetachConfirm,
 }: UseWorkflowStateProps): UseWorkflowStateReturn {
   // Core graph state and operations
   const graphOps = useGraphOperations({
@@ -143,6 +151,7 @@ export function useWorkflowState({
     generativeDefaults,
     commitEditorViewport,
     suppressViewportPersistEndRef,
+    requestDetachConfirm,
   });
 
   const graphLocked = disabled;
@@ -165,6 +174,7 @@ export function useWorkflowState({
     setNodes: graphOps.setNodes,
     reactFlowInstance: graphOps.reactFlowInstance,
     disabled: graphLocked,
+    onBeforeLayout: graphOps.captureHistory,
   });
 
   // Clipboard & duplication
@@ -175,9 +185,10 @@ export function useWorkflowState({
     selectedEdges: graphOps.selectedEdges,
     setNodes: graphOps.setNodes,
     setEdges: graphOps.setEdges,
-    deleteSelected: graphOps.deleteSelected,
+    removeNodesWithoutConfirm: graphOps.removeNodesWithoutConfirm,
     disabled: graphLocked,
     createObjectUrl,
+    captureHistory: graphOps.captureHistory,
   });
 
   return {
@@ -189,5 +200,10 @@ export function useWorkflowState({
     cutSelected: clipboardLocked ? NOOP : clipboard.cutSelected,
     pasteFromClipboard: clipboardLocked ? NOOP : clipboard.pasteFromClipboard,
     hasClipboardData: clipboard.hasClipboardData,
+    undo: graphLocked ? NOOP : graphOps.undo,
+    redo: graphLocked ? NOOP : graphOps.redo,
+    canUndo: graphOps.canUndo,
+    canRedo: graphOps.canRedo,
+    captureHistory: graphOps.captureHistory,
   };
 }
