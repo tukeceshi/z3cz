@@ -38,7 +38,7 @@ import Music from "lucide-react/icons/music";
 import Type from "lucide-react/icons/type";
 import Video from "lucide-react/icons/video";
 import X from "lucide-react/icons/x";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,7 +47,12 @@ import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
-import { CanvasShortcutHint } from "./canvas-shortcut-hint";
+import {
+  CanvasShortcutHintButton,
+  CanvasShortcutHintPanel,
+  useCanvasShortcutHintState,
+  useCanvasShortcutHintToolbarLayout,
+} from "./canvas-shortcut-hint";
 import {
   buildConnectedHandleKeysByNode,
 } from "./workflow-connected-handles";
@@ -627,6 +632,23 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
   const { zoom } = useViewport();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const newNodeToolbarRef = useRef<HTMLDivElement>(null);
+  const operationsToolbarRef = useRef<HTMLDivElement>(null);
+  const keyboardToolbarRef = useRef<HTMLDivElement>(null);
+  const layoutToolbarRef = useRef<HTMLDivElement>(null);
+  const {
+    collapsed: shortcutHintCollapsed,
+    setCollapsed: setShortcutHintCollapsed,
+    toggle: toggleShortcutHint,
+  } = useCanvasShortcutHintState();
+  const shortcutHintToolbarLayout = useCanvasShortcutHintToolbarLayout({
+    toolbarRef,
+    newNodeRef: newNodeToolbarRef,
+    operationsRef: operationsToolbarRef,
+    keyboardRef: keyboardToolbarRef,
+    layoutRef: layoutToolbarRef,
+  });
   const [displayNodes, setDisplayNodes] =
     useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
   const blockCardInteraction = useShiftSelectGate(selectedNodes.length);
@@ -787,8 +809,6 @@ export function WorkflowCanvas({
           <AiEditorOverlays nodes={displayNodes} />
         )}
 
-        {showControls && !disabled && <CanvasShortcutHint />}
-
         {/* Action Bars */}
         {showControls &&
           (onAction || (onToggleSidebar && isSidebarVisible !== undefined)) && (
@@ -825,77 +845,109 @@ export function WorkflowCanvas({
         {showControls && (
           <Panel
             position="bottom-center"
-            className="m-4 flex flex-row items-center gap-2"
+            className="m-4"
           >
-            <ActionBarGroup>
-              {onQuickAddAiNode && (
-                <>
-                  <QuickAddAiNodeButton
-                    label={t("workflow.canvas.aiText")}
-                    icon={<Type className="size-4!" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAddAiNode("ai-text");
-                    }}
-                    disabled={disabled}
-                  />
-                  <QuickAddAiNodeButton
-                    label={t("workflow.canvas.aiImage")}
-                    icon={<Image className="size-4!" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAddAiNode("ai-image");
-                    }}
-                    disabled={disabled}
-                  />
-                  <QuickAddAiNodeButton
-                    label={t("workflow.canvas.aiVideo")}
-                    icon={<Video className="size-4!" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAddAiNode("ai-video");
-                    }}
-                    disabled={disabled}
-                  />
-                  <QuickAddAiNodeButton
-                    label={t("workflow.canvas.aiAudio")}
-                    icon={<Music className="size-4!" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAddAiNode("ai-audio");
-                    }}
-                    disabled={disabled}
-                  />
-                </>
+            <div
+              ref={toolbarRef}
+              className="relative flex flex-row items-center gap-2"
+            >
+              {!disabled && !shortcutHintCollapsed && (
+                <CanvasShortcutHintPanel
+                  layout={shortcutHintToolbarLayout}
+                  onClose={() => setShortcutHintCollapsed(true)}
+                />
               )}
-            </ActionBarGroup>
 
-            <ActionBarGroup>
-              {onCopySelected && (
-                <CopyButton onClick={onCopySelected} disabled={disabled || !hasSelectedNodes} />
-              )}
-              {onCutSelected && (
-                <CutButton onClick={onCutSelected} disabled={disabled || !hasSelectedNodes} />
-              )}
-              {onPasteFromClipboard && (
-                <PasteButton onClick={onPasteFromClipboard} disabled={disabled || !hasClipboardData} />
-              )}
-              {onDeleteSelected && (
-                <DeleteButton onClick={onDeleteSelected} disabled={disabled || !hasSelectedElements} />
-              )}
-            </ActionBarGroup>
+              <div ref={newNodeToolbarRef} className="shrink-0">
+                <ActionBarGroup>
+                  {onQuickAddAiNode && (
+                    <>
+                      <QuickAddAiNodeButton
+                        label={t("workflow.canvas.aiText")}
+                        icon={<Type className="size-4!" />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickAddAiNode("ai-text");
+                        }}
+                        disabled={disabled}
+                      />
+                      <QuickAddAiNodeButton
+                        label={t("workflow.canvas.aiImage")}
+                        icon={<Image className="size-4!" />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickAddAiNode("ai-image");
+                        }}
+                        disabled={disabled}
+                      />
+                      <QuickAddAiNodeButton
+                        label={t("workflow.canvas.aiVideo")}
+                        icon={<Video className="size-4!" />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickAddAiNode("ai-video");
+                        }}
+                        disabled={disabled}
+                      />
+                      <QuickAddAiNodeButton
+                        label={t("workflow.canvas.aiAudio")}
+                        icon={<Music className="size-4!" />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickAddAiNode("ai-audio");
+                        }}
+                        disabled={disabled}
+                      />
+                    </>
+                  )}
+                </ActionBarGroup>
+              </div>
 
-            {!disabled && (onApplyLayout || onFitToScreen || onZoomOneToOne) && (
-              <ActionBarGroup>
-                {onApplyLayout && (
-                  <ApplyLayoutButton onClick={() => onApplyLayout()} disabled={disabled || nodes.length === 0} />
-                )}
-                {onFitToScreen && <FitToScreenButton onClick={onFitToScreen} />}
-                {onZoomOneToOne && (
-                  <ZoomOneToOneButton onClick={onZoomOneToOne} />
-                )}
-              </ActionBarGroup>
-            )}
+              <div ref={operationsToolbarRef} className="shrink-0">
+                <ActionBarGroup>
+                  {onCopySelected && (
+                    <CopyButton onClick={onCopySelected} disabled={disabled || !hasSelectedNodes} />
+                  )}
+                  {onCutSelected && (
+                    <CutButton onClick={onCutSelected} disabled={disabled || !hasSelectedNodes} />
+                  )}
+                  {onPasteFromClipboard && (
+                    <PasteButton onClick={onPasteFromClipboard} disabled={disabled || !hasClipboardData} />
+                  )}
+                  {onDeleteSelected && (
+                    <DeleteButton onClick={onDeleteSelected} disabled={disabled || !hasSelectedElements} />
+                  )}
+                </ActionBarGroup>
+              </div>
+
+              {!disabled && (
+                <div ref={keyboardToolbarRef} className="shrink-0">
+                  <ActionBarGroup>
+                    <CanvasShortcutHintButton
+                      collapsed={shortcutHintCollapsed}
+                      onToggle={(event) => {
+                        event.stopPropagation();
+                        toggleShortcutHint();
+                      }}
+                    />
+                  </ActionBarGroup>
+                </div>
+              )}
+
+              {!disabled && (onApplyLayout || onFitToScreen || onZoomOneToOne) && (
+                <div ref={layoutToolbarRef} className="shrink-0">
+                  <ActionBarGroup>
+                    {onApplyLayout && (
+                      <ApplyLayoutButton onClick={() => onApplyLayout()} disabled={disabled || nodes.length === 0} />
+                    )}
+                    {onFitToScreen && <FitToScreenButton onClick={onFitToScreen} />}
+                    {onZoomOneToOne && (
+                      <ZoomOneToOneButton onClick={onZoomOneToOne} />
+                    )}
+                  </ActionBarGroup>
+                </div>
+              )}
+            </div>
           </Panel>
         )}
       </ReactFlow>

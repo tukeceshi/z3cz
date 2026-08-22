@@ -17,6 +17,10 @@ interface UseKeyboardShortcutsProps {
   pasteFromClipboard: () => void;
   requestDeleteSelected?: () => void;
   hasStudioNodeSelected?: boolean;
+  undo?: () => void;
+  redo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 /** True when the user has a non-empty DOM text selection (browser copy/cut should win). */
@@ -33,7 +37,7 @@ export function hasDomTextSelection(
 
 /**
  * Side-effect-only hook that registers global keyboard shortcuts
- * for clipboard (Cmd+C/X/V) and delete (Delete).
+ * for clipboard (Cmd+C/X/V), undo/redo, and delete (Delete).
  */
 export function useKeyboardShortcuts({
   disabled,
@@ -46,6 +50,10 @@ export function useKeyboardShortcuts({
   pasteFromClipboard,
   requestDeleteSelected,
   hasStudioNodeSelected = false,
+  undo,
+  redo,
+  canUndo = false,
+  canRedo = false,
 }: UseKeyboardShortcutsProps): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -64,6 +72,33 @@ export function useKeyboardShortcuts({
         hasStudioNodeSelected;
       const isMac = /mac/i.test(navigator.userAgent);
       const isCtrlOrCmd = isMac ? event.metaKey : event.ctrlKey;
+
+      if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
+        if (disabled) return;
+        if (event.shiftKey) {
+          if (canRedo && redo) {
+            event.preventDefault();
+            redo();
+          }
+        } else if (canUndo && undo) {
+          event.preventDefault();
+          undo();
+        }
+        return;
+      }
+
+      if (
+        isCtrlOrCmd &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "y" &&
+        !disabled &&
+        canRedo &&
+        redo
+      ) {
+        event.preventDefault();
+        redo();
+        return;
+      }
 
       if (
         !isCtrlOrCmd &&
@@ -113,8 +148,11 @@ export function useKeyboardShortcuts({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [
+    canRedo,
+    canUndo,
     clipboardDisabled,
     disabled,
+    redo,
     selectedNodes,
     selectedEdges,
     hasClipboardData,
@@ -123,5 +161,6 @@ export function useKeyboardShortcuts({
     pasteFromClipboard,
     requestDeleteSelected,
     hasStudioNodeSelected,
+    undo,
   ]);
 }

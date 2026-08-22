@@ -28,9 +28,10 @@ interface UseClipboardProps {
   setEdges: React.Dispatch<
     React.SetStateAction<ReactFlowEdge<WorkflowEdgeType>[]>
   >;
-  deleteSelected: () => void;
+  removeNodesWithoutConfirm: (nodeIds: readonly string[]) => void;
   disabled: boolean;
   createObjectUrl: (objectReference: ObjectReference) => string;
+  captureHistory: () => void;
 }
 
 interface UseClipboardReturn {
@@ -49,9 +50,10 @@ export function useClipboard({
   selectedEdges,
   setNodes,
   setEdges,
-  deleteSelected,
+  removeNodesWithoutConfirm,
   disabled,
   createObjectUrl,
+  captureHistory,
 }: UseClipboardProps): UseClipboardReturn {
   const [clipboardData, setClipboardData] = useState<ClipboardData | null>(
     null
@@ -63,6 +65,8 @@ export function useClipboard({
       if (disabled) return;
       const nodeToDuplicate = nodes.find((n) => n.id === nodeId);
       if (!nodeToDuplicate) return;
+
+      captureHistory();
 
       const newNode: ReactFlowNode<WorkflowNodeType> = {
         ...nodeToDuplicate,
@@ -97,13 +101,15 @@ export function useClipboard({
         }))
       );
     },
-    [disabled, nodes, setNodes, setEdges]
+    [captureHistory, disabled, nodes, setNodes, setEdges]
   );
 
   // Duplicate selected elements (nodes and edges)
   const duplicateSelected = useCallback(() => {
     if (disabled || (selectedNodes.length === 0 && selectedEdges.length === 0))
       return;
+
+    captureHistory();
 
     if (selectedNodes.length > 0) {
       const selectedNodeIds = selectedNodes.map((node) => node.id);
@@ -174,6 +180,7 @@ export function useClipboard({
       ]);
     }
   }, [
+    captureHistory,
     disabled,
     selectedNodes,
     selectedEdges,
@@ -233,12 +240,28 @@ export function useClipboard({
       isCut: true,
     });
 
-    deleteSelected();
-  }, [disabled, selectedNodes, selectedEdges, edges, deleteSelected]);
+    if (selectedNodes.length > 0) {
+      removeNodesWithoutConfirm(selectedNodes.map((node) => node.id));
+    } else if (selectedEdges.length > 0) {
+      captureHistory();
+      const edgeIds = new Set(selectedEdges.map((edge) => edge.id));
+      setEdges((eds) => eds.filter((edge) => !edgeIds.has(edge.id)));
+    }
+  }, [
+    captureHistory,
+    disabled,
+    selectedNodes,
+    selectedEdges,
+    edges,
+    removeNodesWithoutConfirm,
+    setEdges,
+  ]);
 
   // Paste from clipboard
   const pasteFromClipboard = useCallback(() => {
     if (disabled || !clipboardData || clipboardData.nodes.length === 0) return;
+
+    captureHistory();
 
     const pasteOffset = { x: 50, y: 50 };
 
@@ -300,7 +323,7 @@ export function useClipboard({
     if (clipboardData.isCut) {
       setClipboardData(null);
     }
-  }, [disabled, clipboardData, setNodes, setEdges, createObjectUrl]);
+  }, [captureHistory, disabled, clipboardData, setNodes, setEdges, createObjectUrl]);
 
   return {
     copySelected,

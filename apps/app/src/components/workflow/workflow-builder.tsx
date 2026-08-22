@@ -16,7 +16,7 @@ import type {
   ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import { ReactFlowProvider, getConnectedEdges } from "@xyflow/react";
+import { ReactFlowProvider } from "@xyflow/react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -34,8 +34,10 @@ import {
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
-import { DeleteSelectionConfirmDialog } from "./delete-selection-confirm-dialog";
+import { DetachNodesConfirmDialog } from "./detach-nodes-confirm-dialog";
+import { writeSkipDetachWithRecordsConfirm } from "./detach-confirm-preference";
 import { UpgradeRequiredDialog } from "./upgrade-required-dialog";
+import type { DetachConfirmSource, PendingDetachConfirm } from "./use-graph-history";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowExecutionState } from "./use-workflow-execution-state";
@@ -279,6 +281,43 @@ export function WorkflowBuilder({
 
   const suppressViewportPersistEndRef = useRef(false);
 
+  const [detachConfirmOpen, setDetachConfirmOpen] = useState(false);
+  const [detachConfirmSource, setDetachConfirmSource] =
+    useState<DetachConfirmSource | null>(null);
+  const [detachConfirmNodeCount, setDetachConfirmNodeCount] = useState(0);
+  const [detachConfirmDontAsk, setDetachConfirmDontAsk] = useState(false);
+  const detachConfirmPendingRef = useRef<PendingDetachConfirm | null>(null);
+
+  const requestDetachConfirm = useCallback((pending: PendingDetachConfirm) => {
+    detachConfirmPendingRef.current = pending;
+    setDetachConfirmSource(pending.source);
+    setDetachConfirmNodeCount(pending.nodeIds.length);
+    setDetachConfirmDontAsk(false);
+    setDetachConfirmOpen(true);
+  }, []);
+
+  const handleDetachConfirmOpenChange = useCallback((open: boolean) => {
+    setDetachConfirmOpen(open);
+    if (!open) {
+      detachConfirmPendingRef.current = null;
+      setDetachConfirmSource(null);
+      setDetachConfirmNodeCount(0);
+      setDetachConfirmDontAsk(false);
+    }
+  }, []);
+
+  const handleDetachConfirm = useCallback(() => {
+    if (detachConfirmDontAsk) {
+      writeSkipDetachWithRecordsConfirm(true);
+    }
+    detachConfirmPendingRef.current?.proceed();
+    detachConfirmPendingRef.current = null;
+    setDetachConfirmOpen(false);
+    setDetachConfirmSource(null);
+    setDetachConfirmNodeCount(0);
+    setDetachConfirmDontAsk(false);
+  }, [detachConfirmDontAsk]);
+
   // Graph state & operations
   const {
     nodes,
@@ -320,6 +359,10 @@ export function WorkflowBuilder({
     handlePaneContextMenu,
     handleAddNodeMenuSelect,
     generativeReferenceCatalogs,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useWorkflowState({
     initialNodes,
     initialEdges,
@@ -334,6 +377,7 @@ export function WorkflowBuilder({
     generativeDefaults,
     commitEditorViewport: onCommitEditorViewport,
     suppressViewportPersistEndRef,
+    requestDetachConfirm,
   });
 
   useWorkflowMediaReconcile({
@@ -418,52 +462,19 @@ export function WorkflowBuilder({
       ? execution.handleActionButtonClick
       : undefined;
 
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{
-    readonly nodeIds: readonly string[];
-    readonly edgeCount: number;
-  } | null>(null);
-
   const requestDeleteSelected = useCallback(() => {
     if (readOnly) return;
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
-    setDeleteConfirmTarget(null);
-    setDeleteConfirmOpen(true);
-  }, [readOnly, selectedEdges.length, selectedNodes.length]);
+    deleteSelected();
+  }, [deleteSelected, readOnly, selectedEdges.length, selectedNodes.length]);
 
   const requestDeleteStudioNode = useCallback(
     (nodeId: string) => {
       if (readOnly) return;
-      const node = nodes.find((item) => item.id === nodeId);
-      if (!node) return;
-      const connectedEdges = getConnectedEdges([node], edges);
-      setDeleteConfirmTarget({
-        nodeIds: [nodeId],
-        edgeCount: connectedEdges.length,
-      });
-      setDeleteConfirmOpen(true);
+      deleteNode(nodeId);
     },
-    [edges, nodes, readOnly]
+    [deleteNode, readOnly]
   );
-
-  const handleDeleteConfirmOpenChange = useCallback((open: boolean) => {
-    setDeleteConfirmOpen(open);
-    if (!open) {
-      setDeleteConfirmTarget(null);
-    }
-  }, []);
-
-  const handleConfirmDeleteSelected = useCallback(() => {
-    if (deleteConfirmTarget && deleteConfirmTarget.nodeIds.length > 0) {
-      for (const nodeId of deleteConfirmTarget.nodeIds) {
-        deleteNode(nodeId);
-      }
-    } else {
-      deleteSelected();
-    }
-    setDeleteConfirmTarget(null);
-    setDeleteConfirmOpen(false);
-  }, [deleteConfirmTarget, deleteNode, deleteSelected]);
 
   const handleFitToScreen = useCallback(() => {
     reactFlowInstance?.fitView({
@@ -815,6 +826,10 @@ export function WorkflowBuilder({
             pasteFromClipboard={pasteFromClipboard}
             requestDeleteSelected={requestDeleteSelected}
             requestDeleteStudioNode={requestDeleteStudioNode}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
           <CreativeStudioCanvasSync selectNode={selectNode} />
           {workflowsListUrl ? (
@@ -950,14 +965,14 @@ export function WorkflowBuilder({
           />
         </div>
 
-        <DeleteSelectionConfirmDialog
-          open={deleteConfirmOpen}
-          onOpenChange={handleDeleteConfirmOpenChange}
-          nodeCount={
-            deleteConfirmTarget?.nodeIds.length ?? selectedNodes.length
-          }
-          edgeCount={deleteConfirmTarget?.edgeCount ?? selectedEdges.length}
-          onConfirm={handleConfirmDeleteSelected}
+        <DetachNodesConfirmDialog
+          open={detachConfirmOpen}
+          source={detachConfirmSource}
+          nodeCount={detachConfirmNodeCount}
+          dontAskAgain={detachConfirmDontAsk}
+          onDontAskAgainChange={setDetachConfirmDontAsk}
+          onOpenChange={handleDetachConfirmOpenChange}
+          onConfirm={handleDetachConfirm}
         />
 
         <WorkflowRunConfigDialog
@@ -1018,6 +1033,10 @@ function WorkflowStudioKeyboardShortcuts({
   pasteFromClipboard,
   requestDeleteSelected,
   requestDeleteStudioNode,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
 }: {
   readonly readOnly: boolean;
   readonly selectedNodes: ReactFlowNode<WorkflowNodeType>[];
@@ -1028,6 +1047,10 @@ function WorkflowStudioKeyboardShortcuts({
   readonly pasteFromClipboard: () => void;
   readonly requestDeleteSelected: () => void;
   readonly requestDeleteStudioNode: (nodeId: string) => void;
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
 }) {
   const { viewMode, studioNodeId } = useCreativeStudio();
 
@@ -1058,6 +1081,10 @@ function WorkflowStudioKeyboardShortcuts({
     pasteFromClipboard,
     requestDeleteSelected: requestDeleteActive,
     hasStudioNodeSelected,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   });
 
   return null;

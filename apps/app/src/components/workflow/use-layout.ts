@@ -23,6 +23,7 @@ interface UseLayoutProps {
     ReactFlowEdge<WorkflowEdgeType>
   > | null;
   disabled: boolean;
+  onBeforeLayout?: () => void;
 }
 
 interface UseLayoutReturn {
@@ -35,9 +36,12 @@ export function useLayout({
   setNodes,
   reactFlowInstance,
   disabled,
+  onBeforeLayout,
 }: UseLayoutProps): UseLayoutReturn {
   const applyLayout = useCallback(() => {
     if (disabled) return;
+
+    onBeforeLayout?.();
 
     void import("@dagrejs/dagre").then(({ default: dagre }) => {
       const layoutNodes =
@@ -101,7 +105,7 @@ export function useLayout({
       );
       reactFlowInstance?.fitView({ duration: 200 });
     });
-  }, [setNodes, disabled, reactFlowInstance, nodesRef, edgesRef]);
+  }, [disabled, onBeforeLayout, reactFlowInstance, nodesRef, edgesRef, setNodes]);
 
   return { applyLayout };
 }
