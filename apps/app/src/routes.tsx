@@ -6,6 +6,7 @@ import { AdminProtectedRoute } from "./components/admin-protected-route";
 import { createRouteHead } from "./components/route-head";
 import { AdminLayout } from "./components/layouts/admin-layout";
 import { AppLayout } from "./components/layouts/app-layout";
+import { CanvasLayout } from "./components/layouts/canvas-layout";
 import { OrgLayout } from "./components/org-layout";
 import { OrgFeatureRoute } from "./components/org-feature-route";
 import { OrgRedirect } from "./components/org-redirect";
@@ -629,11 +630,9 @@ export const routes: AppRouteObject[] = [
   {
     path: "/org/:organizationId/workflows/:id",
     element: (
-      <OrgLayout title="Workflows">
-        <ProtectedRoute>
-          <EditorPage />
-        </ProtectedRoute>
-      </OrgLayout>
+      <CanvasLayout>
+        <EditorPage />
+      </CanvasLayout>
     ),
     handle: { head: createRouteHead("seo.routes.editor") },
   },
