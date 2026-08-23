@@ -7,6 +7,7 @@ import type {
 } from "@dafthunk/types";
 import {
   isTransformCollectAllValueType,
+  isAdaptiveVideoRatio,
   resolveForwardingVideoSize,
 } from "@dafthunk/types";
 import { JSONPath } from "jsonpath-plus";
@@ -125,7 +126,7 @@ export function applyForwardingMappings(params: {
     });
 
     const coerced = coerceForwardingValue(raw, upstreamParam.valueType);
-    if (shouldOmitMappedValue(coerced)) {
+    if (shouldOmitMappedValue(coerced) || isAdaptiveVideoRatio(coerced)) {
       continue;
     }
 

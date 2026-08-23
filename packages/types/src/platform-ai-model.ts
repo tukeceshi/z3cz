@@ -1646,6 +1646,21 @@ export function appendVideoReferenceImagesToContent(
   });
 }
 
+export function isAdaptiveVideoRatio(value: unknown): boolean {
+  return typeof value === "string" && value.trim() === "adaptive";
+}
+
+/** Direct Volcano requests omit adaptive ratio; forwarding maps it before this runs. */
+export function omitAdaptiveVideoRatioFromRequestBody(
+  body: Readonly<Record<string, unknown>>
+): Record<string, unknown> {
+  if (!isAdaptiveVideoRatio(body.ratio)) {
+    return { ...body };
+  }
+  const { ratio: _ratio, ...rest } = body;
+  return rest;
+}
+
 /** Build Volcano /contents/generations/tasks body from admin field definitions. */
 export function buildVolcanoVideoGenerationBody(params: {
   readonly providerModelId: string;

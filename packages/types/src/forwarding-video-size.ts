@@ -127,12 +127,14 @@ export function resolveForwardingVideoSize(params: {
   readonly sourceBody: unknown;
   readonly lockedResolution?: ForwardingLockedResolution | null;
 }): string | undefined {
-  const ratio = readTopLevelString(params.sourceBody, "ratio");
-  if (!ratio) {
+  const ratioRaw = readTopLevelString(params.sourceBody, "ratio");
+  if (!ratioRaw) {
     return undefined;
   }
 
-  const aspectRatio = normalizeAspectRatio(ratio);
+  const aspectRatio = normalizeAspectRatio(
+    ratioRaw === "adaptive" ? "16:9" : ratioRaw
+  );
   if (!aspectRatio) {
     return undefined;
   }

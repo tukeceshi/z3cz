@@ -48,6 +48,23 @@ function normalizeRatio(value: string): string {
   return value.trim().replace(/\s+/g, "");
 }
 
+const ESTIMATE_RATIOS = new Set([
+  "16:9",
+  "9:16",
+  "4:3",
+  "1:1",
+  "3:4",
+  "21:9",
+]);
+
+function resolveSeedanceEstimateRatio(ratio: string): string {
+  const aspect = normalizeRatio(ratio);
+  if (!aspect || aspect === "adaptive" || !ESTIMATE_RATIOS.has(aspect)) {
+    return "16:9";
+  }
+  return aspect;
+}
+
 export function resolveSeedanceSeries(canonicalId: string): SeedanceSeries {
   return canonicalId.includes("2-5") || canonicalId.includes("2.5")
     ? "2.5"
@@ -60,7 +77,7 @@ export function getSeedanceOutputPixels(
   ratio: string
 ): SeedanceOutputPixels {
   const tier = normalizeResolution(resolution);
-  const aspect = normalizeRatio(ratio);
+  const aspect = resolveSeedanceEstimateRatio(ratio);
 
   if (tier === "480p" && aspect === "16:9") {
     return series === "2.5"

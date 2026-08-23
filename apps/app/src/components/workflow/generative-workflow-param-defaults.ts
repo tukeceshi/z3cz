@@ -9,7 +9,11 @@ import {
   type WorkflowGenerativeDefaults,
 } from "@dafthunk/types";
 
-import { sanitizeCardGenerationParams } from "./generative-card-params";
+import {
+  readNodeGenerationParams,
+  sanitizeCardGenerationParams,
+} from "./generative-card-params";
+import { paramRecordsEqual } from "./param-records-equal";
 import {
   readWorkflowGenerativeDefault,
   writeWorkflowGenerativeDefault,
@@ -41,18 +45,6 @@ export function mergeWorkflowParamDefaults(
     ...(existing ?? {}),
     ...incoming,
   };
-}
-
-export function paramRecordsEqual(
-  left: Readonly<Record<string, unknown>>,
-  right: Readonly<Record<string, unknown>>
-): boolean {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-  return leftKeys.every((key) => Object.is(left[key], right[key]));
 }
 
 /** Model template first; saved value used only when it fits the field. */
@@ -124,7 +116,7 @@ function readBindingFromInputs(
   });
 }
 
-export function commitGenerativeParamWindow(params: {
+export interface GenerativeParamCommitContext {
   readonly next: Record<string, unknown>;
   readonly fields: readonly UpstreamParamProfileField[];
   readonly nodeId: string;
@@ -138,8 +130,19 @@ export function commitGenerativeParamWindow(params: {
   readonly onGenerativeDefaultChange?: (
     defaults: WorkflowGenerativeDefaults
   ) => void;
-}): void {
+}
+
+export function commitNodeGenerationParams(
+  params: Pick<
+    GenerativeParamCommitContext,
+    "next" | "fields" | "nodeId" | "nodeInputs" | "updateNodeData"
+  >
+): void {
   const sanitized = sanitizeCardGenerationParams(params.fields, params.next);
+  const current = readNodeGenerationParams(params.nodeInputs);
+  if (paramRecordsEqual(current, sanitized)) {
+    return;
+  }
   updateNodeInput(
     params.nodeId,
     "params",
@@ -147,11 +150,16 @@ export function commitGenerativeParamWindow(params: {
     params.nodeInputs,
     params.updateNodeData
   );
+}
 
+export function commitGenerativeDefaultParams(
+  params: GenerativeParamCommitContext
+): void {
   if (!params.onGenerativeDefaultChange) {
     return;
   }
 
+  const sanitized = sanitizeCardGenerationParams(params.fields, params.next);
   const existing = readWorkflowGenerativeDefault(
     params.generativeDefaults,
     params.modality
@@ -171,4 +179,11 @@ export function commitGenerativeParamWindow(params: {
       params: mergeWorkflowParamDefaults(existing?.params, sanitized),
     })
   );
+}
+
+export function commitGenerativeParamWindow(
+  params: GenerativeParamCommitContext
+): void {
+  commitNodeGenerationParams(params);
+  commitGenerativeDefaultParams(params);
 }

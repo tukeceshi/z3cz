@@ -4,8 +4,7 @@ import {
   computeCostPerOutputSecond,
   computePackTokens,
   computeVideoPriceEstimateForModel,
-  formatVideoPriceEstimateParts,
-  formatVideoTokenMillions,
+  formatVideoBillingTokensDisplay,
   type VideoPriceEstimateResult,
 } from "@dafthunk/types";
 import type { WorkflowMediaValue } from "@dafthunk/types";
@@ -111,7 +110,7 @@ export interface AiVideoPriceEstimateChipProps {
   readonly canonicalId: string;
   readonly priceWithoutVideo: number;
   readonly priceWithVideo: number;
-  readonly baseline480pWithVideo: number | null;
+  readonly baseline480pWithoutVideo: number | null;
   readonly generationValues: Readonly<Record<string, unknown>>;
   readonly referenceVideoMedia: readonly WorkflowMediaValue[];
   readonly displayFolds?: readonly number[];
@@ -182,12 +181,12 @@ function PriceEstimateDetail({
     <div className="space-y-2">
       <PriceEstimateDetailRow
         label={t("workflow.aiVideoPanel.priceEstimateBillingTokens")}
-        value={formatVideoTokenMillions(estimate.billingTokens)}
+        value={formatVideoBillingTokensDisplay(estimate.billingTokens)}
       />
       {packTokens != null ? (
         <PriceEstimateDetailRow
           label={t("workflow.aiVideoPanel.priceEstimatePackTokens")}
-          value={formatVideoTokenMillions(packTokens)}
+          value={formatVideoBillingTokensDisplay(packTokens)}
           labelNode={
             <PackTokenLabel
               label={t("workflow.aiVideoPanel.priceEstimatePackTokens")}
@@ -218,7 +217,7 @@ export function AiVideoPriceEstimateChip({
   canonicalId,
   priceWithoutVideo,
   priceWithVideo,
-  baseline480pWithVideo,
+  baseline480pWithoutVideo,
   generationValues,
   referenceVideoMedia,
   displayFolds = [],
@@ -271,21 +270,17 @@ export function AiVideoPriceEstimateChip({
   );
 
   const packTokens = useMemo(() => {
-    if (baseline480pWithVideo == null) {
+    if (baseline480pWithoutVideo == null) {
       return null;
     }
     return computePackTokens({
       billingTokens: estimate.billingTokens,
       unitPrice: estimate.unitPrice,
-      baseline480pWithVideo,
+      baseline480pWithoutVideo,
     });
-  }, [baseline480pWithVideo, estimate.billingTokens, estimate.unitPrice]);
+  }, [baseline480pWithoutVideo, estimate.billingTokens, estimate.unitPrice]);
 
-  const summaryParts = formatVideoPriceEstimateParts(
-    displayCostYuan,
-    estimate.billingTokens
-  );
-  const summary = t("workflow.aiVideoPanel.priceEstimateSummary", summaryParts);
+  const summary = formatVideoBillingTokensDisplay(estimate.billingTokens);
 
   return (
     <Popover>

@@ -2937,6 +2937,10 @@ export const en = {
       clearErrors: "Clear Errors & Reset",
       resume: "Resume Workflow",
       nodeTypeUnavailable: "This node type is not available for this workflow.",
+      fileDrop: {
+        maxCount: "You can drop up to {{max}} files at once",
+        previewRelease: "Release to upload",
+      },
       referenceConnectFailed:
         "{{targetName}} cannot reference {{sourceName}}; node created only.",
       referenceConnectModelError:
@@ -3586,7 +3590,7 @@ export const en = {
       priceEstimateBillingTokens: "Billing tokens",
       priceEstimatePackTokens: "Pack tokens",
       priceEstimatePackTokensHelp:
-        "Resource packs are metered against the 480p (with reference video) rate. Pack tokens = current rate ÷ 480p baseline × billing tokens.",
+        "Resource packs are metered against the 480p (no reference video) rate. Pack tokens = current rate ÷ 480p baseline × billing tokens.",
       priceEstimateCost: "Est. price",
       priceEstimateCostValue: "{{cost}} CNY",
       priceEstimateUnitRate: "Est. rate",

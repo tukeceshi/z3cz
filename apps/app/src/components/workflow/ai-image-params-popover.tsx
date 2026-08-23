@@ -26,7 +26,7 @@ import { cn } from "@/utils/utils";
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
 import { DurationDragSlider } from "./duration-drag-slider";
 import { readNodeGenerationParams } from "./generative-card-params";
-import { useParamsPopoverDraft } from "./use-params-popover-draft";
+import type { GenerativeParamsPopoverUiProps } from "./use-generative-params-editor";
 import {
   formatGenerationDurationLabel,
   resolveGenerationFieldLabel,
@@ -37,13 +37,12 @@ import type { TranslateFn } from "@/i18n";
 export { applyAiImageRatioToPromptFromTypes as applyAiImageRatioToPrompt };
 export { mergeImageGenerationParams, resolveImageGenerateCount, sanitizeImageGenerationParams } from "@dafthunk/types";
 
-export interface AiImageParamsPopoverProps {
+export interface AiImageParamsPopoverProps extends GenerativeParamsPopoverUiProps {
   readonly fields: readonly UpstreamParamProfileField[];
-  readonly values: Readonly<Record<string, unknown>>;
   readonly disabled?: boolean;
   readonly triggerLabel: string;
   readonly title: string;
-  readonly onChange: (next: Record<string, unknown>) => void;
+  readonly onInlineCommit?: (next: Record<string, unknown>) => void;
   readonly displayMode?: "popover" | "inline";
 }
 
@@ -757,14 +756,19 @@ function TailFieldSection({
 }
 
 export function AiImageParamsPopover({
-  fields,
-  values,
+  fields: fieldsProp,
+  open,
+  draft,
+  summaryValues,
+  onOpenChange,
+  onFieldChange,
   disabled = false,
   triggerLabel,
   title: _title,
-  onChange,
+  onInlineCommit,
   displayMode = "popover",
 }: AiImageParamsPopoverProps) {
+  const fields = fieldsProp ?? [];
   const { t } = useTranslation();
   const smartLabel = t("workflow.aiImagePanel.smartOption");
   const sizeLabels = {
@@ -778,9 +782,10 @@ export function AiImageParamsPopover({
   } as const;
   const formatCount = (count: number) =>
     t("workflow.aiVideoPanel.generateCountOption", { count });
+  const { mainFields, tailFields } = partitionVisibleFields(fields);
   const summary = formatParamSummary(
     fields,
-    values,
+    summaryValues,
     formatCount,
     smartLabel,
     sizeLabels,
@@ -788,12 +793,7 @@ export function AiImageParamsPopover({
     t
   );
   const summaryText = summary.text;
-  const { mainFields, tailFields } = partitionVisibleFields(fields);
-  const { open, draft, updateDraft, handleOpenChange } = useParamsPopoverDraft(
-    values,
-    onChange
-  );
-  const editorValues = displayMode === "inline" ? values : draft;
+  const editorValues = displayMode === "inline" ? summaryValues : draft;
 
   const handleFieldChange = (
     field: UpstreamParamProfileField,
@@ -804,10 +804,10 @@ export function AiImageParamsPopover({
       [field.name]: coerceFieldValue(field, raw),
     };
     if (displayMode === "inline") {
-      onChange(next);
+      (onInlineCommit ?? onFieldChange)(next);
       return;
     }
-    updateDraft(next);
+    onFieldChange(next);
   };
 
   const fieldPanel = (
@@ -862,7 +862,7 @@ export function AiImageParamsPopover({
   }
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

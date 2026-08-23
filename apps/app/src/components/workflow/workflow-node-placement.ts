@@ -5,11 +5,11 @@ import { resolveGenerativeLayoutContentSize } from "./generative-node-content-ge
 import { GENERATIVE_EDGE_PLUS_OUTER_PX } from "./generative-edge-connection-config";
 import type { WorkflowNodeType } from "./workflow-types";
 
-/** Same spacing as Dagre layout (`nodesep` / `ranksep`). */
+/** Same spacing as organize layout (ELK node / layer gaps). */
 export const WORKFLOW_NODE_GAP_PX = 100;
 
 /**
- * Card-edge gap when adding nodes — matches visual spacing after Dagre relayout
+ * Card-edge gap when adding nodes — matches visual spacing after organize layout
  * (~70px), without changing layout config.
  */
 export const WORKFLOW_NODE_ADD_GAP_PX =

@@ -56,7 +56,8 @@ import {
   AiAudioParamsPopover,
   buildDefaultAudioGenerationParams,
 } from "./ai-audio-params-popover";
-import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
+import { readNodeGenerationParams } from "./generative-card-params";
+import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import {
   AI_AUDIO_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_AUDIO_PROMPT_HANDLE_ID,
@@ -307,31 +308,26 @@ export function AiAudioConfigPanel({
       t("workflow.aiAudioPanel.promptReferenceEditHintFallback"),
   });
 
-  const commitGenerationParams = useCallback(
-    (next: Record<string, unknown>) => {
-      if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
-
-      commitGenerativeParamWindow({
-        next,
-        fields: cardGenerationParams.fields,
-        nodeId,
-        nodeInputs,
-        updateNodeData,
-        modality: "audio",
-        generativeDefaults,
-        onGenerativeDefaultChange,
-      });
-    },
-    [
-      cardGenerationParams,
-      disabled,
-      generativeDefaults,
-      nodeId,
-      nodeInputs,
-      onGenerativeDefaultChange,
-      updateNodeData,
-    ]
+  const committedGenerationValues = useMemo(
+    () =>
+      cardGenerationParams.visible
+        ? cardGenerationParams.values
+        : readNodeGenerationParams(data.inputs),
+    [cardGenerationParams, data.inputs]
   );
+
+  const paramsEditor = useGenerativeParamsEditor({
+    visible: cardGenerationParams.visible,
+    disabled,
+    fields: cardGenerationParams.visible ? cardGenerationParams.fields : [],
+    committedValues: committedGenerationValues,
+    nodeId,
+    nodeInputs,
+    updateNodeData,
+    modality: "audio",
+    generativeDefaults,
+    onGenerativeDefaultChange,
+  });
 
   const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
     useGenerativeReferenceConnection();
@@ -421,9 +417,7 @@ export function AiAudioConfigPanel({
 
     generateInFlightRef.current = true;
     setIsGenerating(true);
-    const generationValues = cardGenerationParams.visible
-      ? cardGenerationParams.values
-      : {};
+    const generationValues = paramsEditor.flushBeforeGenerate();
     /** False when another caller owns persist/progress for this job. */
     let ownsJobProgress = true;
     syncProgress({ phase: "generating" });
@@ -752,11 +746,10 @@ export function AiAudioConfigPanel({
             {cardGenerationParams.visible ? (
               <AiAudioParamsPopover
                 fields={cardGenerationParams.fields}
-                values={cardGenerationParams.values}
                 disabled={disabled}
                 triggerLabel={t("workflow.aiAudioPanel.params")}
                 title={t("workflow.aiAudioPanel.paramsTitle")}
-                onChange={commitGenerationParams}
+                {...paramsEditor.popover}
               />
             ) : null}
             <div className="min-w-0">
