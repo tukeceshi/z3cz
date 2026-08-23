@@ -1062,6 +1062,8 @@ function WorkflowEditorMainArea({
   canvasFileDropEnabled,
   onAddCanvasDropNodes,
   onSelectDroppedNodes,
+  reserveTopChromeSpace = false,
+  suppressViewportPersistEndRef,
   ...props
 }: WorkflowEditorMainAreaProps) {
   useGenerativeMediaBeforeUnloadGuard();
@@ -1079,11 +1081,21 @@ function WorkflowEditorMainArea({
     });
 
   const isStudio = viewMode === "studio";
+  const wasStudioRef = useRef(isStudio);
+
+  useEffect(() => {
+    if (wasStudioRef.current && !isStudio && suppressViewportPersistEndRef) {
+      suppressViewportPersistEndRef.current = true;
+    }
+    wasStudioRef.current = isStudio;
+  }, [isStudio, suppressViewportPersistEndRef]);
 
   return (
     <div className="relative h-full w-full min-h-0">
       <WorkflowCanvas
         {...props}
+        suppressViewportPersistEndRef={suppressViewportPersistEndRef}
+        parked={isStudio}
         disabled={Boolean(props.disabled) || isStudio}
         showControls={isStudio ? false : props.showControls}
         canvasFileDropPreview={fileDropPreview}
@@ -1093,7 +1105,14 @@ function WorkflowEditorMainArea({
       />
 
       {isStudio ? (
-        <div className="absolute inset-0 z-50">
+        <div
+          className={cn(
+            "absolute z-50",
+            reserveTopChromeSpace
+              ? "inset-x-0 bottom-0 top-14"
+              : "inset-0"
+          )}
+        >
           <Suspense fallback={<CreativeStudioLoadingFallback />}>
             <CreativeStudioView />
           </Suspense>

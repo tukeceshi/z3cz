@@ -5,6 +5,8 @@ import { Toaster } from "sonner";
 import { useAuth } from "@/components/auth-context";
 import { InsetLoading } from "@/components/inset-loading";
 import { useRequireLoginDialog } from "@/components/login-dialog";
+import { WORKFLOW_CANVAS_SURFACE } from "@/components/workflow/workflow-canvas-styles";
+import { cn } from "@/utils/utils";
 
 interface CanvasLayoutProps {
   readonly children: ReactNode;
@@ -28,14 +30,24 @@ export function CanvasLayout({ children }: CanvasLayoutProps) {
 
   if (isLoading || !isAuthenticated || waitingForLogin || !organization?.id) {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+      <div
+        className={cn(
+          "flex h-screen w-screen flex-col overflow-hidden",
+          WORKFLOW_CANVAS_SURFACE
+        )}
+      >
         <InsetLoading />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+    <div
+      className={cn(
+        "flex h-screen w-screen flex-col overflow-hidden",
+        WORKFLOW_CANVAS_SURFACE
+      )}
+    >
       <Toaster />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </div>

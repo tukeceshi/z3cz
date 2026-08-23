@@ -63,6 +63,7 @@ import { useShiftSelectGate } from "./use-shift-select-gate";
 import {
   WORKFLOW_CANVAS_CLASS,
   WORKFLOW_CANVAS_DOT_GAP_PX,
+  WORKFLOW_CANVAS_SURFACE,
   WORKFLOW_MULTI_SELECTED_CLASS,
 } from "./workflow-canvas-styles";
 import type {
@@ -151,6 +152,8 @@ export interface WorkflowCanvasProps {
   onCanvasFileDragOver?: (event: React.DragEvent) => void;
   onCanvasFileDragLeave?: (event: React.DragEvent) => void;
   onCanvasFileDrop?: (event: React.DragEvent) => void;
+  /** Shrink the live pane to 1×1 so off-screen nodes unmount; do not persist. */
+  parked?: boolean;
 }
 
 interface SidebarToggleProps {
@@ -472,6 +475,7 @@ export function WorkflowCanvas({
   onCanvasFileDragOver,
   onCanvasFileDragLeave,
   onCanvasFileDrop,
+  parked = false,
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
   const { zoom } = useViewport();
@@ -556,13 +560,15 @@ export function WorkflowCanvas({
     <TooltipProvider>
       <div
         className={cn(
-          "relative h-full w-full min-h-0",
+          "relative min-h-0",
+          parked ? "h-px w-px overflow-hidden" : "h-full w-full",
           selectedNodes.length > 1 && WORKFLOW_MULTI_SELECTED_CLASS
         )}
       >
         <ReactFlow
         nodes={renderNodes}
         edges={edges}
+        onlyRenderVisibleElements={parked}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -602,7 +608,7 @@ export function WorkflowCanvas({
         className={cn(
           WORKFLOW_CANVAS_CLASS,
           "h-full w-full",
-          showBackground && "bg-neutral-100/50",
+          showBackground && WORKFLOW_CANVAS_SURFACE,
           disabled && "cursor-default",
           addNodeMenu && "cursor-default"
         )}

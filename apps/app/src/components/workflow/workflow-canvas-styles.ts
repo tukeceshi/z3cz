@@ -1,6 +1,10 @@
 /** PixVerse canvas reference — dark workflow editor background. */
 export const WORKFLOW_CANVAS_BG_DARK = "#0b0b0f" as const;
 
+/** Canvas / studio / editor loading — one surface. */
+export const WORKFLOW_CANVAS_SURFACE =
+  "bg-neutral-100/50 text-foreground dark:bg-[var(--workflow-canvas-bg-dark)]";
+
 export const WORKFLOW_CANVAS_CLASS = "workflow-canvas" as const;
 
 /** Dot grid spacing — light and dark (PixVerse uses 20px). */

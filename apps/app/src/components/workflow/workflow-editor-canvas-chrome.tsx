@@ -62,8 +62,8 @@ export function WorkflowEditorCanvasChrome({
   return (
     <nav
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 z-[60]",
-        "flex items-center justify-between gap-3 px-4 py-3"
+        "pointer-events-none absolute inset-x-0 top-0 z-[60] h-14",
+        "flex items-center justify-between gap-3 px-4"
       )}
     >
       <div className="pointer-events-auto flex min-w-0 items-center gap-2">

@@ -457,7 +457,7 @@ export function CreativeStudioView() {
 
     <div className={cn("flex h-full min-h-0 flex-col", STUDIO_SHELL)}>
 
-      <div className={cn("flex min-h-0 flex-1", hasPrimary && "gap-3 p-4")}>
+      <div className={cn("flex min-h-0 flex-1", hasPrimary && "gap-3 px-4 pb-4")}>
 
         <div
 
