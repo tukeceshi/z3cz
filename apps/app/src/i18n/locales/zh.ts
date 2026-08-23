@@ -2739,6 +2739,10 @@ export const zh: TranslationDictionary = {
       aiVideo: "视频",
       aiAudio: "音频",
       nodeTypeUnavailable: "当前工作流不可用此节点类型。",
+      fileDrop: {
+        maxCount: "一次最多拖入 {{max}} 个文件",
+        previewRelease: "释放以上传",
+      },
       referenceConnectFailed:
         "{{targetName}}无法引用{{sourceName}}，仅做节点创建",
       referenceConnectModelError: "模型加载失败，仅做节点创建",
@@ -3413,7 +3417,7 @@ export const zh: TranslationDictionary = {
       priceEstimateBillingTokens: "计费 token",
       priceEstimatePackTokens: "资源包 token",
       priceEstimatePackTokensHelp:
-        "购买资源包时，平台按 480p（含参考视频）单价折算消耗量。资源包 token = 当前档单价 ÷ 480p 基准单价 × 计费 token。",
+        "购买资源包时，平台按 480p（无参考视频）单价折算消耗量。资源包 token = 当前档单价 ÷ 480p 基准单价 × 计费 token。",
       priceEstimateCost: "预估价格",
       priceEstimateCostValue: "{{cost}}￥",
       priceEstimateUnitRate: "预估单价",

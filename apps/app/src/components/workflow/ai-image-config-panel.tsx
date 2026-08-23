@@ -70,7 +70,8 @@ import {
   buildDefaultImageGenerationParams,
   mergeImageGenerationParams,
 } from "./ai-image-params-popover";
-import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
+import { readNodeGenerationParams } from "./generative-card-params";
+import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import {
   AI_IMAGE_OUTPUT_ID,
   AI_IMAGE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -383,31 +384,26 @@ export function AiImageConfigPanel({
       t("workflow.aiImagePanel.promptReferenceEditHintFallback"),
   });
 
-  const commitGenerationParams = useCallback(
-    (next: Record<string, unknown>) => {
-      if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
-
-      commitGenerativeParamWindow({
-        next,
-        fields: cardGenerationParams.fields,
-        nodeId,
-        nodeInputs,
-        updateNodeData,
-        modality: "image",
-        generativeDefaults,
-        onGenerativeDefaultChange,
-      });
-    },
-    [
-      cardGenerationParams,
-      disabled,
-      generativeDefaults,
-      nodeId,
-      nodeInputs,
-      onGenerativeDefaultChange,
-      updateNodeData,
-    ]
+  const committedGenerationValues = useMemo(
+    () =>
+      cardGenerationParams.visible
+        ? cardGenerationParams.values
+        : readNodeGenerationParams(data.inputs),
+    [cardGenerationParams, data.inputs]
   );
+
+  const paramsEditor = useGenerativeParamsEditor({
+    visible: cardGenerationParams.visible,
+    disabled,
+    fields: cardGenerationParams.visible ? cardGenerationParams.fields : [],
+    committedValues: committedGenerationValues,
+    nodeId,
+    nodeInputs,
+    updateNodeData,
+    modality: "image",
+    generativeDefaults,
+    onGenerativeDefaultChange,
+  });
 
   const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
     useGenerativeReferenceConnection();
@@ -646,9 +642,7 @@ export function AiImageConfigPanel({
       return;
     }
 
-    const generationValues = cardGenerationParams.visible
-      ? cardGenerationParams.values
-      : {};
+    const generationValues = paramsEditor.flushBeforeGenerate();
 
     const promptForApi = applyAiImageRatioToPrompt(
       prompt,
@@ -1096,11 +1090,11 @@ export function AiImageConfigPanel({
               {cardGenerationParams.visible ? (
                 <AiImageParamsPopover
                   fields={cardGenerationParams.fields}
-                  values={cardGenerationParams.values}
                   disabled={disabled}
                   triggerLabel={t("workflow.aiImagePanel.params")}
                   title={t("workflow.aiImagePanel.paramsTitle")}
-                  onChange={commitGenerationParams}
+                  onInlineCommit={paramsEditor.commitNow}
+                  {...paramsEditor.popover}
                 />
               ) : null}
             </div>

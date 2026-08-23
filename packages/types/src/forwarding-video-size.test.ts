@@ -27,4 +27,12 @@ describe("resolveForwardingVideoSize", () => {
       })
     ).toBeUndefined();
   });
+
+  it("treats adaptive ratio as 16:9 for size lookup", () => {
+    expect(
+      resolveForwardingVideoSize({
+        sourceBody: { ratio: "adaptive", resolution: "720p" },
+      })
+    ).toBe("1280x720");
+  });
 });

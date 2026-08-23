@@ -6,7 +6,7 @@ import {
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
   readVideoPriceEstimateTier,
-  readVideoPriceEstimateBaseline480pWithVideo,
+  readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   type LocalMediaReference,
@@ -101,7 +101,7 @@ import {
   syncVideoReferenceModeIfNeeded,
 } from "./ai-video-reference-mode";
 import { readNodeGenerationParams } from "./generative-card-params";
-import { commitGenerativeParamWindow } from "./generative-workflow-param-defaults";
+import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import {
   AI_IMAGE_OUTPUT_ID,
   mergeAiImageNodeCatalogInputs,
@@ -333,6 +333,31 @@ export function AiVideoConfigPanel({
     modelFitsCurrentRefs,
   });
 
+  const committedGenerationValues = useMemo(
+    () =>
+      cardGenerationParams.visible
+        ? cardGenerationParams.values
+        : readNodeGenerationParams(data.inputs),
+    [cardGenerationParams, data.inputs]
+  );
+
+  const paramPopoverFields = cardGenerationParams.visible
+    ? cardGenerationParams.fields
+    : [];
+
+  const paramsEditor = useGenerativeParamsEditor({
+    visible: cardGenerationParams.visible,
+    disabled,
+    fields: paramPopoverFields,
+    committedValues: committedGenerationValues,
+    nodeId,
+    nodeInputs,
+    updateNodeData,
+    modality: "video",
+    generativeDefaults,
+    onGenerativeDefaultChange,
+  });
+
   const videoModelCatalog = useMemo(
     () =>
       models.map((entry) => ({
@@ -358,9 +383,7 @@ export function AiVideoConfigPanel({
       edges,
       nodes: typedNodes,
     });
-    const generationValues = cardGenerationParams.visible
-      ? cardGenerationParams.values
-      : readNodeGenerationParams(data.inputs);
+    const generationValues = paramsEditor.effectiveValues;
     const referenceMode = resolveEffectiveVideoReferenceMode(
       data,
       modelRules,
@@ -371,18 +394,18 @@ export function AiVideoConfigPanel({
       lastFrame: t("workflow.aiVideoPanel.frameRoleLast"),
     });
   }, [
-    cardGenerationParams,
     data,
     edges,
     modelRules,
     nodeId,
+    paramsEditor.effectiveValues,
     referenceCounts,
     t,
     typedNodes,
   ]);
 
   useEffect(() => {
-    if (disabled || !updateNodeData) {
+    if (!paramsEditor.isParamsIdle || disabled || !updateNodeData) {
       return;
     }
     const flowNodes = typedNodes.map((node) => ({ id: node.id, data: node.data }));
@@ -416,7 +439,7 @@ export function AiVideoConfigPanel({
     if (shouldShowReferenceModeAutoSwitchNotice(nodeId, counts)) {
       toast.info("workflow.aiVideoPanel.referenceModeSwitched");
     }
-  }, [data, disabled, edges, nodeId, toast, typedNodes, updateNodeData]);
+  }, [data, disabled, edges, nodeId, paramsEditor.isParamsIdle, toast, typedNodes, updateNodeData]);
 
   const selectableModels = useMemo(
     () => models.filter((entry) => entry.selectable),
@@ -664,32 +687,6 @@ export function AiVideoConfigPanel({
       promptReferenceSourceName ??
       t("workflow.aiVideoPanel.promptReferenceEditHintFallback"),
   });
-
-  const commitGenerationParams = useCallback(
-    (next: Record<string, unknown>) => {
-      if (!cardGenerationParams.visible || disabled || !updateNodeData) return;
-
-      commitGenerativeParamWindow({
-        next,
-        fields: cardGenerationParams.fields,
-        nodeId,
-        nodeInputs,
-        updateNodeData,
-        modality: "video",
-        generativeDefaults,
-        onGenerativeDefaultChange,
-      });
-    },
-    [
-      cardGenerationParams,
-      disabled,
-      generativeDefaults,
-      nodeId,
-      nodeInputs,
-      onGenerativeDefaultChange,
-      updateNodeData,
-    ]
-  );
 
   const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
     useGenerativeReferenceConnection();
@@ -940,9 +937,7 @@ export function AiVideoConfigPanel({
       return;
     }
 
-    const generationValues = cardGenerationParams.visible
-      ? cardGenerationParams.values
-      : {};
+    const generationValues = paramsEditor.flushBeforeGenerate();
     const mergedGenerationParams = mergeImageGenerationParams(
       cardGenerationParams.visible
         ? cardGenerationParams.fields
@@ -1369,9 +1364,7 @@ export function AiVideoConfigPanel({
         return;
       }
 
-      const generationValues = cardGenerationParams.visible
-        ? cardGenerationParams.values
-        : {};
+      const generationValues = readNodeGenerationParams(nodeInputs);
       const mergedGenerationParams = mergeImageGenerationParams(
         cardGenerationParams.visible
           ? cardGenerationParams.fields
@@ -1456,12 +1449,10 @@ export function AiVideoConfigPanel({
     [referenceChips]
   );
 
-  const generationValuesForEstimate = cardGenerationParams.visible
-    ? cardGenerationParams.values
-    : readNodeGenerationParams(data.inputs);
+  const generationValuesForEstimate = paramsEditor.effectiveValues;
 
-  const baseline480pWithVideo = useMemo(
-    () => readVideoPriceEstimateBaseline480pWithVideo(modelRules),
+  const baseline480pWithoutVideo = useMemo(
+    () => readVideoPriceEstimateBaseline480pWithoutVideo(modelRules),
     [modelRules]
   );
 
@@ -1686,12 +1677,12 @@ export function AiVideoConfigPanel({
               />
               {cardGenerationParams.visible ? (
                 <AiVideoParamsPopover
-                  fields={cardGenerationParams.fields}
-                  values={cardGenerationParams.values}
+                  fields={paramPopoverFields}
                   disabled={disabled}
                   triggerLabel={t("workflow.aiVideoPanel.params")}
                   title={t("workflow.aiVideoPanel.paramsTitle")}
-                  onChange={commitGenerationParams}
+                  onInlineCommit={paramsEditor.commitNow}
+                  {...paramsEditor.popover}
                 />
               ) : null}
               {priceEstimateTier && effectiveModel ? (
@@ -1699,7 +1690,7 @@ export function AiVideoConfigPanel({
                   canonicalId={effectiveModel.canonicalId}
                   priceWithoutVideo={priceEstimateTier.priceWithoutVideo}
                   priceWithVideo={priceEstimateTier.priceWithVideo}
-                  baseline480pWithVideo={baseline480pWithVideo}
+                  baseline480pWithoutVideo={baseline480pWithoutVideo}
                   generationValues={generationValuesForEstimate}
                   referenceVideoMedia={referenceVideoMedia}
                   displayFolds={priceEstimateDisplayFolds}

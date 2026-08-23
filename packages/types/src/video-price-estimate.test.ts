@@ -11,11 +11,12 @@ import {
   computeVideoPriceEstimateForModel,
   applyVideoPriceEstimateDisplayFolds,
   EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES,
+  formatVideoBillingTokensDisplay,
   formatVideoPriceEstimateSummary,
   isVideoPriceEstimateEnabled,
   parsePublicVideoPriceEstimatesCache,
   planVideoEstimateClips,
-  readVideoPriceEstimateBaseline480pWithVideo,
+  readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
   splitClipOutputSeconds,
@@ -169,14 +170,34 @@ describe("readVideoPriceEstimateDisplayFolds", () => {
 });
 
 describe("computePackTokens", () => {
-  it("scales billing tokens by unit price ratio to 480p baseline", () => {
+  it("scales billing tokens by unit price ratio to 480p without-video baseline", () => {
     expect(
       computePackTokens({
         billingTokens: 100_000,
         unitPrice: 2.88,
-        baseline480pWithVideo: 1.44,
+        baseline480pWithoutVideo: 1.44,
       })
     ).toBe(200_000);
+  });
+
+  it("equals billing tokens at 480p without reference video", () => {
+    expect(
+      computePackTokens({
+        billingTokens: 50_222,
+        unitPrice: 46,
+        baseline480pWithoutVideo: 46,
+      })
+    ).toBe(50_222);
+  });
+
+  it("scales down with-video unit price against without-video baseline", () => {
+    expect(
+      computePackTokens({
+        billingTokens: 100_000,
+        unitPrice: 28,
+        baseline480pWithoutVideo: 46,
+      })
+    ).toBeCloseTo(60_869.565, 2);
   });
 
   it("returns null when baseline is missing", () => {
@@ -184,7 +205,7 @@ describe("computePackTokens", () => {
       computePackTokens({
         billingTokens: 100_000,
         unitPrice: 2.88,
-        baseline480pWithVideo: 0,
+        baseline480pWithoutVideo: 0,
       })
     ).toBeNull();
   });
@@ -196,23 +217,23 @@ describe("computeCostPerOutputSecond", () => {
   });
 });
 
-describe("readVideoPriceEstimateBaseline480pWithVideo", () => {
-  it("reads enabled 480p with-video price", () => {
+describe("readVideoPriceEstimateBaseline480pWithoutVideo", () => {
+  it("reads enabled 480p without-video price", () => {
     expect(
-      readVideoPriceEstimateBaseline480pWithVideo({
+      readVideoPriceEstimateBaseline480pWithoutVideo({
         priceEstimate: {
           enabled: true,
           tiers: [
             {
               resolution: "480p",
               enabled: true,
-              priceWithoutVideo: 1,
-              priceWithVideo: 1.44,
+              priceWithoutVideo: 46,
+              priceWithVideo: 28,
             },
           ],
         },
       })
-    ).toBe(1.44);
+    ).toBe(46);
   });
 });
 
@@ -288,6 +309,25 @@ describe("formatVideoPriceEstimateSummary", () => {
   it("formats one-decimal cost and mega tokens with yen symbol", () => {
     expect(formatVideoPriceEstimateSummary(5.04, 128_000)).toBe("约5.0￥~0.1M");
     expect(formatVideoPriceEstimateSummary(1.44, 320_000)).toBe("约1.4￥~0.3M");
+  });
+});
+
+describe("formatVideoBillingTokensDisplay", () => {
+  it("formats sub-thousand tokens with token suffix", () => {
+    expect(formatVideoBillingTokensDisplay(555)).toBe("555 token");
+    expect(formatVideoBillingTokensDisplay(999)).toBe("999 token");
+    expect(formatVideoBillingTokensDisplay(0)).toBe("0 token");
+  });
+
+  it("formats sub-million tokens with K suffix", () => {
+    expect(formatVideoBillingTokensDisplay(1000)).toBe("1 K");
+    expect(formatVideoBillingTokensDisplay(128_000)).toBe("128 K");
+    expect(formatVideoBillingTokensDisplay(555_250)).toBe("555.25 K");
+  });
+
+  it("formats million-plus tokens with M suffix", () => {
+    expect(formatVideoBillingTokensDisplay(1_000_000)).toBe("1M");
+    expect(formatVideoBillingTokensDisplay(1_250_000)).toBe("1.25M");
   });
 });
 

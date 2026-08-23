@@ -48,4 +48,19 @@ describe("getSeedanceOutputPixels", () => {
       height: 834,
     });
   });
+
+  it("treats adaptive as 16:9 for billing estimate pixels", () => {
+    expect(getSeedanceOutputPixels("2.0", "480p", "adaptive")).toEqual({
+      width: 864,
+      height: 496,
+    });
+    expect(getSeedanceOutputPixels("2.0", "1080p", "adaptive")).toEqual({
+      width: 1920,
+      height: 1080,
+    });
+    expect(getSeedanceOutputPixels("2.5", "720p", "")).toEqual({
+      width: 1280,
+      height: 720,
+    });
+  });
 });

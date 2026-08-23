@@ -80,4 +80,29 @@ describe("applyForwardingMappings", () => {
       size: "960x960",
     });
   });
+
+  it("maps adaptive ratio to 16:9 size and omits adaptive string fields", () => {
+    expect(
+      applyForwardingMappings({
+        sourceBody: {
+          content: [{ type: "text", text: "hello" }],
+          duration: 5,
+          ratio: "adaptive",
+          resolution: "720p",
+        },
+        upstreamParams: [
+          ...upstreamParams,
+          { id: "p6", name: "aspect_ratio", valueType: "string" as const },
+        ],
+        paramMappings: [
+          ...paramMappings,
+          { upstreamParamId: "p6", sourcePath: "$.ratio" },
+        ],
+      })
+    ).toEqual({
+      prompt: "hello",
+      seconds: "5",
+      size: "1280x720",
+    });
+  });
 });

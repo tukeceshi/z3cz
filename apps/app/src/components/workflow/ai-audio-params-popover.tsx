@@ -18,20 +18,18 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
-import { useParamsPopoverDraft } from "./use-params-popover-draft";
+import type { GenerativeParamsPopoverUiProps } from "./use-generative-params-editor";
 import {
   resolveGenerationFieldLabel,
   resolveGenerationOptionLabel,
 } from "./generative-param-labels";
 import type { TranslateFn } from "@/i18n";
 
-export interface AiAudioParamsPopoverProps {
+export interface AiAudioParamsPopoverProps extends GenerativeParamsPopoverUiProps {
   readonly fields: readonly UpstreamParamProfileField[];
-  readonly values: Readonly<Record<string, unknown>>;
   readonly disabled?: boolean;
   readonly triggerLabel: string;
   readonly title: string;
-  readonly onChange: (next: Record<string, unknown>) => void;
 }
 
 const SPEED_FIELD_NAMES = new Set(["speed"]);
@@ -177,33 +175,33 @@ export function readAiAudioGenerationParams(
 }
 
 export function AiAudioParamsPopover({
-  fields,
-  values,
+  fields: fieldsProp,
+  open,
+  draft,
+  summaryValues,
+  onOpenChange,
+  onFieldChange,
   disabled = false,
   triggerLabel,
   title,
-  onChange,
 }: AiAudioParamsPopoverProps) {
+  const fields = fieldsProp ?? [];
   const { t } = useTranslation();
-  const summary = formatParamSummary(fields, values, t);
   const visibleFields = fields.filter((field) => !field.hidden);
-  const { open, draft, updateDraft, handleOpenChange } = useParamsPopoverDraft(
-    values,
-    onChange
-  );
+  const summary = formatParamSummary(fields, summaryValues, t);
 
   const handleFieldChange = (
     field: UpstreamParamProfileField,
     raw: string | number
   ) => {
-    updateDraft({
+    onFieldChange({
       ...draft,
       [field.name]: coerceFieldValue(field, raw),
     });
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

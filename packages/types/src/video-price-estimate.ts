@@ -436,29 +436,29 @@ export function readVideoPriceEstimateTier(
   };
 }
 
-export function readVideoPriceEstimateBaseline480pWithVideo(
+export function readVideoPriceEstimateBaseline480pWithoutVideo(
   rules: Pick<VideoModelParameterRules, "priceEstimate">
 ): number | null {
   const tier = readVideoPriceEstimateTier(rules, "480p");
-  if (!tier || tier.priceWithVideo <= 0) {
+  if (!tier || tier.priceWithoutVideo <= 0) {
     return null;
   }
-  return tier.priceWithVideo;
+  return tier.priceWithoutVideo;
 }
 
 export function computePackTokens(params: {
   readonly billingTokens: number;
   readonly unitPrice: number;
-  readonly baseline480pWithVideo: number;
+  readonly baseline480pWithoutVideo: number;
 }): number | null {
   if (
-    !Number.isFinite(params.baseline480pWithVideo) ||
-    params.baseline480pWithVideo <= 0
+    !Number.isFinite(params.baseline480pWithoutVideo) ||
+    params.baseline480pWithoutVideo <= 0
   ) {
     return null;
   }
   return (
-    (params.unitPrice / params.baseline480pWithVideo) * params.billingTokens
+    (params.unitPrice / params.baseline480pWithoutVideo) * params.billingTokens
   );
 }
 
@@ -631,4 +631,25 @@ export function formatVideoPriceEstimateSummary(
 
 export function formatVideoTokenMillions(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(2)}M`;
+}
+
+function formatVideoTokenCompactAmount(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  if (Number.isInteger(rounded)) {
+    return String(rounded);
+  }
+  return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+export function formatVideoBillingTokensDisplay(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) {
+    return "0 token";
+  }
+  if (tokens < 1_000) {
+    return `${formatVideoTokenCompactAmount(tokens)} token`;
+  }
+  if (tokens < 1_000_000) {
+    return `${formatVideoTokenCompactAmount(tokens / 1_000)} K`;
+  }
+  return `${formatVideoTokenCompactAmount(tokens / 1_000_000)}M`;
 }

@@ -6,11 +6,8 @@ import type {
 import { useCallback } from "react";
 
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
-import {
-  resolveWorkflowNodeDimensions,
-  WORKFLOW_NODE_GAP_PX,
-} from "./workflow-node-placement";
-import { applyWorkflowLayoutPostprocess } from "./workflow-layout-postprocess";
+import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
+import { computeWorkflowOrganizeLayoutUpdates } from "./workflow-organize-layout";
 
 interface UseLayoutProps {
   nodesRef: React.RefObject<ReactFlowNode<WorkflowNodeType>[]>;
@@ -43,59 +40,26 @@ export function useLayout({
 
     onBeforeLayout?.();
 
-    void import("@dagrejs/dagre").then(({ default: dagre }) => {
-      const layoutNodes =
-        reactFlowInstance?.getNodes() ?? nodesRef.current;
+    const layoutNodes = reactFlowInstance?.getNodes() ?? nodesRef.current;
 
-      const dagreGraph = new dagre.graphlib.Graph();
-      dagreGraph.setDefaultEdgeLabel(() => ({}));
-      dagreGraph.setGraph({
-        rankdir: "LR",
-        nodesep: WORKFLOW_NODE_GAP_PX,
-        ranksep: WORKFLOW_NODE_GAP_PX,
-      });
+    void computeWorkflowOrganizeLayoutUpdates(
+      layoutNodes,
+      edgesRef.current,
+      (node) =>
+        resolveWorkflowNodeDimensions(node.data.nodeType, node)
+    ).then((updates) => {
+      if (updates.length === 0) {
+        reactFlowInstance?.fitView({ duration: 200 });
+        return;
+      }
 
-      layoutNodes.forEach((node) => {
-        const { width, height } = resolveWorkflowNodeDimensions(
-          node.data.nodeType,
-          node
-        );
-        dagreGraph.setNode(node.id, { width, height });
-      });
-
-      edgesRef.current.forEach((edge) => {
-        dagreGraph.setEdge(edge.source, edge.target);
-      });
-
-      dagre.layout(dagreGraph);
-
-      const nodesById = new Map(
-        layoutNodes.map((node) => [node.id, node] as const)
-      );
-      const dimensions = new Map<string, { width: number; height: number }>();
-      const positions = new Map<string, { x: number; y: number }>();
-
-      layoutNodes.forEach((node) => {
-        const size = resolveWorkflowNodeDimensions(node.data.nodeType, node);
-        dimensions.set(node.id, size);
-        const nodeWithPosition = dagreGraph.node(node.id);
-        if (!nodeWithPosition) return;
-        positions.set(node.id, {
-          x: nodeWithPosition.x - size.width / 2,
-          y: nodeWithPosition.y - size.height / 2,
-        });
-      });
-
-      applyWorkflowLayoutPostprocess(
-        positions,
-        dimensions,
-        edgesRef.current,
-        nodesById
+      const updatesById = new Map(
+        updates.map((update) => [update.id, update.position] as const)
       );
 
       setNodes((nds) =>
         nds.map((node) => {
-          const position = positions.get(node.id);
+          const position = updatesById.get(node.id);
           if (!position) return node;
           return {
             ...node,
@@ -103,7 +67,10 @@ export function useLayout({
           };
         })
       );
-      reactFlowInstance?.fitView({ duration: 200 });
+
+      requestAnimationFrame(() => {
+        reactFlowInstance?.fitView({ duration: 200 });
+      });
     });
   }, [disabled, onBeforeLayout, reactFlowInstance, nodesRef, edgesRef, setNodes]);
 

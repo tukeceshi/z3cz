@@ -12,6 +12,7 @@ import {
   type MediaReference,
   type ObjectReference,
   normalizeVideoModelParameterRules,
+  omitAdaptiveVideoRatioFromRequestBody,
   validateSubmitAiVideoReferences,
   buildVideoPollUrl,
   buildVideoSubmitUrl,
@@ -177,7 +178,7 @@ export async function submitVolcanoVideoTask(params: {
         paramMappings: params.formatTransform.paramMappings,
         lockedResolution: params.formatTransform.lockedResolution ?? null,
       })
-    : body;
+    : omitAdaptiveVideoRatioFromRequestBody(body);
 
   const endpoints = resolveVideoEndpoints(params.videoEndpoints);
   const url = buildVideoSubmitUrl({
