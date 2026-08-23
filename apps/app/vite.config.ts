@@ -98,78 +98,91 @@ function maintenanceHomepagePlugin(apiTarget: string): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  build: {
-    manifest: true,
-    // After "rendering chunks", Vite gzip-compresses every file just to print
-    // sizes. On 2GB Docker hosts that looks hung and can thrash the 1536MB heap.
-    reportCompressedSize: mode !== "docker-prod",
-  },
-  plugins: [
-    tailwindcss(),
-    react({
-      babel: {
-        plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
-      },
-    }),
-    bootstrapManifestPlugin(),
-    bootstrapArchivePreviewPlugin(),
-    maintenanceHomepagePlugin(apiProxyTarget),
-  ],
-  server: {
-    host: true,
-    // Docker Desktop (Windows/macOS) bind mounts often miss inotify events.
-    watch: {
-      usePolling: process.env.CHOKIDAR_USEPOLLING === "1" || !!process.env.API_PROXY_TARGET,
-      interval: 300,
+export default defineConfig(({ mode }) => {
+  const isDockerProd = mode === "docker-prod";
+
+  return {
+    build: {
+      manifest: true,
+      // After "rendering chunks", Vite gzip-compresses every file just to print
+      // sizes — skip on small Docker hosts to cut peak heap after transform.
+      reportCompressedSize: !isDockerProd,
+      sourcemap: false,
+      // Lower parallel emit reduces peak RSS during minify on constrained builders.
+      ...(isDockerProd
+        ? {
+            rollupOptions: {
+              maxParallelFileOps: 2,
+            },
+          }
+        : {}),
     },
-    proxy: {
-      ...apiProxyConfig,
-      "/api": {
-        ...apiProxyConfig["/api"],
-        configure: (proxy) => {
-          proxy.on(
-            "error",
-            (error: NodeJS.ErrnoException, _req: IncomingMessage, res) => {
-              console.error("[vite] API proxy error:", error.message);
-              if (
-                !res ||
-                typeof (res as ServerResponse).writeHead !== "function"
-              ) {
-                return;
+    plugins: [
+      tailwindcss(),
+      react({
+        babel: {
+          plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
+        },
+      }),
+      bootstrapManifestPlugin(),
+      bootstrapArchivePreviewPlugin(),
+      maintenanceHomepagePlugin(apiProxyTarget),
+    ],
+    server: {
+      host: true,
+      // Docker Desktop (Windows/macOS) bind mounts often miss inotify events.
+      watch: {
+        usePolling: process.env.CHOKIDAR_USEPOLLING === "1" || !!process.env.API_PROXY_TARGET,
+        interval: 300,
+      },
+      proxy: {
+        ...apiProxyConfig,
+        "/api": {
+          ...apiProxyConfig["/api"],
+          configure: (proxy) => {
+            proxy.on(
+              "error",
+              (error: NodeJS.ErrnoException, _req: IncomingMessage, res) => {
+                console.error("[vite] API proxy error:", error.message);
+                if (
+                  !res ||
+                  typeof (res as ServerResponse).writeHead !== "function"
+                ) {
+                  return;
+                }
+                const response = res as ServerResponse;
+                if (response.writableEnded || response.headersSent) {
+                  return;
+                }
+                response.writeHead(503, { "Content-Type": "application/json" });
+                response.end(
+                  JSON.stringify({
+                    error: "API unavailable",
+                    message:
+                      "API is starting or unreachable. Wait for [api] Node server listening in docker logs, then retry.",
+                  })
+                );
               }
-              const response = res as ServerResponse;
-              if (response.writableEnded || response.headersSent) {
-                return;
-              }
-              response.writeHead(503, { "Content-Type": "application/json" });
-              response.end(
-                JSON.stringify({
-                  error: "API unavailable",
-                  message:
-                    "API is starting or unreachable. Wait for [api] Node server listening in docker logs, then retry.",
-                })
-              );
-            }
-          );
+            );
+          },
         },
       },
     },
-  },
-  preview: {
-    host: true,
-    proxy: apiProxyConfig,
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "lucide-react/icons": path.resolve(
-        __dirname,
-        "node_modules/lucide-react/dist/esm/icons"
-      ),
+    preview: {
+      host: true,
+      proxy: apiProxyConfig,
     },
-  },
-  test: {
-    environment: "jsdom",
-  },
-}));
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+        "lucide-react/icons": path.resolve(
+          __dirname,
+          "node_modules/lucide-react/dist/esm/icons"
+        ),
+      },
+    },
+    test: {
+      environment: "jsdom",
+    },
+  };
+});
