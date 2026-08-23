@@ -91,8 +91,11 @@ ENV VITE_API_HOST=${VITE_API_HOST}
 ENV VITE_WEBSITE_URL=${VITE_WEBSITE_URL}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_WS_VIA_PROXY=${VITE_WS_VIA_PROXY}
-# Small VPS (2GB): allow Vite to use swap instead of dying at ~1GB default heap.
-ENV NODE_OPTIONS=--max-old-space-size=1536
+# Vite chunk/minify peak >1.5GB (5366+ modules). Cap must exceed peak so
+# small hosts can spill to swap instead of V8 OOM at the artificial limit.
+# Override: docker build --build-arg NODE_MAX_OLD_SPACE_SIZE=6144 ...
+ARG NODE_MAX_OLD_SPACE_SIZE=4096
+ENV NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}
 
 RUN pnpm --filter '@dafthunk/types' build \
   && pnpm --filter '@dafthunk/app' build:docker-prod
