@@ -3,7 +3,6 @@ import {
   hasFailedResource,
   hasGeneratingResource,
   isDisplayableWorkflowMedia,
-  isLocalMediaReference,
   type ImageGenerationRequestSnapshot,
 } from "@dafthunk/types";
 
@@ -87,9 +86,6 @@ function isReadyCoverMedia(
   value: unknown,
   holdUnreadyCover: boolean
 ): boolean {
-  if (isLocalMediaReference(value)) {
-    return true;
-  }
   if (!isDisplayableWorkflowMedia(value)) {
     return false;
   }
@@ -174,7 +170,7 @@ export function readDisplayHistoryMedia<TItem extends { readonly id: string }, T
 
   const shouldHold =
     hasGeneratingResource(selected) ||
-    (holdUnreadyCover && !selected.some(isLocalMediaReference));
+    (holdUnreadyCover && !selected.some(isDisplayableWorkflowMedia));
   if (!shouldHold) {
     return selected;
   }

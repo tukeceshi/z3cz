@@ -1,4 +1,4 @@
-import type { LocalMediaReference, MediaReference } from "@dafthunk/types";
+import type { MediaReference, ResourceIdReference } from "@dafthunk/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 
@@ -133,17 +133,17 @@ export function GenerativeCloudJobResumeHost({
   );
 
   const handleStaged = useCallback(
-    (localMedia: readonly LocalMediaReference[]) => {
-      if (!updateNodeData || localMedia.length === 0) {
+    (stagedMedia: readonly ResourceIdReference[]) => {
+      if (!updateNodeData || stagedMedia.length === 0) {
         return;
       }
       updateNodeData(nodeId, (current) => {
         const withPreview =
           modality === "image"
-            ? withAiImageStagingPreview(current, localMedia)
+            ? withAiImageStagingPreview(current, stagedMedia)
             : modality === "video"
-              ? withAiVideoStagingPreview(current, localMedia)
-              : withAiAudioStagingPreview(current, localMedia);
+              ? withAiVideoStagingPreview(current, stagedMedia)
+              : withAiAudioStagingPreview(current, stagedMedia);
         const withBusy = applyBusyMetadata(current.metadata, true);
         const withGenerateError =
           modality === "image"
@@ -155,7 +155,7 @@ export function GenerativeCloudJobResumeHost({
           ...withPreview,
           metadata: withGenerativeProgress(withGenerateError, {
             phase: "uploading",
-            stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+            stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
           }),
         };
       });

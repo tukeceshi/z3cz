@@ -1,14 +1,11 @@
 import {
   isEphemeralMediaReference,
-  isLocalMediaReference,
   isObjectReference,
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
 
 import { buildApiUrl } from "@/config/api";
-
-import { findStableBlobUrlForMediaId } from "./media-display-blob-url-registry";
 
 /** Fallback same-origin URL when a full ObjectReference is available (not resourceId resolve path). */
 export function createCloudObjectUrl(
@@ -32,9 +29,6 @@ export function resolveMediaFetchUrl(
   if (isEphemeralMediaReference(media)) {
     return media.url;
   }
-  if (isLocalMediaReference(media)) {
-    return findStableBlobUrlForMediaId(media.mediaId);
-  }
   if (isObjectReference(media)) {
     return createCloudObjectUrl(media, organizationId);
   }
@@ -46,9 +40,6 @@ export function resolveMediaCacheFetchUrl(
   media: MediaReference,
   organizationId: string
 ): string | null {
-  if (isLocalMediaReference(media)) {
-    return null;
-  }
   if (isObjectReference(media)) {
     return createCloudObjectUrl(media, organizationId);
   }

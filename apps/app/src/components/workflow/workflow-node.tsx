@@ -1,5 +1,5 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, readNodeLayoutFromMetadata } from "@dafthunk/types";
 import { Handle, Position } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -40,6 +40,7 @@ import { commitAiTextValue } from "./commit-ai-text-value";
 import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import {
   AI_AUDIO_CARD_WIDTH_PX,
+  AI_AUDIO_CARD_HEIGHT_PX,
   isAiAudioGenerating,
 } from "./ai-audio-node-utils";
 import {
@@ -302,6 +303,10 @@ export const WorkflowNode = memo(
             : null;
     const isGenerativeCanvasNode =
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode;
+    const persistedLayout = useMemo(
+      () => readNodeLayoutFromMetadata(data.metadata),
+      [data.metadata]
+    );
     const showBottomPanel =
       isWorkflowBottomPanelVisible(viewportZoom) &&
       (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
@@ -520,12 +525,15 @@ export const WorkflowNode = memo(
           style={
             isAiTextNode
               ? {
-                  width: AI_TEXT_CARD_WIDTH_PX,
-                  height: AI_TEXT_CARD_HEIGHT_PX,
+                  width: persistedLayout?.width ?? AI_TEXT_CARD_WIDTH_PX,
+                  height: persistedLayout?.height ?? AI_TEXT_CARD_HEIGHT_PX,
                   boxSizing: "border-box",
                 }
               : isAiAudioNode
-                ? { width: AI_AUDIO_CARD_WIDTH_PX }
+                ? {
+                    width: persistedLayout?.width ?? AI_AUDIO_CARD_WIDTH_PX,
+                    height: persistedLayout?.height ?? AI_AUDIO_CARD_HEIGHT_PX,
+                  }
                 : undefined
           }
         >

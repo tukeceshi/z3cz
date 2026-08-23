@@ -35,6 +35,8 @@ import {
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 import { cn } from "@/utils/utils";
 
+import { MediaDisplayLoadingPlaceholder } from "./media-display-loading-placeholder";
+
 import { useCreativeStudioOptional } from "./creative-studio-context";
 import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 
@@ -80,7 +82,7 @@ export function ReferenceChipMediaThumb({
   readonly thumbUrl?: string | null;
 }) {
   const media = chipMedia(chip);
-  const hookThumbUrl = useReferenceThumbUrl({
+  const { displayUrl: hookThumbUrl, phase } = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
     paused: thumbUrlOverride !== undefined,
@@ -94,6 +96,8 @@ export function ReferenceChipMediaThumb({
         alt={chip.label}
         className="h-full w-full object-cover"
       />
+    ) : phase === "loading" && (chip.kind === "image" || chip.kind === "video") ? (
+      <MediaDisplayLoadingPlaceholder className="h-full w-full" />
     ) : (
       <span className="text-muted-foreground">{fallbackIcon}</span>
     );
@@ -120,7 +124,7 @@ export function ReferenceHoverPreview({
   readonly thumbUrl?: string | null;
 }) {
   const media = chipMedia(chip);
-  const hookThumbUrl = useReferenceThumbUrl({
+  const { displayUrl: hookThumbUrl, phase } = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
     paused: thumbUrlOverride !== undefined,

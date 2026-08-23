@@ -1,12 +1,13 @@
 import {
   isEphemeralMediaReference,
-  isLocalMediaReference,
+  isResourceIdReference,
   isGrokImagineVideoCanonicalId,
   isVeoCanonicalId,
   type MediaReference,
   type NodeExecution,
   type NodeType,
   type ObjectReference,
+  type ResourceIdReference,
 } from "@dafthunk/types";
 
 import { submitVolcanoVideoTask } from "../../ai-interface/execute-volcano-video";
@@ -20,6 +21,7 @@ import {
 } from "../../ai-interface/execute-veo-video";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode, isObjectReference } from "../../node-types";
+import { resolveMediaInputUrl } from "./resolve-media-input-url";
 import {
   readModelInterfaceIdInput,
   resolveModelInterfaceIdFromInputs,
@@ -118,10 +120,10 @@ export class AiVideoNode extends ExecutableNode {
     const manualVideos = context.inputs.manual_videos;
     if (Array.isArray(manualVideos) && manualVideos.length > 0) {
       const refs = manualVideos.filter(
-        (value): value is ObjectReference | MediaReference =>
+        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
-          isLocalMediaReference(value)
+          isResourceIdReference(value)
       );
       if (refs.length > 0) {
         return this.createSuccessResult({ videos: refs }, refs.length);
@@ -130,16 +132,16 @@ export class AiVideoNode extends ExecutableNode {
 
     const prompt = context.inputs.prompt;
     const referenceValues = context.inputs[AI_VIDEO_REFERENCE_INPUT];
-    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
+    const referenceRefs: Array<MediaReference | ResourceIdReference> = Array.isArray(referenceValues)
       ? referenceValues.filter(
-          (value): value is MediaReference =>
+          (value): value is MediaReference | ResourceIdReference =>
             isObjectReference(value) ||
             isEphemeralMediaReference(value) ||
-            isLocalMediaReference(value)
+            isResourceIdReference(value)
         )
       : isObjectReference(referenceValues) ||
           isEphemeralMediaReference(referenceValues) ||
-          isLocalMediaReference(referenceValues)
+          isResourceIdReference(referenceValues)
         ? [referenceValues]
         : [];
 
@@ -206,26 +208,13 @@ export class AiVideoNode extends ExecutableNode {
 
     const referenceImageUrls: string[] = [];
     for (const ref of referenceRefs) {
-      if (isLocalMediaReference(ref)) {
+      try {
+        referenceImageUrls.push(await resolveMediaInputUrl(context, ref));
+      } catch (error) {
         return this.createErrorResult(
-          "Local browser-only reference images cannot be used in server workflow runs."
+          error instanceof Error ? error.message : "Failed to resolve reference image"
         );
       }
-
-      if (isEphemeralMediaReference(ref)) {
-        referenceImageUrls.push(ref.url);
-        continue;
-      }
-
-      if (!context.objectStore) {
-        return this.createErrorResult(
-          "Object store is not available for reference images."
-        );
-      }
-
-      referenceImageUrls.push(
-        await context.objectStore.getPresignedUrl(ref, 3600)
-      );
     }
 
     const storageResolution = context.resolveAiVideoStorage

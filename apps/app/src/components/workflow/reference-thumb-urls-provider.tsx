@@ -23,16 +23,27 @@ function ReferenceThumbUrlCollector({
   onResolved,
 }: {
   readonly chip: AiTextReferenceChip;
-  readonly onResolved: (edgeId: string, thumbUrl: string | null) => void;
+  readonly onResolved: (
+    edgeId: string,
+    thumbUrl: string | null | undefined
+  ) => void;
 }) {
-  const thumbUrl = useReferenceThumbUrl({
+  const { displayUrl, phase } = useReferenceThumbUrl({
     media: chipMedia(chip),
     nodeType: mediaNodeTypeForChip(chip),
   });
 
   useEffect(() => {
-    onResolved(chip.edgeId, thumbUrl);
-  }, [chip.edgeId, onResolved, thumbUrl]);
+    if (phase === "ready") {
+      onResolved(chip.edgeId, displayUrl);
+      return;
+    }
+    if (phase === "missing") {
+      onResolved(chip.edgeId, null);
+      return;
+    }
+    onResolved(chip.edgeId, undefined);
+  }, [chip.edgeId, displayUrl, onResolved, phase]);
 
   return null;
 }
@@ -53,8 +64,16 @@ export function ReferenceThumbUrlsProvider({
   >(() => new Map());
 
   const handleResolved = useCallback(
-    (edgeId: string, thumbUrl: string | null) => {
+    (edgeId: string, thumbUrl: string | null | undefined) => {
       setThumbUrls((current) => {
+        if (thumbUrl === undefined) {
+          if (!current.has(edgeId)) {
+            return current;
+          }
+          const next = new Map(current);
+          next.delete(edgeId);
+          return next;
+        }
         if (current.get(edgeId) === thumbUrl) {
           return current;
         }

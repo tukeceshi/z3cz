@@ -1,4 +1,4 @@
-import { forgetMediaDisplayUrlSetsForMediaId } from "@/services/media-display-url-set-memory";
+import { forgetWorkflowMediaFromCatalog } from "@/services/workflow-media-address-catalog";
 
 /** Stable object URLs keyed by org/workflow/media/tier — survives display cache invalidation. */
 
@@ -10,6 +10,15 @@ export function stagingBlobUrlKey(params: {
   readonly mediaId: string;
 }): string {
   return `${params.organizationId}:${params.workflowId}:${params.mediaId}:staging`;
+}
+
+export function mediaDisplayStableBlobUrlKey(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly tierLabel: string;
+}): string {
+  return `${params.organizationId}:${params.workflowId}:${params.mediaId}:${params.tierLabel}`;
 }
 
 export function getStableBlobUrl(stableKey: string): string | null {
@@ -61,7 +70,7 @@ export function rekeyStableBlobUrlsForMediaId(params: {
 }
 
 export function dropStableBlobUrlsForMediaId(mediaId: string): void {
-  forgetMediaDisplayUrlSetsForMediaId(mediaId);
+  forgetWorkflowMediaFromCatalog(mediaId);
   for (const [key, url] of [...stableBlobUrls.entries()]) {
     if (!key.includes(`:${mediaId}:`)) {
       continue;

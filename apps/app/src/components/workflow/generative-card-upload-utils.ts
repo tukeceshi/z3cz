@@ -1,12 +1,11 @@
-import type { MediaReference } from "@dafthunk/types";
-import { isLocalMediaReference } from "@dafthunk/types";
+import type { MediaReference, WorkflowMediaValue } from "@dafthunk/types";
+import { isResourceIdReference } from "@dafthunk/types";
 
 import type { GenerativeCardError } from "@dafthunk/types";
 import type { TranslateFn } from "@/i18n";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
-
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import type { WorkflowParameter } from "./workflow-types";
 
@@ -140,7 +139,7 @@ export function warmGenerativeCardUploadCache(params: {
   readonly media: MediaReference;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
 }): void {
-  if (!params.workflowId || isLocalMediaReference(params.media)) {
+  if (!params.workflowId) {
     return;
   }
 
@@ -208,11 +207,15 @@ export function hasGenerativePrompt(prompt: string): boolean {
 }
 
 export function resolveGenerativeCardUploadError(params: {
-  readonly value: MediaReference;
+  readonly value: MediaReference | WorkflowMediaValue;
   readonly cloudConfigured: boolean;
   readonly t: TranslateFn;
 }): GenerativeCardError | null {
-  if (!params.cloudConfigured || !isLocalMediaReference(params.value)) {
+  if (
+    !params.cloudConfigured ||
+    !isResourceIdReference(params.value) ||
+    params.value.cloudUploadFailed !== true
+  ) {
     return null;
   }
   return prepareGenerativeCardError(

@@ -1,34 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveGenerativeStudioDropFile } from "./generative-card-upload-utils";
+import { resolveGenerativeCardUploadError } from "./generative-card-upload-utils";
 
-describe("resolveGenerativeStudioDropFile", () => {
-  it("resolves image files", () => {
-    const file = new File(["x"], "photo.png", { type: "image/png" });
-    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
-      kind: "image",
-      nodeType: "ai-image",
+const t = (key: string) => key;
+
+describe("resolveGenerativeCardUploadError", () => {
+  it("returns an error when cloud upload failed locally", () => {
+    const error = resolveGenerativeCardUploadError({
+      value: {
+        resourceId: "res-1",
+        mimeType: "image/png",
+        cloudUploadFailed: true,
+      },
+      cloudConfigured: true,
+      t,
     });
+
+    expect(error).not.toBeNull();
+    expect(error?.summary).toBe(
+      "workflow.generativeErrors.cloudUploadFailedSavedLocally"
+    );
   });
 
-  it("resolves video files", () => {
-    const file = new File(["x"], "clip.mp4", { type: "video/mp4" });
-    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
-      kind: "video",
-      nodeType: "ai-video",
-    });
-  });
-
-  it("resolves audio files", () => {
-    const file = new File(["x"], "track.mp3", { type: "audio/mpeg" });
-    expect(resolveGenerativeStudioDropFile(file)).toMatchObject({
-      kind: "audio",
-      nodeType: "ai-audio",
-    });
-  });
-
-  it("rejects unsupported files", () => {
-    const file = new File(["x"], "notes.txt", { type: "text/plain" });
-    expect(resolveGenerativeStudioDropFile(file)).toBeNull();
+  it("returns null for successful cloud uploads", () => {
+    expect(
+      resolveGenerativeCardUploadError({
+        value: { resourceId: "res-1", mimeType: "image/png" },
+        cloudConfigured: true,
+        t,
+      })
+    ).toBeNull();
   });
 });

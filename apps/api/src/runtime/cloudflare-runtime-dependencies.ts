@@ -44,6 +44,7 @@ import { resolveAiAudioStorage } from "../services/ai-audio-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "../services/assert-cloud-storage-healthy-for-generative-media";
 import { createWorkflowGenerationJobTracker } from "../services/workflow-generation-job-tracker";
 import { readTextContentBody } from "../services/text-content-service";
+import { resolveResourceRefs } from "../services/resolve-resource-refs";
 
 export async function buildDependencies(
   env: Bindings,
@@ -126,6 +127,16 @@ export async function buildDependencies(
     },
     trackWorkflowGenerationJob: createWorkflowGenerationJobTracker(env),
     readTextContent: (params) => readTextContentBody(env, params),
+    resolveResourceUrl: async (params) => {
+      const result = await resolveResourceRefs(env, {
+        organizationId: params.organizationId,
+        resourceIds: [params.resourceId],
+      });
+      const hit = result.resolved.find(
+        (entry) => entry.resourceId === params.resourceId
+      );
+      return hit?.url ?? null;
+    },
     runtimeVersion,
   };
 }

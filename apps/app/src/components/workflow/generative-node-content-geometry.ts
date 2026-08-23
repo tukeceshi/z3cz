@@ -3,6 +3,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
+  readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
 import type { InternalNode, Node, Node as ReactFlowNode } from "@xyflow/react";
 
@@ -55,8 +56,15 @@ function fallbackContentSize(nodeType: string | undefined): {
  */
 export function resolveGenerativeLayoutContentSize(
   nodeType: string | undefined,
-  node?: Pick<ReactFlowNode, "measured" | "width" | "height">
+  node?: Pick<ReactFlowNode, "measured" | "width" | "height"> & {
+    readonly data?: { readonly metadata?: Record<string, string> };
+  }
 ): { width: number; height: number } {
+  const fromMetadata = readNodeLayoutFromMetadata(node?.data?.metadata);
+  if (fromMetadata) {
+    return fromMetadata;
+  }
+
   if (
     nodeType === AI_TEXT_NODE_TYPE ||
     nodeType === AI_AUDIO_NODE_TYPE

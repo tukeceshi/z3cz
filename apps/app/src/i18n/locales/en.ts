@@ -2786,6 +2786,9 @@ export const en = {
       cloudUploadFailed: "Cloud upload failed. Check bucket CORS and try again",
       cloudUploadFailedSavedLocally:
         "Cloud upload failed. The file was saved locally in this browser",
+      uploadingReferencesToCloud: "Uploading references to cloud…",
+      referenceCloudUploadFailed:
+        "Could not upload reference media to cloud. Check storage settings and try again",
       cloudStorageUnavailable:
         "Cloud storage is unavailable. Check AI interface storage settings",
       realPersonInReferenceRejected:

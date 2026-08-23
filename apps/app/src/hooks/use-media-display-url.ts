@@ -7,7 +7,8 @@ import { useMemo } from "react";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
 import {
-  resolveMediaDisplayReadiness,
+  resolveMediaDisplay,
+  type MediaDisplay,
   type MediaDisplayPhase,
 } from "@/services/media-display-readiness";
 
@@ -17,6 +18,46 @@ export interface SharedMediaDisplayUrlSet {
   readonly urlSet: MediaDisplayUrlSet;
   readonly stale: boolean;
   readonly retry: () => void;
+}
+
+export function useMediaDisplayAtSize(params: {
+  readonly media: WorkflowMediaValue | null;
+  readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
+  readonly size: MediaDisplaySize;
+  readonly paused?: boolean;
+  readonly sharedUrlSet?: SharedMediaDisplayUrlSet;
+}): MediaDisplay & {
+  readonly urlSet: MediaDisplayUrlSet;
+  readonly stale: boolean;
+  readonly retry: () => void;
+} {
+  const internal = useMediaDisplayUrlSet({
+    media: params.sharedUrlSet ? null : params.media,
+    nodeType: params.nodeType,
+    paused: params.paused,
+    preferredSize: params.size,
+  });
+  const urlSet = params.sharedUrlSet?.urlSet ?? internal.urlSet;
+  const stale = params.sharedUrlSet?.stale ?? internal.stale;
+  const retry = params.sharedUrlSet?.retry ?? internal.retry;
+
+  const display = useMemo(
+    () =>
+      resolveMediaDisplay({
+        media: params.media,
+        urlSet,
+        stale,
+        size: params.size,
+      }),
+    [params.media, params.size, stale, urlSet]
+  );
+
+  return {
+    ...display,
+    urlSet,
+    stale,
+    retry,
+  };
 }
 
 /** One fetch layer + full-size readiness for generative canvas cards. */
@@ -35,9 +76,9 @@ export function useGenerativeCardMediaDisplay(params: {
     () => ({ urlSet, stale, retry }),
     [urlSet, stale, retry]
   );
-  const fullReadiness = useMemo(
+  const fullDisplay = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media: params.media,
         urlSet,
         size: "full",
@@ -49,7 +90,7 @@ export function useGenerativeCardMediaDisplay(params: {
   return {
     sharedUrlSet,
     fullDisplayUrl:
-      fullReadiness.phase === "ready" ? fullReadiness.displayUrl : null,
+      fullDisplay.phase === "ready" ? fullDisplay.displayUrl : null,
   };
 }
 
@@ -78,11 +119,12 @@ export function useMediaDisplayUrl({
     media,
     nodeType,
     paused,
+    preferredSize: size,
   });
 
-  const readiness = useMemo(
+  const display = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media,
         urlSet,
         size,
@@ -92,8 +134,8 @@ export function useMediaDisplayUrl({
   );
 
   return {
-    displayUrl: readiness.displayUrl,
-    phase: readiness.phase,
+    displayUrl: display.displayUrl,
+    phase: display.phase,
     stale,
     retry,
   };

@@ -21,6 +21,7 @@ import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { CanvasMaintenanceProvider, useCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
+import { useWorkflowMediaAddressCatalogInit } from "@/hooks/use-workflow-media-address-catalog-init";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -69,6 +70,7 @@ function EditorPageCanvas() {
   const appToast = useAppToast();
   const orgId = organization?.id || "";
   const { getOrgUrl } = useOrgUrl();
+  const mediaAddressCatalogReady = useWorkflowMediaAddressCatalogInit(orgId, id);
 
   const [httpWorkflowMetadata, setHttpWorkflowMetadata] =
     useState<WorkflowWithMetadata | null>(() => {
@@ -273,7 +275,8 @@ function EditorPageCanvas() {
     isWorkflowInitializing ||
     !effectiveWorkflowMetadata ||
     !httpMetadataLoaded ||
-    !isEditorViewportReady;
+    !isEditorViewportReady ||
+    !mediaAddressCatalogReady;
 
   if (isLoading) {
     return <InsetLoading />;

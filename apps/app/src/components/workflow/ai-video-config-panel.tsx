@@ -9,7 +9,7 @@ import {
   readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
-  type LocalMediaReference,
+  type ResourceIdReference,
   type MediaReference,
   type ObjectReference,
   type OrgTextModelOption,
@@ -41,6 +41,7 @@ import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storag
 import { useObjectService } from "@/services/object-service";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import { stageGenerativeMediaFromEphemeralUrl } from "@/services/stage-generative-media";
+import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 import {
@@ -155,6 +156,7 @@ import {
   generativeVideoProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
 import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
+import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
@@ -183,6 +185,7 @@ async function pollUntilVideoReady(
   options?: {
     readonly signal?: AbortSignal;
     readonly shouldAbort?: () => boolean;
+    readonly patchNodeLayout?: PatchNodeLayoutMetadata;
   }
 ): Promise<MediaReference> {
   for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
@@ -210,6 +213,7 @@ async function pollUntilVideoReady(
           sourceUrl: result.videoUrl,
           mimeType: "video/mp4",
           nodeType: "ai-video",
+          patchNodeLayout: options?.patchNodeLayout,
         });
       }
       throw new Error("Video generation succeeded without a playable reference");
@@ -259,6 +263,14 @@ export function AiVideoConfigPanel({
   const orgId = organization?.id;
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
+
+  const patchNodeLayout = useMemo(
+    () =>
+      updateNodeData
+        ? createPatchNodeLayoutMetadata(nodeId, updateNodeData)
+        : undefined,
+    [nodeId, updateNodeData]
+  );
 
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
@@ -528,10 +540,10 @@ export function AiVideoConfigPanel({
   const promptOverLimit = promptCompiledLength > promptMaxLength;
 
   const handleStaged = useCallback(
-    (localMedia: readonly LocalMediaReference[]) => {
-      if (!updateNodeData || localMedia.length === 0) return;
+    (stagedMedia: readonly ResourceIdReference[]) => {
+      if (!updateNodeData || stagedMedia.length === 0) return;
       updateNodeData(nodeId, (current) => {
-        const withPreview = withAiVideoStagingPreview(current, localMedia);
+        const withPreview = withAiVideoStagingPreview(current, stagedMedia);
         return {
           ...withPreview,
           metadata: withAiVideoGenerateError(
@@ -539,7 +551,7 @@ export function AiVideoConfigPanel({
               withAiVideoGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
-                stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+                stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
               }
             ),
             null
@@ -1093,7 +1105,7 @@ export function AiVideoConfigPanel({
             submitPayload.modelCanonicalId,
             workflowId,
             (phase) => syncProgress({ phase }),
-            { signal, shouldAbort: isCancelConfirmed }
+            { signal, shouldAbort: isCancelConfirmed, patchNodeLayout }
           );
         }
         return {

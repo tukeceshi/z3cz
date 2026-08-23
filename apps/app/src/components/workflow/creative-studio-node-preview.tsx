@@ -19,6 +19,8 @@ import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
 import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
+
+import { MediaDisplayLoadingPlaceholder } from "./media-display-loading-placeholder";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
@@ -597,7 +599,7 @@ function ReferenceThumb({
 }) {
   const media =
     chip.media && isWorkflowMediaValue(chip.media) ? chip.media : null;
-  const thumbUrl = useReferenceThumbUrl({
+  const { displayUrl: thumbUrl, phase } = useReferenceThumbUrl({
     media,
     nodeType: "ai-image",
   });
@@ -609,6 +611,12 @@ function ReferenceThumb({
         alt=""
         className={STUDIO_REFERENCE_THUMB}
       />
+    );
+  }
+
+  if (phase === "loading" && media) {
+    return (
+      <MediaDisplayLoadingPlaceholder className={STUDIO_REFERENCE_THUMB} />
     );
   }
 

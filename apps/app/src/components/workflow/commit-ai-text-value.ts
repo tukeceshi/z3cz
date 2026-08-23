@@ -23,6 +23,7 @@ import {
   readAiTextResultHistory,
 } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
 import { hangAiTextDisplayFromReference } from "@/services/ai-text-display-registry";
 import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
@@ -128,11 +129,16 @@ export async function commitAiTextValue(
   const baseSha256 = readAiTextResultContentSha256(params.current.inputs);
 
   const stageFallback = async (): Promise<WorkflowMediaValue> => {
+    const patchNodeLayout = createPatchNodeLayoutMetadata(
+      params.nodeId,
+      params.updateNodeData
+    );
     const local = await stageAiTextContent({
       organizationId: params.organizationId,
       workflowId: params.workflowId,
       text: params.value,
       mediaId: existingId,
+      patchNodeLayout,
     });
     if (existingId && isResourceIdReference(existingReference)) {
       return buildResourceIdReference({

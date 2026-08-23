@@ -146,6 +146,11 @@ export interface RuntimeDependencies<Env = unknown> {
     readonly organizationId: string;
     readonly resourceId: string;
   }) => Promise<string | null>;
+  /** Resolve a catalog resource id to a fetch URL (cloud/ephemeral). */
+  resolveResourceUrl?: (params: {
+    readonly organizationId: string;
+    readonly resourceId: string;
+  }) => Promise<string | null>;
   runtimeVersion?: string;
 }
 
@@ -192,6 +197,7 @@ export abstract class Runtime<Env = unknown> {
   protected resolveAiAudioStorage?: ResolveAiImageStorage;
   protected trackWorkflowGenerationJob?: import("./generation-job-tracker").WorkflowGenerationJobTracker;
   protected readTextContent?: RuntimeDependencies<Env>["readTextContent"];
+  protected resolveResourceUrl?: RuntimeDependencies<Env>["resolveResourceUrl"];
   protected env: Env;
   protected runtimeVersion?: string;
   protected userPlan?: string;
@@ -235,6 +241,7 @@ export abstract class Runtime<Env = unknown> {
     this.resolveAiAudioStorage = dependencies.resolveAiAudioStorage;
     this.trackWorkflowGenerationJob = dependencies.trackWorkflowGenerationJob;
     this.readTextContent = dependencies.readTextContent;
+    this.resolveResourceUrl = dependencies.resolveResourceUrl;
     this.runtimeVersion = dependencies.runtimeVersion;
   }
 
@@ -1333,6 +1340,13 @@ export abstract class Runtime<Env = unknown> {
         readTextContent: this.readTextContent
           ? (resourceId) =>
               this.readTextContent!({
+                organizationId: context.organizationId,
+                resourceId,
+              })
+          : undefined,
+        resolveResourceUrl: this.resolveResourceUrl
+          ? (resourceId) =>
+              this.resolveResourceUrl!({
                 organizationId: context.organizationId,
                 resourceId,
               })

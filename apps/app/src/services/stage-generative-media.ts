@@ -1,29 +1,31 @@
 import type {
-  LocalMediaReference,
   MediaReference,
   ObjectReference,
+  PatchNodeLayoutMetadata,
   ResourceIdReference,
   WorkflowMediaValue,
 } from "@dafthunk/types";
 
 import {
   getResourceIdFromValue,
-  isLocalMediaReference,
   isResourceIdReference,
   mediaReferenceToWorkflowValue,
 } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
   cacheMediaFromUrl,
   getCachedMediaBlob,
 } from "@/services/ai-media-cache-service";
 import {
+  commitNodeLayoutFromStaging,
   readGenerativeStagingBlob,
   writeGenerativeStaging,
-  writeGenerativeStagingWithNewId,
+  writeGenerativeStagingWithResourceId,
 } from "@/services/generative-media-staging";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
+import { registerMediaResource } from "@/services/register-media-resource";
 import {
   requireStagingWorkflowId,
   uploadBlobToCloudStorage,
@@ -57,6 +59,7 @@ export async function stageGenerativeMediaBlob(params: {
   readonly blob: Blob;
   readonly mimeType: string;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
 }): Promise<boolean> {
   const cachedOk = await writeGenerativeStaging({
     organizationId: params.organizationId,
@@ -66,6 +69,7 @@ export async function stageGenerativeMediaBlob(params: {
     blob: params.blob,
     mimeType: params.mimeType,
     nodeType: params.nodeType,
+    patchNodeLayout: params.patchNodeLayout,
   });
 
   if (cachedOk) {
@@ -82,6 +86,7 @@ export async function uploadGenerativeMediaFile(params: {
   readonly cloudConfigured: boolean;
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
   readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
 }): Promise<WorkflowMediaValue> {
   const mimeType = params.file.type || "application/octet-stream";
   const workflowId = requireStagingWorkflowId(params.workflowId);
@@ -89,15 +94,24 @@ export async function uploadGenerativeMediaFile(params: {
     params.nodeType ?? inferNodeTypeFromMediaKind(params.mediaKind, mimeType);
 
   if (!params.cloudConfigured) {
-    const { mediaId } = await writeGenerativeStagingWithNewId({
+    const resourceId = allocateGenerativeMediaResourceId();
+    await writeGenerativeStagingWithResourceId({
       organizationId: params.organizationId,
       workflowId,
+      resourceId,
       blob: params.file,
       mimeType,
       nodeType,
+      patchNodeLayout: params.patchNodeLayout,
     });
     notifyAiMediaCacheChanged();
-    return { kind: "local", mediaId, mimeType };
+    await registerMediaResource({
+      organizationId: params.organizationId,
+      id: resourceId,
+      kind: "local",
+      mimeType,
+    });
+    return { resourceId, mimeType };
   }
 
   return uploadBlobToCloudWorkflow({
@@ -117,6 +131,7 @@ export async function stageGenerativeCardUpload(params: {
   readonly cloudConfigured: boolean;
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
 }): Promise<WorkflowMediaValue> {
   return uploadGenerativeMediaFile({
     organizationId: params.organizationId,
@@ -125,6 +140,7 @@ export async function stageGenerativeCardUpload(params: {
     cloudConfigured: params.cloudConfigured,
     mediaKind: params.mediaKind,
     nodeType: params.nodeType,
+    patchNodeLayout: params.patchNodeLayout,
   });
 }
 
@@ -134,6 +150,7 @@ export async function ensureGenerativeMediaCached(params: {
   readonly media: WorkflowMediaValue;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly blob?: Blob;
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
 }): Promise<void> {
   if (!params.workflowId) return;
 
@@ -149,26 +166,8 @@ export async function ensureGenerativeMediaCached(params: {
       mimeType:
         params.media.mimeType || params.blob.type || "application/octet-stream",
       nodeType: params.nodeType,
+      patchNodeLayout: params.patchNodeLayout,
     });
-    return;
-  }
-
-  if (isLocalMediaReference(params.media)) {
-    const entry = await readGenerativeStagingBlob({
-      mediaId: params.media.mediaId,
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-    });
-    if (entry) {
-      await stageGenerativeMediaBlob({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        mediaId: params.media.mediaId,
-        blob: entry.blob,
-        mimeType: params.media.mimeType || entry.mimeType,
-        nodeType: params.nodeType,
-      });
-    }
     return;
   }
 
@@ -182,6 +181,24 @@ export async function ensureGenerativeMediaCached(params: {
       return;
     }
 
+    const staged = await readGenerativeStagingBlob({
+      mediaId,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    });
+    if (staged) {
+      await stageGenerativeMediaBlob({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId,
+        blob: staged.blob,
+        mimeType: params.media.mimeType || staged.mimeType,
+        nodeType: params.nodeType,
+        patchNodeLayout: params.patchNodeLayout,
+      });
+      return;
+    }
+
     const cachedOk = await cacheMediaFromUrl({
       organizationId: params.organizationId,
       workflowId: params.workflowId,
@@ -191,6 +208,13 @@ export async function ensureGenerativeMediaCached(params: {
     });
     if (cachedOk) {
       notifyAiMediaCacheChanged();
+      await commitNodeLayoutFromStaging({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId,
+        nodeType: params.nodeType,
+        patchNodeLayout: params.patchNodeLayout,
+      });
     }
   }
 }
@@ -201,7 +225,8 @@ export async function stageGenerativeMediaFromEphemeralUrl(params: {
   readonly sourceUrl: string;
   readonly mimeType: string;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
-}): Promise<LocalMediaReference> {
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
+}): Promise<ResourceIdReference> {
   const workflowId = requireStagingWorkflowId(params.workflowId);
   const fetchUrl = buildMediaProxyEndpoint(
     params.organizationId,
@@ -223,15 +248,24 @@ export async function stageGenerativeMediaFromEphemeralUrl(params: {
         ? "audio/mpeg"
         : "image/png");
 
-  const { mediaId } = await writeGenerativeStagingWithNewId({
+  const resourceId = allocateGenerativeMediaResourceId();
+  await writeGenerativeStagingWithResourceId({
     organizationId: params.organizationId,
     workflowId,
+    resourceId,
     blob,
     mimeType,
     nodeType: params.nodeType,
+    patchNodeLayout: params.patchNodeLayout,
   });
   notifyAiMediaCacheChanged();
-  return { kind: "local", mediaId, mimeType };
+  await registerMediaResource({
+    organizationId: params.organizationId,
+    id: resourceId,
+    kind: "local",
+    mimeType,
+  });
+  return { resourceId, mimeType };
 }
 
 /** Job persist complete — returns object ref for server validation. */
@@ -265,8 +299,7 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
     mimeType,
     mediaKind: params.mediaKind ?? "reference",
     nodeType,
-    existingLocalMediaId: params.mediaId,
-    objectId: params.objectId,
+    resourceId: params.objectId ?? params.mediaId,
   });
 
   return result.object;

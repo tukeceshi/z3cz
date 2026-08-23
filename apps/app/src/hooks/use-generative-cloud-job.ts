@@ -21,7 +21,7 @@ import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
-import type { ImageGenerationRequestSnapshot, LocalMediaReference, WorkflowMediaValue } from "@dafthunk/types";
+import type { ImageGenerationRequestSnapshot, ResourceIdReference, WorkflowMediaValue } from "@dafthunk/types";
 import { VIDEO_JOB_CLIENT_POLL_INTERVAL_MS } from "@dafthunk/types";
 
 const JOB_POLL_INTERVAL_MS = VIDEO_JOB_CLIENT_POLL_INTERVAL_MS;
@@ -107,7 +107,7 @@ interface UseGenerativeCloudJobOptions {
     metadata: Record<string, string> | undefined,
     busy: boolean
   ) => Record<string, string> | undefined;
-  readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
+  readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
   readonly onResumeSuccess?: (
     result: ResolveGenerativeJobMediaResult
   ) => void | Promise<void>;
@@ -210,13 +210,13 @@ export function useGenerativeCloudJobProgress(
           stagingMediaIds: readGenerativeStagingMediaIds(options.metadata),
           onPhase: options.setPersistPhase,
           onProgressPhase: (phase) => syncProgress({ jobId, phase }),
-          onStaged: (localMedia) => {
+          onStaged: (stagedMedia) => {
             syncProgress({
               jobId,
               phase: "uploading",
-              stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+              stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
             });
-            options.onStaged?.(localMedia);
+            options.onStaged?.(stagedMedia);
           },
           shouldAbortJobPoll: options.shouldAbortJobPoll,
         });

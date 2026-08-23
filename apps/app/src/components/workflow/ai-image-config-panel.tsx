@@ -2,7 +2,7 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   normalizeImageModelParameterRules,
-  type LocalMediaReference,
+  type ResourceIdReference,
   type MediaReference,
   type ObjectReference,
   type OrgImageModelOption,
@@ -318,10 +318,10 @@ export function AiImageConfigPanel({
     promptForGenerate.trim().length > promptMaxLength;
 
   const handleStaged = useCallback(
-    (localMedia: readonly LocalMediaReference[]) => {
-      if (!updateNodeData) return;
+    (stagedMedia: readonly ResourceIdReference[]) => {
+      if (!updateNodeData || stagedMedia.length === 0) return;
       updateNodeData(nodeId, (current) => {
-        const withPreview = withAiImageStagingPreview(current, localMedia);
+        const withPreview = withAiImageStagingPreview(current, stagedMedia);
         return {
           ...withPreview,
           metadata: withAiImageGenerateError(
@@ -329,7 +329,7 @@ export function AiImageConfigPanel({
               withAiImageGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
-                stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+                stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
               }
             ),
             null

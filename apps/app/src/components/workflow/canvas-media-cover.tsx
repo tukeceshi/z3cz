@@ -12,7 +12,8 @@ import { useTranslation } from "@/components/locale-provider";
 import { useCanvasMediaCoverUrl } from "@/hooks/use-canvas-media-cover-url";
 import type { SharedMediaDisplayUrlSet } from "@/hooks/use-media-display-url";
 import { deleteCachedMediaEntry } from "@/services/ai-media-cache-service";
-import { resolveMediaDisplayReadiness } from "@/services/media-display-readiness";
+import { resolveMediaDisplay } from "@/services/media-display-readiness";
+import { MediaDisplayLoadingPlaceholder } from "./media-display-loading-placeholder";
 import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
@@ -332,13 +333,7 @@ function CanvasMediaLoadingPlaceholder({
   readonly className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "absolute inset-0 bg-muted/30 animate-pulse",
-        className
-      )}
-      aria-hidden
-    />
+    <MediaDisplayLoadingPlaceholder className={cn("absolute inset-0", className)} />
   );
 }
 
@@ -437,9 +432,9 @@ function CanvasVideoCover({
   });
   const hoverPreviewEnabled =
     !staticCover && isHovered && isCanvasOnScreen;
-  const fullVideoReadiness = useMemo(
+  const fullVideoDisplay = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media: hoverPreviewEnabled ? media : null,
         urlSet,
         size: "full",
@@ -448,7 +443,7 @@ function CanvasVideoCover({
     [hoverPreviewEnabled, media, stale, urlSet]
   );
   const videoUrl =
-    fullVideoReadiness.phase === "ready" ? fullVideoReadiness.displayUrl : null;
+    fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null;
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);

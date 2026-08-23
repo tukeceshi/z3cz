@@ -7,8 +7,9 @@ import {
   isMediaReference,
   type MediaReference,
   type ObjectReference,
+  readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import ZoomInIcon from "lucide-react/icons/zoom-in";
 
@@ -69,6 +70,7 @@ import {
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
+import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
 import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
@@ -115,6 +117,17 @@ function AiImageWidget({
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
+  const initialLayout = useMemo(
+    () => readNodeLayoutFromMetadata(metadata),
+    [metadata]
+  );
+  const patchNodeLayout = useMemo(
+    () =>
+      updateNodeData
+        ? createPatchNodeLayoutMetadata(nodeId, updateNodeData)
+        : undefined,
+    [nodeId, updateNodeData]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageZoomTriggerRef = useRef<HTMLButtonElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
@@ -175,6 +188,7 @@ function AiImageWidget({
     hasMedia: hasImage,
     mediaKey: primaryImageKey,
     holdSize: cardDisplay.isBusy,
+    initialLayout,
   });
   const cardPlaceholder = t(
     generativeCardProgressKey(
@@ -280,6 +294,7 @@ function AiImageWidget({
           cloudConfigured,
           mediaKind: "ai-image",
           nodeType: "ai-image",
+          patchNodeLayout,
         });
 
         warmCardUploadPersist({

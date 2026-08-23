@@ -1,8 +1,8 @@
 import type {
   GenerationJobPendingMedia,
   GenerationJobRecord,
-  LocalMediaReference,
   ObjectReference,
+  ResourceIdReference,
   WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
@@ -15,9 +15,10 @@ import {
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
   readGenerativeStagingByMediaId,
-  writeGenerativeStagingWithNewId,
+  writeGenerativeStagingWithResourceId,
 } from "@/services/generative-media-staging";
 import {
   claimGenerationJobClientUpload,
@@ -41,23 +42,23 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-function localRefFromStaging(
-  mediaId: string,
+function resourceRefFromStaging(
+  resourceId: string,
   mimeType: string
-): LocalMediaReference {
-  return { kind: "local", mediaId, mimeType };
+): ResourceIdReference {
+  return { resourceId, mimeType };
 }
 
-async function resolveExistingLocalRefs(
-  stagingMediaIds: readonly string[]
-): Promise<LocalMediaReference[]> {
-  const refs: LocalMediaReference[] = [];
-  for (const mediaId of stagingMediaIds) {
-    const entry = await readGenerativeStagingByMediaId(mediaId);
+async function resolveExistingStagedRefs(
+  stagingResourceIds: readonly string[]
+): Promise<ResourceIdReference[]> {
+  const refs: ResourceIdReference[] = [];
+  for (const resourceId of stagingResourceIds) {
+    const entry = await readGenerativeStagingByMediaId(resourceId);
     if (!entry) {
       return [];
     }
-    refs.push(localRefFromStaging(mediaId, entry.mimeType));
+    refs.push(resourceRefFromStaging(resourceId, entry.mimeType));
   }
   return refs;
 }
@@ -67,7 +68,7 @@ async function downloadToAiStaging(params: {
   readonly workflowId?: string;
   readonly item: GenerationJobPendingMedia;
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
-}): Promise<LocalMediaReference> {
+}): Promise<ResourceIdReference> {
   params.onPhase?.("downloading");
 
   const fetchUrl = buildMediaProxyEndpoint(
@@ -90,21 +91,23 @@ async function downloadToAiStaging(params: {
         ? "audio/mpeg"
         : "image/png");
 
-  const { mediaId } = await writeGenerativeStagingWithNewId({
+  const resourceId = params.item.resourceId?.trim() || allocateGenerativeMediaResourceId();
+  await writeGenerativeStagingWithResourceId({
     organizationId: params.organizationId,
     workflowId: params.workflowId ?? "uploads",
+    resourceId,
     blob,
     mimeType,
     nodeType: params.item.mediaKind,
   });
 
-  return localRefFromStaging(mediaId, mimeType);
+  return resourceRefFromStaging(resourceId, mimeType);
 }
 
 async function uploadFromAiStaging(params: {
   readonly organizationId: string;
   readonly workflowId?: string;
-  readonly localRef: LocalMediaReference;
+  readonly stagedRef: ResourceIdReference;
   readonly mediaKind: "ai-image" | "ai-video" | "ai-audio";
   readonly objectId?: string;
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
@@ -113,10 +116,10 @@ async function uploadFromAiStaging(params: {
   return uploadGenerativeMediaFromLocalStaging({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
-    mediaId: params.localRef.mediaId,
-    mimeType: params.localRef.mimeType,
+    mediaId: params.stagedRef.resourceId,
+    mimeType: params.stagedRef.mimeType ?? "application/octet-stream",
     mediaKind: params.mediaKind,
-    objectId: params.objectId,
+    objectId: params.objectId ?? params.stagedRef.resourceId,
   });
 }
 
@@ -191,11 +194,11 @@ async function pollUntilJobSucceeded(params: {
   }
 }
 
-function allLocalRefsReady(
-  localRefs: readonly (LocalMediaReference | undefined)[],
+function allStagedRefsReady(
+  stagedRefs: readonly (ResourceIdReference | undefined)[],
   count: number
-): localRefs is LocalMediaReference[] {
-  return localRefs.length === count && localRefs.every(Boolean);
+): stagedRefs is ResourceIdReference[] {
+  return stagedRefs.length === count && stagedRefs.every(Boolean);
 }
 
 export async function runGenerationJobPersistWorker(params: {
@@ -205,7 +208,7 @@ export async function runGenerationJobPersistWorker(params: {
   readonly stagingMediaIds?: readonly string[];
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
-  readonly onStaged?: (localMedia: readonly LocalMediaReference[]) => void;
+  readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly WorkflowMediaValue[]> {
   const notify = params.onProgressPhase;
@@ -226,12 +229,12 @@ export async function runGenerationJobPersistWorker(params: {
     throw new Error("Generation job has no media to persist");
   }
 
-  const localRefs: (LocalMediaReference | undefined)[] = [];
+  const stagedRefs: (ResourceIdReference | undefined)[] = [];
   if (params.stagingMediaIds && params.stagingMediaIds.length > 0) {
-    const restored = await resolveExistingLocalRefs(params.stagingMediaIds);
+    const restored = await resolveExistingStagedRefs(params.stagingMediaIds);
     if (restored.length === pendingMedia.length) {
       restored.forEach((ref, index) => {
-        localRefs[index] = ref;
+        stagedRefs[index] = ref;
       });
       params.onStaged?.(restored);
     }
@@ -247,8 +250,8 @@ export async function runGenerationJobPersistWorker(params: {
       if (response.finalMedia && response.finalMedia.length > 0) {
         return response.finalMedia;
       }
-      if (allLocalRefsReady(localRefs, pendingMedia.length)) {
-        return localRefs;
+      if (allStagedRefsReady(stagedRefs, pendingMedia.length)) {
+        return stagedRefs;
       }
       throw new Error("Generation succeeded without display media");
     }
@@ -266,8 +269,8 @@ export async function runGenerationJobPersistWorker(params: {
       if (succeeded.finalMedia && succeeded.finalMedia.length > 0) {
         return succeeded.finalMedia;
       }
-      if (allLocalRefsReady(localRefs, pendingMedia.length)) {
-        return localRefs;
+      if (allStagedRefsReady(stagedRefs, pendingMedia.length)) {
+        return stagedRefs;
       }
       return [];
     }
@@ -279,21 +282,21 @@ export async function runGenerationJobPersistWorker(params: {
     let downloadFailed = false;
 
     for (let index = 0; index < pendingMedia.length; index += 1) {
-      if (localRefs[index]) {
+      if (stagedRefs[index]) {
         continue;
       }
 
       notify?.("downloading");
 
       try {
-        localRefs[index] = await downloadToAiStaging({
+        stagedRefs[index] = await downloadToAiStaging({
           organizationId: params.organizationId,
           workflowId: params.workflowId,
           item: pendingMedia[index]!,
           onPhase: params.onPhase,
         });
         params.onStaged?.(
-          localRefs.filter((ref): ref is LocalMediaReference => Boolean(ref))
+          stagedRefs.filter((ref): ref is ResourceIdReference => Boolean(ref))
         );
         notify?.("uploading");
         retryIntervalMs = MIN_RETRY_INTERVAL_MS;
@@ -303,7 +306,7 @@ export async function runGenerationJobPersistWorker(params: {
       }
     }
 
-    if (downloadFailed || !allLocalRefsReady(localRefs, pendingMedia.length)) {
+    if (downloadFailed || !allStagedRefsReady(stagedRefs, pendingMedia.length)) {
       await sleep(retryIntervalMs);
       retryIntervalMs = Math.min(
         Math.round(retryIntervalMs * 1.5),
@@ -322,7 +325,7 @@ export async function runGenerationJobPersistWorker(params: {
         objectRefs[index] = await uploadFromAiStaging({
           organizationId: params.organizationId,
           workflowId: params.workflowId,
-          localRef: localRefs[index]!,
+          stagedRef: stagedRefs[index]!,
           mediaKind: pendingMedia[index]!.mediaKind,
           objectId: pendingMedia[index]!.resourceId,
           onPhase: params.onPhase,

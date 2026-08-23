@@ -516,7 +516,7 @@ export function isAiImageResourceGenerating(
  */
 export function withAiImageStagingPreview(
   current: WorkflowNodeType,
-  images: readonly MediaReference[]
+  images: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   const inputs = upsertInputValue(
     current.inputs,

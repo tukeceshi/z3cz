@@ -2,12 +2,12 @@ import type {
   ReferenceImageInline,
   WorkflowMediaValue,
 } from "@dafthunk/types";
-import { getResourceIdFromValue, isLocalMediaReference } from "@dafthunk/types";
+import { getResourceIdFromValue } from "@dafthunk/types";
 
+import { ensureReferencesCloudForGenerate } from "@/services/ensure-references-cloud-for-generate";
 import { collectResourceIds } from "@/services/ensure-resource-cached";
 import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
-import { resolveCanonicalResourceId } from "@/services/media-resource-alias-service";
-import { makeRequest } from "@/services/utils";
+import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
 export type {
   ResolvedMediaReferencesForTextGenerate,
@@ -21,19 +21,6 @@ import type {
   ResolvedReferencesForGenerate,
 } from "./resolve-references-for-generate.types";
 
-interface ResolveResourceRefsResponse {
-  readonly resolved: readonly {
-    readonly resourceId: string;
-    readonly url: string;
-    readonly mimeType: string;
-  }[];
-  readonly unresolved: readonly string[];
-}
-
-function platformAiEndpoint(organizationId: string): string {
-  return `/${organizationId}/platform-ai`;
-}
-
 function isVideoMimeType(mimeType: string): boolean {
   return mimeType.toLowerCase().startsWith("video/");
 }
@@ -42,59 +29,18 @@ function isAudioMimeType(mimeType: string): boolean {
   return mimeType.toLowerCase().startsWith("audio/");
 }
 
-async function resolveResourceIdsOnServer(params: {
-  readonly organizationId: string;
-  readonly resourceIds: readonly string[];
-}): Promise<ResolveResourceRefsResponse> {
-  if (params.resourceIds.length === 0) {
-    return { resolved: [], unresolved: [] };
-  }
-
-  return makeRequest<ResolveResourceRefsResponse>(
-    `${platformAiEndpoint(params.organizationId)}/resolve-resource-refs`,
-    {
-      method: "POST",
-      body: JSON.stringify({ resourceIds: params.resourceIds }),
-    }
-  );
-}
-
-function lookupIdsForMedia(params: {
-  readonly media: WorkflowMediaValue;
-  readonly organizationId: string;
-  readonly workflowId?: string;
-}): readonly string[] {
-  const id = getResourceIdFromValue(params.media);
-  const ids: string[] = id ? [id] : [];
-  if (!params.workflowId) {
-    return ids;
-  }
-
-  const canonical = resolveCanonicalResourceId({
-    media: params.media,
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
-  });
-  if (canonical && !ids.includes(canonical)) {
-    ids.push(canonical);
-  }
-  return ids;
+function lookupIdForMedia(media: WorkflowMediaValue): string | null {
+  return getResourceIdFromValue(media);
 }
 
 function collectLookupResourceIds(params: {
   readonly media: readonly WorkflowMediaValue[];
-  readonly organizationId: string;
-  readonly workflowId?: string;
 }): readonly string[] {
   return [
     ...new Set(
-      params.media.flatMap((entry) =>
-        lookupIdsForMedia({
-          media: entry,
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-        })
-      )
+      params.media
+        .map((entry) => lookupIdForMedia(entry))
+        .filter((id): id is string => Boolean(id))
     ),
   ];
 }
@@ -118,16 +64,17 @@ function pushResolvedUrl(params: {
   params.referenceImageUrls.push(params.url);
 }
 
-async function resolveLocalInline(
+async function resolveStagedInline(
   media: readonly WorkflowMediaValue[]
 ): Promise<readonly ReferenceImageInline[]> {
   const inline: ReferenceImageInline[] = [];
 
   for (const ref of media) {
-    if (!isLocalMediaReference(ref)) continue;
-    const payload = await readGenerativeStagingAsInline(ref.mediaId);
+    const resourceId = getResourceIdFromValue(ref);
+    if (!resourceId) continue;
+    const payload = await readGenerativeStagingAsInline(resourceId);
     if (!payload) {
-      throw new Error("Local reference is missing from this browser");
+      throw new Error("Staged reference is missing from this browser");
     }
     inline.push(payload);
   }
@@ -135,16 +82,17 @@ async function resolveLocalInline(
   return inline;
 }
 
-async function resolveLocalDataUrls(
+async function resolveStagedDataUrls(
   media: readonly WorkflowMediaValue[]
 ): Promise<readonly string[]> {
   const urls: string[] = [];
 
   for (const ref of media) {
-    if (!isLocalMediaReference(ref)) continue;
-    const inline = await readGenerativeStagingAsInline(ref.mediaId);
+    const resourceId = getResourceIdFromValue(ref);
+    if (!resourceId) continue;
+    const inline = await readGenerativeStagingAsInline(resourceId);
     if (!inline) {
-      throw new Error("Local reference is missing from this browser");
+      throw new Error("Staged reference is missing from this browser");
     }
     urls.push(`data:${inline.mimeType};base64,${inline.data}`);
   }
@@ -172,10 +120,18 @@ async function resolveMediaGroup(params: {
     };
   }
 
+  const media =
+    params.cloudConfigured && params.workflowId
+      ? await ensureReferencesCloudForGenerate({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          media: params.media,
+          cloudConfigured: true,
+        })
+      : params.media;
+
   const resourceIds = collectLookupResourceIds({
-    media: params.media,
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
+    media,
   });
 
   const server = await resolveResourceIdsOnServer({
@@ -194,15 +150,9 @@ async function resolveMediaGroup(params: {
   const referenceAudioUrls: string[] = [];
   const unresolvedMedia: WorkflowMediaValue[] = [];
 
-  for (const entry of params.media) {
-    const ids = lookupIdsForMedia({
-      media: entry,
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-    });
-    const hit = ids
-      .map((id) => resolvedById.get(id))
-      .find((resolved) => resolved !== undefined);
+  for (const entry of media) {
+    const resourceId = lookupIdForMedia(entry);
+    const hit = resourceId ? resolvedById.get(resourceId) : undefined;
 
     if (!hit) {
       unresolvedMedia.push(entry);
@@ -247,9 +197,9 @@ async function resolveMediaGroup(params: {
     isAudioMimeType(entry.mimeType ?? "")
   );
 
-  const referenceImageInline = await resolveLocalInline(images);
-  referenceVideoUrls.push(...(await resolveLocalDataUrls(videos)));
-  referenceAudioUrls.push(...(await resolveLocalDataUrls(audios)));
+  const referenceImageInline = await resolveStagedInline(images);
+  referenceVideoUrls.push(...(await resolveStagedDataUrls(videos)));
+  referenceAudioUrls.push(...(await resolveStagedDataUrls(audios)));
 
   return {
     referenceImageUrls,

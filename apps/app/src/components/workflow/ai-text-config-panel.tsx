@@ -65,6 +65,7 @@ import { sha256HexFromText } from "@/utils/text-content-utils";
 import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
 import { buildResourceIdReference, readAiTextGeneratingResourceId } from "./ai-text-persist-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
+import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
@@ -176,6 +177,14 @@ export function AiTextConfigPanel({
     useModels: useOrgTextModels,
     modelFitsCurrentRefs,
   });
+
+  const patchNodeLayout = useMemo(
+    () =>
+      updateNodeData
+        ? createPatchNodeLayoutMetadata(nodeId, updateNodeData)
+        : undefined,
+    [nodeId, updateNodeData]
+  );
 
   const textModelCatalog = useMemo(
     () =>
@@ -515,6 +524,7 @@ export function AiTextConfigPanel({
             organizationId: orgId,
             workflowId,
             text: response.text,
+            patchNodeLayout,
           });
 
       if (resourceId) {
@@ -523,6 +533,7 @@ export function AiTextConfigPanel({
           workflowId,
           text: response.text,
           mediaId: resourceId,
+          patchNodeLayout,
         });
       }
 
