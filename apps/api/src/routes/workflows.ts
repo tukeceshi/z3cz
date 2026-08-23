@@ -1,11 +1,9 @@
 import {
-  type CancelWorkflowExecutionResponse,
   type CreateWorkflowRequest,
   type CreateWorkflowResponse,
   type DeleteQueueTriggerResponse,
   type DeleteWorkflowResponse,
   type ExecuteWorkflowResponse,
-  ExecutionStatus,
   type GetQueueTriggerResponse,
   type GetWorkflowResponse,
   type JWTTokenPayload,
@@ -45,11 +43,8 @@ import {
   getWorkflowFolder,
   touchWorkflowFolderUpdatedAt,
 } from "../db/workflow-folder-queries";
-import { getAgentByName } from "../durable-objects/agent-utils";
-import { createExecuteRateLimitMiddleware } from "../middleware/execute-rate-limit";
 import { requireWorkflowRouteAccess } from "../middleware/org-permissions";
 import { assertOrgCloudStorageConfigured } from "../services/assert-org-cloud-storage-configured";
-import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { executeSingleNodeWorkflow } from "../services/single-node-executor";
 import { WorkflowExecutor } from "../services/workflow-executor";
 import { WorkflowStore } from "../stores/workflow-store";
@@ -61,10 +56,6 @@ import {
   assertTriggerAllowedByScheme,
   getAllowedNodeTypesForScheme,
 } from "../utils/workflow-scheme";
-import {
-  isExecutionPreparationError,
-  prepareWorkflowExecution,
-} from "../utils/execution-preparation";
 import { validateWorkflow } from "../utils/workflows";
 import { validateWorkflowGraphAgainstCatalog } from "../utils/workflow-catalog-validation";
 
@@ -537,139 +528,6 @@ workflowRoutes.delete("/:id", async (c) => {
 });
 
 /**
- * Shared workflow execution logic
- */
-async function executeWorkflow(
-  c: Context<ExtendedApiContext>,
-  workflow: { id: string; name: string },
-  workflowData: any
-): Promise<Response> {
-  const db = createDatabase(c.env);
-  const { organizationId, userId } = getAuthContext(c);
-
-  // Get organization billing info
-  const billingInfo = await getOrganizationBillingInfo(db, organizationId);
-  if (!billingInfo) {
-    return c.json({ error: "Organization not found" }, 404);
-  }
-
-  if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
-    return c.json({ error: "Insufficient compute credits" }, 402 as const);
-  }
-
-  // Prepare workflow for execution
-  const preparationResult = await prepareWorkflowExecution(c, workflowData);
-  if (isExecutionPreparationError(preparationResult)) {
-    return c.json({ error: preparationResult.error }, preparationResult.status);
-  }
-
-  const { parameters } = preparationResult;
-
-  // Execute workflow
-  const { execution } = await WorkflowExecutor.execute({
-    workflow: {
-      id: workflow.id,
-      name: workflow.name,
-      trigger: workflowData.trigger,
-      runtime: workflowData.runtime,
-      nodes: workflowData.nodes,
-      edges: workflowData.edges,
-    },
-    userId,
-    organizationId,
-    ...resolveOrganizationBillingOptions(billingInfo, c.env.CLOUDFLARE_ENV),
-    parameters,
-    env: c.env,
-  });
-
-  // Return execution ID for all workflow types
-  // Note: http_request workflows execute synchronously and are already complete
-  const response: ExecuteWorkflowResponse = {
-    id: execution.id,
-    workflowId: execution.workflowId,
-    status: execution.status,
-    nodeExecutions: execution.nodeExecutions,
-  };
-
-  return c.json(response, 201);
-}
-
-/**
- * Execute a workflow in production mode (GET/POST)
- */
-workflowRoutes.on(
-  ["GET", "POST"],
-  "/:workflowId/execute",
-  createExecuteRateLimitMiddleware(),
-  async (c) => {
-    const workflowId = c.req.param("workflowId")!;
-    const { organizationId } = getAuthContext(c);
-
-    const workflowStore = new WorkflowStore(c.env);
-
-    // Load workflow with data
-    let workflowWithData;
-    try {
-      workflowWithData = await workflowStore.getWithData(
-        workflowId,
-        organizationId
-      );
-    } catch (error) {
-      return c.json(
-        {
-          error: `Failed to load workflow: ${error instanceof Error ? error.message : String(error)}`,
-        },
-        500
-      );
-    }
-
-    if (!workflowWithData || !workflowWithData.data) {
-      return c.json({ error: "Workflow not found" }, 404);
-    }
-
-    return executeWorkflow(c, workflowWithData, workflowWithData.data);
-  }
-);
-
-/**
- * Execute a workflow in development mode (GET/POST)
- * Uses the working version from R2
- */
-workflowRoutes.on(
-  ["GET", "POST"],
-  "/:workflowId/execute/dev",
-  createExecuteRateLimitMiddleware(),
-  async (c) => {
-    const workflowId = c.req.param("workflowId")!;
-    const { organizationId } = getAuthContext(c);
-
-    const workflowStore = new WorkflowStore(c.env);
-
-    // Load workflow with data from working version
-    let workflowWithData;
-    try {
-      workflowWithData = await workflowStore.getWithData(
-        workflowId,
-        organizationId
-      );
-    } catch (error) {
-      return c.json(
-        {
-          error: `Failed to load workflow: ${error instanceof Error ? error.message : String(error)}`,
-        },
-        500
-      );
-    }
-
-    if (!workflowWithData || !workflowWithData.data) {
-      return c.json({ error: "Workflow not found" }, 404);
-    }
-
-    return executeWorkflow(c, workflowWithData, workflowWithData.data);
-  }
-);
-
-/**
  * Execute a single node in isolation (AI panel "Run" button).
  * Prefers the node snapshot from the request body (unsaved editor values);
  * falls back to the persisted workflow node. Runs a 1-node worker workflow.
@@ -794,103 +652,6 @@ workflowRoutes.post(
     };
 
     return c.json(response, 201);
-  }
-);
-
-/**
- * Cancel a running workflow execution
- */
-workflowRoutes.post(
-  "/:workflowId/executions/:executionId/cancel",
-  async (c) => {
-    const organizationId = c.get("organizationId")!;
-    const executionId = c.req.param("executionId")!;
-    const executionStore = new CloudflareExecutionStore(c.env);
-
-    // Get the execution to verify it exists and belongs to this organization
-    const execution = await executionStore.getWithData(
-      executionId,
-      organizationId
-    );
-    if (!execution) {
-      return c.json({ error: "Execution not found" }, 404);
-    }
-
-    // Only allow cancellation of submitted or executing workflows
-    if (!["submitted", "executing"].includes(execution.status)) {
-      return c.json(
-        {
-          error: `Cannot cancel execution in status: ${execution.status}`,
-        },
-        400
-      );
-    }
-
-    const executionData = execution.data;
-
-    try {
-      // Terminate the workflow via Agent RPC or Node in-process runner
-      if (c.env.RUNTIME === "node") {
-        const { nodeWorkflowExecutionService } = await import(
-          "../runtime/node-workflow-execution-service"
-        );
-        nodeWorkflowExecutionService.cancelExecution(executionId);
-      } else {
-        const agent = await getAgentByName(
-          c.env.WORKFLOW_AGENT,
-          execution.workflowId
-        );
-        await agent.cancelWorkflow(executionId);
-      }
-
-      // Update the execution status in the database
-      const now = new Date();
-      const updatedExecution = await executionStore.save({
-        id: executionId,
-        workflowId: execution.workflowId,
-        workflowName: execution.workflowName,
-        userId: "cancelled", // Required by SaveExecutionRecord but not stored in DB
-        organizationId: execution.organizationId,
-        status: ExecutionStatus.CANCELLED,
-        nodeExecutions: executionData.nodeExecutions || [],
-        error: execution.error ?? "Execution cancelled by user",
-        updatedAt: now,
-        endedAt: now,
-        startedAt: execution.startedAt ?? undefined,
-      });
-
-      const response: CancelWorkflowExecutionResponse = {
-        id: updatedExecution.id,
-        status: "cancelled",
-        message: "Execution cancelled successfully",
-      };
-      return c.json(response);
-    } catch (error) {
-      console.error("Error cancelling execution:", error);
-
-      // If the instance doesn't exist or can't be terminated, still update the database
-      const now = new Date();
-      await executionStore.save({
-        id: executionId,
-        workflowId: execution.workflowId,
-        workflowName: execution.workflowName,
-        userId: "cancelled", // Required by SaveExecutionRecord but not stored in DB
-        organizationId: execution.organizationId,
-        status: ExecutionStatus.CANCELLED,
-        nodeExecutions: executionData.nodeExecutions || [],
-        error: execution.error ?? "Execution cancelled by user",
-        updatedAt: now,
-        endedAt: now,
-        startedAt: execution.startedAt ?? undefined,
-      });
-
-      const response: CancelWorkflowExecutionResponse = {
-        id: executionId,
-        status: "cancelled",
-        message: "Execution cancelled (instance may have already completed)",
-      };
-      return c.json(response);
-    }
   }
 );
 

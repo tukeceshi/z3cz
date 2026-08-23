@@ -25,7 +25,6 @@ export function parseSubAccountPermissions(
     subAccountsView: raw.subAccountsView === true,
     subAccountsDelete: raw.subAccountsDelete === true,
     workflows,
-    executions: raw.executions !== false,
     modelCalls: raw.modelCalls !== false,
     apiKeys: raw.apiKeys === true,
   };
@@ -40,7 +39,6 @@ export function mergeSubAccountPermissions(
     subAccountsView: patch.subAccountsView ?? current.subAccountsView,
     subAccountsDelete: patch.subAccountsDelete ?? current.subAccountsDelete,
     workflows: patch.workflows ?? current.workflows,
-    executions: patch.executions ?? current.executions,
     modelCalls: patch.modelCalls ?? current.modelCalls,
     apiKeys: patch.apiKeys ?? current.apiKeys,
   };
@@ -84,13 +82,6 @@ export function canAccessAiInterfaces(
   permissions?: SubAccountPermissions | null
 ): boolean {
   return hasSubAccountPermission(role, permissions, (p) => p.aiInterfaces);
-}
-
-export function canAccessExecutions(
-  role: OrganizationRoleType,
-  permissions?: SubAccountPermissions | null
-): boolean {
-  return hasSubAccountPermission(role, permissions, (p) => p.executions);
 }
 
 export function canAccessModelCalls(

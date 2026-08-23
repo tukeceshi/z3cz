@@ -9,7 +9,6 @@ import type { ApiContext } from "../context";
 import {
   canAccessAiInterfaces,
   canAccessApiKeys,
-  canAccessExecutions,
   canAccessModelCalls,
   canDeleteSubAccounts,
   canEditWorkflows,
@@ -87,11 +86,6 @@ function deny(c: Context<ApiContext>) {
   return c.json({ error: "Permission denied" }, 403);
 }
 
-/** API key auth has no JWT payload; org-scoped keys bypass sub-account permission checks. */
-function isApiKeyAuthenticated(c: Context<ApiContext>): boolean {
-  return !c.get("jwtPayload");
-}
-
 export function requireWorkflowView() {
   return async (c: Context<ApiContext>, next: Next) => {
     const ctx = getOrgMembershipContext(c);
@@ -110,11 +104,10 @@ export function requireWorkflowRouteAccess() {
     }
 
     const path = c.req.path;
-    const isExecutionOp =
-      /\/execute(\/|$)/.test(path) || /\/executions\//.test(path);
+    const isSingleNodeExecute = /\/nodes\/[^/]+\/execute$/.test(path);
 
-    if (isExecutionOp) {
-      if (!canAccessExecutions(ctx.role, ctx.permissions)) {
+    if (isSingleNodeExecute) {
+      if (!canViewWorkflows(ctx.role, ctx.permissions)) {
         return deny(c);
       }
       await next();
@@ -136,20 +129,6 @@ export function requireAiInterfacesAccess() {
   return async (c: Context<ApiContext>, next: Next) => {
     const ctx = getOrgMembershipContext(c);
     if (!ctx || !canAccessAiInterfaces(ctx.role, ctx.permissions)) {
-      return deny(c);
-    }
-    await next();
-  };
-}
-
-export function requireExecutionsAccess() {
-  return async (c: Context<ApiContext>, next: Next) => {
-    if (isApiKeyAuthenticated(c)) {
-      await next();
-      return;
-    }
-    const ctx = getOrgMembershipContext(c);
-    if (!ctx || !canAccessExecutions(ctx.role, ctx.permissions)) {
       return deny(c);
     }
     await next();
@@ -227,9 +206,7 @@ export function requireDashboardAccess() {
       return deny(c);
     }
 
-    const canAccess =
-      canViewWorkflows(ctx.role, ctx.permissions) ||
-      canAccessExecutions(ctx.role, ctx.permissions);
+    const canAccess = canViewWorkflows(ctx.role, ctx.permissions);
 
     if (!canAccess) {
       return deny(c);

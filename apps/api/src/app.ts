@@ -80,10 +80,8 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     "/stripe/webhooks",
     lazyRoute(() => import("./routes/stripe-webhooks"))
   );
-  app.route("/http", lazyRoute(() => import("./routes/http-triggers")));
   app.route("/queues", lazyRoute(() => import("./routes/queue-publish")));
   app.route("/forms", lazyRoute(() => import("./routes/forms")));
-  app.route("/form-triggers", lazyRoute(() => import("./routes/form-triggers")));
   app.route(
     "/feedback-forms",
     lazyRoute(() => import("./routes/feedback-forms"))
@@ -110,10 +108,6 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route(
     "/:organizationId/feedback",
     lazyRoute(() => import("./routes/feedback"))
-  );
-  app.route(
-    "/:organizationId/executions",
-    lazyRoute(() => import("./routes/executions"))
   );
   app.route(
     "/:organizationId/integrations",

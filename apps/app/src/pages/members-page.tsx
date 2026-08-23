@@ -86,7 +86,6 @@ const summarizePermissions = (
       ? t("pages.members.permissions.edit")
       : t("pages.members.permissions.viewOnly")
   );
-  if (effective.executions) parts.push(t("pages.members.permissions.executions"));
   if (effective.modelCalls) parts.push(t("pages.members.permissions.modelCalls"));
   if (effective.aiInterfaces) parts.push(t("pages.members.permissions.aiInterfaces"));
   if (effective.apiKeys) parts.push(t("pages.members.permissions.apiKeys"));

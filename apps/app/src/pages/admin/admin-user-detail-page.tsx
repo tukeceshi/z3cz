@@ -790,7 +790,7 @@ export function AdminUserDetailPage() {
       )}
 
       {entityCounts && organization && (
-        <div className="grid grid-cols-2 gap-4 mt-6 max-w-xl">
+        <div className="grid grid-cols-1 gap-4 mt-6 max-w-xs">
           <Link
             to={`/admin/workflows?organizationId=${organization.id}`}
             className="block"
@@ -800,19 +800,6 @@ export function AdminUserDetailPage() {
                 <CardDescription>{t("sidebar.workflows")}</CardDescription>
                 <CardTitle className="text-2xl">
                   {entityCounts.workflowCount}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          </Link>
-          <Link
-            to={`/admin/executions?organizationId=${organization.id}`}
-            className="block"
-          >
-            <Card className="hover:bg-muted/50 transition-colors">
-              <CardHeader className="pb-2">
-                <CardDescription>{t("sidebar.executions")}</CardDescription>
-                <CardTitle className="text-2xl">
-                  {entityCounts.executionCount}
                 </CardTitle>
               </CardHeader>
             </Card>

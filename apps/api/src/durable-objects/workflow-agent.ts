@@ -48,7 +48,6 @@ import { ExecutionManager } from "../services/execution-manager";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
 import {
-  canAccessExecutions,
   canEditWorkflows,
 } from "../utils/sub-account-permissions";
 import type { OrgMembershipContext } from "../middleware/org-permissions";
@@ -533,22 +532,15 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
   private async handleExecuteMessage(
     connection: Connection,
-    message: WorkflowExecuteMessage
+    _message: WorkflowExecuteMessage
   ): Promise<void> {
-    const membership = getConnectionMembership(connection);
-    if (
-      !membership ||
-      !canAccessExecutions(membership.role, membership.permissions)
-    ) {
-      denyConnection(connection, "Permission denied");
-      return;
-    }
-
-    if (message.executionId) {
-      await this.subscribeToExecution(connection, message.executionId);
-    } else {
-      await this.startExecution(connection, message.parameters);
-    }
+    this.sendExecutionUpdate(connection, {
+      id: "",
+      workflowId: this.workflowState?.id ?? "",
+      status: "error",
+      nodeExecutions: [],
+      error: "Full workflow execution is disabled",
+    });
   }
 
   private async subscribeToExecution(

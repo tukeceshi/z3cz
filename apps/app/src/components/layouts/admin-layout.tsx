@@ -6,7 +6,6 @@ import Inbox from "lucide-react/icons/inbox";
 import KeyRound from "lucide-react/icons/key-round";
 import Rocket from "lucide-react/icons/rocket";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
-import Play from "lucide-react/icons/play";
 import Settings from "lucide-react/icons/settings";
 import Sparkles from "lucide-react/icons/sparkles";
 import UserMinus from "lucide-react/icons/user-minus";
@@ -53,12 +52,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.workflows"),
           url: "/admin/workflows",
           icon: Workflow,
-        },
-        {
-          id: "executions",
-          title: t("sidebar.executions"),
-          url: "/admin/executions",
-          icon: Play,
         },
       ],
     },

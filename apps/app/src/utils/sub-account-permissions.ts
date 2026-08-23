@@ -16,7 +16,6 @@ export function getEffectivePermissions(
       subAccountsView: true,
       subAccountsDelete: true,
       workflows: "edit",
-      executions: true,
       modelCalls: true,
       apiKeys: true,
     };
@@ -38,12 +37,6 @@ export function canViewWorkflows(
     return false;
   }
   return organization.role === "owner" || getEffectivePermissions(organization).workflows !== undefined;
-}
-
-export function canAccessExecutions(
-  organization: OrganizationInfo | null | undefined
-): boolean {
-  return getEffectivePermissions(organization).executions;
 }
 
 export function canAccessModelCalls(

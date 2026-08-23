@@ -1,12 +1,7 @@
-import type {
-  ObjectReference,
-  WorkflowRuntime,
-  WorkflowTrigger,
-} from "@dafthunk/types";
+import type { ObjectReference, WorkflowTrigger } from "@dafthunk/types";
 import { ReactFlowProvider } from "@xyflow/react";
 import Building2 from "lucide-react/icons/building-2";
 import Hash from "lucide-react/icons/hash";
-import PlayCircle from "lucide-react/icons/play-circle";
 import { useCallback, useEffect, useMemo } from "react";
 import { useParams } from "react-router";
 
@@ -124,11 +119,6 @@ export function AdminWorkflowDetailPage() {
               to: `/admin/organizations/${workflow.organizationId}`,
             },
             {
-              icon: PlayCircle,
-              label: t("admin.workflowDetail.viewExecutions"),
-              to: `/admin/executions?workflowId=${workflow.id}&organizationId=${workflow.organizationId}`,
-            },
-            {
               icon: Hash,
               label: workflow.id,
               mono: true,
@@ -141,7 +131,6 @@ export function AdminWorkflowDetailPage() {
             workflowName={workflow.name}
             workflowDescription={workflow.description ?? undefined}
             workflowTrigger={workflow.trigger as WorkflowTrigger}
-            workflowRuntime={workflow.runtime as WorkflowRuntime}
             initialNodes={reactFlowNodes}
             initialEdges={reactFlowEdges}
             nodeTypes={[]}

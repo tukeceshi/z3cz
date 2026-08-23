@@ -11,7 +11,7 @@ import { Hono } from "hono";
 
 import { apiKeyOrJwtMiddleware, jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
-import { requireExecutionsAccess } from "../middleware/org-permissions";
+import { requireWorkflowView } from "../middleware/org-permissions";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { isUuid, parseUuid } from "../utils/validation";
 
@@ -20,7 +20,7 @@ const executionRoutes = new Hono<ApiContext>();
 executionRoutes.get(
   "/:id",
   apiKeyOrJwtMiddleware,
-  requireExecutionsAccess(),
+  requireWorkflowView(),
   async (c) => {
   const organizationId = c.get("organizationId")!;
   const id = c.req.param("id")!;
@@ -59,7 +59,7 @@ executionRoutes.get(
   }
 });
 
-executionRoutes.get("/", jwtMiddleware, requireExecutionsAccess(), async (c) => {
+executionRoutes.get("/", jwtMiddleware, requireWorkflowView(), async (c) => {
   const executionStore = new CloudflareExecutionStore(c.env);
   const { workflowId, status, startDate, endDate, limit, offset } =
     c.req.query();

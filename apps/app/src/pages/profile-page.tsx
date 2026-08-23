@@ -118,9 +118,6 @@ function ProfilePageContent({ profile, mutateProfile }: ProfilePageContentProps)
         `${t("pages.members.permissions.workflows")} (${t("pages.members.permissions.viewOnly")})`
       );
     }
-    if (orgPermissions.executions) {
-      enabled.push(t("pages.members.permissions.executions"));
-    }
     if (orgPermissions.modelCalls) {
       enabled.push(t("pages.members.permissions.modelCalls"));
     }

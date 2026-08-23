@@ -85,13 +85,6 @@ function createColumns(
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
-              navigate(`/admin/executions?workflowId=${row.original.id}`)
-            }
-          >
-            {t("admin.common.viewExecution")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
               navigate(`/admin/organizations/${row.original.organizationId}`)
             }
           >

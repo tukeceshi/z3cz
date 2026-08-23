@@ -1,4 +1,3 @@
-import type { Workflow } from "@dafthunk/types";
 import { v7 as uuidv7 } from "uuid";
 
 import type { Bindings } from "./context";
@@ -7,14 +6,10 @@ import {
   createDatabase,
   getEmailByHandle,
   getEmailTriggersByEmail,
-  getOrganizationBillingInfo,
-  resolveOrganizationBillingOptions,
 } from "./db";
 import { parseAndStageEmail } from "./mailbox-staging";
-import { WorkflowStore } from "./stores/workflow-store";
 import { handleSupportEmail, isAuthenticated } from "./support-email";
 import { verifyReplyToken } from "./support-reply-token";
-import { isCreditExhausted } from "./utils/credits";
 
 async function streamToBytes(
   stream: ReadableStream<Uint8Array>
@@ -83,7 +78,6 @@ export async function handleIncomingEmail(
   }
 
   const db = createDatabase(env);
-  const workflowStore = new WorkflowStore(env);
 
   const email = await getEmailByHandle(db, handle);
   if (!email) {
@@ -146,18 +140,7 @@ export async function handleIncomingEmail(
     console.log(`Triggering workflow: ${workflow.id} (${workflow.name})`);
 
     try {
-      await triggerWorkflowForEmail({
-        workflow,
-        email,
-        organizationId,
-        env,
-        workflowStore,
-        from,
-        to,
-        headers: headersRecord,
-        rawContent,
-        mailbox,
-      });
+      await triggerWorkflowForEmail({ workflow });
     } catch (error) {
       console.error(
         `Failed to trigger workflow ${workflow.id}:`,
@@ -264,107 +247,10 @@ async function deliverReplyToEmailAgent(
 
 async function triggerWorkflowForEmail({
   workflow,
-  email,
-  organizationId,
-  env,
-  workflowStore,
-  from,
-  to,
-  headers,
-  rawContent,
-  mailbox,
 }: {
-  workflow: any;
-  email: EmailRow;
-  organizationId: string;
-  env: Bindings;
-  workflowStore: WorkflowStore;
-  from: string;
-  to: string;
-  headers: Record<string, string>;
-  rawContent: string;
-  mailbox: { threadId: string; messageId: string } | undefined;
+  workflow: { id: string; name: string };
 }): Promise<void> {
-  const db = createDatabase(env);
-
-  let workflowData: Workflow;
-
-  try {
-    const workflowWithData = await workflowStore.getWithData(
-      workflow.id,
-      organizationId
-    );
-    if (!workflowWithData || !workflowWithData.data) {
-      console.error(`Failed to load workflow data for ${workflow.id}`);
-      return;
-    }
-    workflowData = workflowWithData.data;
-  } catch (error) {
-    console.error(
-      `Failed to load workflow data from R2 for ${workflow.id}:`,
-      error
-    );
-    return;
-  }
-
-  // Validate if workflow has nodes
-  if (!workflowData.nodes || workflowData.nodes.length === 0) {
-    console.error(
-      "Cannot execute an empty workflow. Please add nodes to the workflow."
-    );
-    return;
-  }
-
-  // Get organization billing info
-  const billingInfo = await getOrganizationBillingInfo(db, organizationId);
-  if (billingInfo === undefined) {
-    console.error("Organization not found");
-    return;
-  }
-
-  if (isCreditExhausted(billingInfo, env.CLOUDFLARE_ENV)) {
-    console.log(
-      `Discarding email for workflow ${workflow.id}: credits exhausted`
-    );
-    return;
-  }
-
-  const billingOptions = resolveOrganizationBillingOptions(
-    billingInfo,
-    env.CLOUDFLARE_ENV
-  );
-
-  const executionParams = {
-    userId: "email_trigger",
-    organizationId,
-    ...billingOptions,
-    workflow: {
-      id: workflow.id,
-      name: workflow.name,
-      schemeId: workflowData.schemeId,
-      trigger: workflow.trigger,
-      runtime: workflowData.runtime,
-      nodes: workflowData.nodes,
-      edges: workflowData.edges,
-    },
-    emailMessage: {
-      from,
-      to,
-      headers,
-      raw: rawContent,
-      emailId: email.id,
-      ...(mailbox
-        ? { threadId: mailbox.threadId, messageId: mailbox.messageId }
-        : {}),
-    },
-  };
-
-  const { startWorkflowExecution } = await import(
-    "./runtime/start-workflow-execution"
-  );
-  const result = await startWorkflowExecution(env, executionParams);
   console.log(
-    `[Execution] ${result.executionId} workflow=${workflow.id} runtime=${workflowData.runtime} trigger=email` +
-      (result.status ? ` status=${result.status}` : "")
+    `Skipping email trigger for workflow ${workflow.id}: full workflow execution is disabled`
   );
 }

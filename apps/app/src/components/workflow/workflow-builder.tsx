@@ -6,7 +6,6 @@ import type {
   Parameter,
   WorkflowEditorViewport,
   WorkflowGenerativeDefaults,
-  WorkflowRuntime,
   WorkflowTrigger,
 } from "@dafthunk/types";
 import { buildCatalogAllowedNodeTypeSet } from "@dafthunk/types";
@@ -20,27 +19,17 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
+import { Spinner } from "@/components/ui/spinner";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeMediaBeforeUnloadGuard } from "@/hooks/use-generative-media-before-unload";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { executeWorkflowNode } from "@/services/workflow-service";
 import { cn } from "@/utils/utils";
 
 import { DetachNodesConfirmDialog } from "./detach-nodes-confirm-dialog";
 import { writeSkipDetachWithRecordsConfirm } from "./detach-confirm-preference";
-import { UpgradeRequiredDialog } from "./upgrade-required-dialog";
 import type { DetachConfirmSource, PendingDetachConfirm } from "./use-graph-history";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useResizableSidebar } from "./use-resizable-sidebar";
-import { useWorkflowExecutionState } from "./use-workflow-execution-state";
 import { useWorkflowState } from "./use-workflow-state";
 import { useOptionalCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
 import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
@@ -53,11 +42,11 @@ import {
   useCreativeStudio,
   type GenerativeNodeAddOptions,
 } from "./creative-studio-context";
+import { STUDIO_SHELL } from "./creative-studio-surface";
 import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
-import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
@@ -73,7 +62,6 @@ import {
 import type {
   NodeType,
   WorkflowEdgeType,
-  WorkflowExecution,
   WorkflowNodeType,
 } from "./workflow-types";
 
@@ -83,11 +71,34 @@ const CreativeStudioView = lazy(() =>
   }))
 );
 
-const HttpRequestConfigDialog = lazy(() =>
-  import("./http-request-config-dialog").then((module) => ({
-    default: module.HttpRequestConfigDialog,
-  }))
-);
+function prefetchCreativeStudioView(): void {
+  void import("./creative-studio-view");
+}
+
+function usePrefetchCreativeStudioView(): void {
+  useEffect(() => {
+    const run = () => prefetchCreativeStudioView();
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(run, { timeout: 2000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = window.setTimeout(run, 500);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+}
+
+function CreativeStudioLoadingFallback() {
+  return (
+    <div
+      className={cn(
+        "flex h-full min-h-0 items-center justify-center",
+        STUDIO_SHELL
+      )}
+    >
+      <Spinner className="size-5 text-muted-foreground" />
+    </div>
+  );
+}
 
 /** Serialize a React Flow node into the backend Node shape (unsaved editor values). */
 function serializeNodeSnapshot(
@@ -185,30 +196,19 @@ type WorkflowBuilderMode = "edit" | "readonly" | "preview";
 export interface WorkflowBuilderProps {
   workflowId: string;
   workflowTrigger?: WorkflowTrigger;
-  workflowRuntime?: WorkflowRuntime;
   initialNodes?: ReactFlowNode<WorkflowNodeType>[];
   initialEdges?: ReactFlowEdge<WorkflowEdgeType>[];
   nodeTypes?: NodeType[];
   onNodesChange?: (nodes: ReactFlowNode<WorkflowNodeType>[]) => void;
   onEdgesChange?: (edges: ReactFlowEdge<WorkflowEdgeType>[]) => void;
   validateConnection?: (connection: Connection) => boolean;
-  executeWorkflow?: (
-    workflowId: string,
-    onExecution: (execution: WorkflowExecution) => void,
-    triggerData?: unknown
-  ) => void | (() => void | Promise<void>);
-  initialWorkflowExecution?: WorkflowExecution;
   mode?: WorkflowBuilderMode;
   createObjectUrl: (objectReference: ObjectReference) => string;
   expandedOutputs?: boolean;
   workflowName?: string;
   workflowDescription?: string;
   onWorkflowUpdate?: (name: string, description?: string) => void;
-  onPersistRuntime?: (runtime: WorkflowRuntime) => void;
   orgId: string;
-  wsExecuteWorkflow?: (options?: {
-    parameters?: Record<string, unknown>;
-  }) => void;
   showSidebar?: boolean;
   showBackground?: boolean;
   fitViewPadding?: number;
@@ -235,24 +235,19 @@ export interface WorkflowBuilderProps {
 export function WorkflowBuilder({
   workflowId,
   workflowTrigger,
-  workflowRuntime,
   initialNodes = [],
   initialEdges = [],
   nodeTypes = [],
   onNodesChange: onNodesChangeFromParent,
   onEdgesChange: onEdgesChangeFromParent,
   validateConnection,
-  executeWorkflow,
-  initialWorkflowExecution,
   mode = "edit",
   createObjectUrl,
   expandedOutputs = false,
   workflowName,
   workflowDescription,
   onWorkflowUpdate,
-  onPersistRuntime,
   orgId,
-  wsExecuteWorkflow,
   showSidebar,
   showBackground = true,
   fitViewPadding = 0.25,
@@ -338,7 +333,6 @@ export function WorkflowBuilder({
     handleNodeSelect,
     addGenerativeNodesBatch,
     updateNodeExecution,
-    batchUpdateNodeExecutions,
     setReactFlowInstance,
     reactFlowInstance,
     connectionValidationState,
@@ -348,7 +342,6 @@ export function WorkflowBuilder({
     deleteEdge,
     deleteNode,
     deleteSelected,
-    deselectAll,
     selectNode,
     selectNodes,
     applyLayout,
@@ -393,23 +386,6 @@ export function WorkflowBuilder({
     enabled: !isCanvasFrozen,
     nodes,
     setNodes,
-  });
-
-  // Execution state
-  const execution = useWorkflowExecutionState({
-    workflowId,
-    workflowRuntime: workflowRuntime ?? "workflow",
-    orgId,
-    nodes,
-    nodeTypes,
-    initialWorkflowExecution,
-    onPersistRuntime,
-    executeWorkflow,
-    wsExecuteWorkflow,
-    updateNodeExecution,
-    batchUpdateNodeExecutions,
-    updateNodeData,
-    deselectAll,
   });
 
   const agentSidebarPersisted = useMemo(
@@ -461,12 +437,6 @@ export function WorkflowBuilder({
     },
     [appToast, handleNodeSelect, nodeTypes]
   );
-
-  // Keyboard shortcuts (Cmd+C/X/V, Delete)
-  const handleActionButtonClick =
-    !readOnly && executeWorkflow
-      ? execution.handleActionButtonClick
-      : undefined;
 
   const requestDeleteSelected = useCallback(() => {
     if (readOnly) return;
@@ -894,9 +864,6 @@ export function WorkflowBuilder({
                   onMoveEnd={handleViewportMoveEnd}
                   onInit={handleReactFlowInit}
                   onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
-                  onAction={handleActionButtonClick}
-                  workflowStatus={execution.workflowStatus}
-                  workflowErrorMessage={execution.workflowErrorMessage}
                   onToggleSidebar={
                     sidebarEnabled && !workflowsListUrl
                       ? sidebar.toggleSidebar
@@ -979,8 +946,6 @@ export function WorkflowBuilder({
             workflowDescription={workflowDescription}
             onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
             disabledWorkflow={readOnly}
-            workflowStatus={execution.workflowStatus}
-            workflowErrorMessage={execution.workflowErrorMessage}
           />
           </CloudStorageCanvasProvider>
         </div>
@@ -995,48 +960,6 @@ export function WorkflowBuilder({
           onConfirm={handleDetachConfirm}
         />
 
-        <WorkflowRunConfigDialog
-          open={execution.isRunConfigDialogVisible}
-          onOpenChange={execution.setRunConfigDialogVisible}
-          initialRuntime={workflowRuntime ?? "workflow"}
-          onConfirm={execution.confirmRunConfig}
-        />
-
-        {execution.isHttpRequestConfigDialogVisible ? (
-          <Suspense fallback={null}>
-            <HttpRequestConfigDialog
-              isOpen={execution.isHttpRequestConfigDialogVisible}
-              onClose={execution.closeExecutionForm}
-              onSubmit={execution.submitHttpRequestConfig}
-            />
-          </Suspense>
-        ) : null}
-
-        <Dialog
-          open={execution.errorDialogOpen}
-          onOpenChange={execution.setErrorDialogOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("workflow.execution.errorTitle")}</DialogTitle>
-              <DialogDescription>
-                {t("workflow.execution.errorDescription")}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => execution.setErrorDialogOpen(false)}>
-                {t("workflow.execution.close")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <UpgradeRequiredDialog
-          open={execution.upgradeDialogOpen}
-          onOpenChange={execution.setUpgradeDialogOpen}
-          gatedNodeTypes={execution.upgradeDialogGatedNodeTypes}
-          variant={execution.upgradeDialogVariant}
-        />
         </CreativeStudioProvider>
       </WorkflowProvider>
     </ReactFlowProvider>
@@ -1142,6 +1065,7 @@ function WorkflowEditorMainArea({
   ...props
 }: WorkflowEditorMainAreaProps) {
   useGenerativeMediaBeforeUnloadGuard();
+  usePrefetchCreativeStudioView();
   const { viewMode } = useCreativeStudio();
   const selectDroppedNodes = useCanvasDropNodeSelection(
     onSelectDroppedNodes ?? (() => {})
@@ -1170,7 +1094,7 @@ function WorkflowEditorMainArea({
 
       {isStudio ? (
         <div className="absolute inset-0 z-50">
-          <Suspense fallback={null}>
+          <Suspense fallback={<CreativeStudioLoadingFallback />}>
             <CreativeStudioView />
           </Suspense>
         </div>

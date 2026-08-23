@@ -3,7 +3,6 @@ import type {
   Edge,
   Node,
   ServerMessage,
-  WorkflowExecution,
   WorkflowEditorViewport,
   WorkflowGenerativeDefaults,
   WorkflowGraphPatchBroadcast,
@@ -71,7 +70,6 @@ export interface WorkflowWSOptions {
   onInit?: (state: WorkflowState) => void;
   onUpdate?: (state: WorkflowState) => void;
   onPatchGraph?: (patch: WorkflowGraphPatchBroadcast) => void;
-  onExecutionUpdate?: (execution: WorkflowExecution) => void;
   onWorkflowError?: (error: { code: string; message: string }) => void;
 
   // Connection-level callbacks (problems)
@@ -112,7 +110,6 @@ export class WorkflowWebSocket {
   private shouldReconnect = true;
   private accessToken: string | undefined;
   private currentState: WorkflowState | null = null;
-  private activeExecutionId: string | null = null;
   private lastGraphRev = 0;
 
   constructor(
@@ -197,10 +194,6 @@ export class WorkflowWebSocket {
           this.currentState = message.state;
           this.lastGraphRev = 0;
           this.options.onInit?.(message.state);
-          // Re-subscribe to active execution after reconnection
-          if (this.activeExecutionId) {
-            this.registerForExecutionUpdates(this.activeExecutionId);
-          }
           break;
 
         case "update":
@@ -223,28 +216,6 @@ export class WorkflowWebSocket {
           break;
 
         case "execution_update":
-          // Track active execution for reconnection re-subscription
-          if (message.executionId) {
-            this.activeExecutionId = message.executionId;
-          }
-          // Clear tracking on terminal statuses
-          if (
-            message.status === "completed" ||
-            message.status === "error" ||
-            message.status === "exhausted" ||
-            message.status === "cancelled"
-          ) {
-            this.activeExecutionId = null;
-          }
-          // Execution updates are normal results, not errors
-          // Even if execution.error is set, this is just a summary
-          this.options.onExecutionUpdate?.({
-            id: message.executionId,
-            workflowId: this.workflowId,
-            status: message.status,
-            nodeExecutions: message.nodeExecutions,
-            error: message.error,
-          });
           break;
 
         case "error":
@@ -423,35 +394,6 @@ export class WorkflowWebSocket {
       console.error(`[WorkflowWS] Failed to ${errorContext}:`, error);
       return false;
     }
-  }
-
-  /**
-   * Execute workflow and receive realtime updates via WebSocket
-   */
-  executeWorkflow(options?: { parameters?: Record<string, unknown> }): void {
-    // Clear previous execution tracking — server will assign a new ID
-    this.activeExecutionId = null;
-    this.sendMessage(
-      {
-        type: "execute",
-        parameters: options?.parameters,
-      },
-      "execute workflow"
-    );
-  }
-
-  /**
-   * Register to receive updates for an existing execution
-   */
-  registerForExecutionUpdates(executionId: string): void {
-    this.activeExecutionId = executionId;
-    this.sendMessage(
-      {
-        type: "execute",
-        executionId,
-      },
-      "register for execution updates"
-    );
   }
 
   disconnect(): void {
