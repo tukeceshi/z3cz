@@ -1,5 +1,6 @@
 import DeleteKey from "lucide-react/icons/delete";
 import Keyboard from "lucide-react/icons/keyboard";
+import Upload from "lucide-react/icons/upload";
 import X from "lucide-react/icons/x";
 import {
   Fragment,
@@ -42,11 +43,16 @@ const EMPTY_TOOLBAR_LAYOUT: CanvasShortcutHintToolbarLayout = {
 export const actionBarButtonOutlineClassName =
   "bg-white hover:bg-neutral-50 text-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200";
 
-const PANEL_CLASS =
-  "relative box-border rounded-2xl border border-neutral-200/80 bg-white/95 text-neutral-800 shadow-lg backdrop-blur-lg dark:border-white/15 dark:bg-neutral-900/95 dark:text-neutral-200";
+const PANEL_SURFACE_CLASS =
+  "bg-background/60 backdrop-blur-sm dark:bg-neutral-900/60";
+
+const PANEL_CLASS = cn(
+  "relative box-border rounded-2xl border border-neutral-200/80 text-neutral-800 shadow-lg dark:border-white/15 dark:text-neutral-200",
+  PANEL_SURFACE_CLASS
+);
 
 const PANEL_ARROW_CLASS =
-  "[--shortcut-panel-arrow-fill:rgb(255_255_255/0.95)] [--shortcut-panel-arrow-stroke:rgb(229_229_229/0.8)] dark:[--shortcut-panel-arrow-fill:rgb(23_23_23/0.95)] dark:[--shortcut-panel-arrow-stroke:rgb(255_255_255/0.15)]";
+  "[--shortcut-panel-arrow-fill:rgb(255_255_255/0.6)] [--shortcut-panel-arrow-stroke:rgb(229_229_229/0.8)] dark:[--shortcut-panel-arrow-fill:rgb(23_23_23/0.6)] dark:[--shortcut-panel-arrow-stroke:rgb(255_255_255/0.15)]";
 
 const COLUMN_DIVIDER_CLASS =
   "w-px shrink-0 self-stretch bg-neutral-200 dark:bg-white/15";
@@ -334,6 +340,33 @@ export function CanvasShortcutHintButton({
   );
 }
 
+function CanvasFileDropHintCard() {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-xl border border-dashed border-primary/40 px-4 py-3",
+        PANEL_SURFACE_CLASS
+      )}
+      role="note"
+    >
+      <Upload
+        className="mt-0.5 size-5 shrink-0 text-muted-foreground/80"
+        aria-hidden
+      />
+      <div className="min-w-0">
+        <p className="text-sm leading-snug text-neutral-800 dark:text-neutral-200">
+          {t("workflow.canvas.fileDrop.hintTitle")}
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-neutral-500 dark:text-neutral-400">
+          {t("workflow.canvas.fileDrop.hintFormats")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 interface CanvasShortcutHintPanelProps {
   readonly layout: CanvasShortcutHintToolbarLayout;
   readonly onClose: () => void;
@@ -395,17 +428,20 @@ export function CanvasShortcutHintPanel({
   return (
     <div
       className={cn(
-        "nodrag nopan nowheel pointer-events-auto absolute bottom-full left-1/2 z-[60] mb-4 -translate-x-1/2",
+        "nodrag nopan nowheel pointer-events-auto absolute bottom-full left-1/2 z-[60] mb-4 flex -translate-x-1/2 flex-col gap-3",
         PANEL_ARROW_CLASS
       )}
       style={{ width: panelWidth }}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <div
-        className={cn("p-4 md:p-6", PANEL_CLASS)}
-        role="region"
-        aria-label={t("workflow.canvas.shortcutHint.title")}
-      >
+      <CanvasFileDropHintCard />
+
+      <div className="relative">
+        <div
+          className={cn("p-4 md:p-6", PANEL_CLASS)}
+          role="region"
+          aria-label={t("workflow.canvas.shortcutHint.title")}
+        >
         <div className="mb-4 flex items-center justify-between gap-3">
           <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
             {t("workflow.canvas.shortcutHint.title")}
@@ -493,19 +529,20 @@ export function CanvasShortcutHintPanel({
             </ToolbarSectionLabel>
           </div>
         </div>
-      </div>
+        </div>
 
-      <span
-        aria-hidden
-        className="pointer-events-none absolute"
-        style={{
-          left: arrowLeftPx,
-          bottom: -8,
-          transform: "translateX(-50%)",
-        }}
-      >
-        <ShortcutPanelArrow />
-      </span>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            left: arrowLeftPx,
+            bottom: -8,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <ShortcutPanelArrow />
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, generativeModelKindFromNodeType, type AiGenerativeNodeType, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, generativeModelKindFromNodeType, nodeLayoutMetadataEntries, type AiGenerativeNodeType, type NodeLayoutSize, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -60,6 +60,7 @@ import {
 } from "./workflow-connection-validation";
 import { buildReferenceConnectionToNewNode } from "./workflow-add-node-connection";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
+import { withGenerativeManualContentMode } from "./generative-card-mode-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { applyGenerativeNodeStudioReference } from "./create-generative-node-from-studio-reference";
 import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
@@ -272,6 +273,10 @@ function applyGenerativeDefaultsOnCreate(
   );
 }
 
+function createWorkflowNodeId(nodeType: string): string {
+  return `${nodeType}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function createReactFlowNode(
   nodeType: NodeType,
   position: { x: number; y: number },
@@ -296,7 +301,7 @@ function createReactFlowNode(
   );
 
   return {
-    id: id ?? `${nodeType.type}-${Date.now()}`,
+    id: id ?? createWorkflowNodeId(nodeType.type),
     type: "workflowNode",
     position,
     selected: false,
@@ -321,6 +326,16 @@ function createReactFlowNode(
       createObjectUrl,
     },
   };
+}
+
+export interface AddGenerativeNodesBatchItem {
+  readonly nodeType: AiGenerativeNodeType;
+  readonly positionFlowPoint: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly layout: NodeLayoutSize;
+  readonly manualContent?: boolean;
 }
 
 // --- Hook interface ---
@@ -390,8 +405,15 @@ export interface UseGraphOperationsReturn {
       readonly panIntoView?: boolean;
       readonly prompt?: string;
       readonly precedingText?: string;
+      readonly positionFlowPoint?: {
+        readonly x: number;
+        readonly y: number;
+      };
     }
   ) => string | null;
+  addGenerativeNodesBatch: (
+    items: readonly AddGenerativeNodesBatchItem[]
+  ) => readonly string[];
   updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
   batchUpdateNodeExecutions: (
     updates: Readonly<Record<string, NodeExecutionUpdate>>
@@ -408,6 +430,7 @@ export interface UseGraphOperationsReturn {
   deleteSelected: () => void;
   deselectAll: () => void;
   selectNode: (nodeId: string) => void;
+  selectNodes: (nodeIds: readonly string[]) => void;
   addTriggerNodes: (trigger: WorkflowTrigger) => void;
   removeTriggerNodes: () => void;
   addNodeMenu: WorkflowAddNodeMenuState | null;
@@ -430,6 +453,7 @@ export interface UseGraphOperationsReturn {
 }
 
 const NOOP = () => {};
+const NOOP_ARRAY = (): readonly string[] => [];
 
 export function useGraphOperations({
   initialNodes = [],
@@ -1157,17 +1181,28 @@ export function useGraphOperations({
         readonly panIntoView?: boolean;
         readonly prompt?: string;
         readonly precedingText?: string;
+        readonly positionFlowPoint?: {
+          readonly x: number;
+          readonly y: number;
+        };
+        readonly manualContent?: boolean;
+        readonly selected?: boolean;
       }
     ): string | null => {
       if (!reactFlowInstance) return null;
 
       graphHistory.captureHistory();
 
-      const placement = findOpenNodePosition({
-        reactFlowInstance,
-        nodeType: nodeType.type,
-        existingNodes: nodesRef.current,
-      });
+      const placement = options?.positionFlowPoint
+        ? {
+            position: options.positionFlowPoint,
+            shouldPanIntoView: false,
+          }
+        : findOpenNodePosition({
+            reactFlowInstance,
+            nodeType: nodeType.type,
+            existingNodes: nodesRef.current,
+          });
 
       let newNode = createReactFlowNode(
         nodeType,
@@ -1195,12 +1230,24 @@ export function useGraphOperations({
         });
       }
 
-      newNode.selected = true;
+      if (options?.manualContent) {
+        newNode = {
+          ...newNode,
+          data: {
+            ...newNode.data,
+            metadata: withGenerativeManualContentMode(newNode.data.metadata),
+          },
+        };
+      }
 
-      setNodes((nds) => [
-        ...nds.map((node) => ({ ...node, selected: false })),
-        newNode,
-      ]);
+      const shouldSelect = options?.selected !== false;
+      newNode.selected = shouldSelect;
+
+      const nextNodes = shouldSelect
+        ? [...nodesRef.current.map((node) => ({ ...node, selected: false })), newNode]
+        : [...nodesRef.current, newNode];
+      nodesRef.current = nextNodes;
+      setNodes(nextNodes);
 
       const shouldPan = options?.panIntoView ?? true;
       if (shouldPan && placement.shouldPanIntoView) {
@@ -1238,6 +1285,85 @@ export function useGraphOperations({
       paramCatalog,
       commitEditorViewport,
       suppressViewportPersistEndRef,
+    ]
+  );
+
+  const addGenerativeNodesBatch = useCallback(
+    (items: readonly AddGenerativeNodesBatchItem[]): readonly string[] => {
+      if (!reactFlowInstance || items.length === 0 || !nodeTypes?.length) {
+        return [];
+      }
+
+      const templates = items.map((item) =>
+        nodeTypes.find((entry) => entry.type === item.nodeType)
+      );
+      if (templates.some((template) => !template)) {
+        return [];
+      }
+
+      let existingForNaming = nodesRef.current;
+      const newNodes: ReactFlowNode<WorkflowNodeType>[] = [];
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index]!;
+        const nodeType = templates[index]!;
+        let newNode = createReactFlowNode(
+          nodeType,
+          item.positionFlowPoint,
+          createObjectUrl,
+          existingForNaming,
+          t,
+          orgId,
+          generativeDefaults,
+          paramCatalog
+        );
+
+        if (item.manualContent !== false) {
+          newNode = {
+            ...newNode,
+            data: {
+              ...newNode.data,
+              metadata: {
+                ...withGenerativeManualContentMode(newNode.data.metadata),
+                ...nodeLayoutMetadataEntries(item.layout),
+              },
+            },
+          };
+        } else {
+          newNode = {
+            ...newNode,
+            data: {
+              ...newNode.data,
+              metadata: {
+                ...(newNode.data.metadata ?? {}),
+                ...nodeLayoutMetadataEntries(item.layout),
+              },
+            },
+          };
+        }
+
+        newNode.selected = false;
+        newNodes.push(newNode);
+        existingForNaming = [...existingForNaming, newNode];
+      }
+
+      graphHistory.captureHistory();
+      const nextNodes = [...nodesRef.current, ...newNodes];
+      nodesRef.current = nextNodes;
+      setNodes(nextNodes);
+
+      return newNodes.map((node) => node.id);
+    },
+    [
+      createObjectUrl,
+      generativeDefaults,
+      graphHistory,
+      nodeTypes,
+      orgId,
+      paramCatalog,
+      reactFlowInstance,
+      setNodes,
+      t,
     ]
   );
 
@@ -1433,6 +1559,23 @@ export function useGraphOperations({
     [setNodes, setEdges]
   );
 
+  const selectNodes = useCallback(
+    (nodeIds: readonly string[]) => {
+      const idSet = new Set(nodeIds);
+      if (idSet.size === 0) {
+        return;
+      }
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: idSet.has(node.id),
+        }))
+      );
+      setEdges((eds) => eds.map((edge) => ({ ...edge, selected: false })));
+    },
+    [setNodes, setEdges]
+  );
+
   const removeTriggerNodes = useCallback(() => {
     const triggerNodes = nodesRef.current.filter(
       (n) => n.data.nodeType && ALL_TRIGGER_NODE_TYPE_IDS.has(n.data.nodeType)
@@ -1472,7 +1615,7 @@ export function useGraphOperations({
           orgId,
           generativeDefaults,
           paramCatalog,
-          `${nodeType.type}-${Date.now()}-${i}`
+          `${nodeType.type}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`
         );
       });
 
@@ -1525,6 +1668,7 @@ export function useGraphOperations({
     isDraggingRef,
     isValidConnection,
     handleNodeSelect,
+    addGenerativeNodesBatch: graphEditBlocked ? NOOP_ARRAY : addGenerativeNodesBatch,
     updateNodeExecution,
     batchUpdateNodeExecutions,
     updateNodeData,
@@ -1534,6 +1678,7 @@ export function useGraphOperations({
     deleteSelected: readOnlyDisabled ? NOOP : deleteSelected,
     deselectAll,
     selectNode,
+    selectNodes,
     addTriggerNodes: graphEditBlocked ? NOOP : addTriggerNodes,
     removeTriggerNodes: graphEditBlocked ? NOOP : removeTriggerNodes,
     addNodeMenu,

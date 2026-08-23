@@ -40,10 +40,7 @@ interface CreativeStudioContextValue {
   readonly returnToCanvasFromDetail: () => void;
   readonly addGenerativeNode?: (
     nodeType: AiGenerativeNodeType,
-    options?: {
-      readonly prompt?: string;
-      readonly precedingText?: string;
-    }
+    options?: GenerativeNodeAddOptions
   ) => string | null;
   readonly requestDeleteStudioNode?: (nodeId: string) => void;
   readonly renamingListNodeId: string | null;
@@ -59,6 +56,20 @@ interface CreativeStudioContextValue {
   readonly resolvePendingSecondaryNode: (nodeId: string) => void;
 }
 
+export interface GenerativeNodeAddOptions {
+  readonly prompt?: string;
+  readonly precedingText?: string;
+  readonly positionFlowPoint?: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly openDetail?: boolean;
+  /** Canvas file drop: hide bottom prompt panel until upload completes. */
+  readonly manualContent?: boolean;
+  /** Default true. File drop passes false and batch-selects after all nodes are created. */
+  readonly selected?: boolean;
+}
+
 const CreativeStudioContext = createContext<CreativeStudioContextValue | null>(
   null
 );
@@ -70,10 +81,7 @@ export interface CreativeStudioProviderProps {
   readonly onReturnToCanvasFromDetail?: (nodeId: string | null) => void;
   readonly onAddGenerativeNode?: (
     nodeType: AiGenerativeNodeType,
-    options?: {
-      readonly prompt?: string;
-      readonly precedingText?: string;
-    }
+    options?: GenerativeNodeAddOptions
   ) => string | null;
   readonly onRequestDeleteStudioNode?: (nodeId: string) => void;
 }
@@ -250,13 +258,10 @@ export function CreativeStudioProvider({
   const addGenerativeNode = useCallback(
     (
       nodeType: AiGenerativeNodeType,
-      options?: {
-        readonly prompt?: string;
-        readonly precedingText?: string;
-      }
+      options?: GenerativeNodeAddOptions
     ): string | null => {
       const newNodeId = onAddGenerativeNode?.(nodeType, options) ?? null;
-      if (newNodeId) {
+      if (newNodeId && options?.openDetail !== false) {
         pendingStudioNodeIdRef.current = newNodeId;
         openDetail(newNodeId);
       }

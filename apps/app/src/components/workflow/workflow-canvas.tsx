@@ -47,6 +47,7 @@ import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
+import { CanvasFileDropPreview } from "./canvas-file-drop-preview";
 import {
   CanvasShortcutHintButton,
   CanvasShortcutHintPanel,
@@ -74,6 +75,7 @@ import type {
   WorkflowExecutionStatus,
   WorkflowNodeType,
 } from "./workflow-types";
+import type { CanvasFileDropPreviewState } from "./generative-card-upload-utils";
 
 const nodeTypes = {
   workflowNode: WorkflowNode,
@@ -230,6 +232,10 @@ export interface WorkflowCanvasProps {
   onCloseAddNodeMenu?: () => void;
   onPaneClick?: () => void;
   onPaneContextMenu?: (event: React.MouseEvent) => void;
+  canvasFileDropPreview?: CanvasFileDropPreviewState;
+  onCanvasFileDragOver?: (event: React.DragEvent) => void;
+  onCanvasFileDragLeave?: (event: React.DragEvent) => void;
+  onCanvasFileDrop?: (event: React.DragEvent) => void;
 }
 
 interface ActionButtonProps {
@@ -629,6 +635,10 @@ export function WorkflowCanvas({
   onCloseAddNodeMenu,
   onPaneClick,
   onPaneContextMenu,
+  canvasFileDropPreview,
+  onCanvasFileDragOver,
+  onCanvasFileDragLeave,
+  onCanvasFileDrop,
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
   const { zoom } = useViewport();
@@ -727,6 +737,9 @@ export function WorkflowCanvas({
         onConnectEnd={onConnectEnd}
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
+        onDragOver={onCanvasFileDragOver}
+        onDragLeave={onCanvasFileDragLeave}
+        onDrop={onCanvasFileDrop}
         onNodeDoubleClick={
           blockCardInteraction ? undefined : onNodeDoubleClick
         }
@@ -796,6 +809,9 @@ export function WorkflowCanvas({
           />
         )}
         <WorkflowAddNodePreviewLine menu={addNodeMenu} />
+        {canvasFileDropPreview?.visible ? (
+          <CanvasFileDropPreview preview={canvasFileDropPreview} />
+        ) : null}
 
         {/* Status Bar - hidden in read-only mode */}
         {!disabled && (
