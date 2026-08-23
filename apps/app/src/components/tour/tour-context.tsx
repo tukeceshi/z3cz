@@ -37,6 +37,10 @@ export function useTour() {
   return context;
 }
 
+export function useOptionalTour(): TourContextType | null {
+  return useContext(TourContext);
+}
+
 interface TourProviderProps {
   children: ReactNode;
 }

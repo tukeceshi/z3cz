@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/components/locale-provider";
 import { useTheme } from "@/components/theme-provider";
 import { TourSpotlight } from "@/components/tour/tour-spotlight";
-import { useTour } from "@/components/tour";
+import { useOptionalTour } from "@/components/tour";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
@@ -22,7 +22,7 @@ const THEME_TOGGLE_SELECTOR = '[data-tour="theme-toggle"]';
 export function CanvasThemeTip() {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
-  const { isActive: isTourActive } = useTour();
+  const isTourActive = useOptionalTour()?.isActive ?? false;
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -54,17 +54,16 @@ export function CanvasThemeTip() {
     return null;
   }
 
-  return (
-    <TourSpotlight targetSelector={THEME_TOGGLE_SELECTOR} padding={10}>
-      <div
-        className={cn(
-          "fixed left-1/2 top-1/2 z-60 w-[min(100vw-2rem,22rem)] -translate-x-1/2 -translate-y-1/2",
-          "rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg",
-          "animate-in fade-in-0 zoom-in-95"
-        )}
-        role="dialog"
-        aria-labelledby="canvas-theme-tip-title"
-      >
+  const dialog = (
+    <div
+      className={cn(
+        "fixed left-1/2 top-1/2 z-60 w-[min(100vw-2rem,22rem)] -translate-x-1/2 -translate-y-1/2",
+        "rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg",
+        "animate-in fade-in-0 zoom-in-95"
+      )}
+      role="dialog"
+      aria-labelledby="canvas-theme-tip-title"
+    >
         <h3
           id="canvas-theme-tip-title"
           className="text-sm font-semibold leading-snug"
@@ -117,6 +116,15 @@ export function CanvasThemeTip() {
           </Button>
         </div>
       </div>
+  );
+
+  if (!document.querySelector(THEME_TOGGLE_SELECTOR)) {
+    return dialog;
+  }
+
+  return (
+    <TourSpotlight targetSelector={THEME_TOGGLE_SELECTOR} padding={10}>
+      {dialog}
     </TourSpotlight>
   );
 }

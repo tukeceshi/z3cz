@@ -16,7 +16,6 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { CanvasThemeTip } from "@/components/workflow/canvas-theme-tip";
 import { readInitialViewportOneToOne } from "@/components/workflow/workflow-editor-navigation";
-import { WorkflowEditorSidebarEffect } from "@/components/workflow/workflow-editor-sidebar-effect";
 import { WorkflowError } from "@/components/workflow/workflow-error";
 import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { CanvasMaintenanceProvider, useCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
@@ -293,7 +292,6 @@ function EditorPageCanvas() {
 
   return (
     <ReactFlowProvider>
-      <WorkflowEditorSidebarEffect />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkflowBuilder
           workflowId={id || ""}

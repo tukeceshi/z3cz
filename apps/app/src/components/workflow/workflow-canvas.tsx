@@ -199,6 +199,10 @@ export interface WorkflowCanvasProps {
   workflowErrorMessage?: string;
   onToggleSidebar?: (e: React.MouseEvent) => void;
   isSidebarVisible?: boolean;
+  /** When false, Agent toggle is rendered elsewhere (e.g. floating canvas chrome). */
+  showAgentToggle?: boolean;
+  /** When true, top action bar sits below floating canvas chrome. */
+  reserveTopChromeSpace?: boolean;
   showControls?: boolean;
   isValidConnection?: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
   disabled?: boolean;
@@ -608,6 +612,8 @@ export function WorkflowCanvas({
   workflowErrorMessage,
   onToggleSidebar,
   isSidebarVisible,
+  showAgentToggle = true,
+  reserveTopChromeSpace = false,
   showControls = true,
   isValidConnection,
   disabled = false,
@@ -827,8 +833,16 @@ export function WorkflowCanvas({
 
         {/* Action Bars */}
         {showControls &&
-          (onAction || (onToggleSidebar && isSidebarVisible !== undefined)) && (
-            <div className="absolute top-4 right-4 flex items-center gap-3 z-50">
+          (onAction ||
+            (showAgentToggle &&
+              onToggleSidebar &&
+              isSidebarVisible !== undefined)) && (
+            <div
+              className={cn(
+                "absolute right-4 flex items-center gap-3 z-50",
+                reserveTopChromeSpace ? "top-14" : "top-4"
+              )}
+            >
               {/* Runtime Actions Group - Execute */}
               {onAction && (
                 <ActionBarGroup>
@@ -847,7 +861,7 @@ export function WorkflowCanvas({
               )}
 
               {/* View Controls Group - Sidebar */}
-              {onToggleSidebar && isSidebarVisible !== undefined && (
+              {showAgentToggle && onToggleSidebar && isSidebarVisible !== undefined && (
                 <ActionBarGroup>
                   <SidebarToggle
                     onClick={onToggleSidebar}

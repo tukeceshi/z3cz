@@ -58,7 +58,7 @@ import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
-import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
+import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import { WorkflowSidebar } from "./workflow-sidebar";
 import {
@@ -838,16 +838,7 @@ export function WorkflowBuilder({
             canRedo={canRedo}
           />
           <CreativeStudioCanvasSync selectNode={selectNode} />
-          {workflowsListUrl ? (
-            <WorkflowEditorBreadcrumbEffect
-              workflowName={workflowName ?? ""}
-              workflowsListUrl={workflowsListUrl}
-              readOnly={readOnly}
-              onOpenWorkflowSettings={onOpenWorkflowSettings}
-              soleSelectedNodeId={soleSelectedNodeId}
-            />
-          ) : null}
-          <div className="w-full h-full min-h-0 flex flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
             <InlineAiTextMigrationHost
               organizationId={orgId}
@@ -856,7 +847,22 @@ export function WorkflowBuilder({
               nodes={nodes}
               setNodes={setNodes}
             />
-            <div className="flex min-h-0 flex-1">
+            <div className="relative flex min-h-0 flex-1">
+              {workflowsListUrl ? (
+                <WorkflowEditorCanvasChrome
+                  workflowName={workflowName ?? ""}
+                  workflowsListUrl={workflowsListUrl}
+                  readOnly={readOnly}
+                  onOpenWorkflowSettings={onOpenWorkflowSettings}
+                  soleSelectedNodeId={soleSelectedNodeId}
+                  agentSidebarVisible={
+                    sidebarEnabled ? sidebar.isSidebarVisible : false
+                  }
+                  onToggleAgentSidebar={
+                    sidebarEnabled ? sidebar.toggleSidebar : undefined
+                  }
+                />
+              ) : null}
               <div
                 className={cn(
                   "h-full overflow-hidden relative",
@@ -892,11 +898,15 @@ export function WorkflowBuilder({
                   workflowStatus={execution.workflowStatus}
                   workflowErrorMessage={execution.workflowErrorMessage}
                   onToggleSidebar={
-                    sidebarEnabled ? sidebar.toggleSidebar : undefined
+                    sidebarEnabled && !workflowsListUrl
+                      ? sidebar.toggleSidebar
+                      : undefined
                   }
                   isSidebarVisible={
                     sidebarEnabled ? sidebar.isSidebarVisible : false
                   }
+                  showAgentToggle={!workflowsListUrl}
+                  reserveTopChromeSpace={Boolean(workflowsListUrl)}
                   isValidConnection={isValidConnection}
                   disabled={readOnly}
                   onFitToScreen={handleFitToScreen}
@@ -961,7 +971,6 @@ export function WorkflowBuilder({
                 </>
               )}
             </div>
-          </CloudStorageCanvasProvider>
 
           <WorkflowSettingsDialog
             open={workflowSettingsOpen}
@@ -973,6 +982,7 @@ export function WorkflowBuilder({
             workflowStatus={execution.workflowStatus}
             workflowErrorMessage={execution.workflowErrorMessage}
           />
+          </CloudStorageCanvasProvider>
         </div>
 
         <DetachNodesConfirmDialog
