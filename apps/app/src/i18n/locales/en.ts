@@ -2943,6 +2943,8 @@ export const en = {
       fileDrop: {
         maxCount: "You can drop up to {{max}} files at once",
         previewRelease: "Release to upload",
+        hintTitle: "Drop files onto empty canvas to upload",
+        hintFormats: "Images, video, and audio supported",
       },
       referenceConnectFailed:
         "{{targetName}} cannot reference {{sourceName}}; node created only.",

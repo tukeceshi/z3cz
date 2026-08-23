@@ -51,7 +51,11 @@ import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
 import {
   CreativeStudioProvider,
   useCreativeStudio,
+  type GenerativeNodeAddOptions,
 } from "./creative-studio-context";
+import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
+import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
+import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowRunConfigDialog } from "./workflow-run-config-dialog";
 import { WorkflowEditorBreadcrumbEffect } from "./workflow-editor-breadcrumb-effect";
@@ -332,6 +336,7 @@ export function WorkflowBuilder({
     onConnectStart,
     onConnectEnd,
     handleNodeSelect,
+    addGenerativeNodesBatch,
     updateNodeExecution,
     batchUpdateNodeExecutions,
     setReactFlowInstance,
@@ -345,6 +350,7 @@ export function WorkflowBuilder({
     deleteSelected,
     deselectAll,
     selectNode,
+    selectNodes,
     applyLayout,
     copySelected,
     cutSelected,
@@ -437,10 +443,7 @@ export function WorkflowBuilder({
   const handleAddGenerativeNode = useCallback(
     (
       nodeType: AiGenerativeNodeType,
-      options?: {
-        readonly prompt?: string;
-        readonly precedingText?: string;
-      }
+      options?: GenerativeNodeAddOptions
     ): string | null => {
       const template = nodeTypes.find((item) => item.type === nodeType);
       if (!template) {
@@ -451,6 +454,9 @@ export function WorkflowBuilder({
         panIntoView: false,
         prompt: options?.prompt,
         precedingText: options?.precedingText,
+        positionFlowPoint: options?.positionFlowPoint,
+        manualContent: options?.manualContent,
+        selected: options?.selected,
       });
     },
     [appToast, handleNodeSelect, nodeTypes]
@@ -865,6 +871,10 @@ export function WorkflowBuilder({
                 <WorkflowEditorMainArea
                   nodes={nodes}
                   edges={edges}
+                  reactFlowInstance={reactFlowInstance}
+                  canvasFileDropEnabled={!readOnly && interactive && !isCanvasFrozen}
+                  onAddCanvasDropNodes={readOnly ? undefined : addGenerativeNodesBatch}
+                  onSelectDroppedNodes={readOnly ? undefined : selectNodes}
                   connectionValidationState={connectionValidationState}
                   onNodesChange={onNodesChange}
                   onEdgesChange={onEdgesChange}
@@ -1105,11 +1115,34 @@ function CreativeStudioCanvasSync({
   return null;
 }
 
-type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas>;
+type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas> & {
+  readonly reactFlowInstance: ReactFlowInstance | null;
+  readonly canvasFileDropEnabled: boolean;
+  readonly onAddCanvasDropNodes?: (
+    items: readonly AddGenerativeNodesBatchItem[]
+  ) => readonly string[];
+  readonly onSelectDroppedNodes?: (nodeIds: readonly string[]) => void;
+};
 
-function WorkflowEditorMainArea(props: WorkflowEditorMainAreaProps) {
+function WorkflowEditorMainArea({
+  reactFlowInstance,
+  canvasFileDropEnabled,
+  onAddCanvasDropNodes,
+  onSelectDroppedNodes,
+  ...props
+}: WorkflowEditorMainAreaProps) {
   useGenerativeMediaBeforeUnloadGuard();
   const { viewMode } = useCreativeStudio();
+  const selectDroppedNodes = useCanvasDropNodeSelection(
+    onSelectDroppedNodes ?? (() => {})
+  );
+  const { fileDropPreview, handleCanvasDragOver, handleCanvasDragLeave, handleCanvasDrop } =
+    useCanvasGenerativeFileDrop({
+      reactFlowInstance,
+      enabled: canvasFileDropEnabled && viewMode === "canvas",
+      onAddCanvasDropNodes,
+      onSelectDroppedNodes: onSelectDroppedNodes ? selectDroppedNodes : undefined,
+    });
 
   const isStudio = viewMode === "studio";
 
@@ -1119,6 +1152,10 @@ function WorkflowEditorMainArea(props: WorkflowEditorMainAreaProps) {
         {...props}
         disabled={Boolean(props.disabled) || isStudio}
         showControls={isStudio ? false : props.showControls}
+        canvasFileDropPreview={fileDropPreview}
+        onCanvasFileDragOver={handleCanvasDragOver}
+        onCanvasFileDragLeave={handleCanvasDragLeave}
+        onCanvasFileDrop={handleCanvasDrop}
       />
 
       {isStudio ? (

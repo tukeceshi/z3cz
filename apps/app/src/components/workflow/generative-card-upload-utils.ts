@@ -6,8 +6,46 @@ import type { TranslateFn } from "@/i18n";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
+import { AI_IMAGE_EMPTY_CARD_SIZE, type MediaCardSize } from "./media-card-size";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import type { WorkflowParameter } from "./workflow-types";
+
+/** Max files accepted when dropping onto the workflow canvas. */
+export const CANVAS_GENERATIVE_FILE_DROP_MAX = 10;
+
+/** Horizontal spacing between multi-file drag preview centers. */
+export const CANVAS_GENERATIVE_FILE_DROP_HORIZONTAL_STEP_PX = 350;
+
+/** Gap between adjacent cards when dropping multiple files onto the canvas. */
+export const CANVAS_GENERATIVE_FILE_DROP_GAP_PX = 20;
+
+export interface CanvasFileDropCenterPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface CanvasFileDropFlowPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface CanvasFileDropPreviewItem {
+  readonly kind: GenerativeStudioDropKind;
+  readonly fileIndex: number;
+  readonly cardSize: MediaCardSize;
+}
+
+export interface CanvasFileDropPreviewState {
+  readonly visible: boolean;
+  readonly baseCenter: CanvasFileDropCenterPoint;
+  readonly items: readonly CanvasFileDropPreviewItem[];
+}
+
+export const CANVAS_FILE_DROP_PREVIEW_IDLE: CanvasFileDropPreviewState = {
+  visible: false,
+  baseCenter: { x: 0, y: 0 },
+  items: [],
+};
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png"]);
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
@@ -109,6 +147,102 @@ export interface GenerativeStudioDropFile {
   readonly kind: GenerativeStudioDropKind;
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly file: File;
+}
+
+export function resolveCanvasFileDropPreviewKinds(
+  dataTransfer: DataTransfer
+): readonly GenerativeStudioDropKind[] {
+  const items = dataTransfer.items;
+  if (!items || items.length === 0) {
+    return ["image"];
+  }
+
+  const kinds: GenerativeStudioDropKind[] = [];
+  const limit = Math.min(items.length, CANVAS_GENERATIVE_FILE_DROP_MAX);
+  for (let index = 0; index < limit; index += 1) {
+    const item = items[index];
+    if (!item || item.kind !== "file") {
+      continue;
+    }
+
+    const mime = item.type.toLowerCase();
+    if (mime.startsWith("video/")) {
+      kinds.push("video");
+    } else if (mime.startsWith("audio/")) {
+      kinds.push("audio");
+    } else {
+      kinds.push("image");
+    }
+  }
+
+  return kinds.length > 0 ? kinds : ["image"];
+}
+
+export function buildCanvasFileDropPreviewState(params: {
+  readonly baseCenter: CanvasFileDropCenterPoint;
+  readonly kinds: readonly GenerativeStudioDropKind[];
+}): CanvasFileDropPreviewState {
+  return {
+    visible: true,
+    baseCenter: params.baseCenter,
+    items: params.kinds.map((kind, fileIndex) => ({
+      kind,
+      fileIndex,
+      cardSize: AI_IMAGE_EMPTY_CARD_SIZE,
+    })),
+  };
+}
+
+export function resolveCanvasFileDropCenterPoint(params: {
+  readonly baseCenter: CanvasFileDropCenterPoint;
+  readonly fileIndex: number;
+}): CanvasFileDropCenterPoint {
+  if (params.fileIndex === 0) {
+    return params.baseCenter;
+  }
+
+  return {
+    x:
+      params.baseCenter.x +
+      CANVAS_GENERATIVE_FILE_DROP_HORIZONTAL_STEP_PX * params.fileIndex,
+    y: params.baseCenter.y,
+  };
+}
+
+export function resolveCanvasFileDropDropCenters(
+  baseCenter: CanvasFileDropCenterPoint,
+  cardSizes: readonly MediaCardSize[]
+): readonly CanvasFileDropCenterPoint[] {
+  if (cardSizes.length === 0) {
+    return [];
+  }
+
+  const centers: CanvasFileDropCenterPoint[] = [baseCenter];
+  for (let index = 1; index < cardSizes.length; index += 1) {
+    const previousSize = cardSizes[index - 1]!;
+    const currentSize = cardSizes[index]!;
+    const previousCenter = centers[index - 1]!;
+    centers.push({
+      x:
+        previousCenter.x +
+        previousSize.width / 2 +
+        CANVAS_GENERATIVE_FILE_DROP_GAP_PX +
+        currentSize.width / 2,
+      y: baseCenter.y,
+    });
+  }
+
+  return centers;
+}
+
+export function resolveCanvasFileDropNodePosition(
+  center: CanvasFileDropCenterPoint,
+  cardSize: MediaCardSize
+): CanvasFileDropFlowPoint {
+  return {
+    x: center.x - cardSize.width / 2,
+    y: center.y - cardSize.height / 2,
+  };
 }
 
 export function resolveGenerativeStudioDropFile(

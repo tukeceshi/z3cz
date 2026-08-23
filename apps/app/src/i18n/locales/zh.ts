@@ -2745,6 +2745,8 @@ export const zh: TranslationDictionary = {
       fileDrop: {
         maxCount: "一次最多拖入 {{max}} 个文件",
         previewRelease: "释放以上传",
+        hintTitle: "将文件拖拽到空白区域即可上传",
+        hintFormats: "支持图片、视频、音频",
       },
       referenceConnectFailed:
         "{{targetName}}无法引用{{sourceName}}，仅做节点创建",
