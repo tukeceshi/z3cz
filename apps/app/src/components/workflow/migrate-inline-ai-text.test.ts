@@ -9,8 +9,7 @@ import {
 
 vi.mock("@/services/ai-text-storage-service", () => ({
   stageAiTextContent: vi.fn(async () => ({
-    kind: "local",
-    mediaId: "media-1",
+    resourceId: "media-1",
     mimeType: "text/plain",
   })),
 }));
@@ -82,7 +81,7 @@ describe("migrate-inline-ai-text detection", () => {
           name: AI_TEXT_RESULT_INPUT_ID,
           type: "json",
           hidden: true,
-          value: { kind: "local", mediaId: "media-1", mimeType: "text/plain" },
+          value: { resourceId: "media-1", mimeType: "text/plain" },
         },
       ],
     });
@@ -119,7 +118,7 @@ describe("buildInlineAiTextFingerprint", () => {
               name: AI_TEXT_RESULT_INPUT_ID,
               type: "json",
               hidden: true,
-              value: { kind: "local", mediaId: "m1", mimeType: "text/plain" },
+              value: { resourceId: "m1", mimeType: "text/plain" },
             },
           ],
         }),

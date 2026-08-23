@@ -1,13 +1,13 @@
 import {
   buildAiTextExcerpt,
   inferAiTextMimeType,
-  type LocalMediaReference,
+  type PatchNodeLayoutMetadata,
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
   getResourceIdFromValue,
-  isLocalMediaReference,
+  isResourceIdReference,
 } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
@@ -15,11 +15,12 @@ import {
   getCachedMediaBlob,
   type AiMediaCacheNodeType,
 } from "@/services/ai-media-cache-service";
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import { cloudUploadToResourceId } from "@/services/stage-generative-media";
 import {
   readGenerativeStagingBlob,
   writeGenerativeStaging,
-  writeGenerativeStagingWithNewId,
+  writeGenerativeStagingWithResourceId,
 } from "@/services/generative-media-staging";
 import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
 
@@ -34,34 +35,23 @@ export async function stageAiTextContent(params: {
   readonly workflowName?: string;
   readonly text: string;
   readonly mediaId?: string;
-}): Promise<LocalMediaReference> {
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
+}): Promise<ResourceIdReference> {
   const mimeType = inferAiTextMimeType(params.text);
   const blob = new Blob([params.text], { type: mimeType });
-  const mediaId = params.mediaId?.trim();
-  if (mediaId) {
-    await writeGenerativeStaging({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      workflowName: params.workflowName,
-      mediaId,
-      blob,
-      mimeType,
-      nodeType: AI_TEXT_NODE_TYPE,
-    });
-    notifyAiMediaCacheChanged();
-    return { kind: "local", mediaId, mimeType };
-  }
-
-  const staged = await writeGenerativeStagingWithNewId({
+  const resourceId = params.mediaId?.trim() || allocateGenerativeMediaResourceId();
+  await writeGenerativeStaging({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
+    mediaId: resourceId,
     blob,
     mimeType,
     nodeType: AI_TEXT_NODE_TYPE,
+    patchNodeLayout: params.patchNodeLayout,
   });
   notifyAiMediaCacheChanged();
-  return { kind: "local", mediaId: staged.mediaId, mimeType };
+  return { resourceId, mimeType };
 }
 
 export async function readAiTextContent(params: {
@@ -105,15 +95,15 @@ export async function readAiTextContent(params: {
 export function scheduleAiTextCloudUpload(params: {
   readonly organizationId: string;
   readonly workflowId: string;
-  readonly media: LocalMediaReference;
+  readonly media: ResourceIdReference;
   readonly cloudConfigured: boolean;
   readonly onPromoted?: (value: ResourceIdReference) => void;
 }): void {
-  if (!params.cloudConfigured || !isLocalMediaReference(params.media)) {
+  if (!params.cloudConfigured || !isResourceIdReference(params.media)) {
     return;
   }
 
-  const key = `${params.organizationId}:${params.workflowId}:${params.media.mediaId}`;
+  const key = `${params.organizationId}:${params.workflowId}:${params.media.resourceId}`;
   const existing = pendingCloudUploads.get(key);
   if (existing) {
     clearTimeout(existing);
@@ -123,30 +113,30 @@ export function scheduleAiTextCloudUpload(params: {
     key,
     setTimeout(() => {
       pendingCloudUploads.delete(key);
-      void promoteAiTextLocalToCloud(params).catch((error) => {
+      void promoteAiTextToCloud(params).catch((error) => {
         console.warn("[ai-text-storage] cloud upload failed", error);
       });
     }, CLOUD_UPLOAD_DEBOUNCE_MS)
   );
 }
 
-export async function promoteAiTextLocalToCloud(params: {
+export async function promoteAiTextToCloud(params: {
   readonly organizationId: string;
   readonly workflowId: string;
-  readonly media: LocalMediaReference;
+  readonly media: ResourceIdReference;
   readonly onPromoted?: (value: ResourceIdReference) => void;
 }): Promise<ResourceIdReference | null> {
-  if (!isLocalMediaReference(params.media)) {
+  if (!isResourceIdReference(params.media)) {
     return null;
   }
 
   const object = await uploadGenerativeMediaFromLocalStaging({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
-    mediaId: params.media.mediaId,
-    mimeType: params.media.mimeType,
+    mediaId: params.media.resourceId,
+    mimeType: params.media.mimeType ?? "text/plain",
     mediaKind: "reference",
-    objectId: params.media.mediaId,
+    objectId: params.media.resourceId,
   });
 
   const resource = cloudUploadToResourceId(object);
@@ -162,5 +152,5 @@ export function buildAiTextResultExcerpt(text: string): string {
 export function isAiTextReferenceValue(
   value: unknown
 ): value is WorkflowMediaValue {
-  return isLocalMediaReference(value) || isResourceIdReference(value);
+  return isResourceIdReference(value);
 }

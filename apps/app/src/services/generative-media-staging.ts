@@ -1,14 +1,15 @@
+import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
+
 import type { AiMediaCacheNodeType } from "@/services/ai-media-cache-service";
 import {
   getCachedMediaBlob,
+  getCachedMediaNaturalSize,
   readCachedMediaBlobByMediaId,
   cacheMediaFromBlob,
 } from "@/services/ai-media-cache-service";
-import {
-  createStableBlobUrl,
-  findStableBlobUrlForMediaId,
-  stagingBlobUrlKey,
-} from "@/services/media-display-blob-url-registry";
+import { resolveStagingCardLayout } from "@/services/staging-card-layout";
+import { findStableBlobUrlForMediaId, createStableBlobUrl } from "@/services/media-display-blob-url-registry";
+import { registerWorkflowMediaFullUrl } from "@/services/workflow-media-address-catalog";
 
 const LEGACY_DB_NAME = "dafthunk-local-media-staging";
 const LEGACY_DB_VERSION = 1;
@@ -45,7 +46,13 @@ async function registerStagingBlobUrlFromIndexedDb(params: {
     return null;
   }
 
-  return createStableBlobUrl(stagingBlobUrlKey(params), blob);
+  return registerWorkflowMediaFullUrl({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId: params.mediaId,
+    blob,
+    preferStagingKey: true,
+  });
 }
 
 /** @deprecated Use findStableBlobUrlForMediaId from media-display-blob-url-registry. */
@@ -58,6 +65,31 @@ export function createGenerativeStagingObjectUrl(blob: Blob): string {
   return URL.createObjectURL(blob);
 }
 
+export async function commitNodeLayoutFromStaging(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly nodeType: AiMediaCacheNodeType;
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
+}): Promise<void> {
+  if (!params.patchNodeLayout) {
+    return;
+  }
+
+  const naturalSize =
+    params.nodeType === "ai-image" || params.nodeType === "ai-video"
+      ? await getCachedMediaNaturalSize({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          mediaId: params.mediaId,
+        })
+      : null;
+
+  params.patchNodeLayout(
+    resolveStagingCardLayout(params.nodeType, naturalSize)
+  );
+}
+
 export async function writeGenerativeStaging(params: {
   readonly organizationId: string;
   readonly workflowId: string;
@@ -66,6 +98,7 @@ export async function writeGenerativeStaging(params: {
   readonly blob: Blob;
   readonly mimeType: string;
   readonly nodeType: AiMediaCacheNodeType;
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
 }): Promise<boolean> {
   const stored = await cacheMediaFromBlob({
     organizationId: params.organizationId,
@@ -85,23 +118,39 @@ export async function writeGenerativeStaging(params: {
     workflowId: params.workflowId,
     mediaId: params.mediaId,
   });
+
+  await commitNodeLayoutFromStaging({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId: params.mediaId,
+    nodeType: params.nodeType,
+    patchNodeLayout: params.patchNodeLayout,
+  });
+
   return true;
 }
 
-export async function writeGenerativeStagingWithNewId(params: {
+export async function writeGenerativeStagingWithResourceId(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly workflowName?: string;
+  readonly resourceId: string;
   readonly blob: Blob;
   readonly mimeType: string;
   readonly nodeType: AiMediaCacheNodeType;
-}): Promise<{ readonly mediaId: string; readonly mimeType: string }> {
-  const mediaId = crypto.randomUUID();
+  readonly patchNodeLayout?: PatchNodeLayoutMetadata;
+}): Promise<{ readonly resourceId: string; readonly mimeType: string }> {
   await writeGenerativeStaging({
-    ...params,
-    mediaId,
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    workflowName: params.workflowName,
+    mediaId: params.resourceId,
+    blob: params.blob,
+    mimeType: params.mimeType,
+    nodeType: params.nodeType,
+    patchNodeLayout: params.patchNodeLayout,
   });
-  return { mediaId, mimeType: params.mimeType };
+  return { resourceId: params.resourceId, mimeType: params.mimeType };
 }
 
 export async function readGenerativeStagingBlob(params: {
@@ -118,14 +167,13 @@ export async function readGenerativeStagingBlob(params: {
       mediaId: params.mediaId,
     });
     if (blob) {
-      createStableBlobUrl(
-        stagingBlobUrlKey({
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          mediaId: params.mediaId,
-        }),
-        blob
-      );
+      registerWorkflowMediaFullUrl({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        blob,
+        preferStagingKey: true,
+      });
       return {
         blob,
         mimeType: blob.type || "application/octet-stream",

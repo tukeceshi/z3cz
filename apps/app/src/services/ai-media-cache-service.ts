@@ -12,15 +12,16 @@ import {
   createStableBlobUrl,
   dropStableBlobUrlsForMediaId,
   getStableBlobUrl,
+  mediaDisplayStableBlobUrlKey,
   stagingBlobUrlKey,
 } from "@/services/media-display-blob-url-registry";
-import { recordMediaResourceAlias } from "@/services/media-resource-alias-service";
 import {
   generateImageThumbnail,
   readImageNaturalSize,
 } from "@/services/generate-image-thumbnail";
+import { readVideoNaturalSize } from "@/services/read-video-natural-size";
 import { generateVideoPoster } from "@/services/generate-video-poster";
-import { displaySizeToMaxWidth, CANVAS_TIER_SHORT_EDGE, LEGACY_CANVAS_S_THUMB_WIDTH } from "@/services/canvas-media-tier";
+import { displaySizeToMaxWidth, CANVAS_TIER_SHORT_EDGE } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 import {
   mediaFetchInitForCacheUrl,
@@ -31,11 +32,16 @@ import {
   workflowMediaMimeType,
 } from "@/services/resolve-media-resource-fetch-url";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
-import { invalidateAiTextHydrateState } from "@/services/ensure-ai-text-cached";
+import {
+  getWorkflowMediaUrlSet,
+  registerWorkflowMediaFullUrl,
+  registerWorkflowMediaThumbUrl,
+} from "@/services/workflow-media-address-catalog";
+import type { WorkflowMediaThumbTier } from "@/services/workflow-media-address-catalog";
 import {
   dropAiTextDisplayForMediaId,
-  rekeyAiTextDisplay,
 } from "@/services/ai-text-display-registry";
+import { invalidateAiTextHydrateState } from "@/services/ensure-ai-text-cached";
 
 export type AiMediaCacheNodeType =
   | "ai-image"
@@ -198,6 +204,31 @@ function entryKey(
   return `${organizationId}:${workflowId}:${mediaId}`;
 }
 
+function workflowEntryKeyPrefix(
+  organizationId: string,
+  workflowId: string
+): string {
+  return `${organizationId}:${workflowId}:`;
+}
+
+function workflowEntryKeyRange(
+  organizationId: string,
+  workflowId: string
+): IDBKeyRange {
+  const prefix = workflowEntryKeyPrefix(organizationId, workflowId);
+  return IDBKeyRange.bound(prefix, `${prefix}\uffff`, false, false);
+}
+
+function awaitTransactionComplete(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () =>
+      reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+  });
+}
+
 function workflowKey(organizationId: string, workflowId: string): string {
   return `${organizationId}:${workflowId}`;
 }
@@ -278,53 +309,9 @@ async function withDatabase<T>(
 ): Promise<T> {
   const db = await openDatabase();
   try {
-    await dedupeAliasCacheEntriesOnce(db);
     return await fn(db);
   } finally {
     db.close();
-  }
-}
-
-let aliasDedupeDone = false;
-
-async function dedupeAliasCacheEntriesOnce(db: IDBDatabase): Promise<void> {
-  if (aliasDedupeDone) return;
-  aliasDedupeDone = true;
-
-  const entries = await readAllEntries(db);
-  const groups = new Map<string, CacheEntryRecord[]>();
-
-  for (const entry of entries) {
-    const fingerprint = [
-      entry.organizationId,
-      entry.workflowId,
-      entry.byteSize,
-      entry.mimeType,
-      entry.nodeType,
-    ].join("|");
-    const bucket = groups.get(fingerprint) ?? [];
-    bucket.push(entry);
-    groups.set(fingerprint, bucket);
-  }
-
-  for (const bucket of groups.values()) {
-    if (bucket.length < 2) continue;
-    const cloudEntries = bucket.filter((entry) => entry.mediaId.includes("/"));
-    const aliasEntries = bucket.filter((entry) => !entry.mediaId.includes("/"));
-    if (cloudEntries.length === 0 || aliasEntries.length === 0) continue;
-
-    for (const alias of aliasEntries) {
-      const cloud = cloudEntries[0];
-      if (cloud) {
-        recordMediaResourceAlias({
-          organizationId: alias.organizationId,
-          workflowId: alias.workflowId,
-          fromMediaId: alias.mediaId,
-          toMediaId: cloud.mediaId,
-        });
-      }
-      await deleteEntry(db, alias.key);
-    }
   }
 }
 
@@ -527,17 +514,26 @@ const TIER_THUMB_MAX_WIDTHS = [
   CANVAS_TIER_SHORT_EDGE.m,
   CANVAS_TIER_SHORT_EDGE.l,
 ] as const;
-/** Legacy thumb widths still readable after upgrade. */
-const LEGACY_TIER_THUMB_MAX_WIDTHS = [200, 400, 800, 1600] as const;
 
 function tierCacheKey(entryKey: string, maxWidth: number): string {
   return `${entryKey}|w${maxWidth}`;
 }
 
+/** Known thumb store keys for one cache entry — used by batch init (no thumbs scan). */
+export function collectWorkflowEntryThumbLookupKeys(
+  entryKeyValue: string
+): readonly string[] {
+  return [
+    tierCacheKey(entryKeyValue, CANVAS_TIER_SHORT_EDGE.s),
+    tierCacheKey(entryKeyValue, CANVAS_TIER_SHORT_EDGE.m),
+    tierCacheKey(entryKeyValue, CANVAS_TIER_SHORT_EDGE.l),
+  ];
+}
+
 function parseThumbParentEntryKey(thumbKey: string): string | null {
   const pipeIndex = thumbKey.indexOf("|w");
   if (pipeIndex < 0) {
-    return thumbKey;
+    return null;
   }
   return thumbKey.slice(0, pipeIndex);
 }
@@ -552,12 +548,7 @@ function deleteEntryThumbs(
   thumbsStore: IDBObjectStore,
   entryKey: string
 ): void {
-  thumbsStore.delete(entryKey);
   for (const maxWidth of TIER_THUMB_MAX_WIDTHS) {
-    thumbsStore.delete(tierCacheKey(entryKey, maxWidth));
-  }
-  thumbsStore.delete(tierCacheKey(entryKey, LEGACY_CANVAS_S_THUMB_WIDTH));
-  for (const maxWidth of LEGACY_TIER_THUMB_MAX_WIDTHS) {
     thumbsStore.delete(tierCacheKey(entryKey, maxWidth));
   }
 }
@@ -606,29 +597,7 @@ async function readTierBlob(
   entry: CacheEntryRecord,
   maxWidth: number
 ): Promise<Blob | null> {
-  const key = tierCacheKey(entry.key, maxWidth);
-  const tierBlob = await readThumbBlob(db, key);
-  if (tierBlob) return tierBlob;
-
-  if (maxWidth === CANVAS_TIER_SHORT_EDGE.s) {
-    const legacyCanvasS = await readThumbBlob(
-      db,
-      tierCacheKey(entry.key, LEGACY_CANVAS_S_THUMB_WIDTH)
-    );
-    if (legacyCanvasS) return legacyCanvasS;
-  }
-
-  // Legacy single-thumb key / old widths.
-  if (
-    maxWidth === CANVAS_TIER_SHORT_EDGE.s ||
-    maxWidth === LEGACY_CANVAS_S_THUMB_WIDTH ||
-    maxWidth === 200
-  ) {
-    const legacy = await readThumbBlob(db, entry.key);
-    if (legacy) return legacy;
-  }
-
-  return null;
+  return readThumbBlob(db, tierCacheKey(entry.key, maxWidth));
 }
 
 async function generateCacheResourceTiersForEntry(
@@ -670,6 +639,17 @@ async function generateCacheResourceTiersForEntry(
         maxWidth: spec.maxWidth,
         blob: generated,
       });
+
+      const canvasTier = tierKindToCanvasTier(spec.tier);
+      if (canvasTier) {
+        registerWorkflowMediaThumbUrl({
+          organizationId: entry.organizationId,
+          workflowId: entry.workflowId,
+          mediaId: entry.mediaId,
+          tier: canvasTier,
+          blob: generated,
+        });
+      }
     })
   );
 
@@ -858,10 +838,13 @@ async function putCacheBlobRecord(params: {
     let naturalWidth = existing?.naturalWidth;
     let naturalHeight = existing?.naturalHeight;
     if (
-      params.nodeType === "ai-image" &&
+      (params.nodeType === "ai-image" || params.nodeType === "ai-video") &&
       (!naturalWidth || !naturalHeight)
     ) {
-      const naturalSize = await readImageNaturalSize(storedBlob, params.mimeType);
+      const naturalSize =
+        params.nodeType === "ai-image"
+          ? await readImageNaturalSize(storedBlob, params.mimeType)
+          : await readVideoNaturalSize(storedBlob);
       if (naturalSize) {
         naturalWidth = naturalSize.width;
         naturalHeight = naturalSize.height;
@@ -1097,13 +1080,35 @@ export async function readCachedMediaBlobByMediaId(
   return { blob: record.blob, mimeType: entry.mimeType };
 }
 
+function tierKindToCanvasTier(tier: AiMediaCacheTierKind): WorkflowMediaThumbTier | null {
+  if (tier === "canvas-s") return "s";
+  if (tier === "canvas-m") return "m";
+  if (tier === "canvas-l") return "l";
+  return null;
+}
+
 function stableBlobUrlKey(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly mediaId: string;
   readonly tierLabel: string;
 }): string {
-  return `${params.organizationId}:${params.workflowId}:${params.mediaId}:${params.tierLabel}`;
+  return mediaDisplayStableBlobUrlKey(params);
+}
+
+function mergeMediaDisplayUrlSets(
+  ...sets: readonly MediaDisplayUrlSet[]
+): MediaDisplayUrlSet {
+  let merged: MediaDisplayUrlSet = EMPTY_MEDIA_DISPLAY_URL_SET;
+  for (const set of sets) {
+    merged = {
+      full: merged.full ?? set.full,
+      s: merged.s ?? set.s,
+      m: merged.m ?? set.m,
+      l: merged.l ?? set.l,
+    };
+  }
+  return merged;
 }
 
 export interface CanvasTierUrlSet {
@@ -1135,7 +1140,8 @@ export function getStableMediaDisplayUrlSet(params: {
   readonly workflowId: string;
   readonly mediaId: string;
 }): MediaDisplayUrlSet {
-  return {
+  const catalogSet = getWorkflowMediaUrlSet(params, params.mediaId);
+  const registrySet: MediaDisplayUrlSet = {
     full:
       getStableBlobUrl(
         stableBlobUrlKey({
@@ -1158,6 +1164,7 @@ export function getStableMediaDisplayUrlSet(params: {
       width: CANVAS_TIER_SHORT_EDGE.l,
     }),
   };
+  return mergeMediaDisplayUrlSets(catalogSet, registrySet);
 }
 
 export async function getMediaDisplayUrlSet(params: {
@@ -1184,13 +1191,12 @@ export async function getMediaDisplayUrlSet(params: {
     };
 
     if (!next.full) {
-      const fullKey = stableBlobUrlKey({
+      next.full = registerWorkflowMediaFullUrl({
         organizationId: params.organizationId,
         workflowId: params.workflowId,
         mediaId: params.mediaId,
-        tierLabel: "full",
+        blob: entry.blob,
       });
-      next.full = createStableBlobUrl(fullKey, entry.blob);
     }
 
     if (entry.nodeType !== "ai-image" && entry.nodeType !== "ai-video") {
@@ -1210,17 +1216,17 @@ export async function getMediaDisplayUrlSet(params: {
         continue;
       }
 
-      const tierKey = stableBlobUrlKey({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        mediaId: params.mediaId,
-        tierLabel: `w${width}`,
-      });
       const tierBlob = await readTierBlob(db, entry, width);
       if (!tierBlob) {
         continue;
       }
-      next[tier] = createStableBlobUrl(tierKey, tierBlob);
+      next[tier] = registerWorkflowMediaThumbUrl({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tier,
+        blob: tierBlob,
+      });
     }
 
     return next;
@@ -1235,15 +1241,32 @@ export function pickMediaDisplayUrl(
     return set.full;
   }
   if (size === "canvas-s" || size === "thumb") {
-    return set.s ?? set.full;
+    return set.s;
   }
   if (size === "canvas-m") {
-    return set.m ?? set.s;
+    return set.m;
   }
   if (size === "canvas-l") {
-    return set.l ?? set.m ?? set.s;
+    return set.l;
   }
   return set.full;
+}
+
+export function isMediaDisplayTierPending(
+  set: MediaDisplayUrlSet,
+  size: MediaDisplaySize
+): boolean {
+  if (pickMediaDisplayUrl(set, size)) {
+    return false;
+  }
+  return !isMediaDisplayUrlSetEmpty(set);
+}
+
+export function hasDisplayUrlForSize(
+  set: MediaDisplayUrlSet,
+  size: MediaDisplaySize
+): boolean {
+  return pickMediaDisplayUrl(set, size) !== null;
 }
 
 export function toCanvasTierUrlSet(
@@ -1321,17 +1344,17 @@ export async function getCanvasTierUrlSet(params: {
     for (const [tier, width] of Object.entries(widths) as Array<
       [keyof CanvasTierUrlSet, number]
     >) {
-      const tierKey = stableBlobUrlKey({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        mediaId: params.mediaId,
-        tierLabel: `w${width}`,
-      });
       const tierBlob = await readTierBlob(db, entry, width);
       if (!tierBlob) {
         return null;
       }
-      tierUrls[tier] = createStableBlobUrl(tierKey, tierBlob);
+      tierUrls[tier] = registerWorkflowMediaThumbUrl({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId: params.mediaId,
+        tier,
+        blob: tierBlob,
+      });
     }
 
     return tierUrls as CanvasTierUrlSet;
@@ -1417,13 +1440,12 @@ export async function getCachedMediaBlobUrl(params: {
     const entry = await readCachedMediaEntry(db, params);
     if (!entry) return null;
 
-    const fullKey = stableBlobUrlKey({
+    return registerWorkflowMediaFullUrl({
       organizationId: params.organizationId,
       workflowId: params.workflowId,
       mediaId: params.mediaId,
-      tierLabel: "full",
+      blob: entry.blob,
     });
-    return createStableBlobUrl(fullKey, entry.blob);
   });
 }
 
@@ -1566,6 +1588,93 @@ export async function listOrganizationCacheEntries(
   });
 }
 
+export interface WorkflowMediaThumbBatchItem {
+  readonly mediaId: string;
+  readonly thumbs: {
+    readonly s: Blob | null;
+    readonly m: Blob | null;
+    readonly l: Blob | null;
+  };
+}
+
+function resolveTierBlobFromLoadedThumbs(
+  entry: CacheEntryRecord,
+  maxWidth: number,
+  thumbsByKey: ReadonlyMap<string, ThumbRecord>
+): Blob | null {
+  return thumbsByKey.get(tierCacheKey(entry.key, maxWidth))?.blob ?? null;
+}
+
+/** One IndexedDB read for workflow thumb blobs (prefix entries + point thumb keys). */
+export async function batchLoadWorkflowMediaThumbBlobs(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+}): Promise<readonly WorkflowMediaThumbBatchItem[]> {
+  return withDatabase(async (db) => {
+    if (!db.objectStoreNames.contains(THUMBS_STORE)) {
+      return [];
+    }
+
+    const transaction = db.transaction([ENTRIES_STORE, THUMBS_STORE], "readonly");
+    const entriesStore = transaction.objectStore(ENTRIES_STORE);
+    const thumbsStore = transaction.objectStore(THUMBS_STORE);
+
+    const entries = await idbRequest<CacheEntryRecord[]>(
+      entriesStore.getAll(
+        workflowEntryKeyRange(params.organizationId, params.workflowId)
+      )
+    );
+    const mediaEntries = entries.filter(
+      (entry) => entry.nodeType === "ai-image" || entry.nodeType === "ai-video"
+    );
+
+    const thumbKeys = [
+      ...new Set(
+        mediaEntries.flatMap((entry) =>
+          collectWorkflowEntryThumbLookupKeys(entry.key)
+        )
+      ),
+    ];
+
+    const thumbRecords = await Promise.all(
+      thumbKeys.map((key) =>
+        idbRequest<ThumbRecord | undefined>(thumbsStore.get(key))
+      )
+    );
+
+    await awaitTransactionComplete(transaction);
+
+    const thumbsByKey = new Map<string, ThumbRecord>();
+    for (let index = 0; index < thumbKeys.length; index += 1) {
+      const record = thumbRecords[index];
+      if (record) {
+        thumbsByKey.set(thumbKeys[index]!, record);
+      }
+    }
+
+    return mediaEntries.map((entry) => ({
+      mediaId: entry.mediaId,
+      thumbs: {
+        s: resolveTierBlobFromLoadedThumbs(
+          entry,
+          CANVAS_TIER_SHORT_EDGE.s,
+          thumbsByKey
+        ),
+        m: resolveTierBlobFromLoadedThumbs(
+          entry,
+          CANVAS_TIER_SHORT_EDGE.m,
+          thumbsByKey
+        ),
+        l: resolveTierBlobFromLoadedThumbs(
+          entry,
+          CANVAS_TIER_SHORT_EDGE.l,
+          thumbsByKey
+        ),
+      },
+    }));
+  });
+}
+
 export async function listWorkflowCacheResources(params: {
   readonly organizationId: string;
   readonly workflowId: string;
@@ -1613,25 +1722,6 @@ export async function listWorkflowCacheResources(params: {
         };
       })
       .sort((a, b) => b.lastAccessAt.localeCompare(a.lastAccessAt));
-  });
-}
-
-export async function getCacheResourcePreviewUrl(
-  entryKey: string
-): Promise<string | null> {
-  return withDatabase(async (db) => {
-    const entryReadTx = db.transaction(ENTRIES_STORE, "readonly");
-    const entry = await idbRequest<CacheEntryRecord | undefined>(
-      entryReadTx.objectStore(ENTRIES_STORE).get(entryKey)
-    );
-    if (!entry) return null;
-
-    const preview =
-      (await readTierBlob(db, entry, 200)) ??
-      (await readTierBlob(db, entry, 400)) ??
-      entry.blob;
-    const stableKey = `${entryKey}:preview`;
-    return createStableBlobUrl(stableKey, preview);
   });
 }
 
@@ -1701,127 +1791,6 @@ export async function downloadCacheEntriesByKeys(
   });
 }
 
-async function migrateEntryThumbs(
-  db: IDBDatabase,
-  fromEntryKey: string,
-  toEntryKey: string
-): Promise<void> {
-  if (!db.objectStoreNames.contains(THUMBS_STORE)) return;
-  if (fromEntryKey === toEntryKey) return;
-
-  const legacyTo = await readThumbBlob(db, toEntryKey);
-  if (!legacyTo) {
-    const legacyFrom = await readThumbBlob(db, fromEntryKey);
-    if (legacyFrom) {
-      await storeThumb(db, {
-        key: toEntryKey,
-        parentEntryKey: toEntryKey,
-        tier: "thumb",
-        maxWidth: LEGACY_CANVAS_S_THUMB_WIDTH,
-        blob: legacyFrom,
-      });
-    }
-  }
-
-  for (const maxWidth of TIER_THUMB_MAX_WIDTHS) {
-    const fromTierKey = tierCacheKey(fromEntryKey, maxWidth);
-    const toTierKey = tierCacheKey(toEntryKey, maxWidth);
-    const existingTo = await readThumbBlob(db, toTierKey);
-    if (existingTo) continue;
-    const fromThumb = await readThumbBlob(db, fromTierKey);
-    if (fromThumb) {
-      await storeThumb(db, {
-        key: toTierKey,
-        parentEntryKey: toEntryKey,
-        tier: maxWidthToTierKind(maxWidth),
-        maxWidth,
-        blob: fromThumb,
-      });
-    }
-  }
-}
-
-/**
- * Merge duplicate cache rows after cloud upload rekeys a local staging mediaId
- * to its canonical storageKey id. Keeps the target entry and drops the alias.
- */
-export async function rekeyCacheEntry(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly fromMediaId: string;
-  readonly toMediaId: string;
-}): Promise<void> {
-  if (params.fromMediaId === params.toMediaId) return;
-
-  return withDatabase(async (db) => {
-    const fromKey = entryKey(
-      params.organizationId,
-      params.workflowId,
-      params.fromMediaId
-    );
-    const toKey = entryKey(
-      params.organizationId,
-      params.workflowId,
-      params.toMediaId
-    );
-
-    const fromReadTx = db.transaction(ENTRIES_STORE, "readonly");
-    const fromEntry = await idbRequest<CacheEntryRecord | undefined>(
-      fromReadTx.objectStore(ENTRIES_STORE).get(fromKey)
-    );
-    if (!fromEntry) return;
-
-    const toReadTx = db.transaction(ENTRIES_STORE, "readonly");
-    const toEntry = await idbRequest<CacheEntryRecord | undefined>(
-      toReadTx.objectStore(ENTRIES_STORE).get(toKey)
-    );
-
-    if (toEntry) {
-      await migrateEntryThumbs(db, fromKey, toKey);
-      await deleteEntry(db, fromKey);
-      recordMediaResourceAlias({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        fromMediaId: params.fromMediaId,
-        toMediaId: params.toMediaId,
-      });
-      return;
-    }
-
-    await migrateEntryThumbs(db, fromKey, toKey);
-
-    const now = new Date().toISOString();
-    const record: CacheEntryRecord = {
-      ...fromEntry,
-      key: toKey,
-      mediaId: params.toMediaId,
-      lastAccessAt: now,
-    };
-
-    await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
-      transaction.objectStore(ENTRIES_STORE).put(record);
-      transaction.objectStore(ENTRIES_STORE).delete(fromKey);
-      if (db.objectStoreNames.contains(THUMBS_STORE)) {
-        deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), fromKey);
-      }
-    });
-
-    await reconcileCacheMeta(db);
-
-    dropStableBlobUrlsForMediaId(params.fromMediaId);
-    rekeyAiTextDisplay({
-      fromMediaId: params.fromMediaId,
-      toMediaId: params.toMediaId,
-    });
-    recordMediaResourceAlias({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      fromMediaId: params.fromMediaId,
-      toMediaId: params.toMediaId,
-    });
-  });
-}
-
 export async function downloadCacheForWorkflows(params: {
   readonly organizationId: string;
   readonly workflowIds: readonly string[];
@@ -1880,91 +1849,4 @@ function parseCacheEntryKeyParts(
     workflowId: entryPart.slice(firstColon + 1, secondColon),
     mediaId: entryPart.slice(secondColon + 1),
   };
-}
-
-/** Rebuild local UUID → cloud storageKey aliases from orphan thumbs + cache entries. */
-export async function rebuildMediaResourceAliasesFromCache(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly localHints?: readonly {
-    readonly mediaId: string;
-    readonly mimeType: string;
-    readonly nodeType: AiMediaCacheNodeType;
-  }[];
-}): Promise<void> {
-  return withDatabase(async (db) => {
-    const entries = (await readAllEntries(db)).filter(
-      (entry) =>
-        entry.organizationId === params.organizationId &&
-        entry.workflowId === params.workflowId
-    );
-    const entryIds = new Set(entries.map((entry) => entry.mediaId));
-    const cloudEntries = entries.filter((entry) => entry.mediaId.includes("/"));
-
-    const hintIds = new Set(
-      (params.localHints ?? []).map((hint) => hint.mediaId)
-    );
-
-    const orphanLocalIds = new Set<string>();
-    if (params.localHints) {
-      for (const hint of params.localHints) {
-        if (!entryIds.has(hint.mediaId)) {
-          orphanLocalIds.add(hint.mediaId);
-        }
-      }
-    }
-
-    const thumbs = await readAllThumbs(db);
-    for (const thumb of thumbs) {
-      const parts = parseCacheEntryKeyParts(thumb.key);
-      if (
-        !parts ||
-        parts.organizationId !== params.organizationId ||
-        parts.workflowId !== params.workflowId ||
-        parts.mediaId.includes("/") ||
-        entryIds.has(parts.mediaId)
-      ) {
-        continue;
-      }
-      if (hintIds.size === 0 || hintIds.has(parts.mediaId)) {
-        orphanLocalIds.add(parts.mediaId);
-      }
-    }
-
-    for (const localMediaId of orphanLocalIds) {
-      const hint = params.localHints?.find((entry) => entry.mediaId === localMediaId);
-      const candidates = cloudEntries.filter((entry) => {
-        if (hint) {
-          return entry.mimeType === hint.mimeType && entry.nodeType === hint.nodeType;
-        }
-        return true;
-      });
-      if (candidates.length === 0) continue;
-
-      let match = candidates[0]!;
-      if (candidates.length > 1) {
-        const uniqueByteSize = candidates.filter(
-          (entry, index, list) =>
-            list.findIndex((other) => other.byteSize === entry.byteSize) === index
-        );
-        const sized = candidates.filter(
-          (entry) =>
-            uniqueByteSize.filter((other) => other.byteSize === entry.byteSize)
-              .length === 1
-        );
-        if (sized.length === 1) {
-          match = sized[0]!;
-        } else {
-          continue;
-        }
-      }
-
-      recordMediaResourceAlias({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        fromMediaId: localMediaId,
-        toMediaId: match.mediaId,
-      });
-    }
-  });
 }

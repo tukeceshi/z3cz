@@ -1,9 +1,11 @@
 import {
   isEphemeralMediaReference,
-  isLocalMediaReference,
+  isResourceIdReference,
   type MediaReference,
   type NodeType,
   type ObjectReference,
+  type ResourceIdReference,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 
 
@@ -13,6 +15,7 @@ import { executeVolcanoImageGeneration } from "../../ai-interface/execute-volcan
 import type { NodeContext } from "../../node-types";
 
 import { ExecutableNode, isObjectReference } from "../../node-types";
+import { resolveMediaInputUrl } from "./resolve-media-input-url";
 import {
   readModelInterfaceIdInput,
   resolveModelInterfaceIdFromInputs,
@@ -198,11 +201,11 @@ export class AiImageNode extends ExecutableNode {
 
       const refs = manualImages.filter(
 
-        (value): value is ObjectReference | MediaReference =>
+        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
 
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
-          isLocalMediaReference(value)
+          isResourceIdReference(value)
 
       );
 
@@ -222,15 +225,15 @@ export class AiImageNode extends ExecutableNode {
 
     const referenceValues = context.inputs[AI_IMAGE_REFERENCE_INPUT];
 
-    const referenceRefs: MediaReference[] = Array.isArray(referenceValues)
+    const referenceRefs: Array<MediaReference | ResourceIdReference> = Array.isArray(referenceValues)
 
       ? referenceValues.filter(
 
-          (value): value is MediaReference =>
+          (value): value is MediaReference | ResourceIdReference =>
 
             isObjectReference(value) ||
             isEphemeralMediaReference(value) ||
-            isLocalMediaReference(value)
+            isResourceIdReference(value)
 
         )
 
@@ -238,7 +241,7 @@ export class AiImageNode extends ExecutableNode {
 
           isEphemeralMediaReference(referenceValues) ||
 
-          isLocalMediaReference(referenceValues)
+          isResourceIdReference(referenceValues)
 
         ? [referenceValues]
 
@@ -346,41 +349,13 @@ export class AiImageNode extends ExecutableNode {
     const referenceImageUrls: string[] = [];
 
     for (const ref of referenceRefs) {
-
-      if (isLocalMediaReference(ref)) {
-
+      try {
+        referenceImageUrls.push(await resolveMediaInputUrl(context, ref));
+      } catch (error) {
         return this.createErrorResult(
-
-          "Local browser-only reference images cannot be used in server workflow runs. Generate from the canvas panel instead."
-
+          error instanceof Error ? error.message : "Failed to resolve reference image"
         );
-
       }
-
-      if (isEphemeralMediaReference(ref)) {
-
-        referenceImageUrls.push(ref.url);
-
-        continue;
-
-      }
-
-      if (!context.objectStore) {
-
-        return this.createErrorResult(
-
-          "Object store is not available for reference images."
-
-        );
-
-      }
-
-      referenceImageUrls.push(
-
-        await context.objectStore.getPresignedUrl(ref, 3600)
-
-      );
-
     }
 
 

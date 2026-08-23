@@ -9,7 +9,8 @@ export {
   readGenerativeStagingByMediaId as readLocalMediaBlob,
 } from "@/services/generative-media-staging";
 
-import { writeGenerativeStagingWithNewId } from "@/services/generative-media-staging";
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
+import { writeGenerativeStagingWithResourceId } from "@/services/generative-media-staging";
 
 export async function storeLocalMediaBlob(params: {
   readonly blob: Blob;
@@ -17,7 +18,7 @@ export async function storeLocalMediaBlob(params: {
   readonly organizationId?: string;
   readonly workflowId?: string;
   readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
-}): Promise<{ readonly mediaId: string; readonly mimeType: string }> {
+}): Promise<{ readonly resourceId: string; readonly mimeType: string }> {
   const nodeType =
     params.nodeType ??
     (params.mimeType.toLowerCase().startsWith("video/")
@@ -25,11 +26,14 @@ export async function storeLocalMediaBlob(params: {
       : params.mimeType.toLowerCase().startsWith("audio/")
         ? "ai-audio"
         : "ai-image");
-  return writeGenerativeStagingWithNewId({
+  const resourceId = allocateGenerativeMediaResourceId();
+  await writeGenerativeStagingWithResourceId({
     organizationId: params.organizationId ?? "",
     workflowId: params.workflowId ?? "uploads",
+    resourceId,
     blob: params.blob,
     mimeType: params.mimeType,
     nodeType,
   });
+  return { resourceId, mimeType: params.mimeType };
 }

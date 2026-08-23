@@ -9,37 +9,45 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import {
   EMPTY_MEDIA_DISPLAY_URL_SET,
+  hasDisplayUrlForSize,
   isMediaDisplayUrlSetEmpty,
   type MediaDisplayUrlSet,
 } from "@/services/ai-media-cache-service";
 import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 import { ingestCanvasMediaInBackground } from "@/services/ingest-canvas-media";
 import { dropStableBlobUrlsForMediaId } from "@/services/media-display-blob-url-registry";
+import type { MediaDisplaySize } from "@/services/media-display-size";
 import {
-  hasRememberedDisplayThumb,
+  getWorkflowMediaUrlSet,
   mediaDisplayUrlSetsEqual,
-  recallMediaDisplayUrlSet,
-  rememberMediaDisplayUrlSet,
-} from "@/services/media-display-url-set-memory";
+  patchWorkflowMediaUrlSet,
+} from "@/services/workflow-media-address-catalog";
 import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import {
   resolveMediaDisplayUrlSet,
   resolveStableMediaDisplayUrlSet,
 } from "@/services/resolve-resource-display-url";
 
+const DEFAULT_PREFERRED_SIZE: MediaDisplaySize = "canvas-s";
+
 interface UseMediaDisplayUrlSetParams {
   readonly media: WorkflowMediaValue | null;
   readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
   readonly paused?: boolean;
+  readonly preferredSize?: MediaDisplaySize;
 }
 
 function rememberIfNeeded(
   organizationId: string,
   workflowId: string,
   mediaId: string,
-  urlSet: MediaDisplayUrlSet
+  urlSet: MediaDisplayUrlSet,
+  preferredSize: MediaDisplaySize
 ): void {
-  rememberMediaDisplayUrlSet({
+  if (!hasDisplayUrlForSize(urlSet, preferredSize)) {
+    return;
+  }
+  patchWorkflowMediaUrlSet({
     organizationId,
     workflowId,
     mediaId,
@@ -52,24 +60,28 @@ function readImmediateUrlSet(params: {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly mediaId: string;
+  readonly preferredSize: MediaDisplaySize;
 }): MediaDisplayUrlSet {
   const stable = resolveStableMediaDisplayUrlSet(params);
-  if (hasRememberedDisplayThumb(stable)) {
+  if (hasDisplayUrlForSize(stable, params.preferredSize)) {
     rememberIfNeeded(
       params.organizationId,
       params.workflowId,
       params.mediaId,
-      stable
+      stable,
+      params.preferredSize
     );
     return stable;
   }
 
-  const recalled = recallMediaDisplayUrlSet({
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
-    mediaId: params.mediaId,
-  });
-  if (recalled && hasRememberedDisplayThumb(recalled)) {
+  const recalled = getWorkflowMediaUrlSet(
+    {
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    },
+    params.mediaId
+  );
+  if (hasDisplayUrlForSize(recalled, params.preferredSize)) {
     return recalled;
   }
 
@@ -80,6 +92,7 @@ export function useMediaDisplayUrlSet({
   media,
   nodeType,
   paused = false,
+  preferredSize = DEFAULT_PREFERRED_SIZE,
 }: UseMediaDisplayUrlSetParams): {
   readonly urlSet: MediaDisplayUrlSet;
   readonly stale: boolean;
@@ -94,6 +107,8 @@ export function useMediaDisplayUrlSet({
   );
   const mediaRef = useRef(media);
   mediaRef.current = media;
+  const preferredSizeRef = useRef(preferredSize);
+  preferredSizeRef.current = preferredSize;
 
   const [urlSet, setUrlSet] = useState<MediaDisplayUrlSet>(() => {
     if (!media || isUnloadedResourceRef(media) || !orgId || !workflowId || !mediaKey) {
@@ -104,6 +119,7 @@ export function useMediaDisplayUrlSet({
       organizationId: orgId,
       workflowId,
       mediaId: mediaKey,
+      preferredSize,
     });
   });
   const [cacheRevision, setCacheRevision] = useState(0);
@@ -131,6 +147,7 @@ export function useMediaDisplayUrlSet({
 
   useEffect(() => {
     const currentMedia = mediaRef.current;
+    const currentPreferredSize = preferredSizeRef.current;
     if (
       !currentMedia ||
       isUnloadedResourceRef(currentMedia) ||
@@ -147,6 +164,7 @@ export function useMediaDisplayUrlSet({
       organizationId: orgId,
       workflowId,
       mediaId: mediaKey,
+      preferredSize: currentPreferredSize,
     });
     setUrlSet((prev) =>
       mediaDisplayUrlSetsEqual(prev, immediate) ? prev : immediate
@@ -157,7 +175,7 @@ export function useMediaDisplayUrlSet({
     }
 
     const skipAsync =
-      cacheRevision === 0 && hasRememberedDisplayThumb(immediate);
+      cacheRevision === 0 && hasDisplayUrlForSize(immediate, currentPreferredSize);
     if (skipAsync) {
       return;
     }
@@ -174,8 +192,14 @@ export function useMediaDisplayUrlSet({
         return;
       }
 
-      if (hasRememberedDisplayThumb(resolved)) {
-        rememberIfNeeded(orgId, workflowId, mediaKey, resolved);
+      if (hasDisplayUrlForSize(resolved, currentPreferredSize)) {
+        rememberIfNeeded(
+          orgId,
+          workflowId,
+          mediaKey,
+          resolved,
+          currentPreferredSize
+        );
       }
 
       setUrlSet((prev) =>
@@ -195,7 +219,7 @@ export function useMediaDisplayUrlSet({
     return () => {
       cancelled = true;
     };
-  }, [cacheRevision, mediaKey, nodeType, orgId, paused, workflowId]);
+  }, [cacheRevision, mediaKey, nodeType, orgId, paused, preferredSize, workflowId]);
 
   const stale = Boolean(media && isMediaDisplayUrlSetEmpty(urlSet));
 

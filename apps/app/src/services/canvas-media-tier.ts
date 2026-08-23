@@ -13,9 +13,6 @@ export const CANVAS_TIER_SHORT_EDGE: Readonly<Record<CanvasMediaTier, number>> =
   l: 540,
 } as const;
 
-/** Pre-80 canvas-s thumbs still readable from IndexedDB. */
-export const LEGACY_CANVAS_S_THUMB_WIDTH = 50 as const;
-
 /** @deprecated Use CANVAS_TIER_SHORT_EDGE. */
 export const CANVAS_TIER_MAX_WIDTH = CANVAS_TIER_SHORT_EDGE;
 

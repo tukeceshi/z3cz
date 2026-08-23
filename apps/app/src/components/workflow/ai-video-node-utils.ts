@@ -318,7 +318,7 @@ export function withAiVideoResult(
  */
 export function withAiVideoStagingPreview(
   current: WorkflowNodeType,
-  videos: readonly MediaReference[]
+  videos: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   const inputs = upsertInputValue(
     current.inputs,

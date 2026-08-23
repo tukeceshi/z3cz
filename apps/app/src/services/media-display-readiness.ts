@@ -1,22 +1,26 @@
 import type { WorkflowMediaValue } from "@dafthunk/types";
 
 import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
-import { pickMediaDisplayUrl } from "@/services/resolve-resource-display-url";
+import {
+  isMediaDisplayTierPending,
+  pickMediaDisplayUrl,
+} from "@/services/ai-media-cache-service";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 
 export type MediaDisplayPhase = "empty" | "loading" | "ready" | "missing";
 
-export interface MediaDisplayReadiness {
+export interface MediaDisplay {
   readonly phase: MediaDisplayPhase;
   readonly displayUrl: string | null;
 }
 
-export function resolveMediaDisplayReadiness(params: {
+/** Single-resource display: strict tier pick + loading/missing phases. */
+export function resolveMediaDisplay(params: {
   readonly media: WorkflowMediaValue | null;
   readonly urlSet: MediaDisplayUrlSet;
-  readonly size: MediaDisplaySize;
   readonly stale: boolean;
-}): MediaDisplayReadiness {
+  readonly size: MediaDisplaySize;
+}): MediaDisplay {
   if (!params.media) {
     return { phase: "empty", displayUrl: null };
   }
@@ -30,5 +34,22 @@ export function resolveMediaDisplayReadiness(params: {
     return { phase: "ready", displayUrl };
   }
 
+  if (isMediaDisplayTierPending(params.urlSet, params.size)) {
+    return { phase: "loading", displayUrl: null };
+  }
+
   return { phase: "missing", displayUrl: null };
+}
+
+/** @deprecated Use {@link resolveMediaDisplay}. */
+export type MediaDisplayReadiness = MediaDisplay;
+
+/** @deprecated Use {@link resolveMediaDisplay}. */
+export function resolveMediaDisplayReadiness(params: {
+  readonly media: WorkflowMediaValue | null;
+  readonly urlSet: MediaDisplayUrlSet;
+  readonly size: MediaDisplaySize;
+  readonly stale: boolean;
+}): MediaDisplay {
+  return resolveMediaDisplay(params);
 }

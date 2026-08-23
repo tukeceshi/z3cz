@@ -1,10 +1,11 @@
 import {
   isEphemeralMediaReference,
-  isLocalMediaReference,
+  isResourceIdReference,
   type MediaReference,
   type NodeExecution,
   type NodeType,
   type ObjectReference,
+  type ResourceIdReference,
 } from "@dafthunk/types";
 
 import { executeMinimaxAudioGeneration } from "../../ai-interface/execute-minimax-audio-generation";
@@ -94,10 +95,10 @@ export class AiAudioNode extends ExecutableNode {
     const manualAudios = context.inputs.manual_audios;
     if (Array.isArray(manualAudios) && manualAudios.length > 0) {
       const refs = manualAudios.filter(
-        (value): value is ObjectReference | MediaReference =>
+        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
-          isLocalMediaReference(value)
+          isResourceIdReference(value)
       );
       if (refs.length > 0) {
         return this.createSuccessResult({ audios: refs }, refs.length);

@@ -7,7 +7,7 @@ import {
 } from "./media-reference";
 
 describe("getResourceIdFromValue", () => {
-  it("reads resourceId, local/ephemeral mediaId, then object id", () => {
+  it("reads resourceId, ephemeral mediaId, then object id", () => {
     expect(
       getResourceIdFromValue({
         resourceId: "res-1",
@@ -15,13 +15,6 @@ describe("getResourceIdFromValue", () => {
         generating: true,
       })
     ).toBe("res-1");
-    expect(
-      getResourceIdFromValue({
-        kind: "local",
-        mediaId: "local-1",
-        mimeType: "image/png",
-      })
-    ).toBe("local-1");
     expect(
       getResourceIdFromValue({
         kind: "ephemeral",

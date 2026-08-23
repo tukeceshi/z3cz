@@ -2650,6 +2650,9 @@ export const zh: TranslationDictionary = {
         "本地参考图无法在工作流运行中使用，请在画布面板生成",
       cloudUploadFailed: "云上传失败，请检查桶 CORS 配置后重试",
       cloudUploadFailedSavedLocally: "云上传失败，文件已保存在本浏览器中",
+      uploadingReferencesToCloud: "正在将参考资源上传到云端…",
+      referenceCloudUploadFailed:
+        "参考资源未能上传到云端，请检查存储配置后重试",
       cloudStorageUnavailable: "云存储不可用，请检查 AI 接口中的存储配置",
       realPersonInReferenceRejected: "参考[{{label}}]包含真人图像，生成被拒绝",
       realPersonInReferenceHint: "可将图片转为 彩绘、手绘 尝试生成",

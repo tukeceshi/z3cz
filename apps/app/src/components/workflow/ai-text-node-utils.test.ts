@@ -154,8 +154,7 @@ describe("ai-text-node-utils editing behavior", () => {
           name: AI_TEXT_RESULT_INPUT_ID,
           type: "json",
           value: {
-            kind: "local",
-            mediaId: "media-1",
+            resourceId: "media-1",
             mimeType: "text/plain; charset=utf-8",
           },
         },
@@ -167,8 +166,7 @@ describe("ai-text-node-utils editing behavior", () => {
       (input) => input.id === AI_TEXT_RESULT_INPUT_ID
     );
     expect(resultInput?.value).toEqual({
-      kind: "local",
-      mediaId: "media-1",
+      resourceId: "media-1",
       mimeType: "text/plain; charset=utf-8",
     });
     expect(

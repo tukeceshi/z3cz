@@ -7,6 +7,7 @@ import {
   recallMediaDisplayUrlSet,
   rememberMediaDisplayUrlSet,
 } from "./media-display-url-set-memory";
+import { resetWorkflowMediaAddressCatalog } from "./workflow-media-address-catalog";
 
 const base = {
   organizationId: "org-1",
@@ -16,6 +17,7 @@ const base = {
 
 afterEach(() => {
   forgetMediaDisplayUrlSetsForMediaId(base.mediaId);
+  resetWorkflowMediaAddressCatalog();
 });
 
 describe("media-display-url-set-memory", () => {

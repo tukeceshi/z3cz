@@ -21,7 +21,7 @@ import {
 } from "@/services/canvas-media-tier";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 import {
-  resolveMediaDisplayReadiness,
+  resolveMediaDisplay,
   type MediaDisplayPhase,
 } from "@/services/media-display-readiness";
 
@@ -202,14 +202,6 @@ export function useCanvasMediaCoverUrl(params: {
     cardHeightPx
   );
   const { tierSize } = useCanvasMediaTier();
-  const internalUrlSet = useMediaDisplayUrlSet({
-    media: params.sharedUrlSet ? null : params.media,
-    nodeType: params.nodeType,
-  });
-  const urlSet = params.sharedUrlSet?.urlSet ?? internalUrlSet.urlSet;
-  const stale = params.sharedUrlSet?.stale ?? internalUrlSet.stale;
-  const retry = params.sharedUrlSet?.retry ?? internalUrlSet.retry;
-
   const livePickSize = useMemo(
     () =>
       resolveLivePickSize({
@@ -220,12 +212,19 @@ export function useCanvasMediaCoverUrl(params: {
       }),
     [isCanvasOnScreen, isOffCanvasContext, params.media, tierSize]
   );
-
   const effectivePickSize = useSettledCanvasPickSize(livePickSize);
+  const internalUrlSet = useMediaDisplayUrlSet({
+    media: params.sharedUrlSet ? null : params.media,
+    nodeType: params.nodeType,
+    preferredSize: effectivePickSize,
+  });
+  const urlSet = params.sharedUrlSet?.urlSet ?? internalUrlSet.urlSet;
+  const stale = params.sharedUrlSet?.stale ?? internalUrlSet.stale;
+  const retry = params.sharedUrlSet?.retry ?? internalUrlSet.retry;
 
-  const readiness = useMemo(
+  const display = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media: params.media,
         urlSet,
         size: effectivePickSize,
@@ -235,8 +234,8 @@ export function useCanvasMediaCoverUrl(params: {
   );
 
   return {
-    displayUrl: readiness.displayUrl,
-    phase: readiness.phase,
+    displayUrl: display.displayUrl,
+    phase: display.phase,
     stale,
     tierSize: effectivePickSize,
     isCanvasOnScreen,

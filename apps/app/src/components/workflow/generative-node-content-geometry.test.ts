@@ -16,6 +16,15 @@ describe("generative-node-content-geometry", () => {
     expect(GENERATIVE_NODE_TITLE_OFFSET_PX).toBe(20);
   });
 
+  it("prefers persisted metadata layout over measured size", () => {
+    expect(
+      resolveGenerativeLayoutContentSize(AI_IMAGE_NODE_TYPE, {
+        measured: { width: 400, height: 300 },
+        data: { metadata: { layoutWidth: "540", layoutHeight: "270" } },
+      })
+    ).toEqual({ width: 540, height: 270 });
+  });
+
   it("uses measured content size when present", () => {
     const node = {
       id: "img-1",

@@ -22,8 +22,6 @@ import {
 
   isEphemeralMediaReference,
 
-  isLocalMediaReference,
-
   isObjectReference,
 
 } from "@dafthunk/types";
@@ -59,29 +57,6 @@ export function mediaReferenceToCatalogInsert(
   ref: MediaReference
 
 ): UpsertMediaResourceParams | null {
-
-  if (isLocalMediaReference(ref)) {
-
-    return {
-
-      id: ref.mediaId,
-
-      organizationId,
-
-      kind: "local",
-
-      mimeType: ref.mimeType,
-
-      storageKey: null,
-
-      generating: false,
-      failed: false,
-
-    };
-
-  }
-
-
 
   if (isEphemeralMediaReference(ref)) {
 

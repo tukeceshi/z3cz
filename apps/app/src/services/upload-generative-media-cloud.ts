@@ -1,364 +1,215 @@
 import type {
-
-  LocalMediaReference,
-
   ObjectReference,
-
   ResourceIdReference,
-
   WorkflowMediaValue,
-
 } from "@dafthunk/types";
-
-import { getResourceId } from "@dafthunk/types";
-
-
+import { isCloudObjectReference } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
-
-import { rekeyCacheEntry } from "@/services/ai-media-cache-service";
-
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import { reportCloudStorageError } from "@/services/cloud-storage-error-reporter";
-
-import { rekeyStableBlobUrlsForMediaId } from "@/services/media-display-blob-url-registry";
-
-import { writeGenerativeStagingWithNewId } from "@/services/generative-media-staging";
-
-import { dispatchMediaResourceRekeyed } from "@/services/media-resource-rekey-events";
-
+import { writeGenerativeStaging } from "@/services/generative-media-staging";
+import { registerMediaResource } from "@/services/register-media-resource";
 import { makeRequest } from "@/services/utils";
 
-
-
 interface TosPresignUploadResponse {
-
   readonly uploadUrl: string;
-
   readonly uploadHeaders: Record<string, string>;
-
   readonly reference: ObjectReference;
-
 }
-
-
 
 export interface CloudUploadResult {
-
   readonly workflow: ResourceIdReference;
-
   readonly object: ObjectReference;
-
 }
 
+export class CloudObjectUploadFailedError extends Error {
+  constructor(message = "Cloud upload failed") {
+    super(message);
+    this.name = "CloudObjectUploadFailedError";
+  }
+}
 
+export class CloudCatalogRegisterFailedError extends Error {
+  constructor(message = "Failed to register cloud media resource") {
+    super(message);
+    this.name = "CloudCatalogRegisterFailedError";
+  }
+}
 
 export function requireStagingWorkflowId(workflowId: string | undefined): string {
-
   const trimmed = workflowId?.trim();
-
   if (!trimmed) {
-
     throw new Error("workflowId is required for media staging");
-
   }
-
   return trimmed;
-
 }
 
-
-
-async function rekeyStagingMediaToCloud(params: {
-
+async function stageBlobForUpload(params: {
   readonly organizationId: string;
-
   readonly workflowId: string;
-
-  readonly fromMediaId: string;
-
-  readonly reference: ObjectReference;
-
+  readonly resourceId: string;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
 }): Promise<void> {
-
-  const toMediaId = getResourceId(params.reference);
-
-  if (params.fromMediaId === toMediaId) {
-
-    return;
-
+  const stored = await writeGenerativeStaging({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId: params.resourceId,
+    blob: params.blob,
+    mimeType: params.mimeType,
+    nodeType: params.nodeType,
+  });
+  if (!stored) {
+    throw new Error("Failed to stage media in local cache");
   }
-
-
-
-  await rekeyCacheEntry({
-
-    organizationId: params.organizationId,
-
-    workflowId: params.workflowId,
-
-    fromMediaId: params.fromMediaId,
-
-    toMediaId,
-
-  });
-
-  rekeyStableBlobUrlsForMediaId({
-
-    fromMediaId: params.fromMediaId,
-
-    toMediaId,
-
-  });
-
-  dispatchMediaResourceRekeyed({
-
-    organizationId: params.organizationId,
-
-    workflowId: params.workflowId,
-
-    fromMediaId: params.fromMediaId,
-
-    toMediaReference: {
-      resourceId: toMediaId,
-      mimeType: params.reference.mimeType,
-    },
-
-  });
-
   notifyAiMediaCacheChanged();
-
 }
 
-
-
-/** Stage under a local mediaId first; on success rekey cache to cloud resourceId. */
-
-export async function uploadBlobToCloudStorage(params: {
-
+async function registerCloudMediaResource(params: {
   readonly organizationId: string;
-
-  readonly workflowId: string | undefined;
-
-  readonly blob: Blob;
-
-  readonly mimeType: string;
-
-  readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
-
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
-
-  readonly existingLocalMediaId?: string;
-
-  readonly objectId?: string;
-
-}): Promise<CloudUploadResult> {
-
-  const workflowId = requireStagingWorkflowId(params.workflowId);
-
-
-
-  let localMediaId = params.existingLocalMediaId;
-
-  if (!localMediaId) {
-
-    const staged = await writeGenerativeStagingWithNewId({
-
-      organizationId: params.organizationId,
-
-      workflowId,
-
-      blob: params.blob,
-
-      mimeType: params.mimeType,
-
-      nodeType: params.nodeType,
-
-    });
-
-    localMediaId = staged.mediaId;
-
-    notifyAiMediaCacheChanged();
-
+  readonly reference: ObjectReference;
+}): Promise<void> {
+  if (!isCloudObjectReference(params.reference)) {
+    throw new CloudCatalogRegisterFailedError(
+      "Cloud upload did not return a storage-backed reference"
+    );
   }
 
+  await registerMediaResource({
+    organizationId: params.organizationId,
+    id: params.reference.id,
+    kind: "cloud",
+    mimeType: params.reference.mimeType,
+    storageKey: params.reference.storageKey,
+  });
+}
 
+/** Stage and upload under a single pre-allocated resourceId. */
+export async function uploadBlobToCloudStorage(params: {
+  readonly organizationId: string;
+  readonly workflowId: string | undefined;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly resourceId?: string;
+}): Promise<CloudUploadResult> {
+  const workflowId = requireStagingWorkflowId(params.workflowId);
+  const resourceId = params.resourceId?.trim() || allocateGenerativeMediaResourceId();
+
+  await stageBlobForUpload({
+    organizationId: params.organizationId,
+    workflowId,
+    resourceId,
+    blob: params.blob,
+    mimeType: params.mimeType,
+    nodeType: params.nodeType,
+  });
 
   const presign = await makeRequest<TosPresignUploadResponse>(
-
     `/${params.organizationId}/platform-ai/tos/presign-upload`,
-
     {
-
       method: "POST",
-
       body: JSON.stringify({
-
         mimeType: params.mimeType,
-
         contentLength: params.blob.size,
-
         workflowId,
-
         mediaKind: params.mediaKind,
-
-        objectId: params.objectId,
-
+        objectId: resourceId,
       }),
-
     }
-
   );
 
-
-
   const uploadHeaders: Record<string, string> = {
-
     ...presign.uploadHeaders,
-
     "Content-Type": params.mimeType,
-
   };
-
   delete uploadHeaders.Host;
-
   delete uploadHeaders.host;
 
-
-
   let cloudUploadOk = false;
-
   let uploadLooksLikeCors = false;
-
   try {
-
     const uploadResponse = await fetch(presign.uploadUrl, {
-
       method: "PUT",
-
       headers: uploadHeaders,
-
       body: params.blob,
-
     });
-
     cloudUploadOk = uploadResponse.ok;
-
   } catch {
-
     cloudUploadOk = false;
-
     uploadLooksLikeCors = true;
-
   }
-
-
 
   if (!cloudUploadOk) {
-
     reportCloudStorageError(uploadLooksLikeCors ? "cors_upload" : "api");
-
-    throw new Error("Cloud upload failed");
-
+    throw new CloudObjectUploadFailedError();
   }
-
-
-
-  await rekeyStagingMediaToCloud({
-
-    organizationId: params.organizationId,
-
-    workflowId,
-
-    fromMediaId: localMediaId,
-
-    reference: presign.reference,
-
-  });
-
-
-
-  const resourceId = getResourceId(presign.reference);
-
-  return {
-
-    workflow: { resourceId, mimeType: params.mimeType },
-
-    object: presign.reference,
-
-  };
-
-}
-
-
-
-export async function uploadBlobToCloudWorkflow(params: {
-
-  readonly organizationId: string;
-
-  readonly workflowId: string | undefined;
-
-  readonly blob: Blob;
-
-  readonly mimeType: string;
-
-  readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
-
-  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
-
-  readonly existingLocalMediaId?: string;
-
-  readonly objectId?: string;
-
-}): Promise<WorkflowMediaValue> {
 
   try {
-
-    const result = await uploadBlobToCloudStorage(params);
-
-    return result.workflow;
-
-  } catch {
-
-    const workflowId = requireStagingWorkflowId(params.workflowId);
-
-    const localMediaId =
-
-      params.existingLocalMediaId ??
-
-      (
-
-        await writeGenerativeStagingWithNewId({
-
-          organizationId: params.organizationId,
-
-          workflowId,
-
-          blob: params.blob,
-
-          mimeType: params.mimeType,
-
-          nodeType: params.nodeType,
-
-        })
-
-      ).mediaId;
-
-    notifyAiMediaCacheChanged();
-
-    const localRef: LocalMediaReference = {
-
-      kind: "local",
-
-      mediaId: localMediaId,
-
-      mimeType: params.mimeType,
-
-    };
-
-    return localRef;
-
+    await registerCloudMediaResource({
+      organizationId: params.organizationId,
+      reference: presign.reference,
+    });
+  } catch (error) {
+    if (error instanceof CloudCatalogRegisterFailedError) {
+      throw error;
+    }
+    const message =
+      error instanceof Error ? error.message : "Failed to register cloud media resource";
+    throw new CloudCatalogRegisterFailedError(message);
   }
 
+  return {
+    workflow: { resourceId, mimeType: params.mimeType },
+    object: presign.reference,
+  };
 }
 
+export async function uploadBlobToCloudWorkflow(params: {
+  readonly organizationId: string;
+  readonly workflowId: string | undefined;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly mediaKind: "ai-image" | "ai-video" | "ai-audio" | "reference";
+  readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
+  readonly resourceId?: string;
+}): Promise<WorkflowMediaValue> {
+  const workflowId = requireStagingWorkflowId(params.workflowId);
+  const resourceId = params.resourceId?.trim() || allocateGenerativeMediaResourceId();
 
+  try {
+    const result = await uploadBlobToCloudStorage({
+      ...params,
+      resourceId,
+    });
+    return result.workflow;
+  } catch (error) {
+    if (error instanceof CloudCatalogRegisterFailedError) {
+      throw error;
+    }
+
+    if (!(error instanceof CloudObjectUploadFailedError)) {
+      throw error;
+    }
+
+    try {
+      await registerMediaResource({
+        organizationId: params.organizationId,
+        id: resourceId,
+        kind: "local",
+        mimeType: params.mimeType,
+      });
+    } catch {
+      // Staging succeeded; catalog registration is best-effort for local-only fallback.
+    }
+
+    return {
+      resourceId,
+      mimeType: params.mimeType,
+      cloudUploadFailed: true,
+    };
+  }
+}

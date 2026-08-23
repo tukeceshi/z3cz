@@ -6,7 +6,7 @@ import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useRef, useState } from "react";
 
 import { useMediaDisplayUrlSet } from "@/hooks/use-media-display-url-set";
-import { resolveMediaDisplayReadiness } from "@/services/media-display-readiness";
+import { resolveMediaDisplay } from "@/services/media-display-readiness";
 import { cn } from "@/utils/utils";
 
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
@@ -72,9 +72,9 @@ export function CreativeStudioMediaCard({
     nodeType: isVideo ? "ai-video" : "ai-image",
   });
 
-  const previewReadiness = useMemo(
+  const previewDisplay = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media: mediaRef,
         urlSet,
         size: "thumb",
@@ -82,9 +82,9 @@ export function CreativeStudioMediaCard({
       }),
     [mediaRef, stale, urlSet]
   );
-  const fullReadiness = useMemo(
+  const fullDisplay = useMemo(
     () =>
-      resolveMediaDisplayReadiness({
+      resolveMediaDisplay({
         media: mediaRef,
         urlSet,
         size: "full",
@@ -94,7 +94,7 @@ export function CreativeStudioMediaCard({
   );
 
   const metaProbeUrl =
-    fullReadiness.phase === "ready" ? fullReadiness.displayUrl : null;
+    fullDisplay.phase === "ready" ? fullDisplay.displayUrl : null;
 
   const imageSize = useStudioImageFileSize(isVideo ? null : metaProbeUrl);
   const videoDuration = useStudioVideoFileDuration(isVideo ? metaProbeUrl : null);
@@ -159,8 +159,8 @@ export function CreativeStudioMediaCard({
       >
         <CreativeStudioMediaPreviewFrame
           media={mediaRef}
-          displayUrl={previewReadiness.displayUrl}
-          phase={previewReadiness.phase}
+          displayUrl={previewDisplay.displayUrl}
+          phase={previewDisplay.phase}
           isVideo={isVideo}
           referenceDragEnabled={referenceDragEnabled}
           fallbackBusy={cardState.isBusy}

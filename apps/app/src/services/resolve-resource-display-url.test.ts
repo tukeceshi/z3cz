@@ -6,6 +6,7 @@ import {
   stagingBlobUrlKey,
 } from "./media-display-blob-url-registry";
 import { resolveStableMediaDisplayUrlSet } from "./resolve-resource-display-url";
+import { resetWorkflowMediaAddressCatalog } from "./workflow-media-address-catalog";
 
 const organizationId = "org-thumb";
 const workflowId = "wf-thumb";
@@ -13,6 +14,7 @@ const mediaId = "local-thumb-1";
 
 afterEach(() => {
   dropStableBlobUrlsForMediaId(mediaId);
+  resetWorkflowMediaAddressCatalog();
 });
 
 describe("resolveStableMediaDisplayUrlSet", () => {
@@ -23,7 +25,7 @@ describe("resolveStableMediaDisplayUrlSet", () => {
     );
 
     const set = resolveStableMediaDisplayUrlSet({
-      media: { kind: "local", mediaId, mimeType: "image/png" },
+      media: { resourceId: mediaId, mimeType: "image/png" },
       organizationId,
       workflowId,
     });

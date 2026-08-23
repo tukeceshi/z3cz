@@ -276,7 +276,7 @@ export function withAiAudioResult(
  */
 export function withAiAudioStagingPreview(
   current: WorkflowNodeType,
-  audios: readonly MediaReference[]
+  audios: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   const inputs = upsertInputValue(
     current.inputs,

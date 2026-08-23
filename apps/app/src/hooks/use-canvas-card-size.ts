@@ -17,6 +17,8 @@ interface UseCanvasCardSizeParams {
   readonly mediaKey: string | null;
   /** Keep the last size (e.g. while generating). */
   readonly holdSize?: boolean;
+  /** Persisted layout from workflow JSON — used for first paint. */
+  readonly initialLayout?: MediaCardSize | null;
 }
 
 export function useCanvasCardSize({
@@ -24,20 +26,27 @@ export function useCanvasCardSize({
   hasMedia,
   mediaKey,
   holdSize = false,
+  initialLayout = null,
 }: UseCanvasCardSizeParams): {
   readonly cardSize: MediaCardSize;
   readonly onNaturalSize: (width: number, height: number) => void;
 } {
-  const [cardSize, setCardSize] = useState<MediaCardSize>(() =>
-    emptyCardSize(kind)
+  const [cardSize, setCardSize] = useState<MediaCardSize>(
+    () => initialLayout ?? emptyCardSize(kind)
   );
+
+  useEffect(() => {
+    if (initialLayout) {
+      setCardSize(initialLayout);
+    }
+  }, [initialLayout?.width, initialLayout?.height]);
 
   useEffect(() => {
     if (holdSize || hasMedia) {
       return;
     }
-    setCardSize(emptyCardSize(kind));
-  }, [kind, hasMedia, mediaKey, holdSize]);
+    setCardSize(initialLayout ?? emptyCardSize(kind));
+  }, [kind, hasMedia, mediaKey, holdSize, initialLayout]);
 
   const onNaturalSize = useCallback((width: number, height: number) => {
     setCardSize((current) => {

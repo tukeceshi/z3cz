@@ -1,7 +1,6 @@
 import {
   getResourceIdFromValue,
   isEphemeralMediaReference,
-  isLocalMediaReference,
   type MediaReference,
   type WorkflowMediaValue,
   workflowMediaMimeType as readWorkflowMediaMimeType,
@@ -9,12 +8,6 @@ import {
 
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
-import { readGenerativeStagingBlob } from "@/services/generative-media-staging";
-import {
-  createStableBlobUrl,
-  findStableBlobUrlForMediaId,
-  stagingBlobUrlKey,
-} from "@/services/media-display-blob-url-registry";
 import {
   createCloudObjectUrl,
   resolveMediaCacheFetchUrl,
@@ -49,35 +42,6 @@ export async function resolveMediaDisplayUrl(params: {
   readonly warmCache?: boolean;
   readonly size?: MediaDisplaySize;
 }): Promise<string | null> {
-  if (isLocalMediaReference(params.media)) {
-    const cached = await getCachedMediaBlobUrl({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      mediaId: params.media.mediaId,
-      size: params.size,
-    });
-    if (cached) return cached;
-
-    const existing = findStableBlobUrlForMediaId(params.media.mediaId);
-    if (existing) return existing;
-
-    const entry = await readGenerativeStagingBlob({
-      mediaId: params.media.mediaId,
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-    });
-    if (!entry) return null;
-
-    return createStableBlobUrl(
-      stagingBlobUrlKey({
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        mediaId: params.media.mediaId,
-      }),
-      entry.blob
-    );
-  }
-
   const mediaId = getResourceIdFromValue(params.media);
   if (!mediaId) return null;
 

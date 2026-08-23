@@ -2,8 +2,6 @@ import type { NodeExecution, NodeType } from "@dafthunk/types";
 import {
   buildAiTextUserPrompt,
   collectAiTextMediaReferences,
-  isEphemeralMediaReference,
-  isLocalMediaReference,
   normalizeAiTextReferences,
   resolveAiTextKeywordStrings,
   type MediaReference,
@@ -11,6 +9,7 @@ import {
 
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode } from "../../node-types";
+import { resolveMediaInputUrl } from "./resolve-media-input-url";
 import {
   readModelInterfaceIdInput,
   resolveModelInterfaceIdFromInputs,
@@ -178,24 +177,12 @@ export class AiTextNode extends ExecutableNode {
 
 async function resolveMediaUrlsForTextModel(
   context: NodeContext,
-  refs: readonly MediaReference[]
+  refs: readonly Array<MediaReference | import("@dafthunk/types").ResourceIdReference>
 ): Promise<string[]> {
   const urls: string[] = [];
 
   for (const ref of refs) {
-    if (isLocalMediaReference(ref)) {
-      throw new Error(
-        "Local browser-only media cannot be used in server workflow runs. Generate from the canvas panel instead."
-      );
-    }
-    if (isEphemeralMediaReference(ref)) {
-      urls.push(ref.url);
-      continue;
-    }
-    if (!context.objectStore) {
-      throw new Error("Object store is not available for media references.");
-    }
-    urls.push(await context.objectStore.getPresignedUrl(ref, 3600));
+    urls.push(await resolveMediaInputUrl(context, ref));
   }
 
   return urls;

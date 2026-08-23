@@ -157,13 +157,7 @@ function toWorkflowFinalMedia(
   if (!media || media.length === 0) {
     return undefined;
   }
-  return media.map((ref) => {
-    const value = mediaReferenceToWorkflowValue(ref);
-    if ("kind" in value && value.kind === "local") {
-      return { resourceId: value.mediaId, mimeType: value.mimeType };
-    }
-    return value;
-  });
+  return media.map((ref) => mediaReferenceToWorkflowValue(ref));
 }
 
 function toGetGenerationJobResponse(

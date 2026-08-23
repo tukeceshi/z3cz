@@ -251,10 +251,10 @@ export function AiAudioConfigPanel({
     promptForGenerate.trim().length > promptMaxLength;
 
   const handleStaged = useCallback(
-    (localMedia: readonly import("@dafthunk/types").LocalMediaReference[]) => {
-      if (!updateNodeData || localMedia.length === 0) return;
+    (stagedMedia: readonly import("@dafthunk/types").ResourceIdReference[]) => {
+      if (!updateNodeData || stagedMedia.length === 0) return;
       updateNodeData(nodeId, (current) => {
-        const withPreview = withAiAudioStagingPreview(current, localMedia);
+        const withPreview = withAiAudioStagingPreview(current, stagedMedia);
         return {
           ...withPreview,
           metadata: withAiAudioGenerateError(
@@ -262,7 +262,7 @@ export function AiAudioConfigPanel({
               withAiAudioGeneratingFlag(current.metadata, true),
               {
                 phase: "uploading",
-                stagingMediaIds: localMedia.map((entry) => entry.mediaId),
+                stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
               }
             ),
             null

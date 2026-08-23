@@ -9,13 +9,6 @@ export interface EphemeralMediaReference {
   readonly expiresAt?: string;
 }
 
-/** Browser-local staging — IndexedDB only, not on server. */
-export interface LocalMediaReference {
-  readonly kind: "local";
-  readonly mediaId: string;
-  readonly mimeType: string;
-}
-
 /** Workflow JSON — cloud/ephemeral resolved via media_resources catalog. */
 export interface ResourceIdReference {
   readonly resourceId: string;
@@ -26,14 +19,13 @@ export interface ResourceIdReference {
   readonly generating?: boolean;
   /** Generate failed. No media to load; look up error via history jobId. */
   readonly failed?: boolean;
+  /** Cloud upload failed; media is available in this browser only. */
+  readonly cloudUploadFailed?: boolean;
 }
 
-export type WorkflowMediaValue = ResourceIdReference | LocalMediaReference;
+export type WorkflowMediaValue = ResourceIdReference;
 
-export type MediaReference =
-  | ObjectReference
-  | EphemeralMediaReference
-  | LocalMediaReference;
+export type MediaReference = ObjectReference | EphemeralMediaReference;
 
 /** Upstream ephemeral media links remain valid for about one hour. */
 export const EPHEMERAL_MEDIA_TTL_MS = 3_600_000 as const;
@@ -104,18 +96,6 @@ export function isEphemeralMediaReference(
   );
 }
 
-export function isLocalMediaReference(
-  value: unknown
-): value is LocalMediaReference {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    (value as LocalMediaReference).kind === "local" &&
-    typeof (value as LocalMediaReference).mediaId === "string" &&
-    typeof (value as LocalMediaReference).mimeType === "string"
-  );
-}
-
 export function isObjectReference(value: unknown): value is ObjectReference {
   return (
     value !== null &&
@@ -126,8 +106,7 @@ export function isObjectReference(value: unknown): value is ObjectReference {
     typeof (value as ObjectReference).mimeType === "string" &&
     !(
       "kind" in value &&
-      ((value as unknown as EphemeralMediaReference).kind === "ephemeral" ||
-        (value as unknown as LocalMediaReference).kind === "local")
+      (value as unknown as EphemeralMediaReference).kind === "ephemeral"
     )
   );
 }
@@ -172,7 +151,7 @@ export function hasFailedResource(
 export function isWorkflowMediaValue(
   value: unknown
 ): value is WorkflowMediaValue {
-  return isResourceIdReference(value) || isLocalMediaReference(value);
+  return isResourceIdReference(value);
 }
 
 /** Ready to show on the card — not generating or failed. */
@@ -186,12 +165,12 @@ export function hasDisplayableWorkflowMedia(
   return Boolean(values?.some(isDisplayableWorkflowMedia));
 }
 
-/** Any stored or API media ref — resourceId, local/ephemeral mediaId, then object id. */
+/** Any stored or API media ref — resourceId, ephemeral mediaId, then object id. */
 export function getResourceIdFromValue(value: unknown): string | null {
   if (isResourceIdReference(value)) {
     return value.resourceId;
   }
-  if (isLocalMediaReference(value) || isEphemeralMediaReference(value)) {
+  if (isEphemeralMediaReference(value)) {
     return value.mediaId;
   }
   if (isObjectReference(value)) {
@@ -204,9 +183,6 @@ export function getResourceIdFromValue(value: unknown): string | null {
 export function mediaReferenceToWorkflowValue(
   ref: MediaReference
 ): WorkflowMediaValue {
-  if (isLocalMediaReference(ref)) {
-    return ref;
-  }
   return {
     resourceId: getResourceId(ref),
     mimeType: ref.mimeType,
@@ -220,11 +196,7 @@ export function workflowMediaMimeType(
 }
 
 export function isMediaReference(value: unknown): value is MediaReference {
-  return (
-    isObjectReference(value) ||
-    isEphemeralMediaReference(value) ||
-    isLocalMediaReference(value)
-  );
+  return isObjectReference(value) || isEphemeralMediaReference(value);
 }
 
 export function isCloudObjectReference(

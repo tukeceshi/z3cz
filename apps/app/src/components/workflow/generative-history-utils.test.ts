@@ -118,18 +118,18 @@ describe("readDisplayHistoryMedia", () => {
     ).toEqual([]);
   });
 
-  it("still shows local staging media while download/upload is pending", () => {
-    const local = [{ kind: "local" as const, mediaId: "blob-1", mimeType: "image/png" }];
+  it("still shows staged resource media while download/upload is pending", () => {
+    const staged = [{ resourceId: "blob-1", mimeType: "image/png" }];
     expect(
       readDisplayHistoryMedia(
         {
           selectedId: "gen-1",
-          items: [{ id: "gen-1", images: local }],
+          items: [{ id: "gen-1", images: staged }],
         },
         (item) => item.images,
         { holdUnreadyCover: true }
       )
-    ).toEqual(local);
+    ).toEqual(staged);
   });
 });
 

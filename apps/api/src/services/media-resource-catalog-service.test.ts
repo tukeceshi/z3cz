@@ -8,24 +8,6 @@ import {
 import { partitionResolvedResourceUrls } from "./resolve-resource-refs";
 
 describe("mediaReferenceToCatalogInsert", () => {
-  it("maps local media to catalog row", () => {
-    expect(
-      mediaReferenceToCatalogInsert("org-1", {
-        kind: "local",
-        mediaId: "local-1",
-        mimeType: "image/png",
-      })
-    ).toEqual({
-      id: "local-1",
-      organizationId: "org-1",
-      kind: "local",
-      mimeType: "image/png",
-      storageKey: null,
-      generating: false,
-      failed: false,
-    });
-  });
-
   it("maps ephemeral media to catalog row with upstream url", () => {
     expect(
       mediaReferenceToCatalogInsert("org-1", {

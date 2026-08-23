@@ -6,8 +6,9 @@ import {
   hasGeneratingResource,
   type MediaReference,
   type ObjectReference,
+  readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -63,6 +64,7 @@ import {
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
+import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
 import { GenerativeMediaLazyDownloadButton } from "../../generative-media-download-button";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
@@ -97,6 +99,17 @@ function AiAudioWidget({
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
+  const persistedLayout = useMemo(
+    () => readNodeLayoutFromMetadata(metadata),
+    [metadata]
+  );
+  const patchNodeLayout = useMemo(
+    () =>
+      updateNodeData
+        ? createPatchNodeLayoutMetadata(nodeId, updateNodeData)
+        : undefined,
+    [nodeId, updateNodeData]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -236,6 +249,7 @@ function AiAudioWidget({
           cloudConfigured,
           mediaKind: "ai-audio",
           nodeType: "ai-audio",
+          patchNodeLayout,
         });
 
         warmCardUploadPersist({
@@ -333,8 +347,8 @@ function AiAudioWidget({
           className
         )}
         style={{
-          width: AI_AUDIO_CARD_WIDTH_PX,
-          height: AI_AUDIO_CARD_HEIGHT_PX,
+          width: persistedLayout?.width ?? AI_AUDIO_CARD_WIDTH_PX,
+          height: persistedLayout?.height ?? AI_AUDIO_CARD_HEIGHT_PX,
         }}
         onDoubleClick={(event) => {
           if (generateError) {

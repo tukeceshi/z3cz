@@ -3,7 +3,7 @@ import {
   getResourceIdFromValue,
   inferAiTextMimeType,
 } from "@dafthunk/types";
-import type { LocalMediaReference, ResourceIdReference } from "@dafthunk/types";
+import type { ResourceIdReference } from "@dafthunk/types";
 
 import {
   buildResourceIdReference,
@@ -55,7 +55,7 @@ async function stageTextReference(
   params: MigrateInlineAiTextNodeParams,
   text: string
 ): Promise<{
-  readonly reference: LocalMediaReference | ResourceIdReference;
+  readonly reference: ResourceIdReference;
   readonly contentSha256: string;
 }> {
   const mimeType = inferAiTextMimeType(text);
@@ -106,7 +106,7 @@ export async function migrateInlineAiTextNodeData(
 
   const stagedByText = new Map<
     string,
-    { reference: LocalMediaReference | ResourceIdReference; contentSha256: string }
+    { reference: ResourceIdReference; contentSha256: string }
   >();
   let changed = false;
   let working = params.data;

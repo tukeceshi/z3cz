@@ -4,10 +4,6 @@ import { useEffect, useMemo, useRef } from "react";
 
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import {
-  applyMediaResourceRekeyToNodes,
-  reconcileWorkflowMediaReferencesInNodes,
-} from "@/services/reconcile-workflow-media-references";
-import {
   collectWorkflowCanvasMedia,
   ingestWorkflowCanvasMediaInBackground,
 } from "@/services/ingest-canvas-media";
@@ -15,10 +11,6 @@ import {
   collectWorkflowAiTextNodeRefs,
   pushWorkflowAiTextCacheInBackground,
 } from "@/services/push-ai-text-cache-to-node";
-import {
-  MEDIA_RESOURCE_REKEYED_EVENT,
-  type MediaResourceRekeyedDetail,
-} from "@/services/media-resource-rekey-events";
 
 interface UseWorkflowMediaReconcileParams {
   readonly organizationId: string | undefined;
@@ -56,7 +48,6 @@ export function useWorkflowMediaReconcile({
   graphReady,
   enabled = true,
   nodes,
-  setNodes,
 }: UseWorkflowMediaReconcileParams): void {
   const ingestedFingerprintRef = useRef<string | null>(null);
   const ingestedResourceIdsRef = useRef<Set<string>>(new Set());
@@ -117,84 +108,32 @@ export function useWorkflowMediaReconcile({
       });
     }
 
-    let cancelled = false;
+    ingestedFingerprintRef.current = buildWorkflowMediaFingerprint(snapshotNodes);
 
-    void reconcileWorkflowMediaReferencesInNodes(
-      snapshotNodes,
-      organizationId,
-      workflowId
-    ).then((patched) => {
-      if (cancelled) {
-        return;
+    const items = collectWorkflowCanvasMedia(snapshotNodes);
+    const newResourceIds = new Set<string>();
+    for (const item of items) {
+      const resourceId = getResourceIdFromValue(item.media);
+      if (!resourceId || ingestedResourceIdsRef.current.has(resourceId)) {
+        continue;
       }
+      ingestedResourceIdsRef.current.add(resourceId);
+      newResourceIds.add(resourceId);
+    }
 
-      const activeNodes = patched ?? snapshotNodes;
-      ingestedFingerprintRef.current =
-        buildWorkflowMediaFingerprint(activeNodes);
-
-      if (patched) {
-        setNodes(patched);
-      }
-
-      const items = collectWorkflowCanvasMedia(activeNodes);
-      const newResourceIds = new Set<string>();
-      for (const item of items) {
-        const resourceId = getResourceIdFromValue(item.media);
-        if (!resourceId || ingestedResourceIdsRef.current.has(resourceId)) {
-          continue;
-        }
-        ingestedResourceIdsRef.current.add(resourceId);
-        newResourceIds.add(resourceId);
-      }
-
-      if (newResourceIds.size > 0) {
-        ingestWorkflowCanvasMediaInBackground({
-          organizationId,
-          workflowId,
-          nodes: activeNodes,
-          onlyResourceIds: newResourceIds,
-        });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    if (newResourceIds.size > 0) {
+      ingestWorkflowCanvasMediaInBackground({
+        organizationId,
+        workflowId,
+        nodes: snapshotNodes,
+        onlyResourceIds: newResourceIds,
+      });
+    }
   }, [
     enabled,
     graphReady,
     organizationId,
     workflowId,
     mediaFingerprint,
-    setNodes,
   ]);
-
-  useEffect(() => {
-    if (!enabled || !organizationId || !workflowId) {
-      return;
-    }
-
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<MediaResourceRekeyedDetail>).detail;
-      if (
-        !detail ||
-        detail.organizationId !== organizationId ||
-        detail.workflowId !== workflowId
-      ) {
-        return;
-      }
-
-      setNodes((current) => {
-        const patched = applyMediaResourceRekeyToNodes(
-          current,
-          detail.fromMediaId,
-          detail.toMediaReference
-        );
-        return patched ?? current;
-      });
-    };
-
-    window.addEventListener(MEDIA_RESOURCE_REKEYED_EVENT, handler);
-    return () => window.removeEventListener(MEDIA_RESOURCE_REKEYED_EVENT, handler);
-  }, [enabled, organizationId, workflowId, setNodes]);
 }
