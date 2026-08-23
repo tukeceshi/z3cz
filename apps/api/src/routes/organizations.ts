@@ -43,7 +43,6 @@ const subAccountPermissionsSchema = z.object({
   subAccountsView: z.boolean().optional(),
   subAccountsDelete: z.boolean().optional(),
   workflows: z.enum(["view", "edit"]).optional(),
-  executions: z.boolean().optional(),
   modelCalls: z.boolean().optional(),
   apiKeys: z.boolean().optional(),
 });

@@ -30,20 +30,16 @@ import Copy from "lucide-react/icons/copy";
 import Image from "lucide-react/icons/image";
 import Maximize from "lucide-react/icons/maximize";
 import Network from "lucide-react/icons/network";
-import Play from "lucide-react/icons/play";
 import Scissors from "lucide-react/icons/scissors";
-import Square from "lucide-react/icons/square";
 import Trash2 from "lucide-react/icons/trash-2";
 import Music from "lucide-react/icons/music";
 import Type from "lucide-react/icons/type";
 import Video from "lucide-react/icons/video";
-import X from "lucide-react/icons/x";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTranslation } from "@/components/locale-provider";
-import type { TranslationKey } from "@/i18n";
 import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
@@ -72,7 +68,6 @@ import {
 import type {
   ConnectionValidationState,
   WorkflowEdgeType,
-  WorkflowExecutionStatus,
   WorkflowNodeType,
 } from "./workflow-types";
 import type { CanvasFileDropPreviewState } from "./generative-card-upload-utils";
@@ -87,87 +82,6 @@ const edgeTypes = {
 
 const actionBarButtonOutlineClassName =
   "bg-white hover:bg-neutral-50 text-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200";
-
-interface StatusBarProps {
-  workflowStatus: WorkflowExecutionStatus;
-  errorMessage?: string;
-}
-
-function StatusBar({ workflowStatus, errorMessage }: StatusBarProps) {
-  const { t } = useTranslation();
-
-  const statusStyles: Record<
-    WorkflowExecutionStatus,
-    { color: string; bg: string; labelKey: TranslationKey }
-  > = {
-    idle: {
-      color: "text-neutral-600 dark:text-neutral-400",
-      bg: "bg-neutral-200 dark:bg-neutral-700",
-      labelKey: "workflow.status.idle",
-    },
-    submitted: {
-      color: "text-orange-600 dark:text-orange-400",
-      bg: "bg-orange-200 dark:bg-orange-900/50",
-      labelKey: "workflow.status.submitted",
-    },
-    executing: {
-      color: "text-yellow-600 dark:text-yellow-400",
-      bg: "bg-yellow-400 dark:bg-yellow-500",
-      labelKey: "workflow.status.executing",
-    },
-    completed: {
-      color: "text-green-600 dark:text-green-400",
-      bg: "bg-green-200 dark:bg-green-900/50",
-      labelKey: "workflow.status.completed",
-    },
-    error: {
-      color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-200 dark:bg-red-900/50",
-      labelKey: "workflow.status.error",
-    },
-    cancelled: {
-      color: "text-neutral-600 dark:text-neutral-400",
-      bg: "bg-neutral-200 dark:bg-neutral-700",
-      labelKey: "workflow.status.cancelled",
-    },
-    paused: {
-      color: "text-blue-600 dark:text-blue-400",
-      bg: "bg-blue-200 dark:bg-blue-900/50",
-      labelKey: "workflow.status.paused",
-    },
-    exhausted: {
-      color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-200 dark:bg-red-900/50",
-      labelKey: "workflow.status.exhausted",
-    },
-  };
-
-  const config = statusStyles[workflowStatus] || statusStyles.idle;
-
-  return (
-    <div className="absolute bottom-4 left-4 flex items-center gap-3 z-50">
-      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-3 py-2 shadow-xs flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className={cn("w-2 h-2 rounded-full", config.bg)}>
-            <div className={cn("w-full h-full rounded-full")} />
-          </div>
-          <span className={cn("text-sm font-medium", config.color)}>
-            {t(config.labelKey)}
-          </span>
-        </div>
-
-        {workflowStatus === "error" && errorMessage ? (
-          <>
-            <div className="w-px h-4 bg-neutral-300 dark:bg-neutral-600" />
-            <span className="text-sm text-red-600 dark:text-red-400 max-w-md truncate">
-              {errorMessage}
-            </span>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export interface WorkflowCanvasProps {
   nodes: ReactFlowNode<WorkflowNodeType>[];
@@ -194,9 +108,6 @@ export interface WorkflowCanvasProps {
     >
   ) => void;
   onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => void;
-  onAction?: (e: React.MouseEvent) => void;
-  workflowStatus?: WorkflowExecutionStatus;
-  workflowErrorMessage?: string;
   onToggleSidebar?: (e: React.MouseEvent) => void;
   isSidebarVisible?: boolean;
   /** When false, Agent toggle is rendered elsewhere (e.g. floating canvas chrome). */
@@ -240,87 +151,6 @@ export interface WorkflowCanvasProps {
   onCanvasFileDragOver?: (event: React.DragEvent) => void;
   onCanvasFileDragLeave?: (event: React.DragEvent) => void;
   onCanvasFileDrop?: (event: React.DragEvent) => void;
-}
-
-interface ActionButtonProps {
-  onClick: (e: React.MouseEvent) => void;
-  workflowStatus?: WorkflowExecutionStatus;
-  disabled?: boolean;
-  className?: string;
-  text?: string;
-  showTooltip?: boolean;
-}
-
-export function ActionButton({
-  onClick,
-  workflowStatus = "idle",
-  disabled,
-  className = "",
-  text = "",
-  showTooltip = true,
-}: ActionButtonProps) {
-  const { t } = useTranslation();
-
-  const statusConfig = {
-    idle: {
-      icon: <Play className="size-4!" />,
-      titleKey: "workflow.canvas.execute" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-green-500 hover:text-green-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-green-400 dark:hover:text-green-300",
-    },
-    submitted: {
-      icon: <Square className="size-4!" />,
-      titleKey: "workflow.canvas.stopExecution" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-red-500 hover:text-red-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-red-400 dark:hover:text-red-300",
-    },
-    executing: {
-      icon: <Square className="size-4!" />,
-      titleKey: "workflow.canvas.stopExecution" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-red-500 hover:text-red-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-red-400 dark:hover:text-red-300",
-    },
-    completed: {
-      icon: <X className="size-4!" />,
-      titleKey: "workflow.canvas.clearOutputs" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
-    },
-    error: {
-      icon: <X className="size-4!" />,
-      titleKey: "workflow.canvas.clearErrors" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
-    },
-    cancelled: {
-      icon: <X className="size-4!" />,
-      titleKey: "workflow.canvas.clearOutputs" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-amber-500 hover:text-amber-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-amber-400 dark:hover:text-amber-300",
-    },
-    paused: {
-      icon: <Play className="size-4!" />,
-      titleKey: "workflow.canvas.resume" as TranslationKey,
-      className:
-        "bg-white hover:bg-neutral-50 text-sky-500 hover:text-sky-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-sky-400 dark:hover:text-sky-300",
-    },
-  };
-
-  // Use a default config if the status isn't in our mapping
-  const config = statusConfig[workflowStatus] || statusConfig.idle;
-
-  return (
-    <ActionBarButton
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(config.className, className)}
-      tooltipSide="bottom"
-      tooltip={showTooltip ? t(config.titleKey) : undefined}
-    >
-      {config.icon}
-      {text}
-    </ActionBarButton>
-  );
 }
 
 interface SidebarToggleProps {
@@ -607,9 +437,6 @@ export function WorkflowCanvas({
   onMoveEnd,
   onInit,
   onQuickAddAiNode,
-  onAction,
-  workflowStatus = "idle",
-  workflowErrorMessage,
   onToggleSidebar,
   isSidebarVisible,
   showAgentToggle = true,
@@ -819,56 +646,26 @@ export function WorkflowCanvas({
           <CanvasFileDropPreview preview={canvasFileDropPreview} />
         ) : null}
 
-        {/* Status Bar - hidden in read-only mode */}
-        {!disabled && (
-          <StatusBar
-            workflowStatus={workflowStatus}
-            errorMessage={workflowErrorMessage}
-          />
-        )}
-
         {!disabled && (
           <AiEditorOverlays nodes={displayNodes} />
         )}
 
-        {/* Action Bars */}
         {showControls &&
-          (onAction ||
-            (showAgentToggle &&
-              onToggleSidebar &&
-              isSidebarVisible !== undefined)) && (
+          showAgentToggle &&
+          onToggleSidebar &&
+          isSidebarVisible !== undefined && (
             <div
               className={cn(
                 "absolute right-4 flex items-center gap-3 z-50",
                 reserveTopChromeSpace ? "top-14" : "top-4"
               )}
             >
-              {/* Runtime Actions Group - Execute */}
-              {onAction && (
-                <ActionBarGroup>
-                  <ActionButton
-                    onClick={onAction}
-                    workflowStatus={workflowStatus}
-                    disabled={
-                      disabled ||
-                      ((workflowStatus === "idle" ||
-                        workflowStatus === "submitted" ||
-                        workflowStatus === "executing") &&
-                        nodes.length === 0)
-                    }
-                  />
-                </ActionBarGroup>
-              )}
-
-              {/* View Controls Group - Sidebar */}
-              {showAgentToggle && onToggleSidebar && isSidebarVisible !== undefined && (
-                <ActionBarGroup>
-                  <SidebarToggle
-                    onClick={onToggleSidebar}
-                    isSidebarVisible={isSidebarVisible}
-                  />
-                </ActionBarGroup>
-              )}
+              <ActionBarGroup>
+                <SidebarToggle
+                  onClick={onToggleSidebar}
+                  isSidebarVisible={isSidebarVisible}
+                />
+              </ActionBarGroup>
             </div>
           )}
 

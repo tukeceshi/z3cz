@@ -29,14 +29,6 @@ export const AdminWorkflowDetailPage = lazyRoutePage(
   () => import("@/pages/admin/admin-workflow-detail-page"),
   "AdminWorkflowDetailPage"
 );
-export const AdminExecutionsPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-executions-page"),
-  "AdminExecutionsPage"
-);
-export const AdminExecutionDetailPage = lazyRoutePage(
-  () => import("@/pages/admin/admin-execution-detail-page"),
-  "AdminExecutionDetailPage"
-);
 export const AdminSupportPage = lazyRoutePage(
   () => import("@/pages/admin/admin-support-page"),
   "AdminSupportPage"
@@ -127,10 +119,6 @@ export const TemplateTryPage = lazyRoutePage(
   () => import("@/pages/template-try-page"),
   "TemplateTryPage"
 );
-export const ExecutionsPage = lazyRoutePage(
-  () => import("@/pages/executions-page"),
-  "ExecutionsPage"
-);
 export const ModelCallsPage = lazyRoutePage(
   () => import("@/pages/model-calls-page"),
   "ModelCallsPage"
@@ -179,10 +167,6 @@ export const QueuesPage = lazyRoutePage(
   () => import("@/pages/queues-page"),
   "QueuesPage"
 );
-export const ExecutionDetailPage = lazyRoutePage(
-  () => import("@/pages/execution-detail-page"),
-  "ExecutionDetailPage"
-);
 export const EditorPage = lazyRoutePage(
   () => import("@/pages/editor-page"),
   "EditorPage"
@@ -192,11 +176,6 @@ export const EditorPage = lazyRoutePage(
 export const FormPage = lazyRoutePage(
   () => import("@/pages/form-page"),
   "FormPage",
-  "full"
-);
-export const FormTriggerPage = lazyRoutePage(
-  () => import("@/pages/form-trigger-page"),
-  "FormTriggerPage",
   "full"
 );
 export const TemplatePreviewPage = lazyRoutePage(

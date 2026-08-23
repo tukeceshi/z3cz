@@ -221,31 +221,6 @@ export interface AdminWorkflowDetail extends AdminWorkflow {
   edges: any[];
 }
 
-export interface AdminExecution {
-  id: string;
-  workflowId: string;
-  workflowName: string;
-  organizationId: string;
-  organizationName: string;
-  status: string;
-  error?: string;
-  startedAt: Date;
-  endedAt: Date;
-  usage: number;
-}
-
-export interface AdminNodeExecution {
-  nodeId: string;
-  status: string;
-  error?: string;
-  outputs?: Record<string, unknown>;
-  usage: number;
-}
-
-export interface AdminExecutionDetail extends AdminExecution {
-  nodeExecutions: AdminNodeExecution[];
-}
-
 export interface AdminQueue {
   id: string;
   name: string;
@@ -783,69 +758,6 @@ export const useAdminWorkflowDetail = (workflowId: string | undefined) => {
     workflowError: error || null,
     isWorkflowLoading: isLoading,
     mutateWorkflow: mutate,
-  };
-};
-
-/**
- * Hook to fetch admin executions list
- */
-export const useAdminExecutions = (
-  page = 1,
-  limit = 20,
-  organizationId?: string,
-  workflowId?: string,
-  status?: string
-) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-    ...(organizationId && { organizationId }),
-    ...(workflowId && { workflowId }),
-    ...(status && { status }),
-  });
-
-  const { data, error, isLoading, mutate } = useSWR<{
-    executions: AdminExecution[];
-    pagination: PaginationInfo;
-  }>(`${ADMIN_API_ENDPOINT}/executions?${params}`, async () =>
-    makeRequest<{ executions: AdminExecution[]; pagination: PaginationInfo }>(
-      `${ADMIN_API_ENDPOINT}/executions?${params}`
-    )
-  );
-
-  return {
-    executions: data?.executions || [],
-    pagination: data?.pagination || null,
-    executionsError: error || null,
-    isExecutionsLoading: isLoading,
-    mutateExecutions: mutate,
-  };
-};
-
-/**
- * Hook to fetch admin execution detail
- */
-export const useAdminExecutionDetail = (
-  executionId: string | undefined,
-  organizationId: string | undefined
-) => {
-  const { data, error, isLoading, mutate } = useSWR<{
-    execution: AdminExecutionDetail;
-  }>(
-    executionId && organizationId
-      ? `${ADMIN_API_ENDPOINT}/executions/${executionId}?organizationId=${organizationId}`
-      : null,
-    async () =>
-      makeRequest<{ execution: AdminExecutionDetail }>(
-        `${ADMIN_API_ENDPOINT}/executions/${executionId}?organizationId=${organizationId}`
-      )
-  );
-
-  return {
-    execution: data?.execution || null,
-    executionError: error || null,
-    isExecutionLoading: isLoading,
-    mutateExecution: mutate,
   };
 };
 

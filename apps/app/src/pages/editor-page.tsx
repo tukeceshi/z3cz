@@ -1,5 +1,4 @@
 ﻿import type {
-  WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
@@ -17,7 +16,6 @@ import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { CanvasThemeTip } from "@/components/workflow/canvas-theme-tip";
 import { readInitialViewportOneToOne } from "@/components/workflow/workflow-editor-navigation";
 import { WorkflowError } from "@/components/workflow/workflow-error";
-import type { WorkflowExecution } from "@/components/workflow/workflow-types";
 import { CanvasMaintenanceProvider, useCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useWorkflowMediaAddressCatalogInit } from "@/hooks/use-workflow-media-address-catalog-init";
@@ -91,13 +89,6 @@ function EditorPageCanvas() {
 
   const { createObjectUrl } = useObjectService();
 
-  const executionCallbackRef = useRef<
-    ((execution: WorkflowExecution) => void) | null
-  >(null);
-
-  const [latestExecution, setLatestExecution] =
-    useState<WorkflowExecution | null>(null);
-
   const {
     nodes: initialNodesForUI,
     edges: initialEdgesForUI,
@@ -117,42 +108,16 @@ function EditorPageCanvas() {
     handleEditorViewportGestureEnd,
     commitEditorViewport,
     handleGenerativeDefaultsChange,
-    executeWorkflow: wsExecuteWorkflow,
     updateMetadata: wsUpdateMetadata,
   } = useEditableWorkflow({
     workflowId: id,
     nodeTypes: nodeTypes || [],
     fallbackWorkflow: httpWorkflowMetadata,
     httpMetadataLoaded,
-    onExecutionUpdate: (execution) => {
-      if (executionCallbackRef.current) {
-        executionCallbackRef.current(execution);
-      } else {
-        setLatestExecution(execution);
-      }
-    },
     onWorkflowSync: () => {
       void refreshMaintenanceStatus();
     },
   });
-
-  const executeWorkflowWrapper = useCallback(
-    (
-      _workflowId: string,
-      onExecution: (execution: WorkflowExecution) => void,
-      triggerData?: unknown
-    ) => {
-      executionCallbackRef.current = onExecution;
-      wsExecuteWorkflow?.({
-        parameters: triggerData as Record<string, unknown> | undefined,
-      });
-
-      return () => {
-        executionCallbackRef.current = null;
-      };
-    },
-    [wsExecuteWorkflow]
-  );
 
   useEffect(() => {
     if (!id || !orgId) {
@@ -213,14 +178,6 @@ function EditorPageCanvas() {
         name,
         description,
       });
-    },
-    [id, wsUpdateMetadata]
-  );
-
-  const handlePersistRuntime = useCallback(
-    (runtime: WorkflowRuntime) => {
-      if (!id) return;
-      wsUpdateMetadata?.({ runtime });
     },
     [id, wsUpdateMetadata]
   );
@@ -297,21 +254,16 @@ function EditorPageCanvas() {
           workflowId={id || ""}
           mode={workflowReadOnly ? "readonly" : "edit"}
           workflowTrigger={effectiveWorkflowMetadata.trigger as WorkflowTrigger}
-          workflowRuntime={effectiveWorkflowMetadata.runtime}
           initialNodes={initialNodesForUI}
           initialEdges={initialEdgesForUI}
           nodeTypes={nodeTypes || []}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
-          executeWorkflow={executeWorkflowWrapper}
-          initialWorkflowExecution={latestExecution || undefined}
           createObjectUrl={createObjectUrl}
           workflowName={effectiveWorkflowMetadata.name || ""}
           workflowDescription={effectiveWorkflowMetadata.description}
           onWorkflowUpdate={handleWorkflowUpdate}
-          onPersistRuntime={handlePersistRuntime}
           orgId={orgId}
-          wsExecuteWorkflow={wsExecuteWorkflow}
           workflowSettingsOpen={workflowSettingsOpen}
           onWorkflowSettingsOpenChange={setWorkflowSettingsOpen}
           workflowsListUrl={getOrgUrl("workflows")}

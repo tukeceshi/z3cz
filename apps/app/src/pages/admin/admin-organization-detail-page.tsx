@@ -270,7 +270,7 @@ export function AdminOrganizationDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
         <Link
           to={`/admin/workflows?organizationId=${organizationId}`}
           className="block"
@@ -280,19 +280,6 @@ export function AdminOrganizationDetailPage() {
               <CardDescription>{t("sidebar.workflows")}</CardDescription>
               <CardTitle className="text-2xl">
                 {entityCounts?.workflowCount ?? "-"}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link
-          to={`/admin/executions?organizationId=${organizationId}`}
-          className="block"
-        >
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="pb-2">
-              <CardDescription>{t("sidebar.executions")}</CardDescription>
-              <CardTitle className="text-2xl">
-                {entityCounts?.executionCount ?? "-"}
               </CardTitle>
             </CardHeader>
           </Card>

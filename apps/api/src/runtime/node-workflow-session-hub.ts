@@ -18,11 +18,7 @@ import type { WSContext } from "hono/ws";
 
 import type { Bindings } from "../context";
 import type { OrgMembershipContext } from "../middleware/org-permissions";
-import { ExecutionManager } from "../services/execution-manager";
-import {
-  canAccessExecutions,
-  canEditWorkflows,
-} from "../utils/sub-account-permissions";
+import { canEditWorkflows } from "../utils/sub-account-permissions";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
 
@@ -424,40 +420,15 @@ class NodeWorkflowSessionHub {
   private async handleExecute(
     session: NodeWorkflowSession,
     client: NodeWsClient,
-    message: WorkflowExecuteMessage
+    _message: WorkflowExecuteMessage
   ): Promise<void> {
-    if (
-      !canAccessExecutions(client.membership.role, client.membership.permissions)
-    ) {
-      client.ws.close(1008, "Permission denied");
-      return;
-    }
-
-    if (message.executionId) {
-      client.executionId = message.executionId;
-      return;
-    }
-
-    const executionManager = new ExecutionManager({ env: session.env });
-    try {
-      const { executionId, execution } = await executionManager.executeWorkflow(
-        session.workflowState,
-        session.organizationId,
-        session.userId,
-        message.parameters
-      );
-      client.executionId = executionId;
-      this.sendExecutionUpdate(client, execution);
-    } catch (error) {
-      this.sendExecutionUpdate(client, {
-        id: "",
-        workflowId: session.workflowState.id,
-        status: "error",
-        nodeExecutions: [],
-        error:
-          error instanceof Error ? error.message : "Failed to execute workflow",
-      });
-    }
+    this.sendExecutionUpdate(client, {
+      id: "",
+      workflowId: session.workflowState.id,
+      status: "error",
+      nodeExecutions: [],
+      error: "Full workflow execution is disabled",
+    });
   }
 
   private sendExecutionUpdate(

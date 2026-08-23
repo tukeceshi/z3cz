@@ -2,7 +2,6 @@ import type {
   Edge as WorkflowBackendEdge,
   Node as WorkflowBackendNode,
   WorkflowEditorViewport,
-  WorkflowExecution,
   WorkflowGenerativeDefaults,
   WorkflowGraphPatchBroadcast,
   WorkflowRuntime,
@@ -50,7 +49,6 @@ interface UseEditableWorkflowProps {
   fallbackWorkflow?: WorkflowWithMetadata | null;
   /** True after getWorkflow (or prefetch) has supplied workflow metadata for this open. */
   httpMetadataLoaded?: boolean;
-  onExecutionUpdate?: (execution: WorkflowExecution) => void;
   onWorkflowSync?: () => void;
 }
 
@@ -59,7 +57,6 @@ export function useEditableWorkflow({
   nodeTypes = [],
   fallbackWorkflow = null,
   httpMetadataLoaded = false,
-  onExecutionUpdate,
   onWorkflowSync,
 }: UseEditableWorkflowProps) {
   const [nodes, setNodes] = useState<Node<WorkflowNodeType>[]>([]);
@@ -626,9 +623,6 @@ export function useEditableWorkflow({
               console.error("Error applying remote graph patch:", error);
             }
           },
-          onExecutionUpdate: (execution: WorkflowExecution) => {
-            onExecutionUpdate?.(execution);
-          },
           onWorkflowError: (error) => {
             if (getCanvasMaintenanceFrozen()) {
               return;
@@ -814,17 +808,6 @@ export function useEditableWorkflow({
     [scheduleSave]
   );
 
-  const executeWorkflow = useCallback(
-    (options?: { parameters?: Record<string, unknown> }) => {
-      if (!wsRef.current?.isConnected()) {
-        console.warn("WebSocket is not connected, cannot execute workflow");
-        return;
-      }
-      wsRef.current.executeWorkflow(options);
-    },
-    []
-  );
-
   const updateMetadata = useCallback(
     (metadata: {
       name?: string;
@@ -879,7 +862,6 @@ export function useEditableWorkflow({
     handleEditorViewportGestureEnd,
     commitEditorViewport,
     handleGenerativeDefaultsChange,
-    executeWorkflow,
     updateMetadata,
   };
 }

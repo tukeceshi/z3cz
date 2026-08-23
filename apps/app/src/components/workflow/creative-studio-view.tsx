@@ -14,12 +14,12 @@ import {
 
 import { useNodes, type Node as ReactFlowNode } from "@xyflow/react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 
 
 import { useTranslation } from "@/components/locale-provider";
-
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/utils/utils";
 
 
@@ -44,8 +44,6 @@ import { useCreativeStudio } from "./creative-studio-context";
 
 import { CreativeStudioEmptyAddNode } from "./creative-studio-empty-add-node";
 
-import { CreativeStudioDetailView } from "./creative-studio-detail-view";
-
 import { STUDIO_DETAIL_CARD, STUDIO_SHELL } from "./creative-studio-surface";
 
 import { type StudioListEditorState } from "./studio-list-node-interaction";
@@ -53,6 +51,24 @@ import { type StudioListEditorState } from "./studio-list-node-interaction";
 import { useStudioListNodeInteractionHandlers } from "./use-studio-list-node-interaction-handlers";
 
 import type { WorkflowNodeType } from "./workflow-types";
+
+const CreativeStudioDetailView = lazy(async () => {
+  const module = await import("./creative-studio-detail-view");
+  return { default: module.CreativeStudioDetailView };
+});
+
+function CreativeStudioDetailLoadingFallback() {
+  return (
+    <div
+      className={cn(
+        "flex h-full min-h-0 items-center justify-center",
+        STUDIO_SHELL
+      )}
+    >
+      <Spinner className="size-5 text-muted-foreground" />
+    </div>
+  );
+}
 
 
 
@@ -492,9 +508,9 @@ export function CreativeStudioView() {
           <div className="min-w-0 flex-1 overflow-hidden">
 
             {secondaryNode ? (
-
-              <CreativeStudioDetailView node={secondaryNode} role="secondary" />
-
+              <Suspense fallback={<CreativeStudioDetailLoadingFallback />}>
+                <CreativeStudioDetailView node={secondaryNode} role="secondary" />
+              </Suspense>
             ) : null}
 
           </div>
@@ -518,9 +534,9 @@ export function CreativeStudioView() {
           >
 
             {detailNode ? (
-
-              <CreativeStudioDetailView node={detailNode} role="primary" />
-
+              <Suspense fallback={<CreativeStudioDetailLoadingFallback />}>
+                <CreativeStudioDetailView node={detailNode} role="primary" />
+              </Suspense>
             ) : (
 
               <div className={cn("flex h-full min-h-0 flex-col", STUDIO_SHELL)}>

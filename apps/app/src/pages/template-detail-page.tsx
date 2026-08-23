@@ -84,7 +84,7 @@ function TemplateDetailPageContent() {
       const request: CreateWorkflowRequest = {
         name: template.name,
         description: template.description,
-        trigger: template.trigger,
+        trigger: "manual",
         nodes: template.nodes,
         edges: template.edges,
       };

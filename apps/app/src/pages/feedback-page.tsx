@@ -82,12 +82,9 @@ export const createColumns = (
     cell: ({ row }) => {
       const executionId = row.getValue("executionId") as string;
       return (
-        <Link
-          to={getOrgUrl(`executions/${executionId}`)}
-          className="hover:underline font-mono text-xs"
-        >
+        <span className="font-mono text-xs text-muted-foreground">
           {executionId}
-        </Link>
+        </span>
       );
     },
   },

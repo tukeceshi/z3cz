@@ -167,21 +167,6 @@ export function AdminWorkflowSchemesPage() {
     setDialogOpen(true);
   };
 
-  const toggleTrigger = (trigger: WorkflowTrigger) => {
-    setForm((current) => {
-      const selected = new Set(current.allowedTriggers);
-      if (selected.has(trigger)) {
-        selected.delete(trigger);
-      } else {
-        selected.add(trigger);
-      }
-      return {
-        ...current,
-        allowedTriggers: [...selected],
-      };
-    });
-  };
-
   const toggleRuntime = (runtime: WorkflowRuntime) => {
     setForm((current) => {
       const selected = new Set(current.allowedRuntimes);
@@ -303,7 +288,6 @@ export function AdminWorkflowSchemesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("adminWorkflowSchemes.columns.name")}</TableHead>
-              <TableHead>{t("adminWorkflowSchemes.columns.triggers")}</TableHead>
               <TableHead>{t("adminWorkflowSchemes.columns.runtimes")}</TableHead>
               <TableHead>{t("adminWorkflowSchemes.columns.nodes")}</TableHead>
               <TableHead>{t("adminWorkflowSchemes.columns.status")}</TableHead>
@@ -319,7 +303,6 @@ export function AdminWorkflowSchemesPage() {
                   <div className="font-medium">{scheme.name}</div>
                   <div className="text-xs text-muted-foreground">{scheme.id}</div>
                 </TableCell>
-                <TableCell>{scheme.allowedTriggers.length}</TableCell>
                 <TableCell>{scheme.allowedRuntimes.length}</TableCell>
                 <TableCell>
                   {summarizeSchemeNodes(nodeTypes, scheme.nodeRules, t)}
@@ -442,27 +425,6 @@ export function AdminWorkflowSchemesPage() {
             </div>
 
             <div>
-              <Label>{t("adminWorkflowSchemes.allowedTriggers")}</Label>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {ALL_WORKFLOW_TRIGGERS.map((trigger) => (
-                  <button
-                    key={trigger}
-                    type="button"
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs transition-colors",
-                      form.allowedTriggers.includes(trigger)
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted/50"
-                    )}
-                    onClick={() => toggleTrigger(trigger)}
-                  >
-                    {trigger}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
               <Label>{t("adminWorkflowSchemes.allowedRuntimes")}</Label>
               <div className="mt-3 flex flex-wrap gap-2">
                 {ALL_WORKFLOW_RUNTIMES.map((runtime) => (
@@ -530,7 +492,6 @@ export function AdminWorkflowSchemesPage() {
               disabled={
                 isSaving ||
                 !form.name.trim() ||
-                form.allowedTriggers.length === 0 ||
                 form.allowedRuntimes.length === 0 ||
                 (!editingScheme && !form.id.trim())
               }

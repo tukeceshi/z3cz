@@ -27,12 +27,6 @@ export const PREFETCH_PACK_DEFINITIONS: Readonly<
       "src/components/workflow/workflow-library-view.tsx",
     ],
   },
-  executions: {
-    modules: [
-      "src/pages/executions-page.tsx",
-      "src/pages/execution-detail-page.tsx",
-    ],
-  },
   templates: {
     modules: [
       "src/pages/templates-page.tsx",
@@ -47,6 +41,7 @@ export const PREFETCH_PACK_DEFINITIONS: Readonly<
     modules: [
       "src/pages/editor-page.tsx",
       "src/components/workflow/workflow-builder.tsx",
+      "src/components/workflow/creative-studio-view.tsx",
     ],
   },
   settings: {
@@ -67,8 +62,6 @@ export const ROUTE_TO_PREFETCH_PACKS: Readonly<
   DashboardPage: ["dashboard"],
   WorkflowsPage: ["workflows"],
   WorkflowFolderPage: ["workflows"],
-  ExecutionsPage: ["executions"],
-  ExecutionDetailPage: ["executions"],
   TemplatesPage: ["templates"],
   TemplateDetailPage: ["templates"],
   TemplateTryPage: ["templates"],

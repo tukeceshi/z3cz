@@ -14,10 +14,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 const PERMISSION_LABELS: Record<
-  "executions" | "modelCalls" | "aiInterfaces" | "apiKeys",
+  "modelCalls" | "aiInterfaces" | "apiKeys",
   TranslationKey
 > = {
-  executions: "pages.members.permissions.executions",
   modelCalls: "pages.members.permissions.modelCalls",
   aiInterfaces: "pages.members.permissions.aiInterfaces",
   apiKeys: "pages.members.permissions.apiKeys",
@@ -61,7 +60,7 @@ export function SubAccountPermissionsForm({
 
       {(
         Object.entries(PERMISSION_LABELS) as Array<
-          ["executions" | "modelCalls" | "aiInterfaces" | "apiKeys", TranslationKey]
+          ["modelCalls" | "aiInterfaces" | "apiKeys", TranslationKey]
         >
       ).map(([key, labelKey]) => (
         <div key={key} className="flex items-center justify-between gap-4">

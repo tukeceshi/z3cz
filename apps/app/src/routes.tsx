@@ -16,8 +16,6 @@ import { ProtectedRoute } from "./components/protected-route";
 import {
   AdminAiModelsPage,
   AdminDashboardPage,
-  AdminExecutionDetailPage,
-  AdminExecutionsPage,
   AdminModelInvocationsPage,
   AdminPersistWorkersPage,
   AdminOrganizationRedirectPage,
@@ -42,10 +40,7 @@ import {
   DatabaseExplorerPage,
   DatabasesPage,
   EditorPage,
-  ExecutionDetailPage,
-  ExecutionsPage,
   FormPage,
-  FormTriggerPage,
   IntegrationsPage,
   MembersPage,
   ModelCallsPage,
@@ -195,30 +190,6 @@ export const routes: AppRouteObject[] = [
     },
   },
 
-  {
-    path: "/admin/executions",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminExecutionsPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.adminExecutions") },
-  },
-  {
-    path: "/admin/executions/:executionId",
-    element: (
-      <AdminLayout>
-        <AdminProtectedRoute>
-          <AdminExecutionDetailPage />
-        </AdminProtectedRoute>
-      </AdminLayout>
-    ),
-    handle: {
-      head: createRouteHead("seo.routes.adminExecutionDetail"),
-    },
-  },
   {
     path: "/admin/support",
     element: (
@@ -448,21 +419,6 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.templateTry") },
   },
   {
-    path: "/executions",
-    element: <OrgRedirect to="/org/:organizationId/executions" />,
-  },
-  {
-    path: "/org/:organizationId/executions",
-    element: (
-      <OrgLayout title="Workflows">
-        <ProtectedRoute>
-          <ExecutionsPage />
-        </ProtectedRoute>
-      </OrgLayout>
-    ),
-    handle: { head: createRouteHead("seo.routes.executions") },
-  },
-  {
     path: "/model-calls",
     element: <OrgRedirect to="/org/:organizationId/model-calls" />,
   },
@@ -615,19 +571,6 @@ export const routes: AppRouteObject[] = [
     handle: { head: createRouteHead("seo.routes.queues") },
   },
   {
-    path: "/org/:organizationId/executions/:executionId",
-    element: (
-      <OrgLayout title="Workflows">
-        <ProtectedRoute>
-          <ExecutionDetailPage />
-        </ProtectedRoute>
-      </OrgLayout>
-    ),
-    handle: {
-      head: createRouteHead("seo.routes.executionDetail"),
-    },
-  },
-  {
     path: "/org/:organizationId/workflows/:id",
     element: (
       <CanvasLayout>
@@ -639,13 +582,6 @@ export const routes: AppRouteObject[] = [
   {
     path: "/form/:signedToken",
     element: <FormPage />,
-    handle: {
-      head: createRouteHead("seo.routes.form"),
-    },
-  },
-  {
-    path: "/forms/:workflowId",
-    element: <FormTriggerPage />,
     handle: {
       head: createRouteHead("seo.routes.form"),
     },
