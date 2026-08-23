@@ -16,9 +16,10 @@ import {
   SURFACE_ROW_ACTIVE_STRONG,
 } from "@/components/ui/surface";
 
-/** Shell matches workflow canvas in dark mode (--workflow-canvas-bg-dark). */
-export const STUDIO_SHELL =
-  "bg-background text-foreground dark:bg-[var(--workflow-canvas-bg-dark)]";
+import { WORKFLOW_CANVAS_SURFACE } from "./workflow-canvas-styles";
+
+/** Same surface as the workflow canvas. */
+export const STUDIO_SHELL = WORKFLOW_CANVAS_SURFACE;
 
 export const STUDIO_HEADER = `border-b ${SURFACE_BORDER}`;
 
@@ -76,7 +77,7 @@ export const STUDIO_ROW_ACTIVE = `pointer-events-none absolute -inset-x-2 inset-
 export const STUDIO_BOARD_GAP = "gap-3";
 
 /** Outer padding for full-width studio board (not split with detail). */
-export const STUDIO_BOARD_INSET = "p-4";
+export const STUDIO_BOARD_INSET = "px-4 pb-4";
 
 /** Compact list: add-node slot between tabs and node list. */
 export const STUDIO_ADD_NODE_SLOT = `flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed bg-transparent text-sm ${SURFACE_BORDER_SUBTLE} text-muted-foreground transition-colors hover:text-foreground`;
@@ -123,7 +124,7 @@ export const STUDIO_PREVIEW_EMPTY = `${SURFACE_MUTED_FILL} text-muted-foreground
 
 export const STUDIO_PREVIEW_MEDIA_FALLBACK = `${SURFACE_MUTED_FILL} text-muted-foreground dark:text-neutral-400`;
 
-export const STUDIO_DOCK = `border-t ${SURFACE_BORDER} bg-background/95 dark:bg-[var(--workflow-canvas-bg-dark)]`;
+export const STUDIO_DOCK = `border-t ${SURFACE_BORDER} ${WORKFLOW_CANVAS_SURFACE}`;
 
 /** Fixed list preview height — audio preview slot. */
 export const STUDIO_LIST_PREVIEW_HEIGHT = "h-[66px]";
