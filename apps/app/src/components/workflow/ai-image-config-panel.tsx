@@ -110,6 +110,7 @@ import {
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import { useGenerativeCloudJobProgress, generativeProgressButtonKey, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
+import { formatGenerativePhaseLabel } from "./generative-progress-utils";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
@@ -1125,7 +1126,12 @@ export function AiImageConfigPanel({
             <AiGenerateButton
               disabled={!canGenerate}
               isGenerating={isGenerating}
-              label={t(generativeProgressButtonKey(activeProgressPhase))}
+              label={formatGenerativePhaseLabel({
+                phase: activeProgressPhase,
+                progressKey: generativeProgressButtonKey(activeProgressPhase),
+                metadata: data.metadata,
+                t,
+              })}
               onClick={() => {
                 void handleGenerate();
               }}

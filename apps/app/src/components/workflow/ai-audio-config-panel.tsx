@@ -83,6 +83,7 @@ import {
   useGenerativeCloudJobProgress,
   generativeAudioProgressButtonKey,
 } from "@/hooks/use-generative-cloud-job";
+import { formatGenerativePhaseLabel } from "./generative-progress-utils";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
@@ -777,7 +778,12 @@ export function AiAudioConfigPanel({
             <AiGenerateButton
               disabled={!canGenerate}
               isGenerating={isGenerating}
-              label={t(generativeAudioProgressButtonKey(activeProgressPhase))}
+              label={formatGenerativePhaseLabel({
+                phase: activeProgressPhase,
+                progressKey: generativeAudioProgressButtonKey(activeProgressPhase),
+                metadata: data.metadata,
+                t,
+              })}
               onClick={() => {
                 void handleGenerate();
               }}

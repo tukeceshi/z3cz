@@ -123,6 +123,7 @@ export function useGenerativeCloudJobProgress(
     readonly jobId?: string | null;
     readonly phase?: GenerativeProgressPhase | null;
     readonly stagingMediaIds?: readonly string[] | null;
+    readonly downloadPercent?: number | null;
   }) => void;
   readonly clearProgress: () => void;
   readonly resolveJobMedia: (
@@ -140,6 +141,7 @@ export function useGenerativeCloudJobProgress(
       readonly jobId?: string | null;
       readonly phase?: GenerativeProgressPhase | null;
       readonly stagingMediaIds?: readonly string[] | null;
+      readonly downloadPercent?: number | null;
     }) => {
       if (getCanvasMaintenanceFrozen()) {
         return;
@@ -209,12 +211,24 @@ export function useGenerativeCloudJobProgress(
           workflowId: options.workflowId,
           stagingMediaIds: readGenerativeStagingMediaIds(options.metadata),
           onPhase: options.setPersistPhase,
-          onProgressPhase: (phase) => syncProgress({ jobId, phase }),
+          onProgressPhase: (phase) =>
+            syncProgress({
+              jobId,
+              phase,
+              downloadPercent: phase === "downloading" ? undefined : null,
+            }),
+          onDownloadProgress: (percent) =>
+            syncProgress({
+              jobId,
+              phase: "downloading",
+              downloadPercent: percent,
+            }),
           onStaged: (stagedMedia) => {
             syncProgress({
               jobId,
               phase: "uploading",
               stagingMediaIds: stagedMedia.map((entry) => entry.resourceId),
+              downloadPercent: null,
             });
             options.onStaged?.(stagedMedia);
           },

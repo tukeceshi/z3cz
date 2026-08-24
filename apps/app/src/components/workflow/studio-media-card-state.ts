@@ -7,6 +7,7 @@ import { isAiImageGenerating } from "./ai-image-node-utils";
 import { isAiVideoGenerating } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import {
+  formatGenerativePhaseLabel,
   isGenerativePersistPhase,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
@@ -17,6 +18,7 @@ export type StudioMediaKind = "image" | "video";
 
 export interface StudioMediaCardState {
   readonly placeholderKey: string;
+  readonly phase: GenerativeProgressPhase | null;
   readonly isBusy: boolean;
   readonly generateError: GenerativeCardError | undefined;
 }
@@ -75,7 +77,24 @@ export function readStudioMediaCardState(
 
   return {
     placeholderKey: generativeCardProgressKey(phase, mediaKind),
+    phase,
     isBusy: readStudioMediaIsBusy(metadata, isVideo, media),
     generateError: readGenerativeCardError(metadata),
   };
+}
+
+export function formatStudioMediaCardPlaceholder(params: {
+  readonly cardState: StudioMediaCardState;
+  readonly metadata: Record<string, string> | undefined;
+  readonly t: (
+    key: string,
+    values?: Record<string, string | number>
+  ) => string;
+}): string {
+  return formatGenerativePhaseLabel({
+    phase: params.cardState.phase,
+    progressKey: params.cardState.placeholderKey,
+    metadata: params.metadata,
+    t: params.t,
+  });
 }

@@ -56,11 +56,10 @@ import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view
 import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
-  formatGenerativeProgressElapsed,
+  formatGenerativeBusyOverlayLabel,
   isGenerativePhaseCancellable,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
-  readGenerativeProgressStartedAt,
   withGenerativeProgress,
 } from "./generative-progress-utils";
 import {
@@ -648,25 +647,16 @@ export function AiVideoConfigPanel({
     if (isCancelling || activeProgressPhase === "cancelling") {
       return t(generativeVideoProgressButtonKey("cancelling"));
     }
-    const base = t(generativeVideoProgressButtonKey(activeProgressPhase));
-    const startedAt = readGenerativeProgressStartedAt(data.metadata);
-    if (!activeProgressPhase || !startedAt) {
-      return base;
+    if (!activeProgressPhase) {
+      return t(generativeVideoProgressButtonKey(null));
     }
-    const { minutes, seconds } = formatGenerativeProgressElapsed(
-      startedAt,
-      progressNowMs
-    );
-    const elapsed =
-      minutes > 0
-        ? t("workflow.aiVideoPanel.progressElapsedMinutes", {
-            minutes,
-            seconds: String(seconds).padStart(2, "0"),
-          })
-        : t("workflow.aiVideoPanel.progressElapsedSeconds", { seconds });
-    return t("workflow.aiVideoPanel.progressWithElapsed", {
-      label: base.replace(/[….]+$/u, "").trimEnd(),
-      elapsed,
+    return formatGenerativeBusyOverlayLabel({
+      phase: activeProgressPhase,
+      progressButtonKey: generativeVideoProgressButtonKey,
+      i18nPrefix: "workflow.aiVideoPanel",
+      metadata: data.metadata,
+      progressNowMs,
+      t,
     });
   }, [activeProgressPhase, data.metadata, isCancelling, progressNowMs, t]);
 

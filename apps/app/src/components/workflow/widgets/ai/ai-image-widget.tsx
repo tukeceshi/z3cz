@@ -19,6 +19,7 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
+import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
 import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
@@ -190,13 +191,18 @@ function AiImageWidget({
     holdSize: cardDisplay.isBusy,
     initialLayout,
   });
-  const cardPlaceholder = t(
-    generativeCardProgressKey(
+  const cardPlaceholder = formatGenerativePhaseLabel({
+    phase:
+      persistPhase ??
+      (cardDisplay.isBusy ? "generating" : progressPhase ?? null),
+    progressKey: generativeCardProgressKey(
       persistPhase ??
         (cardDisplay.isBusy ? "generating" : progressPhase ?? null),
       "image"
-    )
-  );
+    ),
+    metadata,
+    t,
+  });
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;

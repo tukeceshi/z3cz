@@ -34,7 +34,7 @@ import { GenerativeCardErrorBlock } from "./generative-card-error-block";
 import { GenerativeCardEmptyUploadSlot } from "./generative-card-empty-upload-slot";
 import type { GenerativeCardUploadKind } from "./generative-card-upload-utils";
 import { StudioMediaEmptyPreview } from "./creative-studio-media-preview-frame";
-import { readStudioMediaCardState } from "./studio-media-card-state";
+import { readStudioMediaCardState, formatStudioMediaCardPlaceholder } from "./studio-media-card-state";
 import { StudioMediaFullPreview } from "./studio-media-full-preview";
 import {
   STUDIO_PREVIEW_MEDIA_FALLBACK,
@@ -283,7 +283,11 @@ function StudioDetailMediaPreview({
       <StudioMediaEmptyPreview
         layout="detail"
         isVideo={isVideo}
-        message={t(cardState.placeholderKey)}
+        message={formatStudioMediaCardPlaceholder({
+          cardState,
+          metadata,
+          t,
+        })}
         busy={cardState.isBusy}
         className={className}
         busyOverlay={
@@ -420,7 +424,11 @@ export function CreativeStudioNodePreview({
         <StudioMediaEmptyPreview
           layout="list"
           isVideo={false}
-          message={t(cardState.placeholderKey)}
+          message={formatStudioMediaCardPlaceholder({
+            cardState,
+            metadata: data.metadata,
+            t,
+          })}
           busy={cardState.isBusy}
           className={className}
         />
@@ -467,7 +475,11 @@ export function CreativeStudioNodePreview({
         <StudioMediaEmptyPreview
           layout="list"
           isVideo
-          message={t(cardState.placeholderKey)}
+          message={formatStudioMediaCardPlaceholder({
+            cardState,
+            metadata: data.metadata,
+            t,
+          })}
           busy={cardState.isBusy}
           className={className}
         />
