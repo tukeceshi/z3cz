@@ -22,6 +22,7 @@ import {
   type GenerativeHistorySelectionResult,
 } from "./apply-history-item-settings";
 import { markResourceRefFailed } from "./generative-resource-ref-utils";
+import { normalizeTableMarkdownForDisplay } from "./normalize-table-markdown-for-display";
 
 export const AI_TEXT_RESULT_INPUT_ID = "result" as const;
 export const AI_TEXT_RESULT_HISTORY_INPUT_ID = "result_history" as const;
@@ -266,7 +267,7 @@ export function readAiTextSessionBodySync(data: WorkflowNodeType): string {
     (output) => output.id === AI_TEXT_BODY_OUTPUT_ID
   );
   if (typeof fromBody?.value === "string" && fromBody.value.trim()) {
-    return fromBody.value.trim();
+    return normalizeTableMarkdownForDisplay(fromBody.value.trim());
   }
   return "";
 }
@@ -280,13 +281,13 @@ export function readAiTextResult(
     (output) => output.id === AI_TEXT_BODY_OUTPUT_ID
   );
   if (typeof fromBody?.value === "string" && fromBody.value.trim()) {
-    return fromBody.value;
+    return normalizeTableMarkdownForDisplay(fromBody.value);
   }
 
   const fromInput = inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID);
   const inputValue = fromInput?.value;
   if (typeof inputValue === "string" && inputValue.trim()) {
-    return inputValue;
+    return normalizeTableMarkdownForDisplay(inputValue);
   }
 
   return undefined;

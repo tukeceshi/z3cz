@@ -58,6 +58,20 @@ describe("ai-text-cache-layer", () => {
     ).resolves.toBe("hello from staging");
   });
 
+  it("readAiTextFullBodyFromStaging treats fullwidth table pipes as ASCII", async () => {
+    ensureAiTextCached.mockResolvedValue(true);
+    readAiTextContent.mockResolvedValue("| 镜头｜时间线 |\n| --- | --- |");
+
+    const { readAiTextFullBodyFromStaging } = await import("./ai-text-cache-layer");
+    await expect(
+      readAiTextFullBodyFromStaging({
+        organizationId: "org",
+        workflowId: "wf",
+        reference: { resourceId: "res-pipes", mimeType: "text/plain" },
+      })
+    ).resolves.toBe("| 镜头|时间线 |\n| --- | --- |");
+  });
+
   it("readyAiTextStaging marks failed when cache miss and no body", async () => {
     ensureAiTextCached.mockResolvedValue(false);
     readAiTextContent.mockResolvedValue(null);

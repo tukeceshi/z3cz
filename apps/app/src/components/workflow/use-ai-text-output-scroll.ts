@@ -46,10 +46,18 @@ export function measureAutoTextareaHeight(
   scrollContainer: HTMLElement
 ): number {
   const minHeight = scrollContainer.clientHeight;
+  const previousMinHeight = textarea.style.minHeight;
+  // CSS min-height (min-h-full / min-h-[80px]) keeps height:0 from collapsing.
+  textarea.style.minHeight = "0px";
   textarea.style.height = "0px";
   const collapsedHeight = textarea.scrollHeight;
-  textarea.style.height = `${Math.max(collapsedHeight, minHeight)}px`;
-  return Math.max(textarea.scrollHeight, collapsedHeight, minHeight);
+  let nextHeight = Math.max(collapsedHeight, minHeight);
+  textarea.style.height = `${nextHeight}px`;
+  // height:0 under-reports wrapping; the second pass is the real content height.
+  nextHeight = Math.max(textarea.scrollHeight, nextHeight);
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.minHeight = previousMinHeight;
+  return nextHeight;
 }
 
 function resolveScrollPhase(params: {

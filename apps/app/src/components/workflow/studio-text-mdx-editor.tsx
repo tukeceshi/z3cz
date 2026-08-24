@@ -49,6 +49,17 @@ export function StudioTextMdxEditor({
     }
   }, [contentKey, onLayoutUpdated, readOnly, value]);
 
+  useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+    const frameId = requestAnimationFrame(() => {
+      editorRef.current?.focus();
+      onLayoutUpdated?.();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [contentKey, onLayoutUpdated, readOnly]);
+
   return (
     <div className="studio-mdx-table-frame">
       <MDXEditor

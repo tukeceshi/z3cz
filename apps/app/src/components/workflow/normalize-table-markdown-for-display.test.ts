@@ -9,7 +9,7 @@ describe("normalizeTableMarkdownForDisplay", () => {
     expect(normalizeTableMarkdownForDisplay(markdown)).toBe(markdown);
   });
 
-  it("converts fullwidth pipes so preview tables parse into columns", () => {
+  it("converts fullwidth pipes so tables parse into columns", () => {
     const markdown = [
       "| 镜头｜时间线｜时长｜音效 |",
       "|---|---:|---:|---|",

@@ -17,7 +17,6 @@ export type StudioTextViewMode = "formatted" | "raw";
 export interface StudioTextOutputViewProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
-  readonly onBlur: () => void;
   readonly onFocus: () => void;
   readonly onCompositionStart: () => void;
   readonly onCompositionEnd: () => void;
@@ -37,7 +36,6 @@ export interface StudioTextOutputViewProps {
 export function StudioTextOutputView({
   value,
   onChange,
-  onBlur,
   onFocus,
   onCompositionStart,
   onCompositionEnd,
@@ -56,7 +54,6 @@ export function StudioTextOutputView({
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<StudioTextViewMode>("formatted");
   const [rawMounted, setRawMounted] = useState(false);
-  const suppressBlurRef = useRef(false);
   const emptyEditRawAppliedRef = useRef(false);
   const isTextEditing = isEditing && !editLocked;
   const showFormatted = viewMode === "formatted";
@@ -64,27 +61,18 @@ export function StudioTextOutputView({
   const charCount = value.length;
   const isOverCharLimit = charCount > maxLength;
 
-  const handleLeaveEdit = useCallback(() => {
-    if (suppressBlurRef.current) {
-      return;
-    }
-    onBlur();
-  }, [onBlur]);
-
   const handleSelectViewMode = useCallback(
     (mode: StudioTextViewMode) => {
       if (isGenerating || mode === viewMode) {
         return;
       }
 
-      suppressBlurRef.current = true;
       if (mode === "raw") {
         setRawMounted(true);
       }
       setViewMode(mode);
 
       window.requestAnimationFrame(() => {
-        suppressBlurRef.current = false;
         if (!isTextEditing) {
           return;
         }
@@ -132,7 +120,7 @@ export function StudioTextOutputView({
     if (!scrollContainer || !textarea) {
       return;
     }
-    measureAutoTextareaHeight(textarea, scrollContainer);
+    textarea.style.height = `${measureAutoTextareaHeight(textarea, scrollContainer)}px`;
   }, [showRaw, value, contentKey, scrollContainerRef, textareaRef]);
 
   useLayoutEffect(() => {
@@ -163,17 +151,12 @@ export function StudioTextOutputView({
       >
         <div className="relative min-h-full">
           <div
-            className={cn(
-              showFormatted
-                ? "relative"
-                : "pointer-events-none invisible absolute inset-x-0 top-0 -z-10"
-            )}
+            className={cn(showFormatted ? "relative" : "hidden")}
             aria-hidden={!showFormatted}
           >
             <StudioTextFormattedView
               value={value}
               onChange={onChange}
-              onBlur={isTextEditing ? handleLeaveEdit : undefined}
               onFocus={isTextEditing ? onFocus : undefined}
               readOnly={!isTextEditing}
               contentKey={contentKey}
@@ -181,15 +164,12 @@ export function StudioTextOutputView({
                 isGenerating && !isTextEditing ? scrollToTailIfAllowed : undefined
               }
             />
+            <div className="h-16 shrink-0" aria-hidden="true" />
           </div>
 
           {rawMounted ? (
             <div
-              className={cn(
-                showRaw
-                  ? "relative"
-                  : "pointer-events-none invisible absolute inset-x-0 top-0 -z-10"
-              )}
+              className={cn(showRaw ? "relative" : "hidden")}
               aria-hidden={!showRaw}
             >
               <Textarea
@@ -198,7 +178,6 @@ export function StudioTextOutputView({
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 onFocus={isTextEditing ? onFocus : undefined}
-                onBlur={isTextEditing ? handleLeaveEdit : undefined}
                 onCompositionStart={
                   isTextEditing ? onCompositionStart : undefined
                 }
@@ -211,6 +190,7 @@ export function StudioTextOutputView({
                   !isTextEditing && "cursor-text"
                 )}
               />
+              <div className="h-16 shrink-0" aria-hidden="true" />
             </div>
           ) : null}
         </div>

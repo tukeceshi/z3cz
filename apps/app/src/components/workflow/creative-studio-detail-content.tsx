@@ -125,14 +125,24 @@ import { useWorkflow } from "./workflow-context";
 import { StudioVideoLightbox } from "./studio-video-lightbox";
 import type { WorkflowNodeType } from "./workflow-types";
 
+export interface StudioTextEditHeaderState {
+  readonly isEditing: boolean;
+  readonly showHint: boolean;
+  readonly onExit: () => void;
+}
+
 export interface CreativeStudioDetailContentProps {
   readonly node: ReactFlowNode<WorkflowNodeType>;
   readonly onEmptyTextEditingChange?: (editing: boolean) => void;
+  readonly onTextEditHeaderChange?: (
+    state: StudioTextEditHeaderState | null
+  ) => void;
 }
 
 export function CreativeStudioDetailContent({
   node,
   onEmptyTextEditingChange,
+  onTextEditHeaderChange,
 }: CreativeStudioDetailContentProps) {
   const nodeType = node.data.nodeType ?? "";
 
@@ -141,6 +151,7 @@ export function CreativeStudioDetailContent({
       <StudioTextDetail
         node={node}
         onEmptyTextEditingChange={onEmptyTextEditingChange}
+        onTextEditHeaderChange={onTextEditHeaderChange}
       />
     );
   }
@@ -179,9 +190,13 @@ function StudioToolbar({
 function StudioTextDetail({
   node,
   onEmptyTextEditingChange,
+  onTextEditHeaderChange,
 }: {
   readonly node: ReactFlowNode<WorkflowNodeType>;
   readonly onEmptyTextEditingChange?: (editing: boolean) => void;
+  readonly onTextEditHeaderChange?: (
+    state: StudioTextEditHeaderState | null
+  ) => void;
 }) {
   const { t } = useTranslation();
   const { organization } = useAuth();
@@ -227,7 +242,6 @@ function StudioTextDetail({
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
-  const editSurfaceRef = useRef<HTMLDivElement>(null);
 
   const nodeDataRef = useRef(node.data);
   nodeDataRef.current = node.data;
@@ -352,6 +366,22 @@ function StudioTextDetail({
   }, [onEmptyTextEditingChange]);
 
   useEffect(() => {
+    if (!showEditHint && !isTextEditing) {
+      onTextEditHeaderChange?.(null);
+      return;
+    }
+    onTextEditHeaderChange?.({
+      isEditing: isTextEditing,
+      showHint: showEditHint,
+      onExit: stopEditing,
+    });
+  }, [isTextEditing, onTextEditHeaderChange, showEditHint, stopEditing]);
+
+  useEffect(() => {
+    return () => onTextEditHeaderChange?.(null);
+  }, [onTextEditHeaderChange]);
+
+  useEffect(() => {
     if (isGenerating && historyOpen) {
       setHistoryOpen(false);
     }
@@ -370,22 +400,9 @@ function StudioTextDetail({
       stopEditing();
     };
 
-    const handlePointerDown = (event: globalThis.MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-      if (editSurfaceRef.current?.contains(target)) {
-        return;
-      }
-      stopEditing();
-    };
-
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handlePointerDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [isTextEditing, stopEditing]);
 
@@ -434,15 +451,7 @@ function StudioTextDetail({
         onDoubleClick={handleDoubleClick}
       >
         <div className="h-full w-full min-h-0 p-4">
-          <div ref={editSurfaceRef} className="relative h-full min-h-0 rounded-lg">
-            {showEditHint ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-3">
-                <span className="rounded-md border border-border/30 bg-background/40 px-3 py-1 text-sm text-muted-foreground/50 backdrop-blur-sm dark:bg-neutral-900/40">
-                  {t("workflow.aiTextPanel.cardDoubleClickInput")}
-                </span>
-              </div>
-            ) : null}
-
+          <div className="relative h-full min-h-0 rounded-lg">
             {isTextEditing ? (
               <div
                 className={STUDIO_TEXT_DETAIL_EDIT_OVERLAY}
@@ -483,7 +492,6 @@ function StudioTextDetail({
                   value={isGenerating ? text : textBuffer.value}
                   onChange={textBuffer.onChange}
                   onFocus={textBuffer.onFocus}
-                  onBlur={stopEditing}
                   onCompositionStart={textBuffer.onCompositionStart}
                   onCompositionEnd={textBuffer.onCompositionEnd}
                   isEditing={editing}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/utils/utils";
 import {
@@ -13,14 +13,12 @@ import {
   splitMarkdownTables,
 } from "./split-markdown-tables";
 import { patchMarkdownTableEdit } from "./patch-markdown-table-edit";
-import { useStudioTextEditLeave } from "./studio-text-edit-leave";
 import { StudioTextMarkdownRange } from "./studio-text-markdown-range";
 import { StudioTextSectionFrameActions } from "./studio-text-section-frame-actions";
 
 export interface StudioTextFormattedViewProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
-  readonly onBlur?: () => void;
   readonly onFocus?: () => void;
   readonly readOnly: boolean;
   readonly contentKey: string;
@@ -31,22 +29,25 @@ export interface StudioTextFormattedViewProps {
 export function StudioTextFormattedView({
   value,
   onChange,
-  onBlur,
   onFocus,
   readOnly,
   contentKey,
   onLayoutUpdated,
   className,
 }: StudioTextFormattedViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeEditorKey, setActiveEditorKey] = useState<string | null>(null);
   const sections = useMemo(() => splitMarkdownSections(value), [value]);
   const segments = useMemo(() => splitMarkdownTables(value), [value]);
 
-  const { handleFocusOut, scheduleLeaveCheck } = useStudioTextEditLeave({
-    containerRef,
-    readOnly,
-    onLeave: onBlur,
-  });
+  useEffect(() => {
+    if (readOnly) {
+      setActiveEditorKey(null);
+    }
+  }, [readOnly]);
+
+  const handleActivateEditor = useCallback((editorKey: string) => {
+    setActiveEditorKey(editorKey);
+  }, []);
 
   const applySegmentEdits = useCallback(
     (edits: {
@@ -81,27 +82,20 @@ export function StudioTextFormattedView({
     [applySegmentEdits]
   );
 
-  const handleContainerBlur = useCallback(() => {
-    scheduleLeaveCheck();
-  }, [scheduleLeaveCheck]);
-
   const rangeProps = {
     value,
     segments,
     readOnly,
+    activeEditorKey,
+    onActivateEditor: handleActivateEditor,
     onFocus,
     onTextChange: handleTextChange,
     onTableChange: handleTableChange,
-    onContainerBlur: handleContainerBlur,
     onLayoutUpdated,
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("min-h-full p-3", className)}
-      onFocusOut={handleFocusOut}
-    >
+    <div className={cn("min-h-full p-3", className)}>
       {sections.map((part) => {
         if (part.type === "preamble") {
           const preamble = value.slice(part.start, part.end);
@@ -124,7 +118,7 @@ export function StudioTextFormattedView({
         const precedingText = sectionPrecedingText(value, part);
         const headingText = sectionHeadingDisplayText(value, part);
         const sectionAnchorKey = `${contentKey}-section-${part.index}`;
-        const contentRanges = sectionContentRanges(part, readOnly);
+        const contentRanges = sectionContentRanges(part);
 
         return (
           <div
