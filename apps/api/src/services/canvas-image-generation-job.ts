@@ -47,6 +47,7 @@ export function buildGeneratingResourceRefs(
     resourceId,
     mimeType: PLACEHOLDER_IMAGE_MIME,
     generating: true,
+    kind: "ephemeral",
   }));
 }
 

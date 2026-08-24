@@ -37,6 +37,7 @@ describe("buildGeneratingResourceRefs", () => {
         resourceId: "res-1",
         mimeType: "image/png",
         generating: true,
+        kind: "ephemeral",
       },
     ]);
   });

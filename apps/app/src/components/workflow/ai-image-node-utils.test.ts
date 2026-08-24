@@ -42,6 +42,7 @@ describe("withAiImageGeneratingHistory", () => {
       resourceId: "pending-1",
       mimeType: "image/png",
       generating: true,
+      kind: "ephemeral",
     });
     expect(history.items[0]?.jobId).toBe("job-2");
     expect(history.selectedId).toBe(history.items[0]?.id);

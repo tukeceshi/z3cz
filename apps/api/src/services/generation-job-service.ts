@@ -49,6 +49,7 @@ import {
   registerMediaResourcesFromReferences,
   type MediaResourceTransition,
 } from "./media-resource-catalog-service";
+import { persistJobCloudMediaKinds } from "./persist-generating-node-content";
 import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 import {
   isPersistWorkerPoolActive,
@@ -567,6 +568,11 @@ async function completeInlineServerGenerationJobPersist(
           finalMedia
         ),
       });
+      try {
+        await persistJobCloudMediaKinds(env, succeeded, pendingMedia);
+      } catch {
+        // Catalog already transitioned; node JSON kind is aligned by client sync.
+      }
       await syncGenerationJobInvocation(db, succeeded);
       return succeeded;
     }
@@ -945,6 +951,11 @@ export async function completeGenerationJobClientUpload(
         validatedFinalMedia
       ),
     });
+    try {
+      await persistJobCloudMediaKinds(env, updated, pendingMedia);
+    } catch {
+      // Catalog already transitioned; node JSON kind is aligned by client sync.
+    }
     await syncGenerationJobInvocation(db, updated);
     return toGetGenerationJobResponse(updated);
   }

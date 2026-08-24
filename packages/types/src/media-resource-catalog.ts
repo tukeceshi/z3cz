@@ -1,5 +1,9 @@
 export type MediaResourceKind = "cloud" | "local" | "ephemeral";
 
+export function isMediaResourceKind(value: unknown): value is MediaResourceKind {
+  return value === "cloud" || value === "local" || value === "ephemeral";
+}
+
 export interface MediaResourceRecord {
   readonly id: string;
   readonly organizationId: string;

@@ -10,6 +10,7 @@ import {
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "./media-reference";
+import type { MediaResourceKind } from "./media-resource-catalog";
 import type {
   AiAudioResultHistory,
   AiAudioResultHistoryItem,
@@ -127,6 +128,7 @@ export function buildGeneratingResourceRefs(
     resourceId,
     mimeType,
     generating: true,
+    kind: "ephemeral" as const,
   }));
 }
 
@@ -251,6 +253,193 @@ function applyMediaResultToNode(
   return { inputs, outputs };
 }
 
+function applyKindToMedia(
+  media: WorkflowMediaValue,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): WorkflowMediaValue {
+  if (!isResourceIdReference(media)) {
+    return media;
+  }
+  const kind = kindsById.get(media.resourceId);
+  if (!kind || media.kind === kind) {
+    return media;
+  }
+  return { ...media, kind };
+}
+
+function applyKindToMediaList(
+  media: readonly WorkflowMediaValue[],
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): readonly WorkflowMediaValue[] {
+  return media.map((entry) => applyKindToMedia(entry, kindsById));
+}
+
+function mediaKindListChanged(
+  previous: readonly WorkflowMediaValue[],
+  next: readonly WorkflowMediaValue[]
+): boolean {
+  if (previous.length !== next.length) {
+    return true;
+  }
+  return previous.some((entry, index) => entry !== next[index]);
+}
+
+/** Write catalog `kind` onto matching media refs in workflow node JSON. */
+export function patchNodeMediaResourceKinds(
+  node: Node,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): Partial<Node> | null {
+  if (kindsById.size === 0) {
+    return null;
+  }
+
+  if (node.type === AI_IMAGE_NODE_TYPE) {
+    const history = readImageHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      images: applyKindToMediaList(item.images, kindsById),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_IMAGE_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyKindToMediaList(result, kindsById)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        mediaKindListChanged(history.items[index]!.images, item.images)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      mediaKindListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_IMAGE_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_VIDEO_NODE_TYPE) {
+    const history = readVideoHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      videos: applyKindToMediaList(item.videos, kindsById),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_VIDEO_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyKindToMediaList(result, kindsById)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        mediaKindListChanged(history.items[index]!.videos, item.videos)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      mediaKindListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_VIDEO_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_AUDIO_NODE_TYPE) {
+    const history = readAudioHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      audios: applyKindToMediaList(item.audios, kindsById),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_AUDIO_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyKindToMediaList(result, kindsById)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        mediaKindListChanged(history.items[index]!.audios, item.audios)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      mediaKindListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_AUDIO_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_AUDIO_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_AUDIO_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_TEXT_NODE_TYPE) {
+    const result = readJsonInput<ResourceIdReference>(
+      node.inputs,
+      AI_TEXT_RESULT_INPUT
+    );
+    if (!result || !isResourceIdReference(result)) {
+      return null;
+    }
+    const nextResult = applyKindToMedia(result, kindsById);
+    if (nextResult === result) {
+      return null;
+    }
+    const inputs = upsertNodeInput(
+      node.inputs,
+      AI_TEXT_RESULT_INPUT,
+      nextResult,
+      "json"
+    );
+    return { inputs };
+  }
+
+  return null;
+}
+
 function historyContainsGeneratingResourceIds(
   items: readonly { readonly images?: readonly WorkflowMediaValue[]; readonly videos?: readonly WorkflowMediaValue[]; readonly audios?: readonly WorkflowMediaValue[] }[],
   resourceIds: readonly string[]
@@ -308,6 +497,7 @@ export function appendImageGeneratingContent(
           resourceId,
           mimeType,
           generating: true,
+          kind: "ephemeral" as const,
         },
       ],
       prompt: params.prompt ?? "",
@@ -480,6 +670,7 @@ export function appendTextGeneratingContent(
     resourceId: params.resourceId,
     mimeType: "text/plain",
     generating: true,
+    kind: "ephemeral",
   };
   const item: AiTextResultHistoryItem = {
     id: createHistoryItemId(Date.now(), 0),

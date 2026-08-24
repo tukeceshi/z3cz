@@ -12,6 +12,7 @@ import {
   isWorkflowMediaValue,
   mediaReferenceToWorkflowValue,
   type MediaReference,
+  type MediaResourceKind,
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
@@ -41,6 +42,11 @@ import {
   AI_IMAGE_EMPTY_CARD_SIZE,
   MEDIA_CARD_SHORT_SIDE_PX,
 } from "./media-card-size";
+import {
+  mapMediaResourceKinds,
+  markResourceRefFailed,
+  stripGeneratingFlag,
+} from "./generative-resource-ref-utils";
 
 export const AI_IMAGE_REFERENCE_HANDLE_ID = "reference_images" as const;
 export const AI_IMAGE_PROMPT_HANDLE_ID = "prompt_reference" as const;
@@ -291,31 +297,6 @@ export function withAiImageResult(
   return { inputs, outputs };
 }
 
-function stripGeneratingFlag(
-  image: WorkflowMediaValue
-): WorkflowMediaValue {
-  if (!isResourceIdReference(image) || !image.generating) {
-    return image;
-  }
-  return {
-    resourceId: image.resourceId,
-    mimeType: image.mimeType,
-    contentSha256: image.contentSha256,
-  };
-}
-
-function markResourceRefFailed(image: WorkflowMediaValue): WorkflowMediaValue {
-  if (!isResourceIdReference(image)) {
-    return image;
-  }
-  return {
-    resourceId: image.resourceId,
-    mimeType: image.mimeType,
-    contentSha256: image.contentSha256,
-    failed: true,
-  };
-}
-
 export function withAiImageGeneratingHistory(
   current: WorkflowNodeType,
   params: {
@@ -344,6 +325,7 @@ export function withAiImageGeneratingHistory(
           resourceId,
           mimeType: "image/png",
           generating: true,
+          kind: "ephemeral",
         },
       ],
       prompt: params.prompt,
@@ -431,6 +413,44 @@ export function withAiImageResourceGeneratingCleared(
     return image;
   });
   return withAiImageResult(current, resultImages, { inputs });
+}
+
+export function withAiImageResourceKinds(
+  current: WorkflowNodeType,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): Partial<WorkflowNodeType> {
+  if (kindsById.size === 0) {
+    return {};
+  }
+
+  const history = readAiImageResultHistory(current.inputs);
+  const nextHistory: AiImageResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      images: mapMediaResourceKinds(item.images, kindsById),
+    })),
+  };
+  const historyChanged = nextHistory.items.some(
+    (item, index) => item.images !== history.items[index]!.images
+  );
+
+  let inputs = current.inputs;
+  if (historyChanged) {
+    inputs = upsertInputValue(
+      current.inputs,
+      AI_IMAGE_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+  }
+
+  const resultImages = readAiImageResult(inputs, current.outputs);
+  const nextResult = mapMediaResourceKinds(resultImages, kindsById);
+  if (!historyChanged && nextResult === resultImages) {
+    return {};
+  }
+  return withAiImageResult(current, [...nextResult], { inputs });
 }
 
 export function withAiImageGeneratingHistoryFailed(

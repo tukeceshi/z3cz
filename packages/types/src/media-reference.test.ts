@@ -4,6 +4,7 @@ import {
   getResourceIdFromValue,
   hasDisplayableWorkflowMedia,
   isDisplayableWorkflowMedia,
+  isResourceIdReference,
 } from "./media-reference";
 
 describe("getResourceIdFromValue", () => {
@@ -30,6 +31,26 @@ describe("getResourceIdFromValue", () => {
       })
     ).toBe("obj-1");
     expect(getResourceIdFromValue(null)).toBeNull();
+  });
+});
+
+describe("isResourceIdReference", () => {
+  it("accepts optional catalog kind and rejects ephemeral media links", () => {
+    expect(
+      isResourceIdReference({
+        resourceId: "res-1",
+        mimeType: "image/png",
+        kind: "cloud",
+      })
+    ).toBe(true);
+    expect(
+      isResourceIdReference({
+        kind: "ephemeral",
+        mediaId: "eph-1",
+        mimeType: "image/png",
+        url: "https://example.com/a.png",
+      })
+    ).toBe(false);
   });
 });
 

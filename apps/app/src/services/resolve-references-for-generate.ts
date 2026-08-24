@@ -2,9 +2,8 @@ import type {
   ReferenceImageInline,
   WorkflowMediaValue,
 } from "@dafthunk/types";
-import { getResourceIdFromValue } from "@dafthunk/types";
+import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 
-import { ensureReferencesCloudForGenerate } from "@/services/ensure-references-cloud-for-generate";
 import { collectResourceIds } from "@/services/ensure-resource-cached";
 import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
@@ -33,16 +32,17 @@ function lookupIdForMedia(media: WorkflowMediaValue): string | null {
   return getResourceIdFromValue(media);
 }
 
-function collectLookupResourceIds(params: {
-  readonly media: readonly WorkflowMediaValue[];
-}): readonly string[] {
-  return [
-    ...new Set(
-      params.media
-        .map((entry) => lookupIdForMedia(entry))
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
+function unusableReferenceError(resourceId: string): Error {
+  return new Error(`Unable to resolve resource references: ${resourceId}`);
+}
+
+function assertReferenceUsableForGenerate(media: WorkflowMediaValue): void {
+  if (!isResourceIdReference(media)) {
+    throw new Error("Unable to resolve resource references");
+  }
+  if (media.generating === true || media.failed === true || media.kind == null) {
+    throw unusableReferenceError(media.resourceId);
+  }
 }
 
 function pushResolvedUrl(params: {
@@ -102,9 +102,7 @@ async function resolveStagedDataUrls(
 
 async function resolveMediaGroup(params: {
   readonly organizationId: string;
-  readonly workflowId?: string;
   readonly media: readonly WorkflowMediaValue[];
-  readonly cloudConfigured: boolean;
 }): Promise<{
   readonly referenceImageUrls: readonly string[];
   readonly referenceImageInline: readonly ReferenceImageInline[];
@@ -120,24 +118,30 @@ async function resolveMediaGroup(params: {
     };
   }
 
-  const media =
-    params.cloudConfigured && params.workflowId
-      ? await ensureReferencesCloudForGenerate({
+  for (const entry of params.media) {
+    assertReferenceUsableForGenerate(entry);
+  }
+
+  const cloudMedia = params.media.filter((entry) => entry.kind === "cloud");
+  const stagedMedia = params.media.filter(
+    (entry) => entry.kind === "local" || entry.kind === "ephemeral"
+  );
+
+  const cloudResourceIds = [
+    ...new Set(
+      cloudMedia
+        .map((entry) => lookupIdForMedia(entry))
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const server =
+    cloudResourceIds.length > 0
+      ? await resolveResourceIdsOnServer({
           organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          media: params.media,
-          cloudConfigured: true,
+          resourceIds: cloudResourceIds,
         })
-      : params.media;
-
-  const resourceIds = collectLookupResourceIds({
-    media,
-  });
-
-  const server = await resolveResourceIdsOnServer({
-    organizationId: params.organizationId,
-    resourceIds,
-  });
+      : { resolved: [], unresolved: [] };
 
   const resolvedById = new Map(
     server.resolved
@@ -148,52 +152,32 @@ async function resolveMediaGroup(params: {
   const referenceImageUrls: string[] = [];
   const referenceVideoUrls: string[] = [];
   const referenceAudioUrls: string[] = [];
-  const unresolvedMedia: WorkflowMediaValue[] = [];
+  const unresolvedStaged: WorkflowMediaValue[] = [...stagedMedia];
 
-  for (const entry of media) {
+  for (const entry of cloudMedia) {
     const resourceId = lookupIdForMedia(entry);
     const hit = resourceId ? resolvedById.get(resourceId) : undefined;
-
-    if (!hit) {
-      unresolvedMedia.push(entry);
+    if (hit) {
+      pushResolvedUrl({
+        mimeType: hit.mimeType || entry.mimeType || "",
+        url: hit.url,
+        referenceImageUrls,
+        referenceVideoUrls,
+        referenceAudioUrls,
+      });
       continue;
     }
-
-    pushResolvedUrl({
-      mimeType: hit.mimeType || entry.mimeType || "",
-      url: hit.url,
-      referenceImageUrls,
-      referenceVideoUrls,
-      referenceAudioUrls,
-    });
+    unresolvedStaged.push(entry);
   }
 
-  if (params.cloudConfigured) {
-    if (unresolvedMedia.length > 0) {
-      const missing = unresolvedMedia
-        .map((entry) => getResourceIdFromValue(entry))
-        .filter((id): id is string => Boolean(id));
-      throw new Error(
-        `Unable to resolve resource references: ${missing.join(", ")}`
-      );
-    }
-
-    return {
-      referenceImageUrls,
-      referenceImageInline: [],
-      referenceVideoUrls,
-      referenceAudioUrls,
-    };
-  }
-
-  const images = unresolvedMedia.filter((entry) => {
+  const images = unresolvedStaged.filter((entry) => {
     const mime = entry.mimeType ?? "";
     return !isVideoMimeType(mime) && !isAudioMimeType(mime);
   });
-  const videos = unresolvedMedia.filter((entry) =>
+  const videos = unresolvedStaged.filter((entry) =>
     isVideoMimeType(entry.mimeType ?? "")
   );
-  const audios = unresolvedMedia.filter((entry) =>
+  const audios = unresolvedStaged.filter((entry) =>
     isAudioMimeType(entry.mimeType ?? "")
   );
 
@@ -217,9 +201,7 @@ export async function resolveReferencesForGenerate(params: {
 }): Promise<ResolvedReferencesForGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
-    workflowId: params.workflowId,
     media: params.references,
-    cloudConfigured: params.cloudConfigured ?? false,
   });
 
   return {
@@ -236,9 +218,7 @@ export async function resolveMediaReferencesForVideoGenerate(params: {
 }): Promise<ResolvedMediaReferencesForVideoGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
-    workflowId: params.workflowId,
     media: params.references,
-    cloudConfigured: params.cloudConfigured ?? false,
   });
 
   return {
@@ -257,9 +237,7 @@ export async function resolveMediaReferencesForTextGenerate(params: {
 }): Promise<ResolvedMediaReferencesForTextGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
-    workflowId: params.workflowId,
     media: params.references,
-    cloudConfigured: params.cloudConfigured ?? false,
   });
 
   return {

@@ -65,6 +65,7 @@ describe("uploadBlobToCloudWorkflow", () => {
     expect(result).toEqual({
       resourceId: "resource-1",
       mimeType: "image/png",
+      kind: "local",
       cloudUploadFailed: true,
     });
     expect(registerMediaResource).toHaveBeenCalledWith({

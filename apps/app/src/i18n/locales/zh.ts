@@ -2932,16 +2932,6 @@ export const zh: TranslationDictionary = {
       deleteFailed: "删除反馈失败",
       saveFailed: "保存反馈失败",
     },
-    docs: {
-      required: "必填",
-      optional: "（可选）",
-      close: "关闭",
-      documentation: "文档",
-      parameters: "参数",
-      inputsHeading: "输入 ({{count}})",
-      outputsHeading: "输出 ({{count}})",
-      viewReference: "查看参考",
-    },
     httpTrigger: {
       integrate: "Integrate",
       title: "HTTP Trigger",
@@ -3069,9 +3059,6 @@ export const zh: TranslationDictionary = {
       saveBlocked: "工作流含已归档节点时，不允许此修改。",
     },
     node: {
-      openDocs: "打开文档",
-      docsUnavailable: "文档不可用",
-      openDocsAria: "打开节点文档",
       editInput: "编辑输入",
       viewOutput: "查看输出",
     },

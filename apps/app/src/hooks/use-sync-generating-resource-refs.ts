@@ -1,7 +1,8 @@
 import {
-  hasGeneratingResource,
   isGeneratingResourceRef,
+  isResourceIdReference,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
+  type MediaResourceKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import { useEffect, useMemo, useRef } from "react";
@@ -12,16 +13,19 @@ import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import {
   withAiAudioGeneratingFlag,
   withAiAudioResourceGeneratingCleared,
+  withAiAudioResourceKinds,
   withAiAudioResourcesMarkedFailed,
 } from "@/components/workflow/ai-audio-node-utils";
 import {
   withAiImageGeneratingFlag,
   withAiImageResourceGeneratingCleared,
+  withAiImageResourceKinds,
   withAiImageResourcesMarkedFailed,
 } from "@/components/workflow/ai-image-node-utils";
 import {
   withAiVideoGeneratingFlag,
   withAiVideoResourceGeneratingCleared,
+  withAiVideoResourceKinds,
   withAiVideoResourcesMarkedFailed,
 } from "@/components/workflow/ai-video-node-utils";
 import { clearGenerativeProgress } from "@/components/workflow/generative-progress-utils";
@@ -69,6 +73,57 @@ function applyGeneratingResourceSync(
   return withAiAudioResourceGeneratingCleared(node, resourceIds);
 }
 
+function applyResourceKinds(
+  node: WorkflowNodeType,
+  modality: GenerativeResourceSyncModality,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): Partial<WorkflowNodeType> {
+  if (kindsById.size === 0) {
+    return {};
+  }
+  if (modality === "image") {
+    return withAiImageResourceKinds(node, kindsById);
+  }
+  if (modality === "video") {
+    return withAiVideoResourceKinds(node, kindsById);
+  }
+  return withAiAudioResourceKinds(node, kindsById);
+}
+
+function collectResourceIds(
+  media: readonly WorkflowMediaValue[]
+): readonly string[] {
+  return [
+    ...new Set(
+      media
+        .filter(isResourceIdReference)
+        .map((item) => item.resourceId)
+        .filter((id) => id.length > 0)
+    ),
+  ];
+}
+
+function collectKindMismatches(
+  media: readonly WorkflowMediaValue[],
+  entriesById: ReadonlyMap<
+    string,
+    { readonly kind?: MediaResourceKind } | null | undefined
+  >
+): Map<string, MediaResourceKind> {
+  const kindsById = new Map<string, MediaResourceKind>();
+  for (const item of media) {
+    if (!isResourceIdReference(item)) {
+      continue;
+    }
+    const entry = entriesById.get(item.resourceId);
+    if (!entry?.kind || entry.kind === item.kind) {
+      continue;
+    }
+    kindsById.set(item.resourceId, entry.kind);
+  }
+  return kindsById;
+}
+
 export function useSyncGeneratingResourceRefs(params: {
   readonly orgId: string | undefined;
   readonly nodeId: string;
@@ -94,12 +149,20 @@ export function useSyncGeneratingResourceRefs(params: {
         .join(","),
     [params.media]
   );
+  const resourceKindKey = useMemo(
+    () =>
+      params.media
+        .filter(isResourceIdReference)
+        .map((item) => `${item.resourceId}:${item.kind ?? ""}`)
+        .join(","),
+    [params.media]
+  );
 
   useEffect(() => {
     if (!params.enabled || !params.orgId || !params.updateNodeData) {
       return;
     }
-    if (!generatingKey || !hasGeneratingResource(params.media)) {
+    if (!generatingKey && !resourceKindKey) {
       return;
     }
 
@@ -115,15 +178,16 @@ export function useSyncGeneratingResourceRefs(params: {
           return;
         }
         const current = mediaRef.current;
+        const allIds = collectResourceIds(current);
         const generatingIds = current
           .filter(isGeneratingResourceRef)
           .map((item) => item.resourceId);
-        if (generatingIds.length === 0) {
+        if (allIds.length === 0) {
           return;
         }
 
         const entries = await Promise.all(
-          generatingIds.map((resourceId) =>
+          allIds.map((resourceId) =>
             resolveMediaResourceEntry({ organizationId, resourceId })
           )
         );
@@ -131,37 +195,77 @@ export function useSyncGeneratingResourceRefs(params: {
           return;
         }
 
-        const failedIds = generatingIds.filter((_, index) => {
-          const entry = entries[index];
+        const entriesById = new Map(
+          allIds.map((resourceId, index) => [resourceId, entries[index]])
+        );
+        const kindsById = collectKindMismatches(current, entriesById);
+
+        const failedIds = generatingIds.filter((resourceId) => {
+          const entry = entriesById.get(resourceId);
           return entry?.failed === true;
         });
         if (failedIds.length > 0) {
           if (getCanvasMaintenanceFrozen()) {
             return;
           }
-          updateNodeData(nodeId, (node) =>
-            applyGeneratingResourceSync(node, modality, generatingIds, failedIds)
-          );
+          updateNodeData(nodeId, (node) => {
+            const synced = applyGeneratingResourceSync(
+              node,
+              modality,
+              generatingIds,
+              failedIds
+            );
+            const kindPatch = applyResourceKinds(
+              { ...node, ...synced },
+              modality,
+              kindsById
+            );
+            return { ...synced, ...kindPatch };
+          });
           return;
         }
 
-        const stillGenerating = entries.some(
-          (entry) => entry?.generating === true
-        );
-        const resolveFailed = entries.every((entry) => entry == null);
-        if (stillGenerating || resolveFailed || holdClearRef.current) {
-          await sleep(POLL_INTERVAL_MS);
-          continue;
+        const stillGenerating = generatingIds.some((resourceId) => {
+          const entry = entriesById.get(resourceId);
+          return entry?.generating === true;
+        });
+        const resolveFailed =
+          generatingIds.length > 0 &&
+          generatingIds.every((resourceId) => entriesById.get(resourceId) == null);
+        const generatingDone =
+          generatingIds.length > 0 &&
+          !stillGenerating &&
+          !resolveFailed &&
+          !holdClearRef.current;
+        const shouldPoll =
+          generatingIds.length > 0 &&
+          (stillGenerating || resolveFailed || holdClearRef.current);
+
+        if (generatingDone || kindsById.size > 0) {
+          if (getCanvasMaintenanceFrozen()) {
+            return;
+          }
+          updateNodeData(nodeId, (node) => {
+            const synced = generatingDone
+              ? applyGeneratingResourceSync(node, modality, generatingIds, [])
+              : {};
+            const kindPatch = applyResourceKinds(
+              { ...node, ...synced },
+              modality,
+              kindsById
+            );
+            return { ...synced, ...kindPatch };
+          });
+          if (!shouldPoll) {
+            return;
+          }
         }
 
-        if (getCanvasMaintenanceFrozen()) {
+        if (!shouldPoll) {
           return;
         }
 
-        updateNodeData(nodeId, (node) =>
-          applyGeneratingResourceSync(node, modality, generatingIds, [])
-        );
-        return;
+        await sleep(POLL_INTERVAL_MS);
       }
     };
 
@@ -171,6 +275,7 @@ export function useSyncGeneratingResourceRefs(params: {
     };
   }, [
     generatingKey,
+    resourceKindKey,
     params.enabled,
     params.modality,
     params.nodeId,

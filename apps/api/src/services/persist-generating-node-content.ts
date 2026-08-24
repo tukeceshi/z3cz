@@ -3,6 +3,7 @@ import type {
   AppendImageGeneratingContentParams,
   AppendMediaGeneratingContentParams,
   AppendTextGeneratingContentParams,
+  MediaResourceKind,
   WorkflowNodeContentPatch,
 } from "@dafthunk/types";
 import {
@@ -11,6 +12,7 @@ import {
   appendTextGeneratingContent,
   appendVideoGeneratingContent,
   buildWorkflowNodeContentPatch,
+  patchNodeMediaResourceKinds,
 } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
@@ -156,4 +158,115 @@ export async function persistTextGeneratingPlaceholder(
     }
   );
   return { resourceId: resourceId!, workflowNodeContent };
+}
+
+export function cloudKindsByResourceIds(
+  ids: readonly (string | undefined | null)[]
+): Map<string, MediaResourceKind> {
+  const map = new Map<string, MediaResourceKind>();
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (id) {
+      map.set(id, "cloud");
+    }
+  }
+  return map;
+}
+
+/** Server persist finished — write `kind` onto the node JSON media refs. */
+export async function persistJobCloudMediaKinds(
+  env: Bindings,
+  job: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly resultJson?: {
+      readonly placeholderResourceIds?: readonly string[] | null;
+    } | null;
+  },
+  pendingMedia: readonly { readonly resourceId?: string | null }[]
+): Promise<WorkflowNodeContentPatch | null> {
+  return persistWorkflowMediaResourceKinds(env, {
+    organizationId: job.organizationId,
+    workflowId: job.workflowId,
+    nodeId: job.nodeId,
+    kindsById: cloudKindsByResourceIds([
+      ...pendingMedia.map((item) => item.resourceId),
+      ...(job.resultJson?.placeholderResourceIds ?? []),
+    ]),
+  });
+}
+
+export async function persistWorkflowMediaResourceKinds(
+  env: Bindings,
+  params: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly kindsById: ReadonlyMap<string, MediaResourceKind>;
+  }
+): Promise<WorkflowNodeContentPatch | null> {
+  const workflowId = params.workflowId?.trim();
+  const nodeId = params.nodeId?.trim();
+  if (!workflowId || !nodeId || params.kindsById.size === 0) {
+    return null;
+  }
+
+  const workflowStore = new WorkflowStore(env);
+  const workflowWithData = await workflowStore.getWithData(
+    workflowId,
+    params.organizationId
+  );
+  if (!workflowWithData) {
+    return null;
+  }
+
+  const nodeIndex = workflowWithData.data.nodes.findIndex(
+    (node) => node.id === nodeId
+  );
+  if (nodeIndex < 0) {
+    return null;
+  }
+
+  const node = workflowWithData.data.nodes[nodeIndex]!;
+  const contentPatch = patchNodeMediaResourceKinds(node, params.kindsById);
+  if (!contentPatch) {
+    return null;
+  }
+
+  const updatedNode = { ...node, ...contentPatch };
+  const nodes = [...workflowWithData.data.nodes];
+  nodes[nodeIndex] = updatedNode;
+
+  const workflowRecord: SaveWorkflowRecord = {
+    id: workflowWithData.id,
+    name: workflowWithData.name,
+    description: workflowWithData.description ?? undefined,
+    schemeId: workflowWithData.schemeId,
+    trigger: workflowWithData.trigger,
+    runtime: workflowWithData.runtime,
+    organizationId: params.organizationId,
+    folderId: workflowWithData.folderId,
+    coverObjectId: workflowWithData.coverObjectId,
+    coverMimeType: workflowWithData.coverMimeType,
+    nodes,
+    edges: workflowWithData.data.edges,
+    editorViewport: workflowWithData.data.editorViewport,
+    generativeDefaults: workflowWithData.data.generativeDefaults,
+    createdAt: workflowWithData.createdAt,
+    updatedAt: new Date(),
+  };
+
+  await workflowStore.save(workflowRecord);
+
+  const patch = buildWorkflowNodeContentPatch(node, updatedNode);
+  if (patch) {
+    await nodeWorkflowSessionHub.broadcastServerNodeUpdate(
+      env,
+      workflowId,
+      updatedNode
+    );
+  }
+
+  return patch;
 }

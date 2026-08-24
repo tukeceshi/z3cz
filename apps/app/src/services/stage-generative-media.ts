@@ -111,7 +111,7 @@ export async function uploadGenerativeMediaFile(params: {
       kind: "local",
       mimeType,
     });
-    return { resourceId, mimeType };
+    return { resourceId, mimeType, kind: "local" };
   }
 
   return uploadBlobToCloudWorkflow({
@@ -265,7 +265,7 @@ export async function stageGenerativeMediaFromEphemeralUrl(params: {
     kind: "local",
     mimeType,
   });
-  return { resourceId, mimeType };
+  return { resourceId, mimeType, kind: "local" };
 }
 
 /** Job persist complete — returns object ref for server validation. */

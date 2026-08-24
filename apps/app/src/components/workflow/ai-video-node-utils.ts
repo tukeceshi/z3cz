@@ -15,6 +15,7 @@ import {
   isWorkflowMediaValue,
   mediaReferenceToWorkflowValue,
   type MediaReference,
+  type MediaResourceKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
@@ -39,6 +40,7 @@ import {
   type GenerativeCardCoverRead,
 } from "./generative-history-utils";
 import {
+  mapMediaResourceKinds,
   markResourceRefFailed,
   stripGeneratingFlag,
 } from "./generative-resource-ref-utils";
@@ -690,6 +692,44 @@ export function withAiVideoResourceGeneratingCleared(
     return video;
   });
   return withAiVideoResult(current, resultVideos, { inputs });
+}
+
+export function withAiVideoResourceKinds(
+  current: WorkflowNodeType,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): Partial<WorkflowNodeType> {
+  if (kindsById.size === 0) {
+    return {};
+  }
+
+  const history = readAiVideoResultHistory(current.inputs);
+  const nextHistory: AiVideoResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      videos: mapMediaResourceKinds(item.videos, kindsById),
+    })),
+  };
+  const historyChanged = nextHistory.items.some(
+    (item, index) => item.videos !== history.items[index]!.videos
+  );
+
+  let inputs = current.inputs;
+  if (historyChanged) {
+    inputs = upsertInputValue(
+      current.inputs,
+      AI_VIDEO_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+  }
+
+  const resultVideos = readAiVideoResult(inputs, current.outputs);
+  const nextResult = mapMediaResourceKinds(resultVideos, kindsById);
+  if (!historyChanged && nextResult === resultVideos) {
+    return {};
+  }
+  return withAiVideoResult(current, [...nextResult], { inputs });
 }
 
 export function withAiVideoHistorySelection(
