@@ -204,7 +204,6 @@ export interface WorkflowBuilderProps {
   validateConnection?: (connection: Connection) => boolean;
   mode?: WorkflowBuilderMode;
   createObjectUrl: (objectReference: ObjectReference) => string;
-  expandedOutputs?: boolean;
   workflowName?: string;
   workflowDescription?: string;
   onWorkflowUpdate?: (name: string, description?: string) => void;
@@ -243,7 +242,6 @@ export function WorkflowBuilder({
   validateConnection,
   mode = "edit",
   createObjectUrl,
-  expandedOutputs = false,
   workflowName,
   workflowDescription,
   onWorkflowUpdate,
@@ -335,7 +333,6 @@ export function WorkflowBuilder({
     updateNodeExecution,
     setReactFlowInstance,
     reactFlowInstance,
-    connectionValidationState,
     isValidConnection,
     updateNodeData,
     updateEdgeData,
@@ -772,7 +769,6 @@ export function WorkflowBuilder({
         soleSelectedNodeId={soleSelectedNodeId}
         isViewportMoving={isViewportMoving}
         disabled={readOnly}
-        expandedOutputs={expandedOutputs}
         nodeTypes={nodeTypes}
         allowedNodeTypes={allowedNodeTypes}
         workflowTrigger={workflowTrigger}
@@ -851,7 +847,6 @@ export function WorkflowBuilder({
                   canvasFileDropEnabled={!readOnly && interactive && !isCanvasFrozen}
                   onAddCanvasDropNodes={readOnly ? undefined : addGenerativeNodesBatch}
                   onSelectDroppedNodes={readOnly ? undefined : selectNodes}
-                  connectionValidationState={connectionValidationState}
                   onNodesChange={onNodesChange}
                   onEdgesChange={onEdgesChange}
                   onConnect={onConnect}
@@ -905,7 +900,6 @@ export function WorkflowBuilder({
                   }
                   suppressViewportPersistEndRef={suppressViewportPersistEndRef}
                   soleSelectedNodeId={soleSelectedNodeId}
-                  isViewportMoving={isViewportMoving}
                   addNodeMenu={addNodeMenu}
                   onAddNodeMenuSelect={
                     readOnly ? undefined : handleAddNodeMenuSelect

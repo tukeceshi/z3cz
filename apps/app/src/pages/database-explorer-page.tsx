@@ -19,6 +19,7 @@ import {
   useNodesState,
   useReactFlow,
 } from "@xyflow/react";
+import { WorkflowFlowAttribution } from "@/components/workflow/workflow-flow-attribution";
 import ArrowUp01 from "lucide-react/icons/arrow-up-0-1";
 import Asterisk from "lucide-react/icons/asterisk";
 import Hash from "lucide-react/icons/hash";
@@ -216,6 +217,7 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
       nodeTypes={nodeTypes}
       nodesConnectable={false}
       elementsSelectable={false}
+      proOptions={{ hideAttribution: true }}
       fitView
       fitViewOptions={{ padding: 0 }}
       minZoom={0.1}
@@ -223,6 +225,7 @@ function SchemaFlowCanvas({ tables }: SchemaFlowCanvasProps) {
     >
       <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       <Controls showInteractive={false} />
+      <WorkflowFlowAttribution />
     </ReactFlow>
   );
 }

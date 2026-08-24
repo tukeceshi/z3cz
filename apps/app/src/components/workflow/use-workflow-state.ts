@@ -22,7 +22,6 @@ import { useGraphPersistence } from "./use-graph-persistence";
 import { useLayout } from "./use-layout";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import type {
-  ConnectionValidationState,
   NodeExecutionUpdate,
   NodeType,
   WorkflowEdgeType,
@@ -65,7 +64,6 @@ interface UseWorkflowStateReturn {
     event: React.MouseEvent,
     node: ReactFlowNode<WorkflowNodeType>
   ) => void;
-  connectionValidationState: ConnectionValidationState;
   isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
   handleNodeSelect: (
     template: NodeType,

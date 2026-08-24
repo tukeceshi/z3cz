@@ -3173,7 +3173,7 @@ export const zh: TranslationDictionary = {
     aiCloudStorageBanner: {
       title: "请先为 AI 资源接入云存储后再用于正式工作",
       description:
-        "当前未接入云存储，图片与视频仅通过临时链接展示，约 1 小时后可能无法访问。请尽快下载，或依赖左下角本地暂存。",
+        "当前未接入云存储，图片与视频仅通过临时链接展示，约 1 小时后可能无法访问。请尽快下载，或依赖右下角本地暂存。",
       configure: "去配置云存储",
       autoFixing: {
         title: "正在尝试自动修复云存储",

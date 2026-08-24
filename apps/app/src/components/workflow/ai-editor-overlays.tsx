@@ -5,12 +5,8 @@ import {
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useState } from "react";
-import { useParams } from "react-router";
-
-import { useAuth } from "@/components/auth-context";
 
 import { AiCloudStorageBanner } from "./ai-cloud-storage-banner";
-import { AiMediaCacheBar } from "./ai-media-cache-panel";
 import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -19,9 +15,6 @@ interface AiEditorOverlaysProps {
 }
 
 export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
-  const { organization } = useAuth();
-  const { id: workflowId } = useParams<{ id: string }>();
-  const orgId = organization?.id;
   const {
     configured,
     blocksGenerativeMedia,
@@ -70,8 +63,6 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
     !unhealthyDismissed &&
     autoFixState !== "fixing_cors";
 
-  if (!orgId) return null;
-
   return (
     <>
       <AiCloudStorageBanner
@@ -95,12 +86,6 @@ export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
         reason={health?.reason}
         onDismiss={() => setUnhealthyDismissed(true)}
       />
-      <div className="absolute bottom-16 left-4 z-50 flex flex-col items-start gap-2">
-        <AiMediaCacheBar
-          organizationId={orgId}
-          currentWorkflowId={workflowId}
-        />
-      </div>
     </>
   );
 }

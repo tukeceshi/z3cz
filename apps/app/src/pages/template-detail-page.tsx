@@ -1,5 +1,4 @@
 import type { CreateWorkflowRequest } from "@dafthunk/types";
-import { ReactFlowProvider } from "@xyflow/react";
 import Import from "lucide-react/icons/import";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -142,20 +141,17 @@ function TemplateDetailPageContent() {
         )}
       </div>
       <div className="flex-1 min-h-0">
-        <ReactFlowProvider>
-          <WorkflowBuilder
-            workflowId={`template-${template.id}`}
-            workflowTrigger={template.trigger}
-            initialNodes={nodes}
-            initialEdges={edges}
-            nodeTypes={nodeTypes}
-            mode="readonly"
-            expandedOutputs={false}
-            createObjectUrl={() => ""}
-            orgId={orgId}
-            showSidebar={false}
-          />
-        </ReactFlowProvider>
+        <WorkflowBuilder
+          workflowId={`template-${template.id}`}
+          workflowTrigger={template.trigger}
+          initialNodes={nodes}
+          initialEdges={edges}
+          nodeTypes={nodeTypes}
+          mode="readonly"
+          createObjectUrl={() => ""}
+          orgId={orgId}
+          showSidebar={false}
+        />
       </div>
     </div>
   );

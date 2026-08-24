@@ -18,14 +18,11 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
-  Controls,
   Panel,
   ReactFlow,
-  useViewport,
 } from "@xyflow/react";
 import Bot from "lucide-react/icons/bot";
 import ClipboardPaste from "lucide-react/icons/clipboard-paste";
-import Clock from "lucide-react/icons/clock";
 import Copy from "lucide-react/icons/copy";
 import Image from "lucide-react/icons/image";
 import Maximize from "lucide-react/icons/maximize";
@@ -36,13 +33,16 @@ import Music from "lucide-react/icons/music";
 import Type from "lucide-react/icons/type";
 import Video from "lucide-react/icons/video";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import { ActionBarButton, ActionBarGroup } from "@/components/ui/action-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTranslation } from "@/components/locale-provider";
 import { cn, getModifierKey } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
+import { AiMediaCacheBar } from "./ai-media-cache-panel";
 import { CanvasFileDropPreview } from "./canvas-file-drop-preview";
 import {
   CanvasShortcutHintButton,
@@ -58,6 +58,7 @@ import { WorkflowNode } from "./workflow-node";
 import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
+import { WorkflowFlowAttribution } from "./workflow-flow-attribution";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
 import { useShiftSelectGate } from "./use-shift-select-gate";
 import {
@@ -67,7 +68,6 @@ import {
   WORKFLOW_MULTI_SELECTED_CLASS,
 } from "./workflow-canvas-styles";
 import type {
-  ConnectionValidationState,
   WorkflowEdgeType,
   WorkflowNodeType,
 } from "./workflow-types";
@@ -87,7 +87,6 @@ const actionBarButtonOutlineClassName =
 export interface WorkflowCanvasProps {
   nodes: ReactFlowNode<WorkflowNodeType>[];
   edges: ReactFlowEdge<WorkflowEdgeType>[];
-  connectionValidationState?: ConnectionValidationState;
   onNodesChange: OnNodesChange<ReactFlowNode<WorkflowNodeType>>;
   onEdgesChange: OnEdgesChange<ReactFlowEdge<WorkflowEdgeType>>;
   onConnect: OnConnect;
@@ -139,7 +138,6 @@ export interface WorkflowCanvasProps {
   onEditorViewportGestureEnd?: (viewport: Viewport) => void;
   suppressViewportPersistEndRef?: React.RefObject<boolean>;
   soleSelectedNodeId?: string | null;
-  isViewportMoving?: boolean;
   addNodeMenu?: WorkflowAddNodeMenuState | null;
   onAddNodeMenuSelect?: (
     nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio",
@@ -293,35 +291,6 @@ function QuickAddAiNodeButton({
   );
 }
 
-export function SetScheduleButton({
-  onClick,
-  disabled,
-  className = "",
-  text = "",
-  tooltip,
-}: {
-  onClick: (e: React.MouseEvent) => void;
-  disabled?: boolean;
-  className?: string;
-  text?: string;
-  tooltip?: string;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <ActionBarButton
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(actionBarButtonOutlineClassName, className)}
-      tooltipSide="bottom"
-      tooltip={tooltip ?? t("workflow.canvas.setSchedule")}
-    >
-      <Clock className="size-4!" />
-      {text}
-    </ActionBarButton>
-  );
-}
-
 function CopyButton({
   onClick,
   disabled,
@@ -465,7 +434,6 @@ export function WorkflowCanvas({
   onEditorViewportGestureEnd,
   suppressViewportPersistEndRef,
   soleSelectedNodeId = null,
-  isViewportMoving = false,
   addNodeMenu = null,
   onAddNodeMenuSelect,
   onCloseAddNodeMenu,
@@ -478,7 +446,8 @@ export function WorkflowCanvas({
   parked = false,
 }: WorkflowCanvasProps) {
   const { t } = useTranslation();
-  const { zoom } = useViewport();
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const newNodeToolbarRef = useRef<HTMLDivElement>(null);
   const operationsToolbarRef = useRef<HTMLDivElement>(null);
@@ -517,7 +486,6 @@ export function WorkflowCanvas({
     return baseNodes.map((node) => {
       const handleKeys = connectedKeysByNode.get(node.id) ?? [];
       const isHost = node.id === soleSelectedNodeId;
-      const nextMoving = isHost && isViewportMoving;
 
       return {
         ...node,
@@ -525,9 +493,6 @@ export function WorkflowCanvas({
           ...node.data,
           connectedHandleKeys: handleKeys,
           showBottomPanelHost: isHost,
-          ...(isHost
-            ? { viewportZoom: zoom, isViewportMoving: nextMoving }
-            : { viewportZoom: undefined, isViewportMoving: undefined }),
         },
       };
     });
@@ -536,9 +501,7 @@ export function WorkflowCanvas({
     displayNodes,
     nodes,
     isDraggingRef,
-    isViewportMoving,
     soleSelectedNodeId,
-    zoom,
   ]);
 
   const handleNodesChange = useCallback(
@@ -568,6 +531,7 @@ export function WorkflowCanvas({
         <ReactFlow
         nodes={renderNodes}
         edges={edges}
+        proOptions={{ hideAttribution: true }}
         onlyRenderVisibleElements={parked}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
@@ -624,19 +588,24 @@ export function WorkflowCanvas({
         zoomOnDoubleClick={showControls}
         preventScrolling={showControls}
       >
+        {showControls ? (
+          <WorkflowFlowAttribution
+            aiMediaCache={
+              !disabled && organization?.id ? (
+                <AiMediaCacheBar
+                  organizationId={organization.id}
+                  currentWorkflowId={workflowId}
+                />
+              ) : undefined
+            }
+          />
+        ) : null}
         {onEditorViewportChange && (
           <WorkflowViewportPersistenceListener
             disabled={disabled}
             onViewportChange={onEditorViewportChange}
             onViewportGestureEnd={onEditorViewportGestureEnd}
             suppressNextEndRef={suppressViewportPersistEndRef}
-          />
-        )}
-        {showControls && (
-          <Controls
-            showInteractive={false}
-            showZoom={false}
-            showFitView={false}
           />
         )}
         {showBackground && (

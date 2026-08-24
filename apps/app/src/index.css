@@ -258,14 +258,6 @@
   }
 }
 
-.react-flow__attribution {
-  @apply bg-muted! rounded-tl overflow-hidden ps-1.5! border-l border-t;
-}
-
-.react-flow__attribution a {
-  @apply text-muted-foreground!;
-}
-
 html.dark .shiki,
 html.dark .shiki span {
   color: var(--shiki-dark) !important;
@@ -592,9 +584,15 @@ html.dark .cm-content {
   color: #e0e0e0;
 }
 
-/* React Flow attribution restyled as a small pill button */
-.react-flow__attribution {
+/* Bottom-right React Flow attribution chip(s) */
+.workflow-flow-bottom-right {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
   margin: 6px !important;
+}
+
+.workflow-flow-attribution {
   padding: 2px 8px !important;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.85) !important;
@@ -603,28 +601,25 @@ html.dark .cm-content {
   backdrop-filter: blur(4px);
   font-size: 10px;
   line-height: 1.4;
-  transition: background-color 0.15s ease;
+  color: #666;
 }
 
-.react-flow__attribution:hover {
-  background: rgba(255, 255, 255, 1) !important;
+button.workflow-flow-attribution {
+  cursor: pointer;
 }
 
-.react-flow__attribution a {
-  color: #666 !important;
+button.workflow-flow-attribution:hover {
+  background: rgba(245, 245, 245, 0.95) !important;
 }
 
-html.dark .react-flow__attribution {
+html.dark .workflow-flow-attribution {
   background: rgba(30, 30, 30, 0.7) !important;
   border-color: rgba(255, 255, 255, 0.08);
+  color: #bbb;
 }
 
-html.dark .react-flow__attribution:hover {
-  background: rgba(30, 30, 30, 0.9) !important;
-}
-
-html.dark .react-flow__attribution a {
-  color: #bbb !important;
+html.dark button.workflow-flow-attribution:hover {
+  background: rgba(45, 45, 45, 0.85) !important;
 }
 
 html.dark .workflow-canvas {
