@@ -102,15 +102,35 @@ export function lazyRoute(
       return Promise.resolve(routeApp);
     }
 
-    routeLoad ??= loader().then((mod) => {
-      routeApp = mod.default;
-      return routeApp;
-    });
+    routeLoad ??= loader()
+      .then((mod) => {
+        routeApp = mod.default;
+        return routeApp;
+      })
+      .catch((error: unknown) => {
+        routeLoad = undefined;
+        throw error;
+      });
     return routeLoad;
   };
 
   const forward = async (c: Context<ApiContext>) => {
-    const sub = await resolveRoute();
+    let sub: Hono<ApiContext>;
+    try {
+      sub = await resolveRoute();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load route module";
+      return c.json(
+        {
+          error: message,
+          name: error instanceof Error ? error.name : undefined,
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        500
+      );
+    }
+
     let executionCtx: Parameters<Hono<ApiContext>["fetch"]>[2];
     try {
       executionCtx = c.executionCtx;

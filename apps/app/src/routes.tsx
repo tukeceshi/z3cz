@@ -44,6 +44,7 @@ import {
   IntegrationsPage,
   MembersPage,
   ModelCallsPage,
+  SeedanceVideoCheckPage,
   NotFoundPage,
   OrganizationAiInterfacesPage,
   ProfilePage,
@@ -432,6 +433,21 @@ export const routes: AppRouteObject[] = [
       </OrgLayout>
     ),
     handle: { head: createRouteHead("seo.routes.modelCalls") },
+  },
+  {
+    path: "/tools/seedance-video-check",
+    element: <OrgRedirect to="/org/:organizationId/tools/seedance-video-check" />,
+  },
+  {
+    path: "/org/:organizationId/tools/seedance-video-check",
+    element: (
+      <OrgLayout title="Tools">
+        <ProtectedRoute>
+          <SeedanceVideoCheckPage />
+        </ProtectedRoute>
+      </OrgLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.seedanceVideoCheck") },
   },
   {
     path: "/api-keys",

@@ -87,6 +87,7 @@ export * from "./types";
 export * from "./upstream-param-profile";
 export * from "./usage";
 export * from "./whatsapp";
+export * from "./seedance-video-check";
 export * from "./workflow-graph-patch";
 export * from "./workflow";
 export * from "./workflow-generative-defaults";
