@@ -9,6 +9,7 @@ import {
   hasDisplayableWorkflowMedia,
   isResourceIdReference,
   isWorkflowMediaValue,
+  type MediaResourceKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
@@ -33,6 +34,7 @@ import {
   type GenerativeCardCoverRead,
 } from "./generative-history-utils";
 import {
+  mapMediaResourceKinds,
   markResourceRefFailed,
   stripGeneratingFlag,
 } from "./generative-resource-ref-utils";
@@ -614,6 +616,44 @@ export function withAiAudioResourceGeneratingCleared(
     return audio;
   });
   return withAiAudioResult(current, resultAudios, { inputs });
+}
+
+export function withAiAudioResourceKinds(
+  current: WorkflowNodeType,
+  kindsById: ReadonlyMap<string, MediaResourceKind>
+): Partial<WorkflowNodeType> {
+  if (kindsById.size === 0) {
+    return {};
+  }
+
+  const history = readAiAudioResultHistory(current.inputs);
+  const nextHistory: AiAudioResultHistory = {
+    selectedId: history.selectedId,
+    items: history.items.map((item) => ({
+      ...item,
+      audios: mapMediaResourceKinds(item.audios, kindsById),
+    })),
+  };
+  const historyChanged = nextHistory.items.some(
+    (item, index) => item.audios !== history.items[index]!.audios
+  );
+
+  let inputs = current.inputs;
+  if (historyChanged) {
+    inputs = upsertInputValue(
+      current.inputs,
+      AI_AUDIO_HISTORY_INPUT_ID,
+      nextHistory,
+      "json"
+    );
+  }
+
+  const resultAudios = readAiAudioResult(inputs, current.outputs);
+  const nextResult = mapMediaResourceKinds(resultAudios, kindsById);
+  if (!historyChanged && nextResult === resultAudios) {
+    return {};
+  }
+  return withAiAudioResult(current, [...nextResult], { inputs });
 }
 
 export function withAiAudioHistorySelection(

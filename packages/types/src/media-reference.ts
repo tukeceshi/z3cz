@@ -1,3 +1,5 @@
+import type { MediaResourceKind } from "./media-resource-catalog";
+import { isMediaResourceKind } from "./media-resource-catalog";
 import type { ObjectReference } from "./workflow";
 
 /** Temporary upstream URL — used when org cloud storage is not configured. */
@@ -12,6 +14,8 @@ export interface EphemeralMediaReference {
 /** Workflow JSON — cloud/ephemeral resolved via media_resources catalog. */
 export interface ResourceIdReference {
   readonly resourceId: string;
+  /** Catalog storage kind. Missing kind is treated as unusable. */
+  readonly kind?: MediaResourceKind;
   readonly mimeType?: string;
   /** Full-text SHA-256 (hex) — pending or stable. */
   readonly contentSha256?: string;
@@ -114,13 +118,20 @@ export function isObjectReference(value: unknown): value is ObjectReference {
 export function isResourceIdReference(
   value: unknown
 ): value is ResourceIdReference {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as ResourceIdReference).resourceId === "string" &&
-    (value as ResourceIdReference).resourceId.length > 0 &&
-    !("kind" in value)
-  );
+  if (isEphemeralMediaReference(value)) {
+    return false;
+  }
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const record = value as ResourceIdReference;
+  if (typeof record.resourceId !== "string" || record.resourceId.length === 0) {
+    return false;
+  }
+  if (record.kind !== undefined && !isMediaResourceKind(record.kind)) {
+    return false;
+  }
+  return true;
 }
 
 export function isGeneratingResourceRef(value: unknown): boolean {
@@ -186,6 +197,11 @@ export function mediaReferenceToWorkflowValue(
   return {
     resourceId: getResourceId(ref),
     mimeType: ref.mimeType,
+    kind: isCloudObjectReference(ref)
+      ? "cloud"
+      : isEphemeralMediaReference(ref)
+        ? "ephemeral"
+        : "local",
   };
 }
 

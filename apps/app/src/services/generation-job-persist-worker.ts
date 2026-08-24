@@ -47,7 +47,7 @@ function resourceRefFromStaging(
   resourceId: string,
   mimeType: string
 ): ResourceIdReference {
-  return { resourceId, mimeType };
+  return { resourceId, mimeType, kind: "local" };
 }
 
 async function resolveExistingStagedRefs(

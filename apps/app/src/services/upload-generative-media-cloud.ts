@@ -163,7 +163,7 @@ export async function uploadBlobToCloudStorage(params: {
   }
 
   return {
-    workflow: { resourceId, mimeType: params.mimeType },
+    workflow: { resourceId, mimeType: params.mimeType, kind: "cloud" },
     object: presign.reference,
   };
 }
@@ -209,6 +209,7 @@ export async function uploadBlobToCloudWorkflow(params: {
     return {
       resourceId,
       mimeType: params.mimeType,
+      kind: "local",
       cloudUploadFailed: true,
     };
   }

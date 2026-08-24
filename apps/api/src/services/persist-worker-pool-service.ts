@@ -27,6 +27,7 @@ import {
 } from "../db/persist-worker-queries";
 import { generationJobs } from "../db/schema";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
+import { persistJobCloudMediaKinds } from "./persist-generating-node-content";
 import { registerMediaResourceTransitions } from "./media-resource-catalog-service";
 import { presignTosMediaUpload } from "./tos-media-presign";
 import {
@@ -314,6 +315,11 @@ export async function completePersistJobFromWorker(
         reference,
       })),
     });
+    try {
+      await persistJobCloudMediaKinds(env, succeeded, pendingMedia ?? []);
+    } catch {
+      // Catalog already transitioned; node JSON kind is aligned by client sync.
+    }
     await decrementPersistWorkerActiveJobs(db, params.workerId);
     await syncGenerationJobInvocation(db, succeeded);
     return succeeded;

@@ -7,7 +7,6 @@ import { DynamicIcon } from "lucide-react/dynamic.mjs";
 import BracesIcon from "lucide-react/icons/braces";
 import CalendarIcon from "lucide-react/icons/calendar";
 import CheckIcon from "lucide-react/icons/check";
-import CircleHelp from "lucide-react/icons/circle-help";
 import DatabaseIcon from "lucide-react/icons/database";
 import FileIcon from "lucide-react/icons/file";
 import FileTextIcon from "lucide-react/icons/file-text";
@@ -25,7 +24,6 @@ import VideoIcon from "lucide-react/icons/video";
 import { createElement, memo, useMemo, useState } from "react";
 import { useParams } from "react-router";
 
-import { NodeDocsDialog } from "@/components/docs/node-docs-dialog";
 import { useTranslation } from "@/components/locale-provider";
 import { useAuth } from "@/components/auth-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -282,7 +280,6 @@ export const WorkflowNode = memo(
       typeof data.viewportZoom === "number" ? data.viewportZoom : 1;
     const isViewportMovingCanvas = data.isViewportMoving === true;
     const isDragging = dragging;
-    const [isDocsOpen, setIsDocsOpen] = useState(false);
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [activeOutputId, setActiveOutputId] = useState<string | null>(null);
     const [emptyTextEditing, setEmptyTextEditing] = useState(false);
@@ -470,30 +467,6 @@ export const WorkflowNode = memo(
             <SubscriptionBadge variant="muted" size="sm" />
           )}
         </div>
-
-        {/* Docs button — absolute top-right, always visible, faded */}
-        <button
-          type="button"
-          className={cn(
-            "nodrag absolute -top-5 right-0 z-10 p-0.5 rounded-sm",
-            "text-muted-foreground/50 hover:text-muted-foreground",
-            "bg-card/40 backdrop-blur-sm"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!resolvedNodeType) return;
-            setIsDocsOpen(true);
-          }}
-          aria-label={t("workflow.node.openDocsAria")}
-          title={
-            resolvedNodeType
-              ? t("workflow.node.openDocs")
-              : t("workflow.node.docsUnavailable")
-          }
-          disabled={!resolvedNodeType}
-        >
-          <CircleHelp className="h-2.5 w-2.5" />
-        </button>
 
         <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode) && "inline-block")}>
         <div
@@ -740,14 +713,6 @@ export const WorkflowNode = memo(
               createObjectUrl={data.createObjectUrl}
             />
           </div>
-        ) : null}
-
-        {resolvedNodeType && isDocsOpen ? (
-          <NodeDocsDialog
-            nodeType={resolvedNodeType}
-            isOpen={isDocsOpen}
-            onOpenChange={setIsDocsOpen}
-          />
         ) : null}
 
         {activeInputId !== null ? (

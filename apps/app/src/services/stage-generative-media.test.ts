@@ -16,6 +16,7 @@ describe("cloudUploadToResourceId", () => {
     expect(cloudUploadToResourceId(object)).toEqual({
       resourceId: "019ffa10-6ffa-710d-8b3d-a6351f6be0bc",
       mimeType: "image/jpeg",
+      kind: "cloud",
     });
   });
 });

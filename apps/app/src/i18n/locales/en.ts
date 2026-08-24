@@ -3078,16 +3078,6 @@ export const en = {
       deleteFailed: "Failed to delete feedback",
       saveFailed: "Failed to save feedback",
     },
-    docs: {
-      required: "Required",
-      optional: "(optional)",
-      close: "Close",
-      documentation: "Documentation",
-      parameters: "Parameters",
-      inputsHeading: "Inputs ({{count}})",
-      outputsHeading: "Outputs ({{count}})",
-      viewReference: "View reference",
-    },
     httpTrigger: {
       integrate: "Integrate",
       title: "HTTP Trigger",
@@ -3220,9 +3210,6 @@ export const en = {
         "This change is not allowed while the workflow contains archived nodes.",
     },
     node: {
-      openDocs: "Open documentation",
-      docsUnavailable: "Documentation unavailable",
-      openDocsAria: "Open node documentation",
       editInput: "Edit Input",
       viewOutput: "View Output",
     },

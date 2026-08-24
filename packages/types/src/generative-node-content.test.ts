@@ -11,6 +11,7 @@ import {
   appendVideoGeneratingContent,
   buildGeneratingResourceRefs,
   mergeGenerativeNodeContentOnSave,
+  patchNodeMediaResourceKinds,
 } from "./generative-node-content";
 import type { Node } from "./workflow";
 
@@ -46,6 +47,7 @@ describe("appendImageGeneratingContent", () => {
       resourceId: "res-1",
       mimeType: "image/png",
       generating: true,
+      kind: "ephemeral",
     });
     expect(result?.[0]).toEqual(history.items[0]?.images[0]);
   });
@@ -90,6 +92,7 @@ describe("appendVideoGeneratingContent", () => {
       resourceId: "vid-1",
       mimeType: "video/mp4",
       generating: true,
+      kind: "ephemeral",
     });
   });
 });
@@ -97,8 +100,58 @@ describe("appendVideoGeneratingContent", () => {
 describe("buildGeneratingResourceRefs", () => {
   it("marks refs as generating", () => {
     expect(buildGeneratingResourceRefs(["a"], "image/png")).toEqual([
-      { resourceId: "a", mimeType: "image/png", generating: true },
+      { resourceId: "a", mimeType: "image/png", generating: true, kind: "ephemeral" },
     ]);
+  });
+});
+
+describe("patchNodeMediaResourceKinds", () => {
+  it("writes catalog kind onto matching image refs", () => {
+    const node = createImageNode([
+      {
+        name: "images_result",
+        type: "json",
+        value: [
+          {
+            resourceId: "res-1",
+            mimeType: "image/png",
+            generating: true,
+            kind: "ephemeral",
+          },
+        ],
+      },
+      {
+        name: "images_history",
+        type: "json",
+        value: {
+          selectedId: "gen-1",
+          items: [
+            {
+              id: "gen-1",
+              images: [
+                {
+                  resourceId: "res-1",
+                  mimeType: "image/png",
+                  generating: true,
+                  kind: "ephemeral",
+                },
+              ],
+              prompt: "",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const patch = patchNodeMediaResourceKinds(
+      node,
+      new Map([["res-1", "cloud"]])
+    );
+    expect(patch).not.toBeNull();
+    const result = patch!.inputs!.find((input) => input.name === "images_result")
+      ?.value as { kind?: string }[];
+    expect(result[0]?.kind).toBe("cloud");
   });
 });
 
