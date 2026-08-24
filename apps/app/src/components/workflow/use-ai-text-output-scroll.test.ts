@@ -35,6 +35,6 @@ describe("measureAutoTextareaHeight", () => {
     });
 
     expect(measureAutoTextareaHeight(textarea, scrollContainer)).toBe(150);
-    expect(textarea.style.height).toBe("120px");
+    expect(textarea.style.height).toBe("150px");
   });
 });

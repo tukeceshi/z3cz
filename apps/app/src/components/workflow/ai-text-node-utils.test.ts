@@ -12,6 +12,7 @@ import {
   mergeAiTextNodeCatalogInputs,
   readAiTextResult,
   readAiTextResultHistory,
+  readAiTextSessionBodySync,
   withAiTextEditedResult,
   withAiTextGeneratedResult,
   withAiTextManualResult,
@@ -187,5 +188,20 @@ describe("ai-text-node-utils editing behavior", () => {
       "一"
     );
     expect(isAiTextAwaitingStream(firstToken.metadata)).toBe(false);
+  });
+
+  it("reads session body without distinguishing fullwidth table pipes", () => {
+    const node = createTextNode({
+      outputs: [
+        {
+          id: AI_TEXT_BODY_OUTPUT_ID,
+          name: "textBody",
+          type: "string",
+          value: "| 镜头｜时间线 |\n| --- | --- |",
+        },
+      ],
+    });
+
+    expect(readAiTextSessionBodySync(node)).toBe("| 镜头|时间线 |\n| --- | --- |");
   });
 });

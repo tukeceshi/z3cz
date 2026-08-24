@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
 import { useCreativeStudio } from "./creative-studio-context";
-import { CreativeStudioDetailContent } from "./creative-studio-detail-content";
+import {
+  CreativeStudioDetailContent,
+  type StudioTextEditHeaderState,
+} from "./creative-studio-detail-content";
 import { CreativeStudioEditableTitle } from "./creative-studio-editable-title";
 import {
   STUDIO_DETAIL_CARD,
@@ -33,19 +36,49 @@ export function CreativeStudioDetailView({
   const { t } = useTranslation();
   const { returnToCanvasFromDetail, closeSecondaryDetail } = useCreativeStudio();
   const [emptyTextEditing, setEmptyTextEditing] = useState(false);
+  const [textEditHeader, setTextEditHeader] =
+    useState<StudioTextEditHeaderState | null>(null);
   const showBottomPanel =
     shouldShowGenerativeBottomPanel(node.data.metadata) && !emptyTextEditing;
   const isPrimary = role === "primary";
 
   useEffect(() => {
     setEmptyTextEditing(false);
+    setTextEditHeader(null);
   }, [node.id]);
+
+  const editHeaderChipClass =
+    "rounded-md border border-border/30 bg-background/40 px-3 py-1 text-sm text-muted-foreground/50 backdrop-blur-sm dark:bg-neutral-900/40";
+  const editHeaderControl = textEditHeader ? (
+    textEditHeader.isEditing ? (
+      <button
+        type="button"
+        className={editHeaderChipClass}
+        onClick={textEditHeader.onExit}
+      >
+        {t("workflow.studio.exitEdit")}
+      </button>
+    ) : textEditHeader.showHint ? (
+      <span className={editHeaderChipClass}>
+        {t("workflow.aiTextPanel.cardDoubleClickInput")}
+      </span>
+    ) : null
+  ) : null;
+  const editHeaderSlot = editHeaderControl ? (
+    <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex -translate-x-1/2 items-center">
+      <div
+        className={textEditHeader?.isEditing ? "pointer-events-auto" : undefined}
+      >
+        {editHeaderControl}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", STUDIO_SHELL)}>
       <div className={STUDIO_DETAIL_CARD}>
         {isPrimary ? (
-          <header className={cn(STUDIO_PANEL_HEADER, "gap-2")}>
+          <header className={cn(STUDIO_PANEL_HEADER, "relative gap-2")}>
             <Button
               type="button"
               variant="ghost"
@@ -57,6 +90,7 @@ export function CreativeStudioDetailView({
               {t("workflow.studio.backToCanvas")}
             </Button>
             <CreativeStudioEditableTitle node={node} />
+            {editHeaderSlot}
             <Button
               type="button"
               variant="ghost"
@@ -68,8 +102,9 @@ export function CreativeStudioDetailView({
             </Button>
           </header>
         ) : (
-          <header className="flex h-11 shrink-0 items-center gap-2 px-4 py-3">
+          <header className="relative flex h-11 shrink-0 items-center gap-2 px-4 py-3">
             <CreativeStudioEditableTitle node={node} />
+            {editHeaderSlot}
             <Button
               type="button"
               variant="ghost"
@@ -86,6 +121,7 @@ export function CreativeStudioDetailView({
           <CreativeStudioDetailContent
             node={node}
             onEmptyTextEditingChange={setEmptyTextEditing}
+            onTextEditHeaderChange={setTextEditHeader}
           />
         </div>
 

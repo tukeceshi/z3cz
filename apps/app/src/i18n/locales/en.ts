@@ -2956,6 +2956,7 @@ export const en = {
       canvas: "Canvas",
       enter: "Open in Studio",
       backToCanvas: "Back to canvas",
+      exitEdit: "Exit editing",
       back: "Back",
       edit: "Edit",
       expand: "Expand list",
@@ -3281,7 +3282,7 @@ export const en = {
       outputTitle: "Output",
       outputPlaceholder: "Generated text appears here…",
       cardInputPlaceholder: "Double-click to enter text…",
-      cardDoubleClickInput: "Double-click to enter text",
+      cardDoubleClickInput: "Double-click to edit",
       cardUploadAction: "Upload file",
       cardUploadFileTypes: "Supports {{types}}",
       cardUploadReplaceNotAllowed:

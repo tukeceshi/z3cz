@@ -162,7 +162,7 @@ export const STUDIO_MEDIA_CARD_FOOTER = "flex flex-col gap-0.5";
 
 /** Studio text detail body — shared by browse and edit (single textarea). */
 export const STUDIO_TEXT_DETAIL_BODY =
-  "block w-full min-h-full resize-none overflow-hidden rounded-lg border-0 bg-transparent p-3 text-base leading-relaxed text-foreground/90 shadow-none focus-visible:border-0 focus-visible:ring-0";
+  "block w-full min-h-0 resize-none overflow-hidden rounded-lg border-0 bg-transparent p-3 text-base leading-relaxed text-foreground/90 shadow-none focus-visible:border-0 focus-visible:ring-0";
 
 export const STUDIO_TEXT_DETAIL_EDIT_OVERLAY =
   "pointer-events-none absolute inset-0 rounded-lg bg-muted/40 ring-1 ring-inset ring-border/70 dark:bg-neutral-900/50 dark:ring-neutral-600";

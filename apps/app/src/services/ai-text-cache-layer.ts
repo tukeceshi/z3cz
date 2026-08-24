@@ -2,6 +2,7 @@ import type { WorkflowMediaValue } from "@dafthunk/types";
 import { buildAiTextExcerpt, getResourceIdFromValue } from "@dafthunk/types";
 
 import type { AiTextStagingDisplayState } from "@/components/workflow/ai-text-staging-display-state";
+import { normalizeTableMarkdownForDisplay } from "@/components/workflow/normalize-table-markdown-for-display";
 import { ensureAiTextCached } from "@/services/ensure-ai-text-cached";
 import {
   getAiTextDisplay,
@@ -71,7 +72,10 @@ export async function readAiTextFullBodyFromStaging(
     value: params.reference,
   });
 
-  return body?.trim() ? body : null;
+  if (!body?.trim()) {
+    return null;
+  }
+  return normalizeTableMarkdownForDisplay(body);
 }
 
 /**
@@ -100,7 +104,9 @@ export async function readyAiTextStaging(
     workflowId: params.workflowId,
     value: params.reference,
   });
-  const trimmed = body?.trim() ? body : "";
+  const trimmed = body?.trim()
+    ? normalizeTableMarkdownForDisplay(body)
+    : "";
 
   if (trimmed) {
     hangAiTextExcerptFromKnownText({ ...params, body: trimmed });

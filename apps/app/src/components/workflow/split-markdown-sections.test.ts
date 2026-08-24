@@ -167,7 +167,7 @@ describe("splitMarkdownSections", () => {
     expect(sectionHeadingDisplayText(markdown, parts[0])).toBe("## Alpha");
   });
 
-  it("keeps title and body split only when browsing", () => {
+  it("keeps title and body split in browse and edit", () => {
     const markdown = ["## Alpha", "body"].join("\n");
     const parts = splitMarkdownSections(markdown);
     expect(parts[0]?.type).toBe("section");
@@ -175,11 +175,9 @@ describe("splitMarkdownSections", () => {
       return;
     }
 
-    expect(sectionContentRanges(parts[0], true).map((range) => range.key)).toEqual(
-      ["heading", "body"]
-    );
-    expect(sectionContentRanges(parts[0], false)).toEqual([
-      { key: "content", start: parts[0].headingStart, end: parts[0].bodyEnd },
+    expect(sectionContentRanges(parts[0]).map((range) => range.key)).toEqual([
+      "heading",
+      "body",
     ]);
   });
 });
