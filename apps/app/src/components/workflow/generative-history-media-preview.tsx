@@ -7,7 +7,17 @@ import {
   type MediaReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
@@ -18,6 +28,13 @@ import {
   fitGenerativeHistoryPreviewPlaceholder,
   fitGenerativeHistoryPreviewSize,
 } from "./fit-generative-history-preview-size";
+import {
+  StudioImagePhotoProvider,
+  StudioImageZoomHiddenTrigger,
+  studioImagePreviewZoomClassName,
+  useStudioImageZoomTrigger,
+} from "./studio-image-lightbox";
+import { StudioVideoLightbox } from "./studio-video-lightbox";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 const WorkflowMediaAudioPlayer = lazy(() =>
@@ -79,11 +96,17 @@ function GenerativeHistoryMediaFrame({
   naturalSize,
   videoSurface = false,
   className,
+  zoomEnabled = false,
+  onZoomClick,
+  onZoomDoubleClick,
   children,
 }: {
   readonly naturalSize: MediaIntrinsicSize | null;
   readonly videoSurface?: boolean;
   readonly className?: string;
+  readonly zoomEnabled?: boolean;
+  readonly onZoomClick?: (event: MouseEvent<HTMLDivElement>) => void;
+  readonly onZoomDoubleClick?: (event: MouseEvent<HTMLDivElement>) => void;
   readonly children: ReactNode;
 }) {
   const { containerRef, containerWidth } = useGenerativeHistoryPreviewBounds();
@@ -108,12 +131,15 @@ function GenerativeHistoryMediaFrame({
         <div
           className={cn(
             "relative shrink-0 overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700",
-            videoSurface ? "bg-neutral-950 dark:bg-black" : undefined
+            videoSurface ? "bg-neutral-950 dark:bg-black" : undefined,
+            studioImagePreviewZoomClassName(zoomEnabled)
           )}
           style={{
             width: displaySize.width,
             height: displaySize.height,
           }}
+          onClick={zoomEnabled ? onZoomClick : undefined}
+          onDoubleClick={zoomEnabled ? onZoomDoubleClick : undefined}
         >
           {children}
         </div>
@@ -145,10 +171,12 @@ function GenerativeHistoryPreviewLoading({
 export function GenerativeHistoryImagePreview({
   value,
   className,
+  onLightboxOpenChange,
 }: {
   readonly value: MediaReference | WorkflowMediaValue;
   readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
   readonly className?: string;
+  readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const generating = isGeneratingResourceRef(value);
@@ -164,6 +192,11 @@ export function GenerativeHistoryImagePreview({
   });
   const [imgError, setImgError] = useState(false);
   const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(null);
+  const {
+    triggerRef,
+    handlePreviewClick,
+    handlePreviewDoubleClick,
+  } = useStudioImageZoomTrigger();
 
   useEffect(() => {
     setImgError(false);
@@ -208,32 +241,43 @@ export function GenerativeHistoryImagePreview({
   }
 
   return (
-    <GenerativeHistoryMediaFrame naturalSize={naturalSize} className={className}>
-      <img
-        src={displayUrl}
-        alt=""
-        decoding="async"
-        className="size-full select-none object-cover"
-        onLoad={(event) => {
-          setNaturalSize(
-            readMediaIntrinsicSize(
-              event.currentTarget.naturalWidth,
-              event.currentTarget.naturalHeight
-            )
-          );
-        }}
-        onError={() => setImgError(true)}
-      />
-    </GenerativeHistoryMediaFrame>
+    <StudioImagePhotoProvider onLightboxOpenChange={onLightboxOpenChange}>
+      <StudioImageZoomHiddenTrigger src={displayUrl} triggerRef={triggerRef} />
+      <GenerativeHistoryMediaFrame
+        naturalSize={naturalSize}
+        className={className}
+        zoomEnabled
+        onZoomClick={(event) => handlePreviewClick(event, true)}
+        onZoomDoubleClick={handlePreviewDoubleClick}
+      >
+        <img
+          src={displayUrl}
+          alt=""
+          decoding="async"
+          className="pointer-events-none size-full select-none object-cover"
+          onLoad={(event) => {
+            setNaturalSize(
+              readMediaIntrinsicSize(
+                event.currentTarget.naturalWidth,
+                event.currentTarget.naturalHeight
+              )
+            );
+          }}
+          onError={() => setImgError(true)}
+        />
+      </GenerativeHistoryMediaFrame>
+    </StudioImagePhotoProvider>
   );
 }
 
 export function GenerativeHistoryVideoPreview({
   value,
   className,
+  onLightboxOpenChange,
 }: {
   readonly value: MediaReference;
   readonly className?: string;
+  readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const mediaKey = getResourceIdFromValue(value) ?? "video";
@@ -244,15 +288,31 @@ export function GenerativeHistoryVideoPreview({
   });
   const [mediaError, setMediaError] = useState(false);
   const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(null);
+  const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
 
   useEffect(() => {
     setMediaError(false);
     setNaturalSize(null);
+    setVideoLightboxOpen(false);
   }, [mediaKey]);
+
+  useEffect(() => {
+    onLightboxOpenChange?.(false);
+  }, [mediaKey, onLightboxOpenChange]);
 
   const handleLoadedMetadata = useCallback((video: HTMLVideoElement) => {
     setNaturalSize(readMediaIntrinsicSize(video.videoWidth, video.videoHeight));
   }, []);
+
+  const handleOpenVideoLightbox = useCallback(() => {
+    setVideoLightboxOpen(true);
+    onLightboxOpenChange?.(true);
+  }, [onLightboxOpenChange]);
+
+  const handleCloseVideoLightbox = useCallback(() => {
+    setVideoLightboxOpen(false);
+    onLightboxOpenChange?.(false);
+  }, [onLightboxOpenChange]);
 
   if (phase === "loading") {
     return (
@@ -277,21 +337,34 @@ export function GenerativeHistoryVideoPreview({
   }
 
   return (
-    <GenerativeHistoryMediaFrame
-      naturalSize={naturalSize}
-      videoSurface
-      className={className}
-    >
-      <WorkflowMediaVideoPlayer
-        key={mediaKey}
+    <>
+      <GenerativeHistoryMediaFrame
+        naturalSize={naturalSize}
+        videoSurface
+        className={className}
+        zoomEnabled
+        onZoomClick={(event) => {
+          event.stopPropagation();
+          handleOpenVideoLightbox();
+        }}
+      >
+        <WorkflowMediaVideoPlayer
+          key={mediaKey}
+          src={displayUrl}
+          className="size-full"
+          objectFit="cover"
+          variant="card"
+          onLoadedMetadata={handleLoadedMetadata}
+          onExpandView={handleOpenVideoLightbox}
+          onError={() => setMediaError(true)}
+        />
+      </GenerativeHistoryMediaFrame>
+      <StudioVideoLightbox
+        open={videoLightboxOpen}
         src={displayUrl}
-        className="size-full"
-        objectFit="cover"
-        variant="card"
-        onLoadedMetadata={handleLoadedMetadata}
-        onError={() => setMediaError(true)}
+        onClose={handleCloseVideoLightbox}
       />
-    </GenerativeHistoryMediaFrame>
+    </>
   );
 }
 
@@ -355,11 +428,13 @@ export function GenerativeHistoryMediaPreview({
   value,
   createObjectUrl,
   className,
+  onLightboxOpenChange,
 }: {
   readonly mediaKind: GenerativeHistoryMediaKind;
   readonly value: MediaReference | WorkflowMediaValue;
   readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
   readonly className?: string;
+  readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
   const mediaKey = getResourceIdFromValue(value) ?? "media";
 
@@ -369,6 +444,7 @@ export function GenerativeHistoryMediaPreview({
         key={mediaKey}
         value={value}
         className={className}
+        onLightboxOpenChange={onLightboxOpenChange}
       />
     );
   }
@@ -387,6 +463,7 @@ export function GenerativeHistoryMediaPreview({
       value={value}
       createObjectUrl={createObjectUrl}
       className={className}
+      onLightboxOpenChange={onLightboxOpenChange}
     />
   );
 }

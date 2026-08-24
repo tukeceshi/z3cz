@@ -299,12 +299,15 @@ function StudioImageZoomToolbar({
 
 function StudioImagePhotoProviderContent({
   children,
+  onLightboxOpenChange,
 }: {
   readonly children: ReactNode;
+  readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
   return (
     <PhotoProvider
       maskOpacity={0.88}
+      onVisibleChange={(visible) => onLightboxOpenChange?.(visible)}
       toolbarRender={({ scale, onScale, visible }) => (
         <StudioImageZoomToolbar
           scale={scale}
@@ -320,8 +323,10 @@ function StudioImagePhotoProviderContent({
 
 export function StudioImagePhotoProvider({
   children,
+  onLightboxOpenChange,
 }: {
   readonly children: ReactNode;
+  readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
   const [naturalSize, setNaturalSize] = useState<ImageNaturalSize | null>(null);
 
@@ -329,7 +334,9 @@ export function StudioImagePhotoProvider({
     <StudioImageZoomMetricsContext.Provider
       value={{ naturalSize, setNaturalSize }}
     >
-      <StudioImagePhotoProviderContent>{children}</StudioImagePhotoProviderContent>
+      <StudioImagePhotoProviderContent onLightboxOpenChange={onLightboxOpenChange}>
+        {children}
+      </StudioImagePhotoProviderContent>
     </StudioImageZoomMetricsContext.Provider>
   );
 }

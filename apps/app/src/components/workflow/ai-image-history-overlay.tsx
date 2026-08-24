@@ -75,6 +75,7 @@ export function AiImageHistoryOverlay({
         : matchingCurrent[0]?.id ?? history.selectedId;
 
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [mediaLightboxOpen, setMediaLightboxOpen] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
   const [listScrollRoot, setListScrollRoot] = useState<HTMLElement | null>(null);
 
@@ -87,18 +88,27 @@ export function AiImageHistoryOverlay({
   }, [open, history.items.length]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setMediaLightboxOpen(false);
+      return;
+    }
     setPreviewId(derivedCurrentId ?? history.items[0]?.id ?? null);
   }, [open, derivedCurrentId, history.items]);
 
   useEffect(() => {
     if (!open) return;
+    setMediaLightboxOpen(false);
+  }, [open, previewId]);
+
+  useEffect(() => {
+    if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape" || mediaLightboxOpen) return;
+      onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, mediaLightboxOpen]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -284,6 +294,7 @@ export function AiImageHistoryOverlay({
                   mediaKind={mediaKind}
                   value={previewMedia}
                   createObjectUrl={createObjectUrl}
+                  onLightboxOpenChange={setMediaLightboxOpen}
                 />
               </div>
             ) : (
