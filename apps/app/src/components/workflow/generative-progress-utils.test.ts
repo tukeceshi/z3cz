@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   clearGenerativeProgress,
+  formatGenerativeBusyOverlayLabel,
+  formatGenerativePhaseLabel,
   formatGenerativeProgressElapsed,
   isGenerativePersistPhase,
   isGenerativePhaseCancellable,
+  readGenerativeDownloadPercent,
   readGenerativeProgressJobId,
   readGenerativeProgressPhase,
   readGenerativeProgressStartedAt,
@@ -37,6 +40,76 @@ describe("generative-progress-utils", () => {
     expect(readGenerativeProgressPhase(cleared)).toBeUndefined();
     expect(readGenerativeProgressStartedAt(cleared)).toBeUndefined();
     expect(readGenerativeStagingMediaIds(cleared)).toEqual([]);
+    expect(readGenerativeDownloadPercent(cleared)).toBeUndefined();
+  });
+
+  it("stores and clears download percent during downloading", () => {
+    const withPercent = withGenerativeProgress(undefined, {
+      phase: "downloading",
+      downloadPercent: 42,
+    });
+    expect(readGenerativeDownloadPercent(withPercent)).toBe(42);
+
+    const uploading = withGenerativeProgress(withPercent, { phase: "uploading" });
+    expect(readGenerativeDownloadPercent(uploading)).toBeUndefined();
+
+    const clearedPercent = withGenerativeProgress(withPercent, {
+      downloadPercent: null,
+    });
+    expect(readGenerativeDownloadPercent(clearedPercent)).toBeUndefined();
+  });
+
+  it("formats downloading labels with percent when available", () => {
+    const t = (key: string, values?: Record<string, string | number>) => {
+      if (key.endsWith("Percent")) {
+        return `${values?.percent ?? ""}%`;
+      }
+      return key;
+    };
+
+    expect(
+      formatGenerativePhaseLabel({
+        phase: "downloading",
+        progressKey: "workflow.aiImagePanel.cardDownloading",
+        metadata: { genDownloadPercent: "37" },
+        t,
+      })
+    ).toBe("37%");
+
+    expect(
+      formatGenerativePhaseLabel({
+        phase: "downloading",
+        progressKey: "workflow.aiImagePanel.cardDownloading",
+        metadata: undefined,
+        t,
+      })
+    ).toBe("workflow.aiImagePanel.cardDownloading");
+  });
+
+  it("shows download percent without elapsed time in busy overlay", () => {
+    const t = (key: string, values?: Record<string, string | number>) => {
+      if (key.endsWith("Percent")) {
+        return `downloading ${values?.percent ?? ""}%`;
+      }
+      if (key.endsWith("progressWithElapsed")) {
+        return `${values?.label} · ${values?.elapsed}`;
+      }
+      return key;
+    };
+
+    expect(
+      formatGenerativeBusyOverlayLabel({
+        phase: "downloading",
+        progressButtonKey: () => "workflow.aiImagePanel.persistDownloading",
+        i18nPrefix: "workflow.aiImagePanel",
+        metadata: {
+          genDownloadPercent: "55",
+          genProgressStartedAt: "1",
+        },
+        progressNowMs: 60_000,
+        t,
+      })
+    ).toBe("downloading 55%");
   });
 
   it("preserves startedAt across phase updates", () => {

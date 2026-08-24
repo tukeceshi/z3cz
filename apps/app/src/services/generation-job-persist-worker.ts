@@ -14,6 +14,7 @@ import {
 
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
+import { fetchBlobWithProgress } from "@/services/fetch-blob-with-progress";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
@@ -68,6 +69,7 @@ async function downloadToAiStaging(params: {
   readonly workflowId?: string;
   readonly item: GenerationJobPendingMedia;
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
+  readonly onDownloadProgress?: (percent: number) => void;
 }): Promise<ResourceIdReference> {
   params.onPhase?.("downloading");
 
@@ -76,12 +78,11 @@ async function downloadToAiStaging(params: {
     params.item.sourceUrl,
     params.item.mimeType
   );
-  const response = await fetch(fetchUrl, { credentials: "include" });
-  if (!response.ok) {
-    throw new Error(`Failed to download generated media (${response.status})`);
-  }
-
-  const blob = await response.blob();
+  const blob = await fetchBlobWithProgress(
+    fetchUrl,
+    { credentials: "include" },
+    params.onDownloadProgress
+  );
   const mimeType =
     params.item.mimeType ||
     blob.type ||
@@ -208,6 +209,7 @@ export async function runGenerationJobPersistWorker(params: {
   readonly stagingMediaIds?: readonly string[];
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+  readonly onDownloadProgress?: (percent: number) => void;
   readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly WorkflowMediaValue[]> {
@@ -294,6 +296,7 @@ export async function runGenerationJobPersistWorker(params: {
           workflowId: params.workflowId,
           item: pendingMedia[index]!,
           onPhase: params.onPhase,
+          onDownloadProgress: params.onDownloadProgress,
         });
         params.onStaged?.(
           stagedRefs.filter((ref): ref is ResourceIdReference => Boolean(ref))

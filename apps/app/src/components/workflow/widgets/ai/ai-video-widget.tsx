@@ -17,6 +17,7 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
+import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
 import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
@@ -164,12 +165,15 @@ function AiVideoWidget({
   const handleDismissCancelledNotice = useCallback(() => {
     dismissGenerativeCancelledNotice(nodeId);
   }, [nodeId]);
-  const cardPlaceholder = t(
-    generativeCardProgressKey(
+  const cardPlaceholder = formatGenerativePhaseLabel({
+    phase: progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
+    progressKey: generativeCardProgressKey(
       progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
       "video"
-    )
-  );
+    ),
+    metadata,
+    t,
+  });
   const coverVideo = cardDisplay.coverMedia[0];
   const hasVideo = cardDisplay.hasCover;
   const activeVideoExpired = hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;

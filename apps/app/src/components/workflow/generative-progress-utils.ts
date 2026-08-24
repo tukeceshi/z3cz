@@ -11,6 +11,7 @@ const GENERATIVE_JOB_ID_META_KEY = "genJobId";
 const GENERATIVE_PROGRESS_PHASE_META_KEY = "genProgressPhase";
 const GENERATIVE_STAGING_MEDIA_IDS_META_KEY = "genStagingMediaIds";
 const GENERATIVE_PROGRESS_STARTED_AT_META_KEY = "genProgressStartedAt";
+const GENERATIVE_DOWNLOAD_PERCENT_META_KEY = "genDownloadPercent";
 
 const PROGRESS_PHASES = new Set<string>([
   "queued",
@@ -60,12 +61,45 @@ export function readGenerativeStagingMediaIds(
   return raw.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
 
+export function readGenerativeDownloadPercent(
+  metadata: Record<string, string> | undefined
+): number | undefined {
+  const raw = metadata?.[GENERATIVE_DOWNLOAD_PERCENT_META_KEY]?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    return undefined;
+  }
+  return Math.round(parsed);
+}
+
+export function formatGenerativePhaseLabel(params: {
+  readonly phase: GenerativeProgressPhase | null;
+  readonly progressKey: string;
+  readonly metadata: Record<string, string> | undefined;
+  readonly t: (
+    key: string,
+    values?: Record<string, string | number>
+  ) => string;
+}): string {
+  if (params.phase === "downloading") {
+    const percent = readGenerativeDownloadPercent(params.metadata);
+    if (percent !== undefined) {
+      return params.t(`${params.progressKey}Percent`, { percent });
+    }
+  }
+  return params.t(params.progressKey);
+}
+
 export function withGenerativeProgress(
   metadata: Record<string, string> | undefined,
   params: {
     readonly jobId?: string | null;
     readonly phase?: GenerativeProgressPhase | null;
     readonly stagingMediaIds?: readonly string[] | null;
+    readonly downloadPercent?: number | null;
   }
 ): Record<string, string> | undefined {
   const next = { ...(metadata ?? {}) };
@@ -79,10 +113,14 @@ export function withGenerativeProgress(
   if (params.phase === null) {
     delete next[GENERATIVE_PROGRESS_PHASE_META_KEY];
     delete next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY];
+    delete next[GENERATIVE_DOWNLOAD_PERCENT_META_KEY];
   } else if (params.phase) {
     next[GENERATIVE_PROGRESS_PHASE_META_KEY] = params.phase;
     if (!next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY]) {
       next[GENERATIVE_PROGRESS_STARTED_AT_META_KEY] = String(Date.now());
+    }
+    if (params.phase !== "downloading") {
+      delete next[GENERATIVE_DOWNLOAD_PERCENT_META_KEY];
     }
   }
 
@@ -90,6 +128,12 @@ export function withGenerativeProgress(
     delete next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY];
   } else if (params.stagingMediaIds && params.stagingMediaIds.length > 0) {
     next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY] = params.stagingMediaIds.join(",");
+  }
+
+  if (params.downloadPercent === null) {
+    delete next[GENERATIVE_DOWNLOAD_PERCENT_META_KEY];
+  } else if (params.downloadPercent !== undefined) {
+    next[GENERATIVE_DOWNLOAD_PERCENT_META_KEY] = String(params.downloadPercent);
   }
 
   return Object.keys(next).length > 0 ? next : undefined;
@@ -315,7 +359,16 @@ export function formatGenerativeBusyOverlayLabel(params: {
   if (params.phase === "cancelling" || params.phase === "cancelled") {
     return params.t(params.progressButtonKey(params.phase));
   }
-  const base = params.t(params.progressButtonKey(params.phase));
+
+  const progressKey = params.progressButtonKey(params.phase);
+  if (params.phase === "downloading") {
+    const percent = readGenerativeDownloadPercent(params.metadata);
+    if (percent !== undefined) {
+      return params.t(`${progressKey}Percent`, { percent });
+    }
+  }
+
+  const base = params.t(progressKey);
   const startedAt = readGenerativeProgressStartedAt(params.metadata);
   if (!startedAt) {
     return base;

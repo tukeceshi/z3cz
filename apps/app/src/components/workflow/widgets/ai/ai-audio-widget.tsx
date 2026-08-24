@@ -17,6 +17,7 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
 import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
+import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
@@ -146,12 +147,15 @@ function AiAudioWidget({
     updateNodeData,
   });
   const generateError = readGenerativeCardError(metadata);
-  const cardPlaceholder = t(
-    generativeCardProgressKey(
+  const cardPlaceholder = formatGenerativePhaseLabel({
+    phase: progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
+    progressKey: generativeCardProgressKey(
       progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
       "audio"
-    )
-  );
+    ),
+    metadata,
+    t,
+  });
   const coverAudio = cardDisplay.coverMedia[0];
   const hasAudio = cardDisplay.hasCover;
   const activeAudioExpired = hasAudio && coverAudio ? isMediaExpired(coverAudio) : false;

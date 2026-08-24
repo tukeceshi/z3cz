@@ -13,6 +13,7 @@ export async function resolveCloudGenerationJobMedia(params: {
   readonly stagingMediaIds?: readonly string[];
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+  readonly onDownloadProgress?: (percent: number) => void;
   readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<readonly WorkflowMediaValue[]> {
@@ -23,6 +24,7 @@ export async function resolveCloudGenerationJobMedia(params: {
     stagingMediaIds: params.stagingMediaIds,
     onPhase: params.onPhase,
     onProgressPhase: params.onProgressPhase,
+    onDownloadProgress: params.onDownloadProgress,
     onStaged: params.onStaged,
     shouldAbortJobPoll: params.shouldAbortJobPoll,
   });
