@@ -28,13 +28,10 @@ import {
 } from "./ai-video-node-utils";
 import {
   GENERATIVE_EDGE_HANDLE_HIT_PX,
-  GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
-  GENERATIVE_EDGE_PLUS_OUTER_PX,
   GENERATIVE_EDGE_PLUS_PX,
-  GENERATIVE_EDGE_SHELL_W_PX,
+  generativeEdgeColumnStyle,
+  generativeEdgePlusLeft,
 } from "./generative-edge-connection-config";
-
-const HANDLE_RF_Y_OFFSET_PX = GENERATIVE_EDGE_HANDLE_HIT_PX / 2;
 
 const PLUS_Y_MAX_PX =
   GENERATIVE_EDGE_HANDLE_HIT_PX / 2 - GENERATIVE_EDGE_PLUS_PX / 2;
@@ -44,10 +41,20 @@ const interactionClass = "nodrag nopan nowheel cursor-default";
 const hitHandleClass = cn(
   interactionClass,
   "!absolute !z-50",
-  "!min-h-0 !min-w-0",
+  "!left-0 !top-0 !right-auto !h-full !w-full",
+  "!min-h-0 !min-w-0 !transform-none",
   "!overflow-visible !rounded-none !border-0 !bg-transparent !p-0 !shadow-none",
   "!opacity-0"
 );
+
+const handleStyle = {
+  left: 0,
+  right: "auto",
+  top: 0,
+  width: "100%",
+  height: "100%",
+  transform: "none",
+} as const;
 
 export type GenerativeEdgeModality = "text" | "image" | "video" | "audio";
 
@@ -120,8 +127,7 @@ interface GenerativeEdgeSideProps {
 }
 
 /**
- * Full-height edge column blocks node drag; inner 80×80 zone aligns Handle + plus.
- * Handle top is offset to cancel React Flow's translate(±40, -40) on custom handles.
+ * Outside-only edge column: Handle + plus stay in the plus band, not inside the card.
  */
 function GenerativeEdgeSide({
   side,
@@ -146,36 +152,8 @@ function GenerativeEdgeSide({
 
   const showPlus = isActive || isDraggingFromHere;
 
-  const columnPositionStyle =
-    side === "left"
-      ? {
-          left: -GENERATIVE_EDGE_PLUS_OUTER_PX,
-          top: 0,
-        }
-      : {
-          right: -GENERATIVE_EDGE_PLUS_OUTER_PX,
-          top: 0,
-        };
-
-  const handleStyle =
-    side === "left"
-      ? {
-          left: GENERATIVE_EDGE_PLUS_OUTER_PX,
-          top: HANDLE_RF_Y_OFFSET_PX,
-          width: GENERATIVE_EDGE_HANDLE_HIT_PX,
-          height: GENERATIVE_EDGE_HANDLE_HIT_PX,
-        }
-      : {
-          left: 0,
-          top: HANDLE_RF_Y_OFFSET_PX,
-          width: GENERATIVE_EDGE_HANDLE_HIT_PX,
-          height: GENERATIVE_EDGE_HANDLE_HIT_PX,
-        };
-
-  const plusLeft =
-    side === "left"
-      ? 0
-      : GENERATIVE_EDGE_HANDLE_HIT_PX + GENERATIVE_EDGE_PLUS_BORDER_GAP_PX;
+  const columnPositionStyle = generativeEdgeColumnStyle(side);
+  const plusLeft = generativeEdgePlusLeft(side);
 
   const updatePlusY = useCallback((clientY: number) => {
     const hitZone = hitZoneRef.current;
@@ -221,7 +199,6 @@ function GenerativeEdgeSide({
         sideDisabled && "opacity-50"
       )}
       style={{
-        width: GENERATIVE_EDGE_SHELL_W_PX,
         height: "100%",
         ...columnPositionStyle,
       }}
