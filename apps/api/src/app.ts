@@ -154,6 +154,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     lazyRoute(() => import("./routes/objects"))
   );
   app.route(
+    "/:organizationId/tools/seedance-video-check",
+    lazyRoute(() => import("./routes/tools/seedance-video-check"))
+  );
+  app.route(
     "/:organizationId/usage",
     lazyRoute(() => import("./routes/usage"))
   );

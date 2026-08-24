@@ -1,6 +1,7 @@
 import type { OrganizationInfo } from "@dafthunk/types";
 import Cpu from "lucide-react/icons/cpu";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
+import ScanSearch from "lucide-react/icons/scan-search";
 import Sparkles from "lucide-react/icons/sparkles";
 import SquareTerminal from "lucide-react/icons/square-terminal";
 import Users from "lucide-react/icons/users";
@@ -25,6 +26,20 @@ interface OrgLayoutProps {
   children: React.ReactNode;
   title: string;
   sidebarDefaultOpen?: boolean;
+}
+
+function buildToolsSidebarItems(
+  orgId: string,
+  t: (key: TranslationKey) => string
+) {
+  return [
+    {
+      id: "seedance-video-check",
+      title: t("sidebar.seedanceVideoCheck"),
+      url: `/org/${orgId}/tools/seedance-video-check`,
+      icon: ScanSearch,
+    },
+  ];
 }
 
 function buildWorkflowSidebarItems(
@@ -68,6 +83,11 @@ export const getDashboardSidebarGroups = (
       items: buildWorkflowSidebarItems(orgId, t),
     },
     {
+      tourId: "tools",
+      label: t("sidebar.groups.tools"),
+      items: buildToolsSidebarItems(orgId, t),
+    },
+    {
       tourId: "settings",
       label: t("nav.settings"),
       items: [
@@ -102,6 +122,8 @@ function filterSidebarGroupsByPermissions(
         return canViewWorkflows(organization);
       case "model-calls":
         return canAccessModelCalls(organization);
+      case "seedance-video-check":
+        return canViewWorkflows(organization);
       case "ai-interfaces":
         return canAccessAiInterfaces(organization);
       case "members":

@@ -123,6 +123,10 @@ export const ModelCallsPage = lazyRoutePage(
   () => import("@/pages/model-calls-page"),
   "ModelCallsPage"
 );
+export const SeedanceVideoCheckPage = lazyRoutePage(
+  () => import("@/pages/seedance-video-check-page"),
+  "SeedanceVideoCheckPage"
+);
 export const ApiKeysPage = lazyRoutePage(
   () => import("@/pages/api-keys-page"),
   "ApiKeysPage"
