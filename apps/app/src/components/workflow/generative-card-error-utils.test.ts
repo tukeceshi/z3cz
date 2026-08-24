@@ -70,6 +70,7 @@ describe("generative-card-error-utils", () => {
         [AI_IMAGE_GENERATE_ERROR_META_KEY]: "legacy",
         aiTextGenerating: "1",
         aiTextStreamStarted: "1",
+        aiTextStagingState: "ready",
         keepMe: "yes",
       })
     ).toEqual({ keepMe: "yes" });

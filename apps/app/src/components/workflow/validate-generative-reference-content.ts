@@ -14,7 +14,7 @@ import {
 import { evaluateGenerativeReferenceReadiness } from "./generative-reference-readiness";
 import { resolveReferenceMediaFromSource } from "./generative-reference-utils";
 import { probeMediaDuration } from "./studio-media-file-meta";
-import { readAiTextCanvasBodySync } from "./resolve-ai-text-result";
+import { readAiTextBodyFromStagingForNode } from "./resolve-ai-text-result";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export type GenerativeReferenceContentLimitReason =
@@ -67,6 +67,7 @@ export async function validateGenerativeReferenceContentLimits(params: {
   readonly targetNodeType?: string;
   readonly targetHandleId?: string | null;
   readonly organizationId?: string;
+  readonly workflowId?: string;
 }): Promise<GenerativeReferenceContentLimitVerdict> {
   const rules = normalizeTextModelParameterRules(params.rules);
 
@@ -80,7 +81,11 @@ export async function validateGenerativeReferenceContentLimits(params: {
   }
 
   if (params.kind === "text") {
-    const text = readAiTextCanvasBodySync(params.sourceData);
+    const text = await readAiTextBodyFromStagingForNode({
+      data: params.sourceData,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    });
     if (text.length > rules.maxTextReferenceChars) {
       return { ok: false, reason: "too_large" };
     }

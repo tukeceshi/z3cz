@@ -70,6 +70,9 @@ export function useGraphPersistence({
     }));
 
     const serialized = JSON.stringify(normalizedNodes);
+    if (serialized === lastPersistedNodesRef.current) {
+      return;
+    }
     lastPersistedNodesRef.current = serialized;
     onNodesChangePersist?.(pendingNodesRef.current);
     lastPersistedProgressRef.current = snapshotGenerativeProgressForPersist(

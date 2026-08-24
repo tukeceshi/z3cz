@@ -1,6 +1,8 @@
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router";
 
+import { useAuth } from "@/components/auth-context";
 import {
   isReferencedAiTextPendingFromEdges,
   resolveReferencedAiTextFromEdges,
@@ -28,6 +30,10 @@ export interface ResolvedReferencedPrompt {
 export function useResolvedReferencedPrompt(
   params: UseResolvedReferencedPromptParams
 ): ResolvedReferencedPrompt {
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
+  const organizationId = organization?.id;
+
   const graphKey = useMemo(
     () =>
       JSON.stringify({
@@ -41,18 +47,42 @@ export function useResolvedReferencedPrompt(
         nodes: params.nodes.map((node) => ({
           id: node.id,
           excerpt: node.data.outputs?.find((output) => output.id === "text")?.value,
-          body: node.data.outputs?.find((output) => output.id === "textBody")?.value,
           result: node.data.inputs?.find((input) => input.id === "result")?.value,
+          staging: node.data.metadata?.aiTextStagingState,
+          generating: node.data.metadata?.aiTextGenerating,
         })),
       }),
     [params.edges, params.nodeId, params.nodes, params.targetHandle]
   );
 
-  return useMemo(() => {
+  const pending = useMemo(() => {
     void graphKey;
-    return {
-      text: resolveReferencedAiTextFromEdges(params),
-      loading: isReferencedAiTextPendingFromEdges(params),
-    };
+    return isReferencedAiTextPendingFromEdges(params);
   }, [graphKey, params]);
+
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(pending);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(pending);
+
+    void resolveReferencedAiTextFromEdges({
+      ...params,
+      organizationId,
+      workflowId,
+    }).then((resolved) => {
+      if (cancelled) {
+        return;
+      }
+      setText(resolved);
+      setLoading(pending && !resolved.trim());
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [graphKey, organizationId, pending, workflowId]);
+
+  return { text, loading };
 }

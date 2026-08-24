@@ -16,18 +16,12 @@ import {
   type AiMediaCacheNodeType,
 } from "@/services/ai-media-cache-service";
 import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
-import { cloudUploadToResourceId } from "@/services/stage-generative-media";
 import {
   readGenerativeStagingBlob,
   writeGenerativeStaging,
-  writeGenerativeStagingWithResourceId,
 } from "@/services/generative-media-staging";
-import { uploadGenerativeMediaFromLocalStaging } from "@/services/stage-generative-media";
 
 const AI_TEXT_NODE_TYPE: AiMediaCacheNodeType = "ai-text";
-
-const pendingCloudUploads = new Map<string, ReturnType<typeof setTimeout>>();
-const CLOUD_UPLOAD_DEBOUNCE_MS = 15_000;
 
 export async function stageAiTextContent(params: {
   readonly organizationId: string;
@@ -71,6 +65,7 @@ export async function readAiTextContent(params: {
     return null;
   }
 
+  const mimeType = params.value.mimeType ?? "text/plain";
   const cached =
     (await readGenerativeStagingBlob({
       mediaId,
@@ -81,68 +76,13 @@ export async function readAiTextContent(params: {
       organizationId: params.organizationId,
       workflowId: params.workflowId,
       mediaId,
-    }).then((blob) =>
-      blob ? { blob, mimeType: params.value?.mimeType ?? "text/plain" } : null
-    ));
+    }).then((blob) => (blob ? { blob, mimeType } : null)));
 
   if (cached) {
     return cached.blob.text();
   }
 
   return null;
-}
-
-export function scheduleAiTextCloudUpload(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly media: ResourceIdReference;
-  readonly cloudConfigured: boolean;
-  readonly onPromoted?: (value: ResourceIdReference) => void;
-}): void {
-  if (!params.cloudConfigured || !isResourceIdReference(params.media)) {
-    return;
-  }
-
-  const key = `${params.organizationId}:${params.workflowId}:${params.media.resourceId}`;
-  const existing = pendingCloudUploads.get(key);
-  if (existing) {
-    clearTimeout(existing);
-  }
-
-  pendingCloudUploads.set(
-    key,
-    setTimeout(() => {
-      pendingCloudUploads.delete(key);
-      void promoteAiTextToCloud(params).catch((error) => {
-        console.warn("[ai-text-storage] cloud upload failed", error);
-      });
-    }, CLOUD_UPLOAD_DEBOUNCE_MS)
-  );
-}
-
-export async function promoteAiTextToCloud(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly media: ResourceIdReference;
-  readonly onPromoted?: (value: ResourceIdReference) => void;
-}): Promise<ResourceIdReference | null> {
-  if (!isResourceIdReference(params.media)) {
-    return null;
-  }
-
-  const object = await uploadGenerativeMediaFromLocalStaging({
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
-    mediaId: params.media.resourceId,
-    mimeType: params.media.mimeType ?? "text/plain",
-    mediaKind: "reference",
-    objectId: params.media.resourceId,
-  });
-
-  const resource = cloudUploadToResourceId(object);
-  params.onPromoted?.(resource);
-  notifyAiMediaCacheChanged();
-  return resource;
 }
 
 export function buildAiTextResultExcerpt(text: string): string {

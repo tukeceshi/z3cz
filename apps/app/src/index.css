@@ -1194,11 +1194,7 @@ html.studio-reference-dragging * {
   }
 
   .dark .landing-glow-hero-top {
-    background-image: radial-gradient(
-      ellipse 62% 52% at 50% 36%,
-      rgb(91 102 222 / 0.09),
-      transparent 72%
-    );
+    background: none;
   }
 }
 

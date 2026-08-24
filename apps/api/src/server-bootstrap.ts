@@ -111,12 +111,4 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
     setInterval(runScheduled, 60_000);
   }
 
-  const { runDueTextContentMerges } = await import(
-    "./services/text-content-service"
-  );
-  setInterval(() => {
-    void runDueTextContentMerges(bindings).catch((error) => {
-      console.error("[api] Text content merge worker failed:", error);
-    });
-  }, 30_000);
 }

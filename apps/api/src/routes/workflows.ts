@@ -863,6 +863,15 @@ workflowRoutes.patch(
       updatedAt: now,
     });
 
+    if (data.name !== undefined || data.description !== undefined) {
+      await workflowStore.syncDataMetadata(id, {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined
+          ? { description: data.description }
+          : {}),
+      });
+    }
+
     if (existing.folderId) {
       await touchWorkflowFolderUpdatedAt(db, existing.folderId, organizationId);
     }

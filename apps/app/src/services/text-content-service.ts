@@ -1,59 +1,12 @@
 import type {
-  TextContentConflictResponse,
-  TextContentRegisterResponse,
-  TextContentStageRequest,
+  TextContentSaveResponse,
   TextContentSyncEvent,
 } from "@dafthunk/types";
 
-import { makeRequest } from "@/services/utils";
-import {
-  applyTextEditOps,
-  diffTextToOps,
-} from "@/utils/text-content-utils";
+import { ApiRequestError, makeRequest } from "@/services/utils";
 
 function textContentEndpoint(organizationId: string): string {
-  return `/api/${organizationId}/text-content`;
-}
-
-export async function registerTextContent(params: {
-  readonly organizationId: string;
-  readonly contentSha256: string;
-  readonly mimeType: string;
-  readonly contentLength: number;
-  readonly workflowId?: string;
-  readonly replacesResourceId?: string;
-}): Promise<TextContentRegisterResponse> {
-  return makeRequest<TextContentRegisterResponse>(
-    `${textContentEndpoint(params.organizationId)}/register`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        contentSha256: params.contentSha256,
-        mimeType: params.mimeType,
-        contentLength: params.contentLength,
-        workflowId: params.workflowId,
-        replacesResourceId: params.replacesResourceId,
-      }),
-    }
-  );
-}
-
-export async function uploadTextContentBlob(params: {
-  readonly uploadUrl: string;
-  readonly uploadHeaders: Record<string, string>;
-  readonly blob: Blob;
-}): Promise<void> {
-  const response = await fetch(params.uploadUrl, {
-    method: "PUT",
-    headers: {
-      ...params.uploadHeaders,
-      "Content-Type": params.blob.type || "text/plain; charset=utf-8",
-    },
-    body: params.blob,
-  });
-  if (!response.ok) {
-    throw new Error(`Text upload failed (${response.status})`);
-  }
+  return `/${organizationId}/text-content`;
 }
 
 export class TextContentConflictError extends Error {
@@ -67,28 +20,33 @@ export class TextContentConflictError extends Error {
   }
 }
 
-export async function stageTextContentEdits(params: {
+export async function saveTextContent(params: {
   readonly organizationId: string;
-  readonly request: TextContentStageRequest;
-}): Promise<void> {
-  const { buildApiUrl } = await import("@/config/api");
-  const response = await fetch(
-    buildApiUrl(`${textContentEndpoint(params.organizationId)}/stage`),
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params.request),
+  readonly text: string;
+  readonly mimeType: string;
+  readonly workflowId?: string;
+  readonly resourceId?: string;
+  readonly baseSha256?: string;
+}): Promise<TextContentSaveResponse> {
+  try {
+    return await makeRequest<TextContentSaveResponse>(
+      `${textContentEndpoint(params.organizationId)}/save`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          text: params.text,
+          mimeType: params.mimeType,
+          workflowId: params.workflowId,
+          resourceId: params.resourceId,
+          baseSha256: params.baseSha256,
+        }),
+      }
+    );
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 409) {
+      throw new TextContentConflictError();
     }
-  );
-
-  if (response.status === 409) {
-    const body = (await response.json()) as TextContentConflictResponse;
-    throw new TextContentConflictError(body.dbSha256);
-  }
-
-  if (!response.ok) {
-    throw new Error(`Text stage failed (${response.status})`);
+    throw error;
   }
 }
 
@@ -165,7 +123,13 @@ export async function syncTextContent(params: {
   let dbSha256: string | undefined;
 
   await readSyncEventStream(response, (event) => {
+    if (event.type === "missing") {
+      return;
+    }
     if (event.type === "conflict") {
+      if (!event.dbSha256) {
+        return;
+      }
       conflict = true;
       dbSha256 = event.dbSha256;
       return;
@@ -178,18 +142,6 @@ export async function syncTextContent(params: {
       downloadUrl = event.downloadUrl;
       dbSha256 = event.dbSha256;
       contentSha256 = event.dbSha256;
-      return;
-    }
-    if (event.type === "append") {
-      text += event.text;
-      return;
-    }
-    if (event.type === "replace") {
-      text = applyTextEditOps(text, [event]);
-      return;
-    }
-    if (event.type === "done") {
-      contentSha256 = event.pendingSha256;
     }
   });
 
@@ -210,19 +162,4 @@ export async function downloadTextContentFromUrl(
     throw new Error(`Text download failed (${response.status})`);
   }
   return response.text();
-}
-
-export function buildTextStageRequest(params: {
-  readonly resourceId: string;
-  readonly baseSha256: string;
-  readonly pendingSha256: string;
-  readonly oldText: string;
-  readonly newText: string;
-}): TextContentStageRequest {
-  return {
-    resourceId: params.resourceId,
-    baseSha256: params.baseSha256,
-    pendingSha256: params.pendingSha256,
-    ops: diffTextToOps(params.oldText, params.newText),
-  };
 }

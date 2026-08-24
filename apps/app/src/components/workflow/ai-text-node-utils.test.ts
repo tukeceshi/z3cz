@@ -162,13 +162,7 @@ describe("ai-text-node-utils editing behavior", () => {
     });
 
     const patch = withAiTextStreamingPreview(node, "一位成年动漫美少女");
-    const resultInput = patch.inputs?.find(
-      (input) => input.id === AI_TEXT_RESULT_INPUT_ID
-    );
-    expect(resultInput?.value).toEqual({
-      resourceId: "media-1",
-      mimeType: "text/plain; charset=utf-8",
-    });
+    expect(patch.inputs).toBeUndefined();
     expect(
       patch.outputs?.find((output) => output.id === AI_TEXT_BODY_OUTPUT_ID)?.value
     ).toBe("一位成年动漫美少女");

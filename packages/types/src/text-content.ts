@@ -8,29 +8,17 @@ export type TextEditOp =
       readonly text: string;
     };
 
-export interface TextContentRegisterRequest {
-  readonly contentSha256: string;
+export interface TextContentSaveRequest {
+  readonly text: string;
   readonly mimeType: string;
-  readonly contentLength: number;
   readonly workflowId?: string;
-  readonly replacesResourceId?: string;
+  readonly resourceId?: string;
+  readonly baseSha256?: string;
 }
 
-export interface TextContentRegisterResponse {
+export interface TextContentSaveResponse {
   readonly resourceId: string;
-  readonly uploadUrl: string;
-  readonly uploadHeaders: Record<string, string>;
-}
-
-export interface TextContentStageRequest {
-  readonly resourceId: string;
-  readonly baseSha256: string;
-  readonly pendingSha256: string;
-  readonly ops: readonly TextEditOp[];
-}
-
-export interface TextContentStageResponse {
-  readonly ok: true;
+  readonly contentSha256: string;
 }
 
 export interface TextContentConflictResponse {
@@ -53,4 +41,5 @@ export type TextContentSyncEvent =
       readonly text: string;
     }
   | { readonly type: "done"; readonly pendingSha256: string }
-  | { readonly type: "conflict"; readonly dbSha256?: string };
+  | { readonly type: "conflict"; readonly dbSha256?: string }
+  | { readonly type: "missing" };

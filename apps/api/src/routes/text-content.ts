@@ -1,7 +1,6 @@
 import type {
   TextContentConflictResponse,
-  TextContentRegisterResponse,
-  TextContentStageResponse,
+  TextContentSaveResponse,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
@@ -12,8 +11,8 @@ import type { ApiContext } from "../context";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { requireModelCallsAccess } from "../middleware/org-permissions";
 import {
-  registerTextContentUpload,
-  stageTextContentEdits,
+  isTextContentSaveConflict,
+  saveTextContent,
   streamTextContentSync,
 } from "../services/text-content-service";
 
@@ -23,72 +22,35 @@ textContentRoutes.use("*", jwtMiddleware);
 textContentRoutes.use("*", requireModelCallsAccess());
 textContentRoutes.use("*", createRequireFeatureMiddleware("ai-interfaces"));
 
-const textEditOpSchema = z.discriminatedUnion("op", [
-  z.object({
-    op: z.literal("append"),
-    text: z.string(),
-  }),
-  z.object({
-    op: z.literal("replace"),
-    start: z.number().int().nonnegative(),
-    end: z.number().int().nonnegative(),
-    text: z.string(),
-  }),
-]);
-
-const registerBodySchema = z.object({
-  contentSha256: z.string().min(64).max(64),
+const saveBodySchema = z.object({
+  text: z.string(),
   mimeType: z.string().min(1),
-  contentLength: z.number().int().positive(),
   workflowId: z.string().min(1).optional(),
-  replacesResourceId: z.string().min(1).optional(),
-});
-
-const stageBodySchema = z.object({
-  resourceId: z.string().min(1),
-  baseSha256: z.string().min(64).max(64),
-  pendingSha256: z.string().min(64).max(64),
-  ops: z.array(textEditOpSchema),
+  resourceId: z.string().min(1).optional(),
+  baseSha256: z.string().min(64).max(64).optional(),
 });
 
 textContentRoutes.post(
-  "/register",
-  zValidator("json", registerBodySchema),
+  "/save",
+  zValidator("json", saveBodySchema),
   async (c) => {
     const organizationId = c.get("organizationId")!;
     const body = c.req.valid("json");
 
-    const result = await registerTextContentUpload(c.env, {
+    const result = await saveTextContent(c.env, {
       organizationId,
-      contentSha256: body.contentSha256,
+      text: body.text,
       mimeType: body.mimeType,
-      contentLength: body.contentLength,
       workflowId: body.workflowId,
-      replacesResourceId: body.replacesResourceId,
+      resourceId: body.resourceId,
+      baseSha256: body.baseSha256,
     });
 
     if (!result) {
       return c.json({ error: "Cloud storage is not configured" }, 400);
     }
 
-    const response: TextContentRegisterResponse = result;
-    return c.json(response);
-  }
-);
-
-textContentRoutes.post(
-  "/stage",
-  zValidator("json", stageBodySchema),
-  async (c) => {
-    const organizationId = c.get("organizationId")!;
-    const body = c.req.valid("json");
-
-    const result = await stageTextContentEdits(c.env, {
-      organizationId,
-      request: body,
-    });
-
-    if ("conflict" in result) {
+    if (isTextContentSaveConflict(result)) {
       const response: TextContentConflictResponse = {
         conflict: true,
         dbSha256: result.dbSha256,
@@ -96,7 +58,7 @@ textContentRoutes.post(
       return c.json(response, 409);
     }
 
-    const response: TextContentStageResponse = { ok: true };
+    const response: TextContentSaveResponse = result;
     return c.json(response);
   }
 );

@@ -421,8 +421,8 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
     this.workflowState = {
       id: workflowId,
-      name: workflowData.name,
-      description: workflowData.description,
+      name: workflow.name,
+      description: workflow.description ?? undefined,
       schemeId: workflowData.schemeId,
       trigger: workflowData.trigger as WorkflowState["trigger"],
       runtime: workflowData.runtime,

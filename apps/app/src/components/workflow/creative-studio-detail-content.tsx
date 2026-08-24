@@ -22,7 +22,7 @@ import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
-import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
+import { useAiTextStagingBody, useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useCreativeStudio } from "@/components/workflow/creative-studio-context";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
@@ -186,7 +186,7 @@ function StudioTextDetail({
   const { t } = useTranslation();
   const { organization } = useAuth();
   const { workflowId } = useCreativeStudio();
-  const { cloudConfigured } = useCloudStorageCanvasContext();
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
   const { updateNodeData, disabled = false } = useWorkflow();
   const historyModels = useGenerativeHistoryModels();
   const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
@@ -194,18 +194,23 @@ function StudioTextDetail({
   const metadata = node.data.metadata;
   const orgId = organization?.id;
   const isGenerating = isAiTextGenerating(metadata);
-  const resolvedText = useResolvedAiText({
+  const previewText = useResolvedAiText({
     inputs: node.data.inputs,
     outputs: node.data.outputs,
     nodeData: node.data,
   });
-  const streamBody = isGenerating ? readAiTextSessionBodySync(node.data) : "";
-  const hasStreamOutput = streamBody.trim().length > 0;
+  const stagingBody = useAiTextStagingBody({
+    reference: previewText.reference,
+    enabled: !isGenerating && previewText.state === "ready",
+  });
+  const streamBody = readAiTextSessionBodySync(node.data);
   const text = isGenerating
-    ? hasStreamOutput
-      ? streamBody
-      : resolvedText.text
-    : resolvedText.text;
+    ? streamBody
+    : stagingBody.text || (stagingBody.loading ? streamBody : "");
+  const contentLoading =
+    !isGenerating &&
+    (previewText.state === "loading" ||
+      (previewText.state === "ready" && stagingBody.loading && !text.trim()));
   const historyItems = readAiTextResultHistory(node.data.inputs);
   const generateError = readGenerativeCardError(metadata);
   const showGeneratingMask =
@@ -214,7 +219,7 @@ function StudioTextDetail({
     historyItems.items.length,
     metadata
   );
-  const editLocked = disabled || isGenerating;
+  const editLocked = disabled || isGenerating || contentLoading;
   const hasOutput = text.trim().length > 0;
   const prompt = readGenerativePrompt(node.data.inputs);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -223,6 +228,9 @@ function StudioTextDetail({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const editSurfaceRef = useRef<HTMLDivElement>(null);
+
+  const nodeDataRef = useRef(node.data);
+  nodeDataRef.current = node.data;
 
   const commitText = useCallback(
     (value: string) => {
@@ -235,7 +243,7 @@ function StudioTextDetail({
         nodeId,
         value,
         updateNodeData,
-        current: node.data,
+        current: nodeDataRef.current,
       });
     },
     [
@@ -274,13 +282,20 @@ function StudioTextDetail({
     !disabled &&
     !isTextEditing &&
     !isGenerating &&
+    !contentLoading &&
     !generateError &&
     (hasOutput || !uploading);
   const scrollText = isTextEditing ? textBuffer.value : text;
   const showEmptyUpload =
-    !hasOutput && !isTextEditing && !isGenerating && !generateError && !uploading;
+    previewText.state === "empty" &&
+    !contentLoading &&
+    !hasOutput &&
+    !isTextEditing &&
+    !isGenerating &&
+    !generateError &&
+    !uploading;
   const showEmptyBusy =
-    !hasOutput && !isTextEditing && !generateError && uploading;
+    !hasOutput && !isTextEditing && !generateError && uploading && !contentLoading;
 
   const {
     scrollContainerRef,
@@ -315,13 +330,18 @@ function StudioTextDetail({
   }, [rememberScrollForEdit, textBuffer]);
 
   useEffect(() => {
-    if (text.trim() || !isGenerativeManualContent(metadata) || !updateNodeData) {
+    if (
+      text.trim() ||
+      contentLoading ||
+      !isGenerativeManualContent(metadata) ||
+      !updateNodeData
+    ) {
       return;
     }
     updateNodeData(nodeId, (current) => ({
       metadata: withGenerativeGeneratedContentMode(current.metadata),
     }));
-  }, [metadata, nodeId, text, updateNodeData]);
+  }, [contentLoading, metadata, nodeId, text, updateNodeData]);
 
   useEffect(() => {
     onEmptyTextEditingChange?.(isTextEditing && !textBuffer.value.trim());
@@ -452,6 +472,10 @@ function StudioTextDetail({
                 }
                 className="h-full"
               />
+            ) : contentLoading ? (
+              <div className="flex h-full items-center justify-center">
+                <LoaderIcon className="size-5 animate-spin text-muted-foreground/50" />
+              </div>
             ) : (
               <>
                 <StudioTextOutputView

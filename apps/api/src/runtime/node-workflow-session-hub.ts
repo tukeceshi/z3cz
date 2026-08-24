@@ -276,8 +276,8 @@ class NodeWorkflowSessionHub {
       rev: 0,
       workflowState: {
         id: workflowId,
-        name: workflowData.name,
-        description: workflowData.description,
+        name: workflow.name,
+        description: workflow.description ?? undefined,
         schemeId: workflowData.schemeId,
         trigger: workflowData.trigger as WorkflowState["trigger"],
         runtime: workflowData.runtime,
@@ -309,8 +309,8 @@ class NodeWorkflowSessionHub {
     const workflowData = workflowWithData.data;
     session.workflowState = {
       id: session.workflowState.id,
-      name: workflowData.name,
-      description: workflowData.description,
+      name: workflowWithData.name,
+      description: workflowWithData.description ?? undefined,
       schemeId: workflowData.schemeId,
       trigger: workflowData.trigger as WorkflowState["trigger"],
       runtime: workflowData.runtime,

@@ -8,7 +8,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 import { buildAiTextExcerpt, type AiTextResultHistory } from "@dafthunk/types";
-import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
+import { readAiTextFullBodyFromStaging } from "@/services/ai-text-cache-layer";
 
 import { STUDIO_SCROLL } from "./creative-studio-surface";
 
@@ -74,7 +74,7 @@ export function AiTextHistoryOverlay({
             return;
           }
           const body =
-            (await loadAiTextBodyFromCache({
+            (await readAiTextFullBodyFromStaging({
               organizationId,
               workflowId,
               reference: {

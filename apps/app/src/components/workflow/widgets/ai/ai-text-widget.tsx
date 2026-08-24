@@ -13,7 +13,7 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
-import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
+import { useResolvedAiText, useAiTextStagingBody } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
 import { AiTextExpandButton } from "../../ai-text-expand-overlay";
@@ -90,24 +90,29 @@ function AiTextWidget({
   const [holdTailAfterGenerate, setHoldTailAfterGenerate] = useState(false);
   const isGenerating = isAiTextGenerating(metadata);
   const streamBody = readAiTextSessionBodySync(nodeData);
-  const resolvedText = useResolvedAiText({
+  const previewText = useResolvedAiText({
     inputs: nodeData.inputs,
     outputs: nodeData.outputs,
     nodeData,
   });
-  const resolvedOutput = (resolvedText.text || resolvedText.displayExcerpt).trim();
+  const needFullBody = selected && !isGenerating && previewText.state === "ready";
+  const stagingBody = useAiTextStagingBody({
+    reference: previewText.reference,
+    enabled: needFullBody,
+  });
   const hasStreamOutput = streamBody.trim().length > 0;
-  const showFullBody = isGenerating || selected;
-  const displayValue = showFullBody
-    ? isGenerating
-      ? hasStreamOutput
-        ? streamBody
-        : resolvedText.text || resolvedText.displayExcerpt
-      : resolvedText.text
-    : resolvedText.displayExcerpt;
-  const hasOutput = isGenerating
-    ? hasStreamOutput || resolvedOutput.length > 0
-    : resolvedOutput.length > 0;
+  const displayValue = isGenerating
+    ? hasStreamOutput
+      ? streamBody
+      : previewText.displayExcerpt
+    : selected
+      ? stagingBody.text || streamBody
+      : previewText.displayExcerpt;
+  const hasOutput =
+    isGenerating
+      ? hasStreamOutput || previewText.displayExcerpt.trim().length > 0
+      : previewText.state === "ready" ||
+        previewText.displayExcerpt.trim().length > 0;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
@@ -134,11 +139,11 @@ function AiTextWidget({
   });
   const generateError = readGenerativeCardError(metadata);
   const showTextLoading =
-    resolvedText.loading &&
-    !hasOutput &&
     !isGenerating &&
     !generateError &&
-    !selectedFailed;
+    !selectedFailed &&
+    (previewText.state === "loading" ||
+      (needFullBody && stagingBody.loading && !displayValue.trim()));
   const showGeneratingMask =
     isAiTextAwaitingStream(metadata) && !generateError;
   const generatingMessage = t("workflow.aiTextPanel.generating");
@@ -195,13 +200,19 @@ function AiTextWidget({
   }, [isGenerating, historyOpen]);
 
   useEffect(() => {
-    if (hasOutput || !isGenerativeManualContent(metadata) || !updateNodeData) {
+    if (
+      hasOutput ||
+      previewText.state === "loading" ||
+      previewText.state === "failed" ||
+      !isGenerativeManualContent(metadata) ||
+      !updateNodeData
+    ) {
       return;
     }
     updateNodeData(nodeId, (current) => ({
       metadata: withGenerativeGeneratedContentMode(current.metadata),
     }));
-  }, [hasOutput, metadata, nodeId, updateNodeData]);
+  }, [hasOutput, metadata, nodeId, previewText.state, updateNodeData]);
 
   useEffect(() => {
     onEmptyOutputEditingChange?.(false);
@@ -255,6 +266,7 @@ function AiTextWidget({
   };
 
   const showEmptyUpload =
+    (previewText.state === "empty" || previewText.state === "failed") &&
     !hasOutput &&
     !showTextLoading &&
     !generateError &&

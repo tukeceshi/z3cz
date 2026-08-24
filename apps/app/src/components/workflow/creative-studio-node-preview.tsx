@@ -21,7 +21,7 @@ import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 
 import { MediaDisplayLoadingPlaceholder } from "./media-display-loading-placeholder";
-import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
+import { useAiTextStagingBody, useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
 import { readAiAudioCardAudios, isAiAudioGenerating } from "./ai-audio-node-utils";
@@ -333,10 +333,20 @@ export function CreativeStudioNodePreview({
     outputs: data.outputs,
     nodeData: data,
   });
+  const stagingBody = useAiTextStagingBody({
+    reference: resolvedText.reference,
+    enabled: variant === "detail" && resolvedText.state === "ready",
+  });
   const textPreview =
     variant === "detail"
-      ? resolvedText.text.trim()
+      ? stagingBody.text.trim()
       : resolvedText.displayExcerpt.trim();
+  const textLoading =
+    resolvedText.loading ||
+    (variant === "detail" &&
+      resolvedText.state === "ready" &&
+      stagingBody.loading &&
+      !textPreview);
 
   const primaryImage = readAiImageCardPrimaryImage(
     data.inputs,
@@ -372,7 +382,7 @@ export function CreativeStudioNodePreview({
           >
             {textPreview}
           </p>
-        ) : resolvedText.loading ? (
+        ) : textLoading ? (
           <div className="flex h-full w-full items-center justify-center">
             <LoaderIcon className="size-5 animate-spin text-muted-foreground/50" />
           </div>

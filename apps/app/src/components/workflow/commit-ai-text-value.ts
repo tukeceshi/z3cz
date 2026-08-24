@@ -19,21 +19,20 @@ import {
 } from "./ai-text-persist-utils";
 import {
   hasAiTextGeneratedHistory,
-  readAiTextResult,
   readAiTextResultHistory,
 } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
+import { withAiTextStagingDisplayState } from "./ai-text-staging-display-state";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
-import { hangAiTextDisplayFromReference } from "@/services/ai-text-display-registry";
-import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
+import {
+  hangAiTextExcerptFromKnownText,
+  readAiTextFullBodyFromStaging,
+} from "@/services/ai-text-cache-layer";
 import { notifyTextContentConflict } from "@/services/text-content-conflict";
 import {
-  buildTextStageRequest,
-  registerTextContent,
-  stageTextContentEdits,
+  saveTextContent,
   TextContentConflictError,
-  uploadTextContentBlob,
 } from "@/services/text-content-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
 
@@ -61,57 +60,22 @@ async function persistTextToCloud(params: {
   readonly mimeType: string;
   readonly existingReference?: WorkflowMediaValue;
   readonly baseSha256?: string;
-  readonly previousText?: string;
-}): Promise<ResourceIdReference | null> {
-  if (!params.existingReference || !isResourceIdReference(params.existingReference)) {
-    const contentSha256 = await sha256HexFromText(params.text);
-    const blob = new Blob([params.text], { type: params.mimeType });
-    const registered = await registerTextContent({
-      organizationId: params.organizationId,
-      contentSha256,
-      mimeType: params.mimeType,
-      contentLength: blob.size,
-      workflowId: params.workflowId,
-    });
-    await uploadTextContentBlob({
-      uploadUrl: registered.uploadUrl,
-      uploadHeaders: registered.uploadHeaders,
-      blob,
-    });
-    return buildResourceIdReference({
-      resourceId: registered.resourceId,
-      contentSha256,
-      mimeType: params.mimeType,
-    });
-  }
-
-  const resourceId = params.existingReference.resourceId;
-  const baseSha256 =
-    params.baseSha256 ?? params.existingReference.contentSha256 ?? "";
-  const pendingSha256 = await sha256HexFromText(params.text);
-
-  if (!baseSha256 || baseSha256 === pendingSha256) {
-    return buildResourceIdReference({
-      resourceId,
-      contentSha256: pendingSha256,
-      mimeType: params.mimeType,
-    });
-  }
-
-  await stageTextContentEdits({
+}): Promise<ResourceIdReference> {
+  const existingId = params.existingReference
+    ? getResourceIdFromValue(params.existingReference)
+    : undefined;
+  const saved = await saveTextContent({
     organizationId: params.organizationId,
-    request: buildTextStageRequest({
-      resourceId,
-      baseSha256,
-      pendingSha256,
-      oldText: params.previousText ?? "",
-      newText: params.text,
-    }),
+    workflowId: params.workflowId,
+    text: params.text,
+    mimeType: params.mimeType,
+    resourceId: existingId || undefined,
+    baseSha256: existingId ? params.baseSha256 : undefined,
   });
 
   return buildResourceIdReference({
-    resourceId,
-    contentSha256: pendingSha256,
+    resourceId: saved.resourceId,
+    contentSha256: saved.contentSha256,
     mimeType: params.mimeType,
   });
 }
@@ -120,8 +84,6 @@ export async function commitAiTextValue(
   params: CommitAiTextValueParams
 ): Promise<void> {
   const mimeType = inferAiTextMimeType(params.value);
-  const previousText =
-    readAiTextResult(params.current.inputs, params.current.outputs) ?? "";
   const existingReference = readAiTextResultReference(params.current.inputs);
   const existingId = existingReference
     ? getResourceIdFromValue(existingReference)
@@ -137,7 +99,7 @@ export async function commitAiTextValue(
       organizationId: params.organizationId,
       workflowId: params.workflowId,
       text: params.value,
-      mediaId: existingId,
+      mediaId: existingId ?? undefined,
       patchNodeLayout,
     });
     if (existingId && isResourceIdReference(existingReference)) {
@@ -162,14 +124,9 @@ export async function commitAiTextValue(
         mimeType,
         existingReference,
         baseSha256,
-        previousText,
       });
-      if (cloudRef) {
-        reference = cloudRef;
-        contentSha256 = cloudRef.contentSha256 ?? contentSha256;
-      } else {
-        reference = await stageFallback();
-      }
+      reference = cloudRef;
+      contentSha256 = cloudRef.contentSha256 ?? contentSha256;
     } catch (error) {
       if (error instanceof TextContentConflictError) {
         notifyTextContentConflict();
@@ -188,7 +145,25 @@ export async function commitAiTextValue(
     sessionText: params.value,
   };
 
-  hangAiTextDisplayFromReference({
+  const mediaId = getResourceIdFromValue(reference);
+  if (mediaId) {
+    try {
+      await stageAiTextContent({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        text: params.value,
+        mediaId,
+        patchNodeLayout: createPatchNodeLayoutMetadata(
+          params.nodeId,
+          params.updateNodeData
+        ),
+      });
+    } catch {
+      // Local staging is best-effort after a successful cloud write.
+    }
+  }
+
+  const displayState = hangAiTextExcerptFromKnownText({
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     reference,
@@ -196,10 +171,16 @@ export async function commitAiTextValue(
   });
 
   params.updateNodeData(params.nodeId, (current) => {
-    if (hasAiTextGeneratedHistory(current.inputs)) {
-      return withAiTextStagedEditedResult(current, staged);
-    }
-    return withAiTextStagedManualResult(current, staged);
+    const patch = hasAiTextGeneratedHistory(current.inputs)
+      ? withAiTextStagedEditedResult(current, staged)
+      : withAiTextStagedManualResult(current, staged);
+    return {
+      ...patch,
+      metadata: withAiTextStagingDisplayState(
+        patch.metadata ?? current.metadata,
+        displayState
+      ),
+    };
   });
 }
 
@@ -240,7 +221,7 @@ export async function commitAiTextHistorySelection(
       };
 
   const sessionText =
-    (await loadAiTextBodyFromCache({
+    (await readAiTextFullBodyFromStaging({
       organizationId: params.organizationId,
       workflowId: params.workflowId,
       reference: referenceForCache,
@@ -259,6 +240,13 @@ export async function commitAiTextHistorySelection(
         resourceId: selected.resourceId,
         mimeType,
       };
+
+  const displayState = hangAiTextExcerptFromKnownText({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    reference,
+    body: sessionText,
+  });
 
   const staged: AiTextStagedResultPatch = {
     reference,
@@ -281,7 +269,18 @@ export async function commitAiTextHistorySelection(
       inputs: settings.patch.inputs ?? latest.inputs,
       metadata: settings.patch.metadata ?? latest.metadata,
     };
-    return withAiTextStagedHistorySelection(working, params.selectedId, staged);
+    const patch = withAiTextStagedHistorySelection(
+      working,
+      params.selectedId,
+      staged
+    );
+    return {
+      ...patch,
+      metadata: withAiTextStagingDisplayState(
+        patch.metadata ?? working.metadata,
+        displayState
+      ),
+    };
   });
 
   return {
