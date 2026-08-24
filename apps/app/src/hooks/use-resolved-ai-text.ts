@@ -4,13 +4,13 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { readAiTextResultReference } from "@/components/workflow/ai-text-persist-utils";
+import { readAiTextStagingDisplayState } from "@/components/workflow/ai-text-staging-display-state";
 import type { WorkflowNodeType, WorkflowParameter } from "@/components/workflow/workflow-types";
-import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
+import { readAiTextFullBodyFromStaging } from "@/services/ai-text-cache-layer";
 import {
   AI_TEXT_DISPLAY_EVENT,
   getAiTextDisplay,
 } from "@/services/ai-text-display-registry";
-import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 
 interface UseResolvedAiTextParams {
   readonly inputs: readonly WorkflowParameter[];
@@ -19,13 +19,13 @@ interface UseResolvedAiTextParams {
 }
 
 export interface ResolvedAiText {
-  readonly text: string;
   readonly displayExcerpt: string;
   readonly loading: boolean;
+  readonly state: "loading" | "ready" | "empty" | "failed";
   readonly reference: ReturnType<typeof readAiTextResultReference>;
 }
 
-/** Canvas preview/body hung by resource ID — not read from the node. */
+/** Canvas/list preview hung by resource ID — not the full body, not a cloud fetch. */
 export function useResolvedAiText(
   params: UseResolvedAiTextParams
 ): ResolvedAiText {
@@ -34,12 +34,6 @@ export function useResolvedAiText(
   const organizationId = organization?.id;
   const reference = readAiTextResultReference(params.inputs);
   const mediaId = reference ? getResourceIdFromValue(reference) : null;
-  const workflowSha =
-    reference && isResourceIdReference(reference)
-      ? reference.contentSha256
-      : undefined;
-  const referenceRef = useRef(reference);
-  referenceRef.current = reference;
 
   const [revision, setRevision] = useState(0);
   const hung =
@@ -58,47 +52,89 @@ export function useResolvedAiText(
     return () => window.removeEventListener(AI_TEXT_DISPLAY_EVENT, handleDisplay);
   }, []);
 
+  const nodeState = readAiTextStagingDisplayState(params.nodeData?.metadata);
+  const state =
+    nodeState ??
+    hung?.state ??
+    (reference ? "loading" : "empty");
+
+  return {
+    displayExcerpt: hung?.excerpt ?? "",
+    loading: state === "loading",
+    state,
+    reference,
+  };
+}
+
+export function useAiTextStagingBody(params: {
+  readonly reference: ReturnType<typeof readAiTextResultReference>;
+  readonly enabled: boolean;
+}): {
+  readonly text: string;
+  readonly loading: boolean;
+} {
+  const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
+  const organizationId = organization?.id;
+  const reference = params.reference;
+  const mediaId = reference ? getResourceIdFromValue(reference) : null;
+  const workflowSha =
+    reference && isResourceIdReference(reference)
+      ? reference.contentSha256
+      : undefined;
+  const referenceRef = useRef(reference);
+  referenceRef.current = reference;
+
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    if (!organizationId || !workflowId || !mediaId) {
+    setText("");
+  }, [mediaId, workflowSha]);
+
+  useEffect(() => {
+    if (!params.enabled || !organizationId || !workflowId || !reference) {
+      setLoading(false);
       return;
     }
 
     let cancelled = false;
-    const hydrate = () => {
-      const current = referenceRef.current;
-      if (!current) {
-        return;
-      }
-      void loadAiTextBodyFromCache({
-        organizationId,
-        workflowId,
-        reference: current,
-        workflowSha,
-      }).then(() => {
-        if (!cancelled) {
-          setRevision((value) => value + 1);
-        }
-      });
-    };
+    setLoading(true);
 
-    if (
-      !getAiTextDisplay({ organizationId, workflowId, mediaId })?.body.trim()
-    ) {
-      hydrate();
+    const current = referenceRef.current;
+    if (!current) {
+      setLoading(false);
+      return;
     }
 
-    const handleCache = () => hydrate();
-    window.addEventListener(CACHE_STATS_EVENT, handleCache);
+    void readAiTextFullBodyFromStaging({
+      organizationId,
+      workflowId,
+      reference: current,
+      workflowSha,
+    }).then((body) => {
+      if (cancelled) {
+        return;
+      }
+      setText(body ?? "");
+      setLoading(false);
+    });
+
     return () => {
       cancelled = true;
-      window.removeEventListener(CACHE_STATS_EVENT, handleCache);
     };
-  }, [mediaId, organizationId, workflowId, workflowSha]);
-
-  return {
-    text: hung?.body ?? "",
-    displayExcerpt: hung?.excerpt ?? "",
-    loading: Boolean(reference) && !hung?.body.trim() && !hung?.excerpt.trim(),
+  }, [
+    params.enabled,
+    organizationId,
+    workflowId,
+    mediaId,
+    workflowSha,
     reference,
-  };
+  ]);
+
+  if (!params.enabled) {
+    return { text: "", loading: false };
+  }
+
+  return { text, loading };
 }

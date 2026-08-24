@@ -9,6 +9,7 @@ import {
 } from "@/services/ingest-canvas-media";
 import {
   collectWorkflowAiTextNodeRefs,
+  patchNodesAiTextStagingState,
   pushWorkflowAiTextCacheInBackground,
 } from "@/services/push-ai-text-cache-to-node";
 
@@ -48,6 +49,7 @@ export function useWorkflowMediaReconcile({
   graphReady,
   enabled = true,
   nodes,
+  setNodes,
 }: UseWorkflowMediaReconcileParams): void {
   const ingestedFingerprintRef = useRef<string | null>(null);
   const ingestedResourceIdsRef = useRef<Set<string>>(new Set());
@@ -105,6 +107,11 @@ export function useWorkflowMediaReconcile({
         workflowId,
         nodes: snapshotNodes,
         onlyFingerprints: newTextFingerprints,
+        applyDisplayState: (nodeId, state) => {
+          setNodes((current) =>
+            patchNodesAiTextStagingState(current, nodeId, state)
+          );
+        },
       });
     }
 
@@ -135,5 +142,6 @@ export function useWorkflowMediaReconcile({
     organizationId,
     workflowId,
     mediaFingerprint,
+    setNodes,
   ]);
 }

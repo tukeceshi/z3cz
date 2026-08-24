@@ -116,6 +116,7 @@ export const TRANSIENT_GENERATIVE_METADATA_KEYS = [
   AI_VIDEO_GENERATE_ERROR_META_KEY,
   "aiTextGenerating",
   "aiTextStreamStarted",
+  "aiTextStagingState",
   "aiImageGenerating",
   "aiVideoGenerating",
   "aiAudioGenerating",

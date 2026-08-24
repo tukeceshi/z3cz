@@ -1,11 +1,13 @@
 import { buildAiTextExcerpt, getResourceIdFromValue } from "@dafthunk/types";
 import type { WorkflowMediaValue } from "@dafthunk/types";
 
+import type { AiTextStagingDisplayState } from "@/components/workflow/ai-text-staging-display-state";
+
 export const AI_TEXT_DISPLAY_EVENT = "dafthunk:ai-text-display-changed";
 
 export interface AiTextDisplay {
   readonly excerpt: string;
-  readonly body: string;
+  readonly state: AiTextStagingDisplayState;
 }
 
 const hungDisplays = new Map<string, AiTextDisplay>();
@@ -22,33 +24,43 @@ function notifyAiTextDisplayChanged(): void {
   window.dispatchEvent(new CustomEvent(AI_TEXT_DISPLAY_EVENT));
 }
 
-export function hangAiTextDisplay(params: {
-  readonly organizationId: string;
-  readonly workflowId: string;
-  readonly mediaId: string;
-  readonly body: string;
-}): void {
-  const body = params.body.trim();
-  if (!body) {
-    return;
-  }
-
-  const next: AiTextDisplay = {
-    excerpt: buildAiTextExcerpt(body),
-    body,
-  };
-  const key = displayKey(
-    params.organizationId,
-    params.workflowId,
-    params.mediaId
-  );
+function writeDisplay(
+  key: string,
+  next: AiTextDisplay
+): void {
   const existing = hungDisplays.get(key);
-  if (existing && existing.body === next.body && existing.excerpt === next.excerpt) {
+  if (
+    existing &&
+    existing.excerpt === next.excerpt &&
+    existing.state === next.state
+  ) {
     return;
   }
 
   hungDisplays.set(key, next);
   notifyAiTextDisplayChanged();
+}
+
+export function hangAiTextDisplay(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly excerpt?: string;
+  readonly body?: string;
+  readonly state?: AiTextStagingDisplayState;
+}): void {
+  const excerptFromBody = params.body?.trim()
+    ? buildAiTextExcerpt(params.body)
+    : "";
+  const excerpt = (params.excerpt ?? excerptFromBody).trim();
+  const state =
+    params.state ??
+    (excerpt || params.body?.trim() ? "ready" : "empty");
+
+  writeDisplay(
+    displayKey(params.organizationId, params.workflowId, params.mediaId),
+    { excerpt, state }
+  );
 }
 
 export function hangAiTextDisplayFromReference(params: {
@@ -67,6 +79,24 @@ export function hangAiTextDisplayFromReference(params: {
     workflowId: params.workflowId,
     mediaId,
     body: params.body,
+  });
+}
+
+export function setAiTextDisplayState(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+  readonly state: AiTextStagingDisplayState;
+}): void {
+  const key = displayKey(
+    params.organizationId,
+    params.workflowId,
+    params.mediaId
+  );
+  const existing = hungDisplays.get(key);
+  writeDisplay(key, {
+    excerpt: existing?.excerpt ?? "",
+    state: params.state,
   });
 }
 
@@ -128,4 +158,13 @@ export function rekeyAiTextDisplay(params: {
   if (changed) {
     notifyAiTextDisplayChanged();
   }
+}
+
+/** @internal — tests only */
+export function clearAiTextDisplaysForTests(): void {
+  if (hungDisplays.size === 0) {
+    return;
+  }
+  hungDisplays.clear();
+  notifyAiTextDisplayChanged();
 }

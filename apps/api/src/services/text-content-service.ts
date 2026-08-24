@@ -1,8 +1,4 @@
-import type {
-  TextContentRegisterResponse,
-  TextContentStageRequest,
-  TextContentSyncEvent,
-} from "@dafthunk/types";
+import type { TextContentSyncEvent } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { createDatabase, type Database } from "../db";
@@ -13,32 +9,24 @@ import {
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
 import { isTosRequestError } from "../integrations/volcengine/tos-errors";
 import { decryptSecret } from "../utils/encryption";
-import {
-  applyTextEditOps,
-  sha256HexFromBytes,
-  sha256HexFromText,
-  syncOpsFromBaseToPending,
-} from "../utils/text-content-utils";
+import { sha256HexFromText } from "../utils/text-content-utils";
 import { recordCloudStorageHealthFromError } from "./probe-org-cloud-storage-health";
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
-import {
-  appendTextContentCacheOps,
-  clearTextContentCacheEntry,
-  getTextContentCacheEntry,
-  listTextContentCacheEntries,
-} from "./text-content-cache";
-import {
-  presignTosMediaDownloadUrls,
-  presignTosMediaUpload,
-} from "./tos-media-presign";
+import { presignTosMediaDownloadUrls, presignTosMediaUpload } from "./tos-media-presign";
 
-const MERGE_DEBOUNCE_MS = 30_000;
-
-const mergeTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-function mergeTimerKey(organizationId: string, resourceId: string): string {
-  return `${organizationId}:${resourceId}`;
+export interface SaveTextContentParams {
+  readonly organizationId: string;
+  readonly text: string;
+  readonly mimeType: string;
+  readonly workflowId?: string;
+  readonly resourceId?: string;
+  readonly baseSha256?: string;
 }
+
+export type SaveTextContentResult =
+  | { readonly resourceId: string; readonly contentSha256: string }
+  | { readonly conflict: true; readonly dbSha256?: string }
+  | null;
 
 async function createOrgTosClient(
   env: Bindings,
@@ -128,7 +116,7 @@ async function getCatalogRow(
   return rows[0] ?? null;
 }
 
-export async function registerTextContentUpload(
+async function allocateTextContentStorage(
   env: Bindings,
   params: {
     readonly organizationId: string;
@@ -136,21 +124,19 @@ export async function registerTextContentUpload(
     readonly mimeType: string;
     readonly contentLength: number;
     readonly workflowId?: string;
-    readonly replacesResourceId?: string;
     readonly objectId?: string;
   }
-): Promise<TextContentRegisterResponse | null> {
+): Promise<{ readonly resourceId: string; readonly storageKey: string } | null> {
   const presigned = await presignTosMediaUpload(env, {
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     mimeType: params.mimeType,
     contentLength: params.contentLength,
     mediaKind: "reference",
-    replacesResourceId: params.replacesResourceId,
     objectId: params.objectId,
   });
 
-  if (!presigned) {
+  if (!presigned?.reference.storageKey) {
     return null;
   }
 
@@ -161,16 +147,92 @@ export async function registerTextContentUpload(
       organizationId: params.organizationId,
       kind: "cloud",
       mimeType: params.mimeType,
-      storageKey: presigned.reference.storageKey ?? null,
+      storageKey: presigned.reference.storageKey,
       contentSha256: params.contentSha256,
     },
   ]);
 
   return {
     resourceId: presigned.reference.id,
-    uploadUrl: presigned.uploadUrl,
-    uploadHeaders: presigned.uploadHeaders,
+    storageKey: presigned.reference.storageKey,
   };
+}
+
+export function isTextContentSaveConflict(
+  result: SaveTextContentResult
+): result is { readonly conflict: true; readonly dbSha256?: string } {
+  return Boolean(result && "conflict" in result && result.conflict);
+}
+
+/** Write full text on the server. Browser never PUTs to object storage. */
+export async function saveTextContent(
+  env: Bindings,
+  params: SaveTextContentParams
+): Promise<SaveTextContentResult> {
+  const contentSha256 = sha256HexFromText(params.text);
+  const bytes = new TextEncoder().encode(params.text);
+  const db = createDatabase(env);
+
+  if (params.resourceId) {
+    const row = await getCatalogRow(
+      db,
+      params.organizationId,
+      params.resourceId
+    );
+    if (
+      row &&
+      params.baseSha256 &&
+      row.contentSha256 &&
+      row.contentSha256 !== params.baseSha256
+    ) {
+      return { conflict: true, dbSha256: row.contentSha256 };
+    }
+
+    if (row?.storageKey) {
+      if (row.contentSha256 === contentSha256) {
+        return { resourceId: row.id, contentSha256 };
+      }
+
+      await putTosTextBytes(env, {
+        organizationId: params.organizationId,
+        storageKey: row.storageKey,
+        mimeType: params.mimeType,
+        body: bytes,
+      });
+      await upsertMediaResources(db, [
+        {
+          id: row.id,
+          organizationId: params.organizationId,
+          kind: row.kind,
+          mimeType: params.mimeType,
+          storageKey: row.storageKey,
+          contentSha256,
+        },
+      ]);
+      return { resourceId: row.id, contentSha256 };
+    }
+  }
+
+  const allocated = await allocateTextContentStorage(env, {
+    organizationId: params.organizationId,
+    contentSha256,
+    mimeType: params.mimeType,
+    contentLength: Math.max(bytes.byteLength, 1),
+    workflowId: params.workflowId,
+    objectId: params.resourceId,
+  });
+  if (!allocated) {
+    return null;
+  }
+
+  await putTosTextBytes(env, {
+    organizationId: params.organizationId,
+    storageKey: allocated.storageKey,
+    mimeType: params.mimeType,
+    body: bytes,
+  });
+
+  return { resourceId: allocated.resourceId, contentSha256 };
 }
 
 export async function persistGeneratedTextContent(
@@ -183,187 +245,19 @@ export async function persistGeneratedTextContent(
     readonly resourceId?: string;
   }
 ): Promise<{ readonly resourceId: string; readonly contentSha256: string } | null> {
-  const contentSha256 = sha256HexFromText(params.text);
-  const bytes = new TextEncoder().encode(params.text);
-  const registered = await registerTextContentUpload(env, {
+  const result = await saveTextContent(env, {
     organizationId: params.organizationId,
-    contentSha256,
-    mimeType: params.mimeType,
-    contentLength: bytes.byteLength,
     workflowId: params.workflowId,
-    objectId: params.resourceId,
-  });
-
-  if (!registered) {
-    return null;
-  }
-
-  const db = createDatabase(env);
-  const row = await getCatalogRow(
-    db,
-    params.organizationId,
-    registered.resourceId
-  );
-  if (!row?.storageKey) {
-    return null;
-  }
-
-  await putTosTextBytes(env, {
-    organizationId: params.organizationId,
-    storageKey: row.storageKey,
+    text: params.text,
     mimeType: params.mimeType,
-    body: bytes,
+    resourceId: params.resourceId,
   });
 
-  clearTextContentCacheEntry(params.organizationId, registered.resourceId);
-  return { resourceId: registered.resourceId, contentSha256 };
-}
-
-export async function stageTextContentEdits(
-  env: Bindings,
-  params: {
-    readonly organizationId: string;
-    readonly request: TextContentStageRequest;
-  }
-): Promise<{ readonly ok: true } | { readonly conflict: true; readonly dbSha256?: string }> {
-  const db = createDatabase(env);
-  const row = await getCatalogRow(
-    db,
-    params.organizationId,
-    params.request.resourceId
-  );
-  if (!row) {
-    return { conflict: true };
+  if (!result || isTextContentSaveConflict(result)) {
+    return null;
   }
 
-  const dbSha = row.contentSha256 ?? undefined;
-  if (dbSha && dbSha !== params.request.baseSha256) {
-    return { conflict: true, dbSha256: dbSha };
-  }
-
-  appendTextContentCacheOps(params.organizationId, params.request.resourceId, {
-    baseSha256: params.request.baseSha256,
-    pendingSha256: params.request.pendingSha256,
-    ops: params.request.ops,
-  });
-
-  scheduleTextContentMerge(env, {
-    organizationId: params.organizationId,
-    resourceId: params.request.resourceId,
-  });
-
-  return { ok: true };
-}
-
-export function scheduleTextContentMerge(
-  env: Bindings,
-  params: {
-    readonly organizationId: string;
-    readonly resourceId: string;
-    readonly immediate?: boolean;
-  }
-): void {
-  const key = mergeTimerKey(params.organizationId, params.resourceId);
-  const existing = mergeTimers.get(key);
-  if (existing) {
-    clearTimeout(existing);
-  }
-
-  const delayMs = params.immediate ? 0 : MERGE_DEBOUNCE_MS;
-  mergeTimers.set(
-    key,
-    setTimeout(() => {
-      mergeTimers.delete(key);
-      void mergeTextContentResource(env, params).catch((error) => {
-        console.warn("[text-content] merge failed", error);
-      });
-    }, delayMs)
-  );
-}
-
-export async function mergeTextContentResource(
-  env: Bindings,
-  params: {
-    readonly organizationId: string;
-    readonly resourceId: string;
-  }
-): Promise<boolean> {
-  const cache = getTextContentCacheEntry(
-    params.organizationId,
-    params.resourceId
-  );
-  if (!cache || cache.ops.length === 0) {
-    return false;
-  }
-
-  const db = createDatabase(env);
-  const row = await getCatalogRow(
-    db,
-    params.organizationId,
-    params.resourceId
-  );
-  if (!row?.storageKey) {
-    return false;
-  }
-
-  const dbSha = row.contentSha256 ?? cache.baseSha256;
-  if (dbSha !== cache.baseSha256) {
-    return false;
-  }
-
-  const baseBytes =
-    (await fetchTosTextBytes(env, {
-      organizationId: params.organizationId,
-      storageKey: row.storageKey,
-    })) ?? new Uint8Array();
-
-  if (row.contentSha256 && sha256HexFromBytes(baseBytes) !== row.contentSha256) {
-    return false;
-  }
-
-  const merged = applyTextEditOps(baseBytes, cache.ops);
-  const mergedSha = sha256HexFromBytes(merged);
-  if (mergedSha !== cache.pendingSha256) {
-    return false;
-  }
-
-  await putTosTextBytes(env, {
-    organizationId: params.organizationId,
-    storageKey: row.storageKey,
-    mimeType: row.mimeType,
-    body: merged,
-  });
-
-  await upsertMediaResources(db, [
-    {
-      id: row.id,
-      organizationId: params.organizationId,
-      kind: row.kind,
-      mimeType: row.mimeType,
-      storageKey: row.storageKey,
-      contentSha256: mergedSha,
-    },
-  ]);
-
-  clearTextContentCacheEntry(params.organizationId, params.resourceId);
-  return true;
-}
-
-export async function runDueTextContentMerges(env: Bindings): Promise<void> {
-  const now = Date.now();
-  for (const row of listTextContentCacheEntries()) {
-    if (now - row.entry.updatedAt < MERGE_DEBOUNCE_MS) {
-      continue;
-    }
-    await mergeTextContentResource(env, {
-      organizationId: row.organizationId,
-      resourceId: row.resourceId,
-    });
-  }
-}
-
-function encodeSyncEvent(event: TextContentSyncEvent): Uint8Array {
-  return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+  return result;
 }
 
 export async function streamTextContentSync(
@@ -384,92 +278,43 @@ export async function streamTextContentSync(
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (event: TextContentSyncEvent): void => {
-        controller.enqueue(encodeSyncEvent(event));
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
+        );
       };
 
-      if (!row) {
-        send({ type: "conflict" });
+      if (!row?.storageKey) {
+        send({ type: "missing" });
         controller.close();
         return;
       }
 
       const dbSha = row.contentSha256 ?? "";
-      const cache = getTextContentCacheEntry(
-        params.organizationId,
-        params.resourceId
-      );
-
-      if (!params.localSha) {
-        if (!row.storageKey) {
-          send({ type: "conflict", dbSha256: dbSha || undefined });
-          controller.close();
-          return;
-        }
-
-        const [downloadUrl] = await presignTosMediaDownloadUrls(env, {
-          organizationId: params.organizationId,
-          references: [
-            {
-              id: row.id,
-              mimeType: row.mimeType,
-              storageKey: row.storageKey,
-              storageBackend: "volcengine_tos",
-            },
-          ],
-        });
-
-        send({ type: "download", downloadUrl, dbSha256: dbSha });
-        controller.close();
-        return;
-      }
-
-      if (!cache || cache.pendingSha256 === dbSha) {
+      if (params.localSha && params.localSha === dbSha) {
         send({ type: "unchanged", dbSha256: dbSha });
         controller.close();
         return;
       }
 
-      if (cache.baseSha256 !== dbSha) {
-        send({ type: "conflict", dbSha256: dbSha || undefined });
-        controller.close();
-        return;
-      }
-
-      const baseBytes = row.storageKey
-        ? ((await fetchTosTextBytes(env, {
-            organizationId: params.organizationId,
+      const [downloadUrl] = await presignTosMediaDownloadUrls(env, {
+        organizationId: params.organizationId,
+        references: [
+          {
+            id: row.id,
+            mimeType: row.mimeType,
             storageKey: row.storageKey,
-          })) ?? new Uint8Array())
-        : new Uint8Array();
+            storageBackend: "volcengine_tos",
+          },
+        ],
+      });
 
-      const pendingBytes = applyTextEditOps(baseBytes, cache.ops);
-      if (sha256HexFromBytes(pendingBytes) !== cache.pendingSha256) {
-        send({ type: "conflict", dbSha256: dbSha || undefined });
-        controller.close();
-        return;
-      }
-
-      const syncOps = syncOpsFromBaseToPending(baseBytes, pendingBytes);
-      for (const op of syncOps) {
-        if (op.op === "append") {
-          send({ type: "append", text: op.text });
-          continue;
-        }
-        send({
-          type: "replace",
-          start: op.start,
-          end: op.end,
-          text: op.text,
-        });
-      }
-
-      send({ type: "done", pendingSha256: cache.pendingSha256 });
+      send({ type: "download", downloadUrl, dbSha256: dbSha });
       controller.close();
     },
   });
 }
 
-/** Read merged text body for workflow/runtime keyword resolution. */
+/** Read stored text body for workflow/runtime keyword resolution. */
 export async function readTextContentBody(
   env: Bindings,
   params: {
@@ -483,42 +328,17 @@ export async function readTextContentBody(
     params.organizationId,
     params.resourceId
   );
-  if (!row) {
+  if (!row?.storageKey) {
     return null;
   }
 
-  const cache = getTextContentCacheEntry(
-    params.organizationId,
-    params.resourceId
-  );
-
-  const baseBytes = row.storageKey
-    ? ((await fetchTosTextBytes(env, {
-        organizationId: params.organizationId,
-        storageKey: row.storageKey,
-      })) ?? new Uint8Array())
-    : new Uint8Array();
-
-  if (cache && cache.ops.length > 0) {
-    const pendingBytes = applyTextEditOps(baseBytes, cache.ops);
-    if (sha256HexFromBytes(pendingBytes) === cache.pendingSha256) {
-      return new TextDecoder().decode(pendingBytes);
-    }
-  }
-
-  if (baseBytes.byteLength === 0) {
+  const baseBytes = await fetchTosTextBytes(env, {
+    organizationId: params.organizationId,
+    storageKey: row.storageKey,
+  });
+  if (!baseBytes || baseBytes.byteLength === 0) {
     return null;
   }
 
   return new TextDecoder().decode(baseBytes);
-}
-
-export function flushTextContentMerge(
-  env: Bindings,
-  params: {
-    readonly organizationId: string;
-    readonly resourceId: string;
-  }
-): void {
-  scheduleTextContentMerge(env, { ...params, immediate: true });
 }

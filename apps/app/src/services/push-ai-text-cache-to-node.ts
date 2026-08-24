@@ -7,22 +7,54 @@ import {
 
 import { isAiTextGenerating, readAiTextResultHistory } from "@/components/workflow/ai-text-node-utils";
 import { readAiTextResultReference } from "@/components/workflow/ai-text-persist-utils";
+import {
+  withAiTextStagingDisplayState,
+  type AiTextStagingDisplayState,
+} from "@/components/workflow/ai-text-staging-display-state";
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
-import { loadAiTextBodyFromCache } from "@/services/ai-text-cache-layer";
+import { readyAiTextStaging } from "@/services/ai-text-cache-layer";
 
 export interface PushAiTextCacheToDisplayParams {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly reference: WorkflowMediaValue;
   readonly workflowSha?: string;
+  readonly onDisplayState?: (state: AiTextStagingDisplayState) => void;
 }
 
-/** Cache hydrates IndexedDB then hangs preview/body for the card. */
+export function patchNodesAiTextStagingState(
+  nodes: readonly ReactFlowNode<WorkflowNodeType>[],
+  nodeId: string,
+  state: AiTextStagingDisplayState
+): ReactFlowNode<WorkflowNodeType>[] {
+  let changed = false;
+  const next = nodes.map((node) => {
+    if (node.id !== nodeId) {
+      return node;
+    }
+    const metadata = withAiTextStagingDisplayState(node.data.metadata, state);
+    if (metadata === node.data.metadata) {
+      return node;
+    }
+    changed = true;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        metadata,
+      },
+    };
+  });
+  return changed ? next : (nodes as ReactFlowNode<WorkflowNodeType>[]);
+}
+
+/** Cache hydrates IndexedDB then hangs preview excerpt for the card. */
 export async function pushAiTextCacheToDisplay(
   params: PushAiTextCacheToDisplayParams
 ): Promise<boolean> {
-  const body = await loadAiTextBodyFromCache(params);
-  return Boolean(body?.trim());
+  const result = await readyAiTextStaging(params);
+  params.onDisplayState?.(result.state);
+  return result.state === "ready";
 }
 
 export interface CollectWorkflowAiTextNodeRef {
@@ -72,6 +104,10 @@ export function pushWorkflowAiTextCacheInBackground(params: {
   readonly workflowId: string;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
   readonly onlyFingerprints?: ReadonlySet<string>;
+  readonly applyDisplayState?: (
+    nodeId: string,
+    state: AiTextStagingDisplayState
+  ) => void;
 }): void {
   for (const item of collectWorkflowAiTextNodeRefs(params.nodes)) {
     if (
@@ -90,8 +126,10 @@ export function pushWorkflowAiTextCacheInBackground(params: {
       workflowId: params.workflowId,
       reference: item.reference,
       workflowSha,
+      onDisplayState: (state) =>
+        params.applyDisplayState?.(item.nodeId, state),
     }).catch(() => {
-      // Best-effort cache → canvas hang.
+      params.applyDisplayState?.(item.nodeId, "failed");
     });
   }
 }

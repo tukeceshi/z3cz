@@ -755,6 +755,34 @@ export class WorkflowStore {
   }
 
   /**
+   * Patch name/description in the R2 workflow JSON without resubmitting the graph.
+   * D1 must already be updated by the caller when list metadata changes.
+   */
+  async syncDataMetadata(
+    workflowId: string,
+    patch: { name?: string; description?: string | null }
+  ): Promise<void> {
+    if (patch.name === undefined && patch.description === undefined) {
+      return;
+    }
+
+    const existing = await this.readFromR2(workflowId);
+    if (!existing) {
+      return;
+    }
+
+    const updated: WorkflowType = {
+      ...existing,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined
+        ? { description: patch.description ?? undefined }
+        : {}),
+    };
+
+    await this.writeToR2(updated);
+  }
+
+  /**
    * Update workflow metadata (name, type, timestamps)
    */
   async update(

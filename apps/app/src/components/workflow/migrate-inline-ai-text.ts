@@ -17,10 +17,7 @@ import {
 } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
-import {
-  registerTextContent,
-  uploadTextContentBlob,
-} from "@/services/text-content-service";
+import { saveTextContent } from "@/services/text-content-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
 
 export function nodeHasInlineAiText(data: WorkflowNodeType): boolean {
@@ -63,26 +60,19 @@ async function stageTextReference(
 
   if (params.cloudConfigured) {
     try {
-      const blob = new Blob([text], { type: mimeType });
-      const registered = await registerTextContent({
+      const saved = await saveTextContent({
         organizationId: params.organizationId,
-        contentSha256,
-        mimeType,
-        contentLength: blob.size,
         workflowId: params.workflowId,
-      });
-      await uploadTextContentBlob({
-        uploadUrl: registered.uploadUrl,
-        uploadHeaders: registered.uploadHeaders,
-        blob,
+        text,
+        mimeType,
       });
       return {
         reference: buildResourceIdReference({
-          resourceId: registered.resourceId,
-          contentSha256,
+          resourceId: saved.resourceId,
+          contentSha256: saved.contentSha256,
           mimeType,
         }),
-        contentSha256,
+        contentSha256: saved.contentSha256,
       };
     } catch {
       // fall through to local staging

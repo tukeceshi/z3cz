@@ -25,7 +25,7 @@ import { useOrgUrl } from "@/hooks/use-org-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { inferAiTextMimeType } from "@dafthunk/types";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
-import { hangAiTextDisplayFromReference } from "@/services/ai-text-display-registry";
+import { hangAiTextExcerptFromKnownText } from "@/services/ai-text-cache-layer";
 import {
   isAiTextReferencePendingFromChips,
   resolveAiTextReferenceInputsFromChips,
@@ -66,6 +66,7 @@ import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
 import { buildResourceIdReference, readAiTextGeneratingResourceId } from "./ai-text-persist-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
+import { withAiTextStagingDisplayState } from "./ai-text-staging-display-state";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
@@ -314,6 +315,7 @@ export function AiTextConfigPanel({
       targetNodeType: AI_TEXT_NODE_TYPE,
       targetHandleId: AI_TEXT_KEYWORDS_HANDLE_ID,
       organizationId: orgId,
+      workflowId,
     });
     if (!limitVerdict.ok) {
       if (limitVerdict.reason === "too_long") {
@@ -352,9 +354,11 @@ export function AiTextConfigPanel({
       return;
     }
 
-    const textReferences = resolveAiTextReferenceInputsFromChips({
+    const textReferences = await resolveAiTextReferenceInputsFromChips({
       chips: textReferenceChips,
       nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+      organizationId: orgId,
+      workflowId,
     });
 
     const assembly = validateAiTextPromptAssembly({
@@ -465,19 +469,6 @@ export function AiTextConfigPanel({
           },
           onDelta: (_delta, fullText) => {
             streamPreviewPendingRef.current = fullText;
-            const hungResourceId = generatingResourceIdRef.current;
-            if (hungResourceId && orgId && workflowId && fullText.trim()) {
-              hangAiTextDisplayFromReference({
-                organizationId: orgId,
-                workflowId,
-                reference: {
-                  resourceId: hungResourceId,
-                  mimeType: "text/plain",
-                  generating: true,
-                },
-                body: fullText,
-              });
-            }
             if (streamPreviewRafRef.current !== null) {
               return;
             }
@@ -543,7 +534,7 @@ export function AiTextConfigPanel({
         sessionText: response.text,
       };
 
-      hangAiTextDisplayFromReference({
+      const displayState = hangAiTextExcerptFromKnownText({
         organizationId: orgId,
         workflowId,
         reference,
@@ -558,9 +549,12 @@ export function AiTextConfigPanel({
         });
         return {
           ...withResult,
-          metadata: withGenerativeCardGenerateError(
-            withAiTextGeneratingFlag(withResult.metadata, false),
-            null
+          metadata: withAiTextStagingDisplayState(
+            withGenerativeCardGenerateError(
+              withAiTextGeneratingFlag(withResult.metadata, false),
+              null
+            ),
+            displayState
           ),
         };
       });

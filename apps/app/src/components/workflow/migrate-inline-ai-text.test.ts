@@ -15,8 +15,7 @@ vi.mock("@/services/ai-text-storage-service", () => ({
 }));
 
 vi.mock("@/services/text-content-service", () => ({
-  registerTextContent: vi.fn(),
-  uploadTextContentBlob: vi.fn(),
+  saveTextContent: vi.fn(),
 }));
 
 vi.mock("@/utils/text-content-utils", () => ({

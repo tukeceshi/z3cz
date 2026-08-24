@@ -57,13 +57,33 @@ describe("evaluateGenerativeReferenceReadiness", () => {
   it("rejects pending resourceId text bodies", () => {
     const verdict = evaluateGenerativeReferenceReadiness({
       sourceData: textNode({
-        result: { resourceId: "text-res-1", mimeType: "text/plain" },
+        result: {
+          resourceId: "text-res-1",
+          mimeType: "text/plain",
+          contentSha256: "abc",
+        },
       }),
       targetNodeType: AI_TEXT_NODE_TYPE,
       targetHandleId: AI_TEXT_KEYWORDS_HANDLE_ID,
     });
     expect(verdict.ok).toBe(false);
     expect(verdict.reason).toBe("not_ready");
+  });
+
+  it("allows keyword references once staging is ready", () => {
+    const verdict = evaluateGenerativeReferenceReadiness({
+      sourceData: textNode({
+        result: {
+          resourceId: "text-res-1",
+          mimeType: "text/plain",
+          contentSha256: "abc",
+        },
+        metadata: { aiTextStagingState: "ready" },
+      }),
+      targetNodeType: AI_TEXT_NODE_TYPE,
+      targetHandleId: AI_TEXT_KEYWORDS_HANDLE_ID,
+    });
+    expect(verdict.ok).toBe(true);
   });
 });
 

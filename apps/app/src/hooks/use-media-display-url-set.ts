@@ -132,10 +132,19 @@ export function useMediaDisplayUrlSet({
         workflowId,
         mediaId: mediaKey,
       });
+      const currentMedia = mediaRef.current;
+      if (currentMedia && nodeType) {
+        ingestCanvasMediaInBackground({
+          organizationId: orgId,
+          workflowId,
+          media: currentMedia,
+          nodeType,
+        });
+      }
     }
     setUrlSet(EMPTY_MEDIA_DISPLAY_URL_SET);
     setCacheRevision((value) => value + 1);
-  }, [mediaKey, orgId, workflowId]);
+  }, [mediaKey, nodeType, orgId, workflowId]);
 
   useEffect(() => {
     const handler = () => {
@@ -205,15 +214,6 @@ export function useMediaDisplayUrlSet({
       setUrlSet((prev) =>
         mediaDisplayUrlSetsEqual(prev, resolved) ? prev : resolved
       );
-
-      if (isMediaDisplayUrlSetEmpty(resolved) && nodeType) {
-        ingestCanvasMediaInBackground({
-          organizationId: orgId,
-          workflowId,
-          media: currentMedia,
-          nodeType,
-        });
-      }
     });
 
     return () => {

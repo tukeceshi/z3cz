@@ -33,9 +33,10 @@ import {
   readAiTextGeneratingResourceId,
   readAiTextResultReference,
 } from "./ai-text-persist-utils";
+import { readAiTextStagingDisplayState } from "./ai-text-staging-display-state";
 import {
+  isUpstreamAiTextFailedLoad,
   isUpstreamAiTextPendingLoad,
-  readAiTextCanvasBodySync,
 } from "./resolve-ai-text-result";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -89,6 +90,9 @@ function evaluateTextSourceReadiness(params: {
   if (readAiTextGeneratingResourceId(params.sourceData.inputs)) {
     return { ok: false, reason: "generating" };
   }
+  if (isUpstreamAiTextFailedLoad(params.sourceData)) {
+    return { ok: false, reason: "failed" };
+  }
   if (isUpstreamAiTextPendingLoad(params.sourceData)) {
     return { ok: false, reason: "not_ready" };
   }
@@ -96,7 +100,11 @@ function evaluateTextSourceReadiness(params: {
   const requiresBody =
     params.targetNodeType === AI_TEXT_NODE_TYPE &&
     params.targetHandleId === AI_TEXT_KEYWORDS_HANDLE_ID;
-  if (requiresBody && !readAiTextCanvasBodySync(params.sourceData).trim()) {
+  if (
+    requiresBody &&
+    (!reference ||
+      readAiTextStagingDisplayState(params.sourceData.metadata) === "empty")
+  ) {
     return { ok: false, reason: "empty" };
   }
 
