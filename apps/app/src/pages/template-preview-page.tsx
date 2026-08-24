@@ -1,4 +1,3 @@
-import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -88,21 +87,18 @@ export function TemplatePreviewPage() {
             }
       }
     >
-      <ReactFlowProvider>
-        <WorkflowBuilder
-          workflowId={`template-${template.id}`}
-          workflowTrigger={template.trigger}
-          initialNodes={nodes}
-          initialEdges={edges}
-          nodeTypes={nodeTypes}
-          mode="preview"
-          expandedOutputs={false}
-          createObjectUrl={() => ""}
-          orgId=""
-          showBackground={showBackground}
-          fitViewPadding={fitViewPadding}
-        />
-      </ReactFlowProvider>
+      <WorkflowBuilder
+        workflowId={`template-${template.id}`}
+        workflowTrigger={template.trigger}
+        initialNodes={nodes}
+        initialEdges={edges}
+        nodeTypes={nodeTypes}
+        mode="preview"
+        createObjectUrl={() => ""}
+        orgId=""
+        showBackground={showBackground}
+        fitViewPadding={fitViewPadding}
+      />
     </div>
   );
 }

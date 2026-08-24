@@ -2,7 +2,6 @@
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -248,7 +247,7 @@ function EditorPageCanvas() {
   }
 
   return (
-    <ReactFlowProvider>
+    <>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkflowBuilder
           workflowId={id || ""}
@@ -280,6 +279,6 @@ function EditorPageCanvas() {
         />
       </div>
       {!workflowReadOnly ? <CanvasThemeTip /> : null}
-    </ReactFlowProvider>
+    </>
   );
 }

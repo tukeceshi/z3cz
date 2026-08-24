@@ -1,6 +1,6 @@
 import type { ObjectReference } from "@dafthunk/types";
 import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, readNodeLayoutFromMetadata } from "@dafthunk/types";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useViewport } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
 import { DynamicIcon } from "lucide-react/dynamic.mjs";
@@ -80,6 +80,7 @@ import {
   isWorkflowHandleConnected,
   updateNodeInput,
   useWorkflowActions,
+  useWorkflowGraph,
 } from "./workflow-context";
 import { WorkflowNodeBottomPanel } from "./workflow-node-bottom-panel";
 import { useWorkflowNodeBottomPanelData } from "./workflow-node-canvas-ui";
@@ -251,6 +252,47 @@ export const TypeBadge = memo(
 
 TypeBadge.displayName = "TypeBadge";
 
+interface WorkflowNodeBottomPanelHostProps {
+  readonly nodeId: string;
+  readonly data: CanvasWorkflowNodeType;
+  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly contentVisible: boolean;
+  readonly isDragging: boolean;
+}
+
+/** Reads zoom locally so pan/zoom does not rewrite every node's data. */
+function WorkflowNodeBottomPanelHost({
+  nodeId,
+  data,
+  createObjectUrl,
+  contentVisible,
+  isDragging,
+}: WorkflowNodeBottomPanelHostProps) {
+  const { zoom } = useViewport();
+  const { isViewportMoving } = useWorkflowGraph();
+  const hide =
+    !contentVisible ||
+    isDragging ||
+    isViewportMoving ||
+    !isWorkflowBottomPanelVisible(zoom);
+
+  return (
+    <div
+      className={cn(
+        WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS,
+        hide && "invisible pointer-events-none"
+      )}
+      aria-hidden={hide}
+    >
+      <WorkflowNodeBottomPanel
+        nodeId={nodeId}
+        data={data}
+        createObjectUrl={createObjectUrl}
+      />
+    </div>
+  );
+}
+
 export const WorkflowNode = memo(
   ({
     data,
@@ -276,9 +318,6 @@ export const WorkflowNode = memo(
     const connectedHandleKeys =
       (data.connectedHandleKeys as readonly string[] | undefined) ?? [];
     const showBottomPanelHost = data.showBottomPanelHost === true;
-    const viewportZoom =
-      typeof data.viewportZoom === "number" ? data.viewportZoom : 1;
-    const isViewportMovingCanvas = data.isViewportMoving === true;
     const isDragging = dragging;
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [activeOutputId, setActiveOutputId] = useState<string | null>(null);
@@ -304,8 +343,7 @@ export const WorkflowNode = memo(
       () => readNodeLayoutFromMetadata(data.metadata),
       [data.metadata]
     );
-    const showBottomPanel =
-      isWorkflowBottomPanelVisible(viewportZoom) &&
+    const showBottomPanelContent =
       (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
         : shouldShowGenerativeBottomPanel(data.metadata)) &&
@@ -697,22 +735,13 @@ export const WorkflowNode = memo(
         </div>
 
         {showBottomPanelHost ? (
-          <div
-            className={cn(
-              WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS,
-              (!showBottomPanel || isDragging || isViewportMovingCanvas) &&
-                "invisible pointer-events-none"
-            )}
-            aria-hidden={
-              !showBottomPanel || isDragging || isViewportMovingCanvas
-            }
-          >
-            <WorkflowNodeBottomPanel
-              nodeId={id}
-              data={bottomPanelData}
-              createObjectUrl={data.createObjectUrl}
-            />
-          </div>
+          <WorkflowNodeBottomPanelHost
+            nodeId={id}
+            data={bottomPanelData}
+            createObjectUrl={data.createObjectUrl}
+            contentVisible={showBottomPanelContent}
+            isDragging={isDragging}
+          />
         ) : null}
 
         {activeInputId !== null ? (

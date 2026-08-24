@@ -95,7 +95,6 @@ import {
 } from "./workflow-node-placement";
 import { computeViewportForFlowCenter } from "./workflow-viewport-utils";
 import type {
-  ConnectionValidationState,
   NodeExecutionState,
   NodeExecutionUpdate,
   NodeType,
@@ -366,7 +365,6 @@ export interface UseGraphOperationsReturn {
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
   > | null;
-  connectionValidationState: ConnectionValidationState;
 
   // Setters (needed by sub-hooks and composition)
   setNodes: React.Dispatch<
@@ -509,8 +507,6 @@ export function useGraphOperations({
     ReactFlowNode<WorkflowNodeType>,
     ReactFlowEdge<WorkflowEdgeType>
   > | null>(null);
-  const [connectionValidationState, setConnectionValidationState] =
-    useState<ConnectionValidationState>("default");
   const [addNodeMenu, setAddNodeMenu] =
     useState<WorkflowAddNodeMenuState | null>(null);
   const addNodeMenuDismissGuardRef = useRef(false);
@@ -821,7 +817,6 @@ export function useGraphOperations({
   // Connection event handlers
   const onConnectStart = useCallback(() => {
     if (graphEditBlocked) return;
-    setConnectionValidationState("default");
   }, [graphEditBlocked]);
 
   // Connection validation
@@ -846,7 +841,6 @@ export function useGraphOperations({
           disabled: graphEditBlocked,
         });
 
-        setConnectionValidationState(valid ? "valid" : "invalid");
         return valid;
       },
       [
@@ -919,7 +913,6 @@ export function useGraphOperations({
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
       if (graphEditBlocked) {
-        setConnectionValidationState("default");
         return;
       }
 
@@ -955,7 +948,6 @@ export function useGraphOperations({
               },
             },
           });
-          setConnectionValidationState("default");
           return;
         }
 
@@ -984,8 +976,6 @@ export function useGraphOperations({
           }
         }
       }
-
-      setConnectionValidationState("default");
     },
     [generativeReferenceCatalogs, graphEditBlocked, onConnect, edgesRef, nodesRef, openAddNodeMenu, reactFlowInstance]
   );
@@ -1633,7 +1623,6 @@ export function useGraphOperations({
     selectedEdges,
     soleSelectedNodeId,
     reactFlowInstance,
-    connectionValidationState,
     setNodes,
     setEdges,
     setReactFlowInstance,

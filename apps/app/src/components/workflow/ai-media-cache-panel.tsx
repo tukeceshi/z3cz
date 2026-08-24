@@ -40,6 +40,7 @@ import {
   deleteCacheResourceTiers,
   downloadCacheForWorkflows,
   formatBytes,
+  formatMegabytesCompact,
   listWorkflowCacheResources,
   regenerateCacheResourceTiers,
   setAiMediaCacheSettings,
@@ -284,10 +285,7 @@ export function AiMediaCacheBar({
 
   const label = useMemo(() => {
     if (!stats) return t("workflow.aiMediaCache.loading");
-    return t("workflow.aiMediaCache.barUsage", {
-      used: formatBytes(stats.totalBytes),
-      limit: formatBytes(stats.limitBytes),
-    });
+    return `${formatMegabytesCompact(stats.totalBytes)} / ${formatMegabytesCompact(stats.limitBytes)}`;
   }, [stats, t]);
 
   return (
@@ -295,9 +293,10 @@ export function AiMediaCacheBar({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-700 shadow-xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        title={t("workflow.aiMediaCache.barLabel")}
+        className="workflow-flow-attribution"
       >
-        {t("workflow.aiMediaCache.barLabel")}: {label}
+        {label}
       </button>
       <AiMediaCachePanel
         organizationId={organizationId}

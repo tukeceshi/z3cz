@@ -1517,6 +1517,10 @@ export function formatBytes(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
+export function formatMegabytesCompact(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))}M`;
+}
+
 function toEntrySummary(entry: AiMediaCacheEntry): AiMediaCacheEntrySummary {
   return {
     key: entry.key,

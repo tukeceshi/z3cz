@@ -3331,7 +3331,7 @@ export const en = {
     aiCloudStorageBanner: {
       title: "Connect cloud storage before using AI outputs in production",
       description:
-        "Cloud storage is not configured. Images and videos use temporary links that may stop working after about 1 hour. Download promptly or use local cache (bottom-left).",
+        "Cloud storage is not configured. Images and videos use temporary links that may stop working after about 1 hour. Download promptly or use local cache (bottom-right).",
       configure: "Configure cloud storage",
       autoFixing: {
         title: "Attempting to auto-fix cloud storage",

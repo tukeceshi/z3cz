@@ -1,5 +1,4 @@
 import type { ObjectReference, WorkflowTrigger } from "@dafthunk/types";
-import { ReactFlowProvider } from "@xyflow/react";
 import Building2 from "lucide-react/icons/building-2";
 import Hash from "lucide-react/icons/hash";
 import { useCallback, useEffect, useMemo } from "react";
@@ -109,38 +108,36 @@ export function AdminWorkflowDetailPage() {
   }
 
   return (
-    <ReactFlowProvider>
-      <div className="h-full w-full flex flex-col relative">
-        <AdminDetailContextBar
-          items={[
-            {
-              icon: Building2,
-              label: workflow.organizationName,
-              to: `/admin/organizations/${workflow.organizationId}`,
-            },
-            {
-              icon: Hash,
-              label: workflow.id,
-              mono: true,
-            },
-          ]}
+    <div className="h-full w-full flex flex-col relative">
+      <AdminDetailContextBar
+        items={[
+          {
+            icon: Building2,
+            label: workflow.organizationName,
+            to: `/admin/organizations/${workflow.organizationId}`,
+          },
+          {
+            icon: Hash,
+            label: workflow.id,
+            mono: true,
+          },
+        ]}
+      />
+      <div className="w-full grow min-h-0">
+        <WorkflowBuilder
+          workflowId={workflow.id}
+          workflowName={workflow.name}
+          workflowDescription={workflow.description ?? undefined}
+          workflowTrigger={workflow.trigger as WorkflowTrigger}
+          initialNodes={reactFlowNodes}
+          initialEdges={reactFlowEdges}
+          nodeTypes={[]}
+          validateConnection={handleValidateConnection}
+          createObjectUrl={createObjectUrl}
+          mode="readonly"
+          orgId={workflow.organizationId}
         />
-        <div className="w-full grow min-h-0">
-          <WorkflowBuilder
-            workflowId={workflow.id}
-            workflowName={workflow.name}
-            workflowDescription={workflow.description ?? undefined}
-            workflowTrigger={workflow.trigger as WorkflowTrigger}
-            initialNodes={reactFlowNodes}
-            initialEdges={reactFlowEdges}
-            nodeTypes={[]}
-            validateConnection={handleValidateConnection}
-            createObjectUrl={createObjectUrl}
-            mode="readonly"
-            orgId={workflow.organizationId}
-          />
-        </div>
       </div>
-    </ReactFlowProvider>
+    </div>
   );
 }

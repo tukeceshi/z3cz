@@ -31,7 +31,6 @@ export interface WorkflowActionsContextValue {
   updateEdgeData: UpdateEdgeFn;
   deleteEdge: DeleteEdgeFn;
   disabled: boolean;
-  expandedOutputs: boolean;
   nodeTypes: NodeType[];
   allowedNodeTypes: ReadonlySet<string>;
   workflowTrigger?: WorkflowTrigger;
@@ -57,7 +56,6 @@ const defaultActions: WorkflowActionsContextValue = {
   updateEdgeData: () => {},
   deleteEdge: () => {},
   disabled: false,
-  expandedOutputs: false,
   nodeTypes: [],
   allowedNodeTypes: new Set(),
   generativeDefaults: undefined,
@@ -115,7 +113,6 @@ export interface WorkflowProviderProps {
   readonly soleSelectedNodeId?: string | null;
   readonly isViewportMoving?: boolean;
   readonly disabled?: boolean;
-  readonly expandedOutputs?: boolean;
   readonly nodeTypes?: NodeType[];
   readonly allowedNodeTypes?: ReadonlySet<string>;
   readonly workflowTrigger?: WorkflowTrigger;
@@ -136,7 +133,6 @@ export function WorkflowProvider({
   soleSelectedNodeId = null,
   isViewportMoving = false,
   disabled = false,
-  expandedOutputs = false,
   nodeTypes = [],
   allowedNodeTypes = new Set(),
   workflowTrigger,
@@ -151,7 +147,6 @@ export function WorkflowProvider({
       updateEdgeData,
       deleteEdge,
       disabled,
-      expandedOutputs,
       nodeTypes,
       allowedNodeTypes,
       workflowTrigger,
@@ -165,7 +160,6 @@ export function WorkflowProvider({
       updateEdgeData,
       deleteEdge,
       disabled,
-      expandedOutputs,
       nodeTypes,
       allowedNodeTypes,
       workflowTrigger,
