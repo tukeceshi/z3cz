@@ -5,6 +5,8 @@ import {
   isClientCancelledTextModelError,
   validateAiTextPromptAssembly,
   validateSubmitAiVideoReferences,
+  type AgentChatStreamEvent,
+  type AiModelInvocation,
   type CompleteGenerationJobUploadRequest,
   type GenerateAiAudioRequest,
   type GenerateAiImageRequest,
@@ -53,6 +55,19 @@ import {
   prepareTextModelStream,
   streamPreparedTextModel,
 } from "../services/stream-text-model";
+import {
+  getAllowedAgentChatBody,
+  listAgentChatDirectory,
+  putHeldAgentChatBody,
+  sealAgentChatConversation,
+  switchAgentChat,
+} from "../services/agent-chat-service";
+import {
+  createAgentChatLiveSseStream,
+  getAgentChatLiveJob,
+  startAgentChatLiveJob,
+  stopAgentChatLiveJob,
+} from "../services/agent-chat-live-job";
 import {
   listOrgImageModelOptions,
   resolveImageModelInterface,
@@ -2181,5 +2196,402 @@ platformAiRoutes.get("/media/proxy", async (c) => {
     },
   });
 });
+
+const AGENT_CHAT_SSE_HEADERS = {
+  "Content-Type": "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+} as const;
+
+function replayFinishedAgentChatSse(invocation: AiModelInvocation): Response {
+  const encoder = new TextEncoder();
+  const events: AgentChatStreamEvent[] = [
+    { type: "started", invocationId: invocation.id },
+    {
+      type: "snapshot",
+      text: invocation.content,
+      invocationId: invocation.id,
+    },
+  ];
+  if (invocation.status === "completed") {
+    events.push({
+      type: "done",
+      text: invocation.content,
+      invocationId: invocation.id,
+      aiInterfaceId: invocation.interfaceId ?? "",
+    });
+  } else if (invocation.status === "cancelled") {
+    events.push({
+      type: "stopped",
+      text: invocation.content,
+      invocationId: invocation.id,
+    });
+  } else {
+    events.push({
+      type: "error",
+      error: invocation.error ?? "Generation is no longer running",
+    });
+  }
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const event of events) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
+        );
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, { headers: AGENT_CHAT_SSE_HEADERS });
+}
+
+const agentChatMessageSchema = z.object({
+  role: z.enum(["user", "assistant", "system"]),
+  content: z.string().min(1),
+});
+
+const agentChatStreamSchema = z.object({
+  modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
+  messages: z.array(agentChatMessageSchema).min(1),
+  workflowId: z.string().optional(),
+});
+
+platformAiRoutes.post(
+  "/agent-chat/generate-stream",
+  zValidator("json", agentChatStreamSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+
+    const options = await listOrgTextModelOptions(db, organizationId);
+    const modelOption = options.find(
+      (entry) =>
+        entry.canonicalId === body.modelCanonicalId &&
+        entry.interfaceId === body.aiInterfaceId
+    );
+
+    if (!modelOption?.selectable) {
+      return c.json({ error: "Model is not available for this organization" }, 400);
+    }
+
+    const lastUser = [...body.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const promptExcerpt = (lastUser?.content ?? "").slice(0, 200);
+    const invocationId = crypto.randomUUID();
+
+    await createAiModelInvocation(db, {
+      id: invocationId,
+      organizationId,
+      userId: jwtPayload?.sub,
+      canonicalId: modelOption.canonicalId,
+      displayName: modelOption.displayName,
+      interfaceId: body.aiInterfaceId,
+      promptExcerpt,
+      content: "",
+      source: "workflow-agent",
+      status: "pending",
+      workflowId: body.workflowId,
+    });
+
+    const prepared = await prepareTextModelStream({
+      env: c.env,
+      db,
+      organizationId,
+      canonicalId: body.modelCanonicalId,
+      interfaceId: body.aiInterfaceId,
+      messages: body.messages,
+      outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
+    });
+
+    if (!prepared.ok) {
+      await finalizeAiModelInvocation(db, {
+        id: invocationId,
+        organizationId,
+        status: "failed",
+        error: prepared.invocationError ?? prepared.error,
+      });
+      return c.json({ error: prepared.error }, 502);
+    }
+
+    const upstreamLog = createUpstreamRequestLogger(db, {
+      organizationId,
+      interfaceId: body.aiInterfaceId,
+      invocationId,
+      operation: "submit",
+    });
+
+    const job = startAgentChatLiveJob({
+      invocationId,
+      organizationId,
+      aiInterfaceId: prepared.prepared.candidate.interfaceId,
+      createStream: async function* (signal) {
+        for await (const event of streamPreparedTextModel({
+          prepared: prepared.prepared,
+          signal,
+          upstreamLog,
+        })) {
+          if (event.type === "error") {
+            const failure = handleTextModelStreamFailure({
+              candidate: prepared.prepared.candidate,
+              upstreamError: event.error,
+              displayName: modelOption.displayName,
+            });
+            yield { type: "error", error: failure.error };
+            continue;
+          }
+          yield event;
+        }
+      },
+      onFinish: async (result) => {
+        if (result.status === "completed") {
+          await finalizeAiModelInvocation(db, {
+            id: invocationId,
+            organizationId,
+            status: "completed",
+            content: result.text,
+            interfaceId: prepared.prepared.candidate.interfaceId,
+            interfaceName: prepared.prepared.candidate.interfaceName,
+            error: null,
+          });
+          return;
+        }
+        if (result.status === "cancelled") {
+          await finalizeAiModelInvocation(db, {
+            id: invocationId,
+            organizationId,
+            status: "cancelled",
+            content: result.text,
+            error: null,
+          });
+          return;
+        }
+        await finalizeAiModelInvocation(db, {
+          id: invocationId,
+          organizationId,
+          status: "failed",
+          content: result.text,
+          error: result.error ?? "Stream failed",
+        });
+      },
+    });
+
+    runAfterResponse(c.executionCtx, job.finished);
+
+    return new Response(createAgentChatLiveSseStream(job), {
+      headers: AGENT_CHAT_SSE_HEADERS,
+    });
+  }
+);
+
+platformAiRoutes.get("/agent-chat/generate-stream/:invocationId", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const invocationId = c.req.param("invocationId");
+  const live = getAgentChatLiveJob(invocationId);
+  if (live && live.organizationId === organizationId) {
+    return new Response(createAgentChatLiveSseStream(live), {
+      headers: AGENT_CHAT_SSE_HEADERS,
+    });
+  }
+
+  const db = createDatabase(c.env);
+  const invocation = await getAiModelInvocation(
+    db,
+    organizationId,
+    invocationId
+  );
+  if (!invocation) {
+    return c.json({ error: "Generation is no longer running" }, 404);
+  }
+  return replayFinishedAgentChatSse(invocation);
+});
+
+platformAiRoutes.post("/agent-chat/generate-stream/:invocationId/stop", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const invocationId = c.req.param("invocationId");
+  const stopped = await stopAgentChatLiveJob(invocationId, organizationId);
+  if (stopped) {
+    return c.json({ text: stopped.text });
+  }
+
+  const db = createDatabase(c.env);
+  const invocation = await getAiModelInvocation(
+    db,
+    organizationId,
+    invocationId
+  );
+  if (!invocation) {
+    return c.json({ error: "Generation is no longer running" }, 404);
+  }
+  return c.json({ text: invocation.content });
+});
+
+platformAiRoutes.get("/agent-chats", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const userId = c.get("jwtPayload")?.sub;
+  const workflowId = c.req.query("workflowId")?.trim();
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  if (!workflowId) {
+    return c.json({ error: "workflowId is required" }, 400);
+  }
+  const db = createDatabase(c.env);
+  const result = await listAgentChatDirectory({
+    db,
+    organizationId,
+    workflowId,
+    userId,
+  });
+  return c.json(result);
+});
+
+const switchAgentChatSchema = z.object({
+  workflowId: z.string().min(1),
+  currentConversationId: z.string().min(1).optional(),
+  currentTitle: z.string().optional(),
+  currentBody: z
+    .object({
+      messages: z.array(
+        z.object({
+          id: z.string().min(1),
+          role: z.enum(["user", "assistant"]),
+          content: z.string(),
+        })
+      ),
+    })
+    .optional(),
+  targetConversationId: z.string().min(1).optional(),
+});
+
+platformAiRoutes.post(
+  "/agent-chats/switch",
+  zValidator("json", switchAgentChatSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const userId = c.get("jwtPayload")?.sub;
+    if (!userId) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+    const result = await switchAgentChat({
+      env: c.env,
+      db,
+      organizationId,
+      userId,
+      workflowId: body.workflowId,
+      currentConversationId: body.currentConversationId,
+      currentTitle: body.currentTitle,
+      currentBody: body.currentBody,
+      targetConversationId: body.targetConversationId,
+    });
+    if (!result.ok) {
+      return c.json(
+        {
+          inUse: true,
+          conversations: result.conversations,
+          cloudEnabled: result.cloudEnabled,
+        },
+        409
+      );
+    }
+    return c.json({
+      conversations: result.conversations,
+      current: result.current,
+      currentBody: null,
+      cloudEnabled: result.cloudEnabled,
+      inUse: false,
+    });
+  }
+);
+
+platformAiRoutes.post("/agent-chats/:conversationId/seal", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const userId = c.get("jwtPayload")?.sub;
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  const conversationId = c.req.param("conversationId");
+  const db = createDatabase(c.env);
+  const result = await sealAgentChatConversation({
+    db,
+    organizationId,
+    userId,
+    conversationId,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json({ current: result.current });
+});
+
+platformAiRoutes.get("/agent-chats/:conversationId/body", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const userId = c.get("jwtPayload")?.sub;
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  const conversationId = c.req.param("conversationId");
+  const db = createDatabase(c.env);
+  const result = await getAllowedAgentChatBody({
+    env: c.env,
+    db,
+    organizationId,
+    userId,
+    conversationId,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json({ body: result.body });
+});
+
+const putAgentChatBodySchema = z.object({
+  workflowId: z.string().min(1),
+  title: z.string(),
+  body: z.object({
+    messages: z.array(
+      z.object({
+        id: z.string().min(1),
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })
+    ),
+  }),
+});
+
+platformAiRoutes.put(
+  "/agent-chats/:conversationId/body",
+  zValidator("json", putAgentChatBodySchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const userId = c.get("jwtPayload")?.sub;
+    if (!userId) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const conversationId = c.req.param("conversationId");
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
+    const result = await putHeldAgentChatBody({
+      env: c.env,
+      db,
+      organizationId,
+      userId,
+      conversationId,
+      title: body.title,
+      body: body.body,
+    });
+    if (!result.ok) {
+      return c.json({ error: result.error }, 403);
+    }
+    return c.json({ ok: true });
+  }
+);
 
 export default platformAiRoutes;

@@ -80,6 +80,9 @@ export function AdminModelInvocationsPage() {
                   {invocation.displayName}
                 </p>
                 <p className="text-xs text-muted-foreground">
+                  {invocation.source === "workflow-agent"
+                    ? `${t("pages.adminModelInvocations.sourceAgent")} · `
+                    : ""}
                   {format(new Date(invocation.createdAt), "yyyy-MM-dd HH:mm")}
                 </p>
               </div>

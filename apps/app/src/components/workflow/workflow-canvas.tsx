@@ -36,6 +36,7 @@ import {
   useCanvasShortcutHintArrowOffset,
   useCanvasShortcutHintState,
 } from "./canvas-shortcut-hint";
+import { useCanvasBottomToolbarLayout } from "./canvas-bottom-toolbar-layout";
 import { WorkflowCanvasBottomToolbar } from "./workflow-canvas-bottom-toolbar";
 import {
   buildConnectedHandleKeysByNode,
@@ -182,6 +183,9 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
+  const canvasShellRef = useRef<HTMLDivElement>(null);
+  const agentChromeRef = useRef<HTMLDivElement>(null);
+  const toolbarPanelRef = useRef<HTMLDivElement>(null);
   const shortcutHintAnchorRef = useRef<HTMLDivElement>(null);
   const keyboardToolbarRef = useRef<HTMLDivElement>(null);
   const {
@@ -192,6 +196,12 @@ export function WorkflowCanvas({
   const shortcutHintArrowLeftPx = useCanvasShortcutHintArrowOffset({
     anchorRef: shortcutHintAnchorRef,
     keyboardRef: keyboardToolbarRef,
+  });
+  const bottomToolbarPanelStyle = useCanvasBottomToolbarLayout({
+    enabled: showControls,
+    shellRef: canvasShellRef,
+    agentRef: agentChromeRef,
+    toolbarPanelRef,
   });
   const [displayNodes, setDisplayNodes] =
     useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
@@ -245,6 +255,7 @@ export function WorkflowCanvas({
   return (
     <TooltipProvider>
       <div
+        ref={canvasShellRef}
         className={cn(
           "relative min-h-0",
           parked ? "h-px w-px overflow-hidden" : "h-full w-full",
@@ -350,14 +361,22 @@ export function WorkflowCanvas({
 
         {showControls && (
           <Panel position="bottom-left" className="m-4">
-            <WorkflowAgentSettingsOverlay />
+            <div ref={agentChromeRef} className="min-w-0">
+              <WorkflowAgentSettingsOverlay
+                orgId={organization?.id}
+                workflowId={workflowId}
+                workflowName={workflowId}
+              />
+            </div>
           </Panel>
         )}
 
         {showControls && (
           <Panel
+            ref={toolbarPanelRef}
             position="bottom-center"
             className="m-4"
+            style={bottomToolbarPanelStyle}
           >
             <div className="relative" ref={shortcutHintAnchorRef}>
               {!disabled && !shortcutHintCollapsed && (

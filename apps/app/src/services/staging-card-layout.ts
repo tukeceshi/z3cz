@@ -18,7 +18,7 @@ export function resolveStagingCardLayout(
   nodeType: AiMediaCacheNodeType,
   naturalSize?: { readonly width: number; readonly height: number } | null
 ): MediaCardSize {
-  if (nodeType === "ai-text") {
+  if (nodeType === "ai-text" || nodeType === "agent-chat") {
     return { width: AI_TEXT_CARD_WIDTH_PX, height: AI_TEXT_CARD_HEIGHT_PX };
   }
   if (nodeType === "ai-audio") {

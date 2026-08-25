@@ -5,6 +5,31 @@ import type {
 } from "@dafthunk/types";
 import { buildOpenAiMultimodalUserContent } from "@dafthunk/types";
 
+function readChatMessages(
+  value: unknown
+): Array<{ role: string; content: string }> | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+  const messages: Array<{ role: string; content: string }> = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    const role = record.role;
+    const content = record.content;
+    if (
+      (role === "user" || role === "assistant" || role === "system") &&
+      typeof content === "string" &&
+      content.trim().length > 0
+    ) {
+      messages.push({ role, content });
+    }
+  }
+  return messages.length > 0 ? messages : null;
+}
+
 function readStringArray(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -53,6 +78,20 @@ export function buildBodyFromSlots(params: {
     }
 
     if (slot.kind === "openai-messages") {
+      const history = readChatMessages(inputs.messages);
+      if (history) {
+        const messages: Array<{ role: string; content: unknown }> = [];
+        if (slot.systemField) {
+          const system = inputs[slot.systemField];
+          if (typeof system === "string" && system.trim().length > 0) {
+            messages.push({ role: "system", content: system });
+          }
+        }
+        messages.push(...history);
+        body[slot.to] = messages;
+        continue;
+      }
+
       const promptField = slot.promptField ?? "prompt";
       const prompt = inputs[promptField];
       if (typeof prompt !== "string" || prompt.trim().length === 0) {
