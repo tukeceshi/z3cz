@@ -29,7 +29,6 @@ import { DetachNodesConfirmDialog } from "./detach-nodes-confirm-dialog";
 import { writeSkipDetachWithRecordsConfirm } from "./detach-confirm-preference";
 import type { DetachConfirmSource, PendingDetachConfirm } from "./use-graph-history";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
-import { useResizableSidebar } from "./use-resizable-sidebar";
 import { useWorkflowState } from "./use-workflow-state";
 import { useOptionalCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
 import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
@@ -49,11 +48,6 @@ import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
-import { WorkflowSidebar } from "./workflow-sidebar";
-import {
-  readAgentSidebarPersistedState,
-  writeAgentSidebarPersistedState,
-} from "./workflow-agent-sidebar-persisted-state";
 import {
   isValidWorkflowEditorViewport,
   restoreEditorViewportWhenPaneStable,
@@ -208,7 +202,6 @@ export interface WorkflowBuilderProps {
   workflowDescription?: string;
   onWorkflowUpdate?: (name: string, description?: string) => void;
   orgId: string;
-  showSidebar?: boolean;
   showBackground?: boolean;
   fitViewPadding?: number;
   /** After workflow creation: center canvas at 100% zoom on first editor open only. */
@@ -246,7 +239,6 @@ export function WorkflowBuilder({
   workflowDescription,
   onWorkflowUpdate,
   orgId,
-  showSidebar,
   showBackground = true,
   fitViewPadding = 0.25,
   initialViewportOneToOne = false,
@@ -269,7 +261,6 @@ export function WorkflowBuilder({
   const canvasMaintenance = useOptionalCanvasMaintenance();
   const isCanvasFrozen = canvasMaintenance?.isCanvasFrozen ?? false;
   const interactive = mode !== "preview";
-  const sidebarEnabled = showSidebar ?? interactive;
 
   const allowedNodeTypes = useMemo(
     () => buildCatalogAllowedNodeTypeSet(nodeTypes),
@@ -383,22 +374,6 @@ export function WorkflowBuilder({
     enabled: !isCanvasFrozen,
     nodes,
     setNodes,
-  });
-
-  const agentSidebarPersisted = useMemo(
-    () => readAgentSidebarPersistedState(workflowId),
-    [workflowId]
-  );
-  const handleAgentSidebarPersist = useCallback(
-    (state: { visible: boolean; width: number }) => {
-      writeAgentSidebarPersistedState(workflowId, state);
-    },
-    [workflowId]
-  );
-  const sidebar = useResizableSidebar({
-    initialVisible: agentSidebarPersisted?.visible ?? false,
-    initialWidth: agentSidebarPersisted?.width,
-    onPersist: handleAgentSidebarPersist,
   });
 
   const handleQuickAddAiNode = useCallback(
@@ -821,24 +796,13 @@ export function WorkflowBuilder({
                   readOnly={readOnly}
                   onOpenWorkflowSettings={onOpenWorkflowSettings}
                   soleSelectedNodeId={soleSelectedNodeId}
-                  agentSidebarVisible={
-                    sidebarEnabled ? sidebar.isSidebarVisible : false
-                  }
-                  onToggleAgentSidebar={
-                    sidebarEnabled ? sidebar.toggleSidebar : undefined
-                  }
                 />
               ) : null}
               <div
                 className={cn(
-                  "h-full overflow-hidden relative",
+                  "h-full w-full overflow-hidden relative",
                   !canvasRevealed && "invisible"
                 )}
-                style={{
-                  width: sidebar.isSidebarVisible
-                    ? `calc(100% - ${sidebar.sidebarWidth}px)`
-                    : "100%",
-                }}
               >
                 <WorkflowEditorMainArea
                   nodes={nodes}
@@ -859,15 +823,6 @@ export function WorkflowBuilder({
                   onMoveEnd={handleViewportMoveEnd}
                   onInit={handleReactFlowInit}
                   onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
-                  onToggleSidebar={
-                    sidebarEnabled && !workflowsListUrl
-                      ? sidebar.toggleSidebar
-                      : undefined
-                  }
-                  isSidebarVisible={
-                    sidebarEnabled ? sidebar.isSidebarVisible : false
-                  }
-                  showAgentToggle={!workflowsListUrl}
                   reserveTopChromeSpace={Boolean(workflowsListUrl)}
                   isValidConnection={isValidConnection}
                   disabled={readOnly}
@@ -911,26 +866,6 @@ export function WorkflowBuilder({
                   }
                 />
               </div>
-
-              {sidebar.isSidebarVisible && (
-                <>
-                  <div
-                    className={cn(
-                      "w-1 bg-neutral-50 border-l border-border cursor-col-resize",
-                      sidebar.isResizing && "bg-muted"
-                    )}
-                    onMouseDown={sidebar.handleResizeStart}
-                  />
-                  <div style={{ width: `${sidebar.sidebarWidth}px` }}>
-                    <WorkflowSidebar
-                      selectedNodes={selectedNodes}
-                      selectedEdges={selectedEdges}
-                      onEdgeUpdate={readOnly ? undefined : updateEdgeData}
-                      disabledWorkflow={readOnly}
-                    />
-                  </div>
-                </>
-              )}
             </div>
 
           <WorkflowSettingsDialog
@@ -1049,6 +984,8 @@ type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas> & {
     items: readonly AddGenerativeNodesBatchItem[]
   ) => readonly string[];
   readonly onSelectDroppedNodes?: (nodeIds: readonly string[]) => void;
+  /** When true, studio overlay sits below floating canvas chrome. */
+  readonly reserveTopChromeSpace?: boolean;
 };
 
 function WorkflowEditorMainArea({

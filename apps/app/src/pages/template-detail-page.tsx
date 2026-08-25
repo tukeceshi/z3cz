@@ -150,7 +150,6 @@ function TemplateDetailPageContent() {
           mode="readonly"
           createObjectUrl={() => ""}
           orgId={orgId}
-          showSidebar={false}
         />
       </div>
     </div>

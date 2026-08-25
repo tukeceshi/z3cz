@@ -8,10 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserProfile } from "@/components/user-profile";
 import { cn } from "@/utils/utils";
 
-import {
-  canvasChromeChipActiveClassName,
-  canvasChromeChipClassName,
-} from "./canvas-chrome-styles";
+import { canvasChromeChipClassName } from "./canvas-chrome-styles";
 import { CanvasViewModeToggle } from "./canvas-view-mode-toggle";
 import { useCreativeStudio } from "./creative-studio-context";
 
@@ -21,8 +18,6 @@ export interface WorkflowEditorCanvasChromeProps {
   readonly readOnly: boolean;
   readonly onOpenWorkflowSettings?: () => void;
   readonly soleSelectedNodeId: string | null;
-  readonly agentSidebarVisible: boolean;
-  readonly onToggleAgentSidebar?: () => void;
 }
 
 export function WorkflowEditorCanvasChrome({
@@ -31,8 +26,6 @@ export function WorkflowEditorCanvasChrome({
   readOnly,
   onOpenWorkflowSettings,
   soleSelectedNodeId,
-  agentSidebarVisible,
-  onToggleAgentSidebar,
 }: WorkflowEditorCanvasChromeProps) {
   const { t, siteSettings } = useTranslation();
   const { viewMode, returnToCanvas, showStudio } = useCreativeStudio();
@@ -104,26 +97,6 @@ export function WorkflowEditorCanvasChrome({
         <LanguageToggle className={canvasChromeChipClassName} />
         <ThemeToggle className={canvasChromeChipClassName} />
         <UserProfile />
-        {onToggleAgentSidebar ? (
-          <button
-            type="button"
-            className={cn(
-              canvasChromeChipClassName,
-              "font-medium",
-              agentSidebarVisible && canvasChromeChipActiveClassName
-            )}
-            onClick={onToggleAgentSidebar}
-            aria-pressed={agentSidebarVisible}
-            aria-label={
-              agentSidebarVisible
-                ? t("workflow.canvas.hideAgent")
-                : t("workflow.canvas.showAgent")
-            }
-          >
-            <Bot className="size-4 shrink-0" />
-            <span>{t("workflow.canvas.agent")}</span>
-          </button>
-        ) : null}
       </div>
     </nav>
   );

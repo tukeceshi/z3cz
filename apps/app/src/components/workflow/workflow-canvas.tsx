@@ -21,7 +21,6 @@ import {
   Panel,
   ReactFlow,
 } from "@xyflow/react";
-import Bot from "lucide-react/icons/bot";
 import ClipboardPaste from "lucide-react/icons/clipboard-paste";
 import Copy from "lucide-react/icons/copy";
 import Image from "lucide-react/icons/image";
@@ -58,6 +57,7 @@ import { WorkflowNode } from "./workflow-node";
 import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
+import { WorkflowAgentSettingsOverlay } from "./workflow-agent-settings-overlay";
 import { WorkflowFlowAttribution } from "./workflow-flow-attribution";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
 import { useShiftSelectGate } from "./use-shift-select-gate";
@@ -108,12 +108,6 @@ export interface WorkflowCanvasProps {
     >
   ) => void;
   onQuickAddAiNode?: (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => void;
-  onToggleSidebar?: (e: React.MouseEvent) => void;
-  isSidebarVisible?: boolean;
-  /** When false, Agent toggle is rendered elsewhere (e.g. floating canvas chrome). */
-  showAgentToggle?: boolean;
-  /** When true, top action bar sits below floating canvas chrome. */
-  reserveTopChromeSpace?: boolean;
   showControls?: boolean;
   isValidConnection?: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
   disabled?: boolean;
@@ -152,30 +146,6 @@ export interface WorkflowCanvasProps {
   onCanvasFileDrop?: (event: React.DragEvent) => void;
   /** Shrink the live pane to 1×1 so off-screen nodes unmount; do not persist. */
   parked?: boolean;
-}
-
-interface SidebarToggleProps {
-  onClick: (e: React.MouseEvent) => void;
-  isSidebarVisible: boolean;
-}
-
-function SidebarToggle({ onClick, isSidebarVisible }: SidebarToggleProps) {
-  const { t } = useTranslation();
-  return (
-    <ActionBarButton
-      onClick={onClick}
-      tooltipSide="bottom"
-      tooltip={
-        isSidebarVisible ? t("workflow.canvas.hideAgent") : t("workflow.canvas.showAgent")
-      }
-      className={actionBarButtonOutlineClassName}
-    >
-      <span className="inline-flex items-center gap-2">
-        <Bot className="size-4 shrink-0" />
-        <span className="text-sm font-medium">{t("workflow.canvas.agent")}</span>
-      </span>
-    </ActionBarButton>
-  );
 }
 
 function FitToScreenButton({
@@ -409,10 +379,6 @@ export function WorkflowCanvas({
   onMoveEnd,
   onInit,
   onQuickAddAiNode,
-  onToggleSidebar,
-  isSidebarVisible,
-  showAgentToggle = true,
-  reserveTopChromeSpace = false,
   showControls = true,
   isValidConnection,
   disabled = false,
@@ -625,24 +591,11 @@ export function WorkflowCanvas({
           <AiEditorOverlays nodes={displayNodes} />
         )}
 
-        {showControls &&
-          showAgentToggle &&
-          onToggleSidebar &&
-          isSidebarVisible !== undefined && (
-            <div
-              className={cn(
-                "absolute right-4 flex items-center gap-3 z-50",
-                reserveTopChromeSpace ? "top-14" : "top-4"
-              )}
-            >
-              <ActionBarGroup>
-                <SidebarToggle
-                  onClick={onToggleSidebar}
-                  isSidebarVisible={isSidebarVisible}
-                />
-              </ActionBarGroup>
-            </div>
-          )}
+        {showControls && (
+          <Panel position="bottom-left" className="m-4">
+            <WorkflowAgentSettingsOverlay />
+          </Panel>
+        )}
 
         {showControls && (
           <Panel

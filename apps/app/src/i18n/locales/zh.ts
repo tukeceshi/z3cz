@@ -2822,9 +2822,9 @@ export const zh: TranslationDictionary = {
       referenceConnectFailed:
         "{{targetName}}无法引用{{sourceName}}，仅做节点创建",
       referenceConnectModelError: "模型加载失败，仅做节点创建",
-      agent: "Agent",
-      showAgent: "显示 Agent",
-      hideAgent: "隐藏 Agent",
+      agentSettings: "设置",
+      agentDialogTitle: "Agent",
+      agentDialogClose: "关闭",
       fitToScreen: "适应屏幕",
       zoomOneToOne: "缩放 100%（1:1）",
       reorganizeLayout: "重新布局",
@@ -2941,16 +2941,6 @@ export const zh: TranslationDictionary = {
       cancelled: "已取消",
       paused: "已暂停",
       exhausted: "额度耗尽",
-    },
-    sidebar: {
-      agentTitle: "Agent",
-      agentDescription:
-        "即将推出。节点的输入与输出显示在画布上选中节点的下方。点击工作流名称旁的设置图标可编辑工作流属性。",
-      multipleSelected: "已选中多项",
-      nodesAndEdges: "已选 {{nodeCount}} 个节点、{{edgeCount}} 条连线",
-      nodesSelected: "已选 {{count}} 个节点",
-      edgesSelected: "已选 {{count}} 条连线",
-      selectSingleHint: "选中单个项目以查看和编辑其属性。",
     },
     nodeSelector: {
       title: "选择节点",
