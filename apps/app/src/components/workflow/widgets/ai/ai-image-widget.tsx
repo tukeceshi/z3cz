@@ -36,6 +36,7 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
+import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
 import {
   isGenerativePersistPhase,
   readGenerativeProgressPhase,
@@ -191,18 +192,15 @@ function AiImageWidget({
     holdSize: cardDisplay.isBusy,
     initialLayout,
   });
+  const cardPhase = cardDisplay.cardPhase;
   const cardPlaceholder = formatGenerativePhaseLabel({
-    phase:
-      persistPhase ??
-      (cardDisplay.isBusy ? "generating" : progressPhase ?? null),
-    progressKey: generativeCardProgressKey(
-      persistPhase ??
-        (cardDisplay.isBusy ? "generating" : progressPhase ?? null),
-      "image"
-    ),
+    phase: cardPhase,
+    progressKey: generativeCardProgressKey(cardPhase, "image"),
     metadata,
     t,
   });
+  const isPersistDownloading =
+    persistPhase === "downloading" || progressPhase === "downloading";
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -431,6 +429,12 @@ function AiImageWidget({
           ) : null}
 
           {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+
+          {isPersistDownloading ? (
+            <div className="nodrag nopan nowheel absolute inset-x-0 bottom-3 z-50 flex justify-center px-2">
+              <GenerativeCloudAccelerationCardOffer nodeId={nodeId} />
+            </div>
+          ) : null}
 
           {!generateError ? (
             <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">

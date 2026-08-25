@@ -34,9 +34,11 @@ import {
 } from "./apply-history-item-settings";
 import {
   readGenerativeCardCoverFromHistory,
+  resolveGenerativeCardPhase,
   splitHistoryMediaRows,
   type GenerativeCardCoverRead,
 } from "./generative-history-utils";
+import { isGenerativeCardBusyPhase } from "./generative-progress-utils";
 
 import {
   AI_IMAGE_EMPTY_CARD_SIZE,
@@ -249,11 +251,21 @@ export function readAiImageResultHistory(
 function toStoredWorkflowMedia(
   images: readonly (WorkflowMediaValue | MediaReference)[]
 ): WorkflowMediaValue[] {
-  return images.map((image) =>
-    isWorkflowMediaValue(image)
+  return images.map((image) => {
+    const stored = isWorkflowMediaValue(image)
       ? image
-      : mediaReferenceToWorkflowValue(image)
-  );
+      : mediaReferenceToWorkflowValue(image);
+    if (!isResourceIdReference(stored)) {
+      return stored;
+    }
+    const {
+      generating: _generating,
+      cloudAccelerationStatus: _cloudAccelerationStatus,
+      failed: _failed,
+      ...rest
+    } = stored;
+    return rest;
+  });
 }
 
 export function withAiImageResult(
@@ -566,6 +578,7 @@ export function readAiImageCardDisplay(
         coverMedia: manual,
         isBusy: false,
         hasCover: hasDisplayableWorkflowMedia(manual),
+        cardPhase: null,
       };
     }
   }
@@ -579,11 +592,19 @@ export function readAiImageCardDisplay(
   }
 
   const fallback = readAiImageResult(inputs, outputs);
+  const cardPhase = resolveGenerativeCardPhase(
+    metadata,
+    fallback,
+    isAiImageGenerating(metadata)
+  );
   return {
     coverMedia: fallback,
     isBusy:
-      isAiImageGenerating(metadata) || hasGeneratingResource(fallback),
+      (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)) ||
+      isAiImageGenerating(metadata) ||
+      hasGeneratingResource(fallback),
     hasCover: hasDisplayableWorkflowMedia(fallback),
+    cardPhase,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { OrganizationInfo } from "@dafthunk/types";
 import Cpu from "lucide-react/icons/cpu";
+import Gauge from "lucide-react/icons/gauge";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
 import ScanSearch from "lucide-react/icons/scan-search";
 import Sparkles from "lucide-react/icons/sparkles";
@@ -98,6 +99,12 @@ export const getDashboardSidebarGroups = (
           icon: Cpu,
         },
         {
+          id: "cloud-acceleration",
+          title: t("sidebar.cloudAcceleration"),
+          url: `/org/${orgId}/cloud-acceleration`,
+          icon: Gauge,
+        },
+        {
           id: "members",
           title: t("sidebar.members"),
           url: `/org/${orgId}/members`,
@@ -125,6 +132,8 @@ function filterSidebarGroupsByPermissions(
       case "seedance-video-check":
         return canViewWorkflows(organization);
       case "ai-interfaces":
+        return canAccessAiInterfaces(organization);
+      case "cloud-acceleration":
         return canAccessAiInterfaces(organization);
       case "members":
         return canManageSubAccounts(organization);

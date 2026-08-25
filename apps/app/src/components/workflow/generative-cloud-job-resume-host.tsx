@@ -1,5 +1,6 @@
 import type { MediaReference, ResourceIdReference } from "@dafthunk/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { hasCloudAcceleratingResource } from "@dafthunk/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -59,6 +60,7 @@ import { useGenerativeCloudJobProgress, type ResolveGenerativeJobMediaResult } f
 import { useSyncGeneratingResourceRefs } from "@/hooks/use-sync-generating-resource-refs";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
+import { readGenerativeNodeInterfaceId } from "@/components/workflow/generative-model-binding";
 
 export type GenerativeCloudJobResumeModality = "image" | "video" | "audio";
 
@@ -344,11 +346,8 @@ export function GenerativeCloudJobResumeHost({
     [applyBusyMetadata, modality, nodeId, t, toast, updateNodeData]
   );
 
-  useSyncGeneratingResourceRefs({
-    orgId,
-    nodeId,
-    modality,
-    media:
+  const syncMedia = useMemo(
+    () =>
       modality === "image"
         ? [
             ...readAiImageResult(data.inputs, data.outputs),
@@ -369,10 +368,18 @@ export function GenerativeCloudJobResumeHost({
                 (item) => item.audios
               ),
             ],
+    [data.inputs, data.outputs, modality]
+  );
+
+  useSyncGeneratingResourceRefs({
+    orgId,
+    nodeId,
+    modality,
+    media: syncMedia,
     enabled: !disabled && !getCanvasMaintenanceFrozen(),
-    holdClear: isGenerativePersistPhase(
-      readGenerativeProgressPhase(data.metadata)
-    ),
+    holdClear:
+      isGenerativePersistPhase(readGenerativeProgressPhase(data.metadata)) &&
+      !hasCloudAcceleratingResource(syncMedia),
     updateNodeData,
   });
 
@@ -394,6 +401,8 @@ export function GenerativeCloudJobResumeHost({
     onResumeSuccess: handleResumeSuccess,
     onResumeError: handleResumeError,
     shouldAbortJobPoll,
+    cloudAccelerationEnabled: modality === "image" || modality === "video",
+    aiInterfaceId: readGenerativeNodeInterfaceId(data),
   });
 
   return null;

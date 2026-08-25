@@ -311,6 +311,7 @@ export const zh: TranslationDictionary = {
     integrations: "集成",
     secrets: "密钥",
     aiInterfaces: "AI/资源 接口",
+    cloudAcceleration: "云加速",
     feedback: "反馈",
     templates: "模板",
     apiKeys: "API 密钥",
@@ -670,6 +671,7 @@ export const zh: TranslationDictionary = {
       members: "成员 - 组织 - {{siteName}}",
       secrets: "密钥 - 设置 - {{siteName}}",
       aiInterfaces: "AI/资源 接口 - 设置 - {{siteName}}",
+      cloudAcceleration: "云加速 - 设置 - {{siteName}}",
       integrations: "集成 - 设置 - {{siteName}}",
       datasetDetail: "数据集详情 - 数据集 - {{siteName}}",
       databases: "数据库 - 数据库 - {{siteName}}",
@@ -1728,6 +1730,22 @@ export const zh: TranslationDictionary = {
       noChanges: "没有可保存的更改",
       updateSuccess: "密钥已更新",
       updateFailed: "更新密钥失败，请重试。",
+    },
+    cloudAcceleration: {
+      title: "云加速",
+      description:
+        "平台免费提供云加速。当本机与上游 API 网络不通畅时，图片/视频生成下载超过 2 秒可手动触发，由加速节点代为上传至云存储。",
+      interfaceListTitle: "始终使用云加速的接口",
+      interfaceListHint: "由生成弹窗写入，此处仅可关闭，不可手动添加。",
+      interfaceListEmpty: "暂无接口开启始终云加速。",
+      interfaceName: "接口",
+      enabledAt: "开启时间",
+      disableInterface: "关闭",
+      loadFailed: "加载云加速设置失败，请重试。",
+      interfaceDisabled: "已关闭该接口的云加速。",
+      interfaceDisableFailed: "关闭接口云加速失败，请重试。",
+      alwaysEnabled: "已设为同接口始终使用云加速。",
+      requestFailed: "云加速请求失败，请重试。",
     },
     aiInterfaces: {
       title: "AI/资源 接口",
@@ -3294,6 +3312,14 @@ export const zh: TranslationDictionary = {
           "请在 AI 接口中重新保存云存储，或执行修复以启用浏览器直传。",
       },
     },
+    cloudAcceleration: {
+      button: "云加速",
+      dialogTitle: "使用云加速",
+      dialogDescription:
+        "由平台加速节点代为下载并上传至云存储，适合本机网络较慢时使用。",
+      single: "单次加速",
+      alwaysForInterface: "同接口始终使用云加速",
+    },
     aiMediaCache: {
       barLabel: "AI 暂存",
       barUsage: "{{used}} / {{limit}}",
@@ -3382,6 +3408,8 @@ export const zh: TranslationDictionary = {
       cardDownloadingPercent: "下载中 {{percent}}%",
       cardUploading: "上传中…",
       cardServerPersisting: "服务端保存中…",
+      cardCloudAccelerating: "云加速…",
+      cloudAccelerating: "云加速…",
       cardUploadClearPromptTitle: "上传将清空提示词",
       cardUploadClearPromptDescription:
         "卡片上传会使用本地图片，当前提示词将被清空。是否继续？",
@@ -3468,6 +3496,8 @@ export const zh: TranslationDictionary = {
       cardDownloadingPercent: "下载中 {{percent}}%",
       cardUploading: "上传中…",
       cardServerPersisting: "服务端保存中…",
+      cardCloudAccelerating: "云加速…",
+      cloudAccelerating: "云加速…",
       cardUploadClearPromptTitle: "上传将清空提示词",
       cardUploadClearPromptDescription:
         "卡片上传会使用本地视频，当前提示词将被清空。是否继续？",
@@ -3561,6 +3591,8 @@ export const zh: TranslationDictionary = {
       cardDownloadingPercent: "下载中 {{percent}}%",
       cardUploading: "上传中…",
       cardServerPersisting: "服务端保存中…",
+      cardCloudAccelerating: "云加速…",
+      cloudAccelerating: "云加速…",
       cardUploadClearPromptTitle: "上传将清空提示词",
       cardUploadClearPromptDescription:
         "卡片上传会使用本地音频，当前提示词将被清空。是否继续？",

@@ -3,6 +3,8 @@ import type {
   AppendImageGeneratingContentParams,
   AppendMediaGeneratingContentParams,
   AppendTextGeneratingContentParams,
+  GenerationJobModality,
+  MediaReference,
   MediaResourceKind,
   WorkflowNodeContentPatch,
 } from "@dafthunk/types";
@@ -12,6 +14,10 @@ import {
   appendTextGeneratingContent,
   appendVideoGeneratingContent,
   buildWorkflowNodeContentPatch,
+  finalizeImageGeneratingContent,
+  finalizeVideoGeneratingContent,
+  mediaReferenceToWorkflowValue,
+  patchNodeMediaCloudAccelerationStatus,
   patchNodeMediaResourceKinds,
 } from "@dafthunk/types";
 
@@ -197,6 +203,116 @@ export async function persistJobCloudMediaKinds(
   });
 }
 
+/** Job succeeded — replace generating history rows with final cloud media. */
+export async function persistJobFinalizedGeneratingContent(
+  env: Bindings,
+  job: {
+    readonly id: string;
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly modality: GenerationJobModality;
+    readonly resultJson?: {
+      readonly placeholderResourceIds?: readonly string[] | null;
+    } | null;
+  },
+  pendingMedia: readonly { readonly resourceId?: string | null }[],
+  finalMedia: readonly MediaReference[]
+): Promise<WorkflowNodeContentPatch | null> {
+  if (finalMedia.length === 0) {
+    return persistJobCloudMediaKinds(env, job, pendingMedia);
+  }
+
+  const workflowId = job.workflowId?.trim();
+  const nodeId = job.nodeId?.trim();
+  if (!workflowId || !nodeId) {
+    return null;
+  }
+
+  const workflowStore = new WorkflowStore(env);
+  const workflowWithData = await workflowStore.getWithData(
+    workflowId,
+    job.organizationId
+  );
+  if (!workflowWithData) {
+    return null;
+  }
+
+  const nodeIndex = workflowWithData.data.nodes.findIndex(
+    (node) => node.id === nodeId
+  );
+  if (nodeIndex < 0) {
+    return null;
+  }
+
+  const node = workflowWithData.data.nodes[nodeIndex]!;
+  const media = finalMedia.map((reference) =>
+    mediaReferenceToWorkflowValue(reference)
+  );
+  const resourceIds = [
+    ...pendingMedia.map((item) => item.resourceId),
+    ...(job.resultJson?.placeholderResourceIds ?? []),
+  ].filter((id): id is string => Boolean(id?.trim()));
+
+  const contentPatch =
+    job.modality === "image"
+      ? finalizeImageGeneratingContent(node, {
+          jobId: job.id,
+          resourceIds,
+          media,
+        })
+      : job.modality === "video"
+        ? finalizeVideoGeneratingContent(node, {
+            jobId: job.id,
+            resourceIds,
+            media,
+          })
+        : patchNodeMediaResourceKinds(
+            node,
+            cloudKindsByResourceIds(resourceIds)
+          );
+
+  if (!contentPatch) {
+    return null;
+  }
+
+  const updatedNode = { ...node, ...contentPatch };
+  const nodes = [...workflowWithData.data.nodes];
+  nodes[nodeIndex] = updatedNode;
+
+  const workflowRecord: SaveWorkflowRecord = {
+    id: workflowWithData.id,
+    name: workflowWithData.name,
+    description: workflowWithData.description ?? undefined,
+    schemeId: workflowWithData.schemeId,
+    trigger: workflowWithData.trigger,
+    runtime: workflowWithData.runtime,
+    organizationId: job.organizationId,
+    folderId: workflowWithData.folderId,
+    coverObjectId: workflowWithData.coverObjectId,
+    coverMimeType: workflowWithData.coverMimeType,
+    nodes,
+    edges: workflowWithData.data.edges,
+    editorViewport: workflowWithData.data.editorViewport,
+    generativeDefaults: workflowWithData.data.generativeDefaults,
+    createdAt: workflowWithData.createdAt,
+    updatedAt: new Date(),
+  };
+
+  await workflowStore.save(workflowRecord);
+
+  const patch = buildWorkflowNodeContentPatch(node, updatedNode);
+  if (patch) {
+    await nodeWorkflowSessionHub.broadcastServerNodeUpdate(
+      env,
+      workflowId,
+      updatedNode
+    );
+  }
+
+  return patch;
+}
+
 export async function persistWorkflowMediaResourceKinds(
   env: Bindings,
   params: {
@@ -269,4 +385,109 @@ export async function persistWorkflowMediaResourceKinds(
   }
 
   return patch;
+}
+
+export async function persistWorkflowMediaCloudAccelerationStatus(
+  env: Bindings,
+  params: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly resourceIds: readonly string[];
+    readonly status: "pending" | "active";
+  }
+): Promise<WorkflowNodeContentPatch | null> {
+  const workflowId = params.workflowId?.trim();
+  const nodeId = params.nodeId?.trim();
+  if (!workflowId || !nodeId || params.resourceIds.length === 0) {
+    return null;
+  }
+
+  const workflowStore = new WorkflowStore(env);
+  const workflowWithData = await workflowStore.getWithData(
+    workflowId,
+    params.organizationId
+  );
+  if (!workflowWithData) {
+    return null;
+  }
+
+  const nodeIndex = workflowWithData.data.nodes.findIndex(
+    (node) => node.id === nodeId
+  );
+  if (nodeIndex < 0) {
+    return null;
+  }
+
+  const node = workflowWithData.data.nodes[nodeIndex]!;
+  const contentPatch = patchNodeMediaCloudAccelerationStatus(node, {
+    resourceIds: params.resourceIds,
+    status: params.status,
+  });
+  if (!contentPatch) {
+    return null;
+  }
+
+  const updatedNode = { ...node, ...contentPatch };
+  const nodes = [...workflowWithData.data.nodes];
+  nodes[nodeIndex] = updatedNode;
+
+  const workflowRecord: SaveWorkflowRecord = {
+    id: workflowWithData.id,
+    name: workflowWithData.name,
+    description: workflowWithData.description ?? undefined,
+    schemeId: workflowWithData.schemeId,
+    trigger: workflowWithData.trigger,
+    runtime: workflowWithData.runtime,
+    organizationId: params.organizationId,
+    folderId: workflowWithData.folderId,
+    coverObjectId: workflowWithData.coverObjectId,
+    coverMimeType: workflowWithData.coverMimeType,
+    nodes,
+    edges: workflowWithData.data.edges,
+    editorViewport: workflowWithData.data.editorViewport,
+    generativeDefaults: workflowWithData.data.generativeDefaults,
+    createdAt: workflowWithData.createdAt,
+    updatedAt: new Date(),
+  };
+
+  await workflowStore.save(workflowRecord);
+
+  const patch = buildWorkflowNodeContentPatch(node, updatedNode);
+  if (patch) {
+    await nodeWorkflowSessionHub.broadcastServerNodeUpdate(
+      env,
+      workflowId,
+      updatedNode
+    );
+  }
+
+  return patch;
+}
+
+export async function persistJobCloudAccelerationStatus(
+  env: Bindings,
+  job: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly resultJson?: {
+      readonly placeholderResourceIds?: readonly string[] | null;
+    } | null;
+  },
+  pendingMedia: readonly { readonly resourceId?: string | null }[],
+  status: "pending" | "active"
+): Promise<WorkflowNodeContentPatch | null> {
+  const resourceIds = [
+    ...pendingMedia.map((item) => item.resourceId),
+    ...(job.resultJson?.placeholderResourceIds ?? []),
+  ].filter((id): id is string => Boolean(id?.trim()));
+
+  return persistWorkflowMediaCloudAccelerationStatus(env, {
+    organizationId: job.organizationId,
+    workflowId: job.workflowId,
+    nodeId: job.nodeId,
+    resourceIds,
+    status,
+  });
 }

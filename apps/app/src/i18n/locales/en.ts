@@ -319,6 +319,7 @@ export const en = {
     integrations: "Integrations",
     secrets: "Secrets",
     aiInterfaces: "AI & Resource APIs",
+    cloudAcceleration: "Cloud acceleration",
     feedback: "Feedback",
     templates: "Templates",
     apiKeys: "API Keys",
@@ -699,6 +700,7 @@ export const en = {
       members: "Members - Organization - {{siteName}}",
       secrets: "Secrets - Settings - {{siteName}}",
       aiInterfaces: "AI & Resource APIs - Settings - {{siteName}}",
+      cloudAcceleration: "Cloud acceleration - Settings - {{siteName}}",
       integrations: "Integrations - Settings - {{siteName}}",
       datasetDetail: "Dataset Details - Datasets - {{siteName}}",
       databases: "Databases - Databases - {{siteName}}",
@@ -1799,6 +1801,23 @@ export const en = {
       noChanges: "No changes to save",
       updateSuccess: "Secret updated successfully",
       updateFailed: "Failed to update secret. Please try again.",
+    },
+    cloudAcceleration: {
+      title: "Cloud acceleration",
+      description:
+        "Platform cloud acceleration is included. During image/video generation, if download takes over 2 seconds, you can trigger acceleration so platform nodes upload to cloud storage for you.",
+      interfaceListTitle: "Interfaces always using cloud acceleration",
+      interfaceListHint:
+        "Added from the generation dialog only. You can disable entries here, not add them.",
+      interfaceListEmpty: "No interfaces are set to always accelerate.",
+      interfaceName: "Interface",
+      enabledAt: "Enabled at",
+      disableInterface: "Disable",
+      loadFailed: "Failed to load cloud acceleration settings.",
+      interfaceDisabled: "Cloud acceleration disabled for this interface.",
+      interfaceDisableFailed: "Failed to disable interface cloud acceleration.",
+      alwaysEnabled: "Always use cloud acceleration for this interface.",
+      requestFailed: "Cloud acceleration request failed.",
     },
     aiInterfaces: {
       title: "AI & Resource APIs",
@@ -3459,6 +3478,14 @@ export const en = {
           "Save cloud storage again in AI interfaces or run repair to allow direct browser upload.",
       },
     },
+    cloudAcceleration: {
+      button: "Cloud accel",
+      dialogTitle: "Use cloud acceleration",
+      dialogDescription:
+        "Platform nodes will download and upload to cloud storage for you.",
+      single: "Accelerate once",
+      alwaysForInterface: "Always for this interface",
+    },
     aiMediaCache: {
       barLabel: "AI cache",
       barUsage: "{{used}} / {{limit}}",
@@ -3551,6 +3578,8 @@ export const en = {
       cardDownloadingPercent: "Downloading {{percent}}%",
       cardUploading: "Uploading…",
       cardServerPersisting: "Saving on server…",
+      cardCloudAccelerating: "Cloud acceleration…",
+      cloudAccelerating: "Cloud acceleration…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local image replaces AI generation setup. The current prompt will be cleared. Continue?",
@@ -3642,6 +3671,8 @@ export const en = {
       cardDownloadingPercent: "Downloading {{percent}}%",
       cardUploading: "Uploading…",
       cardServerPersisting: "Saving on server…",
+      cardCloudAccelerating: "Cloud acceleration…",
+      cloudAccelerating: "Cloud acceleration…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local video replaces AI generation setup. The current prompt will be cleared. Continue?",
@@ -3738,6 +3769,8 @@ export const en = {
       cardDownloadingPercent: "Downloading {{percent}}%",
       cardUploading: "Uploading…",
       cardServerPersisting: "Saving on server…",
+      cardCloudAccelerating: "Cloud acceleration…",
+      cloudAccelerating: "Cloud acceleration…",
       cardUploadClearPromptTitle: "Upload will clear the prompt",
       cardUploadClearPromptDescription:
         "Uploading a local audio file replaces AI generation setup. The current prompt will be cleared. Continue?",

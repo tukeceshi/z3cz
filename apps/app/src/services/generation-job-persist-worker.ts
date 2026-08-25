@@ -6,6 +6,7 @@ import type {
   WorkflowMediaValue,
 } from "@dafthunk/types";
 import {
+  isCloudAccelerationInProgress,
   isGenerationJobReadyAtExpired,
   isServerPersistInProgress,
   shouldDeferClientPersistToServer,
@@ -14,6 +15,10 @@ import {
 
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
+import {
+  CloudAccelerationDownloadAbortError,
+  CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS,
+} from "@/services/cloud-acceleration-download";
 import { fetchBlobWithProgress } from "@/services/fetch-blob-with-progress";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
@@ -25,6 +30,7 @@ import {
   claimGenerationJobClientUpload,
   completeGenerationJobUpload,
   getGenerationJob,
+  requestGenerationJobServerPersist,
 } from "@/services/platform-ai-model-service";
 import {
   cloudUploadToResourceId,
@@ -70,6 +76,8 @@ async function downloadToAiStaging(params: {
   readonly item: GenerationJobPendingMedia;
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onDownloadProgress?: (percent: number) => void;
+  readonly shouldAbortDownload?: () => boolean;
+  readonly onDownloadSlow?: () => void;
 }): Promise<ResourceIdReference> {
   params.onPhase?.("downloading");
 
@@ -81,7 +89,12 @@ async function downloadToAiStaging(params: {
   const blob = await fetchBlobWithProgress(
     fetchUrl,
     { credentials: "include" },
-    params.onDownloadProgress
+    params.onDownloadProgress,
+    {
+      shouldAbort: params.shouldAbortDownload,
+      onSlowDownload: params.onDownloadSlow,
+      slowDownloadMs: CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS,
+    }
   );
   const mimeType =
     params.item.mimeType ||
@@ -195,6 +208,38 @@ async function pollUntilJobSucceeded(params: {
   }
 }
 
+async function pollServerPersistUntilDone(params: {
+  readonly organizationId: string;
+  readonly jobId: string;
+  readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+}): Promise<readonly WorkflowMediaValue[]> {
+  params.onProgressPhase?.("server_persisting");
+  const succeeded = await pollUntilJobSucceeded(params);
+  if (succeeded.finalMedia && succeeded.finalMedia.length > 0) {
+    return succeeded.finalMedia;
+  }
+  return [];
+}
+
+async function runServerPersistAndPoll(params: {
+  readonly organizationId: string;
+  readonly jobId: string;
+  readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+}): Promise<readonly WorkflowMediaValue[]> {
+  params.onProgressPhase?.("server_persisting");
+  await requestGenerationJobServerPersist(params.organizationId, params.jobId);
+  return pollServerPersistUntilDone(params);
+}
+
+function shouldYieldClientPersistToServer(
+  job: GenerationJobRecord,
+  shouldAbortDownload?: () => boolean
+): boolean {
+  return (
+    shouldDeferClientPersistToServer(job) || shouldAbortDownload?.() === true
+  );
+}
+
 function allStagedRefsReady(
   stagedRefs: readonly (ResourceIdReference | undefined)[],
   count: number
@@ -212,6 +257,8 @@ export async function runGenerationJobPersistWorker(params: {
   readonly onDownloadProgress?: (percent: number) => void;
   readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
   readonly shouldAbortJobPoll?: () => boolean;
+  readonly shouldAbortDownload?: () => boolean;
+  readonly onDownloadSlow?: () => void;
 }): Promise<readonly WorkflowMediaValue[]> {
   const notify = params.onProgressPhase;
 
@@ -224,6 +271,17 @@ export async function runGenerationJobPersistWorker(params: {
 
   if (ready.finalMedia && ready.finalMedia.length > 0) {
     return ready.finalMedia;
+  }
+
+  if (
+    ready.shouldUseCloudAcceleration ||
+    ready.deferClientPersistToServer
+  ) {
+    return runServerPersistAndPoll({
+      organizationId: params.organizationId,
+      jobId: params.jobId,
+      onProgressPhase: notify,
+    });
   }
 
   const pendingMedia = ready.pendingMedia ?? [];
@@ -259,22 +317,31 @@ export async function runGenerationJobPersistWorker(params: {
     }
 
     if (
-      isGenerationJobReadyAtExpired(response.job.readyAt) &&
-      isServerPersistInProgress(response.job)
+      shouldYieldClientPersistToServer(
+        response.job,
+        params.shouldAbortDownload
+      )
     ) {
-      notify?.("server_persisting");
-      const succeeded = await pollUntilJobSucceeded({
+      const serverMedia = await pollServerPersistUntilDone({
         organizationId: params.organizationId,
         jobId: params.jobId,
         onProgressPhase: notify,
       });
-      if (succeeded.finalMedia && succeeded.finalMedia.length > 0) {
-        return succeeded.finalMedia;
+      if (serverMedia.length > 0) {
+        return serverMedia;
       }
       if (allStagedRefsReady(stagedRefs, pendingMedia.length)) {
         return stagedRefs;
       }
       return [];
+    }
+
+    if (response.shouldUseCloudAcceleration) {
+      return runServerPersistAndPoll({
+        organizationId: params.organizationId,
+        jobId: params.jobId,
+        onProgressPhase: notify,
+      });
     }
 
     if (response.job.status === "ready_to_persist") {
@@ -297,16 +364,38 @@ export async function runGenerationJobPersistWorker(params: {
           item: pendingMedia[index]!,
           onPhase: params.onPhase,
           onDownloadProgress: params.onDownloadProgress,
+          shouldAbortDownload: params.shouldAbortDownload,
+          onDownloadSlow: params.onDownloadSlow,
         });
         params.onStaged?.(
           stagedRefs.filter((ref): ref is ResourceIdReference => Boolean(ref))
         );
         notify?.("uploading");
         retryIntervalMs = MIN_RETRY_INTERVAL_MS;
-      } catch {
+      } catch (error) {
+        if (error instanceof CloudAccelerationDownloadAbortError) {
+          return pollServerPersistUntilDone({
+            organizationId: params.organizationId,
+            jobId: params.jobId,
+            onProgressPhase: notify,
+          });
+        }
         downloadFailed = true;
         break;
       }
+    }
+
+    const preUploadJob = (
+      await getGenerationJob(params.organizationId, params.jobId)
+    ).job;
+    if (
+      shouldYieldClientPersistToServer(preUploadJob, params.shouldAbortDownload)
+    ) {
+      return pollServerPersistUntilDone({
+        organizationId: params.organizationId,
+        jobId: params.jobId,
+        onProgressPhase: notify,
+      });
     }
 
     if (downloadFailed || !allStagedRefsReady(stagedRefs, pendingMedia.length)) {
@@ -324,6 +413,14 @@ export async function runGenerationJobPersistWorker(params: {
     let uploadFailed = false;
 
     for (let index = 0; index < pendingMedia.length; index += 1) {
+      if (params.shouldAbortDownload?.()) {
+        return pollServerPersistUntilDone({
+          organizationId: params.organizationId,
+          jobId: params.jobId,
+          onProgressPhase: notify,
+        });
+      }
+
       try {
         objectRefs[index] = await uploadFromAiStaging({
           organizationId: params.organizationId,
@@ -349,12 +446,46 @@ export async function runGenerationJobPersistWorker(params: {
       continue;
     }
 
-    await completeGenerationJobUpload(
+    const completeResponse = await completeGenerationJobUpload(
       params.organizationId,
       params.jobId,
       objectRefs
     );
 
+    if (
+      completeResponse.job.status === "succeeded" &&
+      completeResponse.finalMedia.length > 0
+    ) {
+      return completeResponse.finalMedia;
+    }
+
+    if (
+      shouldYieldClientPersistToServer(
+        completeResponse.job,
+        params.shouldAbortDownload
+      )
+    ) {
+      return pollServerPersistUntilDone({
+        organizationId: params.organizationId,
+        jobId: params.jobId,
+        onProgressPhase: notify,
+      });
+    }
+
     return objectRefs.map((object) => cloudUploadToResourceId(object));
   }
+}
+
+export function workflowMediaWithCloudAccelerationStatus(
+  media: readonly WorkflowMediaValue[],
+  status: "pending" | "active" | "done" | "failed" | undefined
+): readonly WorkflowMediaValue[] {
+  if (!status || !isCloudAccelerationInProgress(status)) {
+    return media;
+  }
+  return media.map((item) =>
+    "resourceId" in item
+      ? { ...item, cloudAccelerationStatus: status }
+      : item
+  );
 }

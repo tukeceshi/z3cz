@@ -1,8 +1,11 @@
 import {
+  isCloudAccelerationInProgress,
   isGeneratingResourceRef,
   isResourceIdReference,
+  patchNodeMediaCloudAccelerationStatus,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
   type MediaResourceKind,
+  type ResolvedMediaResourceEntry,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import { useEffect, useMemo, useRef } from "react";
@@ -124,6 +127,61 @@ function collectKindMismatches(
   return kindsById;
 }
 
+function collectCloudAccelerationSync(
+  media: readonly WorkflowMediaValue[],
+  entriesById: ReadonlyMap<string, ResolvedMediaResourceEntry | null | undefined>
+): { readonly resourceIds: readonly string[]; readonly status: "pending" | "active" } | null {
+  const resourceIds: string[] = [];
+  let status: "pending" | "active" | null = null;
+
+  for (const item of media) {
+    if (!isResourceIdReference(item)) {
+      continue;
+    }
+    const entry = entriesById.get(item.resourceId);
+    const entryStatus = entry?.cloudAccelerationStatus;
+    if (entryStatus !== "pending" && entryStatus !== "active") {
+      continue;
+    }
+    const alreadySynced =
+      item.cloudAccelerationStatus === entryStatus && item.generating !== true;
+    if (alreadySynced) {
+      continue;
+    }
+    resourceIds.push(item.resourceId);
+    status = entryStatus;
+  }
+
+  if (resourceIds.length === 0 || !status) {
+    return null;
+  }
+
+  return { resourceIds, status };
+}
+
+function applyCloudAccelerationSync(
+  node: WorkflowNodeType,
+  sync: { readonly resourceIds: readonly string[]; readonly status: "pending" | "active" }
+): Partial<WorkflowNodeType> {
+  return (
+    patchNodeMediaCloudAccelerationStatus(node, {
+      resourceIds: sync.resourceIds,
+      status: sync.status,
+    }) ?? {}
+  );
+}
+
+function hasCloudAccelerationInProgressEntry(
+  entriesById: ReadonlyMap<string, ResolvedMediaResourceEntry | null | undefined>
+): boolean {
+  for (const entry of entriesById.values()) {
+    if (isCloudAccelerationInProgress(entry?.cloudAccelerationStatus)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useSyncGeneratingResourceRefs(params: {
   readonly orgId: string | undefined;
   readonly nodeId: string;
@@ -157,12 +215,27 @@ export function useSyncGeneratingResourceRefs(params: {
         .join(","),
     [params.media]
   );
+  const cloudAccelerationKey = useMemo(
+    () =>
+      params.media
+        .filter(isResourceIdReference)
+        .map(
+          (item) =>
+            `${item.resourceId}:${item.cloudAccelerationStatus ?? ""}:${item.generating === true ? "g" : ""}`
+        )
+        .join(","),
+    [params.media]
+  );
+  const trackedResourceKey = useMemo(
+    () => collectResourceIds(params.media).join(","),
+    [params.media]
+  );
 
   useEffect(() => {
     if (!params.enabled || !params.orgId || !params.updateNodeData) {
       return;
     }
-    if (!generatingKey && !resourceKindKey) {
+    if (!trackedResourceKey) {
       return;
     }
 
@@ -199,6 +272,10 @@ export function useSyncGeneratingResourceRefs(params: {
           allIds.map((resourceId, index) => [resourceId, entries[index]])
         );
         const kindsById = collectKindMismatches(current, entriesById);
+        const cloudAccelerationSync = collectCloudAccelerationSync(
+          current,
+          entriesById
+        );
 
         const failedIds = generatingIds.filter((resourceId) => {
           const entry = entriesById.get(resourceId);
@@ -232,29 +309,43 @@ export function useSyncGeneratingResourceRefs(params: {
         const resolveFailed =
           generatingIds.length > 0 &&
           generatingIds.every((resourceId) => entriesById.get(resourceId) == null);
+        const serverCloudAccelActive = hasCloudAccelerationInProgressEntry(entriesById);
         const generatingDone =
           generatingIds.length > 0 &&
           !stillGenerating &&
           !resolveFailed &&
-          !holdClearRef.current;
+          (!holdClearRef.current || serverCloudAccelActive);
         const shouldPoll =
-          generatingIds.length > 0 &&
-          (stillGenerating || resolveFailed || holdClearRef.current);
+          (generatingIds.length > 0 &&
+            (stillGenerating || resolveFailed || holdClearRef.current)) ||
+          cloudAccelerationSync !== null ||
+          (serverCloudAccelActive && generatingIds.length > 0);
 
-        if (generatingDone || kindsById.size > 0) {
+        if (generatingDone || kindsById.size > 0 || cloudAccelerationSync) {
           if (getCanvasMaintenanceFrozen()) {
             return;
           }
           updateNodeData(nodeId, (node) => {
-            const synced = generatingDone
-              ? applyGeneratingResourceSync(node, modality, generatingIds, [])
-              : {};
-            const kindPatch = applyResourceKinds(
-              { ...node, ...synced },
-              modality,
-              kindsById
-            );
-            return { ...synced, ...kindPatch };
+            let patch: Partial<WorkflowNodeType> = {};
+            if (generatingDone) {
+              patch = {
+                ...patch,
+                ...applyGeneratingResourceSync(node, modality, generatingIds, []),
+              };
+            }
+            let working = { ...node, ...patch };
+            if (cloudAccelerationSync) {
+              patch = {
+                ...patch,
+                ...applyCloudAccelerationSync(working, cloudAccelerationSync),
+              };
+              working = { ...node, ...patch };
+            }
+            patch = {
+              ...patch,
+              ...applyResourceKinds(working, modality, kindsById),
+            };
+            return patch;
           });
           if (!shouldPoll) {
             return;
@@ -274,8 +365,10 @@ export function useSyncGeneratingResourceRefs(params: {
       cancelled = true;
     };
   }, [
+    cloudAccelerationKey,
     generatingKey,
     resourceKindKey,
+    trackedResourceKey,
     params.enabled,
     params.modality,
     params.nodeId,

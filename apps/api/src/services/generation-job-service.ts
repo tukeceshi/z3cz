@@ -49,8 +49,15 @@ import {
   registerMediaResourcesFromReferences,
   type MediaResourceTransition,
 } from "./media-resource-catalog-service";
-import { persistJobCloudMediaKinds } from "./persist-generating-node-content";
-import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
+import {
+  persistJobCloudAccelerationStatus,
+  persistJobFinalizedGeneratingContent,
+} from "./persist-generating-node-content";
+import {
+  markJobResourcesCloudAccelerationStatus,
+  resolveJobCloudAccelerationFlags,
+  shouldAutoCloudAccelerateJob,
+} from "./cloud-acceleration-service";
 import {
   isPersistWorkerPoolActive,
   releaseWorkerPersistJobAssignment,
@@ -61,6 +68,7 @@ import {
   GenerationJobUploadValidationError,
   validateGenerationJobUploadMedia,
 } from "./validate-generation-job-upload";
+import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 
 function inferVideoMimeType(url: string): string {
   const lower = url.split("?")[0]?.toLowerCase() ?? "";
@@ -72,6 +80,19 @@ function readPersistOwner(
   job: GenerationJobRecord
 ): GenerationJobPersistOwner | undefined {
   return job.resultJson?.persistOwner;
+}
+
+async function syncJobCloudAccelerationToWorkflow(
+  env: Bindings,
+  job: GenerationJobRecord,
+  status: "pending" | "active"
+): Promise<void> {
+  const pendingMedia = extractPendingMediaFromJob(job) ?? [];
+  try {
+    await persistJobCloudAccelerationStatus(env, job, pendingMedia, status);
+  } catch {
+    // Node JSON sync is best-effort; catalog status remains authoritative.
+  }
 }
 
 export function resolveGenerationJobDisplayPhase(
@@ -161,15 +182,19 @@ function toWorkflowFinalMedia(
   return media.map((ref) => mediaReferenceToWorkflowValue(ref));
 }
 
-function toGetGenerationJobResponse(
+async function toGetGenerationJobResponse(
+  db: Database,
   job: GenerationJobRecord
-): GetGenerationJobResponse {
+): Promise<GetGenerationJobResponse> {
+  const cloudAccel = await resolveJobCloudAccelerationFlags(db, job);
   return {
     job,
     pendingMedia: extractPendingMediaFromJob(job),
     finalMedia: toWorkflowFinalMedia(extractFinalMediaFromJob(job)),
     displayPhase: resolveGenerationJobDisplayPhase(job),
     deferClientPersistToServer: shouldDeferClientPersistToServer(job),
+    cloudAccelerationEnabled: cloudAccel.cloudAccelerationEnabled,
+    shouldUseCloudAcceleration: cloudAccel.shouldUseCloudAcceleration,
   };
 }
 
@@ -309,15 +334,16 @@ async function persistPendingMediaOnServer(
   return finalMedia;
 }
 
-function toCancelGenerationJobResponse(
+async function toCancelGenerationJobResponse(
+  db: Database,
   job: GenerationJobRecord,
   extras?: {
     readonly upstreamCancelSkipped?: boolean;
     readonly upstreamCancelFailed?: boolean;
   }
-): CancelGenerationJobResponse {
+): Promise<CancelGenerationJobResponse> {
   return {
-    ...toGetGenerationJobResponse(job),
+    ...(await toGetGenerationJobResponse(db, job)),
     cancelled: job.status === "cancelled",
     ...(extras?.upstreamCancelSkipped
       ? { upstreamCancelSkipped: true }
@@ -391,11 +417,11 @@ async function cancelGenerationJobRecord(
   job: GenerationJobRecord
 ): Promise<CancelGenerationJobResponse> {
   if (job.status === "cancelled") {
-    return toCancelGenerationJobResponse(job);
+    return toCancelGenerationJobResponse(db, job);
   }
 
   if (job.status !== "pending" && job.status !== "generating") {
-    return toCancelGenerationJobResponse(job);
+    return toCancelGenerationJobResponse(db, job);
   }
 
   const upstreamCancel = await tryCancelUpstreamVideoTask(env, db, job);
@@ -411,11 +437,11 @@ async function cancelGenerationJobRecord(
   if (cancelled) {
     await syncGenerationJobInvocation(db, cancelled);
     await writeGenerationJobCancelLog(db, cancelled);
-    return toCancelGenerationJobResponse(cancelled, upstreamCancel);
+    return toCancelGenerationJobResponse(db, cancelled, upstreamCancel);
   }
 
   const latest = await getGenerationJob(db, job.id, job.organizationId);
-  return toCancelGenerationJobResponse(latest ?? job, upstreamCancel);
+  return toCancelGenerationJobResponse(db, latest ?? job, upstreamCancel);
 }
 
 export async function pollVideoGenerationJob(
@@ -561,6 +587,7 @@ async function completeInlineServerGenerationJobPersist(
       resultJson: succeededResultJson,
     });
     if (succeeded) {
+      await markJobResourcesCloudAccelerationStatus(db, succeeded, "done");
       await registerMediaResourceTransitions(db, {
         organizationId: claimed.organizationId,
         transitions: buildMediaResourceTransitionsFromJobComplete(
@@ -569,9 +596,14 @@ async function completeInlineServerGenerationJobPersist(
         ),
       });
       try {
-        await persistJobCloudMediaKinds(env, succeeded, pendingMedia);
+        await persistJobFinalizedGeneratingContent(
+          env,
+          succeeded,
+          pendingMedia,
+          finalMedia
+        );
       } catch {
-        // Catalog already transitioned; node JSON kind is aligned by client sync.
+        // Catalog already transitioned; node JSON is aligned by client or a later sync.
       }
       await syncGenerationJobInvocation(db, succeeded);
       return succeeded;
@@ -588,6 +620,7 @@ async function completeInlineServerGenerationJobPersist(
       failureReason: message,
     });
     if (failed) {
+      await markJobResourcesCloudAccelerationStatus(db, failed, "failed");
       await markMediaResourcesFailed(db, {
         organizationId: failed.organizationId,
         resourceIds: failed.resultJson?.placeholderResourceIds ?? [],
@@ -662,6 +695,9 @@ async function runServerGenerationJobPersist(
     return (await getGenerationJob(db, job.id, job.organizationId)) ?? job;
   }
 
+  await markJobResourcesCloudAccelerationStatus(db, claimed, "active");
+  await syncJobCloudAccelerationToWorkflow(env, claimed, "active");
+
   if (useWorkerPool) {
     return claimed;
   }
@@ -708,6 +744,22 @@ async function maybeFallbackStaleWorkerPersist(
   return runServerGenerationJobPersist(env, db, reset, { forceInline: true });
 }
 
+async function maybeRunInterfaceCloudAcceleration(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<GenerationJobRecord> {
+  if (job.status !== "ready_to_persist") {
+    return job;
+  }
+  if (!(await shouldAutoCloudAccelerateJob(db, job))) {
+    return job;
+  }
+  await markJobResourcesCloudAccelerationStatus(db, job, "pending");
+  await syncJobCloudAccelerationToWorkflow(env, job, "pending");
+  return runServerGenerationJobPersist(env, db, job);
+}
+
 async function maybeRunServerPersistFallback(
   env: Bindings,
   db: Database,
@@ -746,15 +798,15 @@ export async function claimClientGenerationJobUpload(
     job.status === "failed" ||
     job.status === "cancelled"
   ) {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (job.status === "uploading") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (job.status !== "ready_to_persist") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   const resultJson: GenerationJobResultJson = {
@@ -771,7 +823,7 @@ export async function claimClientGenerationJobUpload(
     resultJson,
   });
 
-  return claimed ? toGetGenerationJobResponse(claimed) : null;
+  return claimed ? toGetGenerationJobResponse(db, claimed) : null;
 }
 
 export async function requestServerGenerationJobPersist(
@@ -790,7 +842,7 @@ export async function requestServerGenerationJobPersist(
     job.status === "failed" ||
     job.status === "cancelled"
   ) {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (job.status === "generating" && job.modality === "video") {
@@ -798,18 +850,20 @@ export async function requestServerGenerationJobPersist(
   }
 
   if (job.status !== "ready_to_persist" && job.status !== "uploading") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (
     job.status === "uploading" &&
     readPersistOwner(job) === "server"
   ) {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
+  await markJobResourcesCloudAccelerationStatus(db, job, "pending");
+  await syncJobCloudAccelerationToWorkflow(env, job, "pending");
   const persisted = await runServerGenerationJobPersist(env, db, job);
-  return toGetGenerationJobResponse(persisted);
+  return toGetGenerationJobResponse(db, persisted);
 }
 
 export async function cancelUserGenerationJob(
@@ -870,6 +924,10 @@ export async function refreshGenerationJob(
   }
 
   if (job.status === "ready_to_persist") {
+    job = await maybeRunInterfaceCloudAcceleration(env, db, job);
+  }
+
+  if (job.status === "ready_to_persist") {
     job = await maybeRunServerPersistFallback(env, db, job);
   }
 
@@ -877,7 +935,7 @@ export async function refreshGenerationJob(
     await ensureFailedJobPlaceholderResourcesMarked(db, job);
   }
 
-  return toGetGenerationJobResponse(job);
+  return toGetGenerationJobResponse(db, job);
 }
 
 export async function completeGenerationJobClientUpload(
@@ -895,22 +953,22 @@ export async function completeGenerationJobClientUpload(
   }
 
   if (job.status === "cancelled" || job.status === "failed") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (job.status === "succeeded") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (job.status !== "ready_to_persist" && job.status !== "uploading") {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   if (
     job.status === "uploading" &&
     readPersistOwner(job) === "server"
   ) {
-    return toGetGenerationJobResponse(job);
+    return toGetGenerationJobResponse(db, job);
   }
 
   let validatedFinalMedia: readonly MediaReference[];
@@ -952,12 +1010,17 @@ export async function completeGenerationJobClientUpload(
       ),
     });
     try {
-      await persistJobCloudMediaKinds(env, updated, pendingMedia);
+      await persistJobFinalizedGeneratingContent(
+        env,
+        updated,
+        pendingMedia,
+        validatedFinalMedia
+      );
     } catch {
-      // Catalog already transitioned; node JSON kind is aligned by client sync.
+      // Catalog already transitioned; node JSON is aligned by client or a later sync.
     }
     await syncGenerationJobInvocation(db, updated);
-    return toGetGenerationJobResponse(updated);
+    return toGetGenerationJobResponse(db, updated);
   }
 
   return null;

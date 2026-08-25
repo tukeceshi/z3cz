@@ -47,6 +47,7 @@ import {
   SeedanceVideoCheckPage,
   NotFoundPage,
   OrganizationAiInterfacesPage,
+  OrganizationCloudAccelerationPage,
   ProfilePage,
   QueuesPage,
   SchemasPage,
@@ -515,6 +516,15 @@ export const routes: AppRouteObject[] = [
       </OrgFeatureRoute>
     ),
     handle: { head: createRouteHead("seo.routes.aiInterfaces") },
+  },
+  {
+    path: "/org/:organizationId/cloud-acceleration",
+    element: (
+      <OrgFeatureRoute feature="ai-interfaces" title="Settings">
+        <OrganizationCloudAccelerationPage />
+      </OrgFeatureRoute>
+    ),
+    handle: { head: createRouteHead("seo.routes.cloudAcceleration") },
   },
   {
     path: "/integrations",

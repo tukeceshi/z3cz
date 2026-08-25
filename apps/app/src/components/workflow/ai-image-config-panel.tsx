@@ -109,6 +109,7 @@ import {
 } from "./ai-image-prompt-reference";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
+import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleration-offer";
 import { useGenerativeCloudJobProgress, generativeProgressButtonKey, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
 import { formatGenerativePhaseLabel } from "./generative-progress-utils";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
@@ -350,8 +351,17 @@ export function AiImageConfigPanel({
     return controller.signal;
   }, []);
 
-  const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
-    useGenerativeCloudJobProgress({
+  const {
+    syncProgress,
+    clearProgress,
+    resolveJobMedia,
+    activeProgressPhase,
+    cloudAccelerationOfferVisible,
+    cloudAccelerationDialogOpen,
+    setCloudAccelerationDialogOpen,
+    triggerSingleCloudAcceleration,
+    triggerAlwaysCloudAcceleration,
+  } = useGenerativeCloudJobProgress({
       nodeId,
       orgId,
       workflowId,
@@ -366,6 +376,8 @@ export function AiImageConfigPanel({
       applyBusyMetadata: (metadata, busy) =>
         withAiImageGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
+      cloudAccelerationEnabled: true,
+      aiInterfaceId: effectiveModel?.interfaceId,
     });
 
   const promptReferenceSourceName = useMemo(() => {
@@ -1123,6 +1135,13 @@ export function AiImageConfigPanel({
                 maxLength={promptMaxLength}
               />
             ) : null}
+            <GenerativeCloudAccelerationOffer
+              offerVisible={cloudAccelerationOfferVisible}
+              dialogOpen={cloudAccelerationDialogOpen}
+              onDialogOpenChange={setCloudAccelerationDialogOpen}
+              onSingleAccelerate={triggerSingleCloudAcceleration}
+              onAlwaysAccelerate={triggerAlwaysCloudAcceleration}
+            />
             <AiGenerateButton
               disabled={!canGenerate}
               isGenerating={isGenerating}

@@ -169,6 +169,10 @@ export interface GetGenerationJobResponse {
   readonly displayPhase?: GenerationJobDisplayPhase;
   /** True when server is persisting or job succeeded — client must not upload locally. */
   readonly deferClientPersistToServer?: boolean;
+  /** Org has platform free cloud acceleration enabled. */
+  readonly cloudAccelerationEnabled?: boolean;
+  /** This job should skip client download and use server persist immediately. */
+  readonly shouldUseCloudAcceleration?: boolean;
 }
 
 /** Result of a user-initiated generation job cancel request. */

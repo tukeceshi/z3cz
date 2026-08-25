@@ -147,6 +147,10 @@ export const OrganizationAiInterfacesPage = lazyRoutePage(
   () => import("@/pages/organization-ai-interfaces-page"),
   "OrganizationAiInterfacesPage"
 );
+export const OrganizationCloudAccelerationPage = lazyRoutePage(
+  () => import("@/pages/organization-cloud-acceleration-page"),
+  "OrganizationCloudAccelerationPage"
+);
 export const IntegrationsPage = lazyRoutePage(
   () => import("@/pages/integrations-page"),
   "IntegrationsPage"

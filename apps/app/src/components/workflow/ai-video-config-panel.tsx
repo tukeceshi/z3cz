@@ -150,6 +150,7 @@ import {
   compiledVideoPromptLength,
   hasBrokenVideoPromptRefs,
 } from "./video-prompt-compile";
+import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleration-offer";
 import {
   useGenerativeCloudJobProgress,
   generativeVideoProgressButtonKey,
@@ -611,8 +612,17 @@ export function AiVideoConfigPanel({
 
   const isBusyForUi = isGenerating || isCancelling || metadataBusy;
 
-  const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
-    useGenerativeCloudJobProgress({
+  const {
+    syncProgress,
+    clearProgress,
+    resolveJobMedia,
+    activeProgressPhase,
+    cloudAccelerationOfferVisible,
+    cloudAccelerationDialogOpen,
+    setCloudAccelerationDialogOpen,
+    triggerSingleCloudAcceleration,
+    triggerAlwaysCloudAcceleration,
+  } = useGenerativeCloudJobProgress({
       nodeId,
       orgId,
       workflowId,
@@ -628,6 +638,8 @@ export function AiVideoConfigPanel({
         withAiVideoGeneratingFlag(metadata, busy),
       onStaged: handleStaged,
       shouldAbortJobPoll,
+      cloudAccelerationEnabled: true,
+      aiInterfaceId: effectiveModel?.interfaceId,
     });
 
   useEffect(() => {
@@ -1725,6 +1737,13 @@ export function AiVideoConfigPanel({
                 maxLength={promptMaxLength}
               />
             ) : null}
+            <GenerativeCloudAccelerationOffer
+              offerVisible={cloudAccelerationOfferVisible}
+              dialogOpen={cloudAccelerationDialogOpen}
+              onDialogOpenChange={setCloudAccelerationDialogOpen}
+              onSingleAccelerate={triggerSingleCloudAcceleration}
+              onAlwaysAccelerate={triggerAlwaysCloudAcceleration}
+            />
             <AiGenerateButton
               disabled={!canGenerate}
               isGenerating={isBusyForUi}

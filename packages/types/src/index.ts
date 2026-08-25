@@ -5,6 +5,7 @@ export * from "./agent-chat";
 export * from "./text-model-context-windows";
 export * from "./ai-interface";
 export * from "./ai-interface-channels";
+export * from "./cloud-acceleration";
 export * from "./cloud-storage-health";
 export * from "./generation-job";
 export * from "./media-reference";

@@ -12,11 +12,13 @@ import {
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
+import { useGenerativeCloudAcceleration } from "@/hooks/use-generative-cloud-acceleration";
 import {
   releaseGenerativeJobResume,
   tryClaimGenerativeJobResume,
 } from "@/services/generative-cloud-job-resume-registry";
 import { getGenerationJob } from "@/services/platform-ai-model-service";
+import { setGenerativeCloudAccelerationCardSession } from "@/services/generative-cloud-acceleration-session";
 import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
@@ -114,6 +116,8 @@ interface UseGenerativeCloudJobOptions {
   readonly onResumeError?: (error: unknown) => void;
   readonly shouldAbortJobPoll?: () => boolean;
   readonly resumeJobId?: string;
+  readonly cloudAccelerationEnabled?: boolean;
+  readonly aiInterfaceId?: string;
 }
 
 export function useGenerativeCloudJobProgress(
@@ -135,6 +139,9 @@ export function useGenerativeCloudJobProgress(
   const initialResumeJobIdRef = useRef(
     options.resumeJobId ?? readGenerativeProgressJobId(options.metadata)
   );
+  const activeJobId =
+    readGenerativeProgressJobId(options.metadata) ??
+    initialResumeJobIdRef.current;
 
   const syncProgress = useCallback(
     (params: {
@@ -160,6 +167,27 @@ export function useGenerativeCloudJobProgress(
     },
     [options.applyBusyMetadata, options.nodeId, options.updateNodeData]
   );
+
+  const handleServerPersistTriggered = useCallback(() => {
+    syncProgress({
+      jobId: activeJobId ?? undefined,
+      phase: "server_persisting",
+      downloadPercent: null,
+    });
+    options.setPersistPhase(null);
+  }, [
+    activeJobId,
+    options.setPersistPhase,
+    syncProgress,
+  ]);
+
+  const cloudAcceleration = useGenerativeCloudAcceleration({
+    organizationId: options.orgId,
+    aiInterfaceId: options.aiInterfaceId,
+    jobId: activeJobId,
+    enabled: options.cloudAccelerationEnabled === true,
+    onServerPersistTriggered: handleServerPersistTriggered,
+  });
 
   const clearProgress = useCallback(() => {
     if (getCanvasMaintenanceFrozen()) {
@@ -233,7 +261,10 @@ export function useGenerativeCloudJobProgress(
             options.onStaged?.(stagedMedia);
           },
           shouldAbortJobPoll: options.shouldAbortJobPoll,
+          shouldAbortDownload: cloudAcceleration.shouldAbortDownload,
+          onDownloadSlow: cloudAcceleration.onDownloadSlow,
         });
+        cloudAcceleration.resetOffer();
         const meta = await readJobPersistMeta(options.orgId!, jobId);
         return {
           media,
@@ -253,6 +284,9 @@ export function useGenerativeCloudJobProgress(
       options.shouldAbortJobPoll,
       options.workflowId,
       syncProgress,
+      cloudAcceleration.onDownloadSlow,
+      cloudAcceleration.shouldAbortDownload,
+      cloudAcceleration.resetOffer,
     ]
   );
 
@@ -322,11 +356,50 @@ export function useGenerativeCloudJobProgress(
     resolveJobMedia,
   ]);
 
+  useEffect(() => {
+    if (options.cloudAccelerationEnabled !== true) {
+      setGenerativeCloudAccelerationCardSession(options.nodeId, null);
+      return;
+    }
+
+    setGenerativeCloudAccelerationCardSession(options.nodeId, {
+      offerVisible: cloudAcceleration.offerVisible,
+      dialogOpen: cloudAcceleration.dialogOpen,
+      setDialogOpen: cloudAcceleration.setDialogOpen,
+      triggerSingle: () => {
+        void cloudAcceleration.triggerServerPersist(false);
+      },
+      triggerAlways: () => {
+        void cloudAcceleration.triggerServerPersist(true);
+      },
+    });
+
+    return () => {
+      setGenerativeCloudAccelerationCardSession(options.nodeId, null);
+    };
+  }, [
+    cloudAcceleration.dialogOpen,
+    cloudAcceleration.offerVisible,
+    cloudAcceleration.setDialogOpen,
+    cloudAcceleration.triggerServerPersist,
+    options.cloudAccelerationEnabled,
+    options.nodeId,
+  ]);
+
   return {
     syncProgress,
     clearProgress,
     resolveJobMedia,
     activeProgressPhase,
+    cloudAccelerationOfferVisible: cloudAcceleration.offerVisible,
+    cloudAccelerationDialogOpen: cloudAcceleration.dialogOpen,
+    setCloudAccelerationDialogOpen: cloudAcceleration.setDialogOpen,
+    triggerSingleCloudAcceleration: () => {
+      void cloudAcceleration.triggerServerPersist(false);
+    },
+    triggerAlwaysCloudAcceleration: () => {
+      void cloudAcceleration.triggerServerPersist(true);
+    },
   };
 }
 
@@ -339,7 +412,9 @@ export function generativeProgressButtonKey(
     case "uploading":
       return "workflow.aiImagePanel.persistUploading";
     case "server_persisting":
-      return "workflow.aiImagePanel.serverPersisting";
+      return "workflow.aiImagePanel.cloudAccelerating";
+    case "cloud_accelerating":
+      return "workflow.aiImagePanel.cloudAccelerating";
     case "queued":
       return "workflow.aiImagePanel.queued";
     case "generating":
@@ -358,7 +433,9 @@ export function generativeVideoProgressButtonKey(
     case "uploading":
       return "workflow.aiVideoPanel.persistUploading";
     case "server_persisting":
-      return "workflow.aiVideoPanel.serverPersisting";
+      return "workflow.aiVideoPanel.cloudAccelerating";
+    case "cloud_accelerating":
+      return "workflow.aiVideoPanel.cloudAccelerating";
     case "queued":
       return "workflow.aiVideoPanel.queued";
     case "generating":
@@ -381,7 +458,9 @@ export function generativeAudioProgressButtonKey(
     case "uploading":
       return "workflow.aiAudioPanel.persistUploading";
     case "server_persisting":
-      return "workflow.aiAudioPanel.serverPersisting";
+      return "workflow.aiAudioPanel.cloudAccelerating";
+    case "cloud_accelerating":
+      return "workflow.aiAudioPanel.cloudAccelerating";
     case "queued":
       return "workflow.aiAudioPanel.queued";
     case "generating":
@@ -408,7 +487,9 @@ export function generativeCardProgressKey(
     case "uploading":
       return `${prefix}.cardUploading`;
     case "server_persisting":
-      return `${prefix}.cardServerPersisting`;
+      return `${prefix}.cardCloudAccelerating`;
+    case "cloud_accelerating":
+      return `${prefix}.cardCloudAccelerating`;
     case "queued":
       return `${prefix}.cardQueued`;
     case "generating":

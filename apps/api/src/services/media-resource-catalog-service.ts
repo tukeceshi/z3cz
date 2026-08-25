@@ -150,6 +150,7 @@ export function registerRequestToCatalogInsert(
 
     generating: resource.generating ?? false,
     failed: resource.failed ?? false,
+    cloudAccelerationStatus: resource.cloudAccelerationStatus ?? null,
 
   };
 
@@ -477,7 +478,12 @@ export async function resolveMediaResources(
 
 
 
-    if (catalogEntry.generating || catalogEntry.failed) {
+    if (
+      catalogEntry.generating ||
+      catalogEntry.failed ||
+      catalogEntry.cloudAccelerationStatus === "pending" ||
+      catalogEntry.cloudAccelerationStatus === "active"
+    ) {
 
       resolved.push({
 
@@ -490,6 +496,8 @@ export async function resolveMediaResources(
         generating: catalogEntry.generating,
 
         failed: catalogEntry.failed,
+
+        cloudAccelerationStatus: catalogEntry.cloudAccelerationStatus ?? undefined,
 
         ...(catalogEntry.upstreamUrl
 

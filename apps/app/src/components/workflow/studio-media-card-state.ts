@@ -7,10 +7,11 @@ import { isAiImageGenerating } from "./ai-image-node-utils";
 import { isAiVideoGenerating } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import {
+  resolveGenerativeCardPhase,
+} from "./generative-history-utils";
+import {
   formatGenerativePhaseLabel,
-  isGenerativePersistPhase,
-  isGenerativeProgressBusyPhase,
-  readGenerativeProgressPhase,
+  isGenerativeCardBusyPhase,
   type GenerativeProgressPhase,
 } from "./generative-progress-utils";
 
@@ -23,62 +24,24 @@ export interface StudioMediaCardState {
   readonly generateError: GenerativeCardError | undefined;
 }
 
-function resolveProgressPhaseForPlaceholder(
-  metadata: Record<string, string> | undefined,
-  isVideo: boolean,
-  media?: readonly unknown[]
-): GenerativeProgressPhase | null {
-  const progressPhase = readGenerativeProgressPhase(metadata);
-  if (isGenerativePersistPhase(progressPhase)) {
-    return progressPhase;
-  }
-  if (progressPhase !== undefined && progressPhase !== "generating") {
-    return progressPhase;
-  }
-
-  if (!isVideo && hasGeneratingResource(media)) {
-    return "generating";
-  }
-
-  const isGenerating = isVideo
-    ? isAiVideoGenerating(metadata)
-    : isAiImageGenerating(metadata);
-  return isGenerating || progressPhase === "generating" ? "generating" : null;
-}
-
-function readStudioMediaIsBusy(
-  metadata: Record<string, string> | undefined,
-  isVideo: boolean,
-  media?: readonly unknown[]
-): boolean {
-  const progressPhase = readGenerativeProgressPhase(metadata);
-  if (isVideo) {
-    return (
-      isAiVideoGenerating(metadata) ||
-      isGenerativeProgressBusyPhase(progressPhase)
-    );
-  }
-
-  return (
-    isAiImageGenerating(metadata) ||
-    hasGeneratingResource(media) ||
-    isGenerativePersistPhase(progressPhase) ||
-    progressPhase === "cancelled"
-  );
-}
-
 export function readStudioMediaCardState(
   metadata: Record<string, string> | undefined,
   isVideo: boolean,
   media?: readonly unknown[]
 ): StudioMediaCardState {
   const mediaKind: StudioMediaKind = isVideo ? "video" : "image";
-  const phase = resolveProgressPhaseForPlaceholder(metadata, isVideo, media);
+  const isModalityGenerating = isVideo
+    ? isAiVideoGenerating(metadata)
+    : isAiImageGenerating(metadata);
+  const phase = resolveGenerativeCardPhase(metadata, media, isModalityGenerating);
 
   return {
     placeholderKey: generativeCardProgressKey(phase, mediaKind),
     phase,
-    isBusy: readStudioMediaIsBusy(metadata, isVideo, media),
+    isBusy:
+      (phase !== null && isGenerativeCardBusyPhase(phase)) ||
+      isModalityGenerating ||
+      hasGeneratingResource(media),
     generateError: readGenerativeCardError(metadata),
   };
 }

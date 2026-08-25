@@ -1,4 +1,5 @@
 import {
+  hasCloudAcceleratingResource,
   hasDisplayableWorkflowMedia,
   hasFailedResource,
   hasGeneratingResource,
@@ -7,27 +8,78 @@ import {
 } from "@dafthunk/types";
 
 import {
+  isGenerativeCardBusyPhase,
   isGenerativePersistPhase,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
+  type GenerativeProgressPhase,
 } from "./generative-progress-utils";
 
 export interface GenerativeCardCoverRead<TMedia> {
   readonly coverMedia: readonly TMedia[];
   readonly isBusy: boolean;
   readonly hasCover: boolean;
+  readonly cardPhase: GenerativeProgressPhase | null;
+}
+
+/** Resolve card overlay phase — JSON media state first, then client metadata. */
+export function resolveGenerativeCardPhase(
+  metadata: Record<string, string> | undefined,
+  media: readonly unknown[] | undefined,
+  isModalityGenerating: boolean
+): GenerativeProgressPhase | null {
+  const progressPhase = readGenerativeProgressPhase(metadata);
+
+  if (progressPhase === "downloading" || progressPhase === "uploading") {
+    return progressPhase;
+  }
+
+  if (hasGeneratingResource(media)) {
+    return "generating";
+  }
+
+  if (hasCloudAcceleratingResource(media)) {
+    return "cloud_accelerating";
+  }
+
+  if (
+    progressPhase === "queued" ||
+    progressPhase === "cancelling" ||
+    progressPhase === "cancelled"
+  ) {
+    return progressPhase;
+  }
+
+  if (progressPhase === "server_persisting") {
+    return "cloud_accelerating";
+  }
+
+  if (isModalityGenerating || progressPhase === "generating") {
+    return "generating";
+  }
+
+  return null;
 }
 
 /** True while the card should keep loading UI and hold layout. */
 export function isGenerativeCardCoverBusy(
   metadata: Record<string, string> | undefined,
-  isModalityGenerating: boolean
+  isModalityGenerating: boolean,
+  selectedMedia?: readonly unknown[]
 ): boolean {
-  if (isModalityGenerating) {
-    return true;
+  const phase = resolveGenerativeCardPhase(
+    metadata,
+    selectedMedia,
+    isModalityGenerating
+  );
+  if (phase !== null) {
+    return isGenerativeCardBusyPhase(phase) || phase === "cancelled";
   }
-  const phase = readGenerativeProgressPhase(metadata);
-  return isGenerativeProgressBusyPhase(phase);
+
+  const progressPhase = readGenerativeProgressPhase(metadata);
+  return (
+    isModalityGenerating || isGenerativeProgressBusyPhase(progressPhase)
+  );
 }
 
 export function shouldHoldUnreadyCardCover(params: {
@@ -35,14 +87,30 @@ export function shouldHoldUnreadyCardCover(params: {
   readonly isModalityGenerating: boolean;
   readonly selectedMedia?: readonly unknown[];
 }): boolean {
+  const phase = resolveGenerativeCardPhase(
+    params.metadata,
+    params.selectedMedia,
+    params.isModalityGenerating
+  );
+  if (phase !== null) {
+    return isGenerativeCardBusyPhase(phase) || phase === "cancelled";
+  }
+
   if (params.isModalityGenerating) {
     return true;
   }
   if (hasGeneratingResource(params.selectedMedia)) {
     return true;
   }
-  const phase = readGenerativeProgressPhase(params.metadata);
-  return isGenerativePersistPhase(phase) || phase === "queued" || phase === "generating";
+  if (hasCloudAcceleratingResource(params.selectedMedia)) {
+    return true;
+  }
+  const progressPhase = readGenerativeProgressPhase(params.metadata);
+  return (
+    isGenerativePersistPhase(progressPhase) ||
+    progressPhase === "queued" ||
+    progressPhase === "generating"
+  );
 }
 
 export function readGenerativeCardCoverFromHistory<
@@ -61,10 +129,20 @@ export function readGenerativeCardCoverFromHistory<
 ): GenerativeCardCoverRead<TMedia> {
   const selected = readSelectedHistoryMedia(history, getMedia);
   const selectedFailed = hasFailedResource(selected ?? undefined);
+  const cardPhase = resolveGenerativeCardPhase(
+    params.metadata,
+    selected ?? undefined,
+    params.isModalityGenerating
+  );
   const isBusy =
     !selectedFailed &&
-    (isGenerativeCardCoverBusy(params.metadata, params.isModalityGenerating) ||
-      hasGeneratingResource(selected ?? undefined));
+    (cardPhase !== null
+      ? isGenerativeCardBusyPhase(cardPhase) || cardPhase === "cancelled"
+      : isGenerativeCardCoverBusy(
+          params.metadata,
+          params.isModalityGenerating,
+          selected ?? undefined
+        ) || hasGeneratingResource(selected ?? undefined));
   const holdUnreadyCover =
     !selectedFailed &&
     shouldHoldUnreadyCardCover({
@@ -79,6 +157,7 @@ export function readGenerativeCardCoverFromHistory<
     coverMedia,
     isBusy,
     hasCover: hasDisplayableWorkflowMedia(coverMedia),
+    cardPhase,
   };
 }
 
@@ -170,6 +249,7 @@ export function readDisplayHistoryMedia<TItem extends { readonly id: string }, T
 
   const shouldHold =
     hasGeneratingResource(selected) ||
+    hasCloudAcceleratingResource(selected) ||
     (holdUnreadyCover && !selected.some(isDisplayableWorkflowMedia));
   if (!shouldHold) {
     return selected;
@@ -187,6 +267,9 @@ export function readDisplayHistoryMedia<TItem extends { readonly id: string }, T
   }
 
   if (hasGeneratingResource(selected)) {
+    return selected;
+  }
+  if (hasCloudAcceleratingResource(selected)) {
     return selected;
   }
   return [];
