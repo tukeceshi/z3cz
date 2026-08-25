@@ -30,7 +30,9 @@ function readJsonInputValue(
   return input.value;
 }
 
-function isCoverImageMimeType(mimeType: string | undefined): boolean {
+function isCoverImageMimeType(
+  mimeType: string | undefined
+): mimeType is string {
   return typeof mimeType === "string" && mimeType.startsWith("image/");
 }
 

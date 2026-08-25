@@ -197,11 +197,12 @@ export function mediaReferenceToWorkflowValue(
   return {
     resourceId: getResourceId(ref),
     mimeType: ref.mimeType,
-    kind: isCloudObjectReference(ref)
-      ? "cloud"
-      : isEphemeralMediaReference(ref)
-        ? "ephemeral"
-        : "local",
+    kind:
+      isObjectReference(ref) && isCloudObjectReference(ref)
+        ? "cloud"
+        : isEphemeralMediaReference(ref)
+          ? "ephemeral"
+          : "local",
   };
 }
 

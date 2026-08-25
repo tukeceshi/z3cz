@@ -1,4 +1,4 @@
-import type { ObjectReference } from "./media-reference";
+import type { ObjectReference } from "./workflow";
 
 export const SEEDANCE_VIDEO_CHECK_VOLCANO_REQUIRED_CODE =
   "seedance_video_check_volcano_required" as const;
