@@ -625,7 +625,7 @@ export const DEFAULT_TEXT_MODEL_PARAMETER_RULES: TextModelParameterRules = {
   outputMaxTokens: 4096,
   outputMaxTokensLimit: 8192,
   outputMaxChars: 32_000,
-  contextWindowTokens: 1_048_576,
+  contextWindowTokens: 128_000,
   maxTextReferences: 4,
   maxTextReferenceChars: 32_000,
   maxImageReferences: 0,

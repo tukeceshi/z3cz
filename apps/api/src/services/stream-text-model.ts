@@ -34,7 +34,8 @@ export async function prepareTextModelStream(params: {
   readonly organizationId: string;
   readonly canonicalId: string;
   readonly interfaceId: string;
-  readonly effectivePrompt: string;
+  readonly effectivePrompt?: string;
+  readonly messages?: readonly { readonly role: string; readonly content: string }[];
   readonly outputMaxTokens?: number;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
@@ -91,13 +92,19 @@ export async function prepareTextModelStream(params: {
     };
   }
 
+  const hasMessages = (params.messages?.length ?? 0) > 0;
+  const prompt = params.effectivePrompt?.trim() ?? "";
+  if (!hasMessages && prompt.length === 0) {
+    return { ok: false, error: "Prompt is required" };
+  }
+
   return {
     ok: true,
     prepared: {
       candidate,
       resolved: withSelectedModel(iface, inferenceModelId),
       inputs: {
-        prompt: params.effectivePrompt,
+        ...(hasMessages ? { messages: params.messages } : { prompt }),
         ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
           ? { referenceImageUrls: params.referenceImageUrls }
           : {}),

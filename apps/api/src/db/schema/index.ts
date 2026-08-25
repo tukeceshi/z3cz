@@ -704,6 +704,35 @@ export const workflows = pgTable(
   ]
 );
 
+export const agentConversations = pgTable(
+  "agent_conversations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflows.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default(""),
+    cloudPath: text("cloud_path").notNull(),
+    contentFingerprint: text("content_fingerprint").notNull().default(""),
+    sealed: boolean("sealed").notNull().default(true),
+    holderUserId: text("holder_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createCreatedAt(),
+    updatedAt: createUpdatedAt(),
+  },
+  (table) => [
+    index("agent_conversations_org_workflow_idx").on(
+      table.organizationId,
+      table.workflowId
+    ),
+    index("agent_conversations_updated_at_idx").on(table.updatedAt),
+  ]
+);
+
 // Scheduled Triggers - Scheduled triggers for workflows
 export const scheduledTriggers = pgTable(
   "scheduled_triggers",

@@ -47,7 +47,8 @@ export type AiMediaCacheNodeType =
   | "ai-image"
   | "ai-video"
   | "ai-audio"
-  | "ai-text";
+  | "ai-text"
+  | "agent-chat";
 
 const DB_NAME = "dafthunk-ai-media-cache";
 const DB_VERSION = 4;
@@ -472,6 +473,26 @@ async function deleteEntry(db: IDBDatabase, key: string): Promise<void> {
   await reconcileCacheMeta(db);
 }
 
+async function evictAgentChatUntilUnderLimit(
+  db: IDBDatabase,
+  limitBytes: number
+): Promise<void> {
+  let meta = await readMeta(db);
+  if (meta.totalBytes <= limitBytes) return;
+
+  const entries = (await readAllEntries(db))
+    .filter((entry) => entry.nodeType === "agent-chat")
+    .sort((a, b) => a.lastAccessAt.localeCompare(b.lastAccessAt));
+
+  for (const entry of entries) {
+    if (meta.totalBytes <= limitBytes) break;
+    await deleteEntry(db, entry.key);
+    meta = await readMeta(db);
+  }
+
+  await reconcileCacheMeta(db);
+}
+
 async function evictLruUntilUnderLimit(
   db: IDBDatabase,
   limitBytes: number
@@ -480,9 +501,16 @@ async function evictLruUntilUnderLimit(
   if (meta.totalBytes <= limitBytes) return;
 
   const entries = await readAllEntries(db);
-  entries.sort((a, b) => a.lastAccessAt.localeCompare(b.lastAccessAt));
+  const byAccess = (
+    left: (typeof entries)[number],
+    right: (typeof entries)[number]
+  ): number => left.lastAccessAt.localeCompare(right.lastAccessAt);
+  const agentFirst = [
+    ...entries.filter((entry) => entry.nodeType === "agent-chat").sort(byAccess),
+    ...entries.filter((entry) => entry.nodeType !== "agent-chat").sort(byAccess),
+  ];
 
-  for (const entry of entries) {
+  for (const entry of agentFirst) {
     if (meta.totalBytes <= limitBytes) break;
     await deleteEntry(db, entry.key);
     meta = await readMeta(db);
@@ -914,7 +942,14 @@ async function putCacheBlobRecord(params: {
     await reconcileCacheMeta(db);
 
     const metaAfterWrite = await readMeta(db);
-    await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
+    if (params.nodeType === "agent-chat") {
+      await evictAgentChatUntilUnderLimit(
+        db,
+        metaAfterWrite.limitMb * 1024 * 1024
+      );
+    } else {
+      await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
+    }
 
     if (params.nodeType === "ai-image" || params.nodeType === "ai-video") {
       await generateCacheResourceTiers({
@@ -1545,6 +1580,7 @@ function mimeToExtension(
     if (base.includes("markdown")) return "md";
     return "txt";
   }
+  if (nodeType === "agent-chat") return "json";
   const map: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
@@ -1575,7 +1611,9 @@ export function cacheEntryDownloadFilename(
         ? "audio"
         : entry.nodeType === "ai-text"
           ? "text"
-          : "image";
+          : entry.nodeType === "agent-chat"
+            ? "agent"
+            : "image";
   const idPart = entry.mediaId.slice(0, 8);
   return `${prefix}-${idPart}-${index + 1}.${ext}`;
 }
