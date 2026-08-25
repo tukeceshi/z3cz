@@ -1,5 +1,5 @@
 import type { WorkflowFolder, WorkflowWithMetadata } from "@dafthunk/types";
-import { WORKFLOW_SCHEME_BASIC_CANVAS_ID } from "@dafthunk/types";
+import { isCloudObjectReference, WORKFLOW_SCHEME_BASIC_CANVAS_ID } from "@dafthunk/types";
 import FolderPlus from "lucide-react/icons/folder-plus";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
@@ -15,9 +15,6 @@ import { ChangeCoverDialog } from "@/components/workflow/change-cover-dialog";
 import { DeleteFolderDialog } from "@/components/workflow/delete-folder-dialog";
 import { RenameLibraryItemDialog } from "@/components/workflow/rename-library-item-dialog";
 import { createWorkflowEditorLocationState } from "@/components/workflow/workflow-editor-navigation";
-import {
-  hasLibraryCover,
-} from "@/components/workflow/workflow-library-utils";
 import { WorkflowLibraryPreview } from "@/components/workflow/workflow-library-preview";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,8 +38,12 @@ import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { uploadBinaryData } from "@/services/object-service";
 import { useOrgCloudStorageConfigured } from "@/services/platform-ai-model-service";
+import {
+  registerUploadedCoverReference,
+  setWorkflowCover,
+  uploadCoverImageToCloud,
+} from "@/services/workflow-cover-service";
 import {
   createWorkflowFolder,
   deleteWorkflowFolder,
@@ -270,13 +271,20 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
   };
 
   const handleCoverUpload = async (file: File) => {
-    if (!orgId || !coverTarget) {
+    if (!orgId || !coverTarget || !cloudStorageConfigured) {
       return;
     }
     setIsCoverUploading(true);
     try {
-      const reference = await uploadBinaryData(file, file.type, orgId);
+      const reference = await uploadCoverImageToCloud({
+        organizationId: orgId,
+        file,
+      });
+      if (!isCloudObjectReference(reference)) {
+        throw new Error("Cover upload did not return cloud storage metadata");
+      }
       if (coverTarget.kind === "folder") {
+        await registerUploadedCoverReference(orgId, reference);
         await updateWorkflowFolder(
           coverTarget.item.id,
           {
@@ -287,14 +295,14 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
         );
         await mutateFolders();
       } else {
-        await updateWorkflowListMetadata(
-          coverTarget.item.id,
-          {
-            coverObjectId: reference.id,
-            coverMimeType: reference.mimeType,
-          },
-          orgId
-        );
+        await setWorkflowCover({
+          organizationId: orgId,
+          workflowId: coverTarget.item.id,
+          resourceId: reference.id,
+          mimeType: reference.mimeType,
+          storageKey: reference.storageKey,
+          replace: true,
+        });
         await mutateWorkflows();
       }
       setCoverTarget(null);
@@ -302,37 +310,6 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
     } catch (error) {
       console.error("Failed to upload cover:", error);
       appToast.error("pages.workflows.cover.uploadFailed");
-    } finally {
-      setIsCoverUploading(false);
-    }
-  };
-
-  const handleCoverClear = async () => {
-    if (!orgId || !coverTarget) {
-      return;
-    }
-    setIsCoverUploading(true);
-    try {
-      if (coverTarget.kind === "folder") {
-        await updateWorkflowFolder(
-          coverTarget.item.id,
-          { coverObjectId: null, coverMimeType: null },
-          orgId
-        );
-        await mutateFolders();
-      } else {
-        await updateWorkflowListMetadata(
-          coverTarget.item.id,
-          { coverObjectId: null, coverMimeType: null },
-          orgId
-        );
-        await mutateWorkflows();
-      }
-      setCoverTarget(null);
-      appToast.success("pages.workflows.cover.removed");
-    } catch (error) {
-      console.error("Failed to remove cover:", error);
-      appToast.error("errors.workflowUpdateFailed");
     } finally {
       setIsCoverUploading(false);
     }
@@ -532,15 +509,6 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
         cloudStorageConfigured={cloudStorageConfigured}
         isUploading={isCoverUploading}
         onUpload={handleCoverUpload}
-        onClear={handleCoverClear}
-        hasCover={
-          coverTarget
-            ? hasLibraryCover(
-                coverTarget.item.coverObjectId,
-                coverTarget.item.coverMimeType
-              )
-            : false
-        }
       />
 
       <RenameLibraryItemDialog

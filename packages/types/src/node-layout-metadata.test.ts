@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isWideLayoutSize,
   NODE_LAYOUT_HEIGHT_META_KEY,
   NODE_LAYOUT_WIDTH_META_KEY,
   nodeLayoutMetadataEntries,
@@ -28,5 +29,11 @@ describe("node-layout-metadata", () => {
         [NODE_LAYOUT_HEIGHT_META_KEY]: "270",
       })
     ).toBeNull();
+  });
+
+  it("detects wide layout from short-side card rule", () => {
+    expect(isWideLayoutSize({ width: 540, height: 270 })).toBe(true);
+    expect(isWideLayoutSize({ width: 270, height: 480 })).toBe(false);
+    expect(isWideLayoutSize({ width: 270, height: 270 })).toBe(false);
   });
 });

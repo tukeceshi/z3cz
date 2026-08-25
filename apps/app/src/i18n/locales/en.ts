@@ -1428,6 +1428,11 @@ export const en = {
     dashboard: {
       title: "Dashboard",
       noData: "No dashboard data available.",
+      recentWorkflows: {
+        title: "Recent Workflows",
+        viewAll: "View all",
+        empty: "No workflows yet",
+      },
       gettingStarted: {
         title: "Configure AI & Resource APIs first",
         description:

@@ -802,8 +802,9 @@ workflowRoutes.patch(
       .object({
         name: z.string().min(1).optional(),
         description: z.string().nullable().optional(),
-        coverObjectId: z.string().min(1).nullable().optional(),
-        coverMimeType: z.string().min(1).nullable().optional(),
+        coverObjectId: z.string().min(1).optional(),
+        coverMimeType: z.string().min(1).optional(),
+        coverReplace: z.boolean().optional(),
       })
       .refine(
         (value) =>
@@ -826,25 +827,23 @@ workflowRoutes.patch(
       return c.json({ error: "Workflow not found" }, 404);
     }
 
-    if (
-      data.coverObjectId !== undefined ||
-      data.coverMimeType !== undefined
-    ) {
-      const hasCover =
-        data.coverObjectId !== null && data.coverMimeType !== null;
-      const clearingCover =
-        data.coverObjectId === null && data.coverMimeType === null;
-      if (hasCover || clearingCover) {
-        const cloudCheck = await assertOrgCloudStorageConfigured(
-          c,
-          organizationId
-        );
-        if (!cloudCheck.ok) {
-          return cloudCheck.response;
-        }
-      }
-      if (hasCover && (!data.coverObjectId || !data.coverMimeType)) {
+    let coverObjectId = data.coverObjectId;
+    let coverMimeType = data.coverMimeType;
+
+    if (coverObjectId !== undefined || coverMimeType !== undefined) {
+      if (!coverObjectId || !coverMimeType) {
         return c.json({ error: "Cover requires object id and mime type" }, 400);
+      }
+      const cloudCheck = await assertOrgCloudStorageConfigured(
+        c,
+        organizationId
+      );
+      if (!cloudCheck.ok) {
+        return cloudCheck.response;
+      }
+      if (existing.coverObjectId && data.coverReplace !== true) {
+        coverObjectId = undefined;
+        coverMimeType = undefined;
       }
     }
 
@@ -854,12 +853,8 @@ workflowRoutes.patch(
       ...(data.description !== undefined
         ? { description: data.description ?? null }
         : {}),
-      ...(data.coverObjectId !== undefined
-        ? { coverObjectId: data.coverObjectId }
-        : {}),
-      ...(data.coverMimeType !== undefined
-        ? { coverMimeType: data.coverMimeType }
-        : {}),
+      ...(coverObjectId !== undefined ? { coverObjectId } : {}),
+      ...(coverMimeType !== undefined ? { coverMimeType } : {}),
       updatedAt: now,
     });
 

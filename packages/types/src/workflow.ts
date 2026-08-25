@@ -528,8 +528,10 @@ export interface DeleteWorkflowFolderResponse {
 export interface UpdateWorkflowListMetadataRequest {
   name?: string;
   description?: string | null;
-  coverObjectId?: string | null;
-  coverMimeType?: string | null;
+  coverObjectId?: string;
+  coverMimeType?: string;
+  /** When true, replace an existing cover (manual upload). Otherwise only set if absent. */
+  coverReplace?: boolean;
 }
 
 export type UpdateWorkflowListMetadataResponse = WorkflowWithMetadata;

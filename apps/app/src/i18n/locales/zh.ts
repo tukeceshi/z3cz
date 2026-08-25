@@ -1369,6 +1369,11 @@ export const zh: TranslationDictionary = {
     dashboard: {
       title: "仪表盘",
       noData: "暂无仪表盘数据。",
+      recentWorkflows: {
+        title: "近期工作流",
+        viewAll: "查看全部",
+        empty: "暂无工作流",
+      },
       gettingStarted: {
         title: "先配置 AI/资源 接口",
         description:
