@@ -141,6 +141,15 @@ export const GENERATIVE_STUDIO_DROP_EXTENSIONS = [
   ...GENERATIVE_STUDIO_DROP_EXTENSION_SET,
 ].sort() as readonly string[];
 
+/** File picker accept list for canvas upload. */
+export const GENERATIVE_CANVAS_FILE_ACCEPT = [
+  ...GENERATIVE_STUDIO_DROP_EXTENSIONS,
+  "image/jpeg",
+  "image/png",
+  "video/*",
+  "audio/*",
+].join(",");
+
 export type GenerativeStudioDropKind = "image" | "video" | "audio";
 
 export interface GenerativeStudioDropFile {

@@ -823,6 +823,10 @@ export function WorkflowBuilder({
                   onMoveEnd={handleViewportMoveEnd}
                   onInit={handleReactFlowInit}
                   onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
+                  onUndo={readOnly ? undefined : undo}
+                  onRedo={readOnly ? undefined : redo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
                   reserveTopChromeSpace={Boolean(workflowsListUrl)}
                   isValidConnection={isValidConnection}
                   disabled={readOnly}
@@ -830,14 +834,7 @@ export function WorkflowBuilder({
                   onZoomOneToOne={handleZoomOneToOne}
                   selectedNodes={selectedNodes}
                   selectedEdges={selectedEdges}
-                  onDeleteSelected={readOnly ? undefined : requestDeleteSelected}
                   onApplyLayout={readOnly ? undefined : applyLayout}
-                  onCopySelected={readOnly ? undefined : copySelected}
-                  onCutSelected={readOnly ? undefined : cutSelected}
-                  onPasteFromClipboard={
-                    readOnly ? undefined : pasteFromClipboard
-                  }
-                  hasClipboardData={hasClipboardData}
                   showControls={interactive}
                   showBackground={showBackground}
                   fitViewPadding={fitViewPadding}
@@ -1003,8 +1000,13 @@ function WorkflowEditorMainArea({
   const selectDroppedNodes = useCanvasDropNodeSelection(
     onSelectDroppedNodes ?? (() => {})
   );
-  const { fileDropPreview, handleCanvasDragOver, handleCanvasDragLeave, handleCanvasDrop } =
-    useCanvasGenerativeFileDrop({
+  const {
+    fileDropPreview,
+    handleCanvasDragOver,
+    handleCanvasDragLeave,
+    handleCanvasDrop,
+    handleCanvasFilePick,
+  } = useCanvasGenerativeFileDrop({
       reactFlowInstance,
       enabled: canvasFileDropEnabled && viewMode === "canvas",
       onAddCanvasDropNodes,
@@ -1033,6 +1035,11 @@ function WorkflowEditorMainArea({
         onCanvasFileDragOver={handleCanvasDragOver}
         onCanvasFileDragLeave={handleCanvasDragLeave}
         onCanvasFileDrop={handleCanvasDrop}
+        onPickCanvasFiles={
+          canvasFileDropEnabled && viewMode === "canvas"
+            ? handleCanvasFilePick
+            : undefined
+        }
       />
 
       {isStudio ? (
