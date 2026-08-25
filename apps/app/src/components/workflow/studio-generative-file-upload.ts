@@ -33,6 +33,7 @@ import { probeLocalFileCardSize } from "./resolve-local-file-card-size";
 import { hasStudioReferenceDrag } from "./studio-reference-drag";
 import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useWorkflow } from "./workflow-context";
+import { getViewportCenterFlowPoint } from "./workflow-node-placement";
 
 interface GenerativeDropUploadParams {
   readonly nodeId: string;
@@ -261,11 +262,11 @@ export function useCanvasGenerativeFileDrop(params: {
     [clearPreview, params.enabled]
   );
 
-  const handleCanvasDrop = useCallback(
-    async (event: DragEvent) => {
-      event.preventDefault();
-      clearPreview();
-
+  const ingestCanvasFiles = useCallback(
+    async (
+      files: readonly File[],
+      baseCenter: { readonly x: number; readonly y: number }
+    ) => {
       if (
         isDropping ||
         !params.enabled ||
@@ -278,19 +279,11 @@ export function useCanvasGenerativeFileDrop(params: {
         return;
       }
 
-      if (
-        !isCanvasFileDrag(event.dataTransfer) ||
-        isCanvasFileDropOnNode(event)
-      ) {
-        return;
-      }
-
       if (!workflowId?.trim()) {
         toast.error("workflow.studio.addNodeDrop.missingWorkflow");
         return;
       }
 
-      const files = [...event.dataTransfer.files];
       if (files.length === 0) {
         return;
       }
@@ -311,10 +304,6 @@ export function useCanvasGenerativeFileDrop(params: {
       setIsDropping(true);
       try {
         const resolvedDrops = drops as GenerativeStudioDropFile[];
-        const baseCenter = params.reactFlowInstance.screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        });
         const cardSizes = await Promise.all(
           resolvedDrops.map((drop) =>
             probeLocalFileCardSize(drop.file, drop.kind)
@@ -356,20 +345,18 @@ export function useCanvasGenerativeFileDrop(params: {
           return;
         }
 
-        const upload = {
-          organizationId: orgId,
-          workflowId,
-          cloudConfigured,
-          updateNodeData,
-          t,
-          toast,
-        };
-
         startCanvasDropUploads({
           nodeIds,
           drops: batchDrops,
           cardSizes: batchCardSizes,
-          upload,
+          upload: {
+            organizationId: orgId,
+            workflowId,
+            cloudConfigured,
+            updateNodeData,
+            t,
+            toast,
+          },
           updateNodeData,
         });
 
@@ -384,7 +371,6 @@ export function useCanvasGenerativeFileDrop(params: {
     },
     [
       blocksGenerativeMedia,
-      clearPreview,
       cloudConfigured,
       isDropping,
       orgId,
@@ -399,11 +385,49 @@ export function useCanvasGenerativeFileDrop(params: {
     ]
   );
 
+  const handleCanvasDrop = useCallback(
+    async (event: DragEvent) => {
+      event.preventDefault();
+      clearPreview();
+
+      if (
+        !params.reactFlowInstance ||
+        !isCanvasFileDrag(event.dataTransfer) ||
+        isCanvasFileDropOnNode(event)
+      ) {
+        return;
+      }
+
+      const files = [...event.dataTransfer.files];
+      const baseCenter = params.reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      await ingestCanvasFiles(files, baseCenter);
+    },
+    [clearPreview, ingestCanvasFiles, params.reactFlowInstance]
+  );
+
+  const handleCanvasFilePick = useCallback(
+    (files: readonly File[]) => {
+      if (!params.reactFlowInstance) {
+        return;
+      }
+
+      void ingestCanvasFiles(
+        files,
+        getViewportCenterFlowPoint(params.reactFlowInstance)
+      );
+    },
+    [ingestCanvasFiles, params.reactFlowInstance]
+  );
+
   return {
     fileDropPreview,
     handleCanvasDragOver,
     handleCanvasDragLeave,
     handleCanvasDrop,
+    handleCanvasFilePick,
   };
 }
 

@@ -12,36 +12,25 @@ import {
   type RefObject,
 } from "react";
 
-import { ActionBarButton } from "@/components/ui/action-bar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTranslation } from "@/components/locale-provider";
 import { cn, getModifierKey } from "@/utils/utils";
 
+import {
+  canvasDockButtonActiveClassName,
+  canvasDockButtonClassName,
+  canvasDockIconClassName,
+} from "./canvas-chrome-styles";
 import {
   readCanvasShortcutHintCollapsed,
   writeCanvasShortcutHintCollapsed,
 } from "./canvas-shortcut-hint-storage";
 
-const PANEL_HORIZONTAL_INSET_PX = 48;
-const TOOLBAR_SECTION_GAP_PX = 8;
-
-export interface CanvasShortcutHintToolbarLayout {
-  readonly toolbarWidth: number;
-  readonly newNodeWidth: number;
-  readonly operationsWidth: number;
-  readonly keyboardWidth: number;
-  readonly layoutWidth: number;
-}
-
-const EMPTY_TOOLBAR_LAYOUT: CanvasShortcutHintToolbarLayout = {
-  toolbarWidth: 0,
-  newNodeWidth: 0,
-  operationsWidth: 0,
-  keyboardWidth: 0,
-  layoutWidth: 0,
-};
-
-export const actionBarButtonOutlineClassName =
-  "bg-white hover:bg-neutral-50 text-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200";
+const SHORTCUT_PANEL_WIDTH_PX = 600;
 
 const PANEL_SURFACE_CLASS =
   "bg-background/60 backdrop-blur-sm dark:bg-neutral-900/60";
@@ -194,14 +183,6 @@ function LibtvShortcutRow({
   );
 }
 
-function ToolbarSectionLabel({ children }: { readonly children: string }) {
-  return (
-    <div className="flex h-7 w-full items-center justify-center">
-      <span className={cn(MUTED_LABEL_CLASS, "text-center")}>{children}</span>
-    </div>
-  );
-}
-
 function ShortcutPanelArrow() {
   return (
     <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden>
@@ -223,63 +204,40 @@ function ShortcutPanelArrow() {
   );
 }
 
-function getKeyboardArrowLeftPx(
-  layout: CanvasShortcutHintToolbarLayout,
-  panelWidth: number
-): number {
-  const keyboardCenter =
-    layout.newNodeWidth +
-    TOOLBAR_SECTION_GAP_PX +
-    layout.operationsWidth +
-    TOOLBAR_SECTION_GAP_PX +
-    layout.keyboardWidth / 2;
-  const panelLeft = (layout.toolbarWidth - panelWidth) / 2;
-
-  return keyboardCenter - panelLeft;
-}
-
-function measureSectionWidth(element: HTMLElement | null): number {
-  return element?.offsetWidth ?? 0;
-}
-
-export function useCanvasShortcutHintToolbarLayout({
-  toolbarRef,
-  newNodeRef,
-  operationsRef,
+export function useCanvasShortcutHintArrowOffset({
+  anchorRef,
   keyboardRef,
-  layoutRef,
 }: {
-  readonly toolbarRef: RefObject<HTMLElement | null>;
-  readonly newNodeRef: RefObject<HTMLElement | null>;
-  readonly operationsRef: RefObject<HTMLElement | null>;
+  readonly anchorRef: RefObject<HTMLElement | null>;
   readonly keyboardRef: RefObject<HTMLElement | null>;
-  readonly layoutRef: RefObject<HTMLElement | null>;
-}): CanvasShortcutHintToolbarLayout {
-  const [layout, setLayout] = useState<CanvasShortcutHintToolbarLayout>(
-    EMPTY_TOOLBAR_LAYOUT
-  );
+}): number | null {
+  const [arrowLeftPx, setArrowLeftPx] = useState<number | null>(null);
 
   useEffect(() => {
     const measure = () => {
-      const toolbar = toolbarRef.current;
-      if (!toolbar) {
+      const anchor = anchorRef.current;
+      const keyboard = keyboardRef.current;
+      if (!anchor || !keyboard) {
         return;
       }
 
-      setLayout({
-        toolbarWidth: toolbar.offsetWidth,
-        newNodeWidth: measureSectionWidth(newNodeRef.current),
-        operationsWidth: measureSectionWidth(operationsRef.current),
-        keyboardWidth: measureSectionWidth(keyboardRef.current),
-        layoutWidth: measureSectionWidth(layoutRef.current),
-      });
+      const anchorRect = anchor.getBoundingClientRect();
+      const keyboardRect = keyboard.getBoundingClientRect();
+      const keyboardCenterX = keyboardRect.left + keyboardRect.width / 2;
+      const panelLeftX =
+        anchorRect.left + anchorRect.width / 2 - SHORTCUT_PANEL_WIDTH_PX / 2;
+
+      setArrowLeftPx(keyboardCenterX - panelLeftX);
     };
 
     measure();
 
     const observer = new ResizeObserver(measure);
-    if (toolbarRef.current) {
-      observer.observe(toolbarRef.current);
+    if (anchorRef.current) {
+      observer.observe(anchorRef.current);
+    }
+    if (keyboardRef.current) {
+      observer.observe(keyboardRef.current);
     }
 
     window.addEventListener("resize", measure);
@@ -287,9 +245,9 @@ export function useCanvasShortcutHintToolbarLayout({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [keyboardRef, layoutRef, newNodeRef, operationsRef, toolbarRef]);
+  }, [anchorRef, keyboardRef]);
 
-  return layout;
+  return arrowLeftPx;
 }
 
 export function useCanvasShortcutHintState() {
@@ -324,19 +282,32 @@ export function CanvasShortcutHintButton({
 }: CanvasShortcutHintButtonProps) {
   const { t } = useTranslation();
 
-  return (
-    <ActionBarButton
+  const trigger = (
+    <button
+      type="button"
+      className={cn(canvasDockButtonClassName, !collapsed && canvasDockButtonActiveClassName)}
+      aria-label={
+        collapsed
+          ? t("workflow.canvas.shortcutHint.expand")
+          : t("workflow.canvas.shortcutHint.collapse")
+      }
       onClick={onToggle}
-      className={cn(
-        actionBarButtonOutlineClassName,
-        !collapsed &&
-          "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-      )}
-      tooltip={collapsed ? t("workflow.canvas.shortcutHint.expand") : undefined}
-      tooltipSide="top"
     >
-      <Keyboard className="size-4!" />
-    </ActionBarButton>
+      <Keyboard className={canvasDockIconClassName} />
+    </button>
+  );
+
+  if (!collapsed) {
+    return trigger;
+  }
+
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="top">
+        {t("workflow.canvas.shortcutHint.expand")}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -368,23 +339,20 @@ function CanvasFileDropHintCard() {
 }
 
 interface CanvasShortcutHintPanelProps {
-  readonly layout: CanvasShortcutHintToolbarLayout;
+  readonly arrowLeftPx: number | null;
   readonly onClose: () => void;
 }
 
 export function CanvasShortcutHintPanel({
-  layout,
+  arrowLeftPx,
   onClose,
 }: CanvasShortcutHintPanelProps) {
   const { t } = useTranslation();
   const modifierKey = getModifierKey();
 
-  if (layout.toolbarWidth <= 0) {
+  if (arrowLeftPx === null) {
     return null;
   }
-
-  const panelWidth = layout.toolbarWidth + PANEL_HORIZONTAL_INSET_PX;
-  const arrowLeftPx = getKeyboardArrowLeftPx(layout, panelWidth);
 
   const leftShortcuts = [
     {
@@ -431,7 +399,7 @@ export function CanvasShortcutHintPanel({
         "nodrag nopan nowheel pointer-events-auto absolute bottom-full left-1/2 z-[60] mb-4 flex -translate-x-1/2 flex-col gap-3",
         PANEL_ARROW_CLASS
       )}
-      style={{ width: panelWidth }}
+      style={{ width: SHORTCUT_PANEL_WIDTH_PX }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <CanvasFileDropHintCard />
@@ -460,7 +428,7 @@ export function CanvasShortcutHintPanel({
           </button>
         </div>
 
-        <div className="mb-4 flex items-stretch gap-5 border-b border-neutral-200 pb-4 dark:border-white/15">
+        <div className="flex items-stretch gap-5">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             {leftShortcuts.map((item) => (
               <LibtvShortcutRow
@@ -501,32 +469,6 @@ export function CanvasShortcutHintPanel({
                 }
               />
             ))}
-          </div>
-        </div>
-
-        <div className="flex items-end gap-2">
-          <div className="shrink-0" style={{ width: layout.newNodeWidth }}>
-            <ToolbarSectionLabel>
-              {t("workflow.canvas.shortcutHint.sectionNewNode")}
-            </ToolbarSectionLabel>
-          </div>
-
-          <div className="shrink-0" style={{ width: layout.operationsWidth }}>
-            <ToolbarSectionLabel>
-              {t("workflow.canvas.shortcutHint.sectionOperations")}
-            </ToolbarSectionLabel>
-          </div>
-
-          <div
-            className="shrink-0"
-            style={{ width: layout.keyboardWidth }}
-            aria-hidden
-          />
-
-          <div className="shrink-0" style={{ width: layout.layoutWidth }}>
-            <ToolbarSectionLabel>
-              {t("workflow.canvas.shortcutHint.sectionLayout")}
-            </ToolbarSectionLabel>
           </div>
         </div>
         </div>
