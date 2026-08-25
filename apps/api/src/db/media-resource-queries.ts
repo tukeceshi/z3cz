@@ -15,6 +15,7 @@ export interface UpsertMediaResourceParams {
   readonly contentSha256?: string | null;
   readonly generating?: boolean;
   readonly failed?: boolean;
+  readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
 }
 
 function mapMediaResourceRow(
@@ -31,6 +32,7 @@ function mapMediaResourceRow(
     contentSha256: row.contentSha256 ?? null,
     generating: row.generating,
     failed: row.failed,
+    cloudAccelerationStatus: row.cloudAccelerationStatus ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -61,6 +63,7 @@ export async function upsertMediaResources(
         contentSha256: resource.contentSha256 ?? null,
         generating: resource.generating ?? false,
         failed: resource.failed ?? false,
+        cloudAccelerationStatus: resource.cloudAccelerationStatus ?? null,
       }))
     )
     .onConflictDoUpdate({
@@ -74,6 +77,7 @@ export async function upsertMediaResources(
         contentSha256: sql`excluded.content_sha256`,
         generating: sql`excluded.generating`,
         failed: sql`excluded.failed`,
+        cloudAccelerationStatus: sql`excluded.cloud_acceleration_status`,
       },
     });
 }

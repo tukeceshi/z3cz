@@ -79,4 +79,36 @@ describe("fetchBlobWithProgress", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("aborts unknown-size downloads when shouldAbort becomes true", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        buildProgressResponse({
+          totalBytes: 256,
+          chunkSize: 32,
+          includeContentLength: false,
+        })
+      )
+    );
+
+    let abortAfterChunks = 2;
+    const blobPromise = fetchBlobWithProgress(
+      "https://example.com/image.png",
+      {},
+      undefined,
+      {
+        shouldAbort: () => {
+          abortAfterChunks -= 1;
+          return abortAfterChunks <= 0;
+        },
+      }
+    );
+
+    await expect(blobPromise).rejects.toMatchObject({
+      name: "CloudAccelerationDownloadAbortError",
+    });
+
+    vi.unstubAllGlobals();
+  });
 });

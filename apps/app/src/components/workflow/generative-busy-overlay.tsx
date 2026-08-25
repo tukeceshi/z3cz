@@ -222,6 +222,7 @@ export interface WorkflowNodeGenerativeBusyOverlayProps {
   readonly isAiAudioBusy: boolean;
   readonly metadata: Record<string, string> | undefined;
   readonly nodeId: string;
+  readonly cardPhase?: GenerativeProgressPhase | null;
   readonly roundedClass?: string;
 }
 
@@ -236,6 +237,7 @@ export function WorkflowNodeGenerativeBusyOverlay({
   isAiAudioBusy,
   metadata,
   nodeId,
+  cardPhase,
   roundedClass,
 }: WorkflowNodeGenerativeBusyOverlayProps) {
   const { t } = useTranslation();
@@ -263,11 +265,23 @@ export function WorkflowNodeGenerativeBusyOverlay({
     if (!isAiImageNode && !isAiVideoNode && !isAiAudioNode) {
       return null;
     }
-    if (!isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy && !progressPhase) {
+    if (
+      !isAiImageBusy &&
+      !isAiVideoBusy &&
+      !isAiAudioBusy &&
+      !progressPhase &&
+      !cardPhase
+    ) {
       return null;
     }
 
-    const phase = progressPhase ?? "generating";
+    const phase =
+      cardPhase ??
+      progressPhase ??
+      (isAiImageBusy || isAiVideoBusy ? ("generating" as const) : null);
+    if (phase === null) {
+      return null;
+    }
     if (isAiImageNode) {
       return formatGenerativeBusyOverlayLabel({
         phase,
@@ -297,6 +311,7 @@ export function WorkflowNodeGenerativeBusyOverlay({
       t,
     });
   }, [
+    cardPhase,
     isAiAudioNode,
     isAiAudioBusy,
     isAiImageBusy,
@@ -310,6 +325,7 @@ export function WorkflowNodeGenerativeBusyOverlay({
   ]);
 
   const overlayProgressPhase =
+    cardPhase ??
     progressPhase ??
     (isAiImageBusy || isAiVideoBusy ? ("generating" as const) : null);
   const supportsTaskCancel = readVideoTaskCancelSupportFromMetadata(metadata);

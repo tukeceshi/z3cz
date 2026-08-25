@@ -42,12 +42,11 @@ import {
   isAiAudioGenerating,
 } from "./ai-audio-node-utils";
 import {
-  isAiVideoGenerating,
-} from "./ai-video-node-utils";
-import {
-  isAiImageGenerating,
-  isAiImageResourceGenerating,
+  readAiImageCardDisplay,
 } from "./ai-image-node-utils";
+import {
+  readAiVideoCardDisplay,
+} from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
@@ -56,8 +55,6 @@ import {
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
 import {
-  isGenerativePersistPhase,
-  isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
 } from "./generative-progress-utils";
 import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
@@ -448,17 +445,17 @@ export const WorkflowNode = memo(
       data.executionState === "executing" ||
       data.executionState === "pending";
     const progressPhase = readGenerativeProgressPhase(data.metadata);
+    const aiImageCardDisplay = isAiImageNode
+      ? readAiImageCardDisplay(data.inputs, data.outputs, data.metadata)
+      : null;
+    const aiVideoCardDisplay = isAiVideoNode
+      ? readAiVideoCardDisplay(data.inputs, data.outputs, data.metadata)
+      : null;
+    const generativeCardPhase =
+      aiImageCardDisplay?.cardPhase ?? aiVideoCardDisplay?.cardPhase ?? null;
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
-    const isAiImageBusy =
-      isAiImageNode &&
-      (isAiImageGenerating(data.metadata) ||
-        isAiImageResourceGenerating(data.inputs, data.outputs) ||
-        isGenerativePersistPhase(progressPhase) ||
-        progressPhase === "cancelled");
-    const isAiVideoBusy =
-      isAiVideoNode &&
-      (isAiVideoGenerating(data.metadata) ||
-        isGenerativeProgressBusyPhase(progressPhase));
+    const isAiImageBusy = isAiImageNode && (aiImageCardDisplay?.isBusy ?? false);
+    const isAiVideoBusy = isAiVideoNode && (aiVideoCardDisplay?.isBusy ?? false);
     const isAiAudioBusy =
       isAiAudioNode &&
       (isAiAudioGenerating(data.metadata) || progressPhase !== undefined);
@@ -559,6 +556,7 @@ export const WorkflowNode = memo(
             isAiAudioBusy={isAiAudioBusy}
             metadata={data.metadata}
             nodeId={id}
+            cardPhase={generativeCardPhase}
             roundedClass={
               isGenerativeCanvasNode
                 ? GENERATIVE_NODE_CARD_RADIUS_CLASS

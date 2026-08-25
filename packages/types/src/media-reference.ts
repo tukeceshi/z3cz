@@ -1,3 +1,5 @@
+import type { CloudAccelerationStatus } from "./cloud-acceleration";
+import { isCloudAccelerationInProgress } from "./cloud-acceleration";
 import type { MediaResourceKind } from "./media-resource-catalog";
 import { isMediaResourceKind } from "./media-resource-catalog";
 import type { ObjectReference } from "./workflow";
@@ -25,6 +27,8 @@ export interface ResourceIdReference {
   readonly failed?: boolean;
   /** Cloud upload failed; media is available in this browser only. */
   readonly cloudUploadFailed?: boolean;
+  /** Platform cloud acceleration in progress or recently failed. */
+  readonly cloudAccelerationStatus?: CloudAccelerationStatus;
 }
 
 export type WorkflowMediaValue = ResourceIdReference;
@@ -142,15 +146,32 @@ export function isFailedResourceRef(value: unknown): boolean {
   return isResourceIdReference(value) && value.failed === true;
 }
 
-/** Generating or failed — do not fetch or render as media. */
+export function isCloudAcceleratingResourceRef(value: unknown): boolean {
+  return (
+    isResourceIdReference(value) &&
+    isCloudAccelerationInProgress(value.cloudAccelerationStatus)
+  );
+}
+
+/** Generating, cloud-accelerating, or failed — do not fetch or render as media. */
 export function isUnloadedResourceRef(value: unknown): boolean {
-  return isGeneratingResourceRef(value) || isFailedResourceRef(value);
+  return (
+    isGeneratingResourceRef(value) ||
+    isFailedResourceRef(value) ||
+    isCloudAcceleratingResourceRef(value)
+  );
 }
 
 export function hasGeneratingResource(
   values: readonly unknown[] | undefined
 ): boolean {
   return Boolean(values?.some(isGeneratingResourceRef));
+}
+
+export function hasCloudAcceleratingResource(
+  values: readonly unknown[] | undefined
+): boolean {
+  return Boolean(values?.some(isCloudAcceleratingResourceRef));
 }
 
 export function hasFailedResource(

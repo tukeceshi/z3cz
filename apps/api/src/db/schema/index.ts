@@ -180,6 +180,9 @@ export const organizations = pgTable(
     overageLimit: integer("overage_limit"), // null = unlimited
     unlimitedUsage: boolean("unlimited_usage").notNull().default(false),
     creditsExhausted: boolean("credits_exhausted").notNull().default(false),
+    platformCloudAccelerationEnabled: boolean("platform_cloud_acceleration_enabled")
+      .notNull()
+      .default(false),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -418,6 +421,26 @@ export const organizationAiInterfaces = pgTable(
   ]
 );
 
+export const aiInterfaceCloudAcceleration = pgTable(
+  "ai_interface_cloud_acceleration",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    aiInterfaceId: text("ai_interface_id")
+      .notNull()
+      .references(() => organizationAiInterfaces.id, { onDelete: "cascade" }),
+    enabledAt: timestamp("enabled_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("ai_interface_cloud_acceleration_org_idx").on(table.organizationId),
+  ]
+);
+
 export const aiInterfaceCreateIdempotency = pgTable(
   "ai_interface_create_idempotency",
   {
@@ -635,6 +658,9 @@ export const mediaResources = pgTable(
     contentSha256: text("content_sha256"),
     generating: boolean("generating").notNull().default(false),
     failed: boolean("failed").notNull().default(false),
+    cloudAccelerationStatus: text("cloud_acceleration_status").$type<
+      "pending" | "active" | "done" | "failed" | null
+    >(),
     createdAt: createCreatedAt(),
   },
   (table) => [

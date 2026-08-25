@@ -1,3 +1,5 @@
+import type { CloudAccelerationStatus } from "./cloud-acceleration";
+
 export type MediaResourceKind = "cloud" | "local" | "ephemeral";
 
 export function isMediaResourceKind(value: unknown): value is MediaResourceKind {
@@ -15,6 +17,7 @@ export interface MediaResourceRecord {
   readonly contentSha256: string | null;
   readonly generating: boolean;
   readonly failed: boolean;
+  readonly cloudAccelerationStatus: CloudAccelerationStatus | null;
   readonly createdAt: string;
 }
 
@@ -28,6 +31,7 @@ export interface RegisterMediaResourceRequest {
   readonly contentSha256?: string;
   readonly generating?: boolean;
   readonly failed?: boolean;
+  readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
   /** When set, updates an existing row (e.g. ephemeral/local → cloud) instead of creating a duplicate. */
   readonly replacesResourceId?: string;
 }
@@ -66,6 +70,7 @@ export interface ResolvedMediaResourceEntry {
   readonly contentSha256?: string;
   readonly generating?: boolean;
   readonly failed?: boolean;
+  readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
 }
 
 export interface ResolveMediaResourcesResponse {

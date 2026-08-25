@@ -86,6 +86,10 @@ function readModelBindingFromNode(data: WorkflowNodeType) {
   });
 }
 
+export function readGenerativeNodeInterfaceId(data: WorkflowNodeType): string {
+  return readInterfaceId(data);
+}
+
 /** Picker write: model identity only. Leaves node params untouched. */
 export function applySelectedModelRecord<T extends OrgModelBindingRef>(params: {
   readonly model: T;

@@ -1,6 +1,7 @@
 export type GenerativeProgressPhase =
   | "queued"
   | "generating"
+  | "cloud_accelerating"
   | "cancelling"
   | "cancelled"
   | "downloading"
@@ -193,6 +194,20 @@ export function isGenerativeProgressBusyPhase(
   phase: GenerativeProgressPhase | undefined
 ): boolean {
   return phase !== undefined && phase !== "cancelled";
+}
+
+/** Card/upload busy — includes JSON-derived cloud acceleration. */
+export function isGenerativeCardBusyPhase(
+  phase: GenerativeProgressPhase | null | undefined
+): boolean {
+  return (
+    phase === "generating" ||
+    phase === "cloud_accelerating" ||
+    phase === "queued" ||
+    phase === "cancelling" ||
+    isGenerativePersistPhase(phase) ||
+    phase === "server_persisting"
+  );
 }
 
 /** Persist immediately when job id or staged blob ids change (refresh resume). */

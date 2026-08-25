@@ -30,9 +30,11 @@ import {
 } from "./apply-history-item-settings";
 import {
   readGenerativeCardCoverFromHistory,
+  resolveGenerativeCardPhase,
   splitHistoryMediaRows,
   type GenerativeCardCoverRead,
 } from "./generative-history-utils";
+import { isGenerativeCardBusyPhase } from "./generative-progress-utils";
 import {
   mapMediaResourceKinds,
   markResourceRefFailed,
@@ -303,11 +305,12 @@ export function readAiAudioCardDisplay(
     inputs.find((input) => input.id === "manual_audios")?.value
   );
   if (manual.length > 0) {
-    return {
-      coverMedia: manual,
-      isBusy: false,
-      hasCover: hasDisplayableWorkflowMedia(manual),
-    };
+      return {
+        coverMedia: manual,
+        isBusy: false,
+        hasCover: hasDisplayableWorkflowMedia(manual),
+        cardPhase: null,
+      };
   }
 
   const history = readAiAudioResultHistory(inputs);
@@ -319,11 +322,19 @@ export function readAiAudioCardDisplay(
   }
 
   const fallback = readAiAudioResult(inputs, outputs);
+  const cardPhase = resolveGenerativeCardPhase(
+    metadata,
+    fallback,
+    isAiAudioGenerating(metadata)
+  );
   return {
     coverMedia: fallback,
     isBusy:
-      isAiAudioGenerating(metadata) || hasGeneratingResource(fallback),
+      (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)) ||
+      isAiAudioGenerating(metadata) ||
+      hasGeneratingResource(fallback),
     hasCover: hasDisplayableWorkflowMedia(fallback),
+    cardPhase,
   };
 }
 

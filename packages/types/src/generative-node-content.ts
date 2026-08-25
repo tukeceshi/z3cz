@@ -5,11 +5,15 @@ import {
   AI_VIDEO_NODE_TYPE,
 } from "./ai-interface";
 import {
+  hasCloudAcceleratingResource,
   hasGeneratingResource,
+  isGeneratingResourceRef,
   isResourceIdReference,
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "./media-reference";
+import type { CloudAccelerationStatus } from "./cloud-acceleration";
+import { isCloudAccelerationInProgress } from "./cloud-acceleration";
 import type { MediaResourceKind } from "./media-resource-catalog";
 import type {
   AiAudioResultHistory,
@@ -261,10 +265,36 @@ function applyKindToMedia(
     return media;
   }
   const kind = kindsById.get(media.resourceId);
+  const shouldClearTransientFlags =
+    kind === "cloud" &&
+    (media.generating === true ||
+      media.cloudAccelerationStatus !== undefined ||
+      media.failed === true);
   if (!kind || media.kind === kind) {
+    return shouldClearTransientFlags ? stripTransientMediaFlags(media) : media;
+  }
+  return stripTransientMediaFlags({ ...media, kind });
+}
+
+function stripTransientMediaFlags(
+  media: WorkflowMediaValue
+): WorkflowMediaValue {
+  if (!isResourceIdReference(media)) {
     return media;
   }
-  return { ...media, kind };
+  const {
+    generating: _generating,
+    cloudAccelerationStatus: _cloudAccelerationStatus,
+    failed: _failed,
+    ...rest
+  } = media;
+  return rest;
+}
+
+function stripTransientMediaList(
+  media: readonly WorkflowMediaValue[]
+): readonly WorkflowMediaValue[] {
+  return media.map(stripTransientMediaFlags);
 }
 
 function applyKindToMediaList(
@@ -282,6 +312,158 @@ function mediaKindListChanged(
     return true;
   }
   return previous.some((entry, index) => entry !== next[index]);
+}
+
+function applyCloudAccelerationStatusToMedia(
+  media: WorkflowMediaValue,
+  resourceIdSet: ReadonlySet<string>,
+  status: CloudAccelerationStatus
+): WorkflowMediaValue {
+  if (
+    !isResourceIdReference(media) ||
+    !resourceIdSet.has(media.resourceId) ||
+    !isCloudAccelerationInProgress(status)
+  ) {
+    return media;
+  }
+  const { generating: _generating, ...rest } = media;
+  return { ...rest, cloudAccelerationStatus: status };
+}
+
+function applyCloudAccelerationStatusToMediaList(
+  media: readonly WorkflowMediaValue[],
+  resourceIdSet: ReadonlySet<string>,
+  status: CloudAccelerationStatus
+): readonly WorkflowMediaValue[] {
+  return media.map((entry) =>
+    applyCloudAccelerationStatusToMedia(entry, resourceIdSet, status)
+  );
+}
+
+function cloudAccelerationMediaListChanged(
+  previous: readonly WorkflowMediaValue[],
+  next: readonly WorkflowMediaValue[],
+): boolean {
+  if (previous.length !== next.length) {
+    return true;
+  }
+  return previous.some((entry, index) => entry !== next[index]);
+}
+
+/** Write cloud-acceleration status onto matching media refs in workflow node JSON. */
+export function patchNodeMediaCloudAccelerationStatus(
+  node: Node,
+  params: {
+    readonly resourceIds: readonly string[];
+    readonly status: Extract<CloudAccelerationStatus, "pending" | "active">;
+  }
+): Partial<Node> | null {
+  const resourceIdSet = new Set(
+    params.resourceIds.filter((id) => id.trim().length > 0)
+  );
+  if (resourceIdSet.size === 0) {
+    return null;
+  }
+
+  if (node.type === AI_IMAGE_NODE_TYPE) {
+    const history = readImageHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      images: applyCloudAccelerationStatusToMediaList(
+        item.images,
+        resourceIdSet,
+        params.status
+      ),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_IMAGE_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyCloudAccelerationStatusToMediaList(
+          result,
+          resourceIdSet,
+          params.status
+        )
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        cloudAccelerationMediaListChanged(history.items[index]!.images, item.images)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      cloudAccelerationMediaListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_IMAGE_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_VIDEO_NODE_TYPE) {
+    const history = readVideoHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      videos: applyCloudAccelerationStatusToMediaList(
+        item.videos,
+        resourceIdSet,
+        params.status
+      ),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_VIDEO_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyCloudAccelerationStatusToMediaList(
+          result,
+          resourceIdSet,
+          params.status
+        )
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        cloudAccelerationMediaListChanged(history.items[index]!.videos, item.videos)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      cloudAccelerationMediaListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_VIDEO_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  return null;
 }
 
 /** Write catalog `kind` onto matching media refs in workflow node JSON. */
@@ -467,6 +649,197 @@ function historyContainsJobId(
     return false;
   }
   return items.some((item) => item.jobId === jobId);
+}
+
+function finalizeGeneratingHistoryItems<TItem extends {
+  readonly id: string;
+  readonly jobId?: string;
+  readonly images?: readonly WorkflowMediaValue[];
+  readonly videos?: readonly WorkflowMediaValue[];
+  readonly audios?: readonly WorkflowMediaValue[];
+}>(params: {
+  readonly items: readonly TItem[];
+  readonly jobId?: string;
+  readonly resourceIds?: readonly string[];
+  readonly getMedia: (item: TItem) => readonly WorkflowMediaValue[];
+  readonly setMedia: (item: TItem, media: readonly WorkflowMediaValue[]) => TItem;
+  readonly finalMedia: readonly WorkflowMediaValue[];
+}): {
+  readonly items: readonly TItem[];
+  readonly selectedId: string | null;
+  readonly changed: boolean;
+} {
+  const resourceIdSet = new Set(
+    (params.resourceIds ?? []).filter((id) => id.trim().length > 0)
+  );
+  const pendingIds = new Set<string>();
+  for (const item of params.items) {
+    const media = params.getMedia(item);
+    const matchesJob = Boolean(params.jobId && item.jobId === params.jobId);
+    const matchesGeneratingWithoutJob =
+      Boolean(params.jobId) &&
+      !item.jobId &&
+      media.some(isGeneratingResourceRef);
+    const matchesResource =
+      resourceIdSet.size > 0 &&
+      media.some(
+        (entry) =>
+          isResourceIdReference(entry) &&
+          resourceIdSet.has(entry.resourceId) &&
+          (entry.generating === true || matchesJob)
+      );
+    if (matchesJob || matchesGeneratingWithoutJob || matchesResource) {
+      pendingIds.add(item.id);
+    }
+  }
+
+  if (pendingIds.size === 0) {
+    return { items: params.items, selectedId: null, changed: false };
+  }
+
+  let storedIndex = 0;
+  const nextItems = params.items.map((item) => {
+    if (!pendingIds.has(item.id)) {
+      return item;
+    }
+    const image = params.finalMedia[storedIndex];
+    storedIndex += 1;
+    if (!image) {
+      return params.setMedia(
+        item,
+        stripTransientMediaList(params.getMedia(item))
+      );
+    }
+    return params.setMedia(item, [stripTransientMediaFlags(image)]);
+  });
+  const primaryId = params.items.find((item) => pendingIds.has(item.id))?.id ?? null;
+  return {
+    items: nextItems,
+    selectedId: primaryId,
+    changed: true,
+  };
+}
+
+export function finalizeImageGeneratingContent(
+  node: Node,
+  params: {
+    readonly jobId?: string;
+    readonly resourceIds?: readonly string[];
+    readonly media: readonly WorkflowMediaValue[];
+  }
+): Partial<Node> | null {
+  if (node.type !== AI_IMAGE_NODE_TYPE || params.media.length === 0) {
+    return null;
+  }
+
+  const finalMedia = stripTransientMediaList(params.media);
+  const history = readImageHistory(node.inputs);
+  const finalized = finalizeGeneratingHistoryItems({
+    items: history.items,
+    jobId: params.jobId,
+    resourceIds: params.resourceIds,
+    getMedia: (item) => item.images,
+    setMedia: (item, images) => ({ ...item, images: [...images], jobId: undefined }),
+    finalMedia,
+  });
+
+  if (!finalized.changed) {
+    return patchNodeMediaResourceKinds(
+      node,
+      cloudKindsFromWorkflowMedia(finalMedia)
+    );
+  }
+
+  const nextHistory: AiImageResultHistory = {
+    items: finalized.items as AiImageResultHistoryItem[],
+    selectedId: finalized.selectedId ?? history.selectedId,
+  };
+
+  let inputs = upsertNodeInput(node.inputs, AI_IMAGE_HISTORY_INPUT, nextHistory, "json");
+  inputs = upsertNodeInput(inputs, "manual_images", [], "json");
+
+  const mediaResult = applyMediaResultToNode(
+    { ...node, inputs },
+    {
+      resultInputName: AI_IMAGE_RESULT_INPUT,
+      historyInputName: AI_IMAGE_HISTORY_INPUT,
+      outputName: AI_IMAGE_OUTPUT,
+      media: [finalMedia[0]!],
+      clearManualInput: "manual_images",
+    }
+  );
+
+  return {
+    ...mediaResult,
+    metadata: withGenerativeGeneratedContentMode(node.metadata),
+  };
+}
+
+function cloudKindsFromWorkflowMedia(
+  media: readonly WorkflowMediaValue[]
+): Map<string, MediaResourceKind> {
+  const map = new Map<string, MediaResourceKind>();
+  for (const entry of media) {
+    if (isResourceIdReference(entry) && entry.kind) {
+      map.set(entry.resourceId, entry.kind);
+    }
+  }
+  return map;
+}
+
+export function finalizeVideoGeneratingContent(
+  node: Node,
+  params: {
+    readonly jobId?: string;
+    readonly resourceIds?: readonly string[];
+    readonly media: readonly WorkflowMediaValue[];
+  }
+): Partial<Node> | null {
+  if (node.type !== AI_VIDEO_NODE_TYPE || params.media.length === 0) {
+    return null;
+  }
+
+  const finalMedia = stripTransientMediaList(params.media);
+  const history = readVideoHistory(node.inputs);
+  const finalized = finalizeGeneratingHistoryItems({
+    items: history.items,
+    jobId: params.jobId,
+    resourceIds: params.resourceIds,
+    getMedia: (item) => item.videos,
+    setMedia: (item, videos) => ({ ...item, videos: [...videos], jobId: undefined }),
+    finalMedia,
+  });
+
+  if (!finalized.changed) {
+    return patchNodeMediaResourceKinds(
+      node,
+      cloudKindsFromWorkflowMedia(finalMedia)
+    );
+  }
+
+  const nextHistory: AiVideoResultHistory = {
+    items: finalized.items as AiVideoResultHistoryItem[],
+    selectedId: finalized.selectedId ?? history.selectedId,
+  };
+
+  let inputs = upsertNodeInput(node.inputs, AI_VIDEO_HISTORY_INPUT, nextHistory, "json");
+  inputs = upsertNodeInput(inputs, "manual_videos", [], "json");
+
+  const mediaResult = applyMediaResultToNode(
+    { ...node, inputs },
+    {
+      resultInputName: AI_VIDEO_RESULT_INPUT,
+      historyInputName: AI_VIDEO_HISTORY_INPUT,
+      outputName: AI_VIDEO_OUTPUT,
+      media: [finalMedia[0]!],
+      clearManualInput: "manual_videos",
+    }
+  );
+
+  return {
+    ...mediaResult,
+    metadata: withGenerativeGeneratedContentMode(node.metadata),
+  };
 }
 
 export function appendImageGeneratingContent(
@@ -748,16 +1121,24 @@ export function buildWorkflowNodeContentPatch(
   };
 }
 
+function isInFlightHistoryMedia(
+  media: readonly WorkflowMediaValue[] | undefined
+): boolean {
+  return (
+    hasGeneratingResource(media) || hasCloudAcceleratingResource(media)
+  );
+}
+
 function collectInFlightHistoryItemIds(node: Node): readonly string[] {
   switch (node.type) {
     case AI_IMAGE_NODE_TYPE: {
       return readImageHistory(node.inputs).items
-        .filter((item) => hasGeneratingResource(item.images))
+        .filter((item) => isInFlightHistoryMedia(item.images))
         .map((item) => item.id);
     }
     case AI_VIDEO_NODE_TYPE: {
       return readVideoHistory(node.inputs).items
-        .filter((item) => hasGeneratingResource(item.videos))
+        .filter((item) => isInFlightHistoryMedia(item.videos))
         .map((item) => item.id);
     }
     case AI_AUDIO_NODE_TYPE: {

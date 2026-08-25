@@ -27,8 +27,9 @@ import {
 } from "../db/persist-worker-queries";
 import { generationJobs } from "../db/schema";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
-import { persistJobCloudMediaKinds } from "./persist-generating-node-content";
+import { persistJobFinalizedGeneratingContent } from "./persist-generating-node-content";
 import { registerMediaResourceTransitions } from "./media-resource-catalog-service";
+import { markJobResourcesCloudAccelerationStatus } from "./cloud-acceleration-service";
 import { presignTosMediaUpload } from "./tos-media-presign";
 import {
   assertGenerationJobUploadKeysBelongToOrg,
@@ -308,6 +309,7 @@ export async function completePersistJobFromWorker(
   });
 
   if (succeeded) {
+    await markJobResourcesCloudAccelerationStatus(db, succeeded, "done");
     await registerMediaResourceTransitions(db, {
       organizationId: mapped.organizationId,
       transitions: validatedFinalMedia.map((reference, index) => ({
@@ -316,9 +318,14 @@ export async function completePersistJobFromWorker(
       })),
     });
     try {
-      await persistJobCloudMediaKinds(env, succeeded, pendingMedia ?? []);
+      await persistJobFinalizedGeneratingContent(
+        env,
+        succeeded,
+        pendingMedia ?? [],
+        validatedFinalMedia
+      );
     } catch {
-      // Catalog already transitioned; node JSON kind is aligned by client sync.
+      // Catalog already transitioned; node JSON is aligned by client or a later sync.
     }
     await decrementPersistWorkerActiveJobs(db, params.workerId);
     await syncGenerationJobInvocation(db, succeeded);
@@ -368,6 +375,7 @@ export async function failPersistJobFromWorker(
   });
 
   if (failed) {
+    await markJobResourcesCloudAccelerationStatus(db, failed, "failed");
     await decrementPersistWorkerActiveJobs(db, params.workerId);
     await syncGenerationJobInvocation(db, failed);
     return failed;

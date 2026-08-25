@@ -10,8 +10,10 @@ import {
   appendTextGeneratingContent,
   appendVideoGeneratingContent,
   buildGeneratingResourceRefs,
+  finalizeImageGeneratingContent,
   mergeGenerativeNodeContentOnSave,
   patchNodeMediaResourceKinds,
+  patchNodeMediaCloudAccelerationStatus,
 } from "./generative-node-content";
 import type { Node } from "./workflow";
 
@@ -152,6 +154,137 @@ describe("patchNodeMediaResourceKinds", () => {
     const result = patch!.inputs!.find((input) => input.name === "images_result")
       ?.value as { kind?: string }[];
     expect(result[0]?.kind).toBe("cloud");
+    expect(result[0]).not.toHaveProperty("generating");
+  });
+});
+
+describe("patchNodeMediaCloudAccelerationStatus", () => {
+  it("clears generating and writes cloud acceleration on matching refs", () => {
+    const node = createImageNode([
+      {
+        name: "images_result",
+        type: "json",
+        value: [
+          {
+            resourceId: "res-1",
+            mimeType: "image/png",
+            generating: true,
+            kind: "ephemeral",
+          },
+        ],
+      },
+      {
+        name: "images_history",
+        type: "json",
+        value: {
+          selectedId: "gen-1",
+          items: [
+            {
+              id: "gen-1",
+              images: [
+                {
+                  resourceId: "res-1",
+                  mimeType: "image/png",
+                  generating: true,
+                  kind: "ephemeral",
+                },
+              ],
+              prompt: "a cat",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const patch = patchNodeMediaCloudAccelerationStatus(node, {
+      resourceIds: ["res-1"],
+      status: "pending",
+    });
+
+    expect(patch).not.toBeNull();
+    const result = patch!.inputs!.find((input) => input.name === "images_result")
+      ?.value as {
+      resourceId: string;
+      generating?: boolean;
+      cloudAccelerationStatus?: string;
+    }[];
+    expect(result[0]).toEqual({
+      resourceId: "res-1",
+      mimeType: "image/png",
+      kind: "ephemeral",
+      cloudAccelerationStatus: "pending",
+    });
+  });
+});
+
+describe("finalizeImageGeneratingContent", () => {
+  it("replaces generating history rows with final cloud media", () => {
+    const node = createImageNode([
+      {
+        name: "images_result",
+        type: "json",
+        value: [
+          {
+            resourceId: "res-1",
+            mimeType: "image/png",
+            generating: true,
+            kind: "ephemeral",
+          },
+        ],
+      },
+      {
+        name: "images_history",
+        type: "json",
+        value: {
+          selectedId: "gen-1",
+          items: [
+            {
+              id: "gen-1",
+              images: [
+                {
+                  resourceId: "res-1",
+                  mimeType: "image/png",
+                  generating: true,
+                  kind: "ephemeral",
+                  cloudAccelerationStatus: "pending",
+                },
+              ],
+              prompt: "a cat",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              jobId: "job-1",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const patch = finalizeImageGeneratingContent(node, {
+      jobId: "job-1",
+      resourceIds: ["res-1"],
+      media: [
+        {
+          resourceId: "res-1",
+          mimeType: "image/png",
+          kind: "cloud",
+        },
+      ],
+    });
+
+    expect(patch).not.toBeNull();
+    const history = patch!.inputs!.find((input) => input.name === "images_history")
+      ?.value as {
+      items: {
+        images: { resourceId: string; kind?: string; generating?: boolean; cloudAccelerationStatus?: string }[];
+        jobId?: string;
+      }[];
+    };
+    expect(history.items[0]?.images[0]).toEqual({
+      resourceId: "res-1",
+      mimeType: "image/png",
+      kind: "cloud",
+    });
+    expect(history.items[0]?.jobId).toBeUndefined();
   });
 });
 

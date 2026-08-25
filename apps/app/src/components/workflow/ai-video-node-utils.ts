@@ -36,9 +36,11 @@ import {
 } from "./apply-history-item-settings";
 import {
   readGenerativeCardCoverFromHistory,
+  resolveGenerativeCardPhase,
   splitHistoryMediaRows,
   type GenerativeCardCoverRead,
 } from "./generative-history-utils";
+import { isGenerativeCardBusyPhase } from "./generative-progress-utils";
 import {
   mapMediaResourceKinds,
   markResourceRefFailed,
@@ -350,6 +352,7 @@ export function readAiVideoCardDisplay(
         coverMedia: manual,
         isBusy: false,
         hasCover: hasDisplayableWorkflowMedia(manual),
+        cardPhase: null,
       };
     }
   }
@@ -363,11 +366,19 @@ export function readAiVideoCardDisplay(
   }
 
   const fallback = readAiVideoResult(inputs, outputs);
+  const cardPhase = resolveGenerativeCardPhase(
+    metadata,
+    fallback,
+    isAiVideoGenerating(metadata)
+  );
   return {
     coverMedia: fallback,
     isBusy:
-      isAiVideoGenerating(metadata) || hasGeneratingResource(fallback),
+      (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)) ||
+      isAiVideoGenerating(metadata) ||
+      hasGeneratingResource(fallback),
     hasCover: hasDisplayableWorkflowMedia(fallback),
+    cardPhase,
   };
 }
 

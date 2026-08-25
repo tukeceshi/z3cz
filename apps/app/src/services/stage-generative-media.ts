@@ -172,6 +172,13 @@ export async function ensureGenerativeMediaCached(params: {
   }
 
   if (isResourceIdReference(params.media)) {
+    if (
+      params.media.cloudAccelerationStatus === "pending" ||
+      params.media.cloudAccelerationStatus === "active"
+    ) {
+      return;
+    }
+
     const existingBlob = await getCachedMediaBlob({
       organizationId: params.organizationId,
       workflowId: params.workflowId,

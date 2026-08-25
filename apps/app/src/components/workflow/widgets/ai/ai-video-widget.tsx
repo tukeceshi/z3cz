@@ -34,8 +34,13 @@ import {
   AiImageHistoryButton,
   AiImageHistoryOverlay,
 } from "../../ai-image-history-overlay";
+import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
 import type { GenerativeCardCoverRead } from "../../generative-history-utils";
-import { readGenerativeProgressPhase, withGenerativeUploadProgress } from "../../generative-progress-utils";
+import {
+  isGenerativePersistPhase,
+  readGenerativeProgressPhase,
+  withGenerativeUploadProgress,
+} from "../../generative-progress-utils";
 import {
   readAiVideoCardDisplay,
   readAiVideoResultHistory,
@@ -129,6 +134,9 @@ function AiVideoWidget({
     metadata
   );
   const progressPhase = readGenerativeProgressPhase(metadata);
+  const persistPhase = isGenerativePersistPhase(progressPhase)
+    ? progressPhase
+    : undefined;
   const selectedHistoryItem =
     historyItems.items.find((item) => item.id === historyItems.selectedId) ??
     historyItems.items[0];
@@ -165,15 +173,15 @@ function AiVideoWidget({
   const handleDismissCancelledNotice = useCallback(() => {
     dismissGenerativeCancelledNotice(nodeId);
   }, [nodeId]);
+  const cardPhase = cardDisplay.cardPhase;
   const cardPlaceholder = formatGenerativePhaseLabel({
-    phase: progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
-    progressKey: generativeCardProgressKey(
-      progressPhase ?? (cardDisplay.isBusy ? "generating" : null),
-      "video"
-    ),
+    phase: cardPhase,
+    progressKey: generativeCardProgressKey(cardPhase, "video"),
     metadata,
     t,
   });
+  const isPersistDownloading =
+    persistPhase === "downloading" || progressPhase === "downloading";
   const coverVideo = cardDisplay.coverMedia[0];
   const hasVideo = cardDisplay.hasCover;
   const activeVideoExpired = hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;
@@ -438,6 +446,12 @@ function AiVideoWidget({
         ) : null}
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+
+        {isPersistDownloading ? (
+          <div className="nodrag nopan nowheel absolute inset-x-0 bottom-3 z-50 flex justify-center px-2">
+            <GenerativeCloudAccelerationCardOffer nodeId={nodeId} />
+          </div>
+        ) : null}
 
         {showCancelledNotice && !generateError ? (
           <GenerativeCardNoticeBlock
