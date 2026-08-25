@@ -6,7 +6,3 @@ export const canvasChromeChipClassName = cn(
   "bg-background/70 backdrop-blur-sm transition-colors",
   "hover:bg-neutral-200/70 dark:hover:bg-neutral-700/70"
 );
-
-export const canvasChromeChipActiveClassName = cn(
-  "bg-neutral-200/80 dark:bg-neutral-700/80"
-);
