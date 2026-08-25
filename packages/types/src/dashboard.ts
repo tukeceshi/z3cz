@@ -1,21 +1,19 @@
 /**
- * Represents the statistics for the dashboard view
+ * Workflow summary shown on the organization dashboard.
+ */
+export interface DashboardRecentWorkflow {
+  readonly id: string;
+  readonly name: string;
+  readonly coverObjectId?: string | null;
+  readonly coverMimeType?: string | null;
+  readonly updatedAt: Date | string;
+}
+
+/**
+ * Dashboard data for the organization home page.
  */
 export interface DashboardStats {
-  workflows: number;
-  executions: {
-    total: number;
-    running: number;
-    failed: number;
-    avgTimeSeconds: number;
-  };
-  recentExecutions: Array<{
-    id: string;
-    workflowName: string;
-    status: string;
-    startedAt: number;
-    endedAt?: number;
-  }>;
+  readonly recentWorkflows: readonly DashboardRecentWorkflow[];
 }
 
 /**

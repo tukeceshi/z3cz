@@ -8,7 +8,7 @@ import type {
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { applyWorkflowGraphPatch } from "@dafthunk/types";
+import { applyWorkflowGraphPatch, findFirstWorkflowCoverCandidate } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -22,6 +22,7 @@ import type {
   WorkflowEdgeType,
   WorkflowNodeType,
 } from "@/components/workflow/workflow-types";
+import { setWorkflowCoverIfAbsent } from "@/services/workflow-cover-service";
 import {
   connectWorkflowWS,
   WorkflowState,
@@ -50,6 +51,7 @@ interface UseEditableWorkflowProps {
   /** True after getWorkflow (or prefetch) has supplied workflow metadata for this open. */
   httpMetadataLoaded?: boolean;
   onWorkflowSync?: () => void;
+  readOnly?: boolean;
 }
 
 export function useEditableWorkflow({
@@ -58,6 +60,7 @@ export function useEditableWorkflow({
   fallbackWorkflow = null,
   httpMetadataLoaded = false,
   onWorkflowSync,
+  readOnly = false,
 }: UseEditableWorkflowProps) {
   const [nodes, setNodes] = useState<Node<WorkflowNodeType>[]>([]);
   const [edges, setEdges] = useState<Edge<WorkflowEdgeType>[]>([]);
@@ -133,6 +136,16 @@ export function useEditableWorkflow({
     trigger: string;
     runtime?: WorkflowRuntime;
   } | null>(null);
+  const coverObjectIdRef = useRef<string | null | undefined>(
+    fallbackWorkflow?.coverObjectId ?? null
+  );
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
+
+  useEffect(() => {
+    coverObjectIdRef.current = fallbackWorkflow?.coverObjectId ?? null;
+  }, [fallbackWorkflow?.coverObjectId, fallbackWorkflow?.id]);
+
   const [isGraphReady, setIsGraphReady] = useState(false);
 
   // Send the current local graph if it differs from what the server last had.
@@ -174,6 +187,41 @@ export function useEditableWorkflow({
   // cleanup without capturing a stale `flushSave`.
   const flushSaveRef = useRef(flushSave);
   flushSaveRef.current = flushSave;
+
+  const tryAutoWorkflowCoverOnClose = useCallback(() => {
+    if (readOnlyRef.current || getCanvasMaintenanceFrozen()) {
+      return;
+    }
+
+    const organizationId = organization?.id;
+    if (!organizationId || !workflowId || !hasInitializedRef.current) {
+      return;
+    }
+
+    if (coverObjectIdRef.current) {
+      return;
+    }
+
+    const payload = buildWorkflowPayload(nodesRef.current, edgesRef.current, {
+      mergeFromPersisted: lastSentGraphRef.current.nodes,
+    });
+    const candidate = findFirstWorkflowCoverCandidate(payload.nodes);
+    if (!candidate) {
+      return;
+    }
+
+    void setWorkflowCoverIfAbsent({
+      organizationId,
+      workflowId,
+      resourceId: candidate.resourceId,
+      mimeType: candidate.mimeType,
+    }).catch((error) => {
+      console.error("Failed to auto-set workflow cover:", error);
+    });
+  }, [organization?.id, workflowId]);
+
+  const tryAutoWorkflowCoverOnCloseRef = useRef(tryAutoWorkflowCoverOnClose);
+  tryAutoWorkflowCoverOnCloseRef.current = tryAutoWorkflowCoverOnClose;
 
   const flushViewportSave = useCallback(() => {
     if (getCanvasMaintenanceFrozen()) {
@@ -693,6 +741,7 @@ export function useEditableWorkflow({
       flushSaveRef.current();
       flushViewportSaveRef.current();
       flushGenerativeDefaultsSaveRef.current();
+      tryAutoWorkflowCoverOnCloseRef.current();
       if (viewportPersistTimerRef.current !== null) {
         window.clearTimeout(viewportPersistTimerRef.current);
       }

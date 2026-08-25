@@ -1,86 +1,46 @@
 import {
+  DashboardRecentWorkflow,
   DashboardStats,
   DashboardStatsResponse,
-  ExecutionStatus,
 } from "@dafthunk/types";
 import { Hono } from "hono";
 
 import { jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
 import { requireDashboardAccess } from "../middleware/org-permissions";
-import type { ExecutionRow } from "../runtime/cloudflare-execution-store";
-import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
 import { WorkflowStore } from "../stores/workflow-store";
+
+const RECENT_WORKFLOW_LIMIT = 8;
 
 const dashboard = new Hono<ApiContext>();
 
-// Apply authentication middleware to all routes
 dashboard.use("*", jwtMiddleware);
 dashboard.use("*", requireDashboardAccess());
 
 /**
  * GET /:organizationId/dashboard
  *
- * Get dashboard statistics for the organization
+ * Recent workflows for the organization dashboard home page.
  */
 dashboard.get("/", async (c) => {
   const organizationId = c.get("organizationId")!;
 
-  const executionStore = new CloudflareExecutionStore(c.env);
   const workflowStore = new WorkflowStore(c.env);
 
   try {
-    // Workflows count
     const workflows = await workflowStore.list(organizationId);
-    const workflowsCount = workflows.length;
-
-    // Executions stats
-    const executions: ExecutionRow[] = await executionStore.list(
-      organizationId,
-      {
-        limit: 10,
-      }
-    ); // limit for perf
-    const totalExecutions = executions.length;
-    const runningExecutions = executions.filter(
-      (e: ExecutionRow) => e.status === ExecutionStatus.EXECUTING
-    ).length;
-    const failedExecutions = executions.filter(
-      (e: ExecutionRow) => e.status === ExecutionStatus.ERROR
-    ).length;
-    const completedExecutions = executions.filter(
-      (e: ExecutionRow) =>
-        e.status === ExecutionStatus.COMPLETED && e.startedAt && e.endedAt
-    );
-    const avgTimeSeconds =
-      completedExecutions.length > 0
-        ? Math.round(
-            completedExecutions.reduce(
-              (sum: number, e: ExecutionRow) =>
-                sum + (Number(e.endedAt) - Number(e.startedAt)) / 1000,
-              0
-            ) / completedExecutions.length
-          )
-        : 0;
-
-    // Recent executions (last 10)
-    const recentExecutions = executions.slice(0, 10).map((e: ExecutionRow) => ({
-      id: e.id,
-      workflowName: e.workflowName,
-      status: e.status,
-      startedAt: e.startedAt ? Number(e.startedAt) : Date.now(),
-      endedAt: e.endedAt ? Number(e.endedAt) : undefined,
-    }));
+    const recentWorkflows: DashboardRecentWorkflow[] = workflows
+      .slice(0, RECENT_WORKFLOW_LIMIT)
+      .map((workflow) => ({
+        id: workflow.id,
+        name: workflow.name,
+        coverObjectId: workflow.coverObjectId,
+        coverMimeType: workflow.coverMimeType,
+        updatedAt: workflow.updatedAt,
+      }));
 
     const stats: DashboardStats = {
-      workflows: workflowsCount,
-      executions: {
-        total: totalExecutions,
-        running: runningExecutions,
-        failed: failedExecutions,
-        avgTimeSeconds,
-      },
-      recentExecutions,
+      recentWorkflows,
     };
 
     const response: DashboardStatsResponse = { stats };

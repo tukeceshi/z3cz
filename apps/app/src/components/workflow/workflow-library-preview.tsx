@@ -1,9 +1,8 @@
-import type { ObjectReference } from "@dafthunk/types";
 import Folder from "lucide-react/icons/folder";
 import ImageIcon from "lucide-react/icons/image";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 
-import { createObjectUrl } from "@/services/object-service";
+import { resolveMediaResourceFetchUrl } from "@/services/resolve-media-resource-fetch-url";
 import { cn } from "@/utils/utils";
 
 interface WorkflowLibraryPreviewProps {
@@ -23,15 +22,33 @@ export function WorkflowLibraryPreview({
   variant,
   className,
 }: WorkflowLibraryPreviewProps) {
-  const coverUrl = useMemo(() => {
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+  useEffect(() => {
     if (!coverObjectId || !coverMimeType || !orgId) {
-      return null;
+      setCoverUrl(null);
+      return;
     }
-    const reference: ObjectReference = {
-      id: coverObjectId,
-      mimeType: coverMimeType,
+
+    let cancelled = false;
+
+    void (async () => {
+      const resolved = await resolveMediaResourceFetchUrl({
+        organizationId: orgId,
+        media: {
+          resourceId: coverObjectId,
+          mimeType: coverMimeType,
+        },
+      });
+      if (cancelled) {
+        return;
+      }
+      setCoverUrl(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    return createObjectUrl(reference, orgId);
   }, [coverObjectId, coverMimeType, orgId]);
 
   if (variant === "create") {

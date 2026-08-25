@@ -18,8 +18,6 @@ interface ChangeCoverDialogProps {
   cloudStorageConfigured: boolean;
   isUploading: boolean;
   onUpload: (file: File) => void;
-  onClear?: () => void;
-  hasCover: boolean;
 }
 
 export function ChangeCoverDialog({
@@ -28,8 +26,6 @@ export function ChangeCoverDialog({
   cloudStorageConfigured,
   isUploading,
   onUpload,
-  onClear,
-  hasCover,
 }: ChangeCoverDialogProps) {
   const { t } = useTranslation();
   const { getOrgUrl } = useOrgUrl();
@@ -95,15 +91,6 @@ export function ChangeCoverDialog({
               />
             </label>
           </Button>
-          {hasCover && onClear ? (
-            <Button
-              variant="ghost"
-              disabled={isUploading}
-              onClick={onClear}
-            >
-              {t("pages.workflows.cover.remove")}
-            </Button>
-          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

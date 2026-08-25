@@ -113,6 +113,7 @@ function EditorPageCanvas() {
     nodeTypes: nodeTypes || [],
     fallbackWorkflow: httpWorkflowMetadata,
     httpMetadataLoaded,
+    readOnly: workflowReadOnly,
     onWorkflowSync: () => {
       void refreshMaintenanceStatus();
     },

@@ -30,6 +30,11 @@ export function readNodeLayoutFromMetadata(
   return { width, height };
 }
 
+/** Landscape card layout — short side is height (same rule as computeMediaCardSize). */
+export function isWideLayoutSize(layout: NodeLayoutSize): boolean {
+  return layout.width > layout.height;
+}
+
 export function nodeLayoutMetadataEntries(
   layout: NodeLayoutSize
 ): Record<string, string> {
