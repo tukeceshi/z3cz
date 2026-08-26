@@ -60,6 +60,7 @@ export { REPLICATE_PROVIDER } from "./upstream/replicate-upstream";
 export { VOLCANO_VIDEO_PROVIDER } from "./ai-interface/execute-volcano-video";
 export { VEO_VIDEO_PROVIDER } from "./ai-interface/execute-veo-video";
 export { GROK_VIDEO_PROVIDER } from "./ai-interface/execute-grok-video";
+export { MINIMAX_VIDEO_PROVIDER } from "./ai-interface/execute-minimax-video";
 export type { AiInterfaceService } from "./ai-interface-service";
 export type {
   ExecuteRuntimeTextModelResult,

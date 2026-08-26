@@ -20,6 +20,7 @@ import {
   resolveSingleModelVideoEndpoints,
   resolveVideoTaskCancelSupport,
 } from "./single-model-endpoint-rules";
+import { MINIMAX_VIDEO_PROVIDER_CARD_ID } from "./single-model-interface-metadata";
 
 describe("single-model-endpoint-rules", () => {
   it("returns official defaults with optional full submit url", () => {
@@ -72,6 +73,14 @@ describe("single-model-endpoint-rules", () => {
         capabilityLimits: { supportsTaskCancel: false },
       })
     ).toBe(false);
+
+    expect(
+      resolveVideoTaskCancelSupport({
+        canonicalId: "minimax-h3",
+        channelKind: "api",
+        platformRules,
+      })
+    ).toBe(true);
   });
 
   it("builds submit and poll urls from suffix settings", () => {
@@ -129,6 +138,16 @@ describe("single-model-endpoint-rules", () => {
       })
     ).toEqual({
       fullUrlPreview: "https://host/v1/full",
+    });
+
+    expect(
+      buildSingleModelEndpointUrlPreview({
+        baseUrl: "https://api.minimaxi.com",
+        category: "video",
+        presetId: MINIMAX_VIDEO_PROVIDER_CARD_ID,
+      })
+    ).toEqual({
+      fullUrlPreview: "https://api.minimaxi.com/v2/video_generation",
     });
   });
 

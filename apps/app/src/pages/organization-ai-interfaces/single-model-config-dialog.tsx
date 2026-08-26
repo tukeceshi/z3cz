@@ -17,6 +17,7 @@ import {
   isSingleModelProviderMetadata,
   KIMI_PROVIDER_CARD_ID,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   NANO_BANANA_PROVIDER_CARD_ID,
   VEO_PROVIDER_CARD_ID,
   OPENAI_IMAGE_PROVIDER_CARD_ID,
@@ -153,7 +154,8 @@ export function SingleModelConfigDialog({
       iface.metadata.singleModelPresetId === CLAUDE_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === SEEDANCE_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === SEEDREAM_PROVIDER_CARD_ID ||
-      iface.metadata.singleModelPresetId === MINIMAX_SPEECH_PROVIDER_CARD_ID);
+      iface.metadata.singleModelPresetId === MINIMAX_SPEECH_PROVIDER_CARD_ID ||
+      iface.metadata.singleModelPresetId === MINIMAX_VIDEO_PROVIDER_CARD_ID);
 
   const isKimiProvider =
     isSingleModelProviderMetadata(iface.metadata) &&
@@ -380,6 +382,7 @@ export function SingleModelConfigDialog({
                 idPrefix="single-model-config"
                 baseUrl={baseUrl}
                 category={endpointRulesCategory}
+                presetId={presetId}
                 useFullSubmitUrl={endpointRulesForm.useFullSubmitUrl}
                 onUseFullSubmitUrlChange={(useFullSubmitUrl) =>
                   setEndpointRulesForm((current) => ({

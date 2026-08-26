@@ -152,7 +152,7 @@ export function resolveModelBrandKey(params: {
   if (presetId === "provider:claude") {
     return "claude";
   }
-  if (presetId === "provider:minimax-speech") {
+  if (presetId === "provider:minimax-speech" || presetId === "provider:minimax-video") {
     return "minimax";
   }
   if (presetId === "provider:seedance") {
@@ -190,7 +190,7 @@ export function resolveModelBrandKey(params: {
   if (id.startsWith("claude-")) {
     return "claude";
   }
-  if (id.startsWith("minimax-speech-") || id.startsWith("minimax-")) {
+  if (id.startsWith("minimax-speech-") || id.startsWith("minimax-h3") || id.startsWith("minimax-")) {
     return "minimax";
   }
   if (

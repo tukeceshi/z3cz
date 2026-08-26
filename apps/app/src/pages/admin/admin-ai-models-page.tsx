@@ -17,6 +17,7 @@ import {
   VIDEO_PRICE_PROMO_ANY_RESOLUTION,
   createVideoPricePromoId,
   formatVideoPricePromoDate,
+  formatVideoResolutionLabel,
   isVideoPricePromoDate,
   isVideoPricePromoFoldDraft,
   normalizeVideoPricePromoFold,
@@ -1129,7 +1130,7 @@ function VideoModelSettingsDialog({
                     }));
                   }}
                 />
-                <span className="text-sm font-medium uppercase">{resolution}</span>
+                <span className="text-sm font-medium">{formatVideoResolutionLabel(resolution)}</span>
                 <Input
                   className={ADMIN_CONTROL_CLASS}
                   inputMode="decimal"
@@ -1209,7 +1210,7 @@ function VideoModelSettingsDialog({
                     </option>
                     {VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => (
                       <option key={resolution} value={resolution}>
-                        {resolution === "4k" ? "4K" : resolution.toUpperCase()}
+                        {formatVideoResolutionLabel(resolution)}
                       </option>
                     ))}
                   </select>

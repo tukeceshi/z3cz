@@ -4,6 +4,12 @@ import {
   submitGrokVideoTask,
 } from "@dafthunk/runtime/ai-interface/execute-grok-video";
 import {
+  cancelMinimaxVideoTask,
+  downloadMinimaxVideo,
+  pollMinimaxVideoTask,
+  submitMinimaxVideoTask,
+} from "@dafthunk/runtime/ai-interface/execute-minimax-video";
+import {
   downloadVeoVideo,
   pollVeoVideoTask,
   submitVeoVideoTask,
@@ -28,16 +34,21 @@ import type {
 import {
   buildVideoPollUrl,
   isGrokImagineVideoCanonicalId,
+  isMinimaxVideoCanonicalId,
+  MINIMAX_VIDEO_POLL_PATH,
   isVeoCanonicalId,
   resolveOfficialVideoEndpoints,
 } from "@dafthunk/types";
 import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
-type OrgVideoBackend = "grok" | "veo" | "volcano";
+type OrgVideoBackend = "grok" | "minimax" | "veo" | "volcano";
 
 function resolveOrgVideoBackend(canonicalId: string): OrgVideoBackend {
   if (isGrokImagineVideoCanonicalId(canonicalId)) {
     return "grok";
+  }
+  if (isMinimaxVideoCanonicalId(canonicalId)) {
+    return "minimax";
   }
   if (isVeoCanonicalId(canonicalId)) {
     return "veo";
@@ -95,6 +106,22 @@ export async function submitOrgVideoTask(params: {
     });
   }
 
+  if (backend === "minimax") {
+    return submitMinimaxVideoTask({
+      apiKey: params.apiKey,
+      baseUrl: params.baseUrl,
+      providerModelId: params.providerModelId,
+      prompt: params.prompt,
+      parameterRules: params.parameterRules,
+      generationParams: params.generationParams,
+      referenceImageUrls: params.referenceImageUrls,
+      referenceImageInline: params.referenceImageInline,
+      referenceVideoUrls: params.referenceVideoUrls,
+      referenceAudioUrls: params.referenceAudioUrls,
+      upstreamLog: params.upstreamLog,
+    });
+  }
+
   if (backend === "veo") {
     return submitVeoVideoTask({
       apiKey: params.apiKey,
@@ -147,6 +174,18 @@ export async function pollOrgVideoTask(params: {
     });
   }
 
+  if (backend === "minimax") {
+    const pollUrl =
+      params.videoPollUrl ??
+      `${baseUrl}${MINIMAX_VIDEO_POLL_PATH}/${encodeURIComponent(params.upstreamTaskId)}`;
+    return pollMinimaxVideoTask({
+      apiKey: params.apiKey,
+      baseUrl: params.baseUrl,
+      pollUrl,
+      upstreamLog: params.upstreamLog,
+    });
+  }
+
   if (backend === "veo") {
     const pollUrl =
       params.videoPollUrl ?? `${baseUrl}/${params.upstreamTaskId}`;
@@ -178,10 +217,25 @@ export async function cancelOrgVideoTask(params: {
   readonly apiKey: string;
   readonly canonicalId: string;
   readonly pollUrl: string;
+  readonly baseUrl?: string;
+  readonly upstreamTaskId?: string;
   readonly videoEndpoints?: ResolvedSingleModelVideoEndpoints;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<VolcanoVideoCancelResult> {
   const backend = resolveOrgVideoBackend(params.canonicalId);
+
+  if (backend === "minimax") {
+    if (!params.baseUrl || !params.upstreamTaskId?.trim()) {
+      return { status: "skipped" };
+    }
+
+    return cancelMinimaxVideoTask({
+      apiKey: params.apiKey,
+      baseUrl: params.baseUrl,
+      taskId: params.upstreamTaskId.trim(),
+      upstreamLog: params.upstreamLog,
+    });
+  }
 
   if (backend !== "volcano") {
     return { status: "skipped" };
@@ -214,6 +268,19 @@ export async function downloadOrgVideo(params: {
 
   if (backend === "grok") {
     return downloadGrokVideo({
+      videoUrl: params.videoUrl,
+      storageMode: params.storageMode,
+      objectStore: params.objectStore,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      executionId: params.executionId,
+      cloudUpload: params.cloudUpload,
+      upstreamLog: params.upstreamLog,
+    });
+  }
+
+  if (backend === "minimax") {
+    return downloadMinimaxVideo({
       videoUrl: params.videoUrl,
       storageMode: params.storageMode,
       objectStore: params.objectStore,

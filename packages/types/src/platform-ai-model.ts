@@ -2,6 +2,7 @@ import type { AiModelModality } from "./ai-model-catalog";
 import type { OrgModelChannelKind } from "./org-model-label";
 import type { UpstreamParamProfileField } from "./upstream-param-profile";
 import type { VideoModelPricePromo } from "./video-price-promo";
+import { VIDEO_RESOLUTION_OPTIONS } from "./video-resolution-label";
 import {
   assignReferenceImagesToBody,
   mergeReferenceImageValues,
@@ -107,15 +108,13 @@ export interface ImageModelParameterRules {
   readonly generationFields: readonly UpstreamParamProfileField[];
 }
 
-export const VIDEO_PRICE_ESTIMATE_RESOLUTIONS = [
-  "480p",
-  "720p",
-  "1080p",
-  "4k",
-] as const;
-
-export type VideoPriceEstimateResolution =
-  (typeof VIDEO_PRICE_ESTIMATE_RESOLUTIONS)[number];
+export {
+  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
+  VIDEO_RESOLUTION_OPTIONS,
+  formatVideoResolutionLabel,
+  type VideoPriceEstimateResolution,
+  type VideoResolutionOption,
+} from "./video-resolution-label";
 
 export interface VideoModelPriceEstimateTier {
   readonly resolution: string;
@@ -833,13 +832,6 @@ export const VIDEO_RATIO_OPTIONS = [
   "1:1",
   "3:4",
   "21:9",
-] as const;
-
-export const VIDEO_RESOLUTION_OPTIONS = [
-  "480p",
-  "720p",
-  "1080p",
-  "4k",
 ] as const;
 
 /** Full video-generation field catalog for Admin and runtime. */
@@ -1661,9 +1653,8 @@ export function omitAdaptiveVideoRatioFromRequestBody(
   return rest;
 }
 
-/** Build Volcano /contents/generations/tasks body from admin field definitions. */
-export function buildVolcanoVideoGenerationBody(params: {
-  readonly providerModelId: string;
+/** Build multimodal video submit content (prompt text + reference media). */
+export function buildVideoSubmitContent(params: {
   readonly prompt: string;
   readonly generationFields: readonly UpstreamParamProfileField[];
   readonly params?: Readonly<Record<string, unknown>>;
@@ -1671,7 +1662,7 @@ export function buildVolcanoVideoGenerationBody(params: {
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
-}): Record<string, unknown> {
+}): Record<string, unknown>[] {
   const mergedParams = mergeImageGenerationParams(
     params.generationFields,
     params.params
@@ -1716,50 +1707,123 @@ export function buildVolcanoVideoGenerationBody(params: {
     });
   }
 
-  const body: Record<string, unknown> = {
-    model: params.providerModelId,
-    content,
-  };
+  return content;
+}
+
+/** Map admin video generation fields to upstream request keys via apiName. */
+export function mapVideoGenerationFieldsToBody(params: {
+  readonly generationFields: readonly UpstreamParamProfileField[];
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly target?: Record<string, unknown>;
+  readonly targetRoot?: string;
+  readonly omitAdaptiveRatio?: boolean;
+}): Record<string, unknown> {
+  const mergedParams = mergeImageGenerationParams(
+    params.generationFields,
+    params.params
+  );
+
+  const rootBody: Record<string, unknown> = params.target ?? {};
+
+  const fieldTarget: Record<string, unknown> = params.targetRoot
+    ? (() => {
+        const rootKey = params.targetRoot!;
+        const existing = rootBody[rootKey];
+        if (
+          existing &&
+          typeof existing === "object" &&
+          !Array.isArray(existing)
+        ) {
+          return existing as Record<string, unknown>;
+        }
+        const nested: Record<string, unknown> = {};
+        rootBody[rootKey] = nested;
+        return nested;
+      })()
+    : rootBody;
 
   for (const field of params.generationFields) {
-    if (field.clientOnly || !field.apiName) {
+    const apiName = field.apiName?.trim();
+    if (field.clientOnly || !apiName) {
       continue;
     }
 
-    const raw = mergedParams[field.name];
-    const value =
-      raw === undefined || raw === null || raw === ""
-        ? field.default
-        : raw;
+    let value: unknown;
+    if (field.hidden) {
+      const explicit = params.params?.[field.name];
+      if (!isStoredGenerationValuePresent(explicit)) {
+        continue;
+      }
+      value = explicit;
+    } else {
+      const raw = mergedParams[field.name];
+      value =
+        raw === undefined || raw === null || raw === ""
+          ? field.default
+          : raw;
+    }
 
     if (value === undefined || value === null || value === "") {
       continue;
     }
 
-    if (field.type === "boolean") {
-      body[field.apiName] = value === true;
+    if (
+      params.omitAdaptiveRatio &&
+      field.name === "ratio" &&
+      isAdaptiveVideoRatio(value)
+    ) {
       continue;
     }
 
-    if (field.apiName === "web_search") {
+    if (field.type === "boolean") {
+      fieldTarget[apiName] = value === true;
+      continue;
+    }
+
+    if (apiName === "web_search") {
       if (value === true) {
-        body.tools = [{ type: "web_search" }];
+        rootBody.tools = [{ type: "web_search" }];
       }
       continue;
     }
 
-    if (field.apiName.includes(".")) {
-      const [root, leaf] = field.apiName.split(".", 2);
+    if (apiName.includes(".")) {
+      const [root, leaf] = apiName.split(".", 2);
       const existing =
-        body[root] && typeof body[root] === "object"
-          ? (body[root] as Record<string, unknown>)
+        fieldTarget[root] && typeof fieldTarget[root] === "object"
+          ? (fieldTarget[root] as Record<string, unknown>)
           : {};
-      body[root] = { ...existing, [leaf!]: value };
+      fieldTarget[root] = { ...existing, [leaf!]: value };
       continue;
     }
 
-    body[field.apiName] = value;
+    fieldTarget[apiName] = value;
   }
+
+  return rootBody;
+}
+
+/** Build Volcano /contents/generations/tasks body from admin field definitions. */
+export function buildVolcanoVideoGenerationBody(params: {
+  readonly providerModelId: string;
+  readonly prompt: string;
+  readonly generationFields: readonly UpstreamParamProfileField[];
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: params.providerModelId,
+    content: buildVideoSubmitContent(params),
+  };
+
+  mapVideoGenerationFieldsToBody({
+    generationFields: params.generationFields,
+    params: params.params,
+    target: body,
+  });
 
   return body;
 }

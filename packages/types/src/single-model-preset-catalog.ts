@@ -32,6 +32,9 @@ import {
   MINIMAX_SPEECH_CANONICAL_IDS,
   MINIMAX_SPEECH_DEFAULT_ENDPOINT_URL,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_CANONICAL_IDS,
+  MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   CLAUDE_CANONICAL_IDS,
   CLAUDE_DEFAULT_ENDPOINT_URL,
   CLAUDE_PROVIDER_CARD_ID,
@@ -73,6 +76,7 @@ const SINGLE_MODEL_PROVIDER_GROUP_IDS = [
   GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
   CLAUDE_PROVIDER_CARD_ID,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   VOLCANO_AGGREGATE_PRESET_ID,
 ] as const;
 
@@ -125,6 +129,9 @@ const GROK_IMAGINE_VIDEO_CANONICAL_ID_SET = new Set<string>(
 const MINIMAX_SPEECH_CANONICAL_ID_SET = new Set<string>(
   MINIMAX_SPEECH_CANONICAL_IDS
 );
+const MINIMAX_VIDEO_CANONICAL_ID_SET = new Set<string>(
+  MINIMAX_VIDEO_CANONICAL_IDS
+);
 const CLAUDE_CANONICAL_ID_SET = new Set<string>(CLAUDE_CANONICAL_IDS);
 const INDEPENDENT_PRESET_EXCLUDED_CANONICAL_IDS = new Set<string>([
   ...DEEPSEEK_CANONICAL_ID_SET,
@@ -142,6 +149,7 @@ const INDEPENDENT_PRESET_EXCLUDED_CANONICAL_IDS = new Set<string>([
   ...GROK_IMAGINE_IMAGE_CANONICAL_ID_SET,
   ...GROK_IMAGINE_VIDEO_CANONICAL_ID_SET,
   ...MINIMAX_SPEECH_CANONICAL_ID_SET,
+  ...MINIMAX_VIDEO_CANONICAL_ID_SET,
   ...CLAUDE_CANONICAL_ID_SET,
 ]);
 
@@ -223,6 +231,9 @@ export {
   MINIMAX_SPEECH_CANONICAL_IDS,
   MINIMAX_SPEECH_DEFAULT_ENDPOINT_URL,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_CANONICAL_IDS,
+  MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   CLAUDE_CANONICAL_IDS,
   CLAUDE_DEFAULT_ENDPOINT_URL,
   CLAUDE_PROVIDER_CARD_ID,
@@ -419,6 +430,12 @@ export function isMinimaxSpeechProviderSelection(
   return selection.kind === "minimax-speech";
 }
 
+export function isMinimaxVideoProviderSelection(
+  selection: SingleModelWizardSelection
+): selection is MinimaxVideoWizardSelection {
+  return selection.kind === "minimax-video";
+}
+
 export function isMultiModelProviderSelection(
   selection: SingleModelWizardSelection
 ): selection is
@@ -437,7 +454,8 @@ export function isMultiModelProviderSelection(
   | GrokImagineImageWizardSelection
   | GrokImagineVideoWizardSelection
   | ClaudeWizardSelection
-  | MinimaxSpeechWizardSelection {
+  | MinimaxSpeechWizardSelection
+  | MinimaxVideoWizardSelection {
   return (
     selection.kind === "deepseek" ||
     selection.kind === "seedance" ||
@@ -454,7 +472,8 @@ export function isMultiModelProviderSelection(
     selection.kind === "grok-imagine-image" ||
     selection.kind === "grok-imagine-video" ||
     selection.kind === "claude" ||
-    selection.kind === "minimax-speech"
+    selection.kind === "minimax-speech" ||
+    selection.kind === "minimax-video"
   );
 }
 
@@ -543,6 +562,11 @@ export interface MinimaxSpeechWizardSelection {
   readonly checkedCanonicalIds: readonly string[];
 }
 
+export interface MinimaxVideoWizardSelection {
+  readonly kind: "minimax-video";
+  readonly checkedCanonicalIds: readonly string[];
+}
+
 export type SingleModelWizardSelection =
   | PresetWizardSelection
   | DeepSeekWizardSelection
@@ -560,7 +584,8 @@ export type SingleModelWizardSelection =
   | GrokImagineImageWizardSelection
   | GrokImagineVideoWizardSelection
   | ClaudeWizardSelection
-  | MinimaxSpeechWizardSelection;
+  | MinimaxSpeechWizardSelection
+  | MinimaxVideoWizardSelection;
 
 export function createDefaultDeepSeekSelection(
   _enabledCanonicalIds: readonly string[] = []
@@ -702,6 +727,15 @@ export function createDefaultMinimaxSpeechSelection(
 ): MinimaxSpeechWizardSelection {
   return {
     kind: "minimax-speech",
+    checkedCanonicalIds: [],
+  };
+}
+
+export function createDefaultMinimaxVideoSelection(
+  _enabledCanonicalIds: readonly string[]
+): MinimaxVideoWizardSelection {
+  return {
+    kind: "minimax-video",
     checkedCanonicalIds: [],
   };
 }

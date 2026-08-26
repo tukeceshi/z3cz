@@ -12,6 +12,11 @@ import {
   downloadGrokVideo,
 } from "../../ai-interface/execute-grok-video";
 import {
+  MINIMAX_VIDEO_PROVIDER,
+  awaitMinimaxVideoPoll,
+  downloadMinimaxVideo,
+} from "../../ai-interface/execute-minimax-video";
+import {
   VEO_VIDEO_PROVIDER,
   awaitVeoVideoPoll,
   downloadVeoVideo,
@@ -110,6 +115,13 @@ export async function awaitVolcanoVideoOrPending(params: {
           pollIntervalMs: continuation.pollIntervalMs,
           timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
         })
+      : continuation.provider === MINIMAX_VIDEO_PROVIDER
+        ? await awaitMinimaxVideoPoll({
+            apiKey,
+            pollUrl: continuation.pollUrl,
+            pollIntervalMs: continuation.pollIntervalMs,
+            timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
+          })
       : continuation.provider === VEO_VIDEO_PROVIDER
         ? await awaitVeoVideoPoll({
             apiKey,
@@ -146,6 +158,16 @@ export async function awaitVolcanoVideoOrPending(params: {
           executionId: context.executionId,
           cloudUpload,
         })
+      : continuation.provider === MINIMAX_VIDEO_PROVIDER
+        ? await downloadMinimaxVideo({
+            videoUrl: pollResult.videoUrl,
+            storageMode,
+            objectStore: context.objectStore,
+            organizationId: context.organizationId,
+            workflowId: context.workflowId,
+            executionId: context.executionId,
+            cloudUpload,
+          })
       : continuation.provider === VEO_VIDEO_PROVIDER
         ? await downloadVeoVideo({
             apiKey,

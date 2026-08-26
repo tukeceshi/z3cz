@@ -400,6 +400,8 @@ async function tryCancelUpstreamVideoTask(
     apiKey: iface.apiKey,
     canonicalId: job.modelCanonicalId,
     pollUrl,
+    baseUrl: iface.baseUrl,
+    upstreamTaskId: job.upstreamTaskId,
     videoEndpoints,
     upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
   });

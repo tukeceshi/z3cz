@@ -76,6 +76,11 @@ export const MINIMAX_SPEECH_BRAND_ONLY_CANONICAL_IDS = [
   "minimax-speech-2-8-turbo",
 ] as const;
 
+/** MiniMax 官方 API 视频模型；不参与火山聚合 catalog 合并与向导。 */
+export const MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS = [
+  "minimax-h3",
+] as const;
+
 export function isMoonshotBrandOnlyCanonicalId(canonicalId: string): boolean {
   return (MOONSHOT_BRAND_ONLY_CANONICAL_IDS as readonly string[]).includes(
     canonicalId
@@ -148,6 +153,14 @@ export function isMinimaxSpeechBrandOnlyCanonicalId(
   );
 }
 
+export function isMinimaxVideoBrandOnlyCanonicalId(
+  canonicalId: string
+): boolean {
+  return (MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS as readonly string[]).includes(
+    canonicalId
+  );
+}
+
 export function isExternalBrandOnlyCanonicalId(canonicalId: string): boolean {
   return (
     isMoonshotBrandOnlyCanonicalId(canonicalId) ||
@@ -160,7 +173,8 @@ export function isExternalBrandOnlyCanonicalId(canonicalId: string): boolean {
     isGrokImagineImageBrandOnlyCanonicalId(canonicalId) ||
     isGrokImagineVideoBrandOnlyCanonicalId(canonicalId) ||
     isClaudeBrandOnlyCanonicalId(canonicalId) ||
-    isMinimaxSpeechBrandOnlyCanonicalId(canonicalId)
+    isMinimaxSpeechBrandOnlyCanonicalId(canonicalId) ||
+    isMinimaxVideoBrandOnlyCanonicalId(canonicalId)
   );
 }
 
@@ -350,6 +364,12 @@ export const VOLCANO_AI_MODEL_CATALOG: readonly AiModelCatalogEntry[] = [
     alias: "MiniMax Speech 2.8 Turbo",
     modality: "audio",
     providerModelId: "speech-2.8-turbo",
+  },
+  {
+    canonicalId: "minimax-h3",
+    alias: "MiniMax H3",
+    modality: "video",
+    providerModelId: "MiniMax-H3",
   },
   {
     canonicalId: "doubao-seedance-2",

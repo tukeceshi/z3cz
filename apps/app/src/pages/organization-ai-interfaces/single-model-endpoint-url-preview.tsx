@@ -8,6 +8,7 @@ interface SingleModelEndpointUrlPreviewProps {
   readonly baseUrl: string;
   readonly category: SingleModelPresetCategory | string;
   readonly useFullSubmitUrl?: boolean;
+  readonly presetId?: string;
 }
 
 export function SingleModelEndpointUrlPreview(
@@ -18,6 +19,7 @@ export function SingleModelEndpointUrlPreview(
     baseUrl: props.baseUrl,
     category: props.category,
     useFullSubmitUrl: props.useFullSubmitUrl,
+    presetId: props.presetId,
   });
 
   if (!preview.fullUrlPreview) {
@@ -71,6 +73,7 @@ interface SingleModelEndpointUrlFieldsProps {
   readonly useFullSubmitUrl: boolean;
   readonly onUseFullSubmitUrlChange: (checked: boolean) => void;
   readonly idPrefix: string;
+  readonly presetId?: string;
 }
 
 export function SingleModelEndpointUrlFields({
@@ -79,6 +82,7 @@ export function SingleModelEndpointUrlFields({
   useFullSubmitUrl,
   onUseFullSubmitUrlChange,
   idPrefix,
+  presetId,
 }: SingleModelEndpointUrlFieldsProps) {
   return (
     <div className="space-y-2">
@@ -86,6 +90,7 @@ export function SingleModelEndpointUrlFields({
         baseUrl={baseUrl}
         category={category}
         useFullSubmitUrl={useFullSubmitUrl}
+        presetId={presetId}
       />
       <SingleModelUseFullSubmitUrlField
         idPrefix={idPrefix}
