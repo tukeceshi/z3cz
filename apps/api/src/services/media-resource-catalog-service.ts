@@ -54,7 +54,9 @@ export function mediaReferenceToCatalogInsert(
 
   organizationId: string,
 
-  ref: MediaReference
+  ref: MediaReference,
+
+  modelCanonicalId?: string
 
 ): UpsertMediaResourceParams | null {
 
@@ -78,6 +80,7 @@ export function mediaReferenceToCatalogInsert(
 
       generating: false,
       failed: false,
+      ...(modelCanonicalId ? { modelCanonicalId } : {}),
 
     };
 
@@ -105,6 +108,7 @@ export function mediaReferenceToCatalogInsert(
 
       generating: false,
       failed: false,
+      ...(modelCanonicalId ? { modelCanonicalId } : {}),
 
     };
 
@@ -151,6 +155,7 @@ export function registerRequestToCatalogInsert(
     generating: resource.generating ?? false,
     failed: resource.failed ?? false,
     cloudAccelerationStatus: resource.cloudAccelerationStatus ?? null,
+    modelCanonicalId: resource.modelCanonicalId ?? null,
 
   };
 
@@ -294,6 +299,8 @@ export async function registerMediaResourceTransitions(
 
     readonly transitions: readonly MediaResourceTransition[];
 
+    readonly modelCanonicalId?: string;
+
   }
 
 ): Promise<void> {
@@ -304,7 +311,9 @@ export async function registerMediaResourceTransitions(
 
       params.organizationId,
 
-      transition.reference
+      transition.reference,
+
+      params.modelCanonicalId
 
     );
 
@@ -356,6 +365,8 @@ export async function registerMediaResourcesFromReferences(
 
     readonly references: readonly MediaReference[];
 
+    readonly modelCanonicalId?: string;
+
   }
 
 ): Promise<void> {
@@ -365,6 +376,8 @@ export async function registerMediaResourcesFromReferences(
     organizationId: params.organizationId,
 
     transitions: params.references.map((reference) => ({ reference })),
+
+    modelCanonicalId: params.modelCanonicalId,
 
   });
 

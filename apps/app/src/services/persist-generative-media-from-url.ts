@@ -10,6 +10,7 @@ export async function resolveCloudGenerationJobMedia(params: {
   readonly organizationId: string;
   readonly jobId: string;
   readonly workflowId?: string;
+  readonly cloudConfigured: boolean;
   readonly stagingMediaIds?: readonly string[];
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
@@ -23,6 +24,7 @@ export async function resolveCloudGenerationJobMedia(params: {
     organizationId: params.organizationId,
     jobId: params.jobId,
     workflowId: params.workflowId,
+    cloudConfigured: params.cloudConfigured,
     stagingMediaIds: params.stagingMediaIds,
     onPhase: params.onPhase,
     onProgressPhase: params.onProgressPhase,

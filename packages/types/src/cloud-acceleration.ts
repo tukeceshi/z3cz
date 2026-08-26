@@ -40,3 +40,45 @@ export interface EnableAlwaysAiInterfaceCloudAccelerationResponse {
 }
 
 export const CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS = 2_000 as const;
+
+export interface CloudAccelerationResourceSnapshot {
+  readonly kind: string;
+  readonly upstreamUrl?: string;
+  readonly generating?: boolean;
+  readonly expiresAt?: string;
+}
+
+/** Catalog row already in org cloud storage. */
+export function isCloudStoredResource(
+  entry: Pick<CloudAccelerationResourceSnapshot, "kind">
+): boolean {
+  return entry.kind === "cloud";
+}
+
+/** Ephemeral catalog row — temporary upstream connection, not yet in cloud storage. */
+export function isEphemeralTemporaryConnection(
+  entry: CloudAccelerationResourceSnapshot
+): boolean {
+  if (isCloudStoredResource(entry) || entry.kind !== "ephemeral") {
+    return false;
+  }
+  if (entry.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
+    return false;
+  }
+  return Boolean(entry.upstreamUrl?.trim()) || entry.generating === true;
+}
+
+export function shouldCloudAccelerate(params: {
+  readonly resourceEntry: CloudAccelerationResourceSnapshot;
+  readonly cloudConfigured: boolean;
+  readonly interfaceInAccelList: boolean;
+  readonly userTriggered?: boolean;
+}): boolean {
+  if (!params.cloudConfigured) {
+    return false;
+  }
+  if (!params.interfaceInAccelList && !params.userTriggered) {
+    return false;
+  }
+  return isEphemeralTemporaryConnection(params.resourceEntry);
+}

@@ -661,6 +661,7 @@ export const mediaResources = pgTable(
     cloudAccelerationStatus: text("cloud_acceleration_status").$type<
       "pending" | "active" | "done" | "failed" | null
     >(),
+    modelCanonicalId: text("model_canonical_id"),
     createdAt: createCreatedAt(),
   },
   (table) => [

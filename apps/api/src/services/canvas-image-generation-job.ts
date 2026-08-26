@@ -132,6 +132,7 @@ export async function createCanvasImageGenerationJob(
       kind: "ephemeral" as const,
       mimeType: PLACEHOLDER_IMAGE_MIME,
       generating: true,
+      modelCanonicalId: params.modelCanonicalId,
     })),
   });
 
@@ -190,6 +191,7 @@ export async function runCanvasImageGenerationJob(params: {
   readonly interfaceId: string;
   readonly useFullSubmitUrl?: boolean;
   readonly storageMode: "ephemeral" | "cloud";
+  readonly modelCanonicalId: string;
 }): Promise<void> {
   const db = createDatabase(params.env);
   try {
@@ -277,6 +279,7 @@ export async function runCanvasImageGenerationJob(params: {
       expiresAt: image.expiresAt ?? expiresAt,
       generating: false,
       failed: false,
+      modelCanonicalId: params.modelCanonicalId,
     })),
     ...unusedIds.map((id) => ({
       id,
@@ -285,6 +288,7 @@ export async function runCanvasImageGenerationJob(params: {
       mimeType: PLACEHOLDER_IMAGE_MIME,
       generating: false,
       failed: false,
+      modelCanonicalId: params.modelCanonicalId,
     })),
   ]);
 

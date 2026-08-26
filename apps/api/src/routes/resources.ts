@@ -35,6 +35,7 @@ const registerMediaResourceSchema = z
     upstreamUrl: z.string().url().optional(),
     expiresAt: z.string().datetime().optional(),
     replacesResourceId: z.string().min(1).optional(),
+    modelCanonicalId: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.kind === "cloud" && !value.storageKey) {

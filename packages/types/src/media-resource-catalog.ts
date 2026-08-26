@@ -18,6 +18,7 @@ export interface MediaResourceRecord {
   readonly generating: boolean;
   readonly failed: boolean;
   readonly cloudAccelerationStatus: CloudAccelerationStatus | null;
+  readonly modelCanonicalId: string | null;
   readonly createdAt: string;
 }
 
@@ -32,6 +33,7 @@ export interface RegisterMediaResourceRequest {
   readonly generating?: boolean;
   readonly failed?: boolean;
   readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
+  readonly modelCanonicalId?: string | null;
   /** When set, updates an existing row (e.g. ephemeral/local → cloud) instead of creating a duplicate. */
   readonly replacesResourceId?: string;
 }
@@ -71,6 +73,7 @@ export interface ResolvedMediaResourceEntry {
   readonly generating?: boolean;
   readonly failed?: boolean;
   readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
+  readonly modelCanonicalId?: string | null;
 }
 
 export interface ResolveMediaResourcesResponse {

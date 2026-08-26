@@ -589,6 +589,13 @@
       "when": 1790200000000,
       "tag": "0089_cloud_acceleration",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1790280000000,
+      "tag": "0090_media_resource_model_canonical_id",
+      "breakpoints": true
     }
   ]
 }
