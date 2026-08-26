@@ -1,4 +1,4 @@
-import type { MediaResourceKind, MediaResourceRecord } from "@dafthunk/types";
+import type { CloudAccelerationStatus, MediaResourceKind, MediaResourceRecord } from "@dafthunk/types";
 
 import type { Database } from "../db";
 import { mediaResources } from "../db/schema";
@@ -16,6 +16,7 @@ export interface UpsertMediaResourceParams {
   readonly generating?: boolean;
   readonly failed?: boolean;
   readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
+  readonly modelCanonicalId?: string | null;
 }
 
 function mapMediaResourceRow(
@@ -33,6 +34,7 @@ function mapMediaResourceRow(
     generating: row.generating,
     failed: row.failed,
     cloudAccelerationStatus: row.cloudAccelerationStatus ?? null,
+    modelCanonicalId: row.modelCanonicalId ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -64,6 +66,7 @@ export async function upsertMediaResources(
         generating: resource.generating ?? false,
         failed: resource.failed ?? false,
         cloudAccelerationStatus: resource.cloudAccelerationStatus ?? null,
+        modelCanonicalId: resource.modelCanonicalId ?? null,
       }))
     )
     .onConflictDoUpdate({
@@ -78,6 +81,7 @@ export async function upsertMediaResources(
         generating: sql`excluded.generating`,
         failed: sql`excluded.failed`,
         cloudAccelerationStatus: sql`excluded.cloud_acceleration_status`,
+        modelCanonicalId: sql`coalesce(excluded.model_canonical_id, ${mediaResources.modelCanonicalId})`,
       },
     });
 }
@@ -148,6 +152,7 @@ export async function rekeyMediaResource(
         expiresAt: null,
         generating: false,
         failed: false,
+        modelCanonicalId: fromRow.modelCanonicalId,
       })
       .where(
         and(

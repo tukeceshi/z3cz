@@ -1,10 +1,11 @@
-import { getResourceIdFromValue, type WorkflowMediaValue } from "@dafthunk/types";
+import { getResourceIdFromValue } from "@dafthunk/types";
 
 import {
   generateCacheResourceTiers,
   getCachedMediaBlob,
 } from "@/services/ai-media-cache-service";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+import { areResourcesCloudStored } from "@/services/cloud-acceleration-decision";
 import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
 
 const FAILED_COOLDOWN_MS = 30_000;
@@ -68,6 +69,19 @@ async function isMediaCachedInIndexedDb(params: {
   return blob != null;
 }
 
+async function shouldRefreshIngestFromCloudStorage(
+  params: IngestCanvasMediaParams
+): Promise<boolean> {
+  const mediaId = resolveIngestMediaId(params);
+  if (!mediaId) {
+    return false;
+  }
+  return areResourcesCloudStored({
+    organizationId: params.organizationId,
+    resourceIds: [mediaId],
+  });
+}
+
 async function finishIngestSideEffects(
   params: IngestCanvasMediaParams,
   mediaId: string
@@ -101,7 +115,8 @@ async function runIngestCanvasMediaWork(
   };
 
   const alreadyCached = await isMediaCachedInIndexedDb(cacheParams);
-  if (!alreadyCached) {
+  const refreshFromCloud = await shouldRefreshIngestFromCloudStorage(params);
+  if (!alreadyCached || refreshFromCloud) {
     await ensureGenerativeMediaCached(params);
     const cachedAfterIngest = await isMediaCachedInIndexedDb(cacheParams);
     if (!cachedAfterIngest && !params.blob) {
@@ -146,13 +161,16 @@ export async function coordinateIngestCanvasMedia(
   };
 
   if (await isMediaCachedInIndexedDb(cacheParams)) {
-    ingestCoordinator.set(key, {
-      state: "done",
-      promise: null,
-      failedAt: null,
-    });
-    await finishIngestSideEffects(params, mediaId);
-    return;
+    const refreshFromCloud = await shouldRefreshIngestFromCloudStorage(params);
+    if (!refreshFromCloud) {
+      ingestCoordinator.set(key, {
+        state: "done",
+        promise: null,
+        failedAt: null,
+      });
+      await finishIngestSideEffects(params, mediaId);
+      return;
+    }
   }
 
   const existing = readCoordinatorEntry(key);

@@ -25,8 +25,12 @@ import {
   normalizeVideoModelParameterRules,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
-import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 
+import {
+  parseLocalDayEndExclusive,
+  parseLocalDayStart,
+} from "../utils/local-day-range";
 import type { Database } from "./index";
 import { parseJsonColumn } from "./parse-json-column";
 import { aiModelInvocations, platformAiModels } from "./schema";
@@ -340,15 +344,43 @@ export async function finalizeAiModelInvocation(
 export async function listAiModelInvocations(
   db: Database,
   organizationId: string,
-  options?: { readonly limit?: number; readonly offset?: number }
+  options?: {
+    readonly limit?: number;
+    readonly offset?: number;
+    readonly dateFrom?: string;
+    readonly dateTo?: string;
+    readonly tzOffsetMinutes?: number;
+  }
 ): Promise<ListAiModelInvocationsResponse> {
-  const limit = options?.limit ?? 50;
+  const limit = options?.limit ?? 20;
   const offset = options?.offset ?? 0;
+
+  const conditions = [eq(aiModelInvocations.organizationId, organizationId)];
+
+  if (options?.tzOffsetMinutes !== undefined) {
+    const tzOffsetMinutes = options.tzOffsetMinutes;
+
+    if (options.dateFrom !== undefined) {
+      const start = parseLocalDayStart(options.dateFrom, tzOffsetMinutes);
+      if (start) {
+        conditions.push(gte(aiModelInvocations.createdAt, start));
+      }
+    }
+
+    if (options.dateTo !== undefined) {
+      const end = parseLocalDayEndExclusive(options.dateTo, tzOffsetMinutes);
+      if (end) {
+        conditions.push(lt(aiModelInvocations.createdAt, end));
+      }
+    }
+  }
+
+  const where = and(...conditions);
 
   const rows = await db
     .select()
     .from(aiModelInvocations)
-    .where(eq(aiModelInvocations.organizationId, organizationId))
+    .where(where)
     .orderBy(desc(aiModelInvocations.createdAt))
     .limit(limit)
     .offset(offset);
@@ -356,7 +388,7 @@ export async function listAiModelInvocations(
   const countRows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(aiModelInvocations)
-    .where(eq(aiModelInvocations.organizationId, organizationId));
+    .where(where);
 
   return {
     invocations: rows.map(mapInvocationRow),

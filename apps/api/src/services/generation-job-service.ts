@@ -16,6 +16,7 @@ import {
   isGrokImagineVideoCanonicalId,
   isVeoCanonicalId,
   isVideoUpstreamPollDue,
+  createEphemeralMediaExpiresAt,
   mediaReferenceToWorkflowValue,
   nextVideoUpstreamPollAt,
   resolveOfficialVideoEndpoints,
@@ -36,6 +37,7 @@ import {
   getGenerationJobByClientRequestId,
   updateGenerationJob,
 } from "../db/generation-job-queries";
+import { upsertMediaResources } from "../db/media-resource-queries";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
 import { resolveAiAudioStorage } from "./ai-audio-storage";
 import { resolveAiImageStorage } from "./ai-image-storage";
@@ -56,7 +58,6 @@ import {
 import {
   markJobResourcesCloudAccelerationStatus,
   resolveJobCloudAccelerationFlags,
-  shouldAutoCloudAccelerateJob,
 } from "./cloud-acceleration-service";
 import {
   isPersistWorkerPoolActive,
@@ -256,7 +257,8 @@ async function persistPendingMediaOnServer(
     const response = await fetchWithUpstreamLog(
       item.sourceUrl,
       { method: "GET" },
-      downloadLog
+      downloadLog,
+      { responseMode: "stream" }
     );
     if (!response.ok) {
       throw new Error(`Failed to download generated media (${response.status})`);
@@ -538,14 +540,30 @@ export async function pollVideoGenerationJob(
   const previousResult = job.resultJson ?? {};
   const { upstreamVideoStatus: _upstreamVideoStatus, ...restResult } =
     previousResult;
+  const pendingItem = buildVideoPendingMedia(job, pollResult.videoUrl);
   const resultJson: GenerationJobResultJson = {
     ...restResult,
-    pendingMedia: [
-      buildVideoPendingMedia(job, pollResult.videoUrl),
-    ],
+    pendingMedia: [pendingItem],
     upstreamTaskId: job.upstreamTaskId,
     aiInterfaceId: job.interfaceId,
   };
+
+  const videoResourceId = pendingItem.resourceId?.trim();
+  if (videoResourceId) {
+    await upsertMediaResources(db, [
+      {
+        id: videoResourceId,
+        organizationId: job.organizationId,
+        kind: "ephemeral",
+        mimeType: pendingItem.mimeType,
+        upstreamUrl: pollResult.videoUrl,
+        expiresAt: createEphemeralMediaExpiresAt(),
+        generating: false,
+        failed: false,
+        modelCanonicalId: job.modelCanonicalId,
+      },
+    ]);
+  }
 
   return (
     (await updateGenerationJob(db, {
@@ -744,22 +762,6 @@ async function maybeFallbackStaleWorkerPersist(
   return runServerGenerationJobPersist(env, db, reset, { forceInline: true });
 }
 
-async function maybeRunInterfaceCloudAcceleration(
-  env: Bindings,
-  db: Database,
-  job: GenerationJobRecord
-): Promise<GenerationJobRecord> {
-  if (job.status !== "ready_to_persist") {
-    return job;
-  }
-  if (!(await shouldAutoCloudAccelerateJob(db, job))) {
-    return job;
-  }
-  await markJobResourcesCloudAccelerationStatus(db, job, "pending");
-  await syncJobCloudAccelerationToWorkflow(env, job, "pending");
-  return runServerGenerationJobPersist(env, db, job);
-}
-
 async function maybeRunServerPersistFallback(
   env: Bindings,
   db: Database,
@@ -921,10 +923,6 @@ export async function refreshGenerationJob(
     job.resultJson?.persistDispatch === "worker"
   ) {
     job = await maybeFallbackStaleWorkerPersist(env, db, job);
-  }
-
-  if (job.status === "ready_to_persist") {
-    job = await maybeRunInterfaceCloudAcceleration(env, db, job);
   }
 
   if (job.status === "ready_to_persist") {
@@ -1094,6 +1092,7 @@ export async function createReadyToPersistImageJob(
     await registerMediaResourcesFromReferences(db, {
       organizationId: params.organizationId,
       references: params.images,
+      modelCanonicalId: params.modelCanonicalId,
     });
     return job;
   });
@@ -1165,6 +1164,7 @@ export async function createReadyToPersistAudioJob(
   await registerMediaResourcesFromReferences(db, {
     organizationId: params.organizationId,
     references: params.audios,
+    modelCanonicalId: params.modelCanonicalId,
   });
   return job;
 }

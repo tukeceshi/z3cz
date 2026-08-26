@@ -7,6 +7,7 @@ export async function registerGeneratingPlaceholderResources(
     readonly organizationId: string;
     readonly count?: number;
     readonly mimeType: string;
+    readonly modelCanonicalId?: string;
   }
 ): Promise<readonly string[]> {
   const count = params.count ?? 1;
@@ -19,6 +20,9 @@ export async function registerGeneratingPlaceholderResources(
       kind: "ephemeral" as const,
       mimeType: params.mimeType,
       generating: true,
+      ...(params.modelCanonicalId
+        ? { modelCanonicalId: params.modelCanonicalId }
+        : {}),
     })),
   });
 

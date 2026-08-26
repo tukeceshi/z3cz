@@ -8,6 +8,7 @@ import type {
 
 import {
   getResourceIdFromValue,
+  isCloudStoredResource,
   isResourceIdReference,
   mediaReferenceToWorkflowValue,
 } from "@dafthunk/types";
@@ -26,6 +27,7 @@ import {
 } from "@/services/generative-media-staging";
 import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 import { registerMediaResource } from "@/services/register-media-resource";
+import { resolveMediaResourceEntry } from "@/services/resolve-media-resource-fetch-url";
 import {
   requireStagingWorkflowId,
   uploadBlobToCloudStorage,
@@ -176,6 +178,31 @@ export async function ensureGenerativeMediaCached(params: {
       params.media.cloudAccelerationStatus === "pending" ||
       params.media.cloudAccelerationStatus === "active"
     ) {
+      return;
+    }
+
+    const catalogEntry = await resolveMediaResourceEntry({
+      organizationId: params.organizationId,
+      resourceId: mediaId,
+    });
+    if (catalogEntry && isCloudStoredResource(catalogEntry)) {
+      const cachedOk = await cacheMediaFromUrl({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        workflowName: params.workflowId,
+        media: params.media,
+        nodeType: params.nodeType,
+      });
+      if (cachedOk) {
+        notifyAiMediaCacheChanged();
+        await commitNodeLayoutFromStaging({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          mediaId,
+          nodeType: params.nodeType,
+          patchNodeLayout: params.patchNodeLayout,
+        });
+      }
       return;
     }
 

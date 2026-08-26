@@ -23,6 +23,8 @@ import {
   resolveCloudGenerationJobMedia,
   type PersistGenerativeMediaPhase,
 } from "@/services/persist-generative-media-from-url";
+import { patchWorkflowNodeCloudAccelerationPending } from "@/services/patch-node-cloud-acceleration-pending";
+import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import type { ImageGenerationRequestSnapshot, ResourceIdReference, WorkflowMediaValue } from "@dafthunk/types";
 import { VIDEO_JOB_CLIENT_POLL_INTERVAL_MS } from "@dafthunk/types";
 
@@ -99,9 +101,7 @@ interface UseGenerativeCloudJobOptions {
   readonly autoResume?: boolean;
   readonly updateNodeData?: (
     nodeId: string,
-    updater: (current: {
-      readonly metadata?: Record<string, string>;
-    }) => { readonly metadata?: Record<string, string> }
+    updater: (current: WorkflowNodeType) => Partial<WorkflowNodeType>
   ) => void;
   readonly setPersistPhase: (phase: PersistGenerativeMediaPhase | null) => void;
   readonly setIsGenerating: (generating: boolean) => void;
@@ -162,7 +162,14 @@ export function useGenerativeCloudJobProgress(
             metadata = options.applyBusyMetadata(metadata, true);
           }
         }
-        return { metadata };
+
+        if (params.phase !== "server_persisting") {
+          return { metadata };
+        }
+
+        const contentPatch =
+          patchWorkflowNodeCloudAccelerationPending(current) ?? {};
+        return { ...contentPatch, metadata };
       });
     },
     [options.applyBusyMetadata, options.nodeId, options.updateNodeData]
@@ -237,6 +244,7 @@ export function useGenerativeCloudJobProgress(
           organizationId: options.orgId!,
           jobId,
           workflowId: options.workflowId,
+          cloudConfigured: options.cloudConfigured,
           stagingMediaIds: readGenerativeStagingMediaIds(options.metadata),
           onPhase: options.setPersistPhase,
           onProgressPhase: (phase) =>
@@ -277,6 +285,7 @@ export function useGenerativeCloudJobProgress(
       }
     },
     [
+      options.cloudConfigured,
       options.metadata,
       options.onStaged,
       options.orgId,

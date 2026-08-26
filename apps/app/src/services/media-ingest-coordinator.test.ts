@@ -9,6 +9,7 @@ const getCachedMediaBlob = vi.fn();
 const ensureGenerativeMediaCached = vi.fn();
 const generateCacheResourceTiers = vi.fn();
 const notifyAiMediaCacheChanged = vi.fn();
+const areResourcesCloudStored = vi.fn();
 
 vi.mock("@/services/ai-media-cache-service", () => ({
   getCachedMediaBlob: (...args: unknown[]) => getCachedMediaBlob(...args),
@@ -18,6 +19,11 @@ vi.mock("@/services/ai-media-cache-service", () => ({
 
 vi.mock("@/services/ai-media-cache-events", () => ({
   notifyAiMediaCacheChanged: () => notifyAiMediaCacheChanged(),
+}));
+
+vi.mock("@/services/cloud-acceleration-decision", () => ({
+  areResourcesCloudStored: (...args: unknown[]) =>
+    areResourcesCloudStored(...args),
 }));
 
 vi.mock("@/services/stage-generative-media", () => ({
@@ -43,6 +49,7 @@ describe("coordinateIngestCanvasMedia", () => {
     getCachedMediaBlob.mockResolvedValue(null);
     ensureGenerativeMediaCached.mockResolvedValue(undefined);
     generateCacheResourceTiers.mockResolvedValue(undefined);
+    areResourcesCloudStored.mockResolvedValue(false);
   });
 
   it("skips network ingest when IndexedDB already has the blob", async () => {
@@ -74,5 +81,15 @@ describe("coordinateIngestCanvasMedia", () => {
     await Promise.all([first, second]);
 
     expect(ensureGenerativeMediaCached).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-ingests from cloud storage when catalog is cloud despite IndexedDB cache", async () => {
+    getCachedMediaBlob.mockResolvedValue(new Blob(["ephemeral-stale"]));
+    areResourcesCloudStored.mockResolvedValue(true);
+
+    await coordinateIngestCanvasMedia(params);
+
+    expect(ensureGenerativeMediaCached).toHaveBeenCalledTimes(1);
+    expect(generateCacheResourceTiers).toHaveBeenCalledTimes(1);
   });
 });

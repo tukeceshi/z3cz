@@ -7,6 +7,7 @@ import type {
 } from "@dafthunk/types";
 import {
   isCloudAccelerationInProgress,
+  isCloudStoredResource,
   isGenerationJobReadyAtExpired,
   isServerPersistInProgress,
   shouldDeferClientPersistToServer,
@@ -16,11 +17,22 @@ import {
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
 import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import {
+  areResourcesCloudStored,
+  shouldCloudAccelerateResource,
+} from "@/services/cloud-acceleration-decision";
+import {
   CloudAccelerationDownloadAbortError,
   CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS,
 } from "@/services/cloud-acceleration-download";
 import { fetchBlobWithProgress } from "@/services/fetch-blob-with-progress";
-import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
+import {
+  buildMediaProxyEndpoint,
+  mediaFetchInitForCacheUrl,
+} from "@/services/media-cache-fetch-utils";
+import {
+  buildFetchUrlFromResolvedEntry,
+  resolveMediaResourceEntry,
+} from "@/services/resolve-media-resource-fetch-url";
 import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
   readGenerativeStagingByMediaId,
@@ -70,6 +82,63 @@ async function resolveExistingStagedRefs(
   return refs;
 }
 
+async function resolvePersistDownloadUrl(params: {
+  readonly organizationId: string;
+  readonly item: GenerationJobPendingMedia;
+}): Promise<{ readonly url: string; readonly alreadyCloud: boolean }> {
+  const resourceId = params.item.resourceId?.trim();
+  if (resourceId) {
+    const entry = await resolveMediaResourceEntry({
+      organizationId: params.organizationId,
+      resourceId,
+    });
+    const catalogUrl = entry
+      ? buildFetchUrlFromResolvedEntry(entry, params.organizationId)
+      : null;
+    if (entry && catalogUrl) {
+      return {
+        url: catalogUrl,
+        alreadyCloud: isCloudStoredResource(entry),
+      };
+    }
+  }
+
+  return {
+    url: buildMediaProxyEndpoint(
+      params.organizationId,
+      params.item.sourceUrl,
+      params.item.mimeType
+    ),
+    alreadyCloud: false,
+  };
+}
+
+function pendingMediaResourceIds(
+  pendingMedia: readonly GenerationJobPendingMedia[]
+): readonly string[] {
+  return pendingMedia
+    .map((item) => item.resourceId?.trim() ?? "")
+    .filter((id) => id.length > 0);
+}
+
+function cloudRefsFromPendingMedia(
+  pendingMedia: readonly GenerationJobPendingMedia[]
+): readonly ResourceIdReference[] {
+  return pendingMedia.flatMap((item) => {
+    const resourceId = item.resourceId?.trim();
+    if (!resourceId) {
+      return [];
+    }
+    return [
+      {
+        resourceId,
+        mimeType: item.mimeType,
+        kind: "cloud" as const,
+      },
+    ];
+  });
+}
+
 async function downloadToAiStaging(params: {
   readonly organizationId: string;
   readonly workflowId?: string;
@@ -81,20 +150,24 @@ async function downloadToAiStaging(params: {
 }): Promise<ResourceIdReference> {
   params.onPhase?.("downloading");
 
-  const fetchUrl = buildMediaProxyEndpoint(
-    params.organizationId,
-    params.item.sourceUrl,
-    params.item.mimeType
-  );
+  const download = await resolvePersistDownloadUrl({
+    organizationId: params.organizationId,
+    item: params.item,
+  });
+  const fetchInit = download.alreadyCloud
+    ? mediaFetchInitForCacheUrl(download.url)
+    : { credentials: "include" as const };
   const blob = await fetchBlobWithProgress(
-    fetchUrl,
-    { credentials: "include" },
+    download.url,
+    fetchInit,
     params.onDownloadProgress,
-    {
-      shouldAbort: params.shouldAbortDownload,
-      onSlowDownload: params.onDownloadSlow,
-      slowDownloadMs: CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS,
-    }
+    download.alreadyCloud
+      ? undefined
+      : {
+          shouldAbort: params.shouldAbortDownload,
+          onSlowDownload: params.onDownloadSlow,
+          slowDownloadMs: CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS,
+        }
   );
   const mimeType =
     params.item.mimeType ||
@@ -116,6 +189,33 @@ async function downloadToAiStaging(params: {
   });
 
   return resourceRefFromStaging(resourceId, mimeType);
+}
+
+/** Overwrite ephemeral local staging with bytes fetched from org cloud storage. */
+async function refreshLocalStagingFromCloudStorage(params: {
+  readonly organizationId: string;
+  readonly workflowId?: string;
+  readonly pendingMedia: readonly GenerationJobPendingMedia[];
+  readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
+  readonly onDownloadProgress?: (percent: number) => void;
+  readonly shouldAbortDownload?: () => boolean;
+  readonly onDownloadSlow?: () => void;
+  readonly onStaged?: (stagedMedia: readonly ResourceIdReference[]) => void;
+}): Promise<readonly ResourceIdReference[]> {
+  const refs: ResourceIdReference[] = [];
+  for (let index = 0; index < params.pendingMedia.length; index += 1) {
+    refs[index] = await downloadToAiStaging({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      item: params.pendingMedia[index]!,
+      onPhase: params.onPhase,
+      onDownloadProgress: params.onDownloadProgress,
+      shouldAbortDownload: params.shouldAbortDownload,
+      onDownloadSlow: params.onDownloadSlow,
+    });
+  }
+  params.onStaged?.(refs);
+  return refs;
 }
 
 async function uploadFromAiStaging(params: {
@@ -247,10 +347,45 @@ function allStagedRefsReady(
   return stagedRefs.length === count && stagedRefs.every(Boolean);
 }
 
+async function maybeTriggerCloudAcceleration(params: {
+  readonly organizationId: string;
+  readonly jobId: string;
+  readonly pendingMedia: readonly GenerationJobPendingMedia[];
+  readonly cloudConfigured: boolean;
+  readonly interfaceInAccelList: boolean;
+  readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
+}): Promise<readonly WorkflowMediaValue[] | null> {
+  for (const item of params.pendingMedia) {
+    const resourceId = item.resourceId?.trim();
+    if (!resourceId) {
+      continue;
+    }
+
+    const shouldAccelerate = await shouldCloudAccelerateResource({
+      organizationId: params.organizationId,
+      resourceId,
+      cloudConfigured: params.cloudConfigured,
+      interfaceInAccelList: params.interfaceInAccelList,
+    });
+    if (!shouldAccelerate) {
+      continue;
+    }
+
+    return runServerPersistAndPoll({
+      organizationId: params.organizationId,
+      jobId: params.jobId,
+      onProgressPhase: params.onProgressPhase,
+    });
+  }
+
+  return null;
+}
+
 export async function runGenerationJobPersistWorker(params: {
   readonly organizationId: string;
   readonly jobId: string;
   readonly workflowId?: string;
+  readonly cloudConfigured: boolean;
   readonly stagingMediaIds?: readonly string[];
   readonly onPhase?: (phase: PersistGenerativeMediaPhase) => void;
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
@@ -273,10 +408,7 @@ export async function runGenerationJobPersistWorker(params: {
     return ready.finalMedia;
   }
 
-  if (
-    ready.shouldUseCloudAcceleration ||
-    ready.deferClientPersistToServer
-  ) {
+  if (ready.deferClientPersistToServer) {
     return runServerPersistAndPoll({
       organizationId: params.organizationId,
       jobId: params.jobId,
@@ -289,8 +421,35 @@ export async function runGenerationJobPersistWorker(params: {
     throw new Error("Generation job has no media to persist");
   }
 
+  // Accelerate only before client download. After the catalog is cloud storage,
+  // a later pass just downloads for local staging and skips upload.
+  const preDownloadAcceleration = await maybeTriggerCloudAcceleration({
+    organizationId: params.organizationId,
+    jobId: params.jobId,
+    pendingMedia,
+    cloudConfigured: params.cloudConfigured,
+    interfaceInAccelList: ready.shouldUseCloudAcceleration === true,
+    onProgressPhase: notify,
+  });
+  if (preDownloadAcceleration) {
+    return preDownloadAcceleration;
+  }
+
   const stagedRefs: (ResourceIdReference | undefined)[] = [];
-  if (params.stagingMediaIds && params.stagingMediaIds.length > 0) {
+  const pendingResourceIds = pendingMediaResourceIds(pendingMedia);
+  const catalogAlreadyCloud =
+    pendingResourceIds.length === pendingMedia.length &&
+    (await areResourcesCloudStored({
+      organizationId: params.organizationId,
+      resourceIds: pendingResourceIds,
+    }));
+
+  // Ephemeral staging from a prior pass must not skip the cloud-storage download.
+  if (
+    !catalogAlreadyCloud &&
+    params.stagingMediaIds &&
+    params.stagingMediaIds.length > 0
+  ) {
     const restored = await resolveExistingStagedRefs(params.stagingMediaIds);
     if (restored.length === pendingMedia.length) {
       restored.forEach((ref, index) => {
@@ -336,14 +495,6 @@ export async function runGenerationJobPersistWorker(params: {
       return [];
     }
 
-    if (response.shouldUseCloudAcceleration) {
-      return runServerPersistAndPoll({
-        organizationId: params.organizationId,
-        jobId: params.jobId,
-        onProgressPhase: notify,
-      });
-    }
-
     if (response.job.status === "ready_to_persist") {
       await claimGenerationJobClientUpload(params.organizationId, params.jobId);
     }
@@ -370,7 +521,6 @@ export async function runGenerationJobPersistWorker(params: {
         params.onStaged?.(
           stagedRefs.filter((ref): ref is ResourceIdReference => Boolean(ref))
         );
-        notify?.("uploading");
         retryIntervalMs = MIN_RETRY_INTERVAL_MS;
       } catch (error) {
         if (error instanceof CloudAccelerationDownloadAbortError) {
@@ -405,6 +555,47 @@ export async function runGenerationJobPersistWorker(params: {
         MAX_RETRY_INTERVAL_MS
       );
       continue;
+    }
+
+    const pendingIdsForCloudCheck = pendingMediaResourceIds(pendingMedia);
+    if (
+      pendingIdsForCloudCheck.length === pendingMedia.length &&
+      (await areResourcesCloudStored({
+        organizationId: params.organizationId,
+        resourceIds: pendingIdsForCloudCheck,
+      }))
+    ) {
+      const cloudJob = await getGenerationJob(
+        params.organizationId,
+        params.jobId
+      );
+      if (cloudJob.finalMedia && cloudJob.finalMedia.length > 0) {
+        return cloudJob.finalMedia;
+      }
+      if (shouldDeferClientPersistToServer(cloudJob.job)) {
+        return pollServerPersistUntilDone({
+          organizationId: params.organizationId,
+          jobId: params.jobId,
+          onProgressPhase: notify,
+        });
+      }
+      const skipCloudRefresh =
+        catalogAlreadyCloud &&
+        !(params.stagingMediaIds && params.stagingMediaIds.length > 0);
+      if (!skipCloudRefresh) {
+        notify?.("downloading");
+        await refreshLocalStagingFromCloudStorage({
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          pendingMedia,
+          onPhase: params.onPhase,
+          onDownloadProgress: params.onDownloadProgress,
+          shouldAbortDownload: params.shouldAbortDownload,
+          onDownloadSlow: params.onDownloadSlow,
+          onStaged: params.onStaged,
+        });
+      }
+      return cloudRefsFromPendingMedia(pendingMedia);
     }
 
     notify?.("uploading");
