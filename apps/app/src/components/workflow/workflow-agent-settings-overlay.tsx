@@ -15,8 +15,10 @@ import History from "lucide-react/icons/history";
 import Plus from "lucide-react/icons/plus";
 import Square from "lucide-react/icons/square";
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -117,15 +119,21 @@ export interface WorkflowAgentSettingsOverlayProps {
   readonly workflowName?: string;
 }
 
+export interface WorkflowAgentSettingsOverlayHandle {
+  readonly dimOnCanvasClick: () => void;
+}
+
 function messageId(): string {
   return crypto.randomUUID();
 }
 
-export function WorkflowAgentSettingsOverlay({
-  orgId,
-  workflowId,
-  workflowName = "",
-}: WorkflowAgentSettingsOverlayProps) {
+export const WorkflowAgentSettingsOverlay = forwardRef<
+  WorkflowAgentSettingsOverlayHandle,
+  WorkflowAgentSettingsOverlayProps
+>(function WorkflowAgentSettingsOverlay(
+  { orgId, workflowId, workflowName = "" },
+  ref
+) {
   const { t } = useTranslation();
   const { models } = useOrgTextModels(orgId, { enabled: Boolean(orgId) });
   const selectableModels = useMemo(
@@ -134,6 +142,7 @@ export function WorkflowAgentSettingsOverlay({
   );
 
   const [open, setOpen] = useState(false);
+  const [dimmed, setDimmed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [modelId, setModelId] = useState<string>(AGENT_CHAT_AUTO_ID);
@@ -154,6 +163,28 @@ export function WorkflowAgentSettingsOverlay({
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      dimOnCanvasClick: () => {
+        if (open) {
+          setDimmed(true);
+        }
+      },
+    }),
+    [open]
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setDimmed(false);
+    }
+  }, [open]);
+
+  const handleUndim = useCallback(() => {
+    setDimmed(false);
+  }, []);
 
   const selectedModelLabel = useMemo(() => {
     if (modelId === AGENT_CHAT_AUTO_ID) {
@@ -1025,12 +1056,13 @@ export function WorkflowAgentSettingsOverlay({
   return (
     <div
       className={cn(
-        "nodrag nowheel relative flex flex-col items-stretch rounded-lg border",
+        "nodrag nowheel relative flex flex-col items-stretch rounded-lg border transition-opacity duration-200",
         agentWidthClassName,
         open
           ? "overflow-hidden border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
           : "border-transparent",
-        open && agentExpandedHeightClassName
+        open && agentExpandedHeightClassName,
+        open && dimmed && "opacity-40"
       )}
       role={open ? "dialog" : undefined}
       aria-modal={open ? false : undefined}
@@ -1142,7 +1174,11 @@ export function WorkflowAgentSettingsOverlay({
         </div>
       ) : null}
 
-      <form className="p-2" autoComplete="off" onSubmit={(event) => void handleSendNew(event)}>
+      <form
+        className="p-2"
+        autoComplete="off"
+        onSubmit={(event) => void handleSendNew(event)}
+      >
         <div
           className={cn(
             "rounded-2xl border border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800",
@@ -1157,7 +1193,10 @@ export function WorkflowAgentSettingsOverlay({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleComposerKeyDown}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              setOpen(true);
+              handleUndim();
+            }}
             placeholder={t("workflow.canvas.agentInputPlaceholder")}
             autoComplete="off"
             className={cn(
@@ -1229,6 +1268,15 @@ export function WorkflowAgentSettingsOverlay({
         </div>
       </form>
 
+      {open && dimmed ? (
+        <button
+          type="button"
+          className="absolute inset-0 z-50 cursor-default"
+          aria-label={t("workflow.canvas.agentDialogTitle")}
+          onClick={handleUndim}
+        />
+      ) : null}
+
       <AlertDialog
         open={resendIndex !== null}
         onOpenChange={(nextOpen) => {
@@ -1281,7 +1329,7 @@ export function WorkflowAgentSettingsOverlay({
       </AlertDialog>
     </div>
   );
-}
+});
 
 interface ListLike {
   readonly conversations: readonly AgentChatDirectoryEntry[];

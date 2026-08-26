@@ -47,6 +47,7 @@ import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
 import { WorkflowAgentSettingsOverlay } from "./workflow-agent-settings-overlay";
+import type { WorkflowAgentSettingsOverlayHandle } from "./workflow-agent-settings-overlay";
 import { WorkflowFlowAttribution } from "./workflow-flow-attribution";
 import { WorkflowViewportPersistenceListener } from "./workflow-viewport-persistence-listener";
 import { useShiftSelectGate } from "./use-shift-select-gate";
@@ -185,6 +186,7 @@ export function WorkflowCanvas({
   const { id: workflowId } = useParams<{ id: string }>();
   const canvasShellRef = useRef<HTMLDivElement>(null);
   const agentChromeRef = useRef<HTMLDivElement>(null);
+  const agentOverlayRef = useRef<WorkflowAgentSettingsOverlayHandle>(null);
   const toolbarPanelRef = useRef<HTMLDivElement>(null);
   const shortcutHintAnchorRef = useRef<HTMLDivElement>(null);
   const keyboardToolbarRef = useRef<HTMLDivElement>(null);
@@ -252,6 +254,11 @@ export function WorkflowCanvas({
     [onNodesChange, isDraggingRef]
   );
 
+  const handlePaneClick = useCallback(() => {
+    agentOverlayRef.current?.dimOnCanvasClick();
+    onPaneClick?.();
+  }, [onPaneClick]);
+
   return (
     <TooltipProvider>
       <div
@@ -272,7 +279,7 @@ export function WorkflowCanvas({
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
-        onPaneClick={onPaneClick}
+        onPaneClick={showControls ? handlePaneClick : undefined}
         onPaneContextMenu={onPaneContextMenu}
         onDragOver={onCanvasFileDragOver}
         onDragLeave={onCanvasFileDragLeave}
@@ -363,6 +370,7 @@ export function WorkflowCanvas({
           <Panel position="bottom-left" className="m-4">
             <div ref={agentChromeRef} className="min-w-0">
               <WorkflowAgentSettingsOverlay
+                ref={agentOverlayRef}
                 orgId={organization?.id}
                 workflowId={workflowId}
                 workflowName={workflowId}
