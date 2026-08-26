@@ -23,6 +23,11 @@ import {
   pollGrokVideoTask,
 } from "../ai-interface/execute-grok-video";
 import {
+  MINIMAX_VIDEO_PROVIDER,
+  downloadMinimaxVideo,
+  pollMinimaxVideoTask,
+} from "../ai-interface/execute-minimax-video";
+import {
   VEO_VIDEO_PROVIDER,
   downloadVeoVideo,
   pollVeoVideoTask,
@@ -441,11 +446,142 @@ class GrokVideoUpstreamPollProvider implements UpstreamPollProvider {
   }
 }
 
+class MinimaxVideoUpstreamPollProvider implements UpstreamPollProvider {
+  readonly provider = MINIMAX_VIDEO_PROVIDER;
+
+  async poll(
+    continuation: UpstreamPollContinuation,
+    context: UpstreamPollRuntimeContext
+  ): Promise<UpstreamPollResult> {
+    const interfaceId = continuation.metadata?.interfaceId;
+    const organizationId =
+      continuation.metadata?.organizationId ?? context.organizationId;
+
+    if (!interfaceId || !context.aiInterfaceService) {
+      return {
+        status: "failed",
+        error: "MiniMax video poll requires interface context",
+      };
+    }
+
+    const iface = await context.aiInterfaceService.resolveOrgInterface({
+      organizationId,
+      interfaceId,
+    });
+
+    if (!iface?.apiKey) {
+      return {
+        status: "failed",
+        error: "Could not resolve MiniMax AI interface for video poll",
+      };
+    }
+
+    const pollResult = await pollMinimaxVideoTask({
+      apiKey: iface.apiKey,
+      pollUrl: continuation.pollUrl,
+      baseUrl: iface.baseUrl,
+    });
+
+    if (pollResult.status === "failed") {
+      const jobId = continuation.metadata?.generationJobId;
+      if (jobId && context.trackWorkflowGenerationJob) {
+        await context.trackWorkflowGenerationJob.complete({
+          organizationId,
+          jobId,
+          status: "failed",
+          failureReason: pollResult.error ?? "Video poll failed",
+        });
+      }
+      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+    }
+
+    if (pollResult.status === "pending") {
+      return {
+        status: "pending",
+        nextPollAt: new Date(
+          Date.now() + continuation.pollIntervalMs
+        ).toISOString(),
+      };
+    }
+
+    if (!pollResult.videoUrl) {
+      return {
+        status: "failed",
+        error: "Video task completed without a URL",
+      };
+    }
+
+    let storageResolution: Awaited<
+      ReturnType<NonNullable<typeof context.resolveAiVideoStorage>>
+    >;
+    try {
+      storageResolution = context.resolveAiVideoStorage
+        ? await context.resolveAiVideoStorage({
+            organizationId,
+            workflowId: context.workflowId,
+          })
+        : { storageMode: "ephemeral" as const };
+    } catch (error) {
+      return {
+        status: "failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Cloud storage is unavailable for video persistence",
+      };
+    }
+
+    const outputName = context.nodeOutputs[0]?.name ?? "videos";
+    const downloadResult = await downloadMinimaxVideo({
+      videoUrl: pollResult.videoUrl,
+      storageMode: storageResolution.storageMode,
+      objectStore: context.objectStore,
+      organizationId,
+      workflowId: context.workflowId,
+      executionId: context.executionId,
+      cloudUpload: storageResolution.cloudUpload,
+    });
+
+    if (downloadResult.status === "failed") {
+      const jobId = continuation.metadata?.generationJobId;
+      if (jobId && context.trackWorkflowGenerationJob) {
+        await context.trackWorkflowGenerationJob.complete({
+          organizationId,
+          jobId,
+          status: "failed",
+          failureReason:
+            downloadResult.error ?? "Failed to store generated video",
+        });
+      }
+      return {
+        status: "failed",
+        error: downloadResult.error ?? "Failed to store generated video",
+      };
+    }
+
+    const jobId = continuation.metadata?.generationJobId;
+    if (jobId && context.trackWorkflowGenerationJob) {
+      await context.trackWorkflowGenerationJob.complete({
+        organizationId,
+        jobId,
+        status: "succeeded",
+      });
+    }
+
+    return {
+      status: "completed",
+      outputs: { [outputName]: downloadResult.videos ?? [] },
+      usage: 1,
+    };
+  }
+}
+
 const providers: UpstreamPollProvider[] = [
   new ReplicateUpstreamPollProvider(),
   new VolcanoVideoUpstreamPollProvider(),
   new VeoVideoUpstreamPollProvider(),
   new GrokVideoUpstreamPollProvider(),
+  new MinimaxVideoUpstreamPollProvider(),
 ];
 
 export function resolveUpstreamPollProvider(

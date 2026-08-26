@@ -8,6 +8,8 @@ import type { SingleModelProviderMetadata } from "./single-model-interface-metad
 import {
   isGrokImagineVideoCanonicalId,
   isVeoCanonicalId,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_SUBMIT_PATH,
 } from "./single-model-interface-metadata";
 import type { SingleModelPresetCategory } from "./single-model-preset-catalog";
 import { getSingleModelApiPath } from "./single-model-preset-catalog";
@@ -32,8 +34,13 @@ export function usesOfficialSingleModelEndpointRules(
 }
 
 export function resolveDefaultVideoSubmitPath(
-  category: SingleModelPresetCategory | string = "video"
+  category: SingleModelPresetCategory | string = "video",
+  presetId?: string
 ): string {
+  if (presetId === MINIMAX_VIDEO_PROVIDER_CARD_ID) {
+    return MINIMAX_VIDEO_SUBMIT_PATH;
+  }
+
   if (category === "storage") {
     return OFFICIAL_VIDEO_SUBMIT_PATH;
   }
@@ -142,13 +149,17 @@ export function buildSingleModelEndpointUrlPreview(params: {
   readonly baseUrl: string;
   readonly category: SingleModelPresetCategory | string;
   readonly useFullSubmitUrl?: boolean;
+  readonly presetId?: string;
 }): SingleModelEndpointUrlPreview {
   const trimmedBase = params.baseUrl.trim();
   if (!trimmedBase) {
     return { fullUrlPreview: null };
   }
 
-  const submitPath = resolveDefaultVideoSubmitPath(params.category);
+  const submitPath = resolveDefaultVideoSubmitPath(
+    params.category,
+    params.presetId
+  );
   return {
     fullUrlPreview: buildVideoSubmitUrl({
       baseUrl: trimmedBase,

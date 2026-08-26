@@ -1,5 +1,8 @@
 import type { VideoModelParameterRules } from "@dafthunk/types";
-import { normalizeVideoModelParameterRules } from "@dafthunk/types";
+import {
+  mapVideoGenerationFieldsToBody,
+  normalizeVideoModelParameterRules,
+} from "@dafthunk/types";
 
 import {
   downloadVolcanoVideo,
@@ -46,25 +49,15 @@ function buildVeoPollUrl(baseUrl: string, operationName: string): string {
 }
 
 function buildVeoParameters(
+  generationFields: VideoModelParameterRules["generationFields"],
   generationParams?: Readonly<Record<string, unknown>>
 ): Record<string, unknown> {
-  const parameters: Record<string, unknown> = { sampleCount: 1 };
-
-  if (!generationParams) {
-    return parameters;
-  }
-
-  const ratio = generationParams.ratio ?? generationParams.aspectRatio;
-  if (typeof ratio === "string" && ratio.trim().length > 0) {
-    parameters.aspectRatio = ratio.trim();
-  }
-
-  const resolution = generationParams.resolution;
-  if (typeof resolution === "string" && resolution.trim().length > 0) {
-    parameters.resolution = resolution.trim();
-  }
-
-  return parameters;
+  return mapVideoGenerationFieldsToBody({
+    generationFields,
+    params: generationParams,
+    target: { sampleCount: 1 },
+    omitAdaptiveRatio: true,
+  });
 }
 
 export function createVeoVideoPollContinuation(params: {
@@ -132,7 +125,10 @@ export async function submitVeoVideoTask(params: {
   const url = `${baseUrl}/models/${params.providerModelId}:predictLongRunning`;
   const body = {
     instances: [{ prompt: trimmedPrompt }],
-    parameters: buildVeoParameters(params.generationParams),
+    parameters: buildVeoParameters(
+      rules.generationFields,
+      params.generationParams
+    ),
   };
 
   const response = await fetchWithUpstreamLog(

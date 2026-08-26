@@ -14,6 +14,7 @@ import {
   createDefaultGlmSelection,
   createDefaultKimiSelection,
   createDefaultMinimaxSpeechSelection,
+  createDefaultMinimaxVideoSelection,
   createDefaultNanoBananaSelection,
   createDefaultOpenAiImageSelection,
   createDefaultOpenAiSelection,
@@ -29,6 +30,7 @@ import {
   GROK_PROVIDER_CARD_ID,
   KIMI_PROVIDER_CARD_ID,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   NANO_BANANA_PROVIDER_CARD_ID,
   OPENAI_IMAGE_PROVIDER_CARD_ID,
   OPENAI_PROVIDER_CARD_ID,
@@ -103,7 +105,7 @@ function resolveInitialPickerFilter(
   if (selection.kind === "deepseek" || selection.kind === "seed" || selection.kind === "glm" || selection.kind === "kimi" || selection.kind === "openai" || selection.kind === "gemini" || selection.kind === "grok" || selection.kind === "claude") {
     return "text";
   }
-  if (selection.kind === "seedance" || selection.kind === "veo" || selection.kind === "grok-imagine-video") {
+  if (selection.kind === "seedance" || selection.kind === "veo" || selection.kind === "grok-imagine-video" || selection.kind === "minimax-video") {
     return "video";
   }
   if (selection.kind === "minimax-speech") {
@@ -362,6 +364,13 @@ export function SingleModelPickerStep({
   const showMinimaxSpeechCard =
     matchesAudioFilter(activeFilter) && minimaxSpeechEnabledIds.length > 0;
 
+  const minimaxVideoEnabledIds = useMemo(
+    () => enabledIdsForPreset(MINIMAX_VIDEO_PROVIDER_CARD_ID, videoModels),
+    [enabledIdsForPreset, videoModels]
+  );
+  const showMinimaxVideoCard =
+    matchesVideoFilter(activeFilter) && minimaxVideoEnabledIds.length > 0;
+
   const visiblePresets = useMemo(() => {
     const categories: SingleModelPresetCategory[] =
       activeFilter === "all"
@@ -455,6 +464,12 @@ export function SingleModelPickerStep({
   const handleMinimaxSpeechSelect = () => {
     onSelectionChange(
       createDefaultMinimaxSpeechSelection(minimaxSpeechEnabledIds)
+    );
+  };
+
+  const handleMinimaxVideoSelect = () => {
+    onSelectionChange(
+      createDefaultMinimaxVideoSelection(minimaxVideoEnabledIds)
     );
   };
 
@@ -602,6 +617,14 @@ export function SingleModelPickerStep({
               onSelect={handleMinimaxSpeechSelect}
             />
           ) : null}
+          {showMinimaxVideoCard ? (
+            <PresetTile
+              presetId={MINIMAX_VIDEO_PROVIDER_CARD_ID}
+              label={t("pages.aiInterfaces.singleModel.presets.minimaxVideoProvider")}
+              selected={selection.kind === "minimax-video"}
+              onSelect={handleMinimaxVideoSelect}
+            />
+          ) : null}
           {showClaudeCard ? (
             <PresetTile
               presetId={CLAUDE_PROVIDER_CARD_ID}
@@ -648,6 +671,7 @@ export function isSingleModelSelectionValid(
     selection.kind === "veo" ||
     selection.kind === "grok-imagine-video" ||
     selection.kind === "minimax-speech" ||
+    selection.kind === "minimax-video" ||
     selection.kind === "seedream"
   ) {
     return true;
@@ -674,6 +698,7 @@ export function isSingleModelStep2Valid(
     selection.kind === "veo" ||
     selection.kind === "grok-imagine-video" ||
     selection.kind === "minimax-speech" ||
+    selection.kind === "minimax-video" ||
     selection.kind === "seedream"
   ) {
     return true;

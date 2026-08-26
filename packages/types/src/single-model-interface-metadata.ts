@@ -20,6 +20,7 @@ import {
   GROK_IMAGINE_VIDEO_BRAND_ONLY_CANONICAL_IDS,
   MOONSHOT_BRAND_ONLY_CANONICAL_IDS,
   MINIMAX_SPEECH_BRAND_ONLY_CANONICAL_IDS,
+  MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS,
   NANO_BANANA_BRAND_ONLY_CANONICAL_IDS,
   VEO_BRAND_ONLY_CANONICAL_IDS,
   OPENAI_BRAND_ONLY_CANONICAL_IDS,
@@ -294,6 +295,30 @@ export const MINIMAX_SPEECH_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
   "minimax-speech-2-8-turbo": "speech-2.8-turbo",
 } as const;
 
+export const MINIMAX_VIDEO_PROVIDER_CARD_ID =
+  "provider:minimax-video" as const;
+
+export const MINIMAX_VIDEO_CANONICAL_IDS =
+  MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS;
+
+export type MinimaxVideoCanonicalId =
+  (typeof MINIMAX_VIDEO_CANONICAL_IDS)[number];
+
+export const MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL =
+  "https://api.minimaxi.com" as const;
+
+export const MINIMAX_VIDEO_SUBMIT_PATH = "/v2/video_generation" as const;
+
+export const MINIMAX_VIDEO_POLL_PATH =
+  "/v2/query/video_generation" as const;
+
+/** MiniMax 官方视频 API 模型 id。 */
+export const MINIMAX_VIDEO_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
+  Record<MinimaxVideoCanonicalId, string>
+> = {
+  "minimax-h3": "MiniMax-H3",
+} as const;
+
 /** @deprecated Alias for OrgModelInstanceConfig */
 export type SingleModelModelConfig = OrgModelInstanceConfig;
 
@@ -399,6 +424,12 @@ export function isMinimaxSpeechCanonicalId(
   value: string
 ): value is MinimaxSpeechCanonicalId {
   return (MINIMAX_SPEECH_CANONICAL_IDS as readonly string[]).includes(value);
+}
+
+export function isMinimaxVideoCanonicalId(
+  value: string
+): value is MinimaxVideoCanonicalId {
+  return (MINIMAX_VIDEO_CANONICAL_IDS as readonly string[]).includes(value);
 }
 
 export function isSingleModelProviderMetadata(
@@ -906,6 +937,9 @@ export function defaultUpstreamModelIdForCanonical(
   }
   if (isMinimaxSpeechCanonicalId(canonicalId)) {
     return MINIMAX_SPEECH_DEFAULT_UPSTREAM_MODEL_IDS[canonicalId];
+  }
+  if (isMinimaxVideoCanonicalId(canonicalId)) {
+    return MINIMAX_VIDEO_DEFAULT_UPSTREAM_MODEL_IDS[canonicalId];
   }
   if (isSeedanceCanonicalId(canonicalId)) {
     return SEEDANCE_DEFAULT_UPSTREAM_MODEL_IDS[canonicalId];

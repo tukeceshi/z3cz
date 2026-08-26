@@ -5,6 +5,7 @@ import {
   DEFAULT_IMAGE_GENERATION_FIELDS,
   DEFAULT_VIDEO_GENERATION_FIELDS,
   formatImageGenerationOptionLabel,
+  formatVideoResolutionLabel,
   IMAGE_GENERATION_FIELD_CATALOG,
   VIDEO_DURATION_MAX,
   VIDEO_DURATION_MIN,
@@ -170,7 +171,10 @@ export function formatAdminGenerationOptionLabel(
   if (smart !== option) {
     return smart;
   }
-  if (fieldName === "size" || fieldName === "resolution") {
+  if (fieldName === "resolution") {
+    return formatVideoResolutionLabel(option);
+  }
+  if (fieldName === "size") {
     const key = option.toUpperCase();
     if (key === "1K") return labels.size1K;
     if (key === "2K") return labels.size2K;

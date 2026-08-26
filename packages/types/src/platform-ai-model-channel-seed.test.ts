@@ -28,6 +28,21 @@ describe("platform-ai-model-channel-seed", () => {
     ]);
   });
 
+  it("registers MiniMax H3 on api only", () => {
+    const rows = PLATFORM_AI_MODEL_CHANNEL_SEED.filter(
+      (row) => row.canonicalId === "minimax-h3"
+    );
+    expect(rows).toEqual([
+      {
+        canonicalId: "minimax-h3",
+        channel: "api",
+        presetId: "provider:minimax-video",
+        upstreamModelId: "MiniMax-H3",
+        channelEnabled: true,
+      },
+    ]);
+  });
+
   it("registers aggregate volcano preset on aggregate rows", () => {
     const aggregateRows = PLATFORM_AI_MODEL_CHANNEL_SEED.filter(
       (row) => row.channel === "aggregate"

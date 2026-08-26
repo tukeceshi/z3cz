@@ -2,6 +2,7 @@ import {
   isEphemeralMediaReference,
   isResourceIdReference,
   isGrokImagineVideoCanonicalId,
+  isMinimaxVideoCanonicalId,
   isVeoCanonicalId,
   type MediaReference,
   type NodeExecution,
@@ -15,6 +16,10 @@ import {
   createGrokVideoPollContinuation,
   submitGrokVideoTask,
 } from "../../ai-interface/execute-grok-video";
+import {
+  createMinimaxVideoPollContinuation,
+  submitMinimaxVideoTask,
+} from "../../ai-interface/execute-minimax-video";
 import {
   createVeoVideoPollContinuation,
   submitVeoVideoTask,
@@ -234,6 +239,7 @@ export class AiVideoNode extends ExecutableNode {
 
     const trimmedModelId = modelCanonicalId.trim();
     const isGrokVideo = isGrokImagineVideoCanonicalId(trimmedModelId);
+    const isMinimaxVideo = isMinimaxVideoCanonicalId(trimmedModelId);
     const isVeo = isVeoCanonicalId(trimmedModelId);
     if ((isGrokVideo || isVeo) && referenceImageUrls.length > 0) {
       return this.createErrorResult(
@@ -252,6 +258,16 @@ export class AiVideoNode extends ExecutableNode {
           parameterRules: resolvedModel.parameterRules,
           generationParams,
         })
+      : isMinimaxVideo
+        ? await submitMinimaxVideoTask({
+            apiKey: resolvedInterface.apiKey,
+            baseUrl: resolvedInterface.baseUrl,
+            providerModelId: resolvedModel.providerModelId,
+            prompt: typeof prompt === "string" ? prompt : "",
+            parameterRules: resolvedModel.parameterRules,
+            generationParams,
+            referenceImageUrls,
+          })
       : isVeo
         ? await submitVeoVideoTask({
             apiKey: resolvedInterface.apiKey,
@@ -308,6 +324,17 @@ export class AiVideoNode extends ExecutableNode {
           timeoutMinutes: 60,
           generationJobId: generationJobId ?? undefined,
         })
+      : isMinimaxVideo
+        ? createMinimaxVideoPollContinuation({
+            nodeId: this.node.id,
+            taskId: submitResult.taskId,
+            pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+            interfaceId,
+            organizationId: context.organizationId,
+            pollIntervalMs: 10_000,
+            timeoutMinutes: 60,
+            generationJobId: generationJobId ?? undefined,
+          })
       : isVeo
         ? createVeoVideoPollContinuation({
             nodeId: this.node.id,

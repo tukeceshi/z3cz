@@ -596,6 +596,13 @@
       "when": 1790280000000,
       "tag": "0090_media_resource_model_canonical_id",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1790360000000,
+      "tag": "0091_add_minimax_h3_video_model",
+      "breakpoints": true
     }
   ]
 }

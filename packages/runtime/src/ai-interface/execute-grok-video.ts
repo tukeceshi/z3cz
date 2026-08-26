@@ -1,5 +1,11 @@
-import type { VideoModelParameterRules } from "@dafthunk/types";
-import { normalizeVideoModelParameterRules } from "@dafthunk/types";
+import type {
+  UpstreamParamProfileField,
+  VideoModelParameterRules,
+} from "@dafthunk/types";
+import {
+  mapVideoGenerationFieldsToBody,
+  normalizeVideoModelParameterRules,
+} from "@dafthunk/types";
 
 import {
   downloadVolcanoVideo,
@@ -31,6 +37,7 @@ const DEFAULT_TIMEOUT_MINUTES = 60;
 function buildGrokVideoBody(params: {
   readonly providerModelId: string;
   readonly prompt: string;
+  readonly generationFields: readonly UpstreamParamProfileField[];
   readonly generationParams?: Readonly<Record<string, unknown>>;
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
@@ -38,24 +45,12 @@ function buildGrokVideoBody(params: {
     prompt: params.prompt.trim(),
   };
 
-  if (!params.generationParams) {
-    return body;
-  }
-
-  const ratio = params.generationParams.ratio ?? params.generationParams.aspect_ratio;
-  if (typeof ratio === "string" && ratio.trim().length > 0) {
-    body.aspect_ratio = ratio.trim();
-  }
-
-  const duration = params.generationParams.duration;
-  if (typeof duration === "number" && Number.isFinite(duration)) {
-    body.duration = duration;
-  }
-
-  const resolution = params.generationParams.resolution;
-  if (typeof resolution === "string" && resolution.trim().length > 0) {
-    body.resolution = resolution.trim();
-  }
+  mapVideoGenerationFieldsToBody({
+    generationFields: params.generationFields,
+    params: params.generationParams,
+    target: body,
+    omitAdaptiveRatio: true,
+  });
 
   return body;
 }
@@ -126,6 +121,7 @@ export async function submitGrokVideoTask(params: {
   const body = buildGrokVideoBody({
     providerModelId: params.providerModelId,
     prompt: trimmedPrompt,
+    generationFields: rules.generationFields,
     generationParams: params.generationParams,
   });
 

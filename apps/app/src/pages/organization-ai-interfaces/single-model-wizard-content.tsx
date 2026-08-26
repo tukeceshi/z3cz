@@ -22,6 +22,8 @@ import {
   KIMI_PROVIDER_CARD_ID,
   MINIMAX_SPEECH_DEFAULT_ENDPOINT_URL,
   MINIMAX_SPEECH_PROVIDER_CARD_ID,
+  MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL,
+  MINIMAX_VIDEO_PROVIDER_CARD_ID,
   NANO_BANANA_DEFAULT_ENDPOINT_URL,
   NANO_BANANA_PROVIDER_CARD_ID,
   VEO_DEFAULT_ENDPOINT_URL,
@@ -294,6 +296,16 @@ export function SingleModelWizardContent({
     [apiPresetChannelIds, audioPlatformModels]
   );
 
+  const minimaxVideoAvailableModels = useMemo(
+    () =>
+      listPresetAvailableModels(
+        apiPresetChannelIds,
+        MINIMAX_VIDEO_PROVIDER_CARD_ID,
+        videoPlatformModels
+      ),
+    [apiPresetChannelIds, videoPlatformModels]
+  );
+
   const openAiImageAvailableModels = useMemo(
     () =>
       listPresetAvailableModels(
@@ -480,6 +492,16 @@ export function SingleModelWizardContent({
         showEndpointRegionHints: false,
       };
     }
+    if (selection.kind === "minimax-video") {
+      return {
+        presetId: MINIMAX_VIDEO_PROVIDER_CARD_ID,
+        category: "video" as const,
+        defaultEndpoint: MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL,
+        listNameKey: "pages.aiInterfaces.singleModel.presets.minimaxVideoProvider" as const,
+        availableModels: minimaxVideoAvailableModels,
+        showEndpointRegionHints: false,
+      };
+    }
     if (selection.kind === "seedream") {
       return {
         presetId: SEEDREAM_PROVIDER_CARD_ID,
@@ -530,6 +552,7 @@ export function SingleModelWizardContent({
     grokImagineImageAvailableModels,
     grokImagineVideoAvailableModels,
     minimaxSpeechAvailableModels,
+    minimaxVideoAvailableModels,
     kimiAvailableModels,
     nanoBananaAvailableModels,
     openAiAvailableModels,
@@ -892,6 +915,7 @@ export function SingleModelWizardContent({
                 idPrefix="single-model"
                 baseUrl={endpointUrl}
                 category={endpointRulesCategory}
+                presetId={multiModelProviderConfig?.presetId}
                 useFullSubmitUrl={endpointRulesForm.useFullSubmitUrl}
                 onUseFullSubmitUrlChange={(useFullSubmitUrl) =>
                   setEndpointRulesForm((current) => ({
