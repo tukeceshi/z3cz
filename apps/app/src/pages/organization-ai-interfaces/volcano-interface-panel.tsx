@@ -71,9 +71,14 @@ import { VolcanoModelRow } from "./volcano-model-row";
 import {
   countNotOpenModelsFromMetadata,
   isTosStorageEnabled,
+  resolveMediaKitSnapshot,
 } from "./volcano-panel-utils";
 
 import { VolcanoStorageRow } from "./volcano-storage-row";
+
+import { VolcanoMediaKitRow } from "./volcano-mediakit-row";
+
+import { VolcanoMediaKitCollapsedSummary } from "./volcano-mediakit-collapsed-summary";
 
 import { VolcanoPanelSetupBanners } from "./volcano-setup-banners";
 import { InterfaceCardShell, AggregateChannelBadge } from "./interface-card-shell";
@@ -919,6 +924,8 @@ export function VolcanoInterfacePanel({
 
   };
 
+  const mediaKitSnapshot = resolveMediaKitSnapshot(iface, snapshot);
+
 
 
   const panelBanners = (
@@ -937,7 +944,12 @@ export function VolcanoInterfacePanel({
       expanded={expanded}
       onExpandToggle={() => void handleExpand()}
       onDelete={onDelete}
-      collapsedHint={<VolcanoPanelSetupBanners compact {...panelBannerProps} />}
+      collapsedHint={
+        <>
+          <VolcanoMediaKitCollapsedSummary snapshot={mediaKitSnapshot} />
+          <VolcanoPanelSetupBanners compact {...panelBannerProps} />
+        </>
+      }
       leadingActions={
         <Button
           variant="outline"
@@ -1031,6 +1043,22 @@ export function VolcanoInterfacePanel({
                     onUpdated={onUpdated}
 
                     onRefreshSnapshot={handleRefresh}
+
+                  />
+
+                </div>
+
+                <div className="mb-3 break-inside-avoid">
+
+                  <VolcanoMediaKitRow
+
+                    organizationId={organizationId}
+
+                    interfaceId={iface.id}
+
+                    snapshot={mediaKitSnapshot}
+
+                    onUpdated={onUpdated}
 
                   />
 

@@ -234,6 +234,49 @@ export async function updateVolcanoTosStorage(
   });
 }
 
+export async function updateVolcanoMediaKit(
+  organizationId: string,
+  interfaceId: string,
+  input: {
+    readonly enabled: boolean;
+    readonly videoEnhance: {
+      readonly fast: boolean;
+      readonly standard: boolean;
+      readonly pro: boolean;
+      readonly llm: boolean;
+    };
+    readonly subtitleErase: {
+      readonly standard: boolean;
+      readonly refined: boolean;
+    };
+  }
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    mediaKit: input,
+  });
+}
+
+/** @deprecated Use updateVolcanoMediaKit */
+export async function updateVolcanoMediaKitEnhance(
+  organizationId: string,
+  interfaceId: string,
+  input: {
+    readonly enabled: boolean;
+    readonly videoEnhance: {
+      readonly fast: boolean;
+      readonly standard: boolean;
+      readonly pro: boolean;
+      readonly llm: boolean;
+    };
+    readonly subtitleErase: {
+      readonly standard: boolean;
+      readonly refined: boolean;
+    };
+  }
+): Promise<OrganizationAiInterface> {
+  return updateVolcanoMediaKit(organizationId, interfaceId, input);
+}
+
 export async function ensureVolcanoTosCors(
   organizationId: string,
   interfaceId: string

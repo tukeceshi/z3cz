@@ -99,6 +99,13 @@ import {
 
 } from "./volcano-wizard-storage-card";
 
+import {
+  createDefaultWizardMediaKitConfig,
+  isWizardMediaKitConfigValid,
+  VolcanoWizardMediaKitCard,
+  type WizardMediaKitConfig,
+} from "./volcano-wizard-mediakit-card";
+
 import { resolveNewTosBucketName } from "./volcano-storage-bucket-name";
 
 
@@ -313,6 +320,10 @@ export function VolcanoWizardFlow({
 
     createDefaultWizardTosConfig(locale, organizationId)
 
+  );
+
+  const [mediaKitConfig, setMediaKitConfig] = useState<WizardMediaKitConfig>(
+    () => createDefaultWizardMediaKitConfig()
   );
 
   const [tosServiceStatus, setTosServiceStatus] =
@@ -840,6 +851,11 @@ export function VolcanoWizardFlow({
       return;
     }
 
+    if (!isWizardMediaKitConfigValid(mediaKitConfig)) {
+      appToast.error("pages.aiInterfaces.mediaKitEnhance.modeRequired");
+      return;
+    }
+
     saveInFlightRef.current = true;
     setIsSaving(true);
     setSetupWaitError(null);
@@ -848,6 +864,9 @@ export function VolcanoWizardFlow({
     try {
       const includeTos =
         tosConfig.enabled && tosServiceStatus !== "not_opened";
+
+      const includeMediaKit =
+        mediaKitConfig.enabled && isWizardMediaKitConfigValid(mediaKitConfig);
 
       const created = await createOrganizationAiInterface(
         organizationId,
@@ -870,6 +889,7 @@ export function VolcanoWizardFlow({
                 },
               }
             : {}),
+          ...(includeMediaKit ? { mediaKit: mediaKitConfig } : {}),
         },
         { idempotencyKey: setupIdempotencyKeyRef.current }
       );
@@ -1116,6 +1136,18 @@ export function VolcanoWizardFlow({
                       onConfigChange={setTosConfig}
 
                       onServiceStatusChange={setTosServiceStatus}
+
+                    />
+
+                  </div>
+
+                  <div className="mb-3 break-inside-avoid">
+
+                    <VolcanoWizardMediaKitCard
+
+                      config={mediaKitConfig}
+
+                      onConfigChange={setMediaKitConfig}
 
                     />
 

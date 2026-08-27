@@ -26,6 +26,8 @@ export * from "./single-model-capability-limits";
 export * from "./single-model-endpoint-rules";
 export * from "./single-model-preset-catalog";
 export * from "./single-model-snapshot";
+export * from "./volcano-mediakit-enhance";
+export * from "./volcano-mediakit-pricing-catalog";
 export * from "./volcano-tos-regions";
 export * from "./volcano-tos-pricing";
 export * from "./volcano-tos-package-usage";
