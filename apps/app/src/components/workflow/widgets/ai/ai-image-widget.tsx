@@ -28,14 +28,7 @@ import { warmCardUploadPersist } from "@/services/generative-card-upload-persist
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
-import {
-  AiImageExpandButton,
-} from "../../ai-image-expand-overlay";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
-import {
-  AiImageHistoryButton,
-  AiImageHistoryOverlay,
-} from "../../ai-image-history-overlay";
 import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
 import {
   isGenerativePersistPhase,
@@ -46,24 +39,14 @@ import type { GenerativeCardCoverRead } from "../../generative-history-utils";
 import {
   readAiImageCardDisplay,
   readAiImageResultHistory,
-  withAiImageHistorySelection,
   withAiImageGenerateError,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
-import { commitGenerativeHistorySelection } from "../../commit-generative-history-selection";
-import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
-import {
-  useGenerativeHistoryModels,
-  useHistoryModelUnavailableToast,
-} from "../../use-generative-history-models";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
-import {
-  shouldShowGenerativeHistoryIcon,
-} from "../../generative-card-mode-utils";
 import {
   GENERATIVE_IMAGE_UPLOAD_ACCEPT,
   normalizeGenerativeCardUploadFile,
@@ -73,7 +56,6 @@ import {
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
-import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME } from "../../generative-media-download-button";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasMediaCover } from "../../canvas-media-cover";
@@ -135,13 +117,8 @@ function AiImageWidget({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageZoomTriggerRef = useRef<HTMLButtonElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
-  const showHistoryIcon = shouldShowGenerativeHistoryIcon(
-    historyItems.items.length,
-    metadata
-  );
   const progressPhase = readGenerativeProgressPhase(metadata);
   const persistPhase = isGenerativePersistPhase(progressPhase)
     ? progressPhase
@@ -223,56 +200,6 @@ function AiImageWidget({
       onClearPrompt: handleClearPrompt,
       i18nPrefix: "workflow.aiImagePanel",
     });
-
-  const historyModels = useGenerativeHistoryModels();
-  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
-
-  const handleHistorySelect = useCallback(
-    (id: string) => {
-      if (disabled || !updateNodeData) return;
-      const item = historyItems.items.find((entry) => entry.id === id);
-      if (!item) return;
-
-      let modelUnavailable = false;
-      updateNodeData(nodeId, (current) => {
-        const result = withAiImageHistorySelection(current, id, {
-          models: historyModels.image,
-        });
-        const committed = commitGenerativeHistorySelection(result);
-        modelUnavailable = committed.modelUnavailable;
-        return committed.patch;
-      });
-      notifyHistoryModelUnavailable(modelUnavailable);
-    },
-    [
-      disabled,
-      historyItems.items,
-      historyModels.image,
-      nodeId,
-      notifyHistoryModelUnavailable,
-      updateNodeData,
-    ]
-  );
-
-  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "image");
-
-  const handleHistoryExpand = useCallback(
-    (id: string) => {
-      const item = historyItems.items.find((entry) => entry.id === id);
-      const media = item?.images[0];
-      if (!item || !media) return;
-      expandHistoryItem({
-        media,
-        prompt: item.prompt,
-        params: item.params,
-        platformModelId: item.platformModelId,
-        aiInterfaceId: item.aiInterfaceId,
-        modelDisplayName: item.modelDisplayName,
-        createdAt: item.createdAt,
-      });
-    },
-    [expandHistoryItem, historyItems.items]
-  );
 
   const handleOpenImageZoom = useCallback(() => {
     imageZoomTriggerRef.current?.click();
@@ -438,28 +365,6 @@ function AiImageWidget({
             </div>
           ) : null}
 
-          {!generateError ? (
-            <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-              {canDownloadPrimaryImage && coverImage ? (
-                <GenerativeMediaLazyDownloadButton
-                  media={coverImage}
-                  nodeType="ai-image"
-                  fileName={`image-${getResourceIdFromValue(coverImage) ?? "image"}.${coverImage.mimeType?.split("/")[1] ?? "png"}`}
-                  className={GENERATIVE_CARD_OVERLAY_BUTTON_CLASSNAME}
-                />
-              ) : null}
-              {showHistoryIcon ? (
-                <AiImageHistoryButton
-                  count={historyItems.items.length}
-                  onClick={() => setHistoryOpen(true)}
-                />
-              ) : null}
-              {hasImage ? (
-                <AiImageExpandButton onClick={openCreativeStudio} />
-              ) : null}
-            </div>
-          ) : null}
-
           {!generateError && canDownloadPrimaryImage && coverImage ? (
             <div className="nodrag nopan nowheel absolute bottom-2 right-2 z-50">
               <button
@@ -491,25 +396,6 @@ function AiImageWidget({
           error={generateError}
           open={errorDetailOpen}
           onOpenChange={setErrorDetailOpen}
-        />
-      ) : null}
-
-      {showHistoryIcon ? (
-        <AiImageHistoryOverlay
-          open={historyOpen}
-          history={historyItems}
-          currentImages={
-            selectedHistoryItem?.images.length
-              ? [...selectedHistoryItem.images]
-              : coverImage
-                ? [coverImage]
-                : []
-          }
-          mediaKind="image"
-          createObjectUrl={createObjectUrl}
-          onClose={() => setHistoryOpen(false)}
-          onSelect={handleHistorySelect}
-          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

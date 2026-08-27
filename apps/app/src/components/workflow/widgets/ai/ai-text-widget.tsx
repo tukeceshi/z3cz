@@ -1,14 +1,12 @@
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type MouseEvent,
 } from "react";
-import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -17,14 +15,8 @@ import { useCachedAiTextBody } from "@/hooks/use-cached-ai-text-body";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
-import { AiTextExpandButton } from "../../ai-text-expand-overlay";
-import { commitAiTextHistorySelection } from "../../commit-ai-text-value";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
 import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
-import {
-  AiTextHistoryButton,
-  AiTextHistoryOverlay,
-} from "../../ai-text-history-overlay";
 import { STUDIO_SCROLL } from "../../creative-studio-surface";
 import {
   AI_TEXT_HARD_OUTPUT_MAX_CHARS,
@@ -41,7 +33,6 @@ import { readGenerativeCardError } from "../../generative-card-error-utils";
 import { GenerativeBusyOverlay } from "../../generative-busy-overlay";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import {
-  shouldShowGenerativeHistoryIcon,
   isGenerativeManualContent,
   withGenerativeGeneratedContentMode,
 } from "../../generative-card-mode-utils";
@@ -50,10 +41,6 @@ import { useAiTextOutputScroll } from "../../use-ai-text-output-scroll";
 import { useTextCardFileUpload } from "../../use-text-card-file-upload";
 import { useWorkflow } from "../../workflow-context";
 import type { WorkflowNodeType } from "../../workflow-types";
-import {
-  useGenerativeHistoryModels,
-  useHistoryModelUnavailableToast,
-} from "../../use-generative-history-models";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
@@ -84,11 +71,9 @@ function AiTextWidget({
   const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id;
-  const { id: workflowId } = useParams<{ id: string }>();
   const { updateNodeData } = useWorkflow();
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const [holdTailAfterGenerate, setHoldTailAfterGenerate] = useState(false);
   const isGenerating = isAiTextGenerating(metadata);
@@ -116,10 +101,6 @@ function AiTextWidget({
       ? hasStreamOutput || previewText.displayExcerpt.trim().length > 0
       : previewText.state === "ready" ||
         previewText.displayExcerpt.trim().length > 0;
-  const showHistoryIcon = shouldShowGenerativeHistoryIcon(
-    historyItems.items.length,
-    metadata
-  );
   const selectedHistoryItem =
     historyItems.items.find((item) => item.id === historyItems.selectedId) ??
     historyItems.items[0];
@@ -197,12 +178,6 @@ function AiTextWidget({
   }, [nodeId]);
 
   useEffect(() => {
-    if (isGenerating && historyOpen) {
-      setHistoryOpen(false);
-    }
-  }, [isGenerating, historyOpen]);
-
-  useEffect(() => {
     if (
       hasOutput ||
       previewText.state === "loading" ||
@@ -224,38 +199,6 @@ function AiTextWidget({
   useEffect(() => {
     return () => onEmptyOutputEditingChange?.(false);
   }, [onEmptyOutputEditingChange]);
-
-  const historyModels = useGenerativeHistoryModels();
-  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
-
-  const handleHistorySelect = useCallback(
-    (id: string) => {
-      if (editLocked || !updateNodeData || !orgId || !workflowId) return;
-
-      void (async () => {
-        const committed = await commitAiTextHistorySelection({
-          organizationId: orgId,
-          workflowId,
-          nodeId,
-          selectedId: id,
-          updateNodeData,
-          current: nodeData,
-          models: historyModels.text,
-        });
-        notifyHistoryModelUnavailable(committed.modelUnavailable);
-      })();
-    },
-    [
-      editLocked,
-      historyModels.text,
-      nodeData,
-      nodeId,
-      notifyHistoryModelUnavailable,
-      orgId,
-      updateNodeData,
-      workflowId,
-    ]
-  );
 
   const handleDoubleClick = (event: MouseEvent) => {
     if (generateError) {
@@ -342,23 +285,6 @@ function AiTextWidget({
         {generateError ? (
           <GenerativeCardErrorBlock error={generateError} />
         ) : null}
-
-        {!generateError ? (
-          <div className="nodrag nopan nowheel absolute right-[7px] top-[7px] z-50 flex items-center gap-1.5">
-            {isGenerating ? (
-              <LoaderIcon className="h-3.5 w-3.5 animate-spin text-yellow-500" />
-            ) : null}
-            {showHistoryIcon && !isGenerating ? (
-              <AiTextHistoryButton
-                count={historyItems.items.length}
-                onClick={() => setHistoryOpen(true)}
-              />
-            ) : null}
-            {!isGenerating ? (
-              <AiTextExpandButton onClick={openCreativeStudio} />
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {generateError ? (
@@ -366,18 +292,6 @@ function AiTextWidget({
           error={generateError}
           open={errorDetailOpen}
           onOpenChange={setErrorDetailOpen}
-        />
-      ) : null}
-
-      {showHistoryIcon ? (
-        <AiTextHistoryOverlay
-          open={historyOpen}
-          history={historyItems}
-          currentId={historyItems.selectedId}
-          organizationId={orgId}
-          workflowId={workflowId}
-          onClose={() => setHistoryOpen(false)}
-          onSelect={handleHistorySelect}
         />
       ) : null}
     </>

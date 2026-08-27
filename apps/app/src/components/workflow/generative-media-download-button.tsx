@@ -5,6 +5,13 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import { readAiTextResultReference } from "@/components/workflow/ai-text-persist-utils";
+import {
+  isAiTextGenerating,
+  readAiTextResultTextSync,
+} from "@/components/workflow/ai-text-node-utils";
+import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
+import { readAiTextFullBodyFromStaging } from "@/services/ai-text-cache-layer";
 import { resolveResourceDisplayUrl } from "@/services/resolve-resource-display-url";
 import { ingestCanvasMedia } from "@/services/ingest-canvas-media";
 import { cn } from "@/utils/utils";
@@ -144,4 +151,75 @@ export function GenerativeMediaLazyDownloadButton({
       <DownloadIcon className="h-3.5 w-3.5" strokeWidth={2} />
     </button>
   );
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(objectUrl);
+}
+
+export function canDownloadGenerativeText(data: WorkflowNodeType): boolean {
+  if (isAiTextGenerating(data.metadata)) {
+    return false;
+  }
+  if (readAiTextResultTextSync(data).trim()) {
+    return true;
+  }
+  return Boolean(readAiTextResultReference(data.inputs));
+}
+
+export async function downloadGenerativeTextContent(params: {
+  readonly data: WorkflowNodeType;
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly fileName: string;
+}): Promise<void> {
+  const inlineBody = readAiTextResultTextSync(params.data).trim();
+  if (inlineBody) {
+    triggerBlobDownload(
+      new Blob([inlineBody], { type: "text/plain;charset=utf-8" }),
+      params.fileName
+    );
+    return;
+  }
+
+  const reference = readAiTextResultReference(params.data.inputs);
+  if (!reference) {
+    throw new Error("Text not available");
+  }
+
+  const stagedBody = await readAiTextFullBodyFromStaging({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    reference,
+  });
+  if (stagedBody.trim()) {
+    triggerBlobDownload(
+      new Blob([stagedBody], { type: "text/plain;charset=utf-8" }),
+      params.fileName
+    );
+    return;
+  }
+
+  const src = await resolveResourceDisplayUrl({
+    media: reference,
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    nodeType: "ai-text",
+    size: "full",
+  });
+  if (!src) {
+    throw new Error("Text not available");
+  }
+
+  const response = await fetch(src, { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  triggerBlobDownload(blob, params.fileName);
 }

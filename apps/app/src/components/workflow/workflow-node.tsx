@@ -48,6 +48,7 @@ import {
   readAiVideoCardDisplay,
 } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
+import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
@@ -61,6 +62,7 @@ import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host
 import { WorkflowNodeGenerativeBusyOverlay } from "./generative-busy-overlay";
 import {
   WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS,
+  WORKFLOW_NODE_TOP_TOOLBAR_GATE_CLASS,
   WORKFLOW_NODE_CARD_INTERACT_CLASS,
   WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
   WORKFLOW_NODE_SELECTED_BORDER_CLASS,
@@ -290,6 +292,48 @@ function WorkflowNodeBottomPanelHost({
   );
 }
 
+interface WorkflowNodeTopToolbarHostProps {
+  readonly nodeId: string;
+  readonly data: CanvasWorkflowNodeType;
+  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly contentVisible: boolean;
+  readonly isDragging: boolean;
+}
+
+/** Reads zoom locally so pan/zoom does not rewrite every node's data. */
+function WorkflowNodeTopToolbarHost({
+  nodeId,
+  data,
+  createObjectUrl,
+  contentVisible,
+  isDragging,
+}: WorkflowNodeTopToolbarHostProps) {
+  const { zoom } = useViewport();
+  const { isViewportMoving } = useWorkflowGraph();
+  const hide =
+    !contentVisible ||
+    isDragging ||
+    isViewportMoving ||
+    !isWorkflowBottomPanelVisible(zoom);
+
+  return (
+    <div
+      className={cn(
+        WORKFLOW_NODE_TOP_TOOLBAR_GATE_CLASS,
+        hide && "invisible pointer-events-none"
+      )}
+      aria-hidden={hide}
+    >
+      <GenerativeNodeTopToolbar
+        nodeId={nodeId}
+        data={data}
+        zoom={zoom}
+        createObjectUrl={createObjectUrl}
+      />
+    </div>
+  );
+}
+
 export const WorkflowNode = memo(
   ({
     data,
@@ -463,6 +507,8 @@ export const WorkflowNode = memo(
       isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode
         ? readGenerativeCardError(data.metadata)
         : undefined;
+    const showTopToolbarContent =
+      isGenerativeCanvasNode && !generativeCardError;
     const showBusyOverlay =
       isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
     const showProgressOverlay = showBusyOverlay;
@@ -478,32 +524,51 @@ export const WorkflowNode = memo(
     return (
       <TooltipProvider>
         <div className={cn("relative", WORKFLOW_NODE_CARD_INTERACT_CLASS)}>
-        {/* Floating mini header — icon + name */}
+        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode) && "inline-block")}>
         <div
           className={cn(
-            "absolute -top-5 left-0 z-10",
-            "flex items-center gap-1 px-1 py-0.5 rounded-sm",
-            "bg-card/40 backdrop-blur-sm"
+            "absolute left-0 z-10",
+            isGenerativeCanvasNode && showBottomPanelHost
+              ? "bottom-full mb-1"
+              : "-top-5"
           )}
         >
-          <DynamicIcon
-            name={headerIconName as any}
+          <div
             className={cn(
-              "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
-              resolvedNodeType?.trigger || resolvedNodeType?.responder
-                ? "text-emerald-500/70"
-                : "text-blue-500/70"
+              "flex items-center gap-1 px-1 py-0.5 rounded-sm",
+              "bg-card/40 backdrop-blur-sm"
             )}
-          />
-          <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
-            {nodeDisplayName}
-          </span>
-          {resolvedNodeType?.subscription && (
-            <SubscriptionBadge variant="muted" size="sm" />
-          )}
+          >
+            <DynamicIcon
+              name={headerIconName as any}
+              className={cn(
+                "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
+                resolvedNodeType?.trigger || resolvedNodeType?.responder
+                  ? "text-emerald-500/70"
+                  : "text-blue-500/70"
+              )}
+            />
+            <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
+              {nodeDisplayName}
+            </span>
+            {resolvedNodeType?.subscription && (
+              <SubscriptionBadge variant="muted" size="sm" />
+            )}
+          </div>
         </div>
 
-        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode) && "inline-block")}>
+        {isGenerativeCanvasNode && showBottomPanelHost && showTopToolbarContent ? (
+          <div className="absolute left-1/2 z-10 -translate-x-1/2 bottom-full mb-7">
+            <WorkflowNodeTopToolbarHost
+              nodeId={id}
+              data={data as unknown as CanvasWorkflowNodeType}
+              createObjectUrl={data.createObjectUrl}
+              contentVisible={showTopToolbarContent}
+              isDragging={isDragging}
+            />
+          </div>
+        ) : null}
+
         <div
           className={cn(
             "bg-card shadow-xs border relative",
@@ -730,7 +795,6 @@ export const WorkflowNode = memo(
             }
           />
         ) : null}
-        </div>
 
         {showBottomPanelHost ? (
           <WorkflowNodeBottomPanelHost
@@ -741,6 +805,7 @@ export const WorkflowNode = memo(
             isDragging={isDragging}
           />
         ) : null}
+        </div>
 
         {activeInputId !== null ? (
         <Dialog

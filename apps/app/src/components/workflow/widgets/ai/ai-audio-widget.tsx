@@ -21,14 +21,8 @@ import { formatGenerativePhaseLabel } from "@/components/workflow/generative-pro
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
-import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
-import {
-  AiImageHistoryButton,
-  AiImageHistoryOverlay,
-} from "../../ai-image-history-overlay";
-import { AiTextExpandButton } from "../../ai-text-expand-overlay";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
 import type { GenerativeCardCoverRead } from "../../generative-history-utils";
 import {
@@ -40,24 +34,14 @@ import {
   AI_AUDIO_CARD_WIDTH_PX,
   readAiAudioCardDisplay,
   readAiAudioResultHistory,
-  withAiAudioHistorySelection,
   withAiAudioGenerateError,
   withAiAudioManualUpload,
 } from "../../ai-audio-node-utils";
-import { commitGenerativeHistorySelection } from "../../commit-generative-history-selection";
-import { useExpandHistoryToSiblingNode } from "../../use-expand-history-to-sibling-node";
-import {
-  useGenerativeHistoryModels,
-  useHistoryModelUnavailableToast,
-} from "../../use-generative-history-models";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
-import {
-  shouldShowGenerativeHistoryIcon,
-} from "../../generative-card-mode-utils";
 import {
   normalizeGenerativeCardUploadFile,
   readGenerativePrompt,
@@ -66,7 +50,6 @@ import {
 } from "../../generative-card-upload-utils";
 import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
-import { GenerativeMediaLazyDownloadButton } from "../../generative-media-download-button";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasAudioCover } from "../../canvas-media-cover";
@@ -115,13 +98,8 @@ function AiAudioWidget({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
-  const showHistoryIcon = shouldShowGenerativeHistoryIcon(
-    historyItems.items.length,
-    metadata
-  );
   const progressPhase = readGenerativeProgressPhase(metadata);
   const selectedHistoryItem =
     historyItems.items.find((item) => item.id === historyItems.selectedId) ??
@@ -160,8 +138,6 @@ function AiAudioWidget({
   });
   const coverAudio = cardDisplay.coverMedia[0];
   const hasAudio = cardDisplay.hasCover;
-  const activeAudioExpired = hasAudio && coverAudio ? isMediaExpired(coverAudio) : false;
-  const canDownloadActiveAudio = hasAudio && !activeAudioExpired;
 
   const handleClearPrompt = useCallback(() => {
     if (!updateNodeData) return;
@@ -182,56 +158,6 @@ function AiAudioWidget({
       onClearPrompt: handleClearPrompt,
       i18nPrefix: "workflow.aiAudioPanel",
     });
-
-  const historyModels = useGenerativeHistoryModels();
-  const notifyHistoryModelUnavailable = useHistoryModelUnavailableToast();
-
-  const handleHistorySelect = useCallback(
-    (id: string) => {
-      if (disabled || !updateNodeData) return;
-      const item = historyItems.items.find((entry) => entry.id === id);
-      if (!item) return;
-
-      let modelUnavailable = false;
-      updateNodeData(nodeId, (current) => {
-        const result = withAiAudioHistorySelection(current, id, {
-          models: historyModels.audio,
-        });
-        const committed = commitGenerativeHistorySelection(result);
-        modelUnavailable = committed.modelUnavailable;
-        return committed.patch;
-      });
-      notifyHistoryModelUnavailable(modelUnavailable);
-    },
-    [
-      disabled,
-      historyItems.items,
-      historyModels.audio,
-      nodeId,
-      notifyHistoryModelUnavailable,
-      updateNodeData,
-    ]
-  );
-
-  const expandHistoryItem = useExpandHistoryToSiblingNode(nodeId, "audio");
-
-  const handleHistoryExpand = useCallback(
-    (id: string) => {
-      const item = historyItems.items.find((entry) => entry.id === id);
-      const media = item?.audios[0];
-      if (!item || !media) return;
-      expandHistoryItem({
-        media,
-        prompt: item.prompt,
-        params: item.params,
-        platformModelId: item.platformModelId,
-        aiInterfaceId: item.aiInterfaceId,
-        modelDisplayName: item.modelDisplayName,
-        createdAt: item.createdAt,
-      });
-    },
-    [expandHistoryItem, historyItems.items]
-  );
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
@@ -319,20 +245,6 @@ function AiAudioWidget({
     ]
   );
 
-  const historyAsImageHistory = {
-    items: historyItems.items.map((item) => ({
-      id: item.id,
-      images: item.audios,
-      prompt: item.prompt,
-      params: item.params,
-      platformModelId: item.platformModelId,
-      providerModelId: item.providerModelId,
-      modelDisplayName: item.modelDisplayName,
-      createdAt: item.createdAt,
-    })),
-    selectedId: historyItems.selectedId,
-  };
-
   return (
     <>
       {uploadConfirmDialog}
@@ -383,25 +295,6 @@ function AiAudioWidget({
         ) : null}
 
         {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
-
-        {!generateError && hasAudio ? (
-          <div className="nodrag nopan nowheel absolute right-2 top-2 z-50 flex items-center gap-1.5">
-            {canDownloadActiveAudio && coverAudio ? (
-              <GenerativeMediaLazyDownloadButton
-                media={coverAudio}
-                nodeType="ai-audio"
-                fileName={`audio-${getResourceIdFromValue(coverAudio) ?? "audio"}.mp3`}
-              />
-            ) : null}
-            {showHistoryIcon ? (
-              <AiImageHistoryButton
-                count={historyItems.items.length}
-                onClick={() => setHistoryOpen(true)}
-              />
-            ) : null}
-            <AiTextExpandButton onClick={openCreativeStudio} />
-          </div>
-        ) : null}
       </div>
 
       {generateError ? (
@@ -409,24 +302,6 @@ function AiAudioWidget({
           error={generateError}
           open={errorDetailOpen}
           onOpenChange={setErrorDetailOpen}
-        />
-      ) : null}
-
-      {showHistoryIcon ? (
-        <AiImageHistoryOverlay
-          open={historyOpen}
-          history={historyAsImageHistory}
-          currentImages={
-            selectedHistoryItem?.audios.length
-              ? [...selectedHistoryItem.audios]
-              : coverAudio
-                ? [coverAudio]
-                : []
-          }
-          mediaKind="audio"
-          onClose={() => setHistoryOpen(false)}
-          onSelect={handleHistorySelect}
-          onExpandToNode={handleHistoryExpand}
         />
       ) : null}
     </>

@@ -35,3 +35,6 @@ export const WORKFLOW_NODE_CARD_INTERACT_CLASS = "wf-node-card-interact" as cons
 
 export const WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS =
   "wf-node-bottom-panel" as const;
+
+export const WORKFLOW_NODE_TOP_TOOLBAR_GATE_CLASS =
+  "wf-node-top-toolbar" as const;
