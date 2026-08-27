@@ -46,7 +46,10 @@ export function VolcanoWizardMediaKitCard({
     }
   };
 
-  const handleSettingsSave = async (next: WizardMediaKitConfig) => {
+  const handleSettingsSave = async (
+    next: WizardMediaKitConfig,
+    _mediaKitApiKey?: string
+  ) => {
     onConfigChange({ ...next, enabled: config.enabled });
   };
 
@@ -84,7 +87,7 @@ export function VolcanoWizardMediaKitCard({
         open={settingsOpen}
         config={config}
         onOpenChange={setSettingsOpen}
-        onSave={async (next) => handleSettingsSave(next)}
+        onSave={async (next, mediaKitApiKey) => handleSettingsSave(next, mediaKitApiKey)}
         isSaving={false}
       />
     </>

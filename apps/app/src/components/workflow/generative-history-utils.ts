@@ -134,13 +134,16 @@ export function readGenerativeCardCoverFromHistory<
 ): GenerativeCardCoverRead<TMedia> {
   const selected = readSelectedHistoryMedia(history, getMedia);
   const selectedFailed = hasFailedResource(selected ?? undefined);
+  const metadataBusy =
+    params.isModalityGenerating ||
+    isGenerativeProgressBusyPhase(readGenerativeProgressPhase(params.metadata));
   const cardPhase = resolveGenerativeCardPhase(
     params.metadata,
     selected ?? undefined,
     params.isModalityGenerating
   );
   const isBusy =
-    !selectedFailed &&
+    (!selectedFailed || metadataBusy) &&
     (cardPhase !== null
       ? isGenerativeCardBusyPhase(cardPhase) || cardPhase === "cancelled"
       : isGenerativeCardCoverBusy(
@@ -149,7 +152,7 @@ export function readGenerativeCardCoverFromHistory<
           selected ?? undefined
         ) || hasGeneratingResource(selected ?? undefined));
   const holdUnreadyCover =
-    !selectedFailed &&
+    (!selectedFailed || metadataBusy) &&
     shouldHoldUnreadyCardCover({
       metadata: params.metadata,
       isModalityGenerating: params.isModalityGenerating,

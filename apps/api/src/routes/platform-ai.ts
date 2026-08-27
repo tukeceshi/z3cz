@@ -12,6 +12,12 @@ import {
   type GenerateAiImageRequest,
   type GenerateAiTextRequest,
   type SubmitAiVideoRequest,
+  VOLCANO_MEDIKIT_PRICING_RESOLUTIONS,
+  VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES,
+  VIDEO_ENHANCE_FPS_MAX,
+  VIDEO_ENHANCE_FPS_MIN,
+  clampVideoEnhanceFps,
+  type SubmitVideoEnhanceRequest,
   createEphemeralMediaExpiresAt,
   type MediaReference,
 } from "@dafthunk/types";
@@ -143,6 +149,8 @@ import {
 import {
   resolveResourceRefs,
 } from "../services/resolve-resource-refs";
+import { submitVideoEnhanceTask } from "../services/video-enhance-service";
+import { VolcanoMediaKitApiError } from "../integrations/volcengine/mediakit-client";
 
 const platformAiRoutes = new Hono<ApiContext>();
 
@@ -1876,6 +1884,123 @@ platformAiRoutes.post(
       invocationId,
       aiInterfaceId: resolvedModel.interfaceId,
     });
+  }
+);
+
+const submitVideoEnhanceSchema = z.object({
+  aiInterfaceId: z.string().min(1),
+  sourceVideoResourceId: z.string().min(1),
+  mode: z.enum(VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES),
+  resolution: z.enum(VOLCANO_MEDIKIT_PRICING_RESOLUTIONS),
+  fps: z.number().min(VIDEO_ENHANCE_FPS_MIN).max(VIDEO_ENHANCE_FPS_MAX),
+  workflowId: z.string().optional(),
+  nodeId: z.string().optional(),
+  clientRequestId: z.string().min(1).max(128).optional(),
+});
+
+platformAiRoutes.post(
+  "/mediakit/video-enhance/submit",
+  zValidator("json", submitVideoEnhanceSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json") as SubmitVideoEnhanceRequest;
+    const db = createDatabase(c.env);
+
+    const existingJob = await findGenerationJobByClientRequestId(db, {
+      organizationId,
+      clientRequestId: body.clientRequestId,
+      modality: "video",
+    });
+    if (existingJob) {
+      return c.json(buildVideoSubmitResponseFromJob(existingJob));
+    }
+
+    try {
+      await assertNoActiveGenerationJobForNode(db, {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "video",
+        clientRequestId: body.clientRequestId,
+      });
+    } catch (error) {
+      if (error instanceof ActiveGenerationJobConflictError) {
+        return c.json(
+          {
+            error: error.message,
+            code: error.code,
+            jobId: error.jobId,
+          },
+          409
+        );
+      }
+      throw error;
+    }
+
+    const gateResult = await runWithCloudStorageGenerativeGate(
+      c,
+      organizationId,
+      async () => true
+    );
+    if (gateResult instanceof Response) {
+      return gateResult;
+    }
+
+    try {
+      const result = await submitVideoEnhanceTask(c.env, {
+        organizationId,
+        userId: jwtPayload?.sub,
+        body: {
+          ...body,
+          fps: clampVideoEnhanceFps(body.fps),
+        },
+      });
+
+      const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+        c.env,
+        {
+          organizationId,
+          workflowId: body.workflowId,
+          nodeId: body.nodeId,
+          modality: "video",
+          entry: {
+            resourceIds: result.resourceIds,
+            jobId: result.jobId,
+            mimeType: "video/mp4",
+            params: {
+              videoEnhance: {
+                mode: body.mode,
+                resolution: body.resolution,
+                fps: clampVideoEnhanceFps(body.fps),
+                sourceResourceId: body.sourceVideoResourceId,
+              },
+            },
+            aiInterfaceId: result.aiInterfaceId,
+          },
+        }
+      );
+
+      return c.json({
+        taskId: result.taskId,
+        aiInterfaceId: result.aiInterfaceId,
+        jobId: result.jobId,
+        resourceIds: result.resourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
+      });
+    } catch (error) {
+      const message =
+        error instanceof VolcanoMediaKitApiError || error instanceof Error
+          ? error.message
+          : "Video enhance submit failed";
+      const status =
+        message.includes("not enabled") ||
+        message.includes("not configured") ||
+        message.includes("not found")
+          ? 400
+          : 502;
+      return c.json({ error: message }, status);
+    }
   }
 );
 

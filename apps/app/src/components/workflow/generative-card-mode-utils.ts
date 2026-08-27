@@ -1,3 +1,5 @@
+import { isAiVideoEnhancePanel } from "@dafthunk/types";
+
 export const GENERATIVE_CONTENT_MODE_META_KEY = "generativeContentMode" as const;
 export const GENERATIVE_CARD_EDITING_META_KEY = "generativeCardEditing" as const;
 
@@ -68,5 +70,8 @@ export function shouldShowGenerativeHistoryIcon(
 export function shouldShowGenerativeBottomPanel(
   metadata: Record<string, string> | undefined
 ): boolean {
+  if (isAiVideoEnhancePanel(metadata)) {
+    return true;
+  }
   return !isGenerativeManualContent(metadata);
 }

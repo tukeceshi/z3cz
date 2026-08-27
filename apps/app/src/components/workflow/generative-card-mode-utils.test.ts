@@ -1,3 +1,4 @@
+import { withAiVideoPanelKind } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +24,11 @@ describe("generative-card-mode-utils", () => {
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeManualContentMode(undefined))
     ).toBe(false);
+    expect(
+      shouldShowGenerativeBottomPanel(
+        withAiVideoPanelKind(withGenerativeManualContentMode(undefined), "enhance")
+      )
+    ).toBe(true);
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeCardEditing(undefined, true))
     ).toBe(true);

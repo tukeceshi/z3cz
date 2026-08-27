@@ -400,6 +400,7 @@ const updateSchema = z
       .optional(),
     mediaKit: volcanoMediaKitSchema.optional(),
     mediaKitEnhance: volcanoMediaKitLegacyEnhanceSchema.optional(),
+    mediaKitApiKey: z.string().trim().min(1).optional(),
     enabled: z.boolean().optional(),
     isDefault: z.boolean().optional(),
   })
@@ -1617,6 +1618,24 @@ aiInterfaceRoutes.patch(
           baseMetadata,
           normalizeMediaKitRequestBody(mediaKitInput)
         );
+      }
+
+      if (body.mediaKitApiKey !== undefined) {
+        const current = parseInterfaceMetadata(existing.metadata);
+        if (!isVolcanoMetadata(current)) {
+          return c.json({ error: "Volcano metadata not configured" }, 400);
+        }
+        const baseMetadata = isVolcanoMetadata(metadataUpdate)
+          ? metadataUpdate
+          : current;
+        const trimmedKey = body.mediaKitApiKey.trim();
+        metadataUpdate = {
+          ...baseMetadata,
+          mediaKitApiKeyEncrypted:
+            trimmedKey.length > 0
+              ? await encryptSecret(trimmedKey, c.env, organizationId)
+              : undefined,
+        };
       }
 
       const iface = await updateOrganizationAiInterface(

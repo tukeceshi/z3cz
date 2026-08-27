@@ -4,13 +4,14 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   getResourceIdFromValue,
+  isCloudStoredResource,
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
 import DownloadIcon from "lucide-react/icons/download";
 import HistoryIcon from "lucide-react/icons/history";
 import Maximize2Icon from "lucide-react/icons/maximize-2";
-import { useCallback, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -64,6 +65,12 @@ import {
 } from "./generative-media-download-button";
 import { GenerativeNodeTopToolbarShell } from "./generative-node-top-toolbar-shell";
 import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
+import { VideoEnhanceToolbarButton } from "./video-enhance-toolbar-button";
+import {
+  isVideoEnhanceCoverReady,
+  readCloudVideoCoverResource,
+  readVideoEnhanceCoverCandidate,
+} from "./video-enhance-node-utils";
 import {
   useGenerativeHistoryModels,
   useHistoryModelUnavailableToast,
@@ -197,6 +204,43 @@ export function GenerativeNodeTopToolbar({
     nodeType === AI_TEXT_NODE_TYPE && canDownloadGenerativeText(data);
 
   const canDownload = canDownloadMedia || canDownloadText;
+
+  const videoEnhanceCoverCandidate =
+    nodeType === AI_VIDEO_NODE_TYPE ? readVideoEnhanceCoverCandidate(data) : null;
+  const cloudVideoForEnhance =
+    nodeType === AI_VIDEO_NODE_TYPE ? readCloudVideoCoverResource(data) : null;
+  const [cacheCoverReady, setCacheCoverReady] = useState(false);
+
+  useEffect(() => {
+    if (
+      !videoEnhanceCoverCandidate ||
+      isCloudStoredResource(videoEnhanceCoverCandidate) ||
+      !orgId ||
+      !workflowId
+    ) {
+      setCacheCoverReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    void isVideoEnhanceCoverReady({
+      cover: videoEnhanceCoverCandidate,
+      organizationId: orgId,
+      workflowId,
+    }).then((ready) => {
+      if (!cancelled) {
+        setCacheCoverReady(ready);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, videoEnhanceCoverCandidate, workflowId]);
+
+  const videoForEnhance =
+    cloudVideoForEnhance ??
+    (cacheCoverReady ? videoEnhanceCoverCandidate : null);
 
   const downloadFileName = useMemo(() => {
     if (nodeType === AI_TEXT_NODE_TYPE) {
@@ -481,22 +525,32 @@ export function GenerativeNodeTopToolbar({
   return (
     <>
       <GenerativeNodeTopToolbarShell zoom={zoom}>
-        {showHistory ? (
+        {videoForEnhance || showHistory ? (
           <>
-            <TopToolbarButton
-              tooltip={t("workflow.aiImagePanel.historyTitle")}
-              onClick={(event) => {
-                event.stopPropagation();
-                setHistoryOpen(true);
-              }}
-            >
-              <HistoryIcon
-                className={GENERATIVE_NODE_PANEL_TOOLBAR_ICON_CLASS}
-                strokeWidth={2}
+            {videoForEnhance ? (
+              <VideoEnhanceToolbarButton
+                sourceNodeId={nodeId}
+                sourceNodeData={data}
+                sourceVideo={videoForEnhance}
+                disabled={disabled}
               />
-              <span className="tabular-nums">{historyCount}</span>
-              <span>{t("workflow.aiImagePanel.historyTitle")}</span>
-            </TopToolbarButton>
+            ) : null}
+            {showHistory ? (
+              <TopToolbarButton
+                tooltip={t("workflow.aiImagePanel.historyTitle")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setHistoryOpen(true);
+                }}
+              >
+                <HistoryIcon
+                  className={GENERATIVE_NODE_PANEL_TOOLBAR_ICON_CLASS}
+                  strokeWidth={2}
+                />
+                <span className="tabular-nums">{historyCount}</span>
+                <span>{t("workflow.aiImagePanel.historyTitle")}</span>
+              </TopToolbarButton>
+            ) : null}
             <TopToolbarDivider />
           </>
         ) : null}

@@ -2,8 +2,10 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  isAiVideoEnhancePanel,
   normalizeVideoModelParameterRules,
   referencesFitVideoModelReferenceLimits,
+  VIDEO_ENHANCE_MODEL_PARAMETER_RULES,
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
@@ -91,6 +93,19 @@ export function resolveAiVideoReferenceRules(params: {
   readonly targetNodeData: WorkflowNodeType;
   readonly models?: readonly AiVideoReferenceModelOption[];
 }): VideoModelParameterRules {
+  if (isAiVideoEnhancePanel(params.targetNodeData.metadata)) {
+    const modelId = readModelId(params.targetNodeData);
+    if (modelId && params.models) {
+      const selected = params.models.find(
+        (entry) => entry.canonicalId === modelId
+      );
+      if (selected) {
+        return normalizeVideoModelParameterRules(selected.parameterRules);
+      }
+    }
+    return normalizeVideoModelParameterRules(VIDEO_ENHANCE_MODEL_PARAMETER_RULES);
+  }
+
   const modelId = readModelId(params.targetNodeData);
   if (modelId && params.models) {
     const selected = params.models.find(
