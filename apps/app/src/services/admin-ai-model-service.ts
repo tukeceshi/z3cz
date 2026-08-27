@@ -58,10 +58,28 @@ export async function reorderAdminPlatformAiModels(
 export function useAdminModelInvocations(options?: {
   limit?: number;
   offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  tzOffset?: number;
 }) {
-  const limit = options?.limit ?? 50;
+  const limit = options?.limit ?? 20;
   const offset = options?.offset ?? 0;
-  const key = `/admin/model-invocations?limit=${limit}&offset=${offset}`;
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const hasDateFilter =
+    options?.dateFrom !== undefined || options?.dateTo !== undefined;
+  if (options?.dateFrom) {
+    params.set("dateFrom", options.dateFrom);
+  }
+  if (options?.dateTo) {
+    params.set("dateTo", options.dateTo);
+  }
+  if (hasDateFilter && options?.tzOffset !== undefined) {
+    params.set("tzOffset", String(options.tzOffset));
+  }
+  const key = `/admin/model-invocations?${params.toString()}`;
   const { data, error, isLoading, mutate } = useSWR(key, async () =>
     makeRequest<ListAiModelInvocationsResponse>(`${key}`),
     {

@@ -398,21 +398,51 @@ export async function listAiModelInvocations(
 
 export async function listAdminAiModelInvocations(
   db: Database,
-  options?: { readonly limit?: number; readonly offset?: number }
+  options?: {
+    readonly limit?: number;
+    readonly offset?: number;
+    readonly dateFrom?: string;
+    readonly dateTo?: string;
+    readonly tzOffsetMinutes?: number;
+  }
 ): Promise<ListAiModelInvocationsResponse> {
-  const limit = options?.limit ?? 50;
+  const limit = options?.limit ?? 20;
   const offset = options?.offset ?? 0;
+
+  const conditions = [];
+
+  if (options?.tzOffsetMinutes !== undefined) {
+    const tzOffsetMinutes = options.tzOffsetMinutes;
+
+    if (options.dateFrom !== undefined) {
+      const start = parseLocalDayStart(options.dateFrom, tzOffsetMinutes);
+      if (start) {
+        conditions.push(gte(aiModelInvocations.createdAt, start));
+      }
+    }
+
+    if (options.dateTo !== undefined) {
+      const end = parseLocalDayEndExclusive(options.dateTo, tzOffsetMinutes);
+      if (end) {
+        conditions.push(lt(aiModelInvocations.createdAt, end));
+      }
+    }
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const rows = await db
     .select()
     .from(aiModelInvocations)
+    .where(where)
     .orderBy(desc(aiModelInvocations.createdAt))
     .limit(limit)
     .offset(offset);
 
   const countRows = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(aiModelInvocations);
+    .from(aiModelInvocations)
+    .where(where);
 
   return {
     invocations: rows.map(mapInvocationRow),
