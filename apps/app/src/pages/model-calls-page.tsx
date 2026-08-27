@@ -1,27 +1,21 @@
 import { format } from "date-fns";
-import CalendarIcon from "lucide-react/icons/calendar";
 import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
 
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { InsetLayout } from "@/components/layouts/inset-layout";
+import { ModelInvocationsDateFilterToolbar } from "@/components/model-invocations-date-filter-toolbar";
 import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useAuth } from "@/components/auth-context";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -31,47 +25,14 @@ import {
 } from "@/services/platform-ai-model-service";
 import { formatModelCallSummary } from "@/utils/format-model-call-detail";
 import {
+  hasAppliedDateFilter,
+  MODEL_INVOCATIONS_PAGE_SIZE,
+  toAppliedDateParams,
+} from "@/utils/model-invocations-date-filter";
+import {
   invocationStatusBadgeVariant,
   invocationStatusLabelKey,
 } from "@/utils/model-invocation-status";
-import { cn } from "@/utils/utils";
-
-const PAGE_SIZE = 20;
-
-function formatDateRangeLabel(
-  range: DateRange | undefined,
-  allDatesLabel: string
-): string {
-  if (!range?.from) {
-    return allDatesLabel;
-  }
-
-  const fromLabel = format(range.from, "yyyy-MM-dd");
-  if (!range.to) {
-    return fromLabel;
-  }
-
-  const toLabel = format(range.to, "yyyy-MM-dd");
-  if (toLabel === fromLabel) {
-    return fromLabel;
-  }
-
-  return `${fromLabel} ~ ${toLabel}`;
-}
-
-function toAppliedDateParams(range: DateRange | undefined): {
-  dateFrom?: string;
-  dateTo?: string;
-} {
-  if (!range?.from) {
-    return {};
-  }
-
-  const dateFrom = format(range.from, "yyyy-MM-dd");
-  const endDate = range.to ?? range.from;
-  const dateTo = format(endDate, "yyyy-MM-dd");
-  return { dateFrom, dateTo };
-}
 
 export function ModelCallsPage() {
   const { t } = useTranslation();
@@ -104,18 +65,20 @@ function ModelCallsPageContent() {
   const [detailTitle, setDetailTitle] = useState<string>("");
 
   const appliedDates = toAppliedDateParams(appliedRange);
-  const hasDateFilter =
-    appliedDates.dateFrom !== undefined || appliedDates.dateTo !== undefined;
-
   const { invocations, total, isLoading } = useModelCalls(orgId, {
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
+    limit: MODEL_INVOCATIONS_PAGE_SIZE,
+    offset: (page - 1) * MODEL_INVOCATIONS_PAGE_SIZE,
     dateFrom: appliedDates.dateFrom,
     dateTo: appliedDates.dateTo,
-    tzOffset: hasDateFilter ? new Date().getTimezoneOffset() : undefined,
+    tzOffset: hasAppliedDateFilter(appliedDates)
+      ? new Date().getTimezoneOffset()
+      : undefined,
   });
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(total / MODEL_INVOCATIONS_PAGE_SIZE)
+  );
 
   useEffect(() => {
     setBreadcrumbs([
@@ -146,37 +109,15 @@ function ModelCallsPageContent() {
 
   return (
     <InsetLayout title={t("pages.modelCalls.title")}>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "min-w-40 justify-start text-left font-normal",
-                !draftRange?.from && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-              {formatDateRangeLabel(draftRange, t("pages.modelCalls.allDates"))}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={draftRange}
-              onSelect={setDraftRange}
-            />
-          </PopoverContent>
-        </Popover>
-
-        <Button size="sm" onClick={handleSearch}>
-          {t("pages.modelCalls.search")}
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleClear}>
-          {t("pages.modelCalls.clearFilter")}
-        </Button>
-      </div>
+      <ModelInvocationsDateFilterToolbar
+        draftRange={draftRange}
+        onDraftRangeChange={setDraftRange}
+        onSearch={handleSearch}
+        onClear={handleClear}
+        allDatesLabel={t("pages.modelCalls.allDates")}
+        searchLabel={t("pages.modelCalls.search")}
+        clearFilterLabel={t("pages.modelCalls.clearFilter")}
+      />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -219,7 +160,7 @@ function ModelCallsPageContent() {
 
           <AdminPagination
             page={page}
-            limit={PAGE_SIZE}
+            limit={MODEL_INVOCATIONS_PAGE_SIZE}
             itemCount={invocations.length}
             total={total}
             totalPages={totalPages}
