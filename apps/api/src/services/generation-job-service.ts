@@ -72,6 +72,7 @@ import {
   validateGenerationJobUploadMedia,
 } from "./validate-generation-job-upload";
 import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
+import { pollVideoEnhanceGenerationJob } from "./video-enhance-service";
 
 function inferVideoMimeType(url: string): string {
   const lower = url.split("?")[0]?.toLowerCase() ?? "";
@@ -582,6 +583,10 @@ export async function pollVideoGenerationJob(
   db: Database,
   job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
+  if (job.resultJson?.jobKind === "video_enhance") {
+    return pollVideoEnhanceGenerationJob(env, db, job);
+  }
+
   if (job.modality !== "video" || !job.upstreamTaskId) {
     return job;
   }

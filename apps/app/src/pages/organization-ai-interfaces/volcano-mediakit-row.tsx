@@ -9,7 +9,10 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { updateVolcanoMediaKit } from "@/services/organization-ai-interface-service";
+import {
+  updateOrganizationAiInterface,
+  updateVolcanoMediaKit,
+} from "@/services/organization-ai-interface-service";
 
 import { VolcanoMediaKitStatusDetail } from "./volcano-mediakit-collapsed-summary";
 import { VolcanoMediaKitPricingPopover } from "./volcano-mediakit-pricing-popover";
@@ -19,6 +22,7 @@ interface VolcanoMediaKitRowProps {
   readonly organizationId: string;
   readonly interfaceId: string;
   readonly snapshot: VolcanoMediaKitSnapshot;
+  readonly hasApiKey?: boolean;
   readonly onUpdated: () => Promise<void>;
 }
 
@@ -26,6 +30,7 @@ export function VolcanoMediaKitRow({
   organizationId,
   interfaceId,
   snapshot,
+  hasApiKey = false,
   onUpdated,
 }: VolcanoMediaKitRowProps) {
   const { t } = useTranslation();
@@ -72,10 +77,30 @@ export function VolcanoMediaKitRow({
     }
   };
 
-  const handleSettingsSave = async (next: VolcanoMediaKitSnapshot) => {
+  const handleSettingsSave = async (
+    next: VolcanoMediaKitSnapshot,
+    mediaKitApiKey?: string
+  ) => {
     const merged = { ...next, enabled: config.enabled };
     setConfig(merged);
-    await persistConfig(merged);
+    setIsSaving(true);
+    try {
+      await updateVolcanoMediaKit(organizationId, interfaceId, merged);
+      if (mediaKitApiKey) {
+        await updateOrganizationAiInterface(organizationId, interfaceId, {
+          mediaKitApiKey,
+        });
+      }
+      await onUpdated();
+      toast.success("pages.aiInterfaces.mediaKitEnhance.saved");
+    } catch (error) {
+      toast.errorRaw(
+        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+      );
+      setConfig(snapshot);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -116,6 +141,7 @@ export function VolcanoMediaKitRow({
       <VolcanoMediaKitSettingsDialog
         open={settingsOpen}
         config={config}
+        hasApiKey={hasApiKey}
         onOpenChange={setSettingsOpen}
         onSave={handleSettingsSave}
         isSaving={isSaving}

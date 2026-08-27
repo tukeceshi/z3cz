@@ -62,6 +62,8 @@ export interface VolcanoInterfaceMetadata {
   /** ISO timestamps of successful billing package fetches (server rate limit). */
   readonly packageListRefreshLog?: readonly string[];
   readonly tosStorage?: VolcanoTosStorageConfig;
+  /** Encrypted AI MediaKit API key (Bearer auth for enhance/subtitle tasks). */
+  readonly mediaKitApiKeyEncrypted?: string;
   /** Optional AI MediaKit features (console config only). */
   readonly mediaKit?: VolcanoMediaKitConfig;
   /** @deprecated Legacy; use mediaKit */

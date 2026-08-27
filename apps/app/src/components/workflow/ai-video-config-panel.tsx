@@ -35,7 +35,7 @@ import { cn } from "@/utils/utils";
 import {
   pollAiVideoTask,
   submitAiVideo,
-  useOrgVideoModels,
+  useOrgVideoPickerModels,
 } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
@@ -341,7 +341,7 @@ export function AiVideoConfigPanel({
     readGenerationFields: (model) =>
       normalizeVideoModelParameterRules(model.parameterRules).generationFields,
     buildDefaultParams: buildDefaultVideoGenerationParams,
-    useModels: useOrgVideoModels,
+    useModels: useOrgVideoPickerModels,
     modelFitsCurrentRefs,
   });
 

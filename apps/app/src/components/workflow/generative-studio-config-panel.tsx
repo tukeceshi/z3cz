@@ -3,12 +3,14 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
+  isAiVideoEnhancePanel,
 } from "@dafthunk/types";
 
 import { AiAudioConfigPanel } from "./ai-audio-config-panel";
 import { AiImageConfigPanel } from "./ai-image-config-panel";
 import { AiTextConfigPanel } from "./ai-text-config-panel";
 import { AiVideoConfigPanel } from "./ai-video-config-panel";
+import { AiVideoEnhanceConfigPanel } from "./ai-video-enhance-config-panel";
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
 import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
 import type { WorkflowNodeType } from "./workflow-types";
@@ -49,6 +51,15 @@ export function GenerativeStudioConfigPanel({
   }
 
   if (data.nodeType === AI_VIDEO_NODE_TYPE) {
+    if (isAiVideoEnhancePanel(data.metadata)) {
+      return (
+        <AiVideoEnhanceConfigPanel
+          nodeId={nodeId}
+          data={data}
+          layout={layout}
+        />
+      );
+    }
     return (
       <AiVideoConfigPanel
         nodeId={nodeId}

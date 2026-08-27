@@ -22,6 +22,7 @@ import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useObjectService } from "@/services/object-service";
+import { useOrganizationAiInterfaces } from "@/services/organization-ai-interface-service";
 import { useNodeTypes } from "@/services/type-service";
 import { getWorkflow } from "@/services/workflow-service";
 import {
@@ -67,6 +68,7 @@ function EditorPageCanvas() {
   const orgId = organization?.id || "";
   const { getOrgUrl } = useOrgUrl();
   const mediaAddressCatalogReady = useWorkflowMediaAddressCatalogInit(orgId, id);
+  useOrganizationAiInterfaces(orgId || undefined);
 
   const [httpWorkflowMetadata, setHttpWorkflowMetadata] =
     useState<WorkflowWithMetadata | null>(() => {

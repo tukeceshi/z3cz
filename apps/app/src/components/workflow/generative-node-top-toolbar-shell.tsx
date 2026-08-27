@@ -19,7 +19,7 @@ export function GenerativeNodeTopToolbarShell({
   return (
     <div
       className={cn(
-        "nodrag nopan nowheel flex h-[35px] items-center gap-1 overflow-hidden border border-border/70 px-1",
+        "nodrag nopan nowheel flex h-[35px] w-max max-w-none flex-nowrap items-center gap-1 border border-border/70 px-1",
         "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
         GENERATIVE_NODE_PANEL_CLASS
       )}

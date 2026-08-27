@@ -257,6 +257,7 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly mediaKit?: VolcanoMediaKitConfig;
   /** @deprecated Use mediaKit */
   readonly mediaKitEnhance?: VolcanoMediaKitConfig;
+  readonly mediaKitApiKey?: string;
   readonly enabled?: boolean;
   readonly isDefault?: boolean;
 }

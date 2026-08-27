@@ -7,11 +7,12 @@ import type {
   OrgVideoModelOption,
 } from "@dafthunk/types";
 import {
+  isAiVideoEnhancePanel,
+  isVideoEnhanceModelCanonicalId,
   normalizeAudioModelParameterRules,
   normalizeImageModelParameterRules,
   normalizeVideoModelParameterRules,
 } from "@dafthunk/types";
-
 import {
   readNodeGenerationParams,
   sanitizeCardGenerationParams,
@@ -235,11 +236,18 @@ export function resolveModelForNewReference<T extends OrgModelBindingRef>(
     readonly modelFits: (model: T) => boolean;
   }
 ): ResolveModelForNewReferenceResult<T> {
+  const candidateModels = isAiVideoEnhancePanel(params.targetNodeData.metadata)
+    ? params.models.filter((model) =>
+        isVideoEnhanceModelCanonicalId(model.canonicalId)
+      )
+    : params.models.filter(
+        (model) => !isVideoEnhanceModelCanonicalId(model.canonicalId)
+      );
   const nodeBinding = readModelBindingFromNode(params.targetNodeData);
 
   const currentFromNode = nodeBinding
     ? resolveSelectedModelBinding(
-        params.models,
+        candidateModels,
         nodeBinding.canonicalId,
         nodeBinding.interfaceId,
         nodeBinding.instanceId
@@ -254,7 +262,7 @@ export function resolveModelForNewReference<T extends OrgModelBindingRef>(
     };
   }
 
-  const found = params.models.find(
+  const found = candidateModels.find(
     (model) => model.selectable && params.modelFits(model)
   );
   if (!found) {

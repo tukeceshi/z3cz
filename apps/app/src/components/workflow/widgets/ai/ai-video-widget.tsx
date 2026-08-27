@@ -31,10 +31,12 @@ import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acc
 import type { GenerativeCardCoverRead } from "../../generative-history-utils";
 import {
   isGenerativePersistPhase,
+  isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
   withGenerativeUploadProgress,
 } from "../../generative-progress-utils";
 import {
+  isAiVideoGenerating,
   readAiVideoCardDisplay,
   readAiVideoResultHistory,
   withAiVideoGenerateError,
@@ -123,11 +125,15 @@ function AiVideoWidget({
     Boolean(selectedHistoryItem?.jobId) &&
     (selectedHistoryItem.videos.length === 0 ||
       hasFailedResource(selectedHistoryItem.videos));
+  const metadataBusy =
+    isAiVideoGenerating(metadata) ||
+    isGenerativeProgressBusyPhase(progressPhase);
+  const suppressBusyForFailed = selectedFailed && !metadataBusy;
   const isGenerating =
-    (!selectedFailed && cardDisplay.isBusy) ||
+    (!suppressBusyForFailed && cardDisplay.isBusy) ||
     progressPhase === "cancelled";
   useGenerativeMediaWorkSession(
-    uploading || (!selectedFailed && cardDisplay.isBusy)
+    uploading || (!suppressBusyForFailed && cardDisplay.isBusy)
   );
   useGenerativeRecordErrorDisplay({
     orgId,

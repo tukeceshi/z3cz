@@ -203,7 +203,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
     });
   });
 
-  it("keeps failed cover even while generate metadata is still busy", () => {
+  it("reports busy on failed row while generate metadata is active", () => {
     const failed = [{ resourceId: "failed", failed: true }];
     expect(
       readGenerativeCardCoverFromHistory(
@@ -219,8 +219,9 @@ describe("readGenerativeCardCoverFromHistory", () => {
       )
     ).toEqual({
       coverMedia: failed,
-      isBusy: false,
+      isBusy: true,
       hasCover: false,
+      cardPhase: "generating",
     });
   });
 });

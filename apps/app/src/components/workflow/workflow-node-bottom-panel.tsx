@@ -12,6 +12,8 @@ import { AiTextConfigPanel } from "./ai-text-config-panel";
 import { AiImageConfigPanel } from "./ai-image-config-panel";
 import { AiAudioConfigPanel } from "./ai-audio-config-panel";
 import { AiVideoConfigPanel } from "./ai-video-config-panel";
+import { AiVideoEnhanceConfigPanel } from "./ai-video-enhance-config-panel";
+import { isAiVideoEnhancePanel } from "@dafthunk/types";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
 import { PropertyField } from "./fields";
 import { registry } from "./widgets";
@@ -73,6 +75,9 @@ function WorkflowNodeBottomPanelInner({
   }
 
   if (data.nodeType === AI_VIDEO_NODE_TYPE) {
+    if (isAiVideoEnhancePanel(data.metadata)) {
+      return <AiVideoEnhanceConfigPanel nodeId={nodeId} data={data} />;
+    }
     return <AiVideoConfigPanel nodeId={nodeId} data={data} />;
   }
 

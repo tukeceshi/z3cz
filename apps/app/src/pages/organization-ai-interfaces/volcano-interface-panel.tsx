@@ -1058,6 +1058,15 @@ export function VolcanoInterfacePanel({
 
                     snapshot={mediaKitSnapshot}
 
+                    hasApiKey={Boolean(
+                      (
+                        iface.metadata as
+                          | { readonly mediaKitApiKeyEncrypted?: string }
+                          | null
+                          | undefined
+                      )?.mediaKitApiKeyEncrypted?.trim()
+                    )}
+
                     onUpdated={onUpdated}
 
                   />

@@ -23,6 +23,12 @@ import type {
   PollAiVideoTaskResponse,
   SubmitAiVideoRequest,
   SubmitAiVideoResponse,
+  SubmitVideoEnhanceRequest,
+  SubmitVideoEnhanceResponse,
+} from "@dafthunk/types";
+import {
+  isVideoEnhanceModelCanonicalId,
+  type OrgVideoModelOption,
 } from "@dafthunk/types";
 import useSWR from "swr";
 
@@ -267,6 +273,21 @@ export function useOrgVideoModels(
   };
 }
 
+/** Video model picker excludes the virtual MediaKit enhance model. */
+export function useOrgVideoPickerModels(
+  orgId: string | undefined,
+  options?: { readonly enabled?: boolean }
+) {
+  const result = useOrgVideoModels(orgId, options);
+  return {
+    ...result,
+    models: result.models.filter(
+      (model): model is OrgVideoModelOption =>
+        !isVideoEnhanceModelCanonicalId(model.canonicalId)
+    ),
+  };
+}
+
 export function useOrgAudioModels(
   orgId: string | undefined,
   options?: { readonly enabled?: boolean }
@@ -451,6 +472,21 @@ export async function pollAiVideoTask(
   return makeRequest<PollAiVideoTaskResponse>(
     `${platformAiEndpoint(orgId)}/ai-video/tasks/${encodeURIComponent(taskId)}?${query.toString()}`,
     { signal: options?.signal }
+  );
+}
+
+export async function submitVideoEnhance(
+  orgId: string,
+  body: SubmitVideoEnhanceRequest,
+  options?: { readonly signal?: AbortSignal }
+): Promise<SubmitVideoEnhanceResponse> {
+  return makeRequest<SubmitVideoEnhanceResponse>(
+    `${platformAiEndpoint(orgId)}/mediakit/video-enhance/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    }
   );
 }
 
