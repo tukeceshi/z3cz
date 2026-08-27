@@ -5,8 +5,11 @@ import {
   formatGenerativeBusyOverlayLabel,
   formatGenerativePhaseLabel,
   formatGenerativeProgressElapsed,
+  isClientUpstreamQueued,
   isGenerativePersistPhase,
   isGenerativePhaseCancellable,
+  isVideoStopButtonVisible,
+  readClientUpstreamPollPhase,
   readGenerativeDownloadPercent,
   readGenerativeProgressJobId,
   readGenerativeProgressPhase,
@@ -135,6 +138,57 @@ describe("generative-progress-utils", () => {
     expect(isGenerativePhaseCancellable("uploading")).toBe(false);
     expect(isGenerativePhaseCancellable("server_persisting")).toBe(false);
     expect(isGenerativePhaseCancellable(null)).toBe(false);
+  });
+
+  it("tracks client upstream poll phase in metadata", () => {
+    const queued = withGenerativeProgress(undefined, { phase: "queued" });
+    expect(readClientUpstreamPollPhase(queued)).toBe("queued");
+    expect(isClientUpstreamQueued(queued)).toBe(true);
+
+    const generating = withGenerativeProgress(queued, { phase: "generating" });
+    expect(readClientUpstreamPollPhase(generating)).toBe("running");
+    expect(isClientUpstreamQueued(generating)).toBe(false);
+
+    const cleared = clearGenerativeProgress(generating);
+    expect(readClientUpstreamPollPhase(cleared)).toBeUndefined();
+  });
+
+  it("shows video stop button only when upstream poll reports queued", () => {
+    const runningMetadata = withGenerativeProgress(undefined, {
+      phase: "generating",
+    });
+    expect(
+      isVideoStopButtonVisible({
+        metadata: runningMetadata,
+        overlayPhase: "generating",
+        supportsTaskCancel: true,
+      })
+    ).toBe(false);
+
+    const queuedMetadata = withGenerativeProgress(undefined, { phase: "queued" });
+    expect(
+      isVideoStopButtonVisible({
+        metadata: queuedMetadata,
+        overlayPhase: "generating",
+        supportsTaskCancel: true,
+      })
+    ).toBe(true);
+
+    expect(
+      isVideoStopButtonVisible({
+        metadata: withGenerativeProgress(undefined, { phase: "cancelling" }),
+        overlayPhase: "generating",
+        supportsTaskCancel: true,
+      })
+    ).toBe(false);
+
+    expect(
+      isVideoStopButtonVisible({
+        metadata: queuedMetadata,
+        overlayPhase: "generating",
+        supportsTaskCancel: false,
+      })
+    ).toBe(false);
   });
 
   it("snapshots generating resource ids from history inputs", () => {

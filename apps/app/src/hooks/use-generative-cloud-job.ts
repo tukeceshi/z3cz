@@ -61,6 +61,13 @@ async function waitForJobFinalMedia(
     if (response.job.status === "cancelled") {
       throw new GenerativeGenerationCancelledError();
     }
+    if (response.job.status === "cancelling") {
+      if (shouldAbort?.()) {
+        throw new GenerativeGenerationCancelledError();
+      }
+      await sleep(JOB_POLL_INTERVAL_MS);
+      continue;
+    }
     if (shouldAbort?.()) {
       throw new GenerativeGenerationCancelledError();
     }
@@ -126,6 +133,7 @@ export function useGenerativeCloudJobProgress(
   readonly syncProgress: (params: {
     readonly jobId?: string | null;
     readonly phase?: GenerativeProgressPhase | null;
+    readonly upstreamPhase?: "queued" | "running" | null;
     readonly stagingMediaIds?: readonly string[] | null;
     readonly downloadPercent?: number | null;
   }) => void;
@@ -147,6 +155,7 @@ export function useGenerativeCloudJobProgress(
     (params: {
       readonly jobId?: string | null;
       readonly phase?: GenerativeProgressPhase | null;
+      readonly upstreamPhase?: "queued" | "running" | null;
       readonly stagingMediaIds?: readonly string[] | null;
       readonly downloadPercent?: number | null;
     }) => {

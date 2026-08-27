@@ -5,6 +5,7 @@ import {
   computePackTokens,
   computeVideoPriceEstimateForModel,
   formatVideoBillingTokensDisplay,
+  formatVideoPriceEstimateCostDisplay,
   type VideoPriceEstimateResult,
 } from "@dafthunk/types";
 import type { WorkflowMediaValue } from "@dafthunk/types";
@@ -280,7 +281,7 @@ export function AiVideoPriceEstimateChip({
     });
   }, [baseline480pWithoutVideo, estimate.billingTokens, estimate.unitPrice]);
 
-  const summary = formatVideoBillingTokensDisplay(estimate.billingTokens);
+  const summary = formatVideoPriceEstimateCostDisplay(displayCostYuan);
 
   return (
     <Popover>

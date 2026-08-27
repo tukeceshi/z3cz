@@ -2752,6 +2752,7 @@ export const zh: TranslationDictionary = {
       cloudStorageUnavailable: "云存储不可用，请检查 AI 接口中的存储配置",
       realPersonInReferenceRejected: "参考[{{label}}]包含真人图像，生成被拒绝",
       realPersonInReferenceHint: "可将图片转为 彩绘、手绘 尝试生成",
+      copyrightPolicyViolation: "生成内容可能涉及版权限制，生成被拒绝",
       generic: "生成失败：{{detail}}",
       viewDetails: "详情",
       detailTitle: "错误详情",

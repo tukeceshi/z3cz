@@ -20,6 +20,7 @@ import {
   mediaReferenceToWorkflowValue,
   nextVideoUpstreamPollAt,
   resolveOfficialVideoEndpoints,
+  resolveVideoCancelBranch,
   shouldDeferClientPersistToServer,
   type ResourceIdReference,
 } from "@dafthunk/types";
@@ -53,6 +54,7 @@ import {
 } from "./media-resource-catalog-service";
 import {
   persistJobCloudAccelerationStatus,
+  persistJobCancellingNodeContent,
   persistJobFinalizedGeneratingContent,
 } from "./persist-generating-node-content";
 import {
@@ -105,6 +107,8 @@ export function resolveGenerationJobDisplayPhase(
       return job.resultJson?.upstreamVideoStatus === "queued"
         ? "queued"
         : "generating";
+    case "cancelling":
+      return "cancelling";
     case "ready_to_persist":
       return "ready_to_persist";
     case "uploading":
@@ -340,18 +344,105 @@ async function toCancelGenerationJobResponse(
   db: Database,
   job: GenerationJobRecord,
   extras?: {
-    readonly upstreamCancelSkipped?: boolean;
-    readonly upstreamCancelFailed?: boolean;
+    readonly cancelPending?: boolean;
+    readonly cancelFailed?: boolean;
   }
 ): Promise<CancelGenerationJobResponse> {
   return {
     ...(await toGetGenerationJobResponse(db, job)),
     cancelled: job.status === "cancelled",
-    ...(extras?.upstreamCancelSkipped
-      ? { upstreamCancelSkipped: true }
+    ...(extras?.cancelPending ? { cancelPending: true } : {}),
+    ...(extras?.cancelFailed
+      ? {
+          cancelFailed: true,
+          upstreamCancelFailed: true,
+        }
       : {}),
-    ...(extras?.upstreamCancelFailed ? { upstreamCancelFailed: true } : {}),
   };
+}
+
+async function syncJobCancellingToWorkflow(
+  env: Bindings,
+  job: GenerationJobRecord,
+  cancelling: boolean
+): Promise<void> {
+  await persistJobCancellingNodeContent(env, job, cancelling);
+}
+
+async function enterVideoDeferredCancel(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<CancelGenerationJobResponse> {
+  if (job.status === "cancelling") {
+    await syncJobCancellingToWorkflow(env, job, true);
+    return toCancelGenerationJobResponse(db, job, { cancelPending: true });
+  }
+
+  const cancelling = await updateGenerationJob(db, {
+    id: job.id,
+    organizationId: job.organizationId,
+    status: "cancelling",
+    expectedStatuses: ["pending", "generating"],
+    failureReason: "Generation cancel in progress",
+  });
+
+  if (cancelling) {
+    await syncJobCancellingToWorkflow(env, cancelling, true);
+    return toCancelGenerationJobResponse(db, cancelling, { cancelPending: true });
+  }
+
+  const latest = await getGenerationJob(db, job.id, job.organizationId);
+  return toCancelGenerationJobResponse(db, latest ?? job);
+}
+
+async function finalizeJobCancelled(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<GenerationJobRecord | null> {
+  const cancelled = await updateGenerationJob(db, {
+    id: job.id,
+    organizationId: job.organizationId,
+    status: "cancelled",
+    expectedStatuses: ["pending", "generating", "cancelling"],
+    failureReason: "Generation cancelled",
+  });
+
+  if (!cancelled) {
+    return getGenerationJob(db, job.id, job.organizationId);
+  }
+
+  await markMediaResourcesFailed(db, {
+    organizationId: cancelled.organizationId,
+    resourceIds: cancelled.resultJson?.placeholderResourceIds ?? [],
+    mimeType: placeholderMimeTypeForModality(cancelled.modality),
+  });
+  await syncJobCancellingToWorkflow(env, cancelled, false);
+  await syncGenerationJobInvocation(db, cancelled);
+  await writeGenerationJobCancelLog(db, cancelled);
+  return cancelled;
+}
+
+async function revertVideoCancelToGenerating(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<GenerationJobRecord> {
+  const reverted =
+    (await updateGenerationJob(db, {
+      id: job.id,
+      organizationId: job.organizationId,
+      status: "generating",
+      expectedStatuses: ["cancelling"],
+      failureReason: null,
+    })) ?? job;
+
+  if (reverted.status === "generating") {
+    await syncJobCancellingToWorkflow(env, reverted, false);
+  }
+
+  return reverted;
 }
 
 async function tryCancelUpstreamVideoTask(
@@ -359,8 +450,8 @@ async function tryCancelUpstreamVideoTask(
   db: Database,
   job: GenerationJobRecord
 ): Promise<{
-  readonly upstreamCancelSkipped: boolean;
-  readonly upstreamCancelFailed: boolean;
+  readonly deleted: boolean;
+  readonly skipped: boolean;
 }> {
   if (
     job.modality !== "video" ||
@@ -368,7 +459,7 @@ async function tryCancelUpstreamVideoTask(
     isGrokImagineVideoCanonicalId(job.modelCanonicalId) ||
     isVeoCanonicalId(job.modelCanonicalId)
   ) {
-    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+    return { deleted: false, skipped: true };
   }
 
   const service = new CloudflareAiInterfaceService(env);
@@ -378,13 +469,13 @@ async function tryCancelUpstreamVideoTask(
     modelCanonicalId: job.modelCanonicalId,
   });
   if (!iface) {
-    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+    return { deleted: false, skipped: true };
   }
 
   const videoEndpoints =
     iface.videoEndpoints ?? resolveOfficialVideoEndpoints();
   if (!videoEndpoints.supportsTaskCancel) {
-    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+    return { deleted: false, skipped: true };
   }
 
   const pollUrl =
@@ -407,12 +498,71 @@ async function tryCancelUpstreamVideoTask(
   });
 
   if (result.status === "skipped") {
-    return { upstreamCancelSkipped: true, upstreamCancelFailed: false };
+    return { deleted: false, skipped: true };
   }
   if (result.status === "failed") {
-    return { upstreamCancelSkipped: false, upstreamCancelFailed: true };
+    return { deleted: false, skipped: false };
   }
-  return { upstreamCancelSkipped: false, upstreamCancelFailed: false };
+  return { deleted: true, skipped: false };
+}
+
+async function cancelNonVideoGenerationJob(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<CancelGenerationJobResponse> {
+  if (job.status !== "pending" && job.status !== "generating") {
+    return toCancelGenerationJobResponse(db, job);
+  }
+
+  const cancelled = await finalizeJobCancelled(env, db, job);
+  if (cancelled?.status === "cancelled") {
+    return toCancelGenerationJobResponse(db, cancelled);
+  }
+
+  const latest = await getGenerationJob(db, job.id, job.organizationId);
+  return toCancelGenerationJobResponse(db, latest ?? job);
+}
+
+async function cancelVideoGenerationJob(
+  env: Bindings,
+  db: Database,
+  job: GenerationJobRecord
+): Promise<CancelGenerationJobResponse> {
+  const branch = resolveVideoCancelBranch({
+    jobStatus: job.status,
+    upstreamVideoStatus: job.resultJson?.upstreamVideoStatus,
+  });
+
+  if (branch === "already_cancelled") {
+    return toCancelGenerationJobResponse(db, job);
+  }
+
+  if (branch === "already_cancelling") {
+    await syncJobCancellingToWorkflow(env, job, true);
+    return toCancelGenerationJobResponse(db, job, { cancelPending: true });
+  }
+
+  if (branch === "blocked") {
+    return toCancelGenerationJobResponse(db, job);
+  }
+
+  if (branch === "delete_now") {
+    const upstream = await tryCancelUpstreamVideoTask(env, db, job);
+    if (!upstream.deleted) {
+      return enterVideoDeferredCancel(env, db, job);
+    }
+
+    const cancelled = await finalizeJobCancelled(env, db, job);
+    if (cancelled?.status === "cancelled") {
+      return toCancelGenerationJobResponse(db, cancelled);
+    }
+
+    const latest = await getGenerationJob(db, job.id, job.organizationId);
+    return toCancelGenerationJobResponse(db, latest ?? job);
+  }
+
+  return enterVideoDeferredCancel(env, db, job);
 }
 
 async function cancelGenerationJobRecord(
@@ -420,32 +570,11 @@ async function cancelGenerationJobRecord(
   db: Database,
   job: GenerationJobRecord
 ): Promise<CancelGenerationJobResponse> {
-  if (job.status === "cancelled") {
-    return toCancelGenerationJobResponse(db, job);
+  if (job.modality === "video" && job.upstreamTaskId) {
+    return cancelVideoGenerationJob(env, db, job);
   }
 
-  if (job.status !== "pending" && job.status !== "generating") {
-    return toCancelGenerationJobResponse(db, job);
-  }
-
-  const upstreamCancel = await tryCancelUpstreamVideoTask(env, db, job);
-
-  const cancelled = await updateGenerationJob(db, {
-    id: job.id,
-    organizationId: job.organizationId,
-    status: "cancelled",
-    expectedStatuses: ["pending", "generating"],
-    failureReason: "Generation cancelled",
-  });
-
-  if (cancelled) {
-    await syncGenerationJobInvocation(db, cancelled);
-    await writeGenerationJobCancelLog(db, cancelled);
-    return toCancelGenerationJobResponse(db, cancelled, upstreamCancel);
-  }
-
-  const latest = await getGenerationJob(db, job.id, job.organizationId);
-  return toCancelGenerationJobResponse(db, latest ?? job, upstreamCancel);
+  return cancelNonVideoGenerationJob(env, db, job);
 }
 
 export async function pollVideoGenerationJob(
@@ -472,11 +601,13 @@ export async function pollVideoGenerationJob(
     modelCanonicalId: job.modelCanonicalId,
   });
   if (!iface) {
+    const expectedStatuses =
+      job.status === "cancelling" ? (["cancelling"] as const) : (["generating"] as const);
     const failed = await updateGenerationJob(db, {
       id: job.id,
       organizationId: job.organizationId,
       status: "failed",
-      expectedStatuses: ["generating"],
+      expectedStatuses: [...expectedStatuses],
       failureReason: "Could not resolve AI interface",
     });
     if (failed) {
@@ -502,12 +633,17 @@ export async function pollVideoGenerationJob(
     upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
   });
 
+  const activeStatuses =
+    job.status === "cancelling"
+      ? (["cancelling"] as const)
+      : (["generating"] as const);
+
   if (pollResult.status === "failed") {
     const failed = await updateGenerationJob(db, {
       id: job.id,
       organizationId: job.organizationId,
       status: "failed",
-      expectedStatuses: ["generating"],
+      expectedStatuses: [...activeStatuses],
       failureReason: pollResult.error ?? "Video generation failed",
     });
     if (failed) {
@@ -523,6 +659,32 @@ export async function pollVideoGenerationJob(
 
   if (pollResult.status !== "completed" || !pollResult.videoUrl) {
     const upstreamVideoStatus = pollResult.upstreamPhase ?? "running";
+
+    if (job.status === "cancelling") {
+      if (upstreamVideoStatus === "queued") {
+        const upstream = await tryCancelUpstreamVideoTask(env, db, job);
+        if (upstream.deleted) {
+          const cancelled = await finalizeJobCancelled(env, db, job);
+          return cancelled ?? job;
+        }
+        return revertVideoCancelToGenerating(env, db, job);
+      }
+
+      return (
+        (await updateGenerationJob(db, {
+          id: job.id,
+          organizationId: job.organizationId,
+          status: "cancelling",
+          expectedStatuses: ["cancelling"],
+          resultJson: {
+            ...(job.resultJson ?? {}),
+            upstreamVideoStatus,
+            nextUpstreamPollAt: nextVideoUpstreamPollAt(upstreamVideoStatus),
+          },
+        })) ?? job
+      );
+    }
+
     return (
       (await updateGenerationJob(db, {
         id: job.id,
@@ -536,6 +698,10 @@ export async function pollVideoGenerationJob(
         },
       })) ?? job
     );
+  }
+
+  if (job.status === "cancelling") {
+    job = await revertVideoCancelToGenerating(env, db, job);
   }
 
   const readyAt = new Date().toISOString();
@@ -849,7 +1015,10 @@ export async function requestServerGenerationJobPersist(
     return toGetGenerationJobResponse(db, job);
   }
 
-  if (job.status === "generating" && job.modality === "video") {
+  if (
+    (job.status === "generating" || job.status === "cancelling") &&
+    job.modality === "video"
+  ) {
     job = await pollVideoGenerationJob(env, db, job);
   }
 
@@ -912,7 +1081,10 @@ export async function refreshGenerationJob(
     return null;
   }
 
-  if (job.status === "generating" && job.modality === "video") {
+  if (
+    (job.status === "generating" || job.status === "cancelling") &&
+    job.modality === "video"
+  ) {
     job = await pollVideoGenerationJob(env, db, job);
   }
 

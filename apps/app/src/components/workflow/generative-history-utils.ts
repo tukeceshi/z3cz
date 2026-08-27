@@ -1,5 +1,6 @@
 import {
   hasCloudAcceleratingResource,
+  hasCancellingResource,
   hasDisplayableWorkflowMedia,
   hasFailedResource,
   hasGeneratingResource,
@@ -34,12 +35,8 @@ export function resolveGenerativeCardPhase(
     return progressPhase;
   }
 
-  if (hasGeneratingResource(media)) {
-    return "generating";
-  }
-
-  if (hasCloudAcceleratingResource(media)) {
-    return "cloud_accelerating";
+  if (hasCancellingResource(media)) {
+    return "cancelling";
   }
 
   if (
@@ -48,6 +45,14 @@ export function resolveGenerativeCardPhase(
     progressPhase === "cancelled"
   ) {
     return progressPhase;
+  }
+
+  if (hasGeneratingResource(media)) {
+    return "generating";
+  }
+
+  if (hasCloudAcceleratingResource(media)) {
+    return "cloud_accelerating";
   }
 
   if (progressPhase === "server_persisting") {

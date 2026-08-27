@@ -2895,6 +2895,8 @@ export const en = {
         "Reference [{{label}}] contains a real-person image. Generation was rejected.",
       realPersonInReferenceHint:
         "Try converting the image to a painted or hand-drawn style before generating.",
+      copyrightPolicyViolation:
+        "Generation was rejected due to possible copyright restrictions.",
       generic: "Generation failed: {{detail}}",
       viewDetails: "Details",
       detailTitle: "Error details",

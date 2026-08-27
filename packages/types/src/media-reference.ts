@@ -23,6 +23,8 @@ export interface ResourceIdReference {
   readonly contentSha256?: string;
   /** Upstream still generating. Not a download/upload state. */
   readonly generating?: boolean;
+  /** User requested cancel; upstream task may still be running. */
+  readonly cancelling?: boolean;
   /** Generate failed. No media to load; look up error via history jobId. */
   readonly failed?: boolean;
   /** Cloud upload failed; media is available in this browser only. */
@@ -142,6 +144,10 @@ export function isGeneratingResourceRef(value: unknown): boolean {
   return isResourceIdReference(value) && value.generating === true;
 }
 
+export function isCancellingResourceRef(value: unknown): boolean {
+  return isResourceIdReference(value) && value.cancelling === true;
+}
+
 export function isFailedResourceRef(value: unknown): boolean {
   return isResourceIdReference(value) && value.failed === true;
 }
@@ -157,6 +163,7 @@ export function isCloudAcceleratingResourceRef(value: unknown): boolean {
 export function isUnloadedResourceRef(value: unknown): boolean {
   return (
     isGeneratingResourceRef(value) ||
+    isCancellingResourceRef(value) ||
     isFailedResourceRef(value) ||
     isCloudAcceleratingResourceRef(value)
   );
@@ -166,6 +173,12 @@ export function hasGeneratingResource(
   values: readonly unknown[] | undefined
 ): boolean {
   return Boolean(values?.some(isGeneratingResourceRef));
+}
+
+export function hasCancellingResource(
+  values: readonly unknown[] | undefined
+): boolean {
+  return Boolean(values?.some(isCancellingResourceRef));
 }
 
 export function hasCloudAcceleratingResource(

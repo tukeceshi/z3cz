@@ -19,8 +19,8 @@ import { readVideoTaskCancelSupportFromMetadata } from "./generative-reference-m
 import { GENERATIVE_CARD_STATE_LABEL_CLASS } from "./generative-card-styles";
 import {
   formatGenerativeBusyOverlayLabel,
-  isGenerativePhaseCancellable,
   isGenerativeProgressBusyPhase,
+  isVideoStopButtonVisible,
   readGenerativeProgressPhase,
   type GenerativeProgressPhase,
 } from "./generative-progress-utils";
@@ -154,12 +154,16 @@ export function GenerativeBusyOverlay({
   const overlayProgressPhase =
     progressPhase ??
     (modalityBusy && modality !== "audio" ? ("generating" as const) : null);
+  const supportsTaskCancel = readVideoTaskCancelSupportFromMetadata(metadata);
   const showCancel =
     modality === "video" &&
     showOverlay &&
     Boolean(nodeId) &&
-    progressPhase !== "cancelling" &&
-    isGenerativePhaseCancellable(overlayProgressPhase);
+    isVideoStopButtonVisible({
+      metadata,
+      overlayPhase: overlayProgressPhase,
+      supportsTaskCancel,
+    });
 
   const handleCancel = useCallback(() => {
     if (!showCancel || !nodeId) {
@@ -332,9 +336,11 @@ export function WorkflowNodeGenerativeBusyOverlay({
   const showCancel =
     isAiVideoNode &&
     visible &&
-    supportsTaskCancel &&
-    progressPhase !== "cancelling" &&
-    isGenerativePhaseCancellable(overlayProgressPhase);
+    isVideoStopButtonVisible({
+      metadata,
+      overlayPhase: overlayProgressPhase,
+      supportsTaskCancel,
+    });
 
   const handleCancel = useCallback(() => {
     if (!showCancel) {

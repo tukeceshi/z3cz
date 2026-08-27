@@ -12,6 +12,7 @@ import {
   applyVideoPriceEstimateDisplayFolds,
   EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES,
   formatVideoBillingTokensDisplay,
+  formatVideoPriceEstimateCostDisplay,
   formatVideoPriceEstimateSummary,
   isVideoPriceEstimateEnabled,
   parsePublicVideoPriceEstimatesCache,
@@ -309,6 +310,16 @@ describe("formatVideoPriceEstimateSummary", () => {
   it("formats one-decimal cost and mega tokens with yen symbol", () => {
     expect(formatVideoPriceEstimateSummary(5.04, 128_000)).toBe("约5.0￥~0.1M");
     expect(formatVideoPriceEstimateSummary(1.44, 320_000)).toBe("约1.4￥~0.3M");
+  });
+});
+
+describe("formatVideoPriceEstimateCostDisplay", () => {
+  it("formats yuan amount without unit and strips trailing zeros", () => {
+    expect(formatVideoPriceEstimateCostDisplay(1.11)).toBe("1.11");
+    expect(formatVideoPriceEstimateCostDisplay(5.04)).toBe("5.04");
+    expect(formatVideoPriceEstimateCostDisplay(1.1)).toBe("1.1");
+    expect(formatVideoPriceEstimateCostDisplay(2)).toBe("2");
+    expect(formatVideoPriceEstimateCostDisplay(0)).toBe("0");
   });
 });
 

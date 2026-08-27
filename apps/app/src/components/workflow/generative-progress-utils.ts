@@ -10,6 +10,7 @@ export type GenerativeProgressPhase =
 
 const GENERATIVE_JOB_ID_META_KEY = "genJobId";
 const GENERATIVE_PROGRESS_PHASE_META_KEY = "genProgressPhase";
+const GENERATIVE_UPSTREAM_PHASE_META_KEY = "genUpstreamPhase";
 const GENERATIVE_STAGING_MEDIA_IDS_META_KEY = "genStagingMediaIds";
 const GENERATIVE_PROGRESS_STARTED_AT_META_KEY = "genProgressStartedAt";
 const GENERATIVE_DOWNLOAD_PERCENT_META_KEY = "genDownloadPercent";
@@ -39,6 +40,24 @@ export function readGenerativeProgressPhase(
     return value as GenerativeProgressPhase;
   }
   return undefined;
+}
+
+export type ClientUpstreamPollPhase = "queued" | "running";
+
+export function readClientUpstreamPollPhase(
+  metadata: Record<string, string> | undefined
+): ClientUpstreamPollPhase | undefined {
+  const value = metadata?.[GENERATIVE_UPSTREAM_PHASE_META_KEY];
+  if (value === "queued" || value === "running") {
+    return value;
+  }
+  return undefined;
+}
+
+export function isClientUpstreamQueued(
+  metadata: Record<string, string> | undefined
+): boolean {
+  return readClientUpstreamPollPhase(metadata) === "queued";
 }
 
 export function readGenerativeProgressStartedAt(
@@ -99,6 +118,7 @@ export function withGenerativeProgress(
   params: {
     readonly jobId?: string | null;
     readonly phase?: GenerativeProgressPhase | null;
+    readonly upstreamPhase?: ClientUpstreamPollPhase | null;
     readonly stagingMediaIds?: readonly string[] | null;
     readonly downloadPercent?: number | null;
   }
@@ -125,6 +145,16 @@ export function withGenerativeProgress(
     }
   }
 
+  if (params.upstreamPhase === null) {
+    delete next[GENERATIVE_UPSTREAM_PHASE_META_KEY];
+  } else if (params.upstreamPhase) {
+    next[GENERATIVE_UPSTREAM_PHASE_META_KEY] = params.upstreamPhase;
+  } else if (params.phase === "queued") {
+    next[GENERATIVE_UPSTREAM_PHASE_META_KEY] = "queued";
+  } else if (params.phase === "generating") {
+    next[GENERATIVE_UPSTREAM_PHASE_META_KEY] = "running";
+  }
+
   if (params.stagingMediaIds === null) {
     delete next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY];
   } else if (params.stagingMediaIds && params.stagingMediaIds.length > 0) {
@@ -146,6 +176,7 @@ export function clearGenerativeProgress(
   return withGenerativeProgress(metadata, {
     jobId: null,
     phase: null,
+    upstreamPhase: null,
     stagingMediaIds: null,
   });
 }
@@ -172,11 +203,28 @@ export function isGenerativeProgressActive(
   return Boolean(readGenerativeProgressPhase(metadata));
 }
 
-/** User may abort only while upstream generation is still running. */
 export function isGenerativePhaseCancellable(
   phase: GenerativeProgressPhase | null | undefined
 ): boolean {
   return phase === "queued" || phase === "generating";
+}
+
+/** Video stop button — existing UI gates plus client poll must report queued. */
+export function isVideoStopButtonVisible(params: {
+  readonly metadata: Record<string, string> | undefined;
+  readonly overlayPhase: GenerativeProgressPhase | null | undefined;
+  readonly supportsTaskCancel: boolean;
+}): boolean {
+  if (params.supportsTaskCancel !== true) {
+    return false;
+  }
+  if (readGenerativeProgressPhase(params.metadata) === "cancelling") {
+    return false;
+  }
+  return (
+    isGenerativePhaseCancellable(params.overlayPhase) &&
+    isClientUpstreamQueued(params.metadata)
+  );
 }
 
 export function isGenerativePersistPhase(

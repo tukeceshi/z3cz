@@ -268,6 +268,7 @@ function applyKindToMedia(
   const shouldClearTransientFlags =
     kind === "cloud" &&
     (media.generating === true ||
+      media.cancelling === true ||
       media.cloudAccelerationStatus !== undefined ||
       media.failed === true);
   if (!kind || media.kind === kind) {
@@ -284,6 +285,7 @@ function stripTransientMediaFlags(
   }
   const {
     generating: _generating,
+    cancelling: _cancelling,
     cloudAccelerationStatus: _cloudAccelerationStatus,
     failed: _failed,
     ...rest
@@ -457,6 +459,200 @@ export function patchNodeMediaCloudAccelerationStatus(
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  return null;
+}
+
+function applyCancellingStatusToMedia(
+  media: WorkflowMediaValue,
+  resourceIdSet: ReadonlySet<string>,
+  cancelling: boolean
+): WorkflowMediaValue {
+  if (!isResourceIdReference(media) || !resourceIdSet.has(media.resourceId)) {
+    return media;
+  }
+  if (cancelling) {
+    if (media.cancelling === true) {
+      return media;
+    }
+    return { ...media, cancelling: true };
+  }
+  if (media.cancelling !== true) {
+    return media;
+  }
+  const { cancelling: _cancelling, ...rest } = media;
+  return rest;
+}
+
+function applyCancellingStatusToMediaList(
+  media: readonly WorkflowMediaValue[],
+  resourceIdSet: ReadonlySet<string>,
+  cancelling: boolean
+): readonly WorkflowMediaValue[] {
+  return media.map((entry) =>
+    applyCancellingStatusToMedia(entry, resourceIdSet, cancelling)
+  );
+}
+
+function cancellingMediaListChanged(
+  previous: readonly WorkflowMediaValue[],
+  next: readonly WorkflowMediaValue[]
+): boolean {
+  if (previous.length !== next.length) {
+    return true;
+  }
+  return previous.some((entry, index) => entry !== next[index]);
+}
+
+/** Write cancel-in-progress onto matching media refs in workflow node JSON. */
+export function patchNodeMediaCancellingStatus(
+  node: Node,
+  params: {
+    readonly resourceIds: readonly string[];
+    readonly cancelling: boolean;
+  }
+): Partial<Node> | null {
+  const resourceIdSet = new Set(
+    params.resourceIds.filter((id) => id.trim().length > 0)
+  );
+  if (resourceIdSet.size === 0) {
+    return null;
+  }
+
+  if (node.type === AI_IMAGE_NODE_TYPE) {
+    const history = readImageHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      images: applyCancellingStatusToMediaList(
+        item.images,
+        resourceIdSet,
+        params.cancelling
+      ),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_IMAGE_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        cancellingMediaListChanged(history.items[index]!.images, item.images)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      cancellingMediaListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_IMAGE_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_VIDEO_NODE_TYPE) {
+    const history = readVideoHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      videos: applyCancellingStatusToMediaList(
+        item.videos,
+        resourceIdSet,
+        params.cancelling
+      ),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_VIDEO_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        cancellingMediaListChanged(history.items[index]!.videos, item.videos)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      cancellingMediaListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_VIDEO_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
+        ? ({ ...output, value: [...nextResult] } as Parameter)
+        : output
+    );
+    return { inputs, outputs };
+  }
+
+  if (node.type === AI_AUDIO_NODE_TYPE) {
+    const history = readAudioHistory(node.inputs);
+    const nextItems = history.items.map((item) => ({
+      ...item,
+      audios: applyCancellingStatusToMediaList(
+        item.audios,
+        resourceIdSet,
+        params.cancelling
+      ),
+    }));
+    const result = readJsonInput<WorkflowMediaValue[]>(
+      node.inputs,
+      AI_AUDIO_RESULT_INPUT
+    );
+    const nextResult = Array.isArray(result)
+      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      : result;
+    const historyChanged = nextItems.some(
+      (item, index) =>
+        cancellingMediaListChanged(history.items[index]!.audios, item.audios)
+    );
+    const resultChanged =
+      Array.isArray(result) &&
+      Array.isArray(nextResult) &&
+      cancellingMediaListChanged(result, nextResult);
+    if (!historyChanged && !resultChanged) {
+      return null;
+    }
+    let inputs = upsertNodeInput(
+      node.inputs,
+      AI_AUDIO_HISTORY_INPUT,
+      { ...history, items: nextItems },
+      "json"
+    );
+    if (resultChanged && nextResult) {
+      inputs = upsertNodeInput(inputs, AI_AUDIO_RESULT_INPUT, [...nextResult], "json");
+    }
+    const outputs = node.outputs.map((output) =>
+      output.name === AI_AUDIO_OUTPUT && Array.isArray(nextResult)
         ? ({ ...output, value: [...nextResult] } as Parameter)
         : output
     );

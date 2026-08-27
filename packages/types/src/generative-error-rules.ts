@@ -131,6 +131,15 @@ export const GENERATIVE_ERROR_RULES: readonly GenerativeErrorRule[] = [
     appliesTo: ["video"],
   },
   {
+    id: "copyrightPolicyViolation",
+    pattern:
+      /SensitiveContentDetected\.PolicyViolation|copyright\s+restrictions|版权/iu,
+    zh: "生成内容可能涉及版权限制，生成被拒绝",
+    en: "Generation was rejected due to possible copyright restrictions.",
+    i18nKey: "workflow.generativeErrors.copyrightPolicyViolation",
+    appliesTo: ["video"],
+  },
+  {
     id: "generationFailed",
     pattern: /video generation failed|generation failed/iu,
     zh: "生成失败，请稍后重试",

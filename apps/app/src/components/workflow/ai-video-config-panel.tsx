@@ -57,8 +57,8 @@ import { useOpenCreativeStudio } from "./creative-studio-context";
 import {
   clearGenerativeProgress,
   formatGenerativeBusyOverlayLabel,
-  isGenerativePhaseCancellable,
   isGenerativeProgressBusyPhase,
+  isVideoStopButtonVisible,
   readGenerativeProgressPhase,
   withGenerativeProgress,
 } from "./generative-progress-utils";
@@ -563,7 +563,7 @@ export function AiVideoConfigPanel({
   );
 
   const applyCancelledUiState = useCallback(
-    (response?: CancelGenerationJobResponse) => {
+    (_response?: CancelGenerationJobResponse) => {
       setPersistPhase(null);
       setIsGenerating(false);
       generateInFlightRef.current = false;
@@ -576,15 +576,19 @@ export function AiVideoConfigPanel({
           null
         ),
       }));
-      if (response?.upstreamCancelSkipped) {
-        toast.info("workflow.generativeCancel.upstreamSkipped");
-      } else if (response?.upstreamCancelFailed) {
-        toast.info("workflow.generativeCancel.upstreamFailed");
-      }
       showGenerativeCancelledNotice(nodeId);
     },
-    [nodeId, toast, updateNodeData]
+    [nodeId, updateNodeData]
   );
+
+  const restoreActiveGenerationUi = useCallback(() => {
+    updateNodeData?.(nodeId, (current) => ({
+      metadata: withGenerativeProgress(
+        withAiVideoGeneratingFlag(current.metadata, true),
+        { phase: "generating", upstreamPhase: "running" }
+      ),
+    }));
+  }, [nodeId, updateNodeData]);
 
   const {
     beginSession,
@@ -600,6 +604,15 @@ export function AiVideoConfigPanel({
     orgId,
     metadata: data.metadata,
     onCancelConfirmed: applyCancelledUiState,
+    onCancelDeferred: (response) => {
+      updateNodeData?.(nodeId, (current) => ({
+        metadata: withGenerativeProgress(
+          withAiVideoGeneratingFlag(current.metadata, true),
+          { jobId: response.job.id, phase: "cancelling" }
+        ),
+      }));
+    },
+    onCancelNotApplied: restoreActiveGenerationUi,
     setIsGenerating,
     setPersistPhase,
     generateInFlightRef,
@@ -1071,10 +1084,7 @@ export function AiVideoConfigPanel({
           }
 
           const deferredResult = await flushDeferredCancelIfPending();
-          if (
-            deferredResult?.kind === "cancelled" ||
-            isCancelConfirmed()
-          ) {
+          if (deferredResult?.kind === "cancelled" || isCancelConfirmed()) {
             throw new GenerativeGenerationCancelledError();
           }
           if (deferredResult?.kind === "completed") {
@@ -1338,9 +1348,11 @@ export function AiVideoConfigPanel({
     }
   };
 
-  const canCancelGeneration =
-    isGenerativePhaseCancellable(activeProgressPhase) &&
-    effectiveModel?.supportsTaskCancel === true;
+  const canCancelGeneration = isVideoStopButtonVisible({
+    metadata: data.metadata,
+    overlayPhase: activeProgressPhase,
+    supportsTaskCancel: effectiveModel?.supportsTaskCancel === true,
+  });
 
   const handleCancelGeneration = async (): Promise<void> => {
     if (cancelInFlightRef.current || isCancelling) {
@@ -1358,7 +1370,15 @@ export function AiVideoConfigPanel({
 
     try {
       const result = await cancelGeneration();
-      if (result.kind === "pending" || result.kind === "cancelled") {
+      if (
+        result.kind === "pending" ||
+        result.kind === "cancelled" ||
+        result.kind === "cancelling"
+      ) {
+        return;
+      }
+      if (result.kind === "not_applied") {
+        syncProgress({ phase: "generating", upstreamPhase: "running" });
         return;
       }
       if (result.kind !== "completed" || !orgId || !updateNodeData) {
@@ -1439,14 +1459,7 @@ export function AiVideoConfigPanel({
       }
     } catch (error) {
       if (isGenerativeGenerationCancelRejected(error)) {
-        toast.error("workflow.generativeCancel.failed");
-        syncProgress({ phase: "generating" });
-        updateNodeData?.(nodeId, (current) => ({
-          metadata: withGenerativeProgress(
-            withAiVideoGeneratingFlag(current.metadata, true),
-            { phase: "generating" }
-          ),
-        }));
+        syncProgress({ phase: "generating", upstreamPhase: "running" });
         return;
       }
       finalizeCancelUiState();
