@@ -646,6 +646,12 @@ html[data-wf-shift-held] .workflow-canvas .wf-node-bottom-panel,
   pointer-events: none;
 }
 
+html[data-wf-shift-held] .workflow-canvas .wf-node-top-toolbar,
+.wf-multi-selected .wf-node-top-toolbar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Shift box-select: expand multi-drag rect 30px beyond node bounds (visual + hit area). */
 .workflow-canvas .react-flow__nodesselection-rect {
   box-sizing: content-box;
