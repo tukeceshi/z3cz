@@ -7,9 +7,7 @@ import Type from "lucide-react/icons/type";
 import Undo2 from "lucide-react/icons/undo-2";
 import Video from "lucide-react/icons/video";
 import {
-  useRef,
   useState,
-  type ChangeEvent,
   type MouseEvent,
   type ReactNode,
   type RefObject,
@@ -30,7 +28,6 @@ import {
   canvasDockIconClassName,
 } from "./canvas-chrome-styles";
 import { CanvasShortcutHintButton } from "./canvas-shortcut-hint";
-import { GENERATIVE_CANVAS_FILE_ACCEPT } from "./generative-card-upload-utils";
 
 function DockDivider() {
   return <div className={canvasDockDividerClassName} aria-hidden />;
@@ -70,8 +67,9 @@ export interface WorkflowCanvasBottomToolbarProps {
   readonly canRedo: boolean;
   readonly onUndo?: () => void;
   readonly onRedo?: () => void;
-  readonly onPickCanvasFiles?: (files: readonly File[]) => void;
-  readonly onQuickAddAiNode?: (nodeType: "ai-image" | "ai-video" | "ai-audio") => void;
+  readonly onQuickAddAiNode?: (
+    nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio"
+  ) => void;
   readonly onApplyLayout?: () => void;
   readonly onFitToScreen?: (event: MouseEvent) => void;
   readonly onZoomOneToOne?: (event: MouseEvent) => void;
@@ -87,7 +85,6 @@ export function WorkflowCanvasBottomToolbar({
   canRedo,
   onUndo,
   onRedo,
-  onPickCanvasFiles,
   onQuickAddAiNode,
   onApplyLayout,
   onFitToScreen,
@@ -98,22 +95,7 @@ export function WorkflowCanvasBottomToolbar({
   keyboardRef,
 }: WorkflowCanvasBottomToolbarProps) {
   const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showOneToOne, setShowOneToOne] = useState(false);
-
-  const handlePickFileClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    fileInputRef.current?.click();
-  };
-
-  const handleFileInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files ? [...event.target.files] : [];
-    event.target.value = "";
-    if (files.length === 0) {
-      return;
-    }
-    onPickCanvasFiles?.(files);
-  };
 
   const handleFitToggle = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -128,19 +110,6 @@ export function WorkflowCanvasBottomToolbar({
 
   return (
     <div className={cn("relative flex flex-row items-center")}>
-      {onPickCanvasFiles ? (
-        <input
-          ref={fileInputRef}
-          id="workflow-canvas-pick-files"
-          name="canvas_pick_files"
-          type="file"
-          className="hidden"
-          multiple
-          accept={GENERATIVE_CANVAS_FILE_ACCEPT}
-          onChange={handleFileInputChange}
-        />
-      ) : null}
-
       <div className={cn("nodrag nopan nowheel", canvasDockBarClassName)}>
         <div className="flex items-center gap-1">
           <DockButton
@@ -165,49 +134,46 @@ export function WorkflowCanvasBottomToolbar({
           </DockButton>
         </div>
 
-        {!disabled && (onPickCanvasFiles || onQuickAddAiNode) ? (
+        {!disabled && onQuickAddAiNode ? (
           <>
             <DockDivider />
             <div className="flex items-center gap-1">
-              {onPickCanvasFiles ? (
-                <DockButton
-                  tooltip={t("workflow.canvas.pickFile")}
-                  onClick={handlePickFileClick}
-                >
-                  <Type className={canvasDockIconClassName} />
-                </DockButton>
-              ) : null}
-              {onQuickAddAiNode ? (
-                <>
-                  <DockButton
-                    tooltip={t("workflow.canvas.aiImage")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onQuickAddAiNode("ai-image");
-                    }}
-                  >
-                    <Image className={canvasDockIconClassName} />
-                  </DockButton>
-                  <DockButton
-                    tooltip={t("workflow.canvas.aiVideo")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onQuickAddAiNode("ai-video");
-                    }}
-                  >
-                    <Video className={canvasDockIconClassName} />
-                  </DockButton>
-                  <DockButton
-                    tooltip={t("workflow.canvas.aiAudio")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onQuickAddAiNode("ai-audio");
-                    }}
-                  >
-                    <Music className={canvasDockIconClassName} />
-                  </DockButton>
-                </>
-              ) : null}
+              <DockButton
+                tooltip={t("workflow.canvas.aiText")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickAddAiNode("ai-text");
+                }}
+              >
+                <Type className={canvasDockIconClassName} />
+              </DockButton>
+              <DockButton
+                tooltip={t("workflow.canvas.aiImage")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickAddAiNode("ai-image");
+                }}
+              >
+                <Image className={canvasDockIconClassName} />
+              </DockButton>
+              <DockButton
+                tooltip={t("workflow.canvas.aiVideo")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickAddAiNode("ai-video");
+                }}
+              >
+                <Video className={canvasDockIconClassName} />
+              </DockButton>
+              <DockButton
+                tooltip={t("workflow.canvas.aiAudio")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickAddAiNode("ai-audio");
+                }}
+              >
+                <Music className={canvasDockIconClassName} />
+              </DockButton>
             </div>
           </>
         ) : null}
