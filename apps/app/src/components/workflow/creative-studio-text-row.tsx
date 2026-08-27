@@ -13,6 +13,7 @@ import {
 } from "./creative-studio-surface";
 import { useCreativeStudio } from "./creative-studio-context";
 import { studioReferenceDragSourceProps } from "./studio-reference-drag";
+import { useGenerativeNodeCardHydrate } from "./use-generative-node-card-hydrate";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioTextRowProps {
@@ -28,6 +29,7 @@ export function CreativeStudioTextRow({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioTextRowProps) {
+  useGenerativeNodeCardHydrate(node);
   const { isListNodeRenaming } = useCreativeStudio();
   const resolvedText = useResolvedAiText({
     inputs: node.data.inputs,

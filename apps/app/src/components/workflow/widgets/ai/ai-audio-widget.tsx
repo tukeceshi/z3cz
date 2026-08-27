@@ -71,6 +71,7 @@ import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-uploa
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { CanvasAudioCover } from "../../canvas-media-cover";
 import { useWorkflow } from "../../workflow-context";
+import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
@@ -92,6 +93,7 @@ function AiAudioWidget({
   prompt,
   metadata,
 }: AiAudioWidgetProps) {
+  useGenerativeNodeCardHydrateById(nodeId);
   const { t } = useTranslation();
   const toast = useAppToast();
   const { organization } = useAuth();

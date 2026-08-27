@@ -31,9 +31,7 @@ import type { DetachConfirmSource, PendingDetachConfirm } from "./use-graph-hist
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useWorkflowState } from "./use-workflow-state";
 import { useOptionalCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
-import { useWorkflowMediaReconcile } from "./use-workflow-media-reconcile";
 import { InlineAiTextMigrationHost } from "./inline-ai-text-migration-host";
-import { resolveWorkflowNodeDimensions } from "./workflow-node-placement";
 import { WorkflowCanvas } from "./workflow-canvas";
 import { CloudStorageCanvasProvider } from "./cloud-storage-canvas-provider";
 import {
@@ -367,15 +365,6 @@ export function WorkflowBuilder({
     requestDetachConfirm,
   });
 
-  useWorkflowMediaReconcile({
-    organizationId: orgId,
-    workflowId,
-    graphReady,
-    enabled: !isCanvasFrozen,
-    nodes,
-    setNodes,
-  });
-
   const handleQuickAddAiNode = useCallback(
     (nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio") => {
       const template = nodeTypes.find((item) => item.type === nodeType);
@@ -533,15 +522,16 @@ export function WorkflowBuilder({
         ReactFlowNode<WorkflowNodeType>,
         ReactFlowEdge<WorkflowEdgeType>
       >,
-      viewport: WorkflowEditorViewport
+      viewport: WorkflowEditorViewport,
+      options?: { readonly force?: boolean }
     ) => {
       const viewportKey = JSON.stringify(viewport);
-      if (appliedViewportKeyRef.current === viewportKey) {
+      if (!options?.force && appliedViewportKeyRef.current === viewportKey) {
         return;
       }
 
       const live = instance.getViewport();
-      if (viewportNearlyEqual(live, viewport)) {
+      if (!options?.force && viewportNearlyEqual(live, viewport)) {
         appliedViewportKeyRef.current = viewportKey;
         return;
       }
@@ -563,6 +553,19 @@ export function WorkflowBuilder({
     },
     [enableViewportPersistence]
   );
+
+  const restoreEditorViewportAfterStudio = useCallback(() => {
+    if (
+      !reactFlowInstance ||
+      !savedEditorViewport ||
+      !isValidWorkflowEditorViewport(savedEditorViewport)
+    ) {
+      return;
+    }
+    restoreSavedEditorViewport(reactFlowInstance, savedEditorViewport, {
+      force: true,
+    });
+  }, [reactFlowInstance, restoreSavedEditorViewport, savedEditorViewport]);
 
   useEffect(() => {
     if (
@@ -710,30 +713,6 @@ export function WorkflowBuilder({
     [selectNode]
   );
 
-  const handleReturnToCanvasFromDetail = useCallback(
-    (nodeId: string | null) => {
-      if (!nodeId || !reactFlowInstance) return;
-
-      selectNode(nodeId);
-      suppressViewportPersistEndRef.current = true;
-
-      const node = reactFlowInstance.getNode(nodeId);
-      if (!node) return;
-
-      const { width, height } = resolveWorkflowNodeDimensions(
-        node.data.nodeType,
-        node
-      );
-      const { zoom } = reactFlowInstance.getViewport();
-      void reactFlowInstance.setCenter(
-        node.position.x + width / 2,
-        node.position.y + height / 2,
-        { zoom, duration: 300 }
-      );
-    },
-    [reactFlowInstance, selectNode]
-  );
-
   return (
     <ReactFlowProvider>
       <WorkflowProvider
@@ -755,7 +734,7 @@ export function WorkflowBuilder({
         <CreativeStudioProvider
           workflowId={workflowId}
           onReturnToCanvas={handleReturnToCanvas}
-          onReturnToCanvasFromDetail={handleReturnToCanvasFromDetail}
+          onReturnToCanvasFromDetail={handleReturnToCanvas}
           onAddGenerativeNode={
             readOnly ? undefined : handleAddGenerativeNode
           }
@@ -851,6 +830,9 @@ export function WorkflowBuilder({
                       : onEditorViewportGestureEnd
                   }
                   suppressViewportPersistEndRef={suppressViewportPersistEndRef}
+                  onRestoreEditorViewportAfterStudio={
+                    restoreEditorViewportAfterStudio
+                  }
                   soleSelectedNodeId={soleSelectedNodeId}
                   addNodeMenu={addNodeMenu}
                   onAddNodeMenuSelect={
@@ -983,6 +965,7 @@ type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas> & {
   readonly onSelectDroppedNodes?: (nodeIds: readonly string[]) => void;
   /** When true, studio overlay sits below floating canvas chrome. */
   readonly reserveTopChromeSpace?: boolean;
+  readonly onRestoreEditorViewportAfterStudio?: () => void;
 };
 
 function WorkflowEditorMainArea({
@@ -992,6 +975,7 @@ function WorkflowEditorMainArea({
   onSelectDroppedNodes,
   reserveTopChromeSpace = false,
   suppressViewportPersistEndRef,
+  onRestoreEditorViewportAfterStudio,
   ...props
 }: WorkflowEditorMainAreaProps) {
   useGenerativeMediaBeforeUnloadGuard();
@@ -1017,11 +1001,18 @@ function WorkflowEditorMainArea({
   const wasStudioRef = useRef(isStudio);
 
   useEffect(() => {
-    if (wasStudioRef.current && !isStudio && suppressViewportPersistEndRef) {
-      suppressViewportPersistEndRef.current = true;
+    if (wasStudioRef.current && !isStudio) {
+      if (suppressViewportPersistEndRef) {
+        suppressViewportPersistEndRef.current = true;
+      }
+      onRestoreEditorViewportAfterStudio?.();
     }
     wasStudioRef.current = isStudio;
-  }, [isStudio, suppressViewportPersistEndRef]);
+  }, [
+    isStudio,
+    onRestoreEditorViewportAfterStudio,
+    suppressViewportPersistEndRef,
+  ]);
 
   return (
     <div className="relative h-full w-full min-h-0">
