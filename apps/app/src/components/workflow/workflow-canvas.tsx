@@ -94,7 +94,9 @@ export interface WorkflowCanvasProps {
       ReactFlowEdge<WorkflowEdgeType>
     >
   ) => void;
-  onQuickAddAiNode?: (nodeType: "ai-image" | "ai-video" | "ai-audio") => void;
+  onQuickAddAiNode?: (
+    nodeType: "ai-text" | "ai-image" | "ai-video" | "ai-audio"
+  ) => void;
   onPickCanvasFiles?: (files: readonly File[]) => void;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -399,7 +401,6 @@ export function WorkflowCanvas({
                 canRedo={canRedo}
                 onUndo={onUndo}
                 onRedo={onRedo}
-                onPickCanvasFiles={onPickCanvasFiles}
                 onQuickAddAiNode={onQuickAddAiNode}
                 onApplyLayout={onApplyLayout}
                 onFitToScreen={onFitToScreen}
