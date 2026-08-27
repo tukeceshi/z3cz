@@ -55,6 +55,15 @@ describe("readStudioMediaCardState", () => {
     expect(state.isBusy).toBe(true);
   });
 
+  it("prefers cancelling on node json over generating", () => {
+    const state = readStudioMediaCardState(undefined, true, [
+      { resourceId: "res-1", generating: true, cancelling: true },
+    ]);
+    expect(state.placeholderKey).toBe("workflow.aiVideoPanel.cardCancelling");
+    expect(state.phase).toBe("cancelling");
+    expect(state.isBusy).toBe(true);
+  });
+
   it("keeps download phase over resource generating", () => {
     const state = readStudioMediaCardState(
       { genProgressPhase: "downloading" },

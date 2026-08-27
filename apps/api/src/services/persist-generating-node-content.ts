@@ -18,6 +18,7 @@ import {
   finalizeVideoGeneratingContent,
   mediaReferenceToWorkflowValue,
   patchNodeMediaCloudAccelerationStatus,
+  patchNodeMediaCancellingStatus,
   patchNodeMediaResourceKinds,
 } from "@dafthunk/types";
 
@@ -463,6 +464,110 @@ export async function persistWorkflowMediaCloudAccelerationStatus(
   }
 
   return patch;
+}
+
+export async function persistWorkflowMediaCancellingStatus(
+  env: Bindings,
+  params: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly resourceIds: readonly string[];
+    readonly cancelling: boolean;
+  }
+): Promise<WorkflowNodeContentPatch | null> {
+  const workflowId = params.workflowId?.trim();
+  const nodeId = params.nodeId?.trim();
+  if (!workflowId || !nodeId || params.resourceIds.length === 0) {
+    return null;
+  }
+
+  const workflowStore = new WorkflowStore(env);
+  const workflowWithData = await workflowStore.getWithData(
+    workflowId,
+    params.organizationId
+  );
+  if (!workflowWithData) {
+    return null;
+  }
+
+  const nodeIndex = workflowWithData.data.nodes.findIndex(
+    (node) => node.id === nodeId
+  );
+  if (nodeIndex < 0) {
+    return null;
+  }
+
+  const node = workflowWithData.data.nodes[nodeIndex]!;
+  const contentPatch = patchNodeMediaCancellingStatus(node, {
+    resourceIds: params.resourceIds,
+    cancelling: params.cancelling,
+  });
+  if (!contentPatch) {
+    return null;
+  }
+
+  const updatedNode = { ...node, ...contentPatch };
+  const nodes = [...workflowWithData.data.nodes];
+  nodes[nodeIndex] = updatedNode;
+
+  const workflowRecord: SaveWorkflowRecord = {
+    id: workflowWithData.id,
+    name: workflowWithData.name,
+    description: workflowWithData.description ?? undefined,
+    schemeId: workflowWithData.schemeId,
+    trigger: workflowWithData.trigger,
+    runtime: workflowWithData.runtime,
+    organizationId: params.organizationId,
+    folderId: workflowWithData.folderId,
+    coverObjectId: workflowWithData.coverObjectId,
+    coverMimeType: workflowWithData.coverMimeType,
+    nodes,
+    edges: workflowWithData.data.edges,
+    editorViewport: workflowWithData.data.editorViewport,
+    generativeDefaults: workflowWithData.data.generativeDefaults,
+    createdAt: workflowWithData.createdAt,
+    updatedAt: new Date(),
+  };
+
+  await workflowStore.save(workflowRecord);
+
+  const patch = buildWorkflowNodeContentPatch(node, updatedNode);
+  if (patch) {
+    await nodeWorkflowSessionHub.broadcastServerNodeUpdate(
+      env,
+      workflowId,
+      updatedNode
+    );
+  }
+
+  return patch;
+}
+
+export async function persistJobCancellingNodeContent(
+  env: Bindings,
+  job: {
+    readonly organizationId: string;
+    readonly workflowId?: string | null;
+    readonly nodeId?: string | null;
+    readonly resultJson?: {
+      readonly placeholderResourceIds?: readonly string[] | null;
+    } | null;
+  },
+  cancelling: boolean
+): Promise<WorkflowNodeContentPatch | null> {
+  const resourceIds = job.resultJson?.placeholderResourceIds ?? [];
+  if (resourceIds.length === 0) {
+    return null;
+  }
+
+  return persistWorkflowMediaCancellingStatus(env, {
+    organizationId: job.organizationId,
+    workflowId: job.workflowId,
+    nodeId: job.nodeId,
+    resourceIds,
+    cancelling,
+  });
 }
 
 export async function persistJobCloudAccelerationStatus(

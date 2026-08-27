@@ -48,6 +48,12 @@ describe("resolveGenerationJobDisplayPhase", () => {
     ).toBe("generating");
   });
 
+  it("maps cancelling status", () => {
+    expect(
+      resolveGenerationJobDisplayPhase(makeJob({ status: "cancelling" }))
+    ).toBe("cancelling");
+  });
+
   it("maps queued upstream video status", () => {
     expect(
       resolveGenerationJobDisplayPhase(

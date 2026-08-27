@@ -633,7 +633,7 @@ export function formatVideoTokenMillions(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(2)}M`;
 }
 
-function formatVideoTokenCompactAmount(value: number): string {
+function formatCompactDecimalAmount(value: number): string {
   const rounded = Math.round(value * 100) / 100;
   if (Number.isInteger(rounded)) {
     return String(rounded);
@@ -641,15 +641,22 @@ function formatVideoTokenCompactAmount(value: number): string {
   return rounded.toFixed(2).replace(/\.?0+$/, "");
 }
 
+export function formatVideoPriceEstimateCostDisplay(costYuan: number): string {
+  if (!Number.isFinite(costYuan) || costYuan <= 0) {
+    return "0";
+  }
+  return formatCompactDecimalAmount(costYuan);
+}
+
 export function formatVideoBillingTokensDisplay(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) {
     return "0 token";
   }
   if (tokens < 1_000) {
-    return `${formatVideoTokenCompactAmount(tokens)} token`;
+    return `${formatCompactDecimalAmount(tokens)} token`;
   }
   if (tokens < 1_000_000) {
-    return `${formatVideoTokenCompactAmount(tokens / 1_000)} K`;
+    return `${formatCompactDecimalAmount(tokens / 1_000)} K`;
   }
-  return `${formatVideoTokenCompactAmount(tokens / 1_000_000)}M`;
+  return `${formatCompactDecimalAmount(tokens / 1_000_000)}M`;
 }

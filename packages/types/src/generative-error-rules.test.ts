@@ -128,6 +128,31 @@ describe("matchGenerativeErrorRule", () => {
       })
     ).toBeUndefined();
   });
+
+  it("matches copyright policy violation for video models", () => {
+    const raw =
+      "OutputVideoSensitiveContentDetected.PolicyViolation: The request failed because the output video may be related to copyright restrictions. Request id: 02178766853013900000000000000000000ffffac15b3286471f9";
+    const matched = matchGenerativeErrorRule({
+      raw,
+      modelKind: "video",
+      locale: "zh",
+    });
+
+    expect(matched?.id).toBe("copyrightPolicyViolation");
+    expect(matched?.message).toBe("生成内容可能涉及版权限制，生成被拒绝");
+    expect(matched?.i18nKey).toBe(
+      "workflow.generativeErrors.copyrightPolicyViolation"
+    );
+  });
+
+  it("does not match copyright policy violation for image models", () => {
+    expect(
+      matchGenerativeErrorRule({
+        raw: "OutputVideoSensitiveContentDetected.PolicyViolation: copyright restrictions",
+        modelKind: "image",
+      })
+    ).toBeUndefined();
+  });
 });
 
 describe("generativeModelKindFromNodeType", () => {

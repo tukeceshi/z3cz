@@ -37,11 +37,19 @@ export type GenerativeGenerationCancelResult =
       readonly kind: "pending";
     }
   | {
+      readonly kind: "cancelling";
+      readonly response: CancelGenerationJobResponse;
+    }
+  | {
       readonly kind: "cancelled";
       readonly response: CancelGenerationJobResponse;
     }
   | {
       readonly kind: "completed";
+      readonly response: CancelGenerationJobResponse;
+    }
+  | {
+      readonly kind: "not_applied";
       readonly response: CancelGenerationJobResponse;
     };
 
@@ -157,8 +165,6 @@ export async function cancelGenerativeGenerationForNode(params: {
     ),
   }));
 
-  markNodeGenerationCancelled(params.nodeId);
-
   const invoked = await invokeGenerativeGenerationCancel(params.nodeId);
   if (invoked) {
     return;
@@ -167,17 +173,30 @@ export async function cancelGenerativeGenerationForNode(params: {
   const jobId = readGenerativeProgressJobId(params.metadata);
   if (jobId && params.orgId) {
     try {
-      await cancelGenerationJob(params.orgId, jobId);
+      const response = await cancelGenerationJob(params.orgId, jobId);
+      if (response.cancelled) {
+        markNodeGenerationCancelled(params.nodeId);
+        params.updateNodeData?.(params.nodeId, (current) => {
+          const cleared = clearGenerativeProgress(current.metadata);
+          return {
+            metadata: withAiVideoGeneratingFlag(cleared, false),
+          };
+        });
+        showGenerativeCancelledNotice(params.nodeId);
+        return;
+      }
+      if (response.cancelPending) {
+        return;
+      }
     } catch {
       // Job may have already left a cancellable state.
     }
   }
 
-  params.updateNodeData?.(params.nodeId, (current) => {
-    const cleared = clearGenerativeProgress(current.metadata);
-    return {
-      metadata: withAiVideoGeneratingFlag(cleared, false),
-    };
-  });
-  showGenerativeCancelledNotice(params.nodeId);
+  params.updateNodeData?.(params.nodeId, (current) => ({
+    metadata: withGenerativeProgress(
+      withAiVideoGeneratingFlag(current.metadata, true),
+      { phase: "generating", upstreamPhase: "running" }
+    ),
+  }));
 }

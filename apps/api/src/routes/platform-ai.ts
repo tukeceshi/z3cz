@@ -2045,8 +2045,15 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     return c.json({ error: "Could not resolve AI interface" }, 400);
   }
 
-  if (trackedJob?.status === "generating") {
+  if (trackedJob?.status === "generating" || trackedJob?.status === "cancelling") {
     const job = await pollVideoGenerationJob(c.env, db, trackedJob);
+
+    if (job.status === "cancelled") {
+      return c.json({
+        status: "cancelled" as const,
+        error: job.failureReason ?? "Generation cancelled",
+      });
+    }
 
     if (job.status === "failed") {
       return c.json({

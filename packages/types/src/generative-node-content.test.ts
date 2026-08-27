@@ -14,6 +14,7 @@ import {
   mergeGenerativeNodeContentOnSave,
   patchNodeMediaResourceKinds,
   patchNodeMediaCloudAccelerationStatus,
+  patchNodeMediaCancellingStatus,
 } from "./generative-node-content";
 import type { Node } from "./workflow";
 
@@ -215,6 +216,96 @@ describe("patchNodeMediaCloudAccelerationStatus", () => {
       kind: "ephemeral",
       cloudAccelerationStatus: "pending",
     });
+  });
+});
+
+describe("patchNodeMediaCancellingStatus", () => {
+  it("writes cancelling onto matching refs without clearing generating", () => {
+    const node = createImageNode([
+      {
+        name: "images_result",
+        type: "json",
+        value: [
+          {
+            resourceId: "res-1",
+            mimeType: "image/png",
+            generating: true,
+            kind: "ephemeral",
+          },
+        ],
+      },
+      {
+        name: "images_history",
+        type: "json",
+        value: {
+          selectedId: "gen-1",
+          items: [
+            {
+              id: "gen-1",
+              images: [
+                {
+                  resourceId: "res-1",
+                  mimeType: "image/png",
+                  generating: true,
+                  kind: "ephemeral",
+                },
+              ],
+              prompt: "a cat",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const patch = patchNodeMediaCancellingStatus(node, {
+      resourceIds: ["res-1"],
+      cancelling: true,
+    });
+
+    expect(patch).not.toBeNull();
+    const result = patch!.inputs!.find((input) => input.name === "images_result")
+      ?.value as {
+      resourceId: string;
+      generating?: boolean;
+      cancelling?: boolean;
+    }[];
+    expect(result[0]).toEqual({
+      resourceId: "res-1",
+      mimeType: "image/png",
+      kind: "ephemeral",
+      generating: true,
+      cancelling: true,
+    });
+  });
+
+  it("clears cancelling when cancel is reverted", () => {
+    const node = createImageNode([
+      {
+        name: "images_result",
+        type: "json",
+        value: [
+          {
+            resourceId: "res-1",
+            mimeType: "image/png",
+            generating: true,
+            cancelling: true,
+            kind: "ephemeral",
+          },
+        ],
+      },
+    ]);
+
+    const patch = patchNodeMediaCancellingStatus(node, {
+      resourceIds: ["res-1"],
+      cancelling: false,
+    });
+
+    expect(patch).not.toBeNull();
+    const result = patch!.inputs!.find((input) => input.name === "images_result")
+      ?.value as { cancelling?: boolean; generating?: boolean }[];
+    expect(result[0]?.generating).toBe(true);
+    expect(result[0]).not.toHaveProperty("cancelling");
   });
 });
 

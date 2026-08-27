@@ -6,6 +6,7 @@ export type GenerationJobModality = "image" | "video" | "audio";
 export type GenerationJobStatus =
   | "pending"
   | "generating"
+  | "cancelling"
   | "ready_to_persist"
   | "uploading"
   | "succeeded"
@@ -15,6 +16,7 @@ export type GenerationJobStatus =
 export const ACTIVE_GENERATION_JOB_STATUSES = [
   "pending",
   "generating",
+  "cancelling",
   "ready_to_persist",
   "uploading",
 ] as const satisfies readonly GenerationJobStatus[];
@@ -75,6 +77,7 @@ export type GenerationJobPersistOwner = "client" | "server";
 export type GenerationJobDisplayPhase =
   | "queued"
   | "generating"
+  | "cancelling"
   | "ready_to_persist"
   | "downloading"
   | "uploading"
@@ -179,10 +182,41 @@ export interface GetGenerationJobResponse {
 export interface CancelGenerationJobResponse extends GetGenerationJobResponse {
   /** True only when the job ended in `cancelled` status. */
   readonly cancelled: boolean;
-  /** True when the interface did not call upstream task cancel. */
+  /** True when cancel is deferred (job is `cancelling`, upstream poll continues). */
+  readonly cancelPending?: boolean;
+  /** @deprecated Cancel-not-applied is expressed by absent cancelled/cancelPending flags. */
+  readonly cancelFailed?: boolean;
+  /** @deprecated Use cancelFailed — kept for older clients. */
   readonly upstreamCancelSkipped?: boolean;
-  /** True when upstream task cancel was attempted but failed. */
+  /** @deprecated Use cancelFailed — kept for older clients. */
   readonly upstreamCancelFailed?: boolean;
+}
+
+export type VideoCancelUpstreamPhase = GenerationJobUpstreamVideoStatus | "none";
+
+/** Classifies upstream video phase for cancel: none/running defer, queued deletes, other blocks. */
+export function resolveVideoCancelBranch(params: {
+  readonly jobStatus: GenerationJobStatus;
+  readonly upstreamVideoStatus: GenerationJobUpstreamVideoStatus | undefined;
+}): "delete_now" | "defer" | "blocked" | "already_cancelled" | "already_cancelling" {
+  if (params.jobStatus === "cancelled") {
+    return "already_cancelled";
+  }
+  if (params.jobStatus === "cancelling") {
+    return "already_cancelling";
+  }
+  if (
+    params.jobStatus === "ready_to_persist" ||
+    params.jobStatus === "uploading" ||
+    params.jobStatus === "succeeded" ||
+    params.jobStatus === "failed"
+  ) {
+    return "blocked";
+  }
+  if (params.upstreamVideoStatus === "queued") {
+    return "delete_now";
+  }
+  return "defer";
 }
 
 export function isGenerationJobPastUpstreamGeneration(job: {
