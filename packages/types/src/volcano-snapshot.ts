@@ -1,5 +1,10 @@
 import type { AiModelModality } from "./ai-model-catalog";
 import type { OrgModelInstanceConfig } from "./org-model-instance";
+import type {
+  VolcanoMediaKitConfig,
+  VolcanoMediaKitEnhanceConfig,
+  VolcanoMediaKitSnapshot,
+} from "./volcano-mediakit-enhance";
 import type { VolcanoSetupStatus } from "./volcano-setup";
 import type { VolcanoModelActivationCacheEntry } from "./volcano-activation";
 import type { VolcanoTosRegionPricingSnapshot } from "./volcano-tos-pricing";
@@ -57,6 +62,10 @@ export interface VolcanoInterfaceMetadata {
   /** ISO timestamps of successful billing package fetches (server rate limit). */
   readonly packageListRefreshLog?: readonly string[];
   readonly tosStorage?: VolcanoTosStorageConfig;
+  /** Optional AI MediaKit features (console config only). */
+  readonly mediaKit?: VolcanoMediaKitConfig;
+  /** @deprecated Legacy; use mediaKit */
+  readonly mediaKitEnhance?: VolcanoMediaKitEnhanceConfig;
   /** Background provisioning after fast create. */
   readonly setupStatus?: VolcanoSetupStatus;
   readonly setupError?: string | null;
@@ -164,4 +173,7 @@ export interface VolcanoSnapshotResponse {
   readonly pricing: VolcanoSnapshotPricing;
   readonly models: readonly VolcanoModelSnapshotRow[];
   readonly tosStorage?: VolcanoTosStorageSnapshot;
+  readonly mediaKit?: VolcanoMediaKitSnapshot;
+  /** @deprecated Alias for mediaKit */
+  readonly mediaKitEnhance?: VolcanoMediaKitSnapshot;
 }

@@ -1,7 +1,12 @@
 import type {
   OrganizationAiInterface,
   VolcanoInterfaceMetadata,
+  VolcanoMediaKitSnapshot,
   VolcanoSnapshotResponse,
+} from "@dafthunk/types";
+import {
+  buildVolcanoMediaKitSnapshot,
+  createDefaultVolcanoMediaKitConfig,
 } from "@dafthunk/types";
 
 export function isTosStorageEnabled(
@@ -19,6 +24,30 @@ export function isTosStorageEnabled(
   }
 
   return Boolean(config.region?.trim() && config.bucket?.trim());
+}
+
+export function resolveMediaKitSnapshot(
+  iface: OrganizationAiInterface,
+  snapshot: VolcanoSnapshotResponse | null
+): VolcanoMediaKitSnapshot {
+  if (snapshot?.mediaKit) {
+    return snapshot.mediaKit;
+  }
+
+  const metadata = iface.metadata as VolcanoInterfaceMetadata | null | undefined;
+  if (metadata?.credentialMode === "volcengine_iam") {
+    return buildVolcanoMediaKitSnapshot({ metadata });
+  }
+
+  return createDefaultVolcanoMediaKitConfig();
+}
+
+/** @deprecated Use resolveMediaKitSnapshot */
+export function resolveMediaKitEnhanceSnapshot(
+  iface: OrganizationAiInterface,
+  snapshot: VolcanoSnapshotResponse | null
+): VolcanoMediaKitSnapshot {
+  return resolveMediaKitSnapshot(iface, snapshot);
 }
 
 export function countNotOpenModelsFromMetadata(

@@ -1,6 +1,7 @@
 import {
   VOLCANO_MODEL_PRICING_CATALOG,
   VOLCANO_PRICING_EFFECTIVE_DATE,
+  buildVolcanoMediaKitSnapshot,
   resolveInterfaceModelAlias,
   type VolcanoModelUsage,
   type VolcanoResourcePackageRow,
@@ -305,6 +306,9 @@ export async function buildVolcanoSnapshot(params: {
         usageError: usageFetchError,
         bucketStorageGiB,
         bucketStorageError,
+      }),
+      mediaKit: buildVolcanoMediaKitSnapshot({
+        metadata: refreshedMetadata,
       }),
     },
     ...(refreshLimited ? { refreshLimited: true } : {}),

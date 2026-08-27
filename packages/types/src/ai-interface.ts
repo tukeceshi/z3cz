@@ -11,6 +11,7 @@ import type { NodeType } from "./workflow";
 import type { VolcanoActivationProbeResult } from "./volcano-activation";
 import type { VolcanoSetupStatus } from "./volcano-setup";
 import type { VolcanoInterfaceMetadata, VolcanoTosStorageConfig } from "./volcano-snapshot";
+import type { VolcanoMediaKitConfig } from "./volcano-mediakit-enhance";
 
 export const AI_INTERFACE_NODE_TYPE = "ai-interface" as const;
 export const AI_TEXT_NODE_TYPE = "ai-text" as const;
@@ -222,6 +223,9 @@ export interface CreateOrganizationAiInterfaceRequest {
     readonly region: string;
     readonly createBucket?: boolean;
   };
+  readonly mediaKit?: VolcanoMediaKitConfig;
+  /** @deprecated Use mediaKit */
+  readonly mediaKitEnhance?: VolcanoMediaKitConfig;
 }
 
 export interface UpdateOrganizationAiInterfaceRequest {
@@ -250,6 +254,9 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly tosStorage?: VolcanoTosStorageConfig & {
     readonly createBucket?: boolean;
   };
+  readonly mediaKit?: VolcanoMediaKitConfig;
+  /** @deprecated Use mediaKit */
+  readonly mediaKitEnhance?: VolcanoMediaKitConfig;
   readonly enabled?: boolean;
   readonly isDefault?: boolean;
 }

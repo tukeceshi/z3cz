@@ -19,6 +19,7 @@ import type {
 } from "./volcano-snapshot";
 import type { VolcanoResourcePackageRow } from "./volcano-resource-package-usage";
 import { buildTosPackageUsageFromRows } from "./volcano-tos-package-usage";
+import { buildVolcanoMediaKitSnapshot } from "./volcano-mediakit-enhance";
 import { volcanoTosPricingForRegion } from "./volcano-tos-pricing";
 
 const VOLCANO_PRICING_DOC_URL =
@@ -182,5 +183,6 @@ export function buildVolcanoSnapshotFromMetadata(
     pricing: buildPricingSection(catalog),
     models,
     tosStorage: buildTosStorageSnapshot({ metadata, packageRows }),
+    mediaKit: buildVolcanoMediaKitSnapshot({ metadata }),
   };
 }

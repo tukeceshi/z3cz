@@ -17,6 +17,8 @@ import {
   isCapabilityLimitsSubsetOfPlatform,
   isTransformMappingConfigComplete,
   isVolcanoAiInterfaceProvider,
+  mergeVolcanoMediaKit,
+  normalizeVolcanoMediaKitEnhanceConfig,
   migrateLegacyFormatTemplateToModels,
   readSingleModelFormatTemplateId,
   singleModelFormatTransformFromTemplate,
@@ -176,6 +178,54 @@ const volcanoActivationResultSchema = z.object({
   probedAt: z.string(),
 });
 
+const volcanoMediaKitVideoEnhanceModesSchema = z.object({
+  fast: z.boolean(),
+  standard: z.boolean(),
+  pro: z.boolean(),
+  llm: z.boolean(),
+});
+
+const volcanoMediaKitSubtitleEraseModesSchema = z.object({
+  standard: z.boolean(),
+  refined: z.boolean(),
+});
+
+const volcanoMediaKitSchema = z
+  .object({
+    enabled: z.boolean(),
+    videoEnhance: volcanoMediaKitVideoEnhanceModesSchema,
+    subtitleErase: volcanoMediaKitSubtitleEraseModesSchema,
+  })
+  .superRefine((value, ctx) => {
+    const hasFeature =
+      Object.values(value.videoEnhance).some(Boolean) ||
+      Object.values(value.subtitleErase).some(Boolean);
+    if (value.enabled && !hasFeature) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "At least one AI MediaKit feature must be selected when enabled",
+        path: ["videoEnhance"],
+      });
+    }
+  });
+
+const volcanoMediaKitLegacyEnhanceSchema = z.object({
+  enabled: z.boolean(),
+  modes: volcanoMediaKitVideoEnhanceModesSchema,
+});
+
+function normalizeMediaKitRequestBody(
+  body:
+    | z.infer<typeof volcanoMediaKitSchema>
+    | z.infer<typeof volcanoMediaKitLegacyEnhanceSchema>
+): z.infer<typeof volcanoMediaKitSchema> {
+  if ("videoEnhance" in body) {
+    return body;
+  }
+  return normalizeVolcanoMediaKitEnhanceConfig(body);
+}
+
 const createSchema = z
   .object({
     provider: providerSchema,
@@ -198,6 +248,8 @@ const createSchema = z
         createBucket: z.boolean().optional(),
       })
       .optional(),
+    mediaKit: volcanoMediaKitSchema.optional(),
+    mediaKitEnhance: volcanoMediaKitLegacyEnhanceSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (isVolcanoAiInterfaceProvider(value.provider)) {
@@ -346,6 +398,8 @@ const updateSchema = z
         createBucket: z.boolean().optional(),
       })
       .optional(),
+    mediaKit: volcanoMediaKitSchema.optional(),
+    mediaKitEnhance: volcanoMediaKitLegacyEnhanceSchema.optional(),
     enabled: z.boolean().optional(),
     isDefault: z.boolean().optional(),
   })
@@ -975,10 +1029,17 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
             catalogEntries
           )
         : metadata;
+      const mediaKitInput = body.mediaKit ?? body.mediaKitEnhance;
+      const metadataWithMediaKit = mediaKitInput
+        ? mergeVolcanoMediaKit(
+            metadataWithActivation,
+            normalizeMediaKitRequestBody(mediaKitInput)
+          )
+        : metadataWithActivation;
 
       const interfaceId = crypto.randomUUID();
       const metadataPending = {
-        ...metadataWithActivation,
+        ...metadataWithMediaKit,
         arkApiKeyPending: true,
         setupStatus: "pending" as const,
         setupError: null,
@@ -1541,6 +1602,21 @@ aiInterfaceRoutes.patch(
           region: body.tosStorage.region,
           prefix: VOLCANO_TOS_DEFAULT_PREFIX,
         });
+      }
+
+      const mediaKitInput = body.mediaKit ?? body.mediaKitEnhance;
+      if (mediaKitInput) {
+        const current = parseInterfaceMetadata(existing.metadata);
+        if (!isVolcanoMetadata(current)) {
+          return c.json({ error: "Volcano metadata not configured" }, 400);
+        }
+        const baseMetadata = isVolcanoMetadata(metadataUpdate)
+          ? metadataUpdate
+          : current;
+        metadataUpdate = mergeVolcanoMediaKit(
+          baseMetadata,
+          normalizeMediaKitRequestBody(mediaKitInput)
+        );
       }
 
       const iface = await updateOrganizationAiInterface(
