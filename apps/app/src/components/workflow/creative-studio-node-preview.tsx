@@ -21,7 +21,8 @@ import type { MediaDisplayPhase } from "@/services/media-display-readiness";
 import { useReferenceThumbUrl } from "@/hooks/use-reference-thumb-url";
 
 import { MediaDisplayLoadingPlaceholder } from "./media-display-loading-placeholder";
-import { useAiTextStagingBody, useResolvedAiText } from "@/hooks/use-resolved-ai-text";
+import { useCachedAiTextBody } from "@/hooks/use-cached-ai-text-body";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
 import { readAiAudioCardAudios, isAiAudioGenerating } from "./ai-audio-node-utils";
@@ -83,6 +84,7 @@ function StudioVideoPreview({
     media,
     nodeType: "ai-video",
     size: variant === "card" ? "thumb" : "full",
+    paused: variant === "detail",
   });
 
   if (phase !== "ready" || !displayUrl) {
@@ -143,6 +145,7 @@ function StudioAudioPreview({
     media: displayUrlOverride === undefined ? media : null,
     nodeType: "ai-audio",
     size: variant === "card" ? "thumb" : "full",
+    paused: variant === "detail" && displayUrlOverride === undefined,
   });
   const displayUrl = displayUrlOverride ?? resolved.displayUrl;
   const phase: MediaDisplayPhase =
@@ -230,6 +233,7 @@ function StudioDetailMediaPreview({
     media: detailDisplayUrl === undefined ? (media ?? null) : null,
     nodeType: isVideo ? "ai-video" : "ai-image",
     size: "full",
+    paused: detailDisplayUrl === undefined,
   });
   const displayUrl = detailDisplayUrl ?? resolved.displayUrl;
   const phase: MediaDisplayPhase =
@@ -337,7 +341,7 @@ export function CreativeStudioNodePreview({
     outputs: data.outputs,
     nodeData: data,
   });
-  const stagingBody = useAiTextStagingBody({
+  const stagingBody = useCachedAiTextBody({
     reference: resolvedText.reference,
     enabled: variant === "detail" && resolvedText.state === "ready",
   });

@@ -13,12 +13,14 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
-import { useResolvedAiText, useAiTextStagingBody } from "@/hooks/use-resolved-ai-text";
+import { useCachedAiTextBody } from "@/hooks/use-cached-ai-text-body";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
 import { AiTextExpandButton } from "../../ai-text-expand-overlay";
 import { commitAiTextHistorySelection } from "../../commit-ai-text-value";
 import { useOpenCreativeStudio } from "../../creative-studio-context";
+import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
 import {
   AiTextHistoryButton,
   AiTextHistoryOverlay,
@@ -78,6 +80,7 @@ function AiTextWidget({
   selected = false,
   onEmptyOutputEditingChange,
 }: AiTextWidgetProps) {
+  useGenerativeNodeCardHydrateById(nodeId);
   const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id;
@@ -96,7 +99,7 @@ function AiTextWidget({
     nodeData,
   });
   const needFullBody = selected && !isGenerating && previewText.state === "ready";
-  const stagingBody = useAiTextStagingBody({
+  const stagingBody = useCachedAiTextBody({
     reference: previewText.reference,
     enabled: needFullBody,
   });

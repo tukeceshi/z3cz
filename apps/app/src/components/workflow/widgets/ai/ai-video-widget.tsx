@@ -80,6 +80,7 @@ import { GenerativeMediaLazyDownloadButton, GENERATIVE_CARD_OVERLAY_BUTTON_CLASS
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { useWorkflow } from "../../workflow-context";
+import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
 import { CanvasMediaCover } from "../../canvas-media-cover";
 import { StudioVideoLightbox } from "../../studio-video-lightbox";
 import type { BaseWidgetProps } from "../widget";
@@ -104,6 +105,7 @@ function AiVideoWidget({
   metadata,
   createObjectUrl,
 }: AiVideoWidgetProps) {
+  useGenerativeNodeCardHydrateById(nodeId);
   const { t } = useTranslation();
   const toast = useAppToast();
   const { organization } = useAuth();

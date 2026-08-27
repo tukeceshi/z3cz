@@ -21,8 +21,9 @@ import {
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useCachedAiTextBody } from "@/hooks/use-cached-ai-text-body";
 import { useMediaDisplayUrl } from "@/hooks/use-media-display-url";
-import { useAiTextStagingBody, useResolvedAiText } from "@/hooks/use-resolved-ai-text";
+import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useCreativeStudio } from "@/components/workflow/creative-studio-context";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
@@ -214,7 +215,7 @@ function StudioTextDetail({
     outputs: node.data.outputs,
     nodeData: node.data,
   });
-  const stagingBody = useAiTextStagingBody({
+  const stagingBody = useCachedAiTextBody({
     reference: previewText.reference,
     enabled: !isGenerating && previewText.state === "ready",
   });
@@ -823,6 +824,7 @@ function StudioImageDetail({
       media: primaryImage && !imageExpired ? primaryImage : null,
       nodeType: "ai-image",
       size: "full",
+      paused: true,
     });
 
   const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
@@ -1011,6 +1013,7 @@ function StudioVideoDetail({
       media: primaryVideo && !videoExpired ? primaryVideo : null,
       nodeType: "ai-video",
       size: "full",
+      paused: true,
     });
   const showCancelledNotice = useSyncExternalStore(
     subscribeGenerativeCancelledNotice,
@@ -1218,6 +1221,7 @@ function StudioAudioDetail({
       media: primaryAudio && !audioExpired ? primaryAudio : null,
       nodeType: "ai-audio",
       size: "full",
+      paused: true,
     });
 
   const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =

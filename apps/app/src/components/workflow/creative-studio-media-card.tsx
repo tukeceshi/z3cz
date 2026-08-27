@@ -30,6 +30,7 @@ import {
   useStudioVideoFileDuration,
 } from "./studio-media-file-meta";
 import { studioReferenceDragSourceProps } from "./studio-reference-drag";
+import { useGenerativeNodeCardHydrate } from "./use-generative-node-card-hydrate";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioMediaCardProps {
@@ -45,6 +46,7 @@ export function CreativeStudioMediaCard({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioMediaCardProps) {
+  useGenerativeNodeCardHydrate(node);
   const nodeType = node.data.nodeType ?? "";
   const isVideo = nodeType === AI_VIDEO_NODE_TYPE;
   const primaryMedia = isVideo

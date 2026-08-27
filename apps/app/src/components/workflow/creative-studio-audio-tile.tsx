@@ -18,6 +18,7 @@ import {
 import { CreativeStudioListItemFooter } from "./creative-studio-list-item-footer";
 import { useCreativeStudio } from "./creative-studio-context";
 import { studioReferenceDragSourceProps } from "./studio-reference-drag";
+import { useGenerativeNodeCardHydrate } from "./use-generative-node-card-hydrate";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface CreativeStudioAudioTileProps {
@@ -33,6 +34,7 @@ export function CreativeStudioAudioTile({
   onCancelPendingListClick,
   referenceDragEnabled = false,
 }: CreativeStudioAudioTileProps) {
+  useGenerativeNodeCardHydrate(node);
   const modelLabel = readStudioModelLabel(node.data);
   const audios = readAiAudioCardAudios(
     node.data.inputs,
