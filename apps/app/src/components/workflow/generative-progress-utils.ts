@@ -6,7 +6,8 @@ export type GenerativeProgressPhase =
   | "cancelled"
   | "downloading"
   | "uploading"
-  | "server_persisting";
+  | "server_persisting"
+  | "trimming";
 
 const GENERATIVE_JOB_ID_META_KEY = "genJobId";
 const GENERATIVE_PROGRESS_PHASE_META_KEY = "genProgressPhase";
@@ -23,6 +24,7 @@ const PROGRESS_PHASES = new Set<string>([
   "downloading",
   "uploading",
   "server_persisting",
+  "trimming",
 ]);
 
 export function readGenerativeProgressJobId(
@@ -197,6 +199,22 @@ export function withGenerativeUploadProgress(
   return metadata;
 }
 
+/** Local video trim in progress — shown on the target card before upload. */
+export function withGenerativeTrimmingProgress(
+  metadata: Record<string, string> | undefined,
+  trimming: boolean
+): Record<string, string> | undefined {
+  if (trimming) {
+    return withGenerativeProgress(metadata, { phase: "trimming" });
+  }
+
+  if (readGenerativeProgressPhase(metadata) === "trimming") {
+    return withGenerativeProgress(metadata, { phase: null });
+  }
+
+  return metadata;
+}
+
 export function isGenerativeProgressActive(
   metadata: Record<string, string> | undefined
 ): boolean {
@@ -253,6 +271,7 @@ export function isGenerativeCardBusyPhase(
     phase === "cloud_accelerating" ||
     phase === "queued" ||
     phase === "cancelling" ||
+    phase === "trimming" ||
     isGenerativePersistPhase(phase) ||
     phase === "server_persisting"
   );

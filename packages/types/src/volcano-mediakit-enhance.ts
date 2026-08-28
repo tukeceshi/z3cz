@@ -25,15 +25,21 @@ export interface VolcanoMediaKitSubtitleEraseModes {
   readonly refined: boolean;
 }
 
+export interface VolcanoMediaKitVideoTrimConfig {
+  readonly enabled: boolean;
+}
+
 export interface VolcanoMediaKitConfig {
   readonly enabled: boolean;
   readonly videoEnhance: VolcanoMediaKitVideoEnhanceModes;
+  readonly videoTrim: VolcanoMediaKitVideoTrimConfig;
   readonly subtitleErase: VolcanoMediaKitSubtitleEraseModes;
 }
 
 export interface VolcanoMediaKitSnapshot {
   readonly enabled: boolean;
   readonly videoEnhance: VolcanoMediaKitVideoEnhanceModes;
+  readonly videoTrim: VolcanoMediaKitVideoTrimConfig;
   readonly subtitleErase: VolcanoMediaKitSubtitleEraseModes;
 }
 
@@ -86,10 +92,15 @@ function createDefaultSubtitleEraseModes(): VolcanoMediaKitSubtitleEraseModes {
   };
 }
 
+function createDefaultVideoTrimConfig(): VolcanoMediaKitVideoTrimConfig {
+  return { enabled: false };
+}
+
 export function createDefaultVolcanoMediaKitConfig(): VolcanoMediaKitConfig {
   return {
     enabled: false,
     videoEnhance: createDefaultVideoEnhanceModes(),
+    videoTrim: createDefaultVideoTrimConfig(),
     subtitleErase: createDefaultSubtitleEraseModes(),
   };
 }
@@ -109,6 +120,9 @@ export function normalizeVolcanoMediaKitConfig(
       standard: config.videoEnhance.standard,
       pro: config.videoEnhance.pro,
       llm: config.videoEnhance.llm,
+    },
+    videoTrim: {
+      enabled: config.videoTrim?.enabled ?? false,
     },
     subtitleErase: {
       standard: config.subtitleErase.standard,
@@ -131,8 +145,15 @@ export function normalizeVolcanoMediaKitEnhanceConfig(
 function hasAnyMediaKitFeatureSelected(config: VolcanoMediaKitConfig): boolean {
   return (
     VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some((mode) => config.videoEnhance[mode]) ||
+    config.videoTrim.enabled ||
     VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some((mode) => config.subtitleErase[mode])
   );
+}
+
+export function isVolcanoMediaKitVideoTrimEnabled(
+  config: VolcanoMediaKitConfig
+): boolean {
+  return config.enabled && config.videoTrim.enabled;
 }
 
 export function isVolcanoMediaKitConfigValid(config: VolcanoMediaKitConfig): boolean {
@@ -214,6 +235,7 @@ export function buildVolcanoMediaKitSnapshot(params: {
   return {
     enabled: config.enabled,
     videoEnhance: config.videoEnhance,
+    videoTrim: config.videoTrim,
     subtitleErase: config.subtitleErase,
   };
 }

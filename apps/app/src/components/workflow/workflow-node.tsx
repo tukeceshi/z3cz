@@ -49,6 +49,7 @@ import {
 } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
+import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
@@ -384,11 +385,14 @@ export const WorkflowNode = memo(
       () => readNodeLayoutFromMetadata(data.metadata),
       [data.metadata]
     );
+    const trimSession = useOptionalVideoTrimSession();
+    const isTrimPanelActive = trimSession?.isTrimActiveForNode(id) ?? false;
     const showBottomPanelContent =
-      (!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
+      isTrimPanelActive ||
+      ((!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
         : shouldShowGenerativeBottomPanel(data.metadata)) &&
-      !(isAiTextNode && emptyTextEditing);
+        !(isAiTextNode && emptyTextEditing));
     const bottomPanelData = useWorkflowNodeBottomPanelData(
       data as unknown as CanvasWorkflowNodeType
     );

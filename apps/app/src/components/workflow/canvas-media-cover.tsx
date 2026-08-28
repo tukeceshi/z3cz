@@ -1,4 +1,5 @@
 import {
+  createDefaultVideoTrimRange,
   type MediaReference,
   getResourceIdFromValue,
 } from "@dafthunk/types";
@@ -18,6 +19,7 @@ import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
 import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
+import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 const UNAVAILABLE_DEBOUNCE_MS = 300;
@@ -415,8 +417,14 @@ function CanvasVideoCover({
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
   const frameCapture = useWorkflowVideoFrameCapture(nodeId);
+  const trimSessionApi = useOptionalVideoTrimSession();
+  const trimActive = Boolean(nodeId && trimSessionApi?.isTrimActiveForNode(nodeId));
+  const trimSession =
+    trimActive && trimSessionApi?.session?.sourceNodeId === nodeId
+      ? trimSessionApi.session
+      : null;
   const [isHovered, setIsHovered] = useState(false);
-  const ensureFullOnHover = !staticCover && isHovered;
+  const ensureFullOnHover = trimActive || (!staticCover && isHovered);
   const {
     displayUrl,
     phase,
@@ -444,7 +452,8 @@ function CanvasVideoCover({
     [hoverPreviewEnabled, media, stale, urlSet]
   );
   const videoUrl =
-    fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null;
+    trimSession?.trimSourceVideoUrl ??
+    (fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null);
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
@@ -469,7 +478,8 @@ function CanvasVideoCover({
     onBroken: handleBroken,
   });
 
-  const showVideoPlayer = hoverPreviewEnabled && Boolean(videoUrl);
+  const showVideoPlayer =
+    trimActive || (hoverPreviewEnabled && Boolean(videoUrl));
   const showHoverLoading =
     hoverPreviewEnabled && fullVideoDisplay.phase === "loading";
   const showPlayIcon =
@@ -518,12 +528,49 @@ function CanvasVideoCover({
           variant="card"
           objectFit={objectFit}
           initialHovered
+          externalPlaybackControl={trimActive}
+          playbackRange={trimActive ? trimSession?.committedRange ?? null : null}
+          playbackPaused={trimActive ? trimSession?.playbackPaused ?? false : false}
+          onPlaybackPausedChange={
+            trimActive && trimSessionApi
+              ? trimSessionApi.setPlaybackPaused
+              : undefined
+          }
           className="absolute inset-0 z-10"
           showFrameCapture={frameCapture.showFrameCapture}
           frameCaptureDisabled={frameCapture.frameCaptureDisabled}
           videoRef={frameCapture.videoRef}
           onFrameCapture={frameCapture.onFrameCapture}
           onExpandView={onExpandView}
+          onLoadedMetadata={(video) => {
+            if (!trimActive || !trimSessionApi) {
+              return;
+            }
+            if (
+              !Number.isFinite(video.duration) ||
+              video.duration <= 0
+            ) {
+              trimSessionApi.patchTrimSession({ loadPhase: "error" });
+              return;
+            }
+            const sourceUrl = video.currentSrc || videoUrl;
+            const patch: Parameters<typeof trimSessionApi.patchTrimSession>[0] = {
+              trimSourceVideoUrl: sourceUrl,
+              videoDurationSec: video.duration,
+              loadPhase: "ready",
+            };
+            if (trimSession?.loadPhase === "loading") {
+              const defaultRange = createDefaultVideoTrimRange(video.duration);
+              patch.committedRange = defaultRange;
+              patch.draftRange = defaultRange;
+            }
+            trimSessionApi.patchTrimSession(patch);
+          }}
+          onError={() => {
+            if (trimActive && trimSessionApi) {
+              trimSessionApi.patchTrimSession({ loadPhase: "error" });
+            }
+          }}
         />
       ) : null}
 

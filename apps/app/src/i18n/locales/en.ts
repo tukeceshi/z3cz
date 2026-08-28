@@ -2258,6 +2258,7 @@ export const en = {
         optOutHint: "Skip AI MediaKit (configure later in the interface panel)",
         configureHint: "Configure features to use",
         videoEnhanceSection: "Video enhance",
+        videoTrimSection: "Video trim",
         settings: "Settings",
         settingsTitle: "AI MediaKit settings",
         apiKeySection: "API Key",
@@ -3706,6 +3707,8 @@ export const en = {
       cardUploadFileTypes: "Supports {{types}}",
       cardQueued: "Queued…",
       cardGenerating: "Generating…",
+      cardTrimming: "Trimming…",
+      trimming: "Trimming…",
       cardCancelling: "Cancelling…",
       cardCancelled: "Cancelled",
       cardDownloading: "Downloading…",
@@ -3796,6 +3799,46 @@ export const en = {
         "Enhance node created, but the source video reference could not be linked automatically",
       submitFailed: "Video enhance submit failed",
       notConfigured: "Video enhance is not enabled",
+    },
+    videoTrim: {
+      action: "Trim",
+      startTime: "Start",
+      endTime: "End",
+      duration: "Duration",
+      play: "Play",
+      pause: "Pause",
+      generate: "Generate",
+      highQuality: "High quality",
+      configureMediaKit: "Configure MediaKit trim",
+      notConfiguredHint:
+        "Enable AI MediaKit video trim and configure an API key in AI / Resources interfaces",
+      openAiInterfaces: "Open interface settings",
+      loadFailed: "Unable to load video",
+      mediaKitComingSoon: "Cloud high-quality trim is coming soon",
+      sourceNotCloud: "High-quality trim requires the source video in cloud storage",
+      submitFailed: "High-quality trim submit failed",
+      webCodecsUnsupported: "This browser does not support local video trim",
+      createNodeFailed: "Failed to create trim node",
+      referenceLinkFailed:
+        "Trim node created, but the source video reference could not be linked automatically",
+      generateFailed: "Video trim failed",
+      shortDurationConfirm: {
+        title: "Trim selection is very short",
+        seedanceReference: "Seedance video reference requires more than 2s.",
+        seedance25Edit: "Seedance 2.5 video editing requires more than 4s.",
+        dontAskAgain: "Don't show again",
+        continue: "Trim anyway",
+      },
+      localTrimHint: {
+        title: "About local trimming",
+        line1:
+          "Trimming runs locally by default — no upload needed. In most cases, results are indistinguishable from cloud processing.",
+        line2:
+          "Local output can vary slightly with device and browser codecs (frame edges, A/V sync).",
+        line3:
+          "For clips used in Seedance video editing, we recommend enabling high-quality processing.",
+        line4: "This uses cloud MediaKit for more consistent output.",
+      },
     },
     aiAudioPanel: {
       promptTitle: "Prompt",

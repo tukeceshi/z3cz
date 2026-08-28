@@ -142,8 +142,8 @@ export interface GenerationJobResultJson {
   readonly requestSnapshot?: ImageGenerationRequestSnapshot;
   /** Pre-created catalog ids written to the node while upstream is running. */
   readonly placeholderResourceIds?: readonly string[];
-  /** Distinguishes MediaKit video enhance jobs from model video generation. */
-  readonly jobKind?: "video_enhance";
+  /** Distinguishes MediaKit tool jobs from model video generation. */
+  readonly jobKind?: "video_enhance" | "video_trim";
 }
 
 export interface GenerationJobRecord {
