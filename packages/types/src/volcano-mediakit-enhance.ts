@@ -138,6 +138,7 @@ export function normalizeVolcanoMediaKitEnhanceConfig(
   return normalizeVolcanoMediaKitConfig({
     enabled: config.enabled,
     videoEnhance: config.modes,
+    videoTrim: createDefaultVideoTrimConfig(),
     subtitleErase: createDefaultSubtitleEraseModes(),
   });
 }

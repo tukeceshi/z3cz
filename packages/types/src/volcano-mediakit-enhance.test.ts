@@ -95,6 +95,7 @@ describe("volcano-mediakit", () => {
     });
 
     expect(config.videoEnhance.fast).toBe(true);
+    expect(config.videoTrim).toEqual({ enabled: false });
     expect(config.subtitleErase).toEqual({
       standard: false,
       refined: false,
