@@ -225,6 +225,70 @@ export async function pollMediaKitVideoEnhanceTask(params: {
   readonly videoUrl?: string;
   readonly error?: string;
 }> {
+  return pollMediaKitTask(params);
+}
+
+export interface SubmitMediaKitVideoTrimParams {
+  readonly apiKey: string;
+  readonly videoUrl: string;
+  readonly startSec: number;
+  readonly endSec: number;
+  readonly clientToken?: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}
+
+export async function submitMediaKitVideoTrimTask(
+  params: SubmitMediaKitVideoTrimParams
+): Promise<{ readonly taskId: string }> {
+  const body: Record<string, unknown> = {
+    video_url: params.videoUrl,
+    start_time: params.startSec,
+    end_time: params.endSec,
+  };
+
+  if (params.clientToken) {
+    body.client_token = params.clientToken;
+  }
+
+  const response = await fetchWithUpstreamLog(
+    `${VOLCANO_MEDIKIT_API_BASE_URL}/api/v1/tools/trim-video`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey.trim()}`,
+      },
+      body: JSON.stringify(body),
+    },
+    params.upstreamLog
+  );
+
+  const payload = (await response.json()) as MediaKitTaskSubmitResponse;
+  if (!response.ok || payload.success === false) {
+    throw new VolcanoMediaKitApiError(
+      readErrorMessage(payload),
+      response.status
+    );
+  }
+
+  const taskId = payload.task_id?.trim();
+  if (!taskId) {
+    throw new VolcanoMediaKitApiError("MediaKit submit did not return task_id");
+  }
+
+  return { taskId };
+}
+
+export async function pollMediaKitTask(params: {
+  readonly apiKey: string;
+  readonly taskId: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}): Promise<{
+  readonly status: PollVideoEnhanceMappedStatus;
+  readonly videoUrl?: string;
+  readonly error?: string;
+}> {
   const response = await fetchWithUpstreamLog(
     `${VOLCANO_MEDIKIT_API_BASE_URL}/api/v1/tasks/${encodeURIComponent(params.taskId)}`,
     {

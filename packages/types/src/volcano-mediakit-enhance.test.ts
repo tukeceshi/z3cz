@@ -23,6 +23,7 @@ describe("volcano-mediakit", () => {
       pro: false,
       llm: false,
     });
+    expect(config.videoTrim).toEqual({ enabled: false });
     expect(config.subtitleErase).toEqual({
       standard: false,
       refined: false,
@@ -39,6 +40,7 @@ describe("volcano-mediakit", () => {
           pro: false,
           llm: false,
         },
+        videoTrim: { enabled: false },
         subtitleErase: {
           standard: false,
           refined: false,
@@ -55,8 +57,26 @@ describe("volcano-mediakit", () => {
           pro: false,
           llm: false,
         },
+        videoTrim: { enabled: false },
         subtitleErase: {
           standard: true,
+          refined: false,
+        },
+      })
+    ).toBe(true);
+
+    expect(
+      isVolcanoMediaKitConfigValid({
+        enabled: true,
+        videoEnhance: {
+          fast: false,
+          standard: false,
+          pro: false,
+          llm: false,
+        },
+        videoTrim: { enabled: true },
+        subtitleErase: {
+          standard: false,
           refined: false,
         },
       })
@@ -91,6 +111,7 @@ describe("volcano-mediakit", () => {
           pro: false,
           llm: false,
         },
+        videoTrim: { enabled: false },
         subtitleErase: {
           standard: true,
           refined: true,
@@ -117,6 +138,7 @@ describe("volcano-mediakit", () => {
           pro: false,
           llm: false,
         },
+        videoTrim: { enabled: false },
         subtitleErase: {
           standard: false,
           refined: true,
@@ -132,6 +154,7 @@ describe("volcano-mediakit", () => {
         pro: false,
         llm: false,
       },
+      videoTrim: { enabled: false },
       subtitleErase: {
         standard: false,
         refined: true,

@@ -3,6 +3,7 @@ import type {
   FormatTransformTemplate,
   OrganizationAiInterface,
   UpdateOrganizationAiInterfaceRequest,
+  VolcanoMediaKitSnapshot,
   VolcanoProbeActivationResponse,
   VolcanoProbeTosBucketsResponse,
   VolcanoSnapshotFetchResponse,
@@ -237,19 +238,7 @@ export async function updateVolcanoTosStorage(
 export async function updateVolcanoMediaKit(
   organizationId: string,
   interfaceId: string,
-  input: {
-    readonly enabled: boolean;
-    readonly videoEnhance: {
-      readonly fast: boolean;
-      readonly standard: boolean;
-      readonly pro: boolean;
-      readonly llm: boolean;
-    };
-    readonly subtitleErase: {
-      readonly standard: boolean;
-      readonly refined: boolean;
-    };
-  }
+  input: VolcanoMediaKitSnapshot
 ): Promise<OrganizationAiInterface> {
   return updateOrganizationAiInterface(organizationId, interfaceId, {
     mediaKit: input,
@@ -260,19 +249,7 @@ export async function updateVolcanoMediaKit(
 export async function updateVolcanoMediaKitEnhance(
   organizationId: string,
   interfaceId: string,
-  input: {
-    readonly enabled: boolean;
-    readonly videoEnhance: {
-      readonly fast: boolean;
-      readonly standard: boolean;
-      readonly pro: boolean;
-      readonly llm: boolean;
-    };
-    readonly subtitleErase: {
-      readonly standard: boolean;
-      readonly refined: boolean;
-    };
-  }
+  input: VolcanoMediaKitSnapshot
 ): Promise<OrganizationAiInterface> {
   return updateVolcanoMediaKit(organizationId, interfaceId, input);
 }

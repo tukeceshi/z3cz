@@ -21,26 +21,22 @@ import { formatGenerativePhaseLabel } from "@/components/workflow/generative-pro
 import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
 import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
-import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
 import { useOpenCreativeStudio } from "../../creative-studio-context";
 import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
 import type { GenerativeCardCoverRead } from "../../generative-history-utils";
+import { useGenerativeVideoFileUpload } from "../../use-generative-video-file-upload";
 import {
   isGenerativePersistPhase,
   isGenerativeProgressBusyPhase,
   readGenerativeProgressPhase,
-  withGenerativeUploadProgress,
 } from "../../generative-progress-utils";
 import {
   isAiVideoGenerating,
   readAiVideoCardDisplay,
   readAiVideoResultHistory,
-  withAiVideoGenerateError,
-  withAiVideoManualUpload,
 } from "../../ai-video-node-utils";
 import {
   GenerativeCardErrorBlock,
@@ -56,10 +52,8 @@ import { readGenerativeCardError } from "../../generative-card-error-utils";
 import {
   normalizeGenerativeCardUploadFile,
   readGenerativePrompt,
-  resolveGenerativeCardUploadError,
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
-import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
 import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
@@ -95,8 +89,7 @@ function AiVideoWidget({
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
-  const { configured: cloudConfigured, blocksGenerativeMedia } =
-    useCloudStorageCanvasContext();
+  const { blocksGenerativeMedia } = useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
   const initialLayout = useMemo(
     () => readNodeLayoutFromMetadata(metadata),
@@ -109,6 +102,7 @@ function AiVideoWidget({
         : undefined,
     [nodeId, updateNodeData]
   );
+  const { uploadVideoFileToNode } = useGenerativeVideoFileUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
@@ -224,77 +218,24 @@ function AiVideoWidget({
       }
 
       setUploading(true);
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeUploadProgress(current.metadata, true),
-      }));
       try {
-        const staged = await stageGenerativeCardUpload({
-          organizationId: orgId,
-          workflowId,
+        await uploadVideoFileToNode({
+          nodeId,
           file: normalized,
-          cloudConfigured,
-          mediaKind: "ai-video",
-          nodeType: "ai-video",
           patchNodeLayout,
         });
-
-        warmCardUploadPersist({
-          organizationId: orgId,
-          workflowId,
-          staged,
-          nodeType: "ai-video",
-          cloudConfigured,
-        });
-
-        const uploadError = resolveGenerativeCardUploadError({
-          value: staged,
-          cloudConfigured,
-          t,
-        });
-
-        updateNodeData(nodeId, (current) => {
-          const withMedia = withAiVideoManualUpload(current, [staged]);
-          return {
-            ...withMedia,
-            metadata: withGenerativeUploadProgress(
-              withAiVideoGenerateError(withMedia.metadata, uploadError),
-              false
-            ),
-          };
-        });
-
-        if (uploadError) {
-          toast.errorRaw(uploadError.summary);
-        }
-      } catch (error) {
-        const formatted = prepareGenerativeCardError(
-          error instanceof Error ? error.message : String(error),
-          t,
-          "video"
-        );
-        updateNodeData(nodeId, (current) => ({
-          metadata: withGenerativeUploadProgress(
-            withAiVideoGenerateError(current.metadata, formatted),
-            false
-          ),
-        }));
-        toast.errorRaw(formatted.summary);
       } finally {
         setUploading(false);
-        updateNodeData(nodeId, (current) => ({
-          metadata: withGenerativeUploadProgress(current.metadata, false),
-        }));
       }
     },
     [
       blocksGenerativeMedia,
-      cloudConfigured,
       disabled,
       nodeId,
-      orgId,
-      t,
+      patchNodeLayout,
       toast,
       updateNodeData,
+      uploadVideoFileToNode,
       workflowId,
     ]
   );
@@ -343,7 +284,7 @@ function AiVideoWidget({
             kind="video"
             size="canvas"
             doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
-            busy={isGenerating || uploading}
+            busy={isGenerating || uploading || isGenerativeProgressBusyPhase(progressPhase)}
             busyMessage={cardPlaceholder}
             canUpload={canUpload}
             onUploadClick={handleUploadClick}

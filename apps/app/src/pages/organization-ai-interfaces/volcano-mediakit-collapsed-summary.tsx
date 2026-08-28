@@ -77,6 +77,10 @@ export function VolcanoMediaKitStatusDetail({
     );
   }
 
+  if (snapshot.videoTrim.enabled) {
+    summaries.push(t("pages.aiInterfaces.mediaKitEnhance.videoTrimSection"));
+  }
+
   return <>{summaries.join("；")}</>;
 }
 
@@ -107,6 +111,7 @@ export function buildDefaultMediaKitSnapshot(): VolcanoMediaKitSnapshot {
       pro: false,
       llm: false,
     },
+    videoTrim: { enabled: false },
     subtitleErase: {
       standard: false,
       refined: false,

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   shouldShowGenerativeBottomPanel,
   shouldShowGenerativeHistoryIcon,
+  withGenerativeBottomPanelHidden,
   withGenerativeCardEditing,
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
@@ -19,10 +20,13 @@ describe("generative-card-mode-utils", () => {
     ).toBe(false);
   });
 
-  it("hides bottom panel only in manual content mode", () => {
+  it("hides bottom panel in manual content mode or when explicitly hidden", () => {
     expect(shouldShowGenerativeBottomPanel(undefined)).toBe(true);
     expect(
       shouldShowGenerativeBottomPanel(withGenerativeManualContentMode(undefined))
+    ).toBe(false);
+    expect(
+      shouldShowGenerativeBottomPanel(withGenerativeBottomPanelHidden(undefined))
     ).toBe(false);
     expect(
       shouldShowGenerativeBottomPanel(

@@ -18,6 +18,10 @@ import {
   VIDEO_ENHANCE_FPS_MIN,
   clampVideoEnhanceFps,
   type SubmitVideoEnhanceRequest,
+  type SubmitVideoTrimRequest,
+  isSubmitVideoTrimRangeValid,
+  normalizeSubmitVideoTrimRange,
+  VIDEO_TRIM_MIN_DURATION_SEC,
   createEphemeralMediaExpiresAt,
   type MediaReference,
 } from "@dafthunk/types";
@@ -150,6 +154,7 @@ import {
   resolveResourceRefs,
 } from "../services/resolve-resource-refs";
 import { submitVideoEnhanceTask } from "../services/video-enhance-service";
+import { submitVideoTrimTask } from "../services/video-trim-service";
 import { VolcanoMediaKitApiError } from "../integrations/volcengine/mediakit-client";
 
 const platformAiRoutes = new Hono<ApiContext>();
@@ -1997,6 +2002,142 @@ platformAiRoutes.post(
         message.includes("not enabled") ||
         message.includes("not configured") ||
         message.includes("not found")
+          ? 400
+          : 502;
+      return c.json({ error: message }, status);
+    }
+  }
+);
+
+const submitVideoTrimSchema = z
+  .object({
+    aiInterfaceId: z.string().min(1),
+    sourceVideoResourceId: z.string().min(1),
+    startSec: z.number().min(0),
+    endSec: z.number().min(0),
+    workflowId: z.string().optional(),
+    nodeId: z.string().optional(),
+    clientRequestId: z.string().min(1).max(128).optional(),
+  })
+  .superRefine((value, ctx) => {
+    const range = normalizeSubmitVideoTrimRange({
+      startSec: value.startSec,
+      endSec: value.endSec,
+    });
+    if (!isSubmitVideoTrimRangeValid(range)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `endSec must exceed startSec by at least ${VIDEO_TRIM_MIN_DURATION_SEC} seconds`,
+        path: ["endSec"],
+      });
+    }
+  });
+
+platformAiRoutes.post(
+  "/mediakit/video-trim/submit",
+  zValidator("json", submitVideoTrimSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json") as SubmitVideoTrimRequest;
+    const db = createDatabase(c.env);
+
+    const existingJob = await findGenerationJobByClientRequestId(db, {
+      organizationId,
+      clientRequestId: body.clientRequestId,
+      modality: "video",
+    });
+    if (existingJob) {
+      return c.json(buildVideoSubmitResponseFromJob(existingJob));
+    }
+
+    try {
+      await assertNoActiveGenerationJobForNode(db, {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "video",
+        clientRequestId: body.clientRequestId,
+      });
+    } catch (error) {
+      if (error instanceof ActiveGenerationJobConflictError) {
+        return c.json(
+          {
+            error: error.message,
+            code: error.code,
+            jobId: error.jobId,
+          },
+          409
+        );
+      }
+      throw error;
+    }
+
+    const gateResult = await runWithCloudStorageGenerativeGate(
+      c,
+      organizationId,
+      async () => true
+    );
+    if (gateResult instanceof Response) {
+      return gateResult;
+    }
+
+    const trimRange = normalizeSubmitVideoTrimRange({
+      startSec: body.startSec,
+      endSec: body.endSec,
+    });
+
+    try {
+      const result = await submitVideoTrimTask(c.env, {
+        organizationId,
+        userId: jwtPayload?.sub,
+        body: {
+          ...body,
+          startSec: trimRange.startSec,
+          endSec: trimRange.endSec,
+        },
+      });
+
+      const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+        c.env,
+        {
+          organizationId,
+          workflowId: body.workflowId,
+          nodeId: body.nodeId,
+          modality: "video",
+          entry: {
+            resourceIds: result.resourceIds,
+            jobId: result.jobId,
+            mimeType: "video/mp4",
+            params: {
+              videoTrim: {
+                startSec: trimRange.startSec,
+                endSec: trimRange.endSec,
+                sourceResourceId: body.sourceVideoResourceId,
+              },
+            },
+            aiInterfaceId: result.aiInterfaceId,
+          },
+        }
+      );
+
+      return c.json({
+        taskId: result.taskId,
+        aiInterfaceId: result.aiInterfaceId,
+        jobId: result.jobId,
+        resourceIds: result.resourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
+      });
+    } catch (error) {
+      const message =
+        error instanceof VolcanoMediaKitApiError || error instanceof Error
+          ? error.message
+          : "Video trim submit failed";
+      const status =
+        message.includes("not enabled") ||
+        message.includes("not configured") ||
+        message.includes("not found") ||
+        message.includes("Invalid video trim")
           ? 400
           : 502;
       return c.json({ error: message }, status);

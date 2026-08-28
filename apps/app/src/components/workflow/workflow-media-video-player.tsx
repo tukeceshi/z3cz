@@ -26,6 +26,8 @@ import {
 import { cn } from "@/utils/utils";
 
 import { videoSrcAllowsCrossOrigin } from "./video-src-cross-origin";
+import type { VideoTrimRangeSec } from "@dafthunk/types";
+
 import {
   formatVideoTime,
   type VideoFrameCaptureMode,
@@ -46,6 +48,13 @@ export interface WorkflowMediaVideoPlayerProps {
   readonly onLoadedMetadata?: (video: HTMLVideoElement) => void;
   readonly videoRef?: RefObject<HTMLVideoElement | null>;
   readonly onExpandView?: () => void;
+  /** When true, hover autoplay is disabled (trim session open on the card). */
+  readonly externalPlaybackControl?: boolean;
+  /** Loop playback within [startSec, endSec]; progress bar stays on full timeline. */
+  readonly playbackRange?: VideoTrimRangeSec | null;
+  /** Trim session: panel-driven pause state. */
+  readonly playbackPaused?: boolean;
+  readonly onPlaybackPausedChange?: (paused: boolean) => void;
   /** Raised z-index for menus opened inside high-layer overlays (e.g. lightbox). */
   readonly menuContentClassName?: string;
 }
@@ -102,6 +111,10 @@ export function WorkflowMediaVideoPlayer({
   videoRef: externalVideoRef,
   onExpandView,
   menuContentClassName,
+  externalPlaybackControl = false,
+  playbackRange = null,
+  playbackPaused = false,
+  onPlaybackPausedChange,
 }: WorkflowMediaVideoPlayerProps) {
   const { t } = useTranslation();
   const internalVideoRef = useRef<HTMLVideoElement>(null);
@@ -171,8 +184,18 @@ export function WorkflowMediaVideoPlayer({
     lastVolumeBeforeMuteRef.current = DEFAULT_VOLUME;
     syncTimeState();
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      if (externalPlaybackControl) {
+        onPlaybackPausedChange?.(false);
+      }
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      if (externalPlaybackControl) {
+        onPlaybackPausedChange?.(true);
+      }
+    };
     const handleLoadedMetadata = () => {
       syncTimeState();
       onLoadedMetadata?.(video);
@@ -190,6 +213,13 @@ export function WorkflowMediaVideoPlayer({
       }
     };
     const handleEnded = () => {
+      if (playbackRange) {
+        video.currentTime = playbackRange.startSec;
+        if (!video.paused) {
+          void video.play().catch(() => {});
+        }
+        return;
+      }
       if (isCardVariant) {
         resetVideoToStart();
       }
@@ -214,11 +244,57 @@ export function WorkflowMediaVideoPlayer({
     isCardVariant,
     isDragging,
     onLoadedMetadata,
+    onPlaybackPausedChange,
+    playbackRange,
+    externalPlaybackControl,
     resetVideoToStart,
     src,
     syncTimeState,
     videoRef,
   ]);
+
+  useEffect(() => {
+    if (!playbackRange) {
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    if (
+      video.currentTime < playbackRange.startSec ||
+      video.currentTime > playbackRange.endSec
+    ) {
+      video.currentTime = playbackRange.startSec;
+      setCurrentTime(video.currentTime);
+    }
+  }, [playbackRange, videoRef]);
+
+  useEffect(() => {
+    if (!playbackRange) {
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    const handleTimeUpdate = () => {
+      if (video.currentTime >= playbackRange.endSec - 0.05) {
+        video.currentTime = playbackRange.startSec;
+        setCurrentTime(video.currentTime);
+        if (!video.paused) {
+          void video.play().catch(() => {});
+        }
+      }
+    };
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+    };
+  }, [playbackRange, videoRef]);
 
   const tryCardAutoplay = useCallback(() => {
     const video = videoRef.current;
@@ -230,24 +306,55 @@ export function WorkflowMediaVideoPlayer({
     startMutedInlinePlayback(video);
   }, [videoRef]);
 
-  const handleCardMouseEnter = useCallback(() => {
-    if (!isCardVariant) return;
-    setIsHovered(true);
-    tryCardAutoplay();
-  }, [isCardVariant, tryCardAutoplay]);
+  useEffect(() => {
+    if (!externalPlaybackControl) {
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    if (playbackPaused) {
+      video.pause();
+      return;
+    }
+
+    void video.play().catch(() => {});
+  }, [externalPlaybackControl, playbackPaused, videoRef]);
 
   useEffect(() => {
-    if (!isCardVariant || !initialHovered) return;
+    if (!isCardVariant || !externalPlaybackControl || playbackPaused) {
+      return;
+    }
     setIsHovered(true);
     tryCardAutoplay();
-  }, [initialHovered, isCardVariant, src, tryCardAutoplay]);
+  }, [
+    externalPlaybackControl,
+    isCardVariant,
+    playbackPaused,
+    src,
+    tryCardAutoplay,
+  ]);
+
+  const handleCardMouseEnter = useCallback(() => {
+    if (!isCardVariant || externalPlaybackControl) return;
+    setIsHovered(true);
+    tryCardAutoplay();
+  }, [externalPlaybackControl, isCardVariant, tryCardAutoplay]);
+
+  useEffect(() => {
+    if (!isCardVariant || !initialHovered || externalPlaybackControl) return;
+    setIsHovered(true);
+    tryCardAutoplay();
+  }, [externalPlaybackControl, initialHovered, isCardVariant, src, tryCardAutoplay]);
 
   const handleCardMouseLeave = useCallback(() => {
-    if (!isCardVariant || !canHoverVideoPlayback()) return;
+    if (!isCardVariant || !canHoverVideoPlayback() || externalPlaybackControl) return;
     setIsHovered(false);
     setIsVolumeHovered(false);
     resetVideoToStart();
-  }, [isCardVariant, resetVideoToStart]);
+  }, [externalPlaybackControl, isCardVariant, resetVideoToStart]);
 
   const handleTogglePlay = useCallback(() => {
     const video = videoRef.current;

@@ -458,6 +458,8 @@ export function generativeVideoProgressButtonKey(
       return "workflow.aiVideoPanel.queued";
     case "generating":
       return "workflow.aiVideoPanel.generating";
+    case "trimming":
+      return "workflow.aiVideoPanel.trimming";
     case "cancelling":
       return "workflow.generativeCancel.inProgress";
     case "cancelled":
@@ -512,6 +514,8 @@ export function generativeCardProgressKey(
       return `${prefix}.cardQueued`;
     case "generating":
       return `${prefix}.cardGenerating`;
+    case "trimming":
+      return `${prefix}.cardTrimming`;
     case "cancelling":
       return `${prefix}.cardCancelling`;
     case "cancelled":

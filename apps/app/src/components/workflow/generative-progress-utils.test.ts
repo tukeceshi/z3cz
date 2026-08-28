@@ -8,6 +8,7 @@ import {
   isClientUpstreamQueued,
   isGenerativePersistPhase,
   isGenerativePhaseCancellable,
+  isGenerativeCardBusyPhase,
   isVideoStopButtonVisible,
   readClientUpstreamPollPhase,
   readGenerativeDownloadPercent,
@@ -17,6 +18,7 @@ import {
   readGenerativeStagingMediaIds,
   snapshotGenerativeProgressForPersist,
   withGenerativeProgress,
+  withGenerativeTrimmingProgress,
   withGenerativeUploadProgress,
 } from "@/components/workflow/generative-progress-utils";
 
@@ -253,5 +255,14 @@ describe("generative-progress-utils", () => {
     expect(readGenerativeProgressPhase(
       withGenerativeUploadProgress(generating, false)
     )).toBe("generating");
+  });
+
+  it("sets and clears trim progress for manual upload cards", () => {
+    const trimming = withGenerativeTrimmingProgress(undefined, true);
+    expect(readGenerativeProgressPhase(trimming)).toBe("trimming");
+    expect(isGenerativeCardBusyPhase("trimming")).toBe(true);
+
+    const cleared = withGenerativeTrimmingProgress(trimming, false);
+    expect(readGenerativeProgressPhase(cleared)).toBeUndefined();
   });
 });

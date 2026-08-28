@@ -44,6 +44,7 @@ import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
+import { VideoTrimSessionProvider, useVideoTrimSession } from "./video-trim-session-context";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
 import {
@@ -760,6 +761,7 @@ export function WorkflowBuilder({
           <CreativeStudioCanvasSync selectNode={selectNode} />
           <div className="relative flex min-h-0 flex-1 flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
+          <VideoTrimSessionProvider>
             <InlineAiTextMigrationHost
               organizationId={orgId}
               workflowId={workflowId}
@@ -855,6 +857,7 @@ export function WorkflowBuilder({
             onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
             disabledWorkflow={readOnly}
           />
+          </VideoTrimSessionProvider>
           </CloudStorageCanvasProvider>
         </div>
 
@@ -976,11 +979,17 @@ function WorkflowEditorMainArea({
   reserveTopChromeSpace = false,
   suppressViewportPersistEndRef,
   onRestoreEditorViewportAfterStudio,
+  onPaneClick,
   ...props
 }: WorkflowEditorMainAreaProps) {
   useGenerativeMediaBeforeUnloadGuard();
   usePrefetchCreativeStudioView();
   const { viewMode } = useCreativeStudio();
+  const { closeTrimSession } = useVideoTrimSession();
+  const handlePaneClick = useCallback(() => {
+    closeTrimSession();
+    onPaneClick?.();
+  }, [closeTrimSession, onPaneClick]);
   const selectDroppedNodes = useCanvasDropNodeSelection(
     onSelectDroppedNodes ?? (() => {})
   );
@@ -1018,6 +1027,7 @@ function WorkflowEditorMainArea({
     <div className="relative h-full w-full min-h-0">
       <WorkflowCanvas
         {...props}
+        onPaneClick={onPaneClick ? handlePaneClick : undefined}
         suppressViewportPersistEndRef={suppressViewportPersistEndRef}
         parked={isStudio}
         disabled={Boolean(props.disabled) || isStudio}

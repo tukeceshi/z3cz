@@ -36,6 +36,7 @@ interface VolcanoMediaKitSettingsDialogProps {
 function hasSelectedMediaKitFeature(config: VolcanoMediaKitConfig): boolean {
   return (
     VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some((mode) => config.videoEnhance[mode]) ||
+    config.videoTrim.enabled ||
     VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some((mode) => config.subtitleErase[mode])
   );
 }
@@ -154,6 +155,22 @@ export function VolcanoMediaKitSettingsDialog({
                 />
               </div>
             ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm">
+              {t("pages.aiInterfaces.mediaKitEnhance.videoTrimSection")}
+            </span>
+            <Switch
+              checked={draft.videoTrim.enabled}
+              disabled={isSaving}
+              onCheckedChange={(checked) => {
+                setDraft((previous) => ({
+                  ...previous,
+                  videoTrim: { enabled: checked },
+                }));
+              }}
+            />
           </div>
 
           <div className="space-y-2">

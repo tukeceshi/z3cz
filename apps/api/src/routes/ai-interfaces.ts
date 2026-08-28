@@ -190,15 +190,21 @@ const volcanoMediaKitSubtitleEraseModesSchema = z.object({
   refined: z.boolean(),
 });
 
+const volcanoMediaKitVideoTrimSchema = z.object({
+  enabled: z.boolean(),
+});
+
 const volcanoMediaKitSchema = z
   .object({
     enabled: z.boolean(),
     videoEnhance: volcanoMediaKitVideoEnhanceModesSchema,
+    videoTrim: volcanoMediaKitVideoTrimSchema.default({ enabled: false }),
     subtitleErase: volcanoMediaKitSubtitleEraseModesSchema,
   })
   .superRefine((value, ctx) => {
     const hasFeature =
       Object.values(value.videoEnhance).some(Boolean) ||
+      value.videoTrim.enabled ||
       Object.values(value.subtitleErase).some(Boolean);
     if (value.enabled && !hasFeature) {
       ctx.addIssue({

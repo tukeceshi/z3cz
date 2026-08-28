@@ -25,6 +25,8 @@ import type {
   SubmitAiVideoResponse,
   SubmitVideoEnhanceRequest,
   SubmitVideoEnhanceResponse,
+  SubmitVideoTrimRequest,
+  SubmitVideoTrimResponse,
 } from "@dafthunk/types";
 import {
   isVideoEnhanceModelCanonicalId,
@@ -482,6 +484,21 @@ export async function submitVideoEnhance(
 ): Promise<SubmitVideoEnhanceResponse> {
   return makeRequest<SubmitVideoEnhanceResponse>(
     `${platformAiEndpoint(orgId)}/mediakit/video-enhance/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    }
+  );
+}
+
+export async function submitVideoTrim(
+  orgId: string,
+  body: SubmitVideoTrimRequest,
+  options?: { readonly signal?: AbortSignal }
+): Promise<SubmitVideoTrimResponse> {
+  return makeRequest<SubmitVideoTrimResponse>(
+    `${platformAiEndpoint(orgId)}/mediakit/video-trim/submit`,
     {
       method: "POST",
       body: JSON.stringify(body),

@@ -66,6 +66,7 @@ import {
 import { GenerativeNodeTopToolbarShell } from "./generative-node-top-toolbar-shell";
 import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
 import { VideoEnhanceToolbarButton } from "./video-enhance-toolbar-button";
+import { VideoTrimToolbarButton } from "./video-trim-toolbar-button";
 import {
   isVideoEnhanceCoverReady,
   readCloudVideoCoverResource,
@@ -528,12 +529,19 @@ export function GenerativeNodeTopToolbar({
         {videoForEnhance || showHistory ? (
           <>
             {videoForEnhance ? (
-              <VideoEnhanceToolbarButton
-                sourceNodeId={nodeId}
-                sourceNodeData={data}
-                sourceVideo={videoForEnhance}
-                disabled={disabled}
-              />
+              <>
+                <VideoTrimToolbarButton
+                  sourceNodeId={nodeId}
+                  sourceVideo={videoForEnhance}
+                  disabled={disabled}
+                />
+                <VideoEnhanceToolbarButton
+                  sourceNodeId={nodeId}
+                  sourceNodeData={data}
+                  sourceVideo={videoForEnhance}
+                  disabled={disabled}
+                />
+              </>
             ) : null}
             {showHistory ? (
               <TopToolbarButton

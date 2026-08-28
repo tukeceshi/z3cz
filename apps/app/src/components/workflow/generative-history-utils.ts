@@ -31,7 +31,11 @@ export function resolveGenerativeCardPhase(
 ): GenerativeProgressPhase | null {
   const progressPhase = readGenerativeProgressPhase(metadata);
 
-  if (progressPhase === "downloading" || progressPhase === "uploading") {
+  if (
+    progressPhase === "downloading" ||
+    progressPhase === "uploading" ||
+    progressPhase === "trimming"
+  ) {
     return progressPhase;
   }
 
@@ -114,7 +118,8 @@ export function shouldHoldUnreadyCardCover(params: {
   return (
     isGenerativePersistPhase(progressPhase) ||
     progressPhase === "queued" ||
-    progressPhase === "generating"
+    progressPhase === "generating" ||
+    progressPhase === "trimming"
   );
 }
 

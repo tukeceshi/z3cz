@@ -29,6 +29,8 @@ export * from "./single-model-snapshot";
 export * from "./volcano-mediakit-enhance";
 export * from "./volcano-mediakit-pricing-catalog";
 export * from "./video-enhance";
+export * from "./video-trim";
+export * from "./video-trim-mediakit";
 export * from "./ai-video-panel";
 export * from "./volcano-tos-regions";
 export * from "./volcano-tos-pricing";
