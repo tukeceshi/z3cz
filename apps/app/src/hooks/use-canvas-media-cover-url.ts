@@ -27,6 +27,18 @@ import {
 
 import { useMediaDisplayUrlSet } from "./use-media-display-url-set";
 
+function mergeMediaDisplayUrlSets(
+  primary: MediaDisplayUrlSet,
+  secondary: MediaDisplayUrlSet
+): MediaDisplayUrlSet {
+  return {
+    full: primary.full ?? secondary.full,
+    s: primary.s ?? secondary.s,
+    m: primary.m ?? secondary.m,
+    l: primary.l ?? secondary.l,
+  };
+}
+
 function useCanvasNodeOnScreen(
   fallbackWidthPx: number,
   fallbackHeightPx: number
@@ -185,6 +197,7 @@ export function useCanvasMediaCoverUrl(params: {
   readonly cardWidthPx: number;
   readonly cardHeightPx?: number;
   readonly sharedUrlSet?: SharedMediaDisplayUrlSet;
+  readonly ensureSize?: MediaDisplaySize;
 }): {
   readonly displayUrl: string | null;
   readonly phase: MediaDisplayPhase;
@@ -217,8 +230,19 @@ export function useCanvasMediaCoverUrl(params: {
     media: params.sharedUrlSet ? null : params.media,
     nodeType: params.nodeType,
     preferredSize: effectivePickSize,
+    ensureSize: params.sharedUrlSet ? undefined : params.ensureSize,
   });
-  const urlSet = params.sharedUrlSet?.urlSet ?? internalUrlSet.urlSet;
+  const sharedEnsureUrlSet = useMediaDisplayUrlSet({
+    media: params.sharedUrlSet && params.ensureSize ? params.media : null,
+    nodeType: params.nodeType,
+    ensureSize: params.sharedUrlSet ? params.ensureSize : undefined,
+    paused: !params.sharedUrlSet || !params.ensureSize,
+  });
+  const baseUrlSet = params.sharedUrlSet?.urlSet ?? internalUrlSet.urlSet;
+  const urlSet = useMemo(
+    () => mergeMediaDisplayUrlSets(baseUrlSet, sharedEnsureUrlSet.urlSet),
+    [baseUrlSet, sharedEnsureUrlSet.urlSet]
+  );
   const stale = params.sharedUrlSet?.stale ?? internalUrlSet.stale;
   const retry = params.sharedUrlSet?.retry ?? internalUrlSet.retry;
 

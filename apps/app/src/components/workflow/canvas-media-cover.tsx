@@ -416,6 +416,7 @@ function CanvasVideoCover({
   const { t } = useTranslation();
   const frameCapture = useWorkflowVideoFrameCapture(nodeId);
   const [isHovered, setIsHovered] = useState(false);
+  const ensureFullOnHover = !staticCover && isHovered;
   const {
     displayUrl,
     phase,
@@ -429,9 +430,9 @@ function CanvasVideoCover({
     cardWidthPx,
     cardHeightPx,
     sharedUrlSet,
+    ensureSize: ensureFullOnHover ? "full" : undefined,
   });
-  const hoverPreviewEnabled =
-    !staticCover && isHovered && isCanvasOnScreen;
+  const hoverPreviewEnabled = ensureFullOnHover && isCanvasOnScreen;
   const fullVideoDisplay = useMemo(
     () =>
       resolveMediaDisplay({
@@ -469,7 +470,10 @@ function CanvasVideoCover({
   });
 
   const showVideoPlayer = hoverPreviewEnabled && Boolean(videoUrl);
-  const showPlayIcon = !showVideoPlayer && hasImage && Boolean(baseSrc);
+  const showHoverLoading =
+    hoverPreviewEnabled && fullVideoDisplay.phase === "loading";
+  const showPlayIcon =
+    !showVideoPlayer && !showHoverLoading && hasImage && Boolean(baseSrc);
   const showUnavailable = useDebouncedUnavailable(
     phase === "missing" && isCanvasOnScreen
   );
@@ -521,6 +525,12 @@ function CanvasVideoCover({
           onFrameCapture={frameCapture.onFrameCapture}
           onExpandView={onExpandView}
         />
+      ) : null}
+
+      {showHoverLoading ? (
+        <div className="absolute inset-0 z-20">
+          <CanvasMediaLoadingPlaceholder />
+        </div>
       ) : null}
 
       {showPlayIcon ? (

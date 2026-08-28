@@ -35,6 +35,8 @@ interface UseMediaDisplayUrlSetParams {
   readonly nodeType?: "ai-image" | "ai-video" | "ai-audio";
   readonly paused?: boolean;
   readonly preferredSize?: MediaDisplaySize;
+  /** When set, async DB read runs until this tier URL is available (e.g. hover playback). */
+  readonly ensureSize?: MediaDisplaySize;
 }
 
 function rememberIfNeeded(
@@ -88,11 +90,26 @@ function readImmediateUrlSet(params: {
   return stable;
 }
 
+function urlSetSatisfiesSizes(
+  set: MediaDisplayUrlSet,
+  preferredSize: MediaDisplaySize,
+  ensureSize: MediaDisplaySize | undefined
+): boolean {
+  if (!hasDisplayUrlForSize(set, preferredSize)) {
+    return false;
+  }
+  if (ensureSize && !hasDisplayUrlForSize(set, ensureSize)) {
+    return false;
+  }
+  return true;
+}
+
 export function useMediaDisplayUrlSet({
   media,
   nodeType,
   paused = false,
   preferredSize = DEFAULT_PREFERRED_SIZE,
+  ensureSize,
 }: UseMediaDisplayUrlSetParams): {
   readonly urlSet: MediaDisplayUrlSet;
   readonly stale: boolean;
@@ -109,6 +126,8 @@ export function useMediaDisplayUrlSet({
   mediaRef.current = media;
   const preferredSizeRef = useRef(preferredSize);
   preferredSizeRef.current = preferredSize;
+  const ensureSizeRef = useRef(ensureSize);
+  ensureSizeRef.current = ensureSize;
 
   const [urlSet, setUrlSet] = useState<MediaDisplayUrlSet>(() => {
     if (!media || isUnloadedResourceRef(media) || !orgId || !workflowId || !mediaKey) {
@@ -157,6 +176,7 @@ export function useMediaDisplayUrlSet({
   useEffect(() => {
     const currentMedia = mediaRef.current;
     const currentPreferredSize = preferredSizeRef.current;
+    const currentEnsureSize = ensureSizeRef.current;
     if (
       !currentMedia ||
       isUnloadedResourceRef(currentMedia) ||
@@ -184,7 +204,8 @@ export function useMediaDisplayUrlSet({
     }
 
     const skipAsync =
-      cacheRevision === 0 && hasDisplayUrlForSize(immediate, currentPreferredSize);
+      cacheRevision === 0 &&
+      urlSetSatisfiesSizes(immediate, currentPreferredSize, currentEnsureSize);
     if (skipAsync) {
       return;
     }
@@ -219,7 +240,16 @@ export function useMediaDisplayUrlSet({
     return () => {
       cancelled = true;
     };
-  }, [cacheRevision, mediaKey, nodeType, orgId, paused, preferredSize, workflowId]);
+  }, [
+    cacheRevision,
+    ensureSize,
+    mediaKey,
+    nodeType,
+    orgId,
+    paused,
+    preferredSize,
+    workflowId,
+  ]);
 
   const stale = Boolean(media && isMediaDisplayUrlSetEmpty(urlSet));
 
