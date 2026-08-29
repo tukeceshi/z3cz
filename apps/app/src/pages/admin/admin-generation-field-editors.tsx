@@ -922,6 +922,8 @@ function useGenerationFieldTitleResolver(modality: AdminGenerationModality) {
           return t("pages.adminAiModels.videoFieldLabels.virtual_avatar_library");
         case "return_last_frame":
           return t("pages.adminAiModels.videoFieldLabels.return_last_frame");
+        case "output_format":
+          return t("pages.adminAiModels.videoFieldLabels.output_format");
         case "execution_expires_after":
           return t("pages.adminAiModels.videoFieldLabels.execution_expires_after");
         default:

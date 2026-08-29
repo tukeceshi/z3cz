@@ -2433,6 +2433,7 @@ export const en = {
         web_search: "Web search",
         virtual_avatar_library: "Virtual avatar library",
         return_last_frame: "Return last frame",
+        output_format: "Output format",
         execution_expires_after: "Task timeout (seconds)",
       },
       audioFieldLabels: {
@@ -3753,6 +3754,10 @@ export const en = {
       priceEstimatePackTokens: "Pack tokens",
       priceEstimatePackTokensHelp:
         "Resource packs are metered against the 480p (no reference video) rate. Pack tokens = current rate ÷ 480p baseline × billing tokens.",
+      priceEstimateOptimalReferenceSec: "Optimal reference length",
+      priceEstimateOptimalReferenceSecHelp:
+        "Reference video uses a lower rate, but billing has a minimum. Longer reference video within this length does not increase cost.",
+      priceEstimateOptimalReferenceSecValue: "≤{{seconds}} s",
       priceEstimateCost: "Est. price",
       priceEstimateCostValue: "{{cost}} CNY",
       priceEstimateUnitRate: "Est. rate",

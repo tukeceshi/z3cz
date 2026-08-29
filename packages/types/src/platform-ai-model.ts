@@ -907,6 +907,14 @@ export const VIDEO_GENERATION_FIELD_CATALOG: readonly UpstreamParamProfileField[
       default: false,
     },
     {
+      name: "output_format",
+      apiName: "output_format",
+      type: "string",
+      description: "输出格式",
+      default: "mp4",
+      enumValues: ["mp4", "mov"],
+    },
+    {
       name: "seed",
       apiName: "seed",
       type: "number",

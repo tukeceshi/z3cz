@@ -5,6 +5,7 @@ import {
 } from "./platform-ai-model";
 import {
   computeCostPerOutputSecond,
+  computeOptimalReferenceSeconds,
   computePackTokens,
   computeSplitVideoPriceEstimateForModel,
   computeVideoBillingTokens,
@@ -23,6 +24,19 @@ import {
   splitClipOutputSeconds,
   toPublicVideoPriceEstimateModel,
 } from "./video-price-estimate";
+
+describe("computeOptimalReferenceSeconds", () => {
+  it("returns the flat-zone ceiling for common output durations", () => {
+    expect(computeOptimalReferenceSeconds(5)).toBe(4);
+    expect(computeOptimalReferenceSeconds(3)).toBe(2);
+    expect(computeOptimalReferenceSeconds(9)).toBe(6);
+  });
+
+  it("returns zero for non-positive output duration", () => {
+    expect(computeOptimalReferenceSeconds(0)).toBe(0);
+    expect(computeOptimalReferenceSeconds(-1)).toBe(0);
+  });
+});
 
 describe("computeVideoBillingTokens", () => {
   it("rounds output-only tokens", () => {

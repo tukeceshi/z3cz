@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   applyVideoPriceEstimateDisplayFolds,
   computeCostPerOutputSecond,
+  computeOptimalReferenceSeconds,
   computePackTokens,
   computeVideoPriceEstimateForModel,
   formatVideoBillingTokensDisplay,
@@ -135,9 +136,13 @@ function PriceEstimateDetailRow({
   );
 }
 
-function PackTokenLabel({ label }: { readonly label: string }) {
-  const { t } = useTranslation();
-
+function DashedHelpLabel({
+  label,
+  help,
+}: {
+  readonly label: string;
+  readonly help: string;
+}) {
   return (
     <Popover modal={false}>
       <PopoverTrigger asChild>
@@ -157,9 +162,20 @@ function PackTokenLabel({ label }: { readonly label: string }) {
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <p>{t("workflow.aiVideoPanel.priceEstimatePackTokensHelp")}</p>
+        <p>{help}</p>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function PackTokenLabel({ label }: { readonly label: string }) {
+  const { t } = useTranslation();
+
+  return (
+    <DashedHelpLabel
+      label={label}
+      help={t("workflow.aiVideoPanel.priceEstimatePackTokensHelp")}
+    />
   );
 }
 
@@ -167,10 +183,14 @@ function PriceEstimateDetail({
   estimate,
   displayCostYuan,
   packTokens,
+  optimalReferenceSeconds,
+  showOptimalReferenceSeconds,
 }: {
   readonly estimate: VideoPriceEstimateResult;
   readonly displayCostYuan: number;
   readonly packTokens: number | null;
+  readonly optimalReferenceSeconds: number;
+  readonly showOptimalReferenceSeconds: boolean;
 }) {
   const { t } = useTranslation();
   const costPerSecond = computeCostPerOutputSecond(
@@ -184,6 +204,20 @@ function PriceEstimateDetail({
         label={t("workflow.aiVideoPanel.priceEstimateBillingTokens")}
         value={formatVideoBillingTokensDisplay(estimate.billingTokens)}
       />
+      {showOptimalReferenceSeconds ? (
+        <PriceEstimateDetailRow
+          label={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSec")}
+          value={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSecValue", {
+            seconds: optimalReferenceSeconds,
+          })}
+          labelNode={
+            <DashedHelpLabel
+              label={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSec")}
+              help={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSecHelp")}
+            />
+          }
+        />
+      ) : null}
       {packTokens != null ? (
         <PriceEstimateDetailRow
           label={t("workflow.aiVideoPanel.priceEstimatePackTokens")}
@@ -224,7 +258,6 @@ export function AiVideoPriceEstimateChip({
   displayFolds = [],
   disabled = false,
 }: AiVideoPriceEstimateChipProps) {
-  const { t } = useTranslation();
   const inputDurationSec = useSummedReferenceVideoDurationSeconds(
     referenceVideoMedia
   );
@@ -281,6 +314,13 @@ export function AiVideoPriceEstimateChip({
     });
   }, [baseline480pWithoutVideo, estimate.billingTokens, estimate.unitPrice]);
 
+  const optimalReferenceSeconds = useMemo(
+    () => computeOptimalReferenceSeconds(outputDurationSec),
+    [outputDurationSec]
+  );
+  const showOptimalReferenceSeconds =
+    priceWithVideo > 0 && optimalReferenceSeconds > 0;
+
   const summary = formatVideoPriceEstimateCostDisplay(displayCostYuan);
 
   return (
@@ -305,6 +345,8 @@ export function AiVideoPriceEstimateChip({
           estimate={estimate}
           displayCostYuan={displayCostYuan}
           packTokens={packTokens}
+          optimalReferenceSeconds={optimalReferenceSeconds}
+          showOptimalReferenceSeconds={showOptimalReferenceSeconds}
         />
       </PopoverContent>
     </Popover>
