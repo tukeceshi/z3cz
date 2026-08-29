@@ -2329,6 +2329,7 @@ export const zh: TranslationDictionary = {
         web_search: "联网搜索",
         virtual_avatar_library: "虚拟人像库",
         return_last_frame: "返回末帧",
+        output_format: "输出格式",
         execution_expires_after: "任务超时（秒）",
       },
       audioFieldLabels: {
@@ -3574,6 +3575,10 @@ export const zh: TranslationDictionary = {
       priceEstimatePackTokens: "资源包 token",
       priceEstimatePackTokensHelp:
         "购买资源包时，平台按 480p（无参考视频）单价折算消耗量。资源包 token = 当前档单价 ÷ 480p 基准单价 × 计费 token。",
+      priceEstimateOptimalReferenceSec: "最佳参考秒数",
+      priceEstimateOptimalReferenceSecHelp:
+        "有参考视频时单价更低，但存在最低计费量；参考视频在此秒数内加长不会增加费用。",
+      priceEstimateOptimalReferenceSecValue: "≤{{seconds}} 秒",
       priceEstimateCost: "预估价格",
       priceEstimateCostValue: "{{cost}}￥",
       priceEstimateUnitRate: "预估单价",

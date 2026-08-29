@@ -486,6 +486,20 @@ export function computeVideoOutputTokens(
   return Math.round(outputDurationSec * tps);
 }
 
+export function computeReferenceVideoMinBillingDurationSec(
+  outputDurationSec: number
+): number {
+  return Math.ceil(Math.max(0, outputDurationSec) * (5 / 3));
+}
+
+export function computeOptimalReferenceSeconds(
+  outputDurationSec: number
+): number {
+  const minBillingDurationSec =
+    computeReferenceVideoMinBillingDurationSec(outputDurationSec);
+  return Math.max(0, minBillingDurationSec - Math.max(0, outputDurationSec));
+}
+
 export function computeVideoBillingTokens(params: {
   readonly outputDurationSec: number;
   readonly inputDurationSec: number;
@@ -499,7 +513,7 @@ export function computeVideoBillingTokens(params: {
     return Math.round(outputDurationSec * tps);
   }
 
-  const minDuration = Math.ceil(outputDurationSec * (5 / 3));
+  const minDuration = computeReferenceVideoMinBillingDurationSec(outputDurationSec);
   const billingDuration = Math.max(
     inputDurationSec + outputDurationSec,
     minDuration
