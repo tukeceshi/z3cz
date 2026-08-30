@@ -33,6 +33,19 @@ describe("video-trim", () => {
     ).toEqual({ startSec: 9.9, endSec: 10 });
   });
 
+  it("does not snap the end past the video duration", () => {
+    expect(createDefaultVideoTrimRange(1.96)).toEqual({
+      startSec: 0,
+      endSec: 1.96,
+    });
+    expect(
+      clampVideoTrimRange({ startSec: 0, endSec: 5.1 }, 5.07)
+    ).toEqual({ startSec: 0, endSec: 5.07 });
+    expect(
+      clampVideoTrimRange({ startSec: 0, endSec: 99 }, 5.07)
+    ).toEqual({ startSec: 0, endSec: 5.07 });
+  });
+
   it("applies start edits while keeping end fixed", () => {
     const next = applyVideoTrimTimeFieldEdit({
       range: { startSec: 0, endSec: 5 },
@@ -52,6 +65,17 @@ describe("video-trim", () => {
       videoDurationSec: 10,
     });
     expect(next).toEqual({ startSec: 2, endSec: 8 });
+  });
+
+  it("clamps oversized end time edits to the video duration", () => {
+    expect(
+      applyVideoTrimTimeFieldEdit({
+        range: { startSec: 0, endSec: 2 },
+        field: "end",
+        valueSec: 5.1,
+        videoDurationSec: 5.07,
+      })
+    ).toEqual({ startSec: 0, endSec: 5.07 });
   });
 
   it("applies duration edits while keeping start fixed", () => {

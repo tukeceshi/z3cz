@@ -19,6 +19,7 @@ import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
 import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
+import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
@@ -423,8 +424,17 @@ function CanvasVideoCover({
     trimActive && trimSessionApi?.session?.sourceNodeId === nodeId
       ? trimSessionApi.session
       : null;
+  const retakeSessionApi = useOptionalVideoRetakeSession();
+  const retakeActive = Boolean(
+    nodeId && retakeSessionApi?.isRetakeActiveForNode(nodeId)
+  );
+  const retakeSession =
+    retakeActive && retakeSessionApi?.session?.sourceNodeId === nodeId
+      ? retakeSessionApi.session
+      : null;
   const [isHovered, setIsHovered] = useState(false);
-  const ensureFullOnHover = trimActive || (!staticCover && isHovered);
+  const ensureFullOnHover =
+    trimActive || retakeActive || (!staticCover && isHovered);
   const {
     displayUrl,
     phase,
@@ -451,9 +461,12 @@ function CanvasVideoCover({
       }),
     [hoverPreviewEnabled, media, stale, urlSet]
   );
-  const videoUrl =
-    trimSession?.trimSourceVideoUrl ??
-    (fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null);
+  const hoverVideoUrl =
+    fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null;
+  const trimVideoUrl =
+    trimSession?.trimSourceVideoUrl ?? hoverVideoUrl;
+  const retakeVideoUrl =
+    retakeSession?.trimSourceVideoUrl ?? hoverVideoUrl;
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
@@ -478,8 +491,11 @@ function CanvasVideoCover({
     onBroken: handleBroken,
   });
 
-  const showVideoPlayer =
-    trimActive || (hoverPreviewEnabled && Boolean(videoUrl));
+  const showTrimVideoPlayer =
+    trimActive || (!retakeActive && hoverPreviewEnabled && Boolean(trimVideoUrl));
+  const showRetakeVideoPlayer =
+    retakeActive && Boolean(retakeVideoUrl);
+  const showVideoPlayer = showTrimVideoPlayer || showRetakeVideoPlayer;
   const showHoverLoading =
     hoverPreviewEnabled && fullVideoDisplay.phase === "loading";
   const showPlayIcon =
@@ -521,10 +537,10 @@ function CanvasVideoCover({
         </div>
       ) : null}
 
-      {showVideoPlayer && videoUrl ? (
+      {showTrimVideoPlayer && trimVideoUrl ? (
         <WorkflowMediaVideoPlayer
-          key={videoUrl}
-          src={videoUrl}
+          key={trimVideoUrl}
+          src={trimVideoUrl}
           variant="card"
           objectFit={objectFit}
           initialHovered
@@ -553,7 +569,7 @@ function CanvasVideoCover({
               trimSessionApi.patchTrimSession({ loadPhase: "error" });
               return;
             }
-            const sourceUrl = video.currentSrc || videoUrl;
+            const sourceUrl = video.currentSrc || trimVideoUrl;
             const patch: Parameters<typeof trimSessionApi.patchTrimSession>[0] = {
               trimSourceVideoUrl: sourceUrl,
               videoDurationSec: video.duration,
@@ -569,6 +585,59 @@ function CanvasVideoCover({
           onError={() => {
             if (trimActive && trimSessionApi) {
               trimSessionApi.patchTrimSession({ loadPhase: "error" });
+            }
+          }}
+        />
+      ) : null}
+
+      {showRetakeVideoPlayer && retakeVideoUrl ? (
+        <WorkflowMediaVideoPlayer
+          key={retakeVideoUrl}
+          src={retakeVideoUrl}
+          variant="card"
+          objectFit={objectFit}
+          initialHovered
+          externalPlaybackControl={retakeActive}
+          playbackRange={retakeActive ? retakeSession?.committedRange ?? null : null}
+          playbackPaused={retakeActive ? retakeSession?.playbackPaused ?? false : false}
+          onPlaybackPausedChange={
+            retakeActive && retakeSessionApi
+              ? retakeSessionApi.setPlaybackPaused
+              : undefined
+          }
+          className="absolute inset-0 z-10"
+          showFrameCapture={frameCapture.showFrameCapture}
+          frameCaptureDisabled={frameCapture.frameCaptureDisabled}
+          videoRef={frameCapture.videoRef}
+          onFrameCapture={frameCapture.onFrameCapture}
+          onExpandView={onExpandView}
+          onLoadedMetadata={(video) => {
+            if (!retakeActive || !retakeSessionApi) {
+              return;
+            }
+            if (
+              !Number.isFinite(video.duration) ||
+              video.duration <= 0
+            ) {
+              retakeSessionApi.patchRetakeSession({ loadPhase: "error" });
+              return;
+            }
+            const sourceUrl = video.currentSrc || retakeVideoUrl;
+            const patch: Parameters<typeof retakeSessionApi.patchRetakeSession>[0] = {
+              trimSourceVideoUrl: sourceUrl,
+              videoDurationSec: video.duration,
+              loadPhase: "ready",
+            };
+            if (retakeSession?.loadPhase === "loading") {
+              const defaultRange = createDefaultVideoTrimRange(video.duration);
+              patch.committedRange = defaultRange;
+              patch.draftRange = defaultRange;
+            }
+            retakeSessionApi.patchRetakeSession(patch);
+          }}
+          onError={() => {
+            if (retakeActive && retakeSessionApi) {
+              retakeSessionApi.patchRetakeSession({ loadPhase: "error" });
             }
           }}
         />

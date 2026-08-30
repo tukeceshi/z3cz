@@ -38,7 +38,7 @@ export function createDefaultVideoTrimRange(
     videoDurationSec,
     Math.max(VIDEO_TRIM_MIN_DURATION_SEC, SEEDANCE_VIDEO_REFERENCE_MIN_SEC)
   );
-  return { startSec: 0, endSec: snapVideoTrimSec(endSec) };
+  return clampVideoTrimRange({ startSec: 0, endSec }, videoDurationSec);
 }
 
 export function clampVideoTrimRange(
@@ -54,6 +54,9 @@ export function clampVideoTrimRange(
     Math.min(duration, Math.max(VIDEO_TRIM_MIN_DURATION_SEC, range.endSec))
   );
   let startSec = snapVideoTrimSec(Math.max(0, Math.min(range.startSec, endSec)));
+
+  endSec = Math.min(duration, Math.max(VIDEO_TRIM_MIN_DURATION_SEC, endSec));
+  startSec = Math.max(0, Math.min(startSec, endSec));
 
   if (endSec - startSec < VIDEO_TRIM_MIN_DURATION_SEC) {
     if (endSec >= duration) {

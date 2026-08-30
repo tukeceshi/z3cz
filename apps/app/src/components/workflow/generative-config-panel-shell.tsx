@@ -21,7 +21,11 @@ import {
 } from "./studio-reference-drag";
 import type { StudioReferenceDropPreview } from "./generative-reference-utils";
 
-export type GenerativeConfigPanelLayout = "attached" | "studio" | "studio-dock";
+export type GenerativeConfigPanelLayout =
+  | "attached"
+  | "studio"
+  | "studio-dock"
+  | "retake-embedded";
 
 export interface GenerativeConfigPanelShellProps {
   readonly nodeId: string;
@@ -152,6 +156,32 @@ export function GenerativeConfigPanelShell({
             </p>
           </div>
         ) : null}
+      </div>
+    );
+  }
+
+  if (layout === "retake-embedded") {
+    return (
+      <div
+        className={cn(
+          "overflow-hidden border border-border/70",
+          "bg-neutral-50/95 shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
+          GENERATIVE_NODE_PANEL_CLASS
+        )}
+        style={{
+          width: AI_GENERATIVE_PANEL_WIDTH_PX,
+          height: AI_GENERATIVE_PANEL_HEIGHT_PX,
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerDownCapture={() => {
+          armGenerativePanelPointerGuard(nodeId);
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2 thin-scrollbar">
+          {children}
+        </div>
       </div>
     );
   }

@@ -49,6 +49,7 @@ import {
 } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
+import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
@@ -386,9 +387,12 @@ export const WorkflowNode = memo(
       [data.metadata]
     );
     const trimSession = useOptionalVideoTrimSession();
+    const retakeSession = useOptionalVideoRetakeSession();
     const isTrimPanelActive = trimSession?.isTrimActiveForNode(id) ?? false;
+    const isRetakePanelActive = retakeSession?.isRetakeActiveForNode(id) ?? false;
     const showBottomPanelContent =
       isTrimPanelActive ||
+      isRetakePanelActive ||
       ((!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
         : shouldShowGenerativeBottomPanel(data.metadata)) &&
