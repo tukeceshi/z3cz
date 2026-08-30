@@ -4,7 +4,7 @@ import {
   type VideoTrimRangeSec,
 } from "@dafthunk/types";
 import { useRanger } from "@tanstack/react-ranger";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useCallback } from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -12,6 +12,7 @@ interface VideoTrimRulerProps {
   readonly className?: string;
   readonly videoDurationSec: number;
   readonly range: VideoTrimRangeSec;
+  readonly minSelectionSec?: number;
   readonly onRangeChange: (range: VideoTrimRangeSec) => void;
   readonly onRangeCommit: (range: VideoTrimRangeSec) => void;
 }
@@ -68,6 +69,7 @@ export function VideoTrimRuler({
   className,
   videoDurationSec,
   range,
+  minSelectionSec,
   onRangeChange,
   onRangeCommit,
 }: VideoTrimRulerProps) {
@@ -75,6 +77,12 @@ export function VideoTrimRuler({
   const ticks = useMemo(
     () => buildRulerTicks(videoDurationSec),
     [videoDurationSec]
+  );
+
+  const clampRange = useCallback(
+    (nextRange: VideoTrimRangeSec) =>
+      clampVideoTrimRange(nextRange, videoDurationSec, minSelectionSec),
+    [minSelectionSec, videoDurationSec]
   );
 
   const startPercent = rangeToTrackPercent(range.startSec, videoDurationSec);
@@ -90,15 +98,11 @@ export function VideoTrimRuler({
     stepSize: VIDEO_TRIM_SNAP_STEP_SEC,
     onDrag: (instance) => {
       const [startSec, endSec] = instance.sortedValues;
-      onRangeChange(
-        clampVideoTrimRange({ startSec, endSec }, videoDurationSec)
-      );
+      onRangeChange(clampRange({ startSec, endSec }));
     },
     onChange: (instance) => {
       const [startSec, endSec] = instance.sortedValues;
-      onRangeCommit(
-        clampVideoTrimRange({ startSec, endSec }, videoDurationSec)
-      );
+      onRangeCommit(clampRange({ startSec, endSec }));
     },
   });
 

@@ -44,6 +44,10 @@ export interface AiImageParamsPopoverProps extends GenerativeParamsPopoverUiProp
   readonly title: string;
   readonly onInlineCommit?: (next: Record<string, unknown>) => void;
   readonly displayMode?: "popover" | "inline";
+  /** When false, the trigger shows only `triggerLabel` (no resolution/ratio summary). */
+  readonly showSummaryOnTrigger?: boolean;
+  /** When set, the trigger summary includes only these fields; no `triggerLabel` fallback. */
+  readonly triggerSummaryFieldNames?: ReadonlySet<string>;
 }
 
 export const RATIO_FIELD_NAMES = new Set(["ratio", "aspect_ratio"]);
@@ -767,6 +771,8 @@ export function AiImageParamsPopover({
   title: _title,
   onInlineCommit,
   displayMode = "popover",
+  showSummaryOnTrigger = true,
+  triggerSummaryFieldNames,
 }: AiImageParamsPopoverProps) {
   const fields = fieldsProp ?? [];
   const { t } = useTranslation();
@@ -783,8 +789,11 @@ export function AiImageParamsPopover({
   const formatCount = (count: number) =>
     t("workflow.aiVideoPanel.generateCountOption", { count });
   const { mainFields, tailFields } = partitionVisibleFields(fields);
+  const summarySourceFields = triggerSummaryFieldNames
+    ? fields.filter((field) => triggerSummaryFieldNames.has(field.name))
+    : fields;
   const summary = formatParamSummary(
-    fields,
+    summarySourceFields,
     summaryValues,
     formatCount,
     smartLabel,
@@ -792,7 +801,17 @@ export function AiImageParamsPopover({
     optimizePromptLabels,
     t
   );
-  const summaryText = summary.text;
+  const summaryText = triggerSummaryFieldNames
+    ? summary.text
+    : showSummaryOnTrigger
+      ? summary.text
+      : "";
+  const showAudioOnTrigger = triggerSummaryFieldNames
+    ? triggerSummaryFieldNames.has(GENERATE_AUDIO_FIELD_NAME) && summary.showAudio
+    : showSummaryOnTrigger && summary.showAudio;
+  const triggerDisplayText = triggerSummaryFieldNames
+    ? summaryText
+    : summaryText || triggerLabel;
   const editorValues = displayMode === "inline" ? summaryValues : draft;
 
   const handleFieldChange = (
@@ -869,8 +888,8 @@ export function AiImageParamsPopover({
           disabled={disabled}
           className={AI_BOTTOM_CHIP_CLASS}
         >
-          <span className="truncate">{summaryText || triggerLabel}</span>
-          {summary.showAudio ? (
+          <span className="truncate">{triggerDisplayText}</span>
+          {showAudioOnTrigger ? (
             <Volume2Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           ) : null}
         </button>

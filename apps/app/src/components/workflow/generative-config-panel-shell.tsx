@@ -170,7 +170,6 @@ export function GenerativeConfigPanelShell({
         )}
         style={{
           width: AI_GENERATIVE_PANEL_WIDTH_PX,
-          height: AI_GENERATIVE_PANEL_HEIGHT_PX,
         }}
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
@@ -179,7 +178,7 @@ export function GenerativeConfigPanelShell({
         }}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2 thin-scrollbar">
+        <div className="flex min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2 thin-scrollbar">
           {children}
         </div>
       </div>

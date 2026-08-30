@@ -2159,7 +2159,7 @@ export const zh: TranslationDictionary = {
         optOutHint: "不使用 AI MediaKit（可在接口面板中稍后配置）",
         configureHint: "请设置要使用的功能",
         videoEnhanceSection: "视频增强",
-        videoTrimSection: "视频裁剪",
+        videoTrimSection: "裁剪拼接",
         settings: "设置",
         settingsTitle: "AI MediaKit 设置",
         apiKeySection: "API Key",

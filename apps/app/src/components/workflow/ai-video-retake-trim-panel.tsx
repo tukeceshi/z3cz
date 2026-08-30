@@ -2,16 +2,14 @@ import {
   getResourceIdFromValue,
   isCloudStoredResource,
   isVolcanoMediaKitVideoTrimEnabled,
-  shouldWarnVideoTrimShortDuration,
+  SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
-  videoTrimSelectionDurationSec,
   type VideoTrimRangeSec,
 } from "@dafthunk/types";
 import LoaderIcon from "lucide-react/icons/loader";
 import PauseIcon from "lucide-react/icons/pause";
 import PlayIcon from "lucide-react/icons/play";
-import XIcon from "lucide-react/icons/x";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -69,11 +67,6 @@ import {
 import { useVideoRetakeSession } from "./video-retake-session-context";
 import { isWebCodecsVideoTrimSupported } from "./video-trim-utils";
 import { useVideoTrimToSiblingNode } from "./use-video-trim-to-sibling-node";
-import { VideoTrimShortDurationConfirmDialog } from "./video-trim-short-duration-confirm-dialog";
-import {
-  readSkipVideoTrimShortDurationConfirm,
-  writeSkipVideoTrimShortDurationConfirm,
-} from "./video-trim-short-duration-confirm-preference";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
@@ -117,8 +110,8 @@ export function AiVideoRetakeTrimPanel({
   const [isStartingTrim, setIsStartingTrim] = useState(false);
   const trimTaskRef = useRef(0);
   const [highQualityHintOpen, setHighQualityHintOpen] = useState(false);
-  const [shortDurationConfirmOpen, setShortDurationConfirmOpen] = useState(false);
-  const [shortDurationDontAsk, setShortDurationDontAsk] = useState(false);
+  const [localTrimHintOpen, setLocalTrimHintOpen] = useState(false);
+  const highQualityDefaultAppliedRef = useRef(false);
 
   const mediaKitTrimAvailable = Boolean(
     mediaKitConfig &&
@@ -130,6 +123,38 @@ export function AiVideoRetakeTrimPanel({
       }) &&
       mediaKitConfig.hasApiKey
   );
+
+  const retakeReady =
+    session?.sourceNodeId === nodeId &&
+    session.loadPhase === "ready" &&
+    session.videoDurationSec !== null &&
+    session.videoDurationSec > 0;
+
+  useEffect(() => {
+    if (!session || session.sourceNodeId !== nodeId) {
+      highQualityDefaultAppliedRef.current = false;
+      return;
+    }
+
+    if (!retakeReady || highQualityDefaultAppliedRef.current) {
+      return;
+    }
+
+    highQualityDefaultAppliedRef.current = true;
+
+    if (mediaKitTrimAvailable) {
+      patchRetakeSession({ highQuality: true });
+      return;
+    }
+
+    setLocalTrimHintOpen(true);
+  }, [
+    mediaKitTrimAvailable,
+    nodeId,
+    patchRetakeSession,
+    retakeReady,
+    session,
+  ]);
 
   const handleDraftRangeChange = useCallback(
     (range: VideoTrimRangeSec) => {
@@ -465,62 +490,18 @@ export function AiVideoRetakeTrimPanel({
   ]);
 
   const handleGenerate = useCallback(async () => {
-    if (
-      !session ||
-      session.loadPhase !== "ready" ||
-      !session.trimSourceVideoUrl ||
-      session.videoDurationSec === null ||
-      !orgId ||
-      !workflowId ||
-      !updateNodeData ||
-      isStartingTrim ||
-      blocksGenerativeMedia
-    ) {
-      return;
-    }
-
-    const selectionDurationSec = videoTrimSelectionDurationSec(
-      session.committedRange
-    );
-    if (
-      shouldWarnVideoTrimShortDuration(selectionDurationSec) &&
-      !readSkipVideoTrimShortDurationConfirm()
-    ) {
-      setShortDurationConfirmOpen(true);
-      return;
-    }
-
     await runGenerate();
-  }, [
-    blocksGenerativeMedia,
-    isStartingTrim,
-    orgId,
-    runGenerate,
-    session,
-    updateNodeData,
-    workflowId,
-  ]);
-
-  const handleShortDurationConfirm = useCallback(() => {
-    if (shortDurationDontAsk) {
-      writeSkipVideoTrimShortDurationConfirm(true);
-    }
-    setShortDurationConfirmOpen(false);
-    void runGenerate();
-  }, [runGenerate, shortDurationDontAsk]);
+  }, [runGenerate]);
 
   if (!session || session.sourceNodeId !== nodeId) {
     return null;
   }
 
+  const ready = retakeReady;
+
   const interfacesUrl = mediaKitInterfaceId
     ? getOrgUrl(`/ai-interfaces/${mediaKitInterfaceId}`)
     : getOrgUrl("/ai-interfaces");
-
-  const ready =
-    session.loadPhase === "ready" &&
-    session.videoDurationSec !== null &&
-    session.videoDurationSec > 0;
 
   const handleHighQualityToggle = (checked: boolean) => {
     if (checked && !mediaKitTrimAvailable) {
@@ -538,25 +519,13 @@ export function AiVideoRetakeTrimPanel({
             <VideoTrimRuler
               videoDurationSec={session.videoDurationSec ?? 0}
               range={session.draftRange}
+              minSelectionSec={SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC}
               onRangeChange={handleDraftRangeChange}
               onRangeCommit={handleRangeCommit}
             />
           ) : (
             <div className="h-9 min-w-0 flex-1 animate-pulse rounded-md bg-neutral-200/80 dark:bg-neutral-700/60" />
           )}
-          <button
-            type="button"
-            aria-label={t("common.close")}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-neutral-100 dark:hover:bg-neutral-700/60"
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              closeRetakeSession();
-            }}
-          >
-            <XIcon className="size-4" strokeWidth={2} />
-          </button>
         </div>
 
         <div className={VIDEO_TRIM_PANEL_FOOTER_CLASS}>
@@ -595,7 +564,10 @@ export function AiVideoRetakeTrimPanel({
                   </div>
                 </PopoverContent>
               </Popover>
-              <VideoTrimLocalTrimHintIcon />
+              <VideoTrimLocalTrimHintIcon
+                open={localTrimHintOpen}
+                onOpenChange={setLocalTrimHintOpen}
+              />
             </div>
           </div>
 
@@ -604,12 +576,15 @@ export function AiVideoRetakeTrimPanel({
               <VideoTrimTimeFields
                 videoDurationSec={session.videoDurationSec ?? 0}
                 range={session.draftRange}
+                minSelectionSec={SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC}
                 disabled={isStartingTrim}
                 onRangeChange={handleDraftRangeChange}
                 onRangeCommit={handleRangeCommit}
               />
             ) : session.loadPhase === "error" ? (
-              <p className="text-xs text-destructive">{t("workflow.videoTrim.loadFailed")}</p>
+              <p className="text-xs text-destructive">
+                {t("workflow.videoRetake.loadFailed")}
+              </p>
             ) : (
               <div className="h-7 w-40 animate-pulse rounded bg-neutral-200/80 dark:bg-neutral-700/60" />
             )}
@@ -658,14 +633,6 @@ export function AiVideoRetakeTrimPanel({
           </div>
         </div>
       </div>
-
-      <VideoTrimShortDurationConfirmDialog
-        open={shortDurationConfirmOpen}
-        dontAskAgain={shortDurationDontAsk}
-        onDontAskAgainChange={setShortDurationDontAsk}
-        onOpenChange={setShortDurationConfirmOpen}
-        onConfirm={handleShortDurationConfirm}
-      />
     </>
   );
 }

@@ -301,3 +301,19 @@ export function getSeedanceDefaultParameterRules(
   }
   return SEEDANCE_PLATFORM_MODEL_DEFAULTS[canonicalId].parameterRules;
 }
+
+/** Admin platform AI model display name for the Seedance 2.5 tier. */
+export const SEEDANCE_25_PLATFORM_DISPLAY_NAME = "Seedance 2.5" as const;
+
+/** Platform canonical IDs for Admin → AI models → Seedance 2.5 tier. */
+export const SEEDANCE_25_PLATFORM_CANONICAL_IDS = Object.values(
+  SEEDANCE_PLATFORM_MODEL_DEFAULTS
+)
+  .filter((entry) => entry.displayName === SEEDANCE_25_PLATFORM_DISPLAY_NAME)
+  .map((entry) => entry.canonicalId);
+
+export function isSeedance25PlatformModel(canonicalId: string): boolean {
+  return (SEEDANCE_25_PLATFORM_CANONICAL_IDS as readonly string[]).includes(
+    canonicalId
+  );
+}

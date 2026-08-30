@@ -8,12 +8,28 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export function VideoTrimLocalTrimHintIcon() {
+export interface VideoTrimLocalTrimHintIconProps {
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+}
+
+export function VideoTrimLocalTrimHintIcon({
+  open: openProp,
+  onOpenChange,
+}: VideoTrimLocalTrimHintIconProps = {}) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (openProp === undefined) {
+      setInternalOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
 
   return (
-    <Popover modal={false} open={open} onOpenChange={setOpen}>
+    <Popover modal={false} open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   getSeedanceDefaultParameterRules,
+  isSeedance25PlatformModel,
+  SEEDANCE_25_PLATFORM_CANONICAL_IDS,
   SEEDANCE_PLATFORM_MODEL_DEFAULTS,
 } from "./seedance-model-defaults";
 import { SEEDANCE_CANONICAL_IDS } from "./single-model-interface-metadata";
@@ -57,5 +59,13 @@ describe("SEEDANCE_PLATFORM_MODEL_DEFAULTS", () => {
     expect(
       getSeedanceDefaultParameterRules("doubao-seedream-5")
     ).toBeUndefined();
+  });
+});
+
+describe("isSeedance25PlatformModel", () => {
+  it("matches Admin platform Seedance 2.5 tier", () => {
+    expect(SEEDANCE_25_PLATFORM_CANONICAL_IDS).toContain("doubao-seedance-2-5");
+    expect(isSeedance25PlatformModel("doubao-seedance-2-5")).toBe(true);
+    expect(isSeedance25PlatformModel("doubao-seedance-2")).toBe(false);
   });
 });

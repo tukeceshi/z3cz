@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyVideoTrimTimeFieldEdit,
+  clampVideoRetakeTrimRange,
   clampVideoTrimRange,
+  createDefaultVideoRetakeTrimRange,
   createDefaultVideoTrimRange,
   formatVideoTrimTimeSec,
   parseVideoTrimTimeInput,
+  SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
   snapVideoTrimSec,
   VIDEO_TRIM_MIN_DURATION_SEC,
   shouldWarnVideoTrimShortDuration,
@@ -98,5 +101,35 @@ describe("video-trim", () => {
     expect(shouldWarnVideoTrimShortDuration(1.9)).toBe(true);
     expect(shouldWarnVideoTrimShortDuration(2)).toBe(false);
     expect(shouldWarnVideoTrimShortDuration(3)).toBe(false);
+  });
+
+  it("creates a default retake range of 4 seconds when the video is long enough", () => {
+    expect(createDefaultVideoRetakeTrimRange(30)).toEqual({
+      startSec: 0,
+      endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
+    });
+  });
+
+  it("uses the full video duration when shorter than the retake minimum", () => {
+    expect(createDefaultVideoRetakeTrimRange(3)).toEqual({ startSec: 0, endSec: 3 });
+    expect(createDefaultVideoRetakeTrimRange(1.5)).toEqual({
+      startSec: 0,
+      endSec: 1.5,
+    });
+  });
+
+  it("clamps retake selections to at least 4 seconds when possible", () => {
+    expect(
+      clampVideoRetakeTrimRange({ startSec: 0, endSec: 2 }, 30)
+    ).toEqual({ startSec: 0, endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC });
+    expect(
+      applyVideoTrimTimeFieldEdit({
+        range: { startSec: 0, endSec: 8 },
+        field: "duration",
+        valueSec: 2,
+        videoDurationSec: 30,
+        minSelectionSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
+      })
+    ).toEqual({ startSec: 0, endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC });
   });
 });
