@@ -21,8 +21,8 @@ interface RulerTick {
   readonly kind: "second" | "minute";
 }
 
-function resolveSecondTickStepSec(totalSeconds: number): number {
-  return totalSeconds > 180 ? 5 : 1;
+function resolveSecondTickStepSec(videoDurationSec: number): number {
+  return videoDurationSec > 180 ? 5 : 1;
 }
 
 function buildRulerTicks(videoDurationSec: number): readonly RulerTick[] {
@@ -30,30 +30,38 @@ function buildRulerTicks(videoDurationSec: number): readonly RulerTick[] {
     return [];
   }
 
-  const totalSeconds = Math.ceil(videoDurationSec);
-  const secondStep = resolveSecondTickStepSec(totalSeconds);
+  const secondStep = resolveSecondTickStepSec(videoDurationSec);
   const tickBySec = new Map<number, RulerTick>();
 
-  for (let sec = 0; sec <= totalSeconds; sec += secondStep) {
+  for (let sec = 0; sec <= videoDurationSec; sec += secondStep) {
     if (sec % 60 === 0) {
       continue;
     }
     tickBySec.set(sec, { sec, kind: "second" });
   }
 
-  for (let sec = 0; sec <= totalSeconds; sec += 60) {
+  for (let sec = 0; sec <= videoDurationSec; sec += 60) {
     tickBySec.set(sec, { sec, kind: "minute" });
   }
 
-  const lastTick = tickBySec.get(totalSeconds);
-  if (!lastTick) {
-    tickBySec.set(totalSeconds, {
-      sec: totalSeconds,
-      kind: totalSeconds % 60 === 0 ? "minute" : "second",
+  if (!tickBySec.has(videoDurationSec)) {
+    tickBySec.set(videoDurationSec, {
+      sec: videoDurationSec,
+      kind: videoDurationSec % 60 === 0 ? "minute" : "second",
     });
   }
 
   return [...tickBySec.values()].sort((a, b) => a.sec - b.sec);
+}
+
+function rangeToTrackPercent(
+  valueSec: number,
+  videoDurationSec: number
+): number {
+  if (videoDurationSec <= 0) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, (valueSec / videoDurationSec) * 100));
 }
 
 export function VideoTrimRuler({
@@ -69,10 +77,9 @@ export function VideoTrimRuler({
     [videoDurationSec]
   );
 
-  const startPercent =
-    videoDurationSec > 0 ? (range.startSec / videoDurationSec) * 100 : 0;
-  const endPercent =
-    videoDurationSec > 0 ? (range.endSec / videoDurationSec) * 100 : 0;
+  const startPercent = rangeToTrackPercent(range.startSec, videoDurationSec);
+  const endPercent = rangeToTrackPercent(range.endSec, videoDurationSec);
+  const handlePercents = [startPercent, endPercent] as const;
   const selectionWidth = endPercent - startPercent;
 
   const rangerInstance = useRanger({
@@ -103,10 +110,7 @@ export function VideoTrimRuler({
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-2.5">
           {ticks.map((tick) => {
-            const left =
-              videoDurationSec > 0
-                ? (tick.sec / videoDurationSec) * 100
-                : 0;
+            const left = rangeToTrackPercent(tick.sec, videoDurationSec);
             return (
               <div
                 key={tick.sec}
@@ -157,7 +161,7 @@ export function VideoTrimRuler({
               handle.isActive && "z-30 ring-2 ring-white/80"
             )}
             style={{
-              left: `${rangerInstance.getPercentageForValue(handle.value)}%`,
+              left: `${handlePercents[index] ?? endPercent}%`,
             }}
           />
         ))}

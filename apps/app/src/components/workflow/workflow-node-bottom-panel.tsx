@@ -13,6 +13,7 @@ import { AiImageConfigPanel } from "./ai-image-config-panel";
 import { AiAudioConfigPanel } from "./ai-audio-config-panel";
 import { AiVideoConfigPanel } from "./ai-video-config-panel";
 import { AiVideoEnhanceConfigPanel } from "./ai-video-enhance-config-panel";
+import { AiVideoRetakeBottomPanel } from "./ai-video-retake-bottom-panel";
 import { AiVideoTrimBottomPanel } from "./ai-video-trim-bottom-panel";
 import { isAiVideoEnhancePanel } from "@dafthunk/types";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
@@ -26,6 +27,7 @@ import {
 } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
+import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 
 export const NODE_BOTTOM_PANEL_SINGLE_WIDTH = 384;
@@ -67,7 +69,9 @@ function WorkflowNodeBottomPanelInner({
   const [outputsExpanded, setOutputsExpanded] = useState(true);
   const [errorExpanded, setErrorExpanded] = useState(true);
   const trimSession = useOptionalVideoTrimSession();
+  const retakeSession = useOptionalVideoRetakeSession();
   const isTrimPanelActive = trimSession?.isTrimActiveForNode(nodeId) ?? false;
+  const isRetakePanelActive = retakeSession?.isRetakeActiveForNode(nodeId) ?? false;
 
   // AI generative nodes get a dedicated config panel
   if (data.nodeType === AI_TEXT_NODE_TYPE) {
@@ -79,6 +83,9 @@ function WorkflowNodeBottomPanelInner({
   }
 
   if (data.nodeType === AI_VIDEO_NODE_TYPE) {
+    if (isRetakePanelActive) {
+      return <AiVideoRetakeBottomPanel nodeId={nodeId} data={data} />;
+    }
     if (isTrimPanelActive) {
       return <AiVideoTrimBottomPanel nodeId={nodeId} data={data} />;
     }

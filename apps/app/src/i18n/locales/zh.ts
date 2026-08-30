@@ -3660,6 +3660,10 @@ export const zh: TranslationDictionary = {
         line4: "开启后改用云端 MediaKit 裁剪，输出更稳定。",
       },
     },
+    videoRetake: {
+      action: "重拍",
+      loadFailed: "无法加载视频",
+    },
     aiAudioPanel: {
       promptTitle: "提示词",
       promptPlaceholder: "描述你想生成的语音…",

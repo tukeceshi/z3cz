@@ -3845,6 +3845,10 @@ export const en = {
         line4: "This uses cloud MediaKit for more consistent output.",
       },
     },
+    videoRetake: {
+      action: "Retake",
+      loadFailed: "Unable to load video",
+    },
     aiAudioPanel: {
       promptTitle: "Prompt",
       promptPlaceholder: "Describe the speech you want to generate…",
