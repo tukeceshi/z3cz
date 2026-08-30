@@ -1,7 +1,11 @@
 import { createDefaultTransformPollMapping } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
-import { getValueByDotPath, parsePollResponse } from "./parse-poll-response";
+import {
+  getValueByDotPath,
+  parseOfficialVolcanoPollBody,
+  parsePollResponse,
+} from "./parse-poll-response";
 
 describe("getValueByDotPath", () => {
   it("reads nested paths", () => {
@@ -48,6 +52,29 @@ describe("parsePollResponse", () => {
     expect(parsePollResponse({ status: "running" }, pollMapping)).toEqual({
       status: "pending",
       upstreamPhase: "running",
+    });
+  });
+
+  it("treats nested FAILURE as failed and reads the inner error", () => {
+    expect(
+      parseOfficialVolcanoPollBody({
+        code: "success",
+        data: {
+          status: "FAILURE",
+          fail_reason: "task failed",
+          data: {
+            error: {
+              code: "OutputVideoSensitiveContentDetected.PolicyViolation",
+              message:
+                "The request failed because the output video may be related to copyright restrictions.",
+            },
+          },
+        },
+      })
+    ).toEqual({
+      status: "failed",
+      error:
+        "The request failed because the output video may be related to copyright restrictions.",
     });
   });
 

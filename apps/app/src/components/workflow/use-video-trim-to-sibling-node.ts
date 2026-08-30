@@ -15,7 +15,9 @@ import { AI_VIDEO_OUTPUT_ID } from "./ai-video-node-utils";
 import {
   buildEmptyAiVideoSiblingNode,
   findAiVideoCatalog,
+  resolveRetakeSiblingNodeName,
   resolveTrimSiblingNodeName,
+  type AiVideoSiblingBusyKind,
 } from "./create-ai-video-node-from-manual-upload";
 import {
   appendGenerativeReferenceConnection,
@@ -28,12 +30,19 @@ import {
   resolveWorkflowNodeDimensions,
 } from "./workflow-node-placement";
 
-export interface CreateTrimSiblingNodeShellResult {
+export interface CreateAiVideoSiblingNodeShellResult {
   readonly nodeId: string;
   readonly referenceLinked: boolean;
 }
 
-export function useVideoTrimToSiblingNode(sourceNodeId: string) {
+export type CreateTrimSiblingNodeShellResult = CreateAiVideoSiblingNodeShellResult;
+
+interface CreateAiVideoSiblingNodeShellParams {
+  readonly kind: "trim" | "retake";
+  readonly initialBusy?: AiVideoSiblingBusyKind;
+}
+
+function useCreateAiVideoSiblingNode(sourceNodeId: string) {
   const { nodeTypes = [], disabled, generativeReferenceCatalogs } =
     useWorkflow();
   const nodes = useNodes();
@@ -42,8 +51,10 @@ export function useVideoTrimToSiblingNode(sourceNodeId: string) {
   const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
 
-  const createTrimSiblingNodeShell =
-    useCallback((): CreateTrimSiblingNodeShellResult | null => {
+  const createSiblingNodeShell = useCallback(
+    (
+      params: CreateAiVideoSiblingNodeShellParams
+    ): CreateAiVideoSiblingNodeShellResult | null => {
       if (disabled || !workflowId) {
         return null;
       }
@@ -61,11 +72,17 @@ export function useVideoTrimToSiblingNode(sourceNodeId: string) {
       const sourceData = sourceNode.data as WorkflowNodeType;
       const sourceName = sourceData.name?.trim() || catalog.name;
       const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
-      const nodeName = resolveTrimSiblingNodeName({
-        sourceNodeName: sourceName,
-        existingNodes: typedNodes,
-      });
-      const nodeId = `${AI_VIDEO_NODE_TYPE}-trim-${Date.now()}`;
+      const nodeName =
+        params.kind === "retake"
+          ? resolveRetakeSiblingNodeName({
+              sourceNodeName: sourceName,
+              existingNodes: typedNodes,
+            })
+          : resolveTrimSiblingNodeName({
+              sourceNodeName: sourceName,
+              existingNodes: typedNodes,
+            });
+      const nodeId = `${AI_VIDEO_NODE_TYPE}-${params.kind}-${Date.now()}`;
       const position = findOpenNodePositionFromSource({
         sourceNode,
         targetNodeType: AI_VIDEO_NODE_TYPE,
@@ -78,6 +95,7 @@ export function useVideoTrimToSiblingNode(sourceNodeId: string) {
         nodeName,
         position,
         createObjectUrl: sourceData.createObjectUrl ?? createObjectUrl,
+        initialBusy: params.initialBusy,
       });
 
       setNodes((current) => [
@@ -120,7 +138,8 @@ export function useVideoTrimToSiblingNode(sourceNodeId: string) {
       setCenter(centerX, centerY, { zoom, duration: 200 });
 
       return { nodeId, referenceLinked };
-    }, [
+    },
+    [
       createObjectUrl,
       disabled,
       edges,
@@ -134,7 +153,30 @@ export function useVideoTrimToSiblingNode(sourceNodeId: string) {
       setNodes,
       sourceNodeId,
       workflowId,
-    ]);
+    ]
+  );
+
+  return { createSiblingNodeShell };
+}
+
+export function useVideoTrimToSiblingNode(sourceNodeId: string) {
+  const { createSiblingNodeShell } = useCreateAiVideoSiblingNode(sourceNodeId);
+  const createTrimSiblingNodeShell = useCallback(
+    (): CreateTrimSiblingNodeShellResult | null =>
+      createSiblingNodeShell({ kind: "trim" }),
+    [createSiblingNodeShell]
+  );
 
   return { createTrimSiblingNodeShell };
+}
+
+export function useVideoRetakeToSiblingNode(sourceNodeId: string) {
+  const { createSiblingNodeShell } = useCreateAiVideoSiblingNode(sourceNodeId);
+  const createRetakeSiblingNodeShell = useCallback(
+    (): CreateAiVideoSiblingNodeShellResult | null =>
+      createSiblingNodeShell({ kind: "retake", initialBusy: "generating" }),
+    [createSiblingNodeShell]
+  );
+
+  return { createRetakeSiblingNodeShell };
 }

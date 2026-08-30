@@ -52,6 +52,7 @@ import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
 import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
+import { isAiVideoResultSiblingNodeId } from "./create-ai-video-node-from-manual-upload";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
 import {
   GENERATIVE_NODE_CARD_CLASS,
@@ -395,7 +396,8 @@ export const WorkflowNode = memo(
       isRetakePanelActive ||
       ((!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true
-        : shouldShowGenerativeBottomPanel(data.metadata)) &&
+        : shouldShowGenerativeBottomPanel(data.metadata) &&
+          !isAiVideoResultSiblingNodeId(id)) &&
         !(isAiTextNode && emptyTextEditing));
     const bottomPanelData = useWorkflowNodeBottomPanelData(
       data as unknown as CanvasWorkflowNodeType

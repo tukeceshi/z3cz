@@ -3663,6 +3663,9 @@ export const zh: TranslationDictionary = {
     videoRetake: {
       action: "重拍",
       loadFailed: "无法加载视频",
+      createNodeFailed: "创建重拍节点失败",
+      referenceLinkFailed: "未能连上原视频节点",
+      generateFailed: "重拍失败",
     },
     aiAudioPanel: {
       promptTitle: "提示词",

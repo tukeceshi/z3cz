@@ -1,37 +1,32 @@
 import {
+  applyVideoRetakeEditOverrides,
+  getResourceIdFromValue,
   getSeedanceDefaultParameterRules,
   isSeedance25PlatformModel,
+  isVolcanoMediaKitVideoTrimEnabled,
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
   readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
   resolveDefaultVideoGenerationResolution,
-  type MediaReference,
   type OrgTextModelOption,
   type WorkflowMediaValue,
-  VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS,
   videoTrimSelectionDurationSec,
 } from "@dafthunk/types";
 import { useViewport } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrgUrl } from "@/hooks/use-org-url";
+import { useOrgVolcanoMediaKitConfig } from "@/hooks/use-volcano-mediakit-config";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { cn } from "@/utils/utils";
-import {
-  pollAiVideoTask,
-  submitAiVideo,
-  useOrgVideoPickerModels,
-} from "@/services/platform-ai-model-service";
+import { useOrgVideoPickerModels } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
-import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
-import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
-import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 
 import { AiGenerateButton } from "./ai-generate-button";
 import { AiTextModelPicker } from "./ai-text-model-picker";
@@ -41,37 +36,17 @@ import {
 } from "./ai-video-params-popover";
 import { AiVideoPriceEstimateChip } from "./ai-video-price-estimate-chip";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
-import {
-  appendAiVideoGeneratedHistoryItems,
-  isAiVideoGenerating,
-  withAiVideoGenerateError,
-  withAiVideoGeneratingFlag,
-} from "./ai-video-node-utils";
-import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
-import {
-  clearGenerativeProgress,
-  formatGenerativeBusyOverlayLabel,
-  isGenerativeProgressBusyPhase,
-  readGenerativeProgressPhase,
-  withGenerativeProgress,
-} from "./generative-progress-utils";
-import {
-  GenerativeGenerationCancelledError,
-  isGenerativeGenerationCancelled,
-  showGenerativeCancelledNotice,
-} from "./generative-generation-cancel";
-import { prepareGenerativeCardError } from "./prepare-generative-card-error";
-import { useGenerativeCloudJobProgress } from "@/hooks/use-generative-cloud-job";
-import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useGenerativeParamsEditor } from "./use-generative-params-editor";
+import { useGenerativeVideoFileUpload } from "./use-generative-video-file-upload";
+import { useVideoRetakeToSiblingNode } from "./use-video-trim-to-sibling-node";
+import { runVideoRetakePipeline } from "./run-video-retake-pipeline";
 import { useVideoRetakeSession } from "./video-retake-session-context";
+import { isWebCodecsVideoTrimSupported } from "./video-trim-utils";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
 const AI_VIDEO_RETAKE_PROMPT_MIN_HEIGHT_PX = 120 as const;
-const VIDEO_POLL_INTERVAL_MS = VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS;
-const VIDEO_POLL_MAX_ATTEMPTS = 120;
 const RETAKE_HIDDEN_PARAM_FIELD_NAMES = new Set([
   "ratio",
   "aspect_ratio",
@@ -89,73 +64,11 @@ export interface AiVideoRetakeConfigPanelProps {
   readonly data: WorkflowNodeType;
 }
 
-async function pollUntilVideoReady(
-  orgId: string,
-  taskId: string,
-  aiInterfaceId: string,
-  modelCanonicalId: string,
-  workflowId: string | undefined,
-  onPhase?: (phase: "queued" | "generating") => void,
-  options?: {
-    readonly signal?: AbortSignal;
-    readonly shouldAbort?: () => boolean;
-  }
-): Promise<MediaReference> {
-  for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
-    if (options?.shouldAbort?.() || options?.signal?.aborted) {
-      throw new GenerativeGenerationCancelledError();
-    }
-
-    const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId, {
-      workflowId,
-      modelCanonicalId,
-      signal: options?.signal,
-    });
-    if (result.status === "succeeded") {
-      const stored = result.videos?.[0];
-      if (stored) {
-        return stored;
-      }
-      throw new Error("Video generation succeeded without a playable reference");
-    }
-    if (result.status === "cancelled") {
-      throw new GenerativeGenerationCancelledError();
-    }
-    if (result.status === "failed" || result.status === "expired") {
-      throw new Error(result.error ?? "Video generation failed");
-    }
-    if (result.status === "queued") {
-      onPhase?.("queued");
-    } else {
-      onPhase?.("generating");
-    }
-    await new Promise((resolve) => {
-      setTimeout(resolve, VIDEO_POLL_INTERVAL_MS);
-    });
-  }
-  throw new Error("Video generation timed out");
-}
-
-function generativeVideoProgressButtonKey(
-  phase: ReturnType<typeof readGenerativeProgressPhase>
-): string {
-  if (phase === "queued") {
-    return "workflow.aiVideoPanel.queued";
-  }
-  if (phase === "generating") {
-    return "workflow.aiVideoPanel.generating";
-  }
-  if (phase === "cancelling") {
-    return "workflow.generativeCancel.cancelling";
-  }
-  return "workflow.aiVideoPanel.generate";
-}
-
 export function AiVideoRetakeConfigPanel({
   nodeId,
   data,
 }: AiVideoRetakeConfigPanelProps) {
-  const { updateNodeData, disabled } = useWorkflow();
+  const { disabled, updateNodeData } = useWorkflow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
@@ -165,11 +78,14 @@ export function AiVideoRetakeConfigPanel({
   const orgId = organization?.id;
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
-  const { session, patchRetakeSession } = useVideoRetakeSession();
+  const { session, patchRetakeSession, closeRetakeSession } =
+    useVideoRetakeSession();
+  const { createRetakeSiblingNodeShell } = useVideoRetakeToSiblingNode(nodeId);
+  const { uploadVideoFileToNode } = useGenerativeVideoFileUpload();
+  const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
+    useOrgVolcanoMediaKitConfig(orgId);
 
-  const [isGenerating, setIsGenerating] = useState(false);
-  const generateInFlightRef = useRef(false);
-  const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
+  const [isStarting, setIsStarting] = useState(false);
 
   const {
     models,
@@ -323,45 +239,9 @@ export function AiVideoRetakeConfigPanel({
     [patchRetakeSession]
   );
 
-  const applyCancelledUiState = useCallback(() => {
-    setIsGenerating(false);
-    generateInFlightRef.current = false;
-    updateNodeData?.(nodeId, (current) => ({
-      metadata: withAiVideoGenerateError(
-        withAiVideoGeneratingFlag(clearGenerativeProgress(current.metadata), false),
-        null
-      ),
-    }));
-    showGenerativeCancelledNotice(nodeId);
-  }, [nodeId, updateNodeData]);
-
-  const {
-    beginSession,
-    trackJobId,
-    trackClientRequestId,
-    isCancelConfirmed,
-    isCancelling,
-    shouldAbortJobPoll,
-  } = useGenerativeGenerationSession({
-    nodeId,
-    orgId,
-    metadata: data.metadata,
-    onCancelConfirmed: applyCancelledUiState,
-    onCancelNotApplied: () => {},
-    setIsGenerating,
-    setPersistPhase: () => {},
-    generateInFlightRef,
-  });
-
-  const metadataProgressPhase = readGenerativeProgressPhase(data.metadata);
-  const metadataBusy =
-    isAiVideoGenerating(data.metadata) ||
-    isGenerativeProgressBusyPhase(metadataProgressPhase);
-  const isBusyForUi = isGenerating || isCancelling || metadataBusy;
-
   const paramsEditor = useGenerativeParamsEditor({
     visible: paramsVisible,
-    disabled: disabled || isBusyForUi,
+    disabled: disabled || isStarting,
     fields: paramPopoverFields,
     committedValues: committedGenerationValues,
     nodeId,
@@ -370,46 +250,22 @@ export function AiVideoRetakeConfigPanel({
     onCommit: commitGenerationParams,
   });
 
-  const {
-    syncProgress,
-    clearProgress,
-    resolveJobMedia,
-    activeProgressPhase,
-  } = useGenerativeCloudJobProgress({
-    nodeId,
-    orgId,
-    workflowId,
-    cloudConfigured,
-    metadata: data.metadata,
-    isGenerating: isBusyForUi,
-    persistPhase: null,
-    autoResume: false,
-    updateNodeData,
-    setPersistPhase: () => {},
-    setIsGenerating,
-    applyBusyMetadata: (metadata, busy) =>
-      withAiVideoGeneratingFlag(metadata, busy),
-    shouldAbortJobPoll,
-    cloudAccelerationEnabled: false,
-    aiInterfaceId: selectedModel?.interfaceId,
-  });
+  const retakeReady =
+    session?.sourceNodeId === nodeId &&
+    session.loadPhase === "ready" &&
+    session.videoDurationSec !== null &&
+    session.videoDurationSec > 0;
 
-  const progressButtonLabel = useMemo(() => {
-    if (isCancelling || activeProgressPhase === "cancelling") {
-      return t(generativeVideoProgressButtonKey("cancelling"));
-    }
-    if (!activeProgressPhase) {
-      return t("workflow.aiVideoPanel.generate");
-    }
-    return formatGenerativeBusyOverlayLabel({
-      phase: activeProgressPhase,
-      progressButtonKey: generativeVideoProgressButtonKey,
-      i18nPrefix: "workflow.aiVideoPanel",
-      metadata: data.metadata,
-      progressNowMs,
-      t,
-    });
-  }, [activeProgressPhase, data.metadata, isCancelling, progressNowMs, t]);
+  const mediaKitTrimAvailable = Boolean(
+    mediaKitConfig &&
+      isVolcanoMediaKitVideoTrimEnabled({
+        enabled: mediaKitConfig.active,
+        videoEnhance: mediaKitConfig.snapshot.videoEnhance,
+        videoTrim: mediaKitConfig.snapshot.videoTrim,
+        subtitleErase: mediaKitConfig.snapshot.subtitleErase,
+      }) &&
+      mediaKitConfig.hasApiKey
+  );
 
   const canGenerate = Boolean(
     selectedModel &&
@@ -418,220 +274,132 @@ export function AiVideoRetakeConfigPanel({
       !modelsLoading &&
       prompt.length > 0 &&
       !promptOverLimit &&
-      !isBusyForUi
+      retakeReady &&
+      !isStarting
   );
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(() => {
+    if (!canGenerate || !session || isStarting) {
+      return;
+    }
     if (
-      !canGenerate ||
+      !session.trimSourceVideoUrl ||
+      session.videoDurationSec === null ||
       !orgId ||
-      !workflowId ||
-      !updateNodeData ||
-      !selectedModel ||
-      !session ||
-      generateInFlightRef.current
+      !workflowId
     ) {
       return;
     }
 
-    generateInFlightRef.current = true;
-    setIsGenerating(true);
-    const signal = beginSession();
-    const clientRequestId = crypto.randomUUID();
-    trackClientRequestId(clientRequestId);
-    syncProgress({ phase: "generating" });
+    if (session.highQuality) {
+      if (!mediaKitTrimAvailable || !mediaKitInterfaceId) {
+        toast.error("workflow.videoTrim.notConfiguredHint");
+        return;
+      }
+      const sourceResourceId = getResourceIdFromValue(session.sourceMedia);
+      if (
+        !sourceResourceId ||
+        (session.sourceMedia as { readonly kind?: string }).kind !== "cloud"
+      ) {
+        toast.error("workflow.videoTrim.sourceNotCloud");
+        return;
+      }
+    } else if (!isWebCodecsVideoTrimSupported()) {
+      toast.error("workflow.videoTrim.webCodecsUnsupported");
+      return;
+    }
 
-    updateNodeData(nodeId, (current) => ({
-      metadata: withAiVideoGenerateError(
-        withGenerativeProgress(
-          withAiVideoGeneratingFlag(current.metadata, true),
-          { phase: "generating" }
-        ),
-        null
-      ),
-    }));
+    promptBuffer.flush();
+    const flushedPrompt = promptBuffer.value.trim();
+    if (!flushedPrompt || !selectedModel) {
+      return;
+    }
 
+    const flushedParams = paramsEditor.flushBeforeGenerate();
+    const generationParams = applyVideoRetakeEditOverrides(
+      mergeImageGenerationParams(paramPopoverFields, {
+        ...defaultGenerationParams,
+        ...flushedParams,
+      })
+    );
+
+    setIsStarting(true);
     try {
-      const resolved = await resolveMediaReferencesForVideoGenerate({
-        organizationId: orgId,
-        workflowId,
-        cloudConfigured,
-        references: [session.sourceMedia],
-      });
-
-      const visibleGenerationValues = paramsEditor.flushBeforeGenerate();
-      const mergedGenerationParams = mergeImageGenerationParams(
-        allGenerationFields,
-        {
-          ...defaultGenerationParams,
-          ...visibleGenerationValues,
-        }
-      );
-
-      const submitPayload = {
+      const snapshot = {
+        sourceMedia: session.sourceMedia,
+        trimSourceVideoUrl: session.trimSourceVideoUrl,
+        committedRange: {
+          startSec: session.draftRange.startSec,
+          endSec: session.draftRange.endSec,
+        },
+        videoDurationSec: session.videoDurationSec,
+        highQuality: session.highQuality,
+        prompt: flushedPrompt,
         modelCanonicalId: selectedModel.canonicalId,
         aiInterfaceId: selectedModel.interfaceId,
-        ...(selectedModel.instanceId.trim()
-          ? { instanceId: selectedModel.instanceId.trim() }
-          : {}),
-        prompt,
-        params: mergedGenerationParams,
-        referenceVideoUrls:
-          resolved.referenceVideoUrls.length > 0
-            ? resolved.referenceVideoUrls
-            : undefined,
-        nodeId,
+        instanceId: selectedModel.instanceId.trim() || undefined,
+        modelDisplayName: selectedModel.alias,
+        supportsTaskCancel: selectedModel.supportsTaskCancel === true,
+        generationParams,
+      };
+
+      const shell = createRetakeSiblingNodeShell();
+      if (!shell) {
+        toast.error("workflow.videoRetake.createNodeFailed");
+        return;
+      }
+
+      if (!shell.referenceLinked) {
+        toast.error("workflow.videoRetake.referenceLinkFailed");
+      }
+
+      closeRetakeSession();
+
+      runVideoRetakePipeline({
+        organizationId: orgId,
         workflowId,
-        clientRequestId,
-      } as const;
-
-      const submitResponse = await submitAiVideo(orgId, submitPayload, { signal });
-
-      if (isCancelConfirmed()) {
-        throw new GenerativeGenerationCancelledError();
-      }
-
-      let video: MediaReference | null = null;
-      let jobId: string | null = null;
-      let owned = true;
-
-      if (submitResponse.jobId) {
-        jobId = submitResponse.jobId;
-        trackJobId(submitResponse.jobId);
-        if (submitResponse.workflowNodeContent) {
-          updateNodeData(nodeId, (current) => ({
-            ...applyWorkflowNodeContentPatch(
-              current,
-              submitResponse.workflowNodeContent!
-            ),
-            metadata: withGenerativeProgress(
-              withAiVideoGeneratingFlag(current.metadata, true),
-              { jobId: submitResponse.jobId, phase: "generating" }
-            ),
-          }));
-        }
-        syncProgress({ jobId: submitResponse.jobId, phase: "generating" });
-        const resolvedJob = await resolveJobMedia(submitResponse.jobId);
-        owned = resolvedJob.owned;
-        video = resolvedJob.media[0] ?? null;
-      } else if (submitResponse.taskId) {
-        video = await pollUntilVideoReady(
-          orgId,
-          submitResponse.taskId,
-          submitResponse.aiInterfaceId,
-          submitPayload.modelCanonicalId,
-          workflowId,
-          (phase) => syncProgress({ phase }),
-          { signal, shouldAbort: isCancelConfirmed }
-        );
-      }
-
-      if (owned && !video) {
-        throw new Error("Video generation succeeded without a playable reference");
-      }
-
-      if (!owned) {
-        return;
-      }
-
-      const canWriteHistory =
-        video !== null &&
-        (!jobId || tryClaimGenerativeJobFinalize(jobId));
-
-      if (canWriteHistory && workflowId && orgId && video) {
-        persistMediaForNodeInBackground({
-          organizationId: orgId,
-          workflowId,
-          media: [video],
-          nodeType: "ai-video",
-          cloudConfigured,
-        });
-      }
-
-      updateNodeData(nodeId, (current) => {
-        if (!canWriteHistory || !video) {
-          return {
-            metadata: withAiVideoGenerateError(
-              withAiVideoGeneratingFlag(
-                clearGenerativeProgress(current.metadata),
-                false
-              ),
-              null
-            ),
-          };
-        }
-
-        const withResult = appendAiVideoGeneratedHistoryItems(current, [video], {
-          prompt,
-          params: mergedGenerationParams,
-          platformModelId: selectedModel.canonicalId,
-          aiInterfaceId: selectedModel.interfaceId,
-          modelDisplayName: selectedModel.alias,
-          jobId: jobId ?? undefined,
-        });
-
-        return {
-          ...withResult,
-          metadata: withAiVideoGenerateError(
-            withAiVideoGeneratingFlag(
-              clearGenerativeProgress(withResult.metadata),
-              false
-            ),
-            null
-          ),
-        };
-      });
-
-      if (canWriteHistory) {
-        toast.success("workflow.aiVideoPanel.generated");
-      }
-      clearProgress();
-    } catch (error) {
-      if (isGenerativeGenerationCancelled(error) || isCancelConfirmed()) {
-        applyCancelledUiState();
-        return;
-      }
-      const formatted = prepareGenerativeCardError(
-        error instanceof Error ? error.message : t("workflow.aiVideoPanel.generateFailed"),
+        targetNodeId: shell.nodeId,
+        sourceMedia: snapshot.sourceMedia,
+        trimSourceVideoUrl: snapshot.trimSourceVideoUrl,
+        committedRange: snapshot.committedRange,
+        videoDurationSec: snapshot.videoDurationSec,
+        highQuality: snapshot.highQuality,
+        mediaKitInterfaceId,
+        cloudConfigured,
+        prompt: snapshot.prompt,
+        modelCanonicalId: snapshot.modelCanonicalId,
+        aiInterfaceId: snapshot.aiInterfaceId,
+        instanceId: snapshot.instanceId,
+        modelDisplayName: snapshot.modelDisplayName,
+        supportsTaskCancel: snapshot.supportsTaskCancel,
+        generationParams: snapshot.generationParams,
+        updateNodeData,
+        uploadVideoFileToNode,
         t,
-        "video"
-      );
-      updateNodeData(nodeId, (current) => ({
-        metadata: withAiVideoGenerateError(
-          withAiVideoGeneratingFlag(
-            clearGenerativeProgress(current.metadata),
-            false
-          ),
-          formatted
-        ),
-      }));
-      toast.errorRaw(formatted.summary);
+        toast,
+      });
     } finally {
-      generateInFlightRef.current = false;
-      setIsGenerating(false);
+      setIsStarting(false);
     }
   }, [
-    applyCancelledUiState,
-    beginSession,
     canGenerate,
-    clearProgress,
+    closeRetakeSession,
     cloudConfigured,
-    allGenerationFields,
+    createRetakeSiblingNodeShell,
     defaultGenerationParams,
-    isCancelConfirmed,
-    paramsEditor,
-    nodeId,
+    isStarting,
+    mediaKitInterfaceId,
+    mediaKitTrimAvailable,
     orgId,
-    prompt,
-    resolveJobMedia,
+    paramPopoverFields,
+    paramsEditor,
+    promptBuffer,
     selectedModel,
     session,
-    syncProgress,
     t,
     toast,
-    trackClientRequestId,
-    trackJobId,
     updateNodeData,
+    uploadVideoFileToNode,
     workflowId,
   ]);
 
@@ -659,7 +427,7 @@ export function AiVideoRetakeConfigPanel({
     if (!session || session.sourceNodeId !== nodeId) {
       return [];
     }
-    return [session.sourceMedia as WorkflowMediaValue];
+    return [session.sourceMedia as unknown as WorkflowMediaValue];
   }, [nodeId, session]);
 
   const referenceVideoDurationSec = useMemo(() => {
@@ -718,7 +486,7 @@ export function AiVideoRetakeConfigPanel({
       >
         <Textarea
           value={promptBuffer.value}
-          disabled={disabled || isBusyForUi}
+          disabled={disabled || isStarting}
           placeholder={t("workflow.aiVideoPanel.promptPlaceholder")}
           className={cn(
             "min-h-[120px] resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
@@ -739,7 +507,7 @@ export function AiVideoRetakeConfigPanel({
               models={seedance25Models as unknown as readonly OrgTextModelOption[]}
               selectedOptionId={selectedModel?.optionId ?? ""}
               chipModel={selectedModel as unknown as OrgTextModelOption | undefined}
-              disabled={disabled || isBusyForUi}
+              disabled={disabled || isStarting}
               isLoading={modelsLoading}
               loadError={Boolean(modelsError)}
               onOpenChange={() => {}}
@@ -752,7 +520,7 @@ export function AiVideoRetakeConfigPanel({
             {paramsVisible ? (
               <AiVideoParamsPopover
                 fields={paramPopoverFields}
-                disabled={disabled || isBusyForUi}
+                disabled={disabled || isStarting}
                 triggerLabel={t("workflow.aiVideoPanel.params")}
                 title={t("workflow.aiVideoPanel.paramsTitle")}
                 triggerSummaryFieldNames={RETAKE_TRIGGER_SUMMARY_FIELD_NAMES}
@@ -770,7 +538,7 @@ export function AiVideoRetakeConfigPanel({
                 referenceVideoMedia={referenceVideoMedia}
                 referenceVideoDurationSec={referenceVideoDurationSec}
                 displayFolds={priceEstimateDisplayFolds}
-                disabled={disabled || isBusyForUi}
+                disabled={disabled || isStarting}
               />
             ) : null}
           </div>
@@ -794,14 +562,12 @@ export function AiVideoRetakeConfigPanel({
 
         <AiGenerateButton
           disabled={!canGenerate}
-          isGenerating={isBusyForUi}
-          isCancelling={isCancelling}
+          isGenerating={isStarting}
+          isCancelling={false}
           canCancel={false}
-          label={progressButtonLabel}
+          label={t("workflow.aiVideoPanel.generate")}
           cancelLabel={t("workflow.generativeCancel.action")}
-          onClick={() => {
-            void handleGenerate();
-          }}
+          onClick={handleGenerate}
           onCancel={() => {}}
         />
       </div>

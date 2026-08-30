@@ -15,7 +15,6 @@ import {
   type OrgTextModelOption,
   type OrgVideoModelOption,
   type CancelGenerationJobResponse,
-  VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS,
 } from "@dafthunk/types";
 import {
   useNodes,
@@ -32,16 +31,12 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { cn } from "@/utils/utils";
-import {
-  pollAiVideoTask,
-  submitAiVideo,
-  useOrgVideoPickerModels,
-} from "@/services/platform-ai-model-service";
+import { useOrgVideoPickerModels } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
 import { useObjectService } from "@/services/object-service";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
-import { stageGenerativeMediaFromEphemeralUrl } from "@/services/stage-generative-media";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
+import { runAiVideoGeneration } from "./run-ai-video-generation";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
 import {
@@ -160,9 +155,6 @@ import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
-const VIDEO_POLL_INTERVAL_MS = VIDEO_DIRECT_CLIENT_POLL_INTERVAL_MS;
-const VIDEO_POLL_MAX_ATTEMPTS = 120;
-
 export interface AiVideoConfigPanelProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
@@ -173,67 +165,6 @@ export interface AiVideoConfigPanelProps {
 function getInputString(data: WorkflowNodeType, id: string): string {
   const value = data.inputs.find((input) => input.id === id)?.value;
   return typeof value === "string" ? value : "";
-}
-
-async function pollUntilVideoReady(
-  orgId: string,
-  taskId: string,
-  aiInterfaceId: string,
-  modelCanonicalId: string,
-  workflowId: string | undefined,
-  onPhase?: (phase: "queued" | "generating") => void,
-  options?: {
-    readonly signal?: AbortSignal;
-    readonly shouldAbort?: () => boolean;
-    readonly patchNodeLayout?: PatchNodeLayoutMetadata;
-  }
-): Promise<MediaReference> {
-  for (let attempt = 0; attempt < VIDEO_POLL_MAX_ATTEMPTS; attempt += 1) {
-    if (options?.shouldAbort?.() || options?.signal?.aborted) {
-      throw new GenerativeGenerationCancelledError();
-    }
-
-    const result = await pollAiVideoTask(orgId, taskId, aiInterfaceId, {
-      workflowId,
-      modelCanonicalId,
-      signal: options?.signal,
-    });
-    if (result.status === "succeeded") {
-      const stored = result.videos?.[0];
-      if (stored) {
-        return stored;
-      }
-      if (result.videoUrl) {
-        if (!workflowId) {
-          throw new Error("workflowId is required to stage generated video");
-        }
-        return stageGenerativeMediaFromEphemeralUrl({
-          organizationId: orgId,
-          workflowId,
-          sourceUrl: result.videoUrl,
-          mimeType: "video/mp4",
-          nodeType: "ai-video",
-          patchNodeLayout: options?.patchNodeLayout,
-        });
-      }
-      throw new Error("Video generation succeeded without a playable reference");
-    }
-    if (result.status === "cancelled") {
-      throw new GenerativeGenerationCancelledError();
-    }
-    if (result.status === "failed" || result.status === "expired") {
-      throw new Error(result.error ?? "Video generation failed");
-    }
-    if (result.status === "queued") {
-      onPhase?.("queued");
-    } else {
-      onPhase?.("generating");
-    }
-    await new Promise((resolve) => {
-      setTimeout(resolve, VIDEO_POLL_INTERVAL_MS);
-    });
-  }
-  throw new Error("Video generation timed out");
 }
 
 export function AiVideoConfigPanel({
@@ -1056,76 +987,54 @@ export function AiVideoConfigPanel({
       }
 
       const runOneGeneration = async (): Promise<CompletedVideo> => {
-        const submitResponse = await submitAiVideo(orgId, submitPayload, {
+        const generated = await runAiVideoGeneration({
+          organizationId: orgId,
+          workflowId,
+          body: submitPayload,
           signal,
+          shouldAbort: isCancelConfirmed,
+          onPhase: (phase, jobId) => syncProgress({ phase, jobId }),
+          applySubmitToNode: (submitResponse) => {
+            if (submitResponse.jobId) {
+              trackJobId(submitResponse.jobId);
+            }
+            if (submitResponse.workflowNodeContent) {
+              updateNodeData?.(nodeId, (current) => ({
+                ...applyWorkflowNodeContentPatch(
+                  current,
+                  submitResponse.workflowNodeContent!
+                ),
+                metadata: withGenerativeProgress(
+                  withAiVideoGeneratingFlag(current.metadata, true),
+                  { jobId: submitResponse.jobId, phase: "generating" }
+                ),
+              }));
+            }
+          },
+          afterSubmit: async (submitResponse) => {
+            const deferredResult = await flushDeferredCancelIfPending();
+            if (deferredResult?.kind === "cancelled" || isCancelConfirmed()) {
+              return { cancelled: true };
+            }
+            if (deferredResult?.kind === "completed") {
+              const completedJobId = deferredResult.response.job.id;
+              trackJobId(completedJobId);
+              return { completedJobId };
+            }
+            if (submitResponse.jobId) {
+              trackJobId(submitResponse.jobId);
+            }
+            return undefined;
+          },
+          resolveJobMedia,
+          patchNodeLayout,
         });
-
-        if (isCancelConfirmed()) {
-          throw new GenerativeGenerationCancelledError();
-        }
-
-        let video: MediaReference | null = null;
-        let jobId: string | null = null;
-        let owned = true;
-        if (submitResponse.jobId) {
-          jobId = submitResponse.jobId;
-          trackJobId(submitResponse.jobId);
-          if (submitResponse.workflowNodeContent) {
-            updateNodeData?.(nodeId, (current) => ({
-              ...applyWorkflowNodeContentPatch(
-                current,
-                submitResponse.workflowNodeContent!
-              ),
-              metadata: withGenerativeProgress(
-                withAiVideoGeneratingFlag(current.metadata, true),
-                { jobId: submitResponse.jobId, phase: "generating" }
-              ),
-            }));
-          }
-
-          const deferredResult = await flushDeferredCancelIfPending();
-          if (deferredResult?.kind === "cancelled" || isCancelConfirmed()) {
-            throw new GenerativeGenerationCancelledError();
-          }
-          if (deferredResult?.kind === "completed") {
-            const completedJobId = deferredResult.response.job.id;
-            trackJobId(completedJobId);
-            const resolvedJob = await resolveJobMedia(completedJobId);
-            owned = resolvedJob.owned;
-            video = resolvedJob.media[0] ?? null;
-            return {
-              video,
-              aiInterfaceId: submitResponse.aiInterfaceId,
-              completedAt: Date.now(),
-              jobId: completedJobId,
-              owned,
-            };
-          }
-
-          syncProgress({ jobId: submitResponse.jobId, phase: "generating" });
-          const resolvedJob = await resolveJobMedia(submitResponse.jobId);
-          owned = resolvedJob.owned;
-          video = resolvedJob.media[0] ?? null;
-          if (owned && !video) {
-            throw new Error("Video generation succeeded without a playable reference");
-          }
-        } else {
-          video = await pollUntilVideoReady(
-            orgId,
-            submitResponse.taskId,
-            submitResponse.aiInterfaceId,
-            submitPayload.modelCanonicalId,
-            workflowId,
-            (phase) => syncProgress({ phase }),
-            { signal, shouldAbort: isCancelConfirmed, patchNodeLayout }
-          );
-        }
         return {
-          video,
-          aiInterfaceId: submitResponse.aiInterfaceId,
+          video: generated.video,
+          aiInterfaceId: generated.aiInterfaceId,
           completedAt: Date.now(),
-          jobId,
-          owned,
+          jobId: generated.jobId,
+          owned: generated.owned,
         };
       };
 

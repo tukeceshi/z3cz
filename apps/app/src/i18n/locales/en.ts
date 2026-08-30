@@ -3848,6 +3848,9 @@ export const en = {
     videoRetake: {
       action: "Retake",
       loadFailed: "Unable to load video",
+      createNodeFailed: "Could not create the retake node",
+      referenceLinkFailed: "Could not link the original video node",
+      generateFailed: "Retake failed",
     },
     aiAudioPanel: {
       promptTitle: "Prompt",

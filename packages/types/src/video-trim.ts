@@ -178,3 +178,44 @@ export function parseVideoTrimTimeInput(raw: string): number | null {
   }
   return snapVideoTrimSec(parsed);
 }
+
+export type VideoRetakeSegmentRole = "keep" | "retake";
+
+export interface VideoRetakeSegment {
+  readonly role: VideoRetakeSegmentRole;
+  readonly range: VideoTrimRangeSec;
+}
+
+export function splitVideoRetakeSegments(
+  range: VideoTrimRangeSec,
+  videoDurationSec: number
+): readonly VideoRetakeSegment[] {
+  const duration = resolveVideoDurationSec(videoDurationSec);
+  const startSec = snapVideoTrimSec(Math.max(0, Math.min(range.startSec, duration)));
+  const endSec = snapVideoTrimSec(
+    Math.max(startSec, Math.min(range.endSec, duration))
+  );
+
+  const segments: VideoRetakeSegment[] = [];
+
+  if (startSec >= VIDEO_TRIM_MIN_DURATION_SEC) {
+    segments.push({
+      role: "keep",
+      range: { startSec: 0, endSec: startSec },
+    });
+  }
+
+  segments.push({
+    role: "retake",
+    range: { startSec, endSec: Math.max(endSec, startSec + VIDEO_TRIM_MIN_DURATION_SEC) },
+  });
+
+  if (duration - endSec >= VIDEO_TRIM_MIN_DURATION_SEC) {
+    segments.push({
+      role: "keep",
+      range: { startSec: endSec, endSec: duration },
+    });
+  }
+
+  return segments;
+}
