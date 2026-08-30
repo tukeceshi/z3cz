@@ -15,6 +15,43 @@ import {
 
 export type VideoTrimLoadPhase = "loading" | "ready" | "error";
 
+export interface VideoSegmentPlaybackSeed {
+  readonly videoDurationSec: number | null;
+  readonly trimSourceVideoUrl: string | null;
+  readonly committedRange: VideoTrimRangeSec;
+  readonly draftRange: VideoTrimRangeSec;
+  readonly loadPhase: VideoTrimLoadPhase;
+  readonly playbackPaused: boolean;
+}
+
+export function readVideoSegmentPlaybackSeed(
+  session:
+    | {
+        readonly sourceNodeId: string;
+        readonly videoDurationSec: number | null;
+        readonly trimSourceVideoUrl: string | null;
+        readonly committedRange: VideoTrimRangeSec;
+        readonly draftRange: VideoTrimRangeSec;
+        readonly loadPhase: VideoTrimLoadPhase;
+        readonly playbackPaused: boolean;
+      }
+    | null
+    | undefined,
+  sourceNodeId: string
+): VideoSegmentPlaybackSeed | undefined {
+  if (!session || session.sourceNodeId !== sourceNodeId) {
+    return undefined;
+  }
+  return {
+    videoDurationSec: session.videoDurationSec,
+    trimSourceVideoUrl: session.trimSourceVideoUrl,
+    committedRange: session.committedRange,
+    draftRange: session.draftRange,
+    loadPhase: session.loadPhase,
+    playbackPaused: session.playbackPaused,
+  };
+}
+
 export interface VideoTrimSession {
   readonly sourceNodeId: string;
   readonly sourceMedia: MediaReference;
@@ -33,6 +70,7 @@ interface VideoTrimSessionContextValue {
   readonly openTrimSession: (params: {
     readonly sourceNodeId: string;
     readonly sourceMedia: MediaReference;
+    readonly seed?: VideoSegmentPlaybackSeed;
   }) => void;
   readonly closeTrimSession: () => void;
   readonly toggleTrimSession: (params: {
@@ -82,18 +120,19 @@ export function VideoTrimSessionProvider({
     (params: {
       readonly sourceNodeId: string;
       readonly sourceMedia: MediaReference;
+      readonly seed?: VideoSegmentPlaybackSeed;
     }) => {
       const defaultRange = createDefaultVideoTrimRange(0);
       setSession({
         sourceNodeId: params.sourceNodeId,
         sourceMedia: params.sourceMedia,
-        videoDurationSec: null,
-        trimSourceVideoUrl: null,
-        committedRange: defaultRange,
-        draftRange: defaultRange,
-        loadPhase: "loading",
+        videoDurationSec: params.seed?.videoDurationSec ?? null,
+        trimSourceVideoUrl: params.seed?.trimSourceVideoUrl ?? null,
+        committedRange: params.seed?.committedRange ?? defaultRange,
+        draftRange: params.seed?.draftRange ?? defaultRange,
+        loadPhase: params.seed?.loadPhase ?? "loading",
         highQuality: false,
-        playbackPaused: false,
+        playbackPaused: params.seed?.playbackPaused ?? false,
       });
     },
     []

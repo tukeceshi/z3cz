@@ -115,6 +115,7 @@ export interface AiVideoPriceEstimateChipProps {
   readonly baseline480pWithoutVideo: number | null;
   readonly generationValues: Readonly<Record<string, unknown>>;
   readonly referenceVideoMedia: readonly WorkflowMediaValue[];
+  readonly referenceVideoDurationSec?: number;
   readonly displayFolds?: readonly number[];
   readonly disabled?: boolean;
 }
@@ -255,12 +256,14 @@ export function AiVideoPriceEstimateChip({
   baseline480pWithoutVideo,
   generationValues,
   referenceVideoMedia,
+  referenceVideoDurationSec,
   displayFolds = [],
   disabled = false,
 }: AiVideoPriceEstimateChipProps) {
-  const inputDurationSec = useSummedReferenceVideoDurationSeconds(
-    referenceVideoMedia
-  );
+  const probedReferenceDurationSec =
+    useSummedReferenceVideoDurationSeconds(referenceVideoMedia);
+  const inputDurationSec =
+    referenceVideoDurationSec ?? probedReferenceDurationSec;
   const hasReferenceVideo = referenceVideoMedia.length > 0;
   const outputDurationSec = readGenerationFieldNumber(
     generationValues,

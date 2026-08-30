@@ -21,6 +21,7 @@ interface VideoTrimTimeFieldsProps {
   readonly className?: string;
   readonly videoDurationSec: number;
   readonly range: VideoTrimRangeSec;
+  readonly minSelectionSec?: number;
   readonly disabled?: boolean;
   readonly onRangeChange: (range: VideoTrimRangeSec) => void;
   readonly onRangeCommit: (range: VideoTrimRangeSec) => void;
@@ -104,6 +105,7 @@ export function VideoTrimTimeFields({
   className,
   videoDurationSec,
   range,
+  minSelectionSec,
   disabled = false,
   onRangeChange,
   onRangeCommit,
@@ -116,6 +118,7 @@ export function VideoTrimTimeFields({
       field,
       valueSec,
       videoDurationSec,
+      minSelectionSec,
     });
     onRangeChange(next);
     onRangeCommit(next);

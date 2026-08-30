@@ -32,6 +32,8 @@ export interface UseGenerativeParamsEditorParams {
   readonly onGenerativeDefaultChange?: (
     defaults: WorkflowGenerativeDefaults
   ) => void;
+  /** When set, params commit here instead of the node inputs (e.g. retake session). */
+  readonly onCommit?: (next: Record<string, unknown>) => void;
 }
 
 export interface GenerativeParamsPopoverUiProps {
@@ -131,7 +133,15 @@ export function useGenerativeParamsEditor(
   const commitToNode = useCallback(
     (next: Record<string, unknown>) => {
       const current = paramsRef.current;
-      if (!current.visible || current.disabled || !current.updateNodeData) {
+      if (!current.visible || current.disabled) {
+        return;
+      }
+      if (current.onCommit) {
+        current.onCommit(next);
+        lastCommittedRef.current = { ...next };
+        return;
+      }
+      if (!current.updateNodeData) {
         return;
       }
       commitNodeGenerationParams({

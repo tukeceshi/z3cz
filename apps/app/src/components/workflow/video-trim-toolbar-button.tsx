@@ -11,7 +11,10 @@ import {
   GENERATIVE_NODE_PANEL_TOOLBAR_ICON_CLASS,
 } from "./generative-card-styles";
 import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
-import { useVideoTrimSession } from "./video-trim-session-context";
+import {
+  readVideoSegmentPlaybackSeed,
+  useVideoTrimSession,
+} from "./video-trim-session-context";
 import { useWorkflow } from "./workflow-context";
 
 export interface VideoTrimToolbarButtonProps {
@@ -28,19 +31,36 @@ export function VideoTrimToolbarButton({
   const { t } = useTranslation();
   const { disabled: workflowDisabled } = useWorkflow();
   const retakeSessionApi = useOptionalVideoRetakeSession();
-  const { toggleTrimSession, isTrimActiveForNode } = useVideoTrimSession();
+  const { openTrimSession, closeTrimSession, isTrimActiveForNode } =
+    useVideoTrimSession();
   const active = isTrimActiveForNode(sourceNodeId);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
+      if (active) {
+        closeTrimSession();
+        return;
+      }
+      const seed = readVideoSegmentPlaybackSeed(
+        retakeSessionApi?.session,
+        sourceNodeId
+      );
       retakeSessionApi?.closeRetakeSession();
-      toggleTrimSession({
+      openTrimSession({
         sourceNodeId,
         sourceMedia: sourceVideo,
+        seed,
       });
     },
-    [retakeSessionApi, sourceNodeId, sourceVideo, toggleTrimSession]
+    [
+      active,
+      closeTrimSession,
+      openTrimSession,
+      retakeSessionApi,
+      sourceNodeId,
+      sourceVideo,
+    ]
   );
 
   return (

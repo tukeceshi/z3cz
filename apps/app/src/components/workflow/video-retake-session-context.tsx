@@ -1,8 +1,10 @@
 import {
-  createDefaultVideoTrimRange,
+  createDefaultVideoRetakeTrimRange,
   type MediaReference,
   type VideoTrimRangeSec,
 } from "@dafthunk/types";
+
+import type { VideoSegmentPlaybackSeed } from "./video-trim-session-context";
 import {
   createContext,
   useCallback,
@@ -19,12 +21,17 @@ export interface VideoRetakeSession {
   readonly sourceNodeId: string;
   readonly sourceMedia: MediaReference;
   readonly videoDurationSec: number | null;
+  readonly sourceVideoWidth: number | null;
+  readonly sourceVideoHeight: number | null;
   readonly trimSourceVideoUrl: string | null;
   readonly committedRange: VideoTrimRangeSec;
   readonly draftRange: VideoTrimRangeSec;
   readonly loadPhase: VideoRetakeLoadPhase;
   readonly highQuality: boolean;
   readonly playbackPaused: boolean;
+  readonly prompt: string;
+  readonly selectedModelOptionId: string | null;
+  readonly generationParams: Readonly<Record<string, unknown>>;
 }
 
 interface VideoRetakeSessionContextValue {
@@ -33,6 +40,7 @@ interface VideoRetakeSessionContextValue {
   readonly openRetakeSession: (params: {
     readonly sourceNodeId: string;
     readonly sourceMedia: MediaReference;
+    readonly seed?: VideoSegmentPlaybackSeed;
   }) => void;
   readonly closeRetakeSession: () => void;
   readonly toggleRetakeSession: (params: {
@@ -45,12 +53,17 @@ interface VideoRetakeSessionContextValue {
       Pick<
         VideoRetakeSession,
         | "videoDurationSec"
+        | "sourceVideoWidth"
+        | "sourceVideoHeight"
         | "trimSourceVideoUrl"
         | "committedRange"
         | "draftRange"
         | "loadPhase"
         | "highQuality"
         | "playbackPaused"
+        | "prompt"
+        | "selectedModelOptionId"
+        | "generationParams"
       >
     >
   ) => void;
@@ -81,18 +94,24 @@ export function VideoRetakeSessionProvider({
     (params: {
       readonly sourceNodeId: string;
       readonly sourceMedia: MediaReference;
+      readonly seed?: VideoSegmentPlaybackSeed;
     }) => {
-      const defaultRange = createDefaultVideoTrimRange(0);
+      const defaultRange = createDefaultVideoRetakeTrimRange(0);
       setSession({
         sourceNodeId: params.sourceNodeId,
         sourceMedia: params.sourceMedia,
-        videoDurationSec: null,
-        trimSourceVideoUrl: null,
-        committedRange: defaultRange,
-        draftRange: defaultRange,
-        loadPhase: "loading",
+        videoDurationSec: params.seed?.videoDurationSec ?? null,
+        sourceVideoWidth: null,
+        sourceVideoHeight: null,
+        trimSourceVideoUrl: params.seed?.trimSourceVideoUrl ?? null,
+        committedRange: params.seed?.committedRange ?? defaultRange,
+        draftRange: params.seed?.draftRange ?? defaultRange,
+        loadPhase: params.seed?.loadPhase ?? "loading",
         highQuality: false,
-        playbackPaused: false,
+        playbackPaused: params.seed?.playbackPaused ?? false,
+        prompt: "",
+        selectedModelOptionId: null,
+        generationParams: {},
       });
     },
     []
@@ -107,17 +126,22 @@ export function VideoRetakeSessionProvider({
         if (current?.sourceNodeId === params.sourceNodeId) {
           return null;
         }
-        const defaultRange = createDefaultVideoTrimRange(0);
+        const defaultRange = createDefaultVideoRetakeTrimRange(0);
         return {
           sourceNodeId: params.sourceNodeId,
           sourceMedia: params.sourceMedia,
           videoDurationSec: null,
+          sourceVideoWidth: null,
+          sourceVideoHeight: null,
           trimSourceVideoUrl: null,
           committedRange: defaultRange,
           draftRange: defaultRange,
           loadPhase: "loading",
           highQuality: false,
           playbackPaused: false,
+          prompt: "",
+          selectedModelOptionId: null,
+          generationParams: {},
         };
       });
     },
@@ -130,12 +154,17 @@ export function VideoRetakeSessionProvider({
         Pick<
           VideoRetakeSession,
           | "videoDurationSec"
+          | "sourceVideoWidth"
+          | "sourceVideoHeight"
           | "trimSourceVideoUrl"
           | "committedRange"
           | "draftRange"
           | "loadPhase"
           | "highQuality"
           | "playbackPaused"
+          | "prompt"
+          | "selectedModelOptionId"
+          | "generationParams"
         >
       >
     ) => {
@@ -158,6 +187,20 @@ export function VideoRetakeSessionProvider({
           patch.videoDurationSec !== current.videoDurationSec
         ) {
           next = { ...next, videoDurationSec: patch.videoDurationSec };
+        }
+
+        if (
+          patch.sourceVideoWidth !== undefined &&
+          patch.sourceVideoWidth !== current.sourceVideoWidth
+        ) {
+          next = { ...next, sourceVideoWidth: patch.sourceVideoWidth };
+        }
+
+        if (
+          patch.sourceVideoHeight !== undefined &&
+          patch.sourceVideoHeight !== current.sourceVideoHeight
+        ) {
+          next = { ...next, sourceVideoHeight: patch.sourceVideoHeight };
         }
 
         if (
@@ -190,6 +233,24 @@ export function VideoRetakeSessionProvider({
           patch.playbackPaused !== current.playbackPaused
         ) {
           next = { ...next, playbackPaused: patch.playbackPaused };
+        }
+
+        if (patch.prompt !== undefined && patch.prompt !== current.prompt) {
+          next = { ...next, prompt: patch.prompt };
+        }
+
+        if (
+          patch.selectedModelOptionId !== undefined &&
+          patch.selectedModelOptionId !== current.selectedModelOptionId
+        ) {
+          next = { ...next, selectedModelOptionId: patch.selectedModelOptionId };
+        }
+
+        if (
+          patch.generationParams !== undefined &&
+          patch.generationParams !== current.generationParams
+        ) {
+          next = { ...next, generationParams: patch.generationParams };
         }
 
         return next === current ? current : next;

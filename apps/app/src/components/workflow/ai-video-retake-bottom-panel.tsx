@@ -1,6 +1,6 @@
 import { useViewport } from "@xyflow/react";
 
-import { AiVideoConfigPanel } from "./ai-video-config-panel";
+import { AiVideoRetakeConfigPanel } from "./ai-video-retake-config-panel";
 import { AiVideoRetakeTrimPanel } from "./ai-video-retake-trim-panel";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
 import { VIDEO_TRIM_PANEL_WIDTH_PX } from "./video-trim-panel-styles";
@@ -41,7 +41,7 @@ export function AiVideoRetakeBottomPanel({
       onMouseDown={(event) => event.stopPropagation()}
     >
       <AiVideoRetakeTrimPanel nodeId={nodeId} data={data} />
-      <AiVideoConfigPanel nodeId={nodeId} data={data} layout="retake-embedded" />
+      <AiVideoRetakeConfigPanel nodeId={nodeId} data={data} />
     </div>
   );
 }
