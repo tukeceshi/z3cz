@@ -143,7 +143,7 @@ export interface GenerationJobResultJson {
   /** Pre-created catalog ids written to the node while upstream is running. */
   readonly placeholderResourceIds?: readonly string[];
   /** Distinguishes MediaKit tool jobs from model video generation. */
-  readonly jobKind?: "video_enhance" | "video_trim";
+  readonly jobKind?: "video_enhance" | "video_trim" | "video_concat";
 }
 
 export interface GenerationJobRecord {

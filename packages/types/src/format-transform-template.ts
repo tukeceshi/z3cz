@@ -103,7 +103,7 @@ export interface TransformPollMapping {
 export const DEFAULT_TRANSFORM_POLL_MAPPING: TransformPollMapping = {
   statusKey: "status",
   successValues: ["succeeded", "success"],
-  failedValues: ["failed", "expired"],
+  failedValues: ["failed", "failure", "expired"],
   outputKey: "content.video_url",
 };
 

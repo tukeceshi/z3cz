@@ -12,6 +12,7 @@ import {
   snapVideoTrimSec,
   VIDEO_TRIM_MIN_DURATION_SEC,
   shouldWarnVideoTrimShortDuration,
+  splitVideoRetakeSegments,
   videoTrimSelectionDurationSec,
 } from "./video-trim";
 
@@ -131,5 +132,48 @@ describe("video-trim", () => {
         minSelectionSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
       })
     ).toEqual({ startSec: 0, endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC });
+  });
+
+  it("splits a middle retake into three segments", () => {
+    expect(
+      splitVideoRetakeSegments({ startSec: 4, endSec: 10 }, 20)
+    ).toEqual([
+      { role: "keep", range: { startSec: 0, endSec: 4 } },
+      { role: "retake", range: { startSec: 4, endSec: 10 } },
+      { role: "keep", range: { startSec: 10, endSec: 20 } },
+    ]);
+  });
+
+  it("splits a start or end retake into two segments", () => {
+    expect(
+      splitVideoRetakeSegments({ startSec: 0, endSec: 6 }, 20)
+    ).toEqual([
+      { role: "retake", range: { startSec: 0, endSec: 6 } },
+      { role: "keep", range: { startSec: 6, endSec: 20 } },
+    ]);
+    expect(
+      splitVideoRetakeSegments({ startSec: 12, endSec: 20 }, 20)
+    ).toEqual([
+      { role: "keep", range: { startSec: 0, endSec: 12 } },
+      { role: "retake", range: { startSec: 12, endSec: 20 } },
+    ]);
+  });
+
+  it("keeps a full-video retake as one segment", () => {
+    expect(
+      splitVideoRetakeSegments({ startSec: 0, endSec: 20 }, 20)
+    ).toEqual([{ role: "retake", range: { startSec: 0, endSec: 20 } }]);
+  });
+
+  it("drops leftover head or tail shorter than the minimum keep duration", () => {
+    expect(
+      splitVideoRetakeSegments({ startSec: 0.04, endSec: 10 }, 20)
+    ).toEqual([
+      { role: "retake", range: { startSec: 0, endSec: 10 } },
+      { role: "keep", range: { startSec: 10, endSec: 20 } },
+    ]);
+    expect(
+      splitVideoRetakeSegments({ startSec: 0, endSec: 10 }, 10.05)
+    ).toEqual([{ role: "retake", range: { startSec: 0, endSec: 10 } }]);
   });
 });

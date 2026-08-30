@@ -60,6 +60,8 @@ import { useGenerativeCloudJobProgress, type ResolveGenerativeJobMediaResult } f
 import { useSyncGeneratingResourceRefs } from "@/hooks/use-sync-generating-resource-refs";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
+import { isAiVideoResultSiblingNodeId } from "@/components/workflow/create-ai-video-node-from-manual-upload";
+import { withGenerativeBottomPanelHidden } from "@/components/workflow/generative-card-mode-utils";
 import { readGenerativeNodeInterfaceId } from "@/components/workflow/generative-model-binding";
 
 export type GenerativeCloudJobResumeModality = "image" | "video" | "audio";
@@ -314,7 +316,12 @@ export function GenerativeCloudJobResumeHost({
           modality === "image"
             ? withAiImageGenerateError(withBusy, cardError)
             : modality === "video"
-              ? withAiVideoGenerateError(withBusy, cardError)
+              ? withAiVideoGenerateError(
+                  isAiVideoResultSiblingNodeId(nodeId)
+                    ? withGenerativeBottomPanelHidden(withBusy)
+                    : withBusy,
+                  cardError
+                )
               : withAiAudioGenerateError(withBusy, cardError);
         const failedJobId = readResumeJobId(
           modality,

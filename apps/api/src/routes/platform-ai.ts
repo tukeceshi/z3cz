@@ -19,7 +19,9 @@ import {
   clampVideoEnhanceFps,
   type SubmitVideoEnhanceRequest,
   type SubmitVideoTrimRequest,
+  type SubmitVideoConcatRequest,
   isSubmitVideoTrimRangeValid,
+  isSubmitVideoConcatUrlsValid,
   normalizeSubmitVideoTrimRange,
   VIDEO_TRIM_MIN_DURATION_SEC,
   createEphemeralMediaExpiresAt,
@@ -154,6 +156,7 @@ import {
   resolveResourceRefs,
 } from "../services/resolve-resource-refs";
 import { submitVideoEnhanceTask } from "../services/video-enhance-service";
+import { submitVideoConcatTask } from "../services/video-concat-service";
 import { submitVideoTrimTask } from "../services/video-trim-service";
 import { VolcanoMediaKitApiError } from "../integrations/volcengine/mediakit-client";
 
@@ -2138,6 +2141,125 @@ platformAiRoutes.post(
         message.includes("not configured") ||
         message.includes("not found") ||
         message.includes("Invalid video trim")
+          ? 400
+          : 502;
+      return c.json({ error: message }, status);
+    }
+  }
+);
+
+const submitVideoConcatSchema = z
+  .object({
+    aiInterfaceId: z.string().min(1),
+    videoUrls: z.array(z.string().min(1)).min(1).max(100),
+    workflowId: z.string().optional(),
+    nodeId: z.string().optional(),
+    clientRequestId: z.string().min(1).max(128).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!isSubmitVideoConcatUrlsValid(value.videoUrls)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "videoUrls must contain 1 to 100 non-empty URLs",
+        path: ["videoUrls"],
+      });
+    }
+  });
+
+platformAiRoutes.post(
+  "/mediakit/video-concat/submit",
+  zValidator("json", submitVideoConcatSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json") as SubmitVideoConcatRequest;
+    const db = createDatabase(c.env);
+
+    const existingJob = await findGenerationJobByClientRequestId(db, {
+      organizationId,
+      clientRequestId: body.clientRequestId,
+      modality: "video",
+    });
+    if (existingJob) {
+      return c.json(buildVideoSubmitResponseFromJob(existingJob));
+    }
+
+    try {
+      await assertNoActiveGenerationJobForNode(db, {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "video",
+        clientRequestId: body.clientRequestId,
+      });
+    } catch (error) {
+      if (error instanceof ActiveGenerationJobConflictError) {
+        return c.json(
+          {
+            error: error.message,
+            code: error.code,
+            jobId: error.jobId,
+          },
+          409
+        );
+      }
+      throw error;
+    }
+
+    const gateResult = await runWithCloudStorageGenerativeGate(
+      c,
+      organizationId,
+      async () => true
+    );
+    if (gateResult instanceof Response) {
+      return gateResult;
+    }
+
+    try {
+      const result = await submitVideoConcatTask(c.env, {
+        organizationId,
+        userId: jwtPayload?.sub,
+        body,
+      });
+
+      const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+        c.env,
+        {
+          organizationId,
+          workflowId: body.workflowId,
+          nodeId: body.nodeId,
+          modality: "video",
+          entry: {
+            resourceIds: result.resourceIds,
+            jobId: result.jobId,
+            mimeType: "video/mp4",
+            params: {
+              videoConcat: {
+                sourceCount: body.videoUrls.length,
+              },
+            },
+            aiInterfaceId: result.aiInterfaceId,
+          },
+        }
+      );
+
+      return c.json({
+        taskId: result.taskId,
+        aiInterfaceId: result.aiInterfaceId,
+        jobId: result.jobId,
+        resourceIds: result.resourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
+      });
+    } catch (error) {
+      const message =
+        error instanceof VolcanoMediaKitApiError || error instanceof Error
+          ? error.message
+          : "Video concat submit failed";
+      const status =
+        message.includes("not enabled") ||
+        message.includes("not configured") ||
+        message.includes("not found") ||
+        message.includes("Invalid video concat")
           ? 400
           : 502;
       return c.json({ error: message }, status);

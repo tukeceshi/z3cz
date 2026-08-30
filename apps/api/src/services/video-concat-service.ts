@@ -1,15 +1,13 @@
 import {
-  formatVideoTrimPromptExcerpt,
-  isSubmitVideoTrimRangeValid,
+  isSubmitVideoConcatUrlsValid,
   isVideoUpstreamPollDue,
   isVolcanoMediaKitVideoTrimEnabled,
   nextVideoUpstreamPollAt,
-  normalizeSubmitVideoTrimRange,
   resolveVolcanoMediaKitFromMetadata,
-  VIDEO_TRIM_JOB_KIND,
-  VIDEO_TRIM_MODEL_CANONICAL_ID,
-  VIDEO_TRIM_MODEL_DISPLAY_NAME,
-  type SubmitVideoTrimRequest,
+  VIDEO_CONCAT_JOB_KIND,
+  VIDEO_CONCAT_MODEL_CANONICAL_ID,
+  VIDEO_CONCAT_MODEL_DISPLAY_NAME,
+  type SubmitVideoConcatRequest,
   type VolcanoInterfaceMetadata,
 } from "@dafthunk/types";
 
@@ -27,7 +25,7 @@ import {
 } from "../db/platform-ai-model-queries";
 import {
   pollMediaKitTask,
-  submitMediaKitVideoTrimTask,
+  submitMediaKitVideoConcatTask,
   VolcanoMediaKitApiError,
 } from "../integrations/volcengine/mediakit-client";
 import {
@@ -38,7 +36,6 @@ import { buildVideoPendingMedia } from "./generation-job-service";
 import { createJobUpstreamRequestLogger } from "./job-upstream-request-logger";
 import { markMediaResourcesFailed } from "./mark-media-resources-failed";
 import { registerGeneratingPlaceholderResources } from "./register-generating-placeholder-resources";
-import { resolveResourceRefs } from "./resolve-resource-refs";
 import { resolveVolcanoMediaKitApiKey } from "./resolve-volcano-mediakit-api-key";
 import {
   completeGenerationJobInvocationIfPending,
@@ -52,32 +49,21 @@ function readVolcanoMetadata(
   return isVolcanoMetadata(metadata) ? metadata : null;
 }
 
-function assertVideoTrimEnabled(metadataRaw: string | null): void {
+function assertVideoConcatEnabled(metadataRaw: string | null): void {
   const mediaKit = resolveVolcanoMediaKitFromMetadata(
     readVolcanoMetadata(metadataRaw)
   );
   if (!isVolcanoMediaKitVideoTrimEnabled(mediaKit)) {
-    throw new Error("AI MediaKit video trim is not enabled on this interface");
+    throw new Error("AI MediaKit video concat is not enabled on this interface");
   }
 }
 
-function normalizeTrimRequest(body: SubmitVideoTrimRequest) {
-  const range = normalizeSubmitVideoTrimRange({
-    startSec: body.startSec,
-    endSec: body.endSec,
-  });
-  if (!isSubmitVideoTrimRangeValid(range)) {
-    throw new Error("Invalid video trim range");
-  }
-  return range;
-}
-
-export async function submitVideoTrimTask(
+export async function submitVideoConcatTask(
   env: Bindings,
   params: {
     readonly organizationId: string;
     readonly userId?: string;
-    readonly body: SubmitVideoTrimRequest;
+    readonly body: SubmitVideoConcatRequest;
   }
 ): Promise<{
   readonly taskId: string;
@@ -85,7 +71,10 @@ export async function submitVideoTrimTask(
   readonly resourceIds: readonly string[];
   readonly aiInterfaceId: string;
 }> {
-  const trimRange = normalizeTrimRequest(params.body);
+  const videoUrls = params.body.videoUrls.map((url) => url.trim());
+  if (!isSubmitVideoConcatUrlsValid(videoUrls)) {
+    throw new Error("Invalid video concat sources");
+  }
 
   const db = createDatabase(env);
   const row = await getOrganizationAiInterfaceRow(
@@ -97,7 +86,7 @@ export async function submitVideoTrimTask(
     throw new Error("AI interface not found");
   }
 
-  assertVideoTrimEnabled(row.metadata);
+  assertVideoConcatEnabled(row.metadata);
 
   const apiKey = await resolveVolcanoMediaKitApiKey({
     env,
@@ -110,21 +99,12 @@ export async function submitVideoTrimTask(
     );
   }
 
-  const resolved = await resolveResourceRefs(env, {
-    organizationId: params.organizationId,
-    resourceIds: [params.body.sourceVideoResourceId],
-  });
-  const source = resolved.resolved[0];
-  if (!source?.url) {
-    throw new Error("Source video could not be resolved");
-  }
-
   const jobId = crypto.randomUUID();
   const invocationId = crypto.randomUUID();
   const videoResourceIds = await registerGeneratingPlaceholderResources(db, {
     organizationId: params.organizationId,
     mimeType: "video/mp4",
-    modelCanonicalId: VIDEO_TRIM_MODEL_CANONICAL_ID,
+    modelCanonicalId: VIDEO_CONCAT_MODEL_CANONICAL_ID,
   });
 
   const job = await createGenerationJob(db, {
@@ -135,11 +115,11 @@ export async function submitVideoTrimTask(
     nodeId: params.body.nodeId,
     modality: "video",
     status: "generating",
-    modelCanonicalId: VIDEO_TRIM_MODEL_CANONICAL_ID,
+    modelCanonicalId: VIDEO_CONCAT_MODEL_CANONICAL_ID,
     interfaceId: params.body.aiInterfaceId,
     clientRequestId: params.body.clientRequestId,
     resultJson: {
-      jobKind: VIDEO_TRIM_JOB_KIND,
+      jobKind: VIDEO_CONCAT_JOB_KIND,
       aiInterfaceId: params.body.aiInterfaceId,
       invocationId,
       placeholderResourceIds: videoResourceIds,
@@ -151,13 +131,13 @@ export async function submitVideoTrimTask(
     id: invocationId,
     organizationId: params.organizationId,
     userId: params.userId,
-    canonicalId: VIDEO_TRIM_MODEL_CANONICAL_ID,
-    displayName: VIDEO_TRIM_MODEL_DISPLAY_NAME,
+    canonicalId: VIDEO_CONCAT_MODEL_CANONICAL_ID,
+    displayName: VIDEO_CONCAT_MODEL_DISPLAY_NAME,
     interfaceId: params.body.aiInterfaceId,
     interfaceName: row.name,
-    promptExcerpt: formatVideoTrimPromptExcerpt(trimRange),
+    promptExcerpt: `${videoUrls.length} clips`,
     content: "",
-    source: "ai-video-trim-submit",
+    source: "ai-video-concat-submit",
     status: "pending",
     workflowId: params.body.workflowId,
     nodeId: params.body.nodeId,
@@ -166,11 +146,9 @@ export async function submitVideoTrimTask(
 
   let taskId: string;
   try {
-    const submitResult = await submitMediaKitVideoTrimTask({
+    const submitResult = await submitMediaKitVideoConcatTask({
       apiKey,
-      videoUrl: source.url,
-      startSec: trimRange.startSec,
-      endSec: trimRange.endSec,
+      videoUrls,
       clientToken: params.body.clientRequestId,
       upstreamLog: createJobUpstreamRequestLogger(db, job, "submit"),
     });
@@ -218,7 +196,7 @@ export async function submitVideoTrimTask(
     expectedStatuses: ["generating"],
     upstreamTaskId: taskId,
     resultJson: {
-      jobKind: VIDEO_TRIM_JOB_KIND,
+      jobKind: VIDEO_CONCAT_JOB_KIND,
       upstreamTaskId: taskId,
       aiInterfaceId: params.body.aiInterfaceId,
       invocationId,
@@ -235,7 +213,7 @@ export async function submitVideoTrimTask(
   };
 }
 
-export async function pollVideoTrimGenerationJob(
+export async function pollVideoConcatGenerationJob(
   env: Bindings,
   db: Database,
   job: GenerationJobRecord
@@ -245,7 +223,7 @@ export async function pollVideoTrimGenerationJob(
     job.resultJson?.upstreamTaskId?.trim() ||
     "";
 
-  if (job.resultJson?.jobKind !== VIDEO_TRIM_JOB_KIND || !upstreamTaskId) {
+  if (job.resultJson?.jobKind !== VIDEO_CONCAT_JOB_KIND || !upstreamTaskId) {
     return job;
   }
 
@@ -330,7 +308,7 @@ export async function pollVideoTrimGenerationJob(
       organizationId: job.organizationId,
       status: "failed",
       expectedStatuses: [...activeStatuses],
-      failureReason: pollResult.error ?? "Video trim failed",
+      failureReason: pollResult.error ?? "Video concat failed",
     });
     if (failed) {
       await markMediaResourcesFailed(db, {
@@ -379,21 +357,18 @@ export async function pollVideoTrimGenerationJob(
   const { upstreamVideoStatus: _upstreamVideoStatus, ...restResult } =
     previousResult;
 
-  const readyAt = new Date().toISOString();
-  const resultJson = {
-    ...restResult,
-    pendingMedia: [pendingItem],
-    upstreamTaskId,
-    aiInterfaceId: job.interfaceId,
-  };
-
   const updated = await updateGenerationJob(db, {
     id: job.id,
     organizationId: job.organizationId,
     status: "ready_to_persist",
     expectedStatuses: ["generating", "cancelling"],
-    readyAt,
-    resultJson,
+    readyAt: new Date().toISOString(),
+    resultJson: {
+      ...restResult,
+      pendingMedia: [pendingItem],
+      upstreamTaskId,
+      aiInterfaceId: job.interfaceId,
+    },
   });
 
   if (updated) {

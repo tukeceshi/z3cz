@@ -12,6 +12,7 @@ import {
   type MediaReference,
   type ObjectReference,
   normalizeVideoModelParameterRules,
+  applyVideoRetakeEditOverridesToRequestBody,
   omitAdaptiveVideoRatioFromRequestBody,
   validateSubmitAiVideoReferences,
   buildVideoPollUrl,
@@ -22,7 +23,10 @@ import {
 import type { ObjectStore } from "../node-types";
 import type { CloudImageUploadTarget } from "./execute-volcano-image";
 import { applyForwardingMappings } from "./apply-forwarding-mappings";
-import { parsePollResponse } from "./parse-poll-response";
+import {
+  parseOfficialVolcanoPollBody,
+  parsePollResponse,
+} from "./parse-poll-response";
 import {
   fetchWithUpstreamLog,
   type UpstreamRequestLogSink,
@@ -171,7 +175,7 @@ export async function submitVolcanoVideoTask(params: {
     referenceAudioUrls: params.referenceAudioUrls,
   });
 
-  const requestBody = params.formatTransform
+  const mappedBody = params.formatTransform
     ? applyForwardingMappings({
         sourceBody: body,
         upstreamParams: params.formatTransform.upstreamParams,
@@ -179,6 +183,10 @@ export async function submitVolcanoVideoTask(params: {
         lockedResolution: params.formatTransform.lockedResolution ?? null,
       })
     : omitAdaptiveVideoRatioFromRequestBody(body);
+  const requestBody = applyVideoRetakeEditOverridesToRequestBody(
+    mappedBody,
+    params.generationParams
+  );
 
   const endpoints = resolveVideoEndpoints(params.videoEndpoints);
   const url = buildVideoSubmitUrl({
@@ -279,31 +287,7 @@ export async function pollVolcanoVideoTask(params: {
     return parsePollResponse(parsed, params.pollMapping);
   }
 
-  const status = (parsed.status ?? "").trim().toLowerCase();
-
-  if (status === "failed" || status === "expired") {
-    return {
-      status: "failed",
-      error: parsed.error?.message ?? `Video task ${status}`,
-    };
-  }
-
-  if (status === "succeeded" || status === "success") {
-    const videoUrl = parsed.content?.video_url;
-    if (!videoUrl) {
-      return {
-        status: "failed",
-        error: "Task succeeded but no video URL was returned",
-      };
-    }
-    return { status: "completed", videoUrl };
-  }
-
-  if (status === "queued" || status === "pending" || status === "created") {
-    return { status: "pending", upstreamPhase: "queued" };
-  }
-
-  return { status: "pending", upstreamPhase: "running" };
+  return parseOfficialVolcanoPollBody(parsed);
 }
 
 export async function cancelVolcanoVideoTask(params: {

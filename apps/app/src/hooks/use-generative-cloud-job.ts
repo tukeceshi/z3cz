@@ -222,19 +222,11 @@ export function useGenerativeCloudJobProgress(
     async (jobId: string): Promise<ResolveGenerativeJobMediaResult> => {
       const claimed = tryClaimGenerativeJobResume(jobId);
       if (!claimed) {
-        try {
-          return await waitForJobFinalMedia(
-            options.orgId!,
-            jobId,
-            options.shouldAbortJobPoll
-          );
-        } catch (error) {
-          if (error instanceof GenerativeGenerationCancelledError) {
-            throw error;
-          }
-          // Owner (or another waiter) surfaces job failure; do not fight over UI.
-          return { media: [], owned: false };
-        }
+        return await waitForJobFinalMedia(
+          options.orgId!,
+          jobId,
+          options.shouldAbortJobPoll
+        );
       }
 
       try {

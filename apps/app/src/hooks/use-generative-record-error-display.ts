@@ -1,7 +1,14 @@
-import type { GenerativeModelKind } from "@dafthunk/types";
-import { useEffect } from "react";
+import type { GenerativeCardError, GenerativeModelKind } from "@dafthunk/types";
+import { useEffect, useState } from "react";
 
+import { withGenerativeBottomPanelHidden } from "@/components/workflow/generative-card-mode-utils";
 import { withGenerativeCardGenerateError } from "@/components/workflow/generative-card-error-utils";
+import { isAiVideoResultSiblingNodeId } from "@/components/workflow/create-ai-video-node-from-manual-upload";
+import { clearGenerativeProgress } from "@/components/workflow/generative-progress-utils";
+import {
+  withAiVideoGenerateError,
+  withAiVideoGeneratingFlag,
+} from "@/components/workflow/ai-video-node-utils";
 import { prepareGenerativeCardError } from "@/components/workflow/prepare-generative-card-error";
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { useTranslation } from "@/components/locale-provider";
@@ -22,7 +29,7 @@ export function useGenerativeRecordErrorDisplay(params: {
     nodeId: string,
     updater: (current: WorkflowNodeType) => Partial<WorkflowNodeType>
   ) => void;
-}): void {
+}): GenerativeCardError | undefined {
   const { t } = useTranslation();
   const jobId = params.jobId;
   const invocationId = params.invocationId;
@@ -32,6 +39,9 @@ export function useGenerativeRecordErrorDisplay(params: {
   const nodeId = params.nodeId;
   const modality = params.modality;
   const updateNodeData = params.updateNodeData;
+  const [restoredError, setRestoredError] = useState<
+    GenerativeCardError | undefined
+  >();
 
   useEffect(() => {
     if (!updateNodeData) {
@@ -39,6 +49,7 @@ export function useGenerativeRecordErrorDisplay(params: {
     }
 
     if (clearError) {
+      setRestoredError(undefined);
       updateNodeData(nodeId, (current) => ({
         metadata: withGenerativeCardGenerateError(current.metadata, null),
       }));
@@ -46,6 +57,7 @@ export function useGenerativeRecordErrorDisplay(params: {
     }
 
     if (!enabled || !orgId || (!jobId && !invocationId)) {
+      setRestoredError(undefined);
       return;
     }
 
@@ -68,9 +80,25 @@ export function useGenerativeRecordErrorDisplay(params: {
         return;
       }
       const cardError = prepareGenerativeCardError(raw, t, modality);
-      updateNodeData(nodeId, (current) => ({
-        metadata: withGenerativeCardGenerateError(current.metadata, cardError),
-      }));
+      setRestoredError(cardError);
+      updateNodeData(nodeId, (current) => {
+        const hideBottomPanel =
+          modality === "video" && isAiVideoResultSiblingNodeId(nodeId);
+        let metadata =
+          modality === "video"
+            ? withAiVideoGenerateError(
+                withAiVideoGeneratingFlag(
+                  clearGenerativeProgress(current.metadata),
+                  false
+                ),
+                cardError
+              )
+            : withGenerativeCardGenerateError(current.metadata, cardError);
+        if (hideBottomPanel) {
+          metadata = withGenerativeBottomPanelHidden(metadata);
+        }
+        return { metadata };
+      });
     };
 
     void run();
@@ -88,4 +116,6 @@ export function useGenerativeRecordErrorDisplay(params: {
     t,
     updateNodeData,
   ]);
+
+  return restoredError;
 }

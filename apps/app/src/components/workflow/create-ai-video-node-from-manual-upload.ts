@@ -7,6 +7,7 @@ import type { Node as ReactFlowNode } from "@xyflow/react";
 
 import {
   mergeAiVideoNodeCatalogInputs,
+  withAiVideoGeneratingFlag,
   withAiVideoManualUpload,
 } from "./ai-video-node-utils";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
@@ -14,8 +15,13 @@ import {
   withGenerativeBottomPanelHidden,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
-import { withGenerativeTrimmingProgress } from "./generative-progress-utils";
+import {
+  withGenerativeProgress,
+  withGenerativeTrimmingProgress,
+} from "./generative-progress-utils";
 import type { NodeType, WorkflowNodeType } from "./workflow-types";
+
+export type AiVideoSiblingBusyKind = "trimming" | "generating" | "none";
 
 interface GenerativeNamingNode {
   readonly data: {
@@ -23,13 +29,12 @@ interface GenerativeNamingNode {
   };
 }
 
-export function resolveTrimSiblingNodeName(params: {
-  readonly sourceNodeName: string;
-  readonly existingNodes: ReadonlyArray<GenerativeNamingNode>;
-}): string {
-  const base = `${params.sourceNodeName}-截取`;
+function resolveNumberedSiblingNodeName(
+  base: string,
+  existingNodes: ReadonlyArray<GenerativeNamingNode>
+): string {
   const existingNames = new Set(
-    params.existingNodes
+    existingNodes
       .map((node) => node.data.name?.trim())
       .filter((name): name is string => Boolean(name))
   );
@@ -43,6 +48,33 @@ export function resolveTrimSiblingNodeName(params: {
     index += 1;
   }
   return `${base}-${index}`;
+}
+
+export function resolveTrimSiblingNodeName(params: {
+  readonly sourceNodeName: string;
+  readonly existingNodes: ReadonlyArray<GenerativeNamingNode>;
+}): string {
+  return resolveNumberedSiblingNodeName(
+    `${params.sourceNodeName}-截取`,
+    params.existingNodes
+  );
+}
+
+export function resolveRetakeSiblingNodeName(params: {
+  readonly sourceNodeName: string;
+  readonly existingNodes: ReadonlyArray<GenerativeNamingNode>;
+}): string {
+  return resolveNumberedSiblingNodeName(
+    `${params.sourceNodeName}-重拍`,
+    params.existingNodes
+  );
+}
+
+export function isAiVideoResultSiblingNodeId(nodeId: string): boolean {
+  return (
+    nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-retake-`) ||
+    nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-trim-`)
+  );
 }
 
 function buildCatalogAiVideoNodeData(params: {
@@ -85,12 +117,26 @@ export function buildEmptyAiVideoSiblingNode(params: {
   readonly nodeName: string;
   readonly position: { readonly x: number; readonly y: number };
   readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly initialBusy?: AiVideoSiblingBusyKind;
 }): ReactFlowNode<WorkflowNodeType> {
   const baseData = buildCatalogAiVideoNodeData({
     catalog: params.catalog,
     nodeName: params.nodeName,
     createObjectUrl: params.createObjectUrl,
   });
+
+  const hiddenPanel = withGenerativeBottomPanelHidden(
+    withGenerativeManualContentMode(undefined)
+  );
+  const busyKind = params.initialBusy ?? "trimming";
+  const metadata =
+    busyKind === "generating"
+      ? withGenerativeProgress(withAiVideoGeneratingFlag(hiddenPanel, true), {
+          phase: "generating",
+        })
+      : busyKind === "none"
+        ? hiddenPanel
+        : withGenerativeTrimmingProgress(hiddenPanel, true);
 
   return {
     id: params.nodeId,
@@ -99,12 +145,7 @@ export function buildEmptyAiVideoSiblingNode(params: {
     selected: true,
     data: {
       ...baseData,
-      metadata: withGenerativeTrimmingProgress(
-        withGenerativeBottomPanelHidden(
-          withGenerativeManualContentMode(undefined)
-        ),
-        true
-      ),
+      metadata,
     },
   };
 }

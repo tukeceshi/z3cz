@@ -48,6 +48,7 @@ import {
   isGenerativeCancelledNoticeVisible,
   subscribeGenerativeCancelledNotice,
 } from "../../generative-generation-cancel";
+import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
 import {
   normalizeGenerativeCardUploadFile,
@@ -115,21 +116,16 @@ function AiVideoWidget({
   const selectedHistoryItem =
     historyItems.items.find((item) => item.id === historyItems.selectedId) ??
     historyItems.items[0];
-  const selectedFailed =
-    Boolean(selectedHistoryItem?.jobId) &&
-    (selectedHistoryItem.videos.length === 0 ||
-      hasFailedResource(selectedHistoryItem.videos));
+  const historyFailed = hasFailedResource(selectedHistoryItem?.videos);
   const metadataBusy =
     isAiVideoGenerating(metadata) ||
     isGenerativeProgressBusyPhase(progressPhase);
-  const suppressBusyForFailed = selectedFailed && !metadataBusy;
-  const isGenerating =
-    (!suppressBusyForFailed && cardDisplay.isBusy) ||
-    progressPhase === "cancelled";
-  useGenerativeMediaWorkSession(
-    uploading || (!suppressBusyForFailed && cardDisplay.isBusy)
-  );
-  useGenerativeRecordErrorDisplay({
+  const selectedFailed =
+    historyFailed ||
+    (Boolean(selectedHistoryItem?.jobId) &&
+      (selectedHistoryItem?.videos.length ?? 0) === 0 &&
+      !metadataBusy);
+  const restoredError = useGenerativeRecordErrorDisplay({
     orgId,
     nodeId,
     jobId: selectedFailed ? selectedHistoryItem?.jobId : undefined,
@@ -143,7 +139,25 @@ function AiVideoWidget({
     ),
     updateNodeData,
   });
-  const generateError = readGenerativeCardError(metadata);
+  const fallbackFailedError = useMemo(
+    () =>
+      historyFailed
+        ? prepareGenerativeCardError(
+            t("workflow.generativeErrors.generationFailed"),
+            t,
+            "video"
+          )
+        : undefined,
+    [historyFailed, t]
+  );
+  const generateError =
+    readGenerativeCardError(metadata) ?? restoredError ?? fallbackFailedError;
+  const isGenerating =
+    (!historyFailed && !generateError && cardDisplay.isBusy) ||
+    progressPhase === "cancelled";
+  useGenerativeMediaWorkSession(
+    uploading || (!historyFailed && !generateError && cardDisplay.isBusy)
+  );
   const showCancelledNotice = useSyncExternalStore(
     subscribeGenerativeCancelledNotice,
     () => isGenerativeCancelledNoticeVisible(nodeId),

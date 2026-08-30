@@ -280,6 +280,54 @@ export async function submitMediaKitVideoTrimTask(
   return { taskId };
 }
 
+export interface SubmitMediaKitVideoConcatParams {
+  readonly apiKey: string;
+  readonly videoUrls: readonly string[];
+  readonly clientToken?: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}
+
+export async function submitMediaKitVideoConcatTask(
+  params: SubmitMediaKitVideoConcatParams
+): Promise<{ readonly taskId: string }> {
+  const body: Record<string, unknown> = {
+    video_urls: [...params.videoUrls],
+  };
+
+  if (params.clientToken) {
+    body.client_token = params.clientToken;
+  }
+
+  const response = await fetchWithUpstreamLog(
+    `${VOLCANO_MEDIKIT_API_BASE_URL}/api/v1/tools/concat-video`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey.trim()}`,
+      },
+      body: JSON.stringify(body),
+    },
+    params.upstreamLog
+  );
+
+  const payload = (await response.json()) as MediaKitTaskSubmitResponse;
+  if (!response.ok || payload.success === false) {
+    throw new VolcanoMediaKitApiError(
+      readErrorMessage(payload),
+      response.status
+    );
+  }
+
+  const taskId = payload.task_id?.trim();
+  if (!taskId) {
+    throw new VolcanoMediaKitApiError("MediaKit submit did not return task_id");
+  }
+
+  return { taskId };
+}
+
 export async function pollMediaKitTask(params: {
   readonly apiKey: string;
   readonly taskId: string;

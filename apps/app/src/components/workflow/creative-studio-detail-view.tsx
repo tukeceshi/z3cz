@@ -18,6 +18,7 @@ import {
   STUDIO_PANEL_HEADER,
   STUDIO_SHELL,
 } from "./creative-studio-surface";
+import { isAiVideoResultSiblingNodeId } from "./create-ai-video-node-from-manual-upload";
 import { shouldShowGenerativeBottomPanel } from "./generative-card-mode-utils";
 import { GenerativeStudioConfigPanel } from "./generative-studio-config-panel";
 import type { WorkflowNodeType } from "./workflow-types";
@@ -39,7 +40,9 @@ export function CreativeStudioDetailView({
   const [textEditHeader, setTextEditHeader] =
     useState<StudioTextEditHeaderState | null>(null);
   const showBottomPanel =
-    shouldShowGenerativeBottomPanel(node.data.metadata) && !emptyTextEditing;
+    shouldShowGenerativeBottomPanel(node.data.metadata) &&
+    !isAiVideoResultSiblingNodeId(node.id) &&
+    !emptyTextEditing;
   const isPrimary = role === "primary";
 
   useEffect(() => {
