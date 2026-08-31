@@ -1552,7 +1552,7 @@ export function AiVideoConfigPanel({
                       : t("workflow.aiVideoPanel.promptPlaceholder")
                   }
                   className={cn(
-                    "pr-7",
+                    "min-h-[120px] pr-7",
                     hasPromptReference &&
                       "read-only:cursor-default read-only:text-foreground"
                   )}

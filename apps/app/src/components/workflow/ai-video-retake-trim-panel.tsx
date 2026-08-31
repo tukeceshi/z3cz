@@ -6,7 +6,7 @@ import {
 import PauseIcon from "lucide-react/icons/pause";
 import PlayIcon from "lucide-react/icons/play";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -19,10 +19,12 @@ import { Switch } from "@/components/ui/switch";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useOrgVolcanoMediaKitConfig } from "@/hooks/use-volcano-mediakit-config";
 
+import { readAiVideoCardPrimaryVideo } from "./ai-video-node-utils";
 import { useAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import { VideoTrimLocalTrimHintIcon } from "./video-trim-local-trim-hint-icon";
 import { VideoTrimRuler } from "./video-trim-ruler";
 import { VideoTrimTimeFields } from "./video-trim-time-fields";
+import { resolveRetakeVideoDurationSec } from "./video-trim-utils";
 import {
   VIDEO_TRIM_PANEL_ACTION_BUTTON_CLASS,
   VIDEO_TRIM_PANEL_FOOTER_ACTIONS_CLASS,
@@ -45,6 +47,7 @@ export function AiVideoRetakeTrimPanel({
 }: AiVideoRetakeTrimPanelProps) {
   const { t } = useTranslation();
   const { organization } = useAuth();
+  const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
   const { getOrgUrl } = useOrgUrl();
   const {
@@ -77,6 +80,53 @@ export function AiVideoRetakeTrimPanel({
     draft.loadPhase === "ready" &&
     draft.videoDurationSec !== null &&
     draft.videoDurationSec > 0;
+
+  const sourceVideo = readAiVideoCardPrimaryVideo(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
+
+  useEffect(() => {
+    if (!isRetakePanel || retakeReady || !orgId || !workflowId || !sourceVideo) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const videoDurationSec = await resolveRetakeVideoDurationSec({
+        media: sourceVideo,
+        organizationId: orgId,
+        workflowId,
+        knownDurationSec: draft.videoDurationSec,
+      });
+      if (
+        cancelled ||
+        videoDurationSec === null ||
+        !Number.isFinite(videoDurationSec) ||
+        videoDurationSec <= 0
+      ) {
+        return;
+      }
+
+      patchDraft({
+        videoDurationSec,
+        loadPhase: "ready",
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    draft.videoDurationSec,
+    isRetakePanel,
+    orgId,
+    patchDraft,
+    retakeReady,
+    sourceVideo,
+    workflowId,
+  ]);
 
   useEffect(() => {
     if (!isRetakePanel) {

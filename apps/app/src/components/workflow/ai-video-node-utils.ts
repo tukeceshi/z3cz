@@ -8,6 +8,7 @@ import {
   referencesFitVideoModelReferenceLimits,
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
+  isAiVideoRetakePanel,
   type OrgVideoModelOption,
   hasGeneratingResource,
   hasDisplayableWorkflowMedia,
@@ -868,6 +869,29 @@ export function countAiVideoReferenceCounts(
   }
 
   return counts;
+}
+
+/** Retake generation always submits one trimmed clip as a video reference. */
+export const RETAKE_RESERVED_VIDEO_REFERENCE_COUNT = 1 as const;
+
+export function countAiVideoReferenceCountsForNode(
+  targetNodeId: string,
+  edges: readonly {
+    readonly source: string;
+    readonly target: string;
+    readonly targetHandle?: string | null;
+  }[],
+  nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[],
+  targetNodeData?: Pick<WorkflowNodeType, "metadata">
+): SubmitAiVideoMediaReferenceCounts {
+  const base = countAiVideoReferenceCounts(targetNodeId, edges, nodes);
+  if (!isAiVideoRetakePanel(targetNodeData?.metadata)) {
+    return base;
+  }
+  return {
+    ...base,
+    videoCount: base.videoCount + RETAKE_RESERVED_VIDEO_REFERENCE_COUNT,
+  };
 }
 
 /** @deprecated Prefer countAiVideoReferenceCounts. */

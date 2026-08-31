@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   appendVideoPromptRefToken,
   buildVideoPromptImageEdgeIndexMap,
+  compileRetakePromptForSubmit,
   compileVideoPromptForSubmit,
+  compiledRetakePromptLength,
   compiledVideoPromptLength,
+  formatRetakeEditDisplayPrefix,
+  formatRetakeEditSubmitPrefix,
   formatVideoPromptImageRef,
   hasBrokenVideoPromptRefs,
   listBrokenVideoPromptRefEdgeIds,
@@ -121,5 +125,36 @@ describe("stripVideoPromptRefTokenPrefix", () => {
   it("removes trailing @ from partial mention", () => {
     expect(stripVideoPromptRefTokenPrefix("hello@")).toBe("hello");
     expect(stripVideoPromptRefTokenPrefix("hello")).toBe("hello");
+  });
+});
+
+describe("retake edit prompt prefix", () => {
+  it("formats display and submit prefixes", () => {
+    expect(
+      formatRetakeEditDisplayPrefix({ startSec: 4.4, endSec: 8.4 })
+    ).toBe("编辑[4.4~8.4]");
+    expect(formatRetakeEditSubmitPrefix()).toBe("编辑<视频1>");
+  });
+
+  it("prepends submit prefix and compiles image refs", () => {
+    const indexMap = buildVideoPromptImageEdgeIndexMap([
+      { edgeId: "edge-a", kind: "image" },
+    ]);
+    expect(
+      compileRetakePromptForSubmit("换{{ref:edge-a}}背景", indexMap)
+    ).toEqual({
+      ok: true,
+      prompt: "编辑<视频1>换图片1背景",
+    });
+  });
+
+  it("counts compiled retake prompt length including prefix", () => {
+    const indexMap = buildVideoPromptImageEdgeIndexMap([
+      { edgeId: "edge-a", kind: "image" },
+    ]);
+    expect(compiledRetakePromptLength("", indexMap)).toBe("编辑<视频1>".length);
+    expect(compiledRetakePromptLength("测试", indexMap)).toBe(
+      "编辑<视频1>测试".length
+    );
   });
 });

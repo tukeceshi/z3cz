@@ -9,6 +9,7 @@ import {
   formatVideoTrimTimeSec,
   parseVideoTrimTimeInput,
   SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
+  shiftVideoTrimRange,
   snapVideoTrimSec,
   VIDEO_TRIM_MIN_DURATION_SEC,
   shouldWarnVideoTrimShortDuration,
@@ -35,6 +36,33 @@ describe("video-trim", () => {
     expect(
       clampVideoTrimRange({ startSec: 9.95, endSec: 10 }, 10)
     ).toEqual({ startSec: 9.9, endSec: 10 });
+  });
+
+  it("shifts a selection while preserving its duration", () => {
+    expect(
+      shiftVideoTrimRange({ startSec: 2, endSec: 6 }, 3, 20)
+    ).toEqual({ startSec: 5, endSec: 9 });
+    expect(videoTrimSelectionDurationSec({ startSec: 5, endSec: 9 })).toBe(4);
+  });
+
+  it("clamps shifted selections at timeline edges", () => {
+    expect(
+      shiftVideoTrimRange({ startSec: 2, endSec: 6 }, -5, 10)
+    ).toEqual({ startSec: 0, endSec: 4 });
+    expect(
+      shiftVideoTrimRange({ startSec: 6, endSec: 10 }, 5, 10)
+    ).toEqual({ startSec: 6, endSec: 10 });
+  });
+
+  it("respects retake minimum duration when shifting", () => {
+    expect(
+      shiftVideoTrimRange(
+        { startSec: 0, endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC },
+        26,
+        30,
+        SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC
+      )
+    ).toEqual({ startSec: 26, endSec: 30 });
   });
 
   it("does not snap the end past the video duration", () => {

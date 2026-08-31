@@ -23,7 +23,7 @@ import {
 } from "./video-trim-session-context";
 import {
   resolveTrimSourceVideoUrl,
-  resolveTrimVideoDurationSec,
+  resolveRetakeVideoDurationSec,
 } from "./video-trim-utils";
 import { useWorkflow } from "./workflow-context";
 
@@ -33,46 +33,37 @@ export interface VideoRetakeToolbarButtonProps {
   readonly disabled?: boolean;
 }
 
-async function enrichRetakePlaybackSeed(params: {
+type RetakeDraftSeed = Pick<
+  VideoSegmentPlaybackSeed,
+  | "videoDurationSec"
+  | "committedRange"
+  | "draftRange"
+  | "loadPhase"
+  | "playbackPaused"
+>;
+
+async function enrichRetakeDraftSeed(params: {
   readonly seed: VideoSegmentPlaybackSeed | undefined;
   readonly sourceVideo: MediaReference;
   readonly organizationId: string;
   readonly workflowId: string;
-}): Promise<VideoSegmentPlaybackSeed | undefined> {
-  if (params.seed?.trimSourceVideoUrl?.trim()) {
-    return params.seed;
-  }
-
-  const trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
+}): Promise<RetakeDraftSeed | undefined> {
+  const videoDurationSec = await resolveRetakeVideoDurationSec({
     media: params.sourceVideo,
     organizationId: params.organizationId,
     workflowId: params.workflowId,
+    knownDurationSec: params.seed?.videoDurationSec,
   });
-  if (!trimSourceVideoUrl) {
-    return params.seed;
+
+  if (videoDurationSec === null && !params.seed) {
+    return undefined;
   }
 
-  let videoDurationSec = params.seed?.videoDurationSec ?? null;
-  if (videoDurationSec === null || videoDurationSec <= 0) {
-    try {
-      videoDurationSec = await resolveTrimVideoDurationSec({
-        videoUrl: trimSourceVideoUrl,
-        cardVideoDurationSec: params.seed?.videoDurationSec,
-      });
-    } catch {
-      videoDurationSec = null;
-    }
-  }
-
-  const ready =
-    videoDurationSec !== null &&
-    videoDurationSec > 0 &&
-    trimSourceVideoUrl.trim().length > 0;
   const defaultRange = createDefaultVideoRetakeTrimRange(videoDurationSec ?? 0);
+  const ready = videoDurationSec !== null && videoDurationSec > 0;
 
   return {
     videoDurationSec,
-    trimSourceVideoUrl,
     committedRange: params.seed?.committedRange ?? defaultRange,
     draftRange: params.seed?.draftRange ?? defaultRange,
     loadPhase: ready ? "ready" : (params.seed?.loadPhase ?? "loading"),
@@ -114,13 +105,21 @@ export function VideoRetakeToolbarButton({
       void (async () => {
         const seed =
           orgId && workflowId
-            ? await enrichRetakePlaybackSeed({
+            ? await enrichRetakeDraftSeed({
                 seed: trimSeed,
                 sourceVideo,
                 organizationId: orgId,
                 workflowId,
               })
-            : trimSeed;
+            : trimSeed
+              ? {
+                  videoDurationSec: trimSeed.videoDurationSec,
+                  committedRange: trimSeed.committedRange,
+                  draftRange: trimSeed.draftRange,
+                  loadPhase: trimSeed.loadPhase,
+                  playbackPaused: trimSeed.playbackPaused,
+                }
+              : undefined;
 
         if (!seed || !updateNodeData) {
           return;
@@ -129,7 +128,6 @@ export function VideoRetakeToolbarButton({
         updateNodeData(copy.nodeId, (current) =>
           withAiVideoRetakeDraft(current, {
             videoDurationSec: seed.videoDurationSec,
-            trimSourceVideoUrl: seed.trimSourceVideoUrl,
             committedRange: seed.committedRange,
             draftRange: seed.draftRange,
             loadPhase: seed.loadPhase,

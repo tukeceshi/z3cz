@@ -112,6 +112,33 @@ export function clampVideoRetakeTrimRange(
   );
 }
 
+export function shiftVideoTrimRange(
+  range: VideoTrimRangeSec,
+  deltaSec: number,
+  videoDurationSec: number,
+  minSelectionSec: number = VIDEO_TRIM_MIN_DURATION_SEC
+): VideoTrimRangeSec {
+  const duration = resolveVideoDurationSec(videoDurationSec);
+  const selectionDuration = videoTrimSelectionDurationSec(range);
+  let startSec = snapVideoTrimSec(range.startSec + deltaSec);
+  let endSec = startSec + selectionDuration;
+
+  if (endSec > duration) {
+    endSec = duration;
+    startSec = Math.max(0, endSec - selectionDuration);
+  }
+  if (startSec < 0) {
+    startSec = 0;
+    endSec = Math.min(duration, startSec + selectionDuration);
+  }
+
+  return clampVideoTrimRange(
+    { startSec, endSec },
+    videoDurationSec,
+    minSelectionSec
+  );
+}
+
 export function applyVideoTrimTimeFieldEdit(params: {
   readonly range: VideoTrimRangeSec;
   readonly field: VideoTrimTimeField;

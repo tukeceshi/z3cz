@@ -1,10 +1,17 @@
 import {
   clampVideoTrimRange,
+  shiftVideoTrimRange,
   VIDEO_TRIM_SNAP_STEP_SEC,
   type VideoTrimRangeSec,
 } from "@dafthunk/types";
 import { useRanger } from "@tanstack/react-ranger";
-import { useMemo, useRef, useCallback } from "react";
+import {
+  useMemo,
+  useRef,
+  useCallback,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -20,6 +27,12 @@ interface VideoTrimRulerProps {
 interface RulerTick {
   readonly sec: number;
   readonly kind: "second" | "minute";
+}
+
+interface RegionDragState {
+  readonly pointerId: number;
+  readonly startClientX: number;
+  readonly initialRange: VideoTrimRangeSec;
 }
 
 function resolveSecondTickStepSec(videoDurationSec: number): number {
@@ -65,6 +78,25 @@ function rangeToTrackPercent(
   return Math.min(100, Math.max(0, (valueSec / videoDurationSec) * 100));
 }
 
+function resolveShiftedRange(
+  drag: RegionDragState,
+  clientX: number,
+  trackWidth: number,
+  videoDurationSec: number,
+  minSelectionSec: number | undefined
+): VideoTrimRangeSec {
+  const deltaSec =
+    trackWidth > 0
+      ? ((clientX - drag.startClientX) / trackWidth) * videoDurationSec
+      : 0;
+  return shiftVideoTrimRange(
+    drag.initialRange,
+    deltaSec,
+    videoDurationSec,
+    minSelectionSec
+  );
+}
+
 export function VideoTrimRuler({
   className,
   videoDurationSec,
@@ -74,6 +106,8 @@ export function VideoTrimRuler({
   onRangeCommit,
 }: VideoTrimRulerProps) {
   const rangerRef = useRef<HTMLDivElement>(null);
+  const regionDragRef = useRef<RegionDragState | null>(null);
+  const [isRegionDragging, setIsRegionDragging] = useState(false);
   const ticks = useMemo(
     () => buildRulerTicks(videoDurationSec),
     [videoDurationSec]
@@ -83,6 +117,81 @@ export function VideoTrimRuler({
     (nextRange: VideoTrimRangeSec) =>
       clampVideoTrimRange(nextRange, videoDurationSec, minSelectionSec),
     [minSelectionSec, videoDurationSec]
+  );
+
+  const resolveRangeFromDrag = useCallback(
+    (drag: RegionDragState, clientX: number) => {
+      const track = rangerRef.current;
+      const trackWidth = track?.getBoundingClientRect().width ?? 0;
+      return clampRange(
+        resolveShiftedRange(
+          drag,
+          clientX,
+          trackWidth,
+          videoDurationSec,
+          minSelectionSec
+        )
+      );
+    },
+    [clampRange, minSelectionSec, videoDurationSec]
+  );
+
+  const handleSelectionPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || videoDurationSec <= 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      regionDragRef.current = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        initialRange: range,
+      };
+      setIsRegionDragging(true);
+    },
+    [range, videoDurationSec]
+  );
+
+  const handleSelectionPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = regionDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      onRangeChange(resolveRangeFromDrag(drag, event.clientX));
+    },
+    [onRangeChange, resolveRangeFromDrag]
+  );
+
+  const finishRegionDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = regionDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      regionDragRef.current = null;
+      setIsRegionDragging(false);
+      onRangeCommit(resolveRangeFromDrag(drag, event.clientX));
+    },
+    [onRangeCommit, resolveRangeFromDrag]
+  );
+
+  const handleSelectionPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      finishRegionDrag(event);
+    },
+    [finishRegionDrag]
+  );
+
+  const handleSelectionPointerCancel = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      finishRegionDrag(event);
+    },
+    [finishRegionDrag]
   );
 
   const startPercent = rangeToTrackPercent(range.startSec, videoDurationSec);
@@ -105,6 +214,10 @@ export function VideoTrimRuler({
       onRangeCommit(clampRange({ startSec, endSec }));
     },
   });
+
+  const handleDragActive = rangerInstance
+    .handles()
+    .some((handle) => handle.isActive);
 
   return (
     <div className={cn("min-w-0 flex-1", className)}>
@@ -139,11 +252,27 @@ export function VideoTrimRuler({
               style={{ width: `${startPercent}%` }}
             />
             <div
-              className="pointer-events-none absolute inset-y-0 rounded-sm bg-neutral-100/25 ring-1 ring-inset ring-white/20 dark:bg-white/10"
+              role="slider"
+              aria-label="Move trim selection"
+              aria-valuemin={0}
+              aria-valuemax={videoDurationSec}
+              aria-valuenow={range.startSec}
+              className={cn(
+                "absolute inset-y-0 z-10 rounded-sm bg-neutral-100/25 ring-1 ring-inset ring-white/20 dark:bg-white/10",
+                isRegionDragging
+                  ? "cursor-grabbing"
+                  : "cursor-grab active:cursor-grabbing",
+                (handleDragActive || selectionWidth <= 0) &&
+                  "pointer-events-none"
+              )}
               style={{
                 left: `${startPercent}%`,
                 width: `${selectionWidth}%`,
               }}
+              onPointerDown={handleSelectionPointerDown}
+              onPointerMove={handleSelectionPointerMove}
+              onPointerUp={handleSelectionPointerUp}
+              onPointerCancel={handleSelectionPointerCancel}
             />
             <div
               className="pointer-events-none absolute inset-y-0 right-0 rounded-r-md bg-black/35"
@@ -157,12 +286,14 @@ export function VideoTrimRuler({
             key={index}
             type="button"
             aria-label={index === 0 ? "Trim start" : "Trim end"}
+            disabled={isRegionDragging}
             onKeyDown={handle.onKeyDownHandler}
             onMouseDown={handle.onMouseDownHandler}
             onTouchStart={handle.onTouchStart}
             className={cn(
               "absolute inset-y-1 z-20 w-1.5 -translate-x-1/2 cursor-ew-resize rounded-full bg-white shadow-md ring-1 ring-black/10 dark:ring-white/20",
-              handle.isActive && "z-30 ring-2 ring-white/80"
+              handle.isActive && "z-30 ring-2 ring-white/80",
+              isRegionDragging && "pointer-events-none"
             )}
             style={{
               left: `${handlePercents[index] ?? endPercent}%`,
