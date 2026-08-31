@@ -7,7 +7,7 @@ import {
   compileVideoPromptForSubmit,
   compiledRetakePromptLength,
   compiledVideoPromptLength,
-  formatRetakeEditDisplayPrefix,
+  formatRetakeEditTimeRangeLabel,
   formatRetakeEditSubmitPrefix,
   formatVideoPromptImageRef,
   hasBrokenVideoPromptRefs,
@@ -131,8 +131,8 @@ describe("stripVideoPromptRefTokenPrefix", () => {
 describe("retake edit prompt prefix", () => {
   it("formats display and submit prefixes", () => {
     expect(
-      formatRetakeEditDisplayPrefix({ startSec: 4.4, endSec: 8.4 })
-    ).toBe("编辑[4.4~8.4]");
+      formatRetakeEditTimeRangeLabel({ startSec: 4.4, endSec: 8.4 })
+    ).toBe("00:04—00:08");
     expect(formatRetakeEditSubmitPrefix()).toBe("编辑<视频1>");
   });
 

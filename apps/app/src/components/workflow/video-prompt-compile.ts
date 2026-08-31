@@ -31,8 +31,15 @@ export function formatRetakeEditTrimSec(valueSec: number): string {
   return snapVideoTrimSec(valueSec).toFixed(1);
 }
 
-export function formatRetakeEditDisplayPrefix(range: VideoTrimRangeSec): string {
-  return `编辑[${formatRetakeEditTrimSec(range.startSec)}~${formatRetakeEditTrimSec(range.endSec)}]`;
+function formatRetakeEditClockSec(valueSec: number): string {
+  const totalSec = Math.floor(snapVideoTrimSec(valueSec));
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function formatRetakeEditTimeRangeLabel(range: VideoTrimRangeSec): string {
+  return `${formatRetakeEditClockSec(range.startSec)}—${formatRetakeEditClockSec(range.endSec)}`;
 }
 
 export function formatRetakeEditSubmitPrefix(

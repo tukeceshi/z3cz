@@ -658,7 +658,7 @@ export function VideoPromptMentionEditor({
         {placeholder && showPlaceholder ? (
           <p
             className={cn(
-              "pointer-events-none absolute inset-0 select-none text-muted-foreground",
+              "pointer-events-none absolute inset-0 select-none whitespace-pre-wrap text-muted-foreground",
               VIDEO_PROMPT_EDITOR_TEXT_CLASS
             )}
           >

@@ -3810,6 +3810,9 @@ export const en = {
       startTime: "Start",
       endTime: "End",
       duration: "Duration",
+      startTimeBadge: "In",
+      endTimeBadge: "Out",
+      durationBadge: "Len",
       play: "Play",
       pause: "Pause",
       generate: "Generate",
@@ -3851,6 +3854,8 @@ export const en = {
       createNodeFailed: "Could not create the retake node",
       referenceLinkFailed: "Could not link the original video node",
       generateFailed: "Retake failed",
+      promptPlaceholder:
+        "Add: describe <element traits> + <when it appears> + <where it appears>\nModify: change <original trait> to <new trait>\nRemove: name what to remove; emphasize elements that should stay unchanged\nUse material references like normal video generation; type @ to reference an image",
     },
     aiAudioPanel: {
       promptTitle: "Prompt",
