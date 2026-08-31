@@ -185,7 +185,7 @@ export function GenerativeBusyOverlay({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
+        "pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
         roundedClass,
         className
       )}
@@ -362,7 +362,7 @@ export function WorkflowNodeGenerativeBusyOverlay({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
+        "absolute inset-0 z-50 flex flex-col items-center justify-center gap-2 bg-card/70 backdrop-blur-[1px]",
         roundedClass
       )}
     >

@@ -1,4 +1,4 @@
-import { AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import { AI_VIDEO_NODE_TYPE, type WorkflowMediaValue } from "@dafthunk/types";
 import {
   useEdges,
   useNodes,
@@ -14,6 +14,7 @@ import { useObjectService } from "@/services/object-service";
 import { AI_VIDEO_OUTPUT_ID } from "./ai-video-node-utils";
 import {
   buildEmptyAiVideoSiblingNode,
+  buildLockedRetakeCopyNode,
   findAiVideoCatalog,
   resolveRetakeSiblingNodeName,
   resolveTrimSiblingNodeName,
@@ -179,4 +180,84 @@ export function useVideoRetakeToSiblingNode(sourceNodeId: string) {
   );
 
   return { createRetakeSiblingNodeShell };
+}
+
+export interface CreateLockedRetakeCopyNodeResult {
+  readonly nodeId: string;
+}
+
+export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
+  const { nodeTypes = [], disabled } = useWorkflow();
+  const nodes = useNodes();
+  const { setNodes, getNode, getViewport, setCenter } = useReactFlow();
+  const { createObjectUrl } = useObjectService();
+  const { id: workflowId } = useParams<{ id: string }>();
+
+  const createLockedRetakeCopyNode = useCallback(
+    (coverVideo: WorkflowMediaValue): CreateLockedRetakeCopyNodeResult | null => {
+      if (disabled || !workflowId) {
+        return null;
+      }
+
+      const sourceNode = getNode(sourceNodeId);
+      if (!sourceNode) {
+        return null;
+      }
+
+      const catalog = findAiVideoCatalog(nodeTypes);
+      if (!catalog) {
+        return null;
+      }
+
+      const sourceData = sourceNode.data as WorkflowNodeType;
+      const sourceName = sourceData.name?.trim() || catalog.name;
+      const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+      const nodeName = resolveRetakeSiblingNodeName({
+        sourceNodeName: sourceName,
+        existingNodes: typedNodes,
+      });
+      const nodeId = `${AI_VIDEO_NODE_TYPE}-retake-${Date.now()}`;
+      const position = findOpenNodePositionFromSource({
+        sourceNode,
+        targetNodeType: AI_VIDEO_NODE_TYPE,
+        existingNodes: typedNodes,
+      });
+
+      const newNode = buildLockedRetakeCopyNode({
+        catalog,
+        nodeId,
+        nodeName,
+        position,
+        video: coverVideo,
+        createObjectUrl: sourceData.createObjectUrl ?? createObjectUrl,
+      });
+
+      setNodes((current) => [
+        ...current.map((node) => ({ ...node, selected: false })),
+        newNode,
+      ]);
+
+      const { width, height } = resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
+      const centerX = position.x + width / 2;
+      const centerY = position.y + height / 2;
+      const { zoom } = getViewport();
+      setCenter(centerX, centerY, { zoom, duration: 200 });
+
+      return { nodeId };
+    },
+    [
+      createObjectUrl,
+      disabled,
+      getNode,
+      getViewport,
+      nodeTypes,
+      nodes,
+      setCenter,
+      setNodes,
+      sourceNodeId,
+      workflowId,
+    ]
+  );
+
+  return { createLockedRetakeCopyNode };
 }

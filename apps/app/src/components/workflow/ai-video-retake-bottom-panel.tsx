@@ -1,10 +1,11 @@
 import { useViewport } from "@xyflow/react";
 
+import { isAiVideoRetakePanel } from "@dafthunk/types";
+
 import { AiVideoRetakeConfigPanel } from "./ai-video-retake-config-panel";
 import { AiVideoRetakeTrimPanel } from "./ai-video-retake-trim-panel";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
 import { VIDEO_TRIM_PANEL_WIDTH_PX } from "./video-trim-panel-styles";
-import { useVideoRetakeSession } from "./video-retake-session-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AiVideoRetakeBottomPanelProps {
@@ -17,9 +18,8 @@ export function AiVideoRetakeBottomPanel({
   data,
 }: AiVideoRetakeBottomPanelProps) {
   const { zoom } = useViewport();
-  const { session } = useVideoRetakeSession();
 
-  if (!session || session.sourceNodeId !== nodeId) {
+  if (!isAiVideoRetakePanel(data.metadata)) {
     return null;
   }
 

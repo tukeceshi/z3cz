@@ -44,7 +44,6 @@ import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
-import { VideoRetakeSessionProvider, useVideoRetakeSession } from "./video-retake-session-context";
 import { VideoTrimSessionProvider, useVideoTrimSession } from "./video-trim-session-context";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
@@ -762,7 +761,6 @@ export function WorkflowBuilder({
           <CreativeStudioCanvasSync selectNode={selectNode} />
           <div className="relative flex min-h-0 flex-1 flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
-          <VideoRetakeSessionProvider>
           <VideoTrimSessionProvider>
             <InlineAiTextMigrationHost
               organizationId={orgId}
@@ -860,7 +858,6 @@ export function WorkflowBuilder({
             disabledWorkflow={readOnly}
           />
           </VideoTrimSessionProvider>
-          </VideoRetakeSessionProvider>
           </CloudStorageCanvasProvider>
         </div>
 
@@ -989,12 +986,10 @@ function WorkflowEditorMainArea({
   usePrefetchCreativeStudioView();
   const { viewMode } = useCreativeStudio();
   const { closeTrimSession } = useVideoTrimSession();
-  const { closeRetakeSession } = useVideoRetakeSession();
   const handlePaneClick = useCallback(() => {
     closeTrimSession();
-    closeRetakeSession();
     onPaneClick?.();
-  }, [closeRetakeSession, closeTrimSession, onPaneClick]);
+  }, [closeTrimSession, onPaneClick]);
   const selectDroppedNodes = useCanvasDropNodeSelection(
     onSelectDroppedNodes ?? (() => {})
   );

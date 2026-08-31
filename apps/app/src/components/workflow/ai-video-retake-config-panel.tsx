@@ -31,6 +31,12 @@ import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import { AiGenerateButton } from "./ai-generate-button";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import {
+  isAiVideoGenerating,
+  readAiVideoCardPrimaryVideo,
+  withAiVideoGenerateError,
+} from "./ai-video-node-utils";
+import { useAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
+import {
   AiVideoParamsPopover,
   buildDefaultVideoGenerationParams,
 } from "./ai-video-params-popover";
@@ -39,9 +45,8 @@ import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import { useGenerativeVideoFileUpload } from "./use-generative-video-file-upload";
-import { useVideoRetakeToSiblingNode } from "./use-video-trim-to-sibling-node";
 import { runVideoRetakePipeline } from "./run-video-retake-pipeline";
-import { useVideoRetakeSession } from "./video-retake-session-context";
+import { isGenerativeProgressBusyPhase, readGenerativeProgressPhase } from "./generative-progress-utils";
 import { isWebCodecsVideoTrimSupported } from "./video-trim-utils";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
@@ -78,14 +83,25 @@ export function AiVideoRetakeConfigPanel({
   const orgId = organization?.id;
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
-  const { session, patchRetakeSession, closeRetakeSession } =
-    useVideoRetakeSession();
-  const { createRetakeSiblingNodeShell } = useVideoRetakeToSiblingNode(nodeId);
+  const { draft, isRetakePanel, patchDraft } = useAiVideoRetakeDraft(
+    nodeId,
+    data
+  );
+  const sourceMedia = readAiVideoCardPrimaryVideo(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
   const { uploadVideoFileToNode } = useGenerativeVideoFileUpload();
   const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
     useOrgVolcanoMediaKitConfig(orgId);
 
   const [isStarting, setIsStarting] = useState(false);
+
+  const progressPhase = readGenerativeProgressPhase(data.metadata);
+  const isGenerating =
+    isAiVideoGenerating(data.metadata) ||
+    isGenerativeProgressBusyPhase(progressPhase);
 
   const {
     models,
@@ -100,37 +116,37 @@ export function AiVideoRetakeConfigPanel({
   );
 
   const selectedModel = useMemo(() => {
-    if (!session?.selectedModelOptionId) {
+    if (!draft.selectedModelOptionId) {
       return seedance25Models[0] ?? null;
     }
     return (
       seedance25Models.find(
-        (model) => model.optionId === session.selectedModelOptionId
+        (model) => model.optionId === draft.selectedModelOptionId
       ) ??
       seedance25Models[0] ??
       null
     );
-  }, [seedance25Models, session?.selectedModelOptionId]);
+  }, [draft.selectedModelOptionId, seedance25Models]);
 
   useEffect(() => {
-    if (!session || seedance25Models.length === 0) {
+    if (!isRetakePanel || seedance25Models.length === 0) {
       return;
     }
-    const currentId = session.selectedModelOptionId;
+    const currentId = draft.selectedModelOptionId;
     if (
       currentId &&
       seedance25Models.some((model) => model.optionId === currentId)
     ) {
       return;
     }
-    patchRetakeSession({
+    patchDraft({
       selectedModelOptionId: seedance25Models[0]?.optionId ?? null,
     });
   }, [
-    patchRetakeSession,
+    draft.selectedModelOptionId,
+    isRetakePanel,
+    patchDraft,
     seedance25Models,
-    session,
-    session?.selectedModelOptionId,
   ]);
 
   const modelRules = useMemo(() => {
@@ -160,15 +176,15 @@ export function AiVideoRetakeConfigPanel({
         ? base.resolution
         : "720p";
     const hasUserResolution =
-      session?.generationParams.resolution !== undefined &&
-      session.generationParams.resolution !== null &&
-      String(session.generationParams.resolution).trim().length > 0;
+      draft.generationParams.resolution !== undefined &&
+      draft.generationParams.resolution !== null &&
+      String(draft.generationParams.resolution).trim().length > 0;
     if (hasUserResolution) {
       return base;
     }
     const resolution = resolveDefaultVideoGenerationResolution({
-      width: session?.sourceVideoWidth,
-      height: session?.sourceVideoHeight,
+      width: draft.sourceVideoWidth,
+      height: draft.sourceVideoHeight,
       allowedValues: allowedResolutions,
       fallback: fallbackResolution,
     });
@@ -177,10 +193,10 @@ export function AiVideoRetakeConfigPanel({
       resolution,
     };
   }, [
+    draft.generationParams.resolution,
+    draft.sourceVideoHeight,
+    draft.sourceVideoWidth,
     modelRules,
-    session?.generationParams.resolution,
-    session?.sourceVideoHeight,
-    session?.sourceVideoWidth,
   ]);
 
   const allGenerationFields = modelRules?.generationFields ?? [];
@@ -203,45 +219,45 @@ export function AiVideoRetakeConfigPanel({
     }
     return mergeImageGenerationParams(paramPopoverFields, {
       ...defaultGenerationParams,
-      ...session?.generationParams,
+      ...draft.generationParams,
     });
   }, [
     defaultGenerationParams,
+    draft.generationParams,
     paramPopoverFields,
     paramsVisible,
-    session?.generationParams,
   ]);
 
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
-      patchRetakeSession({ generationParams: next });
+      patchDraft({ generationParams: next });
     },
-    [patchRetakeSession]
+    [patchDraft]
   );
 
   const promptMaxLength = modelRules?.promptMaxChars ?? 1000;
 
   const commitPrompt = useCallback(
     (value: string) => {
-      patchRetakeSession({ prompt: value });
+      patchDraft({ prompt: value });
     },
-    [patchRetakeSession]
+    [patchDraft]
   );
 
-  const promptBuffer = useBufferedTextValue(session?.prompt ?? "", commitPrompt);
+  const promptBuffer = useBufferedTextValue(draft.prompt, commitPrompt);
   const prompt = promptBuffer.value.trim();
   const promptOverLimit = prompt.length > promptMaxLength;
 
   const handleModelSelect = useCallback(
     (optionId: string) => {
-      patchRetakeSession({ selectedModelOptionId: optionId });
+      patchDraft({ selectedModelOptionId: optionId });
     },
-    [patchRetakeSession]
+    [patchDraft]
   );
 
   const paramsEditor = useGenerativeParamsEditor({
     visible: paramsVisible,
-    disabled: disabled || isStarting,
+    disabled: disabled || isStarting || isGenerating,
     fields: paramPopoverFields,
     committedValues: committedGenerationValues,
     nodeId,
@@ -251,10 +267,10 @@ export function AiVideoRetakeConfigPanel({
   });
 
   const retakeReady =
-    session?.sourceNodeId === nodeId &&
-    session.loadPhase === "ready" &&
-    session.videoDurationSec !== null &&
-    session.videoDurationSec > 0;
+    isRetakePanel &&
+    draft.loadPhase === "ready" &&
+    draft.videoDurationSec !== null &&
+    draft.videoDurationSec > 0;
 
   const mediaKitTrimAvailable = Boolean(
     mediaKitConfig &&
@@ -275,31 +291,34 @@ export function AiVideoRetakeConfigPanel({
       prompt.length > 0 &&
       !promptOverLimit &&
       retakeReady &&
-      !isStarting
+      !isStarting &&
+      !isGenerating
   );
 
   const handleGenerate = useCallback(() => {
-    if (!canGenerate || !session || isStarting) {
+    if (!canGenerate || !isRetakePanel || isStarting || isGenerating) {
       return;
     }
     if (
-      !session.trimSourceVideoUrl ||
-      session.videoDurationSec === null ||
+      !draft.trimSourceVideoUrl ||
+      draft.videoDurationSec === null ||
       !orgId ||
-      !workflowId
+      !workflowId ||
+      !sourceMedia
     ) {
+      toast.error("workflow.videoRetake.generateFailed");
       return;
     }
 
-    if (session.highQuality) {
+    if (draft.highQuality) {
       if (!mediaKitTrimAvailable || !mediaKitInterfaceId) {
         toast.error("workflow.videoTrim.notConfiguredHint");
         return;
       }
-      const sourceResourceId = getResourceIdFromValue(session.sourceMedia);
+      const sourceResourceId = getResourceIdFromValue(sourceMedia);
       if (
         !sourceResourceId ||
-        (session.sourceMedia as { readonly kind?: string }).kind !== "cloud"
+        (sourceMedia as { readonly kind?: string }).kind !== "cloud"
       ) {
         toast.error("workflow.videoTrim.sourceNotCloud");
         return;
@@ -323,17 +342,26 @@ export function AiVideoRetakeConfigPanel({
       })
     );
 
+    updateNodeData(nodeId, (current) => ({
+      metadata: withAiVideoGenerateError(current.metadata, null),
+    }));
+
     setIsStarting(true);
     try {
-      const snapshot = {
-        sourceMedia: session.sourceMedia,
-        trimSourceVideoUrl: session.trimSourceVideoUrl,
+      runVideoRetakePipeline({
+        organizationId: orgId,
+        workflowId,
+        targetNodeId: nodeId,
+        sourceMedia,
+        trimSourceVideoUrl: draft.trimSourceVideoUrl,
         committedRange: {
-          startSec: session.draftRange.startSec,
-          endSec: session.draftRange.endSec,
+          startSec: draft.draftRange.startSec,
+          endSec: draft.draftRange.endSec,
         },
-        videoDurationSec: session.videoDurationSec,
-        highQuality: session.highQuality,
+        videoDurationSec: draft.videoDurationSec,
+        highQuality: draft.highQuality,
+        mediaKitInterfaceId,
+        cloudConfigured,
         prompt: flushedPrompt,
         modelCanonicalId: selectedModel.canonicalId,
         aiInterfaceId: selectedModel.interfaceId,
@@ -341,38 +369,6 @@ export function AiVideoRetakeConfigPanel({
         modelDisplayName: selectedModel.alias,
         supportsTaskCancel: selectedModel.supportsTaskCancel === true,
         generationParams,
-      };
-
-      const shell = createRetakeSiblingNodeShell();
-      if (!shell) {
-        toast.error("workflow.videoRetake.createNodeFailed");
-        return;
-      }
-
-      if (!shell.referenceLinked) {
-        toast.error("workflow.videoRetake.referenceLinkFailed");
-      }
-
-      closeRetakeSession();
-
-      runVideoRetakePipeline({
-        organizationId: orgId,
-        workflowId,
-        targetNodeId: shell.nodeId,
-        sourceMedia: snapshot.sourceMedia,
-        trimSourceVideoUrl: snapshot.trimSourceVideoUrl,
-        committedRange: snapshot.committedRange,
-        videoDurationSec: snapshot.videoDurationSec,
-        highQuality: snapshot.highQuality,
-        mediaKitInterfaceId,
-        cloudConfigured,
-        prompt: snapshot.prompt,
-        modelCanonicalId: snapshot.modelCanonicalId,
-        aiInterfaceId: snapshot.aiInterfaceId,
-        instanceId: snapshot.instanceId,
-        modelDisplayName: snapshot.modelDisplayName,
-        supportsTaskCancel: snapshot.supportsTaskCancel,
-        generationParams: snapshot.generationParams,
         updateNodeData,
         uploadVideoFileToNode,
         t,
@@ -383,19 +379,21 @@ export function AiVideoRetakeConfigPanel({
     }
   }, [
     canGenerate,
-    closeRetakeSession,
     cloudConfigured,
-    createRetakeSiblingNodeShell,
     defaultGenerationParams,
+    draft,
+    isGenerating,
+    isRetakePanel,
     isStarting,
     mediaKitInterfaceId,
     mediaKitTrimAvailable,
+    nodeId,
     orgId,
     paramPopoverFields,
     paramsEditor,
     promptBuffer,
     selectedModel,
-    session,
+    sourceMedia,
     t,
     toast,
     updateNodeData,
@@ -408,34 +406,34 @@ export function AiVideoRetakeConfigPanel({
       ...defaultGenerationParams,
       ...paramsEditor.effectiveValues,
     });
-    if (!session || session.sourceNodeId !== nodeId) {
+    if (!isRetakePanel) {
       return merged;
     }
     return {
       ...merged,
-      duration: videoTrimSelectionDurationSec(session.draftRange),
+      duration: videoTrimSelectionDurationSec(draft.draftRange),
     };
   }, [
     allGenerationFields,
     defaultGenerationParams,
-    nodeId,
+    draft.draftRange,
+    isRetakePanel,
     paramsEditor.effectiveValues,
-    session,
   ]);
 
   const referenceVideoMedia = useMemo((): readonly WorkflowMediaValue[] => {
-    if (!session || session.sourceNodeId !== nodeId) {
+    if (!isRetakePanel || !sourceMedia) {
       return [];
     }
-    return [session.sourceMedia as unknown as WorkflowMediaValue];
-  }, [nodeId, session]);
+    return [sourceMedia as unknown as WorkflowMediaValue];
+  }, [isRetakePanel, sourceMedia]);
 
   const referenceVideoDurationSec = useMemo(() => {
-    if (!session || session.sourceNodeId !== nodeId) {
+    if (!isRetakePanel) {
       return undefined;
     }
-    return videoTrimSelectionDurationSec(session.draftRange);
-  }, [nodeId, session]);
+    return videoTrimSelectionDurationSec(draft.draftRange);
+  }, [draft.draftRange, isRetakePanel]);
 
   const baseline480pWithoutVideo = useMemo(
     () =>
@@ -474,7 +472,7 @@ export function AiVideoRetakeConfigPanel({
     });
   }, [generationValuesForEstimate, modelRules]);
 
-  if (!session || session.sourceNodeId !== nodeId) {
+  if (!isRetakePanel) {
     return null;
   }
 
@@ -486,7 +484,7 @@ export function AiVideoRetakeConfigPanel({
       >
         <Textarea
           value={promptBuffer.value}
-          disabled={disabled || isStarting}
+          disabled={disabled || isStarting || isGenerating}
           placeholder={t("workflow.aiVideoPanel.promptPlaceholder")}
           className={cn(
             "min-h-[120px] resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
@@ -507,7 +505,7 @@ export function AiVideoRetakeConfigPanel({
               models={seedance25Models as unknown as readonly OrgTextModelOption[]}
               selectedOptionId={selectedModel?.optionId ?? ""}
               chipModel={selectedModel as unknown as OrgTextModelOption | undefined}
-              disabled={disabled || isStarting}
+              disabled={disabled || isStarting || isGenerating}
               isLoading={modelsLoading}
               loadError={Boolean(modelsError)}
               onOpenChange={() => {}}
@@ -520,7 +518,7 @@ export function AiVideoRetakeConfigPanel({
             {paramsVisible ? (
               <AiVideoParamsPopover
                 fields={paramPopoverFields}
-                disabled={disabled || isStarting}
+                disabled={disabled || isStarting || isGenerating}
                 triggerLabel={t("workflow.aiVideoPanel.params")}
                 title={t("workflow.aiVideoPanel.paramsTitle")}
                 triggerSummaryFieldNames={RETAKE_TRIGGER_SUMMARY_FIELD_NAMES}
@@ -538,7 +536,7 @@ export function AiVideoRetakeConfigPanel({
                 referenceVideoMedia={referenceVideoMedia}
                 referenceVideoDurationSec={referenceVideoDurationSec}
                 displayFolds={priceEstimateDisplayFolds}
-                disabled={disabled || isStarting}
+                disabled={disabled || isStarting || isGenerating}
               />
             ) : null}
           </div>
@@ -562,7 +560,7 @@ export function AiVideoRetakeConfigPanel({
 
         <AiGenerateButton
           disabled={!canGenerate}
-          isGenerating={isStarting}
+          isGenerating={isStarting || isGenerating}
           isCancelling={false}
           canCancel={false}
           label={t("workflow.aiVideoPanel.generate")}

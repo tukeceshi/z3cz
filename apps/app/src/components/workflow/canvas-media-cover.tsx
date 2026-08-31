@@ -1,12 +1,16 @@
 import {
   createDefaultVideoRetakeTrimRange,
   createDefaultVideoTrimRange,
+  isAiVideoRetakePanel,
+  readAiVideoRetakeDraftFromInputs,
+  type AiVideoRetakeDraft,
   type MediaReference,
   getResourceIdFromValue,
 } from "@dafthunk/types";
 import MusicIcon from "lucide-react/icons/music";
 import PlayIcon from "lucide-react/icons/play";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { useNodes } from "@xyflow/react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
@@ -20,8 +24,10 @@ import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import { cn } from "@/utils/utils";
 
 import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
-import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
+import { withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
+import { useWorkflow } from "./workflow-context";
+import type { WorkflowNodeType } from "./workflow-types";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 const UNAVAILABLE_DEBOUNCE_MS = 300;
@@ -419,19 +425,45 @@ function CanvasVideoCover({
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
   const frameCapture = useWorkflowVideoFrameCapture(nodeId);
+  const nodes = useNodes();
+  const { updateNodeData } = useWorkflow();
   const trimSessionApi = useOptionalVideoTrimSession();
   const trimActive = Boolean(nodeId && trimSessionApi?.isTrimActiveForNode(nodeId));
   const trimSession =
     trimActive && trimSessionApi?.session?.sourceNodeId === nodeId
       ? trimSessionApi.session
       : null;
-  const retakeSessionApi = useOptionalVideoRetakeSession();
-  const retakeActive = Boolean(
-    nodeId && retakeSessionApi?.isRetakeActiveForNode(nodeId)
+  const flowNode = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
+  const nodeSelected = flowNode?.selected === true;
+  const nodeData = flowNode?.data as WorkflowNodeType | undefined;
+  const isRetakePanel = isAiVideoRetakePanel(nodeData?.metadata);
+  const retakeActive = Boolean(nodeId && isRetakePanel && nodeSelected);
+  const retakeDraft = nodeData
+    ? readAiVideoRetakeDraftFromInputs(nodeData.inputs)
+    : null;
+  const patchRetakeDraft = useCallback(
+    (patch: Partial<AiVideoRetakeDraft>) => {
+      if (!nodeId || !updateNodeData || !retakeActive) {
+        return;
+      }
+      updateNodeData(nodeId, (current) => withAiVideoRetakeDraft(current, patch));
+    },
+    [nodeId, retakeActive, updateNodeData]
   );
-  const retakeSession =
-    retakeActive && retakeSessionApi?.session?.sourceNodeId === nodeId
-      ? retakeSessionApi.session
+  const setRetakePlaybackPaused = useCallback(
+    (paused: boolean) => {
+      patchRetakeDraft({ playbackPaused: paused });
+    },
+    [patchRetakeDraft]
+  );
+  const retakePlaybackSession =
+    retakeActive && retakeDraft
+      ? {
+          trimSourceVideoUrl: retakeDraft.trimSourceVideoUrl,
+          committedRange: retakeDraft.committedRange,
+          playbackPaused: retakeDraft.playbackPaused,
+          loadPhase: retakeDraft.loadPhase,
+        }
       : null;
   const [isHovered, setIsHovered] = useState(false);
   const ensureFullOnHover =
@@ -464,9 +496,12 @@ function CanvasVideoCover({
   );
   const hoverVideoUrl =
     fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null;
-  const playbackSession = retakeActive ? retakeSession : trimSession;
+  const playbackSession = retakeActive ? retakePlaybackSession : trimSession;
   const playbackActive = Boolean(playbackSession);
   const playbackVideoUrl = playbackSession?.trimSourceVideoUrl ?? hoverVideoUrl;
+  const showVideoPlayer =
+    Boolean(playbackVideoUrl) &&
+    (playbackActive || hoverPreviewEnabled);
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
@@ -491,9 +526,6 @@ function CanvasVideoCover({
     onBroken: handleBroken,
   });
 
-  const showVideoPlayer =
-    playbackActive ||
-    (hoverPreviewEnabled && Boolean(playbackVideoUrl));
   const showHoverLoading =
     hoverPreviewEnabled && fullVideoDisplay.phase === "loading";
   const showPlayIcon =
@@ -551,7 +583,7 @@ function CanvasVideoCover({
           }
           onPlaybackPausedChange={
             retakeActive
-              ? retakeSessionApi?.setPlaybackPaused
+              ? setRetakePlaybackPaused
               : trimActive
                 ? trimSessionApi?.setPlaybackPaused
                 : undefined
@@ -567,7 +599,7 @@ function CanvasVideoCover({
               return;
             }
             const patchPlayback = retakeActive
-              ? retakeSessionApi?.patchRetakeSession
+              ? patchRetakeDraft
               : trimSessionApi?.patchTrimSession;
             if (!patchPlayback) {
               return;
@@ -614,7 +646,7 @@ function CanvasVideoCover({
           }}
           onError={() => {
             if (retakeActive) {
-              retakeSessionApi?.patchRetakeSession({ loadPhase: "error" });
+              patchRetakeDraft({ loadPhase: "error" });
             } else if (trimActive) {
               trimSessionApi?.patchTrimSession({ loadPhase: "error" });
             }
