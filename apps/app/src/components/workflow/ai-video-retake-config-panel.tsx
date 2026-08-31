@@ -116,7 +116,7 @@ import {
   buildVideoPromptImageEdgeIndexMap,
   compileRetakePromptForSubmit,
   compiledRetakePromptLength,
-  formatRetakeEditDisplayPrefix,
+  formatRetakeEditTimeRangeLabel,
   hasBrokenVideoPromptRefs,
 } from "./video-prompt-compile";
 import { useWorkflow } from "./workflow-context";
@@ -560,8 +560,10 @@ export function AiVideoRetakeConfigPanel({
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
 
-  const retakeEditDisplayPrefix = useMemo(
-    () => formatRetakeEditDisplayPrefix(draft.draftRange),
+  const hasPromptInput = displayPrompt.trim().length > 0;
+
+  const retakeEditTimeRangeLabel = useMemo(
+    () => formatRetakeEditTimeRangeLabel(draft.draftRange),
     [draft.draftRange]
   );
 
@@ -624,6 +626,7 @@ export function AiVideoRetakeConfigPanel({
       !modelsLoading &&
       retakeReady &&
       !isBusy &&
+      hasPromptInput &&
       !hasBrokenPromptRefs &&
       storedPromptCompile.ok &&
       generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
@@ -850,12 +853,12 @@ export function AiVideoRetakeConfigPanel({
       return;
     }
 
-    const prompt = promptForGenerate;
-
-    if (hasPromptReference && !prompt) {
-      toast.error("workflow.aiVideoPanel.referencedPromptEmpty");
+    if (!hasPromptInput) {
+      toast.error("workflow.aiVideoPanel.promptRequired");
       return;
     }
+
+    const prompt = promptForGenerate;
 
     if (
       !canGenerateAiVideo({
@@ -997,6 +1000,7 @@ export function AiVideoRetakeConfigPanel({
     draft,
     edges,
     hasBrokenPromptRefs,
+    hasPromptInput,
     hasPromptReference,
     isGenerating,
     isRetakePanel,
@@ -1189,7 +1193,10 @@ export function AiVideoRetakeConfigPanel({
                     className="pointer-events-none shrink-0 select-none text-sm leading-6 text-foreground"
                     aria-hidden
                   >
-                    {retakeEditDisplayPrefix}
+                    编辑{" "}
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      {retakeEditTimeRangeLabel}
+                    </span>
                   </div>
                 ) : null}
                 <VideoPromptMentionEditor
@@ -1211,7 +1218,7 @@ export function AiVideoRetakeConfigPanel({
                   placeholder={
                     hasPromptReference
                       ? ""
-                      : t("workflow.aiVideoPanel.promptPlaceholder")
+                      : t("workflow.videoRetake.promptPlaceholder")
                   }
                   className={cn(
                     hasPromptReference ? "min-h-[120px]" : "min-h-[96px]",

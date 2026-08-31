@@ -13,7 +13,7 @@ export const VIDEO_TRIM_PANEL_RULER_ROW_CLASS =
   "flex items-center gap-2 border-b border-border/60 px-2 py-2" as const;
 
 export const VIDEO_TRIM_PANEL_FOOTER_CLASS =
-  "grid grid-cols-[1fr_auto_1fr] items-end gap-2 px-3 py-2.5" as const;
+  "grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2" as const;
 
 export const VIDEO_TRIM_PANEL_FOOTER_LEFT_CLASS =
   "flex min-w-0 items-center justify-self-start" as const;

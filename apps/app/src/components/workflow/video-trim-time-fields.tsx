@@ -27,30 +27,61 @@ interface VideoTrimTimeFieldsProps {
   readonly onRangeCommit: (range: VideoTrimRangeSec) => void;
 }
 
+type TimeFieldBadgeVariant = "start" | "end" | "duration";
+
+const TIME_FIELD_BADGE_CLASS: Record<TimeFieldBadgeVariant, string> = {
+  start:
+    "bg-neutral-300/80 text-neutral-700 dark:bg-neutral-600/80 dark:text-neutral-100",
+  end: "bg-neutral-400/70 text-neutral-800 dark:bg-neutral-500/70 dark:text-neutral-50",
+  duration:
+    "bg-neutral-200/90 text-neutral-600 dark:bg-neutral-700/90 dark:text-neutral-200",
+};
+
 function TimeField({
-  label,
+  badge,
+  badgeVariant,
+  ariaLabel,
   valueSec,
   disabled,
   onCommit,
 }: {
-  readonly label: string;
+  readonly badge: string;
+  readonly badgeVariant: TimeFieldBadgeVariant;
+  readonly ariaLabel: string;
   readonly valueSec: number;
   readonly disabled?: boolean;
   readonly onCommit: (valueSec: number) => void;
 }) {
   return (
-    <label className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+    <label
+      aria-label={ariaLabel}
+      className={cn(
+        "inline-flex h-7 min-w-0 overflow-hidden rounded border border-border/70 bg-background",
+        "focus-within:ring-1 focus-within:ring-ring",
+        disabled && "opacity-50"
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "flex w-[1.125rem] shrink-0 items-center justify-center border-r border-border/60",
+          "text-[10px] font-medium leading-none",
+          TIME_FIELD_BADGE_CLASS[badgeVariant]
+        )}
+      >
+        {badge}
+      </span>
       <input
         type="text"
         inputMode="decimal"
         disabled={disabled}
+        aria-label={ariaLabel}
         className={cn(
-          "h-7 w-[4.5rem] rounded border border-border/70 bg-background px-1.5 text-xs tabular-nums",
-          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          "h-full w-[3.25rem] min-w-0 border-0 bg-transparent px-1.5 text-xs tabular-nums",
+          "focus-visible:outline-none disabled:cursor-not-allowed"
         )}
         defaultValue={formatVideoTrimTimeSec(valueSec)}
-        key={`${label}-${formatVideoTrimTimeSec(valueSec)}`}
+        key={`${badgeVariant}-${formatVideoTrimTimeSec(valueSec)}`}
         onBlur={(event) => {
           const parsed = parseVideoTrimTimeInput(event.currentTarget.value);
           if (parsed === null) {
@@ -125,22 +156,28 @@ export function VideoTrimTimeFields({
   };
 
   return (
-    <div className={cn("flex items-end gap-2", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       <TimeField
-        label={t("workflow.videoTrim.startTime")}
+        badge={t("workflow.videoTrim.startTimeBadge")}
+        badgeVariant="start"
+        ariaLabel={t("workflow.videoTrim.startTime")}
         valueSec={range.startSec}
         disabled={disabled}
         onCommit={(valueSec) => applyField("start", valueSec)}
       />
       <TimeField
-        label={t("workflow.videoTrim.endTime")}
+        badge={t("workflow.videoTrim.endTimeBadge")}
+        badgeVariant="end"
+        ariaLabel={t("workflow.videoTrim.endTime")}
         valueSec={range.endSec}
         disabled={disabled}
         onCommit={(valueSec) => applyField("end", valueSec)}
       />
-      <div className="flex items-end gap-0.5">
+      <div className="flex items-center gap-0.5">
         <TimeField
-          label={t("workflow.videoTrim.duration")}
+          badge={t("workflow.videoTrim.durationBadge")}
+          badgeVariant="duration"
+          ariaLabel={t("workflow.videoTrim.duration")}
           valueSec={videoTrimSelectionDurationSec(range)}
           disabled={disabled}
           onCommit={(valueSec) => applyField("duration", valueSec)}
