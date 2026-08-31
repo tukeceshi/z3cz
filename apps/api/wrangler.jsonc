@@ -42,12 +42,6 @@
   ],
   "containers": [
     {
-      "class_name": "FFmpegContainer",
-      "image": "./containers/ffmpeg/Dockerfile",
-      "max_instances": 5,
-      "instance_type": "standard-1"
-    },
-    {
       "class_name": "Sandbox",
       "image": "./containers/duckdb/Dockerfile",
       "max_instances": 5,
@@ -143,10 +137,6 @@
         "script_name": "dafthunk-api"
       },
       {
-        "name": "FFMPEG_CONTAINER",
-        "class_name": "FFmpegContainer"
-      },
-      {
         "name": "DUCKDB_SANDBOX",
         "class_name": "Sandbox"
       },
@@ -221,6 +211,10 @@
     {
       "tag": "v14",
       "deleted_classes": ["DatabaseDO"]
+    },
+    {
+      "tag": "v15",
+      "deleted_classes": ["FFmpegContainer"]
     }
   ],
   "unsafe": {
@@ -300,12 +294,6 @@
       ],
       "containers": [
         {
-          "class_name": "FFmpegContainer",
-          "image": "./containers/ffmpeg/Dockerfile",
-          "max_instances": 5,
-          "instance_type": "standard-1"
-        },
-        {
           "class_name": "Sandbox",
           "image": "./containers/duckdb/Dockerfile",
           "max_instances": 5,
@@ -367,10 +355,6 @@
             "name": "WORKFLOW_AGENT",
             "class_name": "WorkflowAgent",
             "script_name": "dafthunk-api"
-          },
-          {
-            "name": "FFMPEG_CONTAINER",
-            "class_name": "FFmpegContainer"
           },
           {
             "name": "DUCKDB_SANDBOX",
@@ -447,6 +431,10 @@
         {
           "tag": "v14",
           "deleted_classes": ["DatabaseDO"]
+        },
+        {
+          "tag": "v15",
+          "deleted_classes": ["FFmpegContainer"]
         }
       ],
       "unsafe": {
