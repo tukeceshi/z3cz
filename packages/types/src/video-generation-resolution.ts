@@ -1,4 +1,5 @@
 import type { VideoResolutionOption } from "./video-resolution-label";
+import { matchSeedance25ResolutionFromPixels } from "./seedance-25-resolution-pixels";
 
 const GENERATION_RESOLUTION_LONG_EDGE_PX: Readonly<
   Record<VideoResolutionOption, number>
@@ -139,6 +140,67 @@ export function resolveDefaultVideoGenerationResolution(params: {
     allowedValues: params.allowedValues,
     fallback: params.fallback,
   });
+}
+
+/** Retake default: source file pixels when probed, otherwise model param fallback. */
+export function resolveRetakeAutoResolution(params: {
+  readonly width: number | null | undefined;
+  readonly height: number | null | undefined;
+  readonly modelFallback: string;
+}): string {
+  const fromSource = inferSourceVideoResolution(params.width, params.height);
+  if (fromSource) {
+    return fromSource;
+  }
+  const fallbackTier = normalizeGenerationResolution(params.modelFallback.trim());
+  return fallbackTier ?? "720p";
+}
+
+/** Retake default: infer tier from source file pixels only — no allowed-list downgrade. */
+export function resolveRetakeDefaultResolutionFromSource(params: {
+  readonly width: number | null | undefined;
+  readonly height: number | null | undefined;
+}): VideoResolutionOption | null {
+  return inferSourceVideoResolution(params.width, params.height);
+}
+
+export function inferSourceVideoResolution(
+  width: number | null | undefined,
+  height: number | null | undefined
+): VideoResolutionOption | null {
+  if (
+    width == null ||
+    height == null ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
+  }
+
+  return matchSeedance25ResolutionFromPixels(width, height);
+}
+
+export function isVideoRetakeResolutionMismatch(params: {
+  readonly selected: string;
+  readonly sourceWidth: number | null | undefined;
+  readonly sourceHeight: number | null | undefined;
+}): boolean {
+  const sourceResolution = inferSourceVideoResolution(
+    params.sourceWidth,
+    params.sourceHeight
+  );
+  if (!sourceResolution) {
+    return true;
+  }
+
+  const selectedResolution = normalizeGenerationResolution(params.selected.trim());
+  if (!selectedResolution) {
+    return true;
+  }
+
+  return selectedResolution !== sourceResolution;
 }
 
 export const VIDEO_GENERATION_RESOLUTION_ORDER = GENERATION_RESOLUTION_ORDER;

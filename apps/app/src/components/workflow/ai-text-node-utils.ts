@@ -694,3 +694,31 @@ export function probeVideoUrlDurationSeconds(url: string): Promise<number> {
     video.src = url;
   });
 }
+
+export interface ProbedVideoDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+
+export function probeVideoUrlDimensions(url: string): Promise<ProbedVideoDimensions> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        reject(new Error("invalid_dimensions"));
+        return;
+      }
+      resolve({ width, height });
+    };
+    video.onerror = () => reject(new Error("probe_failed"));
+    video.src = url;
+  });
+}

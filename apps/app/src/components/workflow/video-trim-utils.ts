@@ -1,6 +1,10 @@
 import { getResourceIdFromValue, type MediaReference } from "@dafthunk/types";
 
-import { probeVideoUrlDurationSeconds } from "@/components/workflow/ai-text-node-utils";
+import {
+  probeVideoUrlDimensions,
+  probeVideoUrlDurationSeconds,
+  type ProbedVideoDimensions,
+} from "@/components/workflow/ai-text-node-utils";
 import { readCachedMediaBlobByMediaId } from "@/services/ai-media-cache-service";
 import { resolveResourceDisplayUrl } from "@/services/resolve-resource-display-url";
 
@@ -76,6 +80,32 @@ export async function resolveRetakeVideoDurationSec(params: {
     });
   } catch {
     return null;
+  }
+}
+
+export async function resolveRetakeVideoDimensions(params: {
+  readonly media: MediaReference;
+  readonly organizationId: string;
+  readonly workflowId: string;
+}): Promise<ProbedVideoDimensions | null> {
+  const trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
+    media: params.media,
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+  });
+  if (!trimSourceVideoUrl) {
+    return null;
+  }
+
+  const shouldRevoke = trimSourceVideoUrl.startsWith("blob:");
+  try {
+    return await probeVideoUrlDimensions(trimSourceVideoUrl);
+  } catch {
+    return null;
+  } finally {
+    if (shouldRevoke) {
+      revokeTrimObjectUrl(trimSourceVideoUrl);
+    }
   }
 }
 

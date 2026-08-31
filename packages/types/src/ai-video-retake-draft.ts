@@ -20,6 +20,7 @@ export interface AiVideoRetakeDraft {
   readonly prompt: string;
   readonly selectedModelOptionId: string | null;
   readonly generationParams: Readonly<Record<string, unknown>>;
+  readonly resolutionManuallySet: boolean;
 }
 
 export function createDefaultAiVideoRetakeDraft(
@@ -39,6 +40,7 @@ export function createDefaultAiVideoRetakeDraft(
     prompt: "",
     selectedModelOptionId: null,
     generationParams: {},
+    resolutionManuallySet: false,
   };
 }
 
@@ -101,6 +103,7 @@ export function parseAiVideoRetakeDraft(raw: unknown): AiVideoRetakeDraft | null
       !Array.isArray(record.generationParams)
         ? record.generationParams
         : {},
+    resolutionManuallySet: record.resolutionManuallySet === true,
   };
 }
 

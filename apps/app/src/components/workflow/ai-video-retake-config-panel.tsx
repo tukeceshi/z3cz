@@ -6,13 +6,14 @@ import {
   getResourceIdFromValue,
   getSeedanceDefaultParameterRules,
   isSeedance25PlatformModel,
+  isVideoRetakeResolutionMismatch,
   isVolcanoMediaKitVideoTrimEnabled,
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
   readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
-  resolveDefaultVideoGenerationResolution,
+  resolveRetakeAutoResolution,
   type OrgTextModelOption,
   type OrgVideoModelOption,
   type WorkflowMediaValue,
@@ -24,11 +25,21 @@ import {
   useViewport,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useOrgVolcanoMediaKitConfig } from "@/hooks/use-volcano-mediakit-config";
 import { useAppToast } from "@/hooks/use-app-toast";
@@ -135,6 +146,15 @@ const RETAKE_TRIGGER_SUMMARY_FIELD_NAMES = new Set([
   "generate_audio",
 ]);
 
+function readModelResolutionFallback(
+  generationFields: readonly { readonly name: string; readonly default?: unknown }[]
+): string {
+  const base = buildDefaultVideoGenerationParams(generationFields);
+  return typeof base.resolution === "string" && base.resolution.trim().length > 0
+    ? base.resolution
+    : "720p";
+}
+
 function getInputString(data: WorkflowNodeType, id: string): string {
   const value = data.inputs.find((input) => input.id === id)?.value;
   return typeof value === "string" ? value : "";
@@ -193,6 +213,12 @@ export function AiVideoRetakeConfigPanel({
 
   const [isStarting, setIsStarting] = useState(false);
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
+  const [resolutionMismatchConfirmOpen, setResolutionMismatchConfirmOpen] =
+    useState(false);
+  const pendingRetakeGenerateRef = useRef<{
+    readonly generationParams: Record<string, unknown>;
+    readonly prompt: string;
+  } | null>(null);
 
   const progressPhase = readGenerativeProgressPhase(data.metadata);
   const isGenerating =
@@ -343,36 +369,54 @@ export function AiVideoRetakeConfigPanel({
       return {};
     }
     const base = buildDefaultVideoGenerationParams(modelRules.generationFields);
-    const resolutionField = modelRules.generationFields.find(
-      (field) => field.name === "resolution"
-    );
-    const allowedResolutions = resolutionField?.enumValues ?? [];
-    const fallbackResolution =
-      typeof base.resolution === "string" && base.resolution.trim().length > 0
-        ? base.resolution
-        : "720p";
-    const hasUserResolution =
-      draft.generationParams.resolution !== undefined &&
-      draft.generationParams.resolution !== null &&
-      String(draft.generationParams.resolution).trim().length > 0;
-    if (hasUserResolution) {
+    if (draft.resolutionManuallySet) {
       return base;
     }
-    const resolution = resolveDefaultVideoGenerationResolution({
+    const resolution = resolveRetakeAutoResolution({
       width: draft.sourceVideoWidth,
       height: draft.sourceVideoHeight,
-      allowedValues: allowedResolutions,
-      fallback: fallbackResolution,
+      modelFallback: readModelResolutionFallback(modelRules.generationFields),
     });
     return {
       ...base,
       resolution,
     };
   }, [
-    draft.generationParams.resolution,
+    draft.resolutionManuallySet,
     draft.sourceVideoHeight,
     draft.sourceVideoWidth,
     modelRules,
+  ]);
+
+  useEffect(() => {
+    if (draft.resolutionManuallySet || !modelRules) {
+      return;
+    }
+    const resolution = resolveRetakeAutoResolution({
+      width: draft.sourceVideoWidth,
+      height: draft.sourceVideoHeight,
+      modelFallback: readModelResolutionFallback(modelRules.generationFields),
+    });
+    const currentResolution =
+      typeof draft.generationParams.resolution === "string"
+        ? draft.generationParams.resolution
+        : "";
+    if (currentResolution === resolution) {
+      return;
+    }
+    patchDraft({
+      generationParams: {
+        ...draft.generationParams,
+        resolution,
+      },
+    });
+  }, [
+    draft.generationParams,
+    draft.resolutionManuallySet,
+    draft.sourceVideoHeight,
+    draft.sourceVideoWidth,
+    modelRules,
+    patchDraft,
   ]);
 
   const allGenerationFields = modelRules?.generationFields ?? [];
@@ -393,22 +437,67 @@ export function AiVideoRetakeConfigPanel({
     if (!paramsVisible) {
       return {};
     }
-    return mergeImageGenerationParams(paramPopoverFields, {
+    const merged = mergeImageGenerationParams(paramPopoverFields, {
       ...defaultGenerationParams,
       ...draft.generationParams,
     });
+    if (draft.resolutionManuallySet) {
+      return merged;
+    }
+    if (!modelRules) {
+      return merged;
+    }
+    return {
+      ...merged,
+      resolution: resolveRetakeAutoResolution({
+        width: draft.sourceVideoWidth,
+        height: draft.sourceVideoHeight,
+        modelFallback: readModelResolutionFallback(modelRules.generationFields),
+      }),
+    };
   }, [
     defaultGenerationParams,
     draft.generationParams,
+    draft.resolutionManuallySet,
+    draft.sourceVideoHeight,
+    draft.sourceVideoWidth,
+    modelRules,
     paramPopoverFields,
     paramsVisible,
   ]);
 
   const commitGenerationParams = useCallback(
     (next: Record<string, unknown>) => {
-      patchDraft({ generationParams: next });
+      const prevResolution = draft.generationParams.resolution;
+      const nextResolution = next.resolution;
+      const resolutionChanged =
+        nextResolution !== undefined &&
+        String(nextResolution) !== String(prevResolution ?? "");
+      const autoResolution = !modelRules
+          ? null
+          : resolveRetakeAutoResolution({
+              width: draft.sourceVideoWidth,
+              height: draft.sourceVideoHeight,
+              modelFallback: readModelResolutionFallback(
+                modelRules.generationFields
+              ),
+            });
+      const resolutionManuallyChanged =
+        resolutionChanged &&
+        (autoResolution === null ||
+          String(nextResolution) !== autoResolution);
+      patchDraft({
+        generationParams: next,
+        ...(resolutionManuallyChanged ? { resolutionManuallySet: true } : {}),
+      });
     },
-    [patchDraft]
+    [
+      draft.generationParams.resolution,
+      draft.sourceVideoHeight,
+      draft.sourceVideoWidth,
+      modelRules,
+      patchDraft,
+    ]
   );
 
   const promptMaxLength = modelRules?.promptMaxChars ?? 1000;
@@ -829,6 +918,137 @@ export function AiVideoRetakeConfigPanel({
     promptBuffer.commit(appendVideoPromptRefToken(promptBuffer.value, chip.edgeId));
   };
 
+  const startRetakeGeneration = useCallback(
+    (params: {
+      readonly generationParams: Record<string, unknown>;
+      readonly prompt: string;
+      readonly skipStitch: boolean;
+    }) => {
+      if (
+        draft.videoDurationSec === null ||
+        !orgId ||
+        !workflowId ||
+        !sourceMedia ||
+        !selectedModel
+      ) {
+        toast.error("workflow.videoRetake.generateFailed");
+        return;
+      }
+
+      updateNodeData(nodeId, (current) => ({
+        metadata: withAiVideoGenerateError(current.metadata, null),
+      }));
+
+      setIsStarting(true);
+      void (async () => {
+        try {
+          const trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
+            media: sourceMedia,
+            organizationId: orgId,
+            workflowId,
+          });
+          if (!trimSourceVideoUrl) {
+            toast.error("workflow.videoRetake.generateFailed");
+            return;
+          }
+
+          const referenceMedia = collectGenerativeReferenceMedia({
+            nodeId,
+            targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+            edges,
+            nodes: typedNodes,
+          });
+
+          const resolved = await resolveMediaReferencesForVideoGenerate({
+            organizationId: orgId,
+            workflowId,
+            cloudConfigured,
+            references: referenceMedia,
+          });
+
+          runVideoRetakePipeline({
+            organizationId: orgId,
+            workflowId,
+            targetNodeId: nodeId,
+            sourceMedia,
+            trimSourceVideoUrl,
+            committedRange: {
+              startSec: draft.draftRange.startSec,
+              endSec: draft.draftRange.endSec,
+            },
+            videoDurationSec: draft.videoDurationSec,
+            highQuality: draft.highQuality,
+            mediaKitInterfaceId,
+            cloudConfigured,
+            prompt: params.prompt,
+            modelCanonicalId: selectedModel.canonicalId,
+            aiInterfaceId: selectedModel.interfaceId,
+            instanceId: selectedModel.instanceId.trim() || undefined,
+            modelDisplayName: selectedModel.alias,
+            supportsTaskCancel: selectedModel.supportsTaskCancel === true,
+            generationParams: params.generationParams,
+            skipStitch: params.skipStitch,
+            referenceImageUrls:
+              resolved.referenceImageUrls.length > 0
+                ? resolved.referenceImageUrls
+                : undefined,
+            referenceImageInline:
+              resolved.referenceImageInline.length > 0
+                ? resolved.referenceImageInline
+                : undefined,
+            referenceVideoUrls:
+              resolved.referenceVideoUrls.length > 0
+                ? resolved.referenceVideoUrls
+                : undefined,
+            referenceAudioUrls:
+              resolved.referenceAudioUrls.length > 0
+                ? resolved.referenceAudioUrls
+                : undefined,
+            updateNodeData,
+            uploadVideoFileToNode,
+            t,
+            toast,
+          });
+        } finally {
+          setIsStarting(false);
+        }
+      })();
+    },
+    [
+      cloudConfigured,
+      draft.draftRange.endSec,
+      draft.draftRange.startSec,
+      draft.highQuality,
+      draft.videoDurationSec,
+      edges,
+      mediaKitInterfaceId,
+      nodeId,
+      orgId,
+      selectedModel,
+      sourceMedia,
+      t,
+      toast,
+      typedNodes,
+      updateNodeData,
+      uploadVideoFileToNode,
+      workflowId,
+    ]
+  );
+
+  const handleConfirmResolutionMismatch = useCallback(() => {
+    setResolutionMismatchConfirmOpen(false);
+    const pending = pendingRetakeGenerateRef.current;
+    pendingRetakeGenerateRef.current = null;
+    if (!pending) {
+      return;
+    }
+    startRetakeGeneration({
+      generationParams: pending.generationParams,
+      prompt: pending.prompt,
+      skipStitch: true,
+    });
+  }, [startRetakeGeneration]);
+
   const handleGenerate = useCallback(() => {
     if (!canGenerate || !isRetakePanel || isStarting || isGenerating) {
       return;
@@ -915,90 +1135,27 @@ export function AiVideoRetakeConfigPanel({
       })
     );
 
-    updateNodeData(nodeId, (current) => ({
-      metadata: withAiVideoGenerateError(current.metadata, null),
-    }));
+    const selectedResolution =
+      typeof generationParams.resolution === "string"
+        ? generationParams.resolution
+        : "";
+    const skipStitch = isVideoRetakeResolutionMismatch({
+      selected: selectedResolution,
+      sourceWidth: draft.sourceVideoWidth,
+      sourceHeight: draft.sourceVideoHeight,
+    });
+    if (skipStitch) {
+      pendingRetakeGenerateRef.current = { generationParams, prompt };
+      setResolutionMismatchConfirmOpen(true);
+      return;
+    }
 
-    setIsStarting(true);
-    void (async () => {
-      try {
-        const trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
-          media: sourceMedia,
-          organizationId: orgId,
-          workflowId,
-        });
-        if (!trimSourceVideoUrl) {
-          toast.error("workflow.videoRetake.generateFailed");
-          return;
-        }
-
-        const referenceMedia = collectGenerativeReferenceMedia({
-          nodeId,
-          targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
-          edges,
-          nodes: typedNodes,
-        });
-
-        const resolved = await resolveMediaReferencesForVideoGenerate({
-          organizationId: orgId,
-          workflowId,
-          cloudConfigured,
-          references: referenceMedia,
-        });
-
-        runVideoRetakePipeline({
-          organizationId: orgId,
-          workflowId,
-          targetNodeId: nodeId,
-          sourceMedia,
-          trimSourceVideoUrl,
-          committedRange: {
-            startSec: draft.draftRange.startSec,
-            endSec: draft.draftRange.endSec,
-          },
-          videoDurationSec: draft.videoDurationSec,
-          highQuality: draft.highQuality,
-          mediaKitInterfaceId,
-          cloudConfigured,
-          prompt,
-          modelCanonicalId: selectedModel.canonicalId,
-          aiInterfaceId: selectedModel.interfaceId,
-          instanceId: selectedModel.instanceId.trim() || undefined,
-          modelDisplayName: selectedModel.alias,
-          supportsTaskCancel: selectedModel.supportsTaskCancel === true,
-          generationParams,
-          referenceImageUrls:
-            resolved.referenceImageUrls.length > 0
-              ? resolved.referenceImageUrls
-              : undefined,
-          referenceImageInline:
-            resolved.referenceImageInline.length > 0
-              ? resolved.referenceImageInline
-              : undefined,
-          referenceVideoUrls:
-            resolved.referenceVideoUrls.length > 0
-              ? resolved.referenceVideoUrls
-              : undefined,
-          referenceAudioUrls:
-            resolved.referenceAudioUrls.length > 0
-              ? resolved.referenceAudioUrls
-              : undefined,
-          updateNodeData,
-          uploadVideoFileToNode,
-          t,
-          toast,
-        });
-      } finally {
-        setIsStarting(false);
-      }
-    })();
+    startRetakeGeneration({ generationParams, prompt, skipStitch: false });
   }, [
     blocksGenerativeMedia,
     canGenerate,
-    cloudConfigured,
     defaultGenerationParams,
     draft,
-    edges,
     hasBrokenPromptRefs,
     hasPromptInput,
     hasPromptReference,
@@ -1008,8 +1165,6 @@ export function AiVideoRetakeConfigPanel({
     mediaKitInterfaceId,
     mediaKitTrimAvailable,
     modelRules,
-    nodeId,
-    orgId,
     paramPopoverFields,
     paramsEditor,
     promptBuffer,
@@ -1018,13 +1173,9 @@ export function AiVideoRetakeConfigPanel({
     referenceCounts,
     selectedModel,
     sourceMedia,
+    startRetakeGeneration,
     storedPromptCompile.ok,
-    t,
     toast,
-    typedNodes,
-    updateNodeData,
-    uploadVideoFileToNode,
-    workflowId,
   ]);
 
   const generationValuesForEstimate = useMemo(() => {
@@ -1349,6 +1500,33 @@ export function AiVideoRetakeConfigPanel({
         entries={pickableOutputs}
         onPick={handlePickNode}
       />
+
+      <AlertDialog
+        open={resolutionMismatchConfirmOpen}
+        onOpenChange={(open) => {
+          setResolutionMismatchConfirmOpen(open);
+          if (!open) {
+            pendingRetakeGenerateRef.current = null;
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("workflow.videoRetake.resolutionMismatchTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("workflow.videoRetake.resolutionMismatchDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmResolutionMismatch}>
+              {t("workflow.videoRetake.resolutionMismatchConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

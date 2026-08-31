@@ -1,5 +1,6 @@
 import {
   createDefaultVideoRetakeTrimRange,
+  resolveRetakeDefaultResolutionFromSource,
   type MediaReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
@@ -22,7 +23,7 @@ import {
   type VideoSegmentPlaybackSeed,
 } from "./video-trim-session-context";
 import {
-  resolveTrimSourceVideoUrl,
+  resolveRetakeVideoDimensions,
   resolveRetakeVideoDurationSec,
 } from "./video-trim-utils";
 import { useWorkflow } from "./workflow-context";
@@ -40,7 +41,11 @@ type RetakeDraftSeed = Pick<
   | "draftRange"
   | "loadPhase"
   | "playbackPaused"
->;
+> & {
+  readonly sourceVideoWidth: number | null;
+  readonly sourceVideoHeight: number | null;
+  readonly generationParams: Readonly<Record<string, unknown>>;
+};
 
 async function enrichRetakeDraftSeed(params: {
   readonly seed: VideoSegmentPlaybackSeed | undefined;
@@ -48,12 +53,19 @@ async function enrichRetakeDraftSeed(params: {
   readonly organizationId: string;
   readonly workflowId: string;
 }): Promise<RetakeDraftSeed | undefined> {
-  const videoDurationSec = await resolveRetakeVideoDurationSec({
-    media: params.sourceVideo,
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
-    knownDurationSec: params.seed?.videoDurationSec,
-  });
+  const [videoDurationSec, dimensions] = await Promise.all([
+    resolveRetakeVideoDurationSec({
+      media: params.sourceVideo,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      knownDurationSec: params.seed?.videoDurationSec,
+    }),
+    resolveRetakeVideoDimensions({
+      media: params.sourceVideo,
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+    }),
+  ]);
 
   if (videoDurationSec === null && !params.seed) {
     return undefined;
@@ -61,6 +73,12 @@ async function enrichRetakeDraftSeed(params: {
 
   const defaultRange = createDefaultVideoRetakeTrimRange(videoDurationSec ?? 0);
   const ready = videoDurationSec !== null && videoDurationSec > 0;
+  const sourceVideoWidth = dimensions?.width ?? null;
+  const sourceVideoHeight = dimensions?.height ?? null;
+  const sourceResolution = resolveRetakeDefaultResolutionFromSource({
+    width: sourceVideoWidth,
+    height: sourceVideoHeight,
+  });
 
   return {
     videoDurationSec,
@@ -68,6 +86,10 @@ async function enrichRetakeDraftSeed(params: {
     draftRange: params.seed?.draftRange ?? defaultRange,
     loadPhase: ready ? "ready" : (params.seed?.loadPhase ?? "loading"),
     playbackPaused: params.seed?.playbackPaused ?? false,
+    sourceVideoWidth,
+    sourceVideoHeight,
+    generationParams:
+      sourceResolution !== null ? { resolution: sourceResolution } : {},
   };
 }
 
@@ -118,6 +140,9 @@ export function VideoRetakeToolbarButton({
                   draftRange: trimSeed.draftRange,
                   loadPhase: trimSeed.loadPhase,
                   playbackPaused: trimSeed.playbackPaused,
+                  sourceVideoWidth: null,
+                  sourceVideoHeight: null,
+                  generationParams: {},
                 }
               : undefined;
 
@@ -132,6 +157,9 @@ export function VideoRetakeToolbarButton({
             draftRange: seed.draftRange,
             loadPhase: seed.loadPhase,
             playbackPaused: seed.playbackPaused ?? false,
+            sourceVideoWidth: seed.sourceVideoWidth,
+            sourceVideoHeight: seed.sourceVideoHeight,
+            generationParams: seed.generationParams,
           })
         );
       })();
