@@ -262,14 +262,20 @@ export function WorkflowMediaVideoPlayer({
       return;
     }
 
-    if (
-      video.currentTime < playbackRange.startSec ||
-      video.currentTime > playbackRange.endSec
-    ) {
-      video.currentTime = playbackRange.startSec;
-      setCurrentTime(video.currentTime);
+    video.currentTime = playbackRange.startSec;
+    setCurrentTime(playbackRange.startSec);
+
+    if (externalPlaybackControl && !playbackPaused) {
+      void video.play().catch(() => {});
     }
-  }, [playbackRange, videoRef]);
+    // Only restart when committed trim range changes, not on pause/play toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playbackPaused intentionally omitted
+  }, [
+    playbackRange?.startSec,
+    playbackRange?.endSec,
+    externalPlaybackControl,
+    videoRef,
+  ]);
 
   useEffect(() => {
     if (!playbackRange) {

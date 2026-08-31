@@ -459,7 +459,6 @@ function CanvasVideoCover({
   const retakePlaybackSession =
     retakeActive && retakeDraft
       ? {
-          trimSourceVideoUrl: retakeDraft.trimSourceVideoUrl,
           committedRange: retakeDraft.committedRange,
           playbackPaused: retakeDraft.playbackPaused,
           loadPhase: retakeDraft.loadPhase,
@@ -498,7 +497,9 @@ function CanvasVideoCover({
     fullVideoDisplay.phase === "ready" ? fullVideoDisplay.displayUrl : null;
   const playbackSession = retakeActive ? retakePlaybackSession : trimSession;
   const playbackActive = Boolean(playbackSession);
-  const playbackVideoUrl = playbackSession?.trimSourceVideoUrl ?? hoverVideoUrl;
+  const playbackVideoUrl = retakeActive
+    ? hoverVideoUrl
+    : (trimSession?.trimSourceVideoUrl ?? hoverVideoUrl);
   const showVideoPlayer =
     Boolean(playbackVideoUrl) &&
     (playbackActive || hoverPreviewEnabled);
@@ -608,24 +609,26 @@ function CanvasVideoCover({
               patchPlayback({ loadPhase: "error" });
               return;
             }
-            const sourceUrl = video.currentSrc || playbackVideoUrl;
             const sourceVideoWidth =
               video.videoWidth > 0 ? video.videoWidth : null;
             const sourceVideoHeight =
               video.videoHeight > 0 ? video.videoHeight : null;
             if (playbackSession?.loadPhase === "loading") {
-              const defaultRange = retakeActive
-                ? createDefaultVideoRetakeTrimRange(video.duration)
-                : createDefaultVideoTrimRange(video.duration);
+              if (retakeActive) {
+                patchPlayback({
+                  videoDurationSec: video.duration,
+                  sourceVideoWidth,
+                  sourceVideoHeight,
+                  loadPhase: "ready",
+                });
+                return;
+              }
+
+              const defaultRange = createDefaultVideoTrimRange(video.duration);
               patchPlayback({
-                trimSourceVideoUrl: sourceUrl,
+                trimSourceVideoUrl:
+                  video.currentSrc || playbackVideoUrl || undefined,
                 videoDurationSec: video.duration,
-                ...(retakeActive
-                  ? {
-                      sourceVideoWidth,
-                      sourceVideoHeight,
-                    }
-                  : {}),
                 loadPhase: "ready",
                 committedRange: defaultRange,
                 draftRange: defaultRange,
@@ -633,7 +636,12 @@ function CanvasVideoCover({
               return;
             }
             patchPlayback({
-              trimSourceVideoUrl: sourceUrl,
+              ...(retakeActive
+                ? {}
+                : {
+                    trimSourceVideoUrl:
+                      video.currentSrc || playbackVideoUrl || undefined,
+                  }),
               videoDurationSec: video.duration,
               ...(retakeActive
                 ? {

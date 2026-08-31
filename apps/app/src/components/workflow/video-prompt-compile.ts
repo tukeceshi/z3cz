@@ -1,6 +1,14 @@
+import {
+  snapVideoTrimSec,
+  type VideoTrimRangeSec,
+} from "@dafthunk/types";
+
 /** Stored token: `{{ref:edgeId}}` — bound to a reference edge, not a slot index. */
 
 export const VIDEO_PROMPT_REF_TOKEN_PATTERN = /\{\{ref:([^}]+)\}\}/g;
+
+/** Trim clip is always the first entry in retake referenceVideoUrls. */
+export const RETAKE_EDIT_TRIM_VIDEO_REF_INDEX = 1 as const;
 
 export interface VideoPromptImageChipRef {
   readonly edgeId: string;
@@ -17,6 +25,46 @@ export type VideoPromptCompileResult =
 
 export function formatVideoPromptImageRef(index: number): string {
   return `图片${index}`;
+}
+
+export function formatRetakeEditTrimSec(valueSec: number): string {
+  return snapVideoTrimSec(valueSec).toFixed(1);
+}
+
+export function formatRetakeEditDisplayPrefix(range: VideoTrimRangeSec): string {
+  return `编辑[${formatRetakeEditTrimSec(range.startSec)}~${formatRetakeEditTrimSec(range.endSec)}]`;
+}
+
+export function formatRetakeEditSubmitPrefix(
+  videoIndex: number = RETAKE_EDIT_TRIM_VIDEO_REF_INDEX
+): string {
+  return `编辑<视频${videoIndex}>`;
+}
+
+export function compileRetakePromptForSubmit(
+  userStored: string,
+  indexMap: ReadonlyMap<string, number>
+): VideoPromptCompileResult {
+  const userCompile = compileVideoPromptForSubmit(userStored, indexMap);
+  if (!userCompile.ok) {
+    return userCompile;
+  }
+
+  const userPart = userCompile.prompt.trim();
+  const prefix = formatRetakeEditSubmitPrefix();
+  if (userPart.length === 0) {
+    return { ok: true, prompt: prefix };
+  }
+
+  return { ok: true, prompt: `${prefix}${userPart}` };
+}
+
+export function compiledRetakePromptLength(
+  userStored: string,
+  indexMap: ReadonlyMap<string, number>
+): number | null {
+  const result = compileRetakePromptForSubmit(userStored, indexMap);
+  return result.ok ? result.prompt.length : null;
 }
 
 /** 1-based index of each image reference edge in connection order. */

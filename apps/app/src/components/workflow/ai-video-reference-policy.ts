@@ -23,7 +23,7 @@ import {
   AI_VIDEO_OUTPUT_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
   classifyAiVideoReferenceFromNodeType,
-  countAiVideoReferenceCounts,
+  countAiVideoReferenceCountsForNode,
   isAiVideoAllowedReferenceNodeType,
   isAiVideoReferenceTarget,
   type AiVideoReferenceKind,
@@ -210,10 +210,11 @@ export function evaluateAiVideoReferenceStructural(
     models: context.models,
   });
 
-  const existing = countAiVideoReferenceCounts(
+  const existing = countAiVideoReferenceCountsForNode(
     context.targetNodeId,
     context.edges,
-    context.nodes.map((node) => ({ id: node.id, data: node.data }))
+    context.nodes.map((node) => ({ id: node.id, data: node.data })),
+    context.targetNodeData
   );
   const isReplacement = context.edges.some(
     (edge) =>

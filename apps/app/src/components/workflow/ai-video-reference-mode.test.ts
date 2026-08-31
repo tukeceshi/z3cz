@@ -2,11 +2,15 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+  withAiVideoPanelKind,
 } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
-import { AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
+import {
+  AI_VIDEO_OUTPUT_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+} from "./ai-video-node-utils";
 import {
   annotateVideoReferenceChips,
   buildVideoReferenceModeSwitchPatch,
@@ -169,6 +173,138 @@ describe("evaluateAiVideoReferenceStructural", () => {
         {
           id: "img-3",
           data: { nodeType: AI_IMAGE_NODE_TYPE, name: "c", inputs: [], outputs: [] },
+        },
+      ],
+    });
+
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("reserves one video reference slot for retake panel nodes", () => {
+    const targetNodeData: WorkflowNodeType = {
+      nodeType: AI_VIDEO_NODE_TYPE,
+      name: "retake",
+      inputs: [{ id: "model", value: "seedance" }],
+      outputs: [],
+      metadata: withAiVideoPanelKind(
+        {
+          refMaxImages: "4",
+          refMaxVideos: "1",
+          refMaxAudios: "0",
+        },
+        "retake"
+      ),
+    };
+
+    const verdict = evaluateAiVideoReferenceStructural({
+      targetNodeId: "video-retake-1",
+      sourceNodeId: "video-src",
+      sourceHandle: AI_VIDEO_OUTPUT_ID,
+      sourceNodeType: AI_VIDEO_NODE_TYPE,
+      targetNodeData,
+      edges: [],
+      nodes: [
+        { id: "video-retake-1", data: targetNodeData },
+        {
+          id: "video-src",
+          data: {
+            nodeType: AI_VIDEO_NODE_TYPE,
+            name: "source",
+            inputs: [],
+            outputs: [],
+          },
+        },
+      ],
+    });
+
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) {
+      expect(verdict.reason).toBe("video_limit");
+    }
+  });
+
+  it("allows canvas video on retake when model rules permit after trim reservation", () => {
+    const targetNodeData: WorkflowNodeType = {
+      nodeType: AI_VIDEO_NODE_TYPE,
+      name: "retake",
+      inputs: [
+        { id: "model", value: "doubao-seedance-2-5" },
+        { id: "ai_interface_id", value: "iface-seedance" },
+      ],
+      outputs: [],
+      metadata: withAiVideoPanelKind(
+        {
+          refMaxImages: "4",
+          refMaxVideos: "3",
+          refMaxAudios: "0",
+        },
+        "retake"
+      ),
+    };
+
+    const verdict = evaluateAiVideoReferenceStructural({
+      targetNodeId: "video-retake-1",
+      sourceNodeId: "video-src",
+      sourceHandle: AI_VIDEO_OUTPUT_ID,
+      sourceNodeType: AI_VIDEO_NODE_TYPE,
+      targetNodeData,
+      edges: [],
+      nodes: [
+        { id: "video-retake-1", data: targetNodeData },
+        {
+          id: "video-src",
+          data: {
+            nodeType: AI_VIDEO_NODE_TYPE,
+            name: "source",
+            inputs: [],
+            outputs: [],
+          },
+        },
+      ],
+      models: [
+        {
+          canonicalId: "doubao-seedance-2-5",
+          parameterRules: {
+            ...DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+            maxReferenceVideos: 3,
+          },
+        },
+      ],
+    });
+
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("does not reserve a video slot for normal video nodes", () => {
+    const targetNodeData: WorkflowNodeType = {
+      nodeType: AI_VIDEO_NODE_TYPE,
+      name: "video",
+      inputs: [{ id: "model", value: "seedance" }],
+      outputs: [],
+      metadata: {
+        refMaxImages: "4",
+        refMaxVideos: "1",
+        refMaxAudios: "0",
+      },
+    };
+
+    const verdict = evaluateAiVideoReferenceStructural({
+      targetNodeId: "video-1",
+      sourceNodeId: "video-src",
+      sourceHandle: AI_VIDEO_OUTPUT_ID,
+      sourceNodeType: AI_VIDEO_NODE_TYPE,
+      targetNodeData,
+      edges: [],
+      nodes: [
+        { id: "video-1", data: targetNodeData },
+        {
+          id: "video-src",
+          data: {
+            nodeType: AI_VIDEO_NODE_TYPE,
+            name: "source",
+            inputs: [],
+            outputs: [],
+          },
         },
       ],
     });

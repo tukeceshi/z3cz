@@ -4,6 +4,7 @@ import {
   splitVideoRetakeSegments,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
   type MediaReference,
+  type ReferenceImageInline,
   type VideoRetakeSegment,
   type VideoTrimRangeSec,
   type WorkflowMediaValue,
@@ -99,6 +100,10 @@ export interface RunVideoRetakePipelineParams {
   readonly modelDisplayName?: string;
   readonly supportsTaskCancel: boolean;
   readonly generationParams: Readonly<Record<string, unknown>>;
+  readonly referenceImageUrls?: readonly string[];
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
+  readonly referenceVideoUrls?: readonly string[];
+  readonly referenceAudioUrls?: readonly string[];
   readonly updateNodeData: UpdateNodeDataFn;
   readonly uploadVideoFileToNode: (params: {
     readonly nodeId: string;
@@ -112,6 +117,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+/** Trim clip first, then canvas video refs; skip empty and duplicate URLs. */
+export function mergeRetakeReferenceVideoUrls(
+  trimClipUrl: string,
+  canvasVideoUrls?: readonly string[]
+): readonly string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  const append = (url: string) => {
+    const normalized = url.trim();
+    if (normalized.length === 0 || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    merged.push(normalized);
+  };
+
+  append(trimClipUrl);
+  for (const url of canvasVideoUrls ?? []) {
+    append(url);
+  }
+
+  return merged;
 }
 
 function findRetakeSegmentIndex(
@@ -375,7 +405,22 @@ async function generateRetakeClip(params: {
         : {}),
       prompt: params.pipeline.prompt,
       params: generationParams,
-      referenceVideoUrls: [params.referenceVideoUrl],
+      referenceVideoUrls: mergeRetakeReferenceVideoUrls(
+        params.referenceVideoUrl,
+        params.pipeline.referenceVideoUrls
+      ),
+      ...(params.pipeline.referenceImageUrls &&
+      params.pipeline.referenceImageUrls.length > 0
+        ? { referenceImageUrls: params.pipeline.referenceImageUrls }
+        : {}),
+      ...(params.pipeline.referenceImageInline &&
+      params.pipeline.referenceImageInline.length > 0
+        ? { referenceImageInline: params.pipeline.referenceImageInline }
+        : {}),
+      ...(params.pipeline.referenceAudioUrls &&
+      params.pipeline.referenceAudioUrls.length > 0
+        ? { referenceAudioUrls: params.pipeline.referenceAudioUrls }
+        : {}),
       workflowId: params.pipeline.workflowId,
       nodeId: params.pipeline.targetNodeId,
       clientRequestId: crypto.randomUUID(),
