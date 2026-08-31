@@ -108,11 +108,14 @@ export default defineConfig(({ mode }) => {
       // sizes — skip on small Docker hosts to cut peak heap after transform.
       reportCompressedSize: !isDockerProd,
       sourcemap: false,
-      // Lower parallel emit reduces peak RSS during minify on constrained builders.
+      // Constrained Docker builders: skip minify (Caddy/nginx gzip/zstd at serve time)
+      // and serialize chunk emit to avoid OOM (exit 137) during "rendering chunks".
       ...(isDockerProd
         ? {
+            minify: false,
+            cssMinify: false,
             rollupOptions: {
-              maxParallelFileOps: 2,
+              maxParallelFileOps: 1,
             },
           }
         : {}),

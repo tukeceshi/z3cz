@@ -172,6 +172,7 @@ services:
       args:
         NODE_VERSION: "22.12.0"
         PNPM_VERSION: "10.3.0"
+        NODE_MAX_OLD_SPACE_SIZE: "3072"
     depends_on:
       postgres:
         condition: service_healthy
@@ -209,6 +210,7 @@ services:
       args:
         NODE_VERSION: "22.12.0"
         PNPM_VERSION: "10.3.0"
+        NODE_MAX_OLD_SPACE_SIZE: "3072"
         VITE_API_HOST: /api
         VITE_APP_URL: "${origin}"
         VITE_WEBSITE_URL: "${origin}"
