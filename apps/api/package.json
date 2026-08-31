@@ -47,7 +47,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
-    "@cloudflare/containers": "^0.1.1",
     "@cloudflare/sandbox": "^0.7.21",
     "@dafthunk/runtime": "workspace:*",
     "@dafthunk/types": "workspace:*",

@@ -1,6 +1,5 @@
 import type { RuntimeParams } from "@dafthunk/runtime";
 import { JWTTokenPayload } from "@dafthunk/types";
-import type { FFmpegContainer } from "./containers/ffmpeg-container";
 import type { LanguageSandbox } from "./containers/language-sandbox";
 import type { AgentRunner } from "./durable-objects/agent-runner";
 import type { EmailAgentRunner } from "./durable-objects/email-agent-runner";
@@ -21,7 +20,6 @@ export interface Bindings {
   AGENT_RUNNER: DurableObjectNamespace<AgentRunner>;
   EMAIL_AGENT_RUNNER: DurableObjectNamespace<EmailAgentRunner>;
   MAILBOX: DurableObjectNamespace<MailboxDO>;
-  FFMPEG_CONTAINER?: DurableObjectNamespace<FFmpegContainer>;
   DUCKDB_SANDBOX?: DurableObjectNamespace<any>;
   SANDBOX?: DurableObjectNamespace<LanguageSandbox>;
   WORKFLOW_QUEUE: Queue;

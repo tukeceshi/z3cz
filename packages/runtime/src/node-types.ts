@@ -222,8 +222,6 @@ export interface NodeEnv {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   EMAIL_AGENT_RUNNER?: DurableObjectNamespace<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  FFMPEG_CONTAINER?: DurableObjectNamespace<any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   DUCKDB_SANDBOX?: DurableObjectNamespace<any>;
   WORKFLOW_QUEUE: Queue;
   EMAIL_DOMAIN: string;
