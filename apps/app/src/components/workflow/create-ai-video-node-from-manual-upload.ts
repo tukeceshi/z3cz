@@ -1,6 +1,7 @@
 import {
   AI_VIDEO_NODE_TYPE,
   type ObjectReference,
+  withAiVideoPanelKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
@@ -19,6 +20,7 @@ import {
   withGenerativeProgress,
   withGenerativeTrimmingProgress,
 } from "./generative-progress-utils";
+import { createDefaultAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import type { NodeType, WorkflowNodeType } from "./workflow-types";
 
 export type AiVideoSiblingBusyKind = "trimming" | "generating" | "none";
@@ -174,6 +176,37 @@ export function buildAiVideoNodeFromManualUpload(params: {
     data: {
       ...baseData,
       ...manualPatch,
+    },
+  };
+}
+
+/** Locked retake window — cover video only, no history, no edges. */
+export function buildLockedRetakeCopyNode(params: {
+  readonly catalog: NodeType;
+  readonly nodeId: string;
+  readonly nodeName: string;
+  readonly position: { readonly x: number; readonly y: number };
+  readonly video: WorkflowMediaValue;
+  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+}): ReactFlowNode<WorkflowNodeType> {
+  const node = buildAiVideoNodeFromManualUpload(params);
+  const hiddenPanel = withGenerativeBottomPanelHidden(node.data.metadata);
+  const draft = createDefaultAiVideoRetakeDraft();
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      inputs: [
+        ...node.data.inputs,
+        {
+          id: "retake_draft",
+          name: "retake_draft",
+          type: "json",
+          hidden: true,
+          value: draft,
+        },
+      ],
+      metadata: withAiVideoPanelKind(hiddenPanel, "retake"),
     },
   };
 }

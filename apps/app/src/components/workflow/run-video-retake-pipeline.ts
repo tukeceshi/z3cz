@@ -55,6 +55,7 @@ import {
 } from "./run-ai-video-generation";
 import { concatVideoLocally } from "./video-concat-local";
 import { trimVideoLocally } from "./video-trim-local";
+import { withAiVideoRetakeNodeUnlocked } from "./ai-video-retake-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 
 type UpdateNodeDataFn = (
@@ -148,6 +149,14 @@ function clearRetakeBusyMetadata(
   metadata: Record<string, string> | undefined
 ): Record<string, string> | undefined {
   return withAiVideoGeneratingFlag(clearGenerativeProgress(metadata), false);
+}
+
+function unlockRetakeNode(current: WorkflowNodeType): Partial<WorkflowNodeType> {
+  const unlocked = withAiVideoRetakeNodeUnlocked(current);
+  return {
+    ...unlocked,
+    metadata: clearRetakeBusyMetadata(unlocked.metadata),
+  };
 }
 
 function markTargetBusy(params: {
@@ -278,12 +287,12 @@ async function writeCloudResultToNode(params: {
       current,
       resolved.media as unknown as readonly MediaReference[]
     );
+    const merged = { ...current, ...withMedia };
+    const unlocked = unlockRetakeNode(merged);
     return {
-      ...withMedia,
-      metadata: withAiVideoGenerateError(
-        clearRetakeBusyMetadata(withMedia.metadata),
-        null
-      ),
+      ...merged,
+      ...unlocked,
+      metadata: withAiVideoGenerateError(unlocked.metadata, null),
     };
   });
 
@@ -334,12 +343,12 @@ function writeGeneratedVideoToNode(params: {
       modelDisplayName: params.pipeline.modelDisplayName,
       jobId: jobId ?? undefined,
     });
+    const merged = { ...current, ...withResult };
+    const unlocked = unlockRetakeNode(merged);
     return {
-      ...withResult,
-      metadata: withAiVideoGenerateError(
-        clearRetakeBusyMetadata(withResult.metadata),
-        null
-      ),
+      ...merged,
+      ...unlocked,
+      metadata: withAiVideoGenerateError(unlocked.metadata, null),
     };
   });
 
@@ -495,12 +504,13 @@ async function finishLocalResult(
     nodeId: params.targetNodeId,
     file,
   });
-  params.updateNodeData(params.targetNodeId, (current) => ({
-    metadata: withAiVideoGenerateError(
-      clearRetakeBusyMetadata(current.metadata),
-      null
-    ),
-  }));
+  params.updateNodeData(params.targetNodeId, (current) => {
+    const unlocked = unlockRetakeNode(current);
+    return {
+      ...unlocked,
+      metadata: withAiVideoGenerateError(unlocked.metadata, null),
+    };
+  });
   params.toast.success("workflow.aiVideoPanel.generated");
 }
 

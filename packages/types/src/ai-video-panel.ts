@@ -1,6 +1,9 @@
 export const AI_VIDEO_PANEL_META_KEY = "aiVideoPanel" as const;
 
-export type AiVideoPanelKind = "generate" | "enhance";
+export type AiVideoPanelKind = "generate" | "enhance" | "retake";
+
+/** @deprecated Legacy lock flag — treat as retake panel. */
+export const VIDEO_RETAKE_LOCK_META_KEY = "videoRetakeLock" as const;
 
 export interface AiVideoPanelMetadata {
   readonly kind: AiVideoPanelKind;
@@ -15,7 +18,13 @@ export function parseAiVideoPanelKind(
   }
   try {
     const parsed = JSON.parse(raw) as AiVideoPanelMetadata;
-    return parsed.kind === "enhance" ? "enhance" : "generate";
+    if (parsed.kind === "enhance") {
+      return "enhance";
+    }
+    if (parsed.kind === "retake") {
+      return "retake";
+    }
+    return "generate";
   } catch {
     return "generate";
   }
@@ -25,6 +34,15 @@ export function isAiVideoEnhancePanel(
   metadata: Readonly<Record<string, string>> | undefined
 ): boolean {
   return parseAiVideoPanelKind(metadata) === "enhance";
+}
+
+export function isAiVideoRetakePanel(
+  metadata: Readonly<Record<string, string>> | undefined
+): boolean {
+  if (metadata?.[VIDEO_RETAKE_LOCK_META_KEY] === "1") {
+    return true;
+  }
+  return parseAiVideoPanelKind(metadata) === "retake";
 }
 
 export function serializeAiVideoPanelMetadata(

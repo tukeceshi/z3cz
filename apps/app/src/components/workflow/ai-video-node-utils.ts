@@ -352,11 +352,17 @@ export function readAiVideoCardDisplay(
       inputs.find((input) => input.id === "manual_videos")?.value
     );
     if (manual.length > 0) {
+      const generating = isAiVideoGenerating(metadata);
+      const progressPhase = readGenerativeProgressPhase(metadata);
+      const cardPhase = resolveGenerativeCardPhase(metadata, manual, generating);
       return {
         coverMedia: manual,
-        isBusy: false,
+        isBusy:
+          generating ||
+          isGenerativeProgressBusyPhase(progressPhase) ||
+          (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)),
         hasCover: hasDisplayableWorkflowMedia(manual),
-        cardPhase: null,
+        cardPhase,
       };
     }
 

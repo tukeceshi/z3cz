@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { useOrgUrl } from "@/hooks/use-org-url";
 import { useOrgVolcanoMediaKitConfig } from "@/hooks/use-volcano-mediakit-config";
 
+import { useAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import { VideoTrimLocalTrimHintIcon } from "./video-trim-local-trim-hint-icon";
 import { VideoTrimRuler } from "./video-trim-ruler";
 import { VideoTrimTimeFields } from "./video-trim-time-fields";
@@ -31,7 +32,6 @@ import {
   VIDEO_TRIM_PANEL_RULER_ROW_CLASS,
   VIDEO_TRIM_PANEL_SHELL_CLASS,
 } from "./video-trim-panel-styles";
-import { useVideoRetakeSession } from "./video-retake-session-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AiVideoRetakeTrimPanelProps {
@@ -41,18 +41,20 @@ export interface AiVideoRetakeTrimPanelProps {
 
 export function AiVideoRetakeTrimPanel({
   nodeId,
+  data,
 }: AiVideoRetakeTrimPanelProps) {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { getOrgUrl } = useOrgUrl();
   const {
-    session,
-    patchRetakeSession,
-    commitDraftRange,
+    draft,
+    isRetakePanel,
+    patchDraft,
     setDraftRange,
+    commitDraftRange,
     setPlaybackPaused,
-  } = useVideoRetakeSession();
+  } = useAiVideoRetakeDraft(nodeId, data);
   const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
     useOrgVolcanoMediaKitConfig(orgId);
 
@@ -72,13 +74,12 @@ export function AiVideoRetakeTrimPanel({
   );
 
   const retakeReady =
-    session?.sourceNodeId === nodeId &&
-    session.loadPhase === "ready" &&
-    session.videoDurationSec !== null &&
-    session.videoDurationSec > 0;
+    draft.loadPhase === "ready" &&
+    draft.videoDurationSec !== null &&
+    draft.videoDurationSec > 0;
 
   useEffect(() => {
-    if (!session || session.sourceNodeId !== nodeId) {
+    if (!isRetakePanel) {
       highQualityDefaultAppliedRef.current = false;
       return;
     }
@@ -90,18 +91,12 @@ export function AiVideoRetakeTrimPanel({
     highQualityDefaultAppliedRef.current = true;
 
     if (mediaKitTrimAvailable) {
-      patchRetakeSession({ highQuality: true });
+      patchDraft({ highQuality: true });
       return;
     }
 
     setLocalTrimHintOpen(true);
-  }, [
-    mediaKitTrimAvailable,
-    nodeId,
-    patchRetakeSession,
-    retakeReady,
-    session,
-  ]);
+  }, [isRetakePanel, mediaKitTrimAvailable, patchDraft, retakeReady]);
 
   const handleDraftRangeChange = useCallback(
     (range: VideoTrimRangeSec) => {
@@ -117,7 +112,7 @@ export function AiVideoRetakeTrimPanel({
     [commitDraftRange]
   );
 
-  if (!session || session.sourceNodeId !== nodeId) {
+  if (!isRetakePanel) {
     return null;
   }
 
@@ -132,7 +127,7 @@ export function AiVideoRetakeTrimPanel({
       setHighQualityHintOpen(true);
       return;
     }
-    patchRetakeSession({ highQuality: checked });
+    patchDraft({ highQuality: checked });
   };
 
   return (
@@ -140,8 +135,8 @@ export function AiVideoRetakeTrimPanel({
       <div className={VIDEO_TRIM_PANEL_RULER_ROW_CLASS}>
         {ready ? (
           <VideoTrimRuler
-            videoDurationSec={session.videoDurationSec ?? 0}
-            range={session.draftRange}
+            videoDurationSec={draft.videoDurationSec ?? 0}
+            range={draft.draftRange}
             minSelectionSec={SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC}
             onRangeChange={handleDraftRangeChange}
             onRangeCommit={handleRangeCommit}
@@ -162,7 +157,7 @@ export function AiVideoRetakeTrimPanel({
               <PopoverAnchor asChild>
                 <label className="flex cursor-pointer items-center gap-2 text-xs">
                   <Switch
-                    checked={session.highQuality}
+                    checked={draft.highQuality}
                     disabled={!ready}
                     onCheckedChange={handleHighQualityToggle}
                   />
@@ -197,14 +192,14 @@ export function AiVideoRetakeTrimPanel({
         <div className={VIDEO_TRIM_PANEL_FOOTER_CENTER_CLASS}>
           {ready ? (
             <VideoTrimTimeFields
-              videoDurationSec={session.videoDurationSec ?? 0}
-              range={session.draftRange}
+              videoDurationSec={draft.videoDurationSec ?? 0}
+              range={draft.draftRange}
               minSelectionSec={SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC}
               disabled={false}
               onRangeChange={handleDraftRangeChange}
               onRangeCommit={handleRangeCommit}
             />
-          ) : session.loadPhase === "error" ? (
+          ) : draft.loadPhase === "error" ? (
             <p className="text-xs text-destructive">
               {t("workflow.videoRetake.loadFailed")}
             </p>
@@ -218,7 +213,7 @@ export function AiVideoRetakeTrimPanel({
             type="button"
             disabled={!ready}
             aria-label={
-              session.playbackPaused
+              draft.playbackPaused
                 ? t("workflow.videoTrim.play")
                 : t("workflow.videoTrim.pause")
             }
@@ -227,10 +222,10 @@ export function AiVideoRetakeTrimPanel({
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              setPlaybackPaused(!session.playbackPaused);
+              setPlaybackPaused(!draft.playbackPaused);
             }}
           >
-            {session.playbackPaused ? (
+            {draft.playbackPaused ? (
               <PlayIcon className="size-4" strokeWidth={2} />
             ) : (
               <PauseIcon className="size-4" strokeWidth={2} />

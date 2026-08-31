@@ -1,5 +1,13 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_GENERATIVE_NODE_TYPES,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+  isAiVideoEnhancePanel,
+  isAiVideoRetakePanel,
+} from "@dafthunk/types";
 import { useNodes } from "@xyflow/react";
 import ChevronDownIcon from "lucide-react/icons/chevron-down";
 import { createElement, memo, useState } from "react";
@@ -15,7 +23,6 @@ import { AiVideoConfigPanel } from "./ai-video-config-panel";
 import { AiVideoEnhanceConfigPanel } from "./ai-video-enhance-config-panel";
 import { AiVideoRetakeBottomPanel } from "./ai-video-retake-bottom-panel";
 import { AiVideoTrimBottomPanel } from "./ai-video-trim-bottom-panel";
-import { isAiVideoEnhancePanel } from "@dafthunk/types";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
 import { PropertyField } from "./fields";
 import { registry } from "./widgets";
@@ -27,7 +34,6 @@ import {
 } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 import { armGenerativePanelPointerGuard } from "./generative-panel-pointer-guard";
-import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 
 export const NODE_BOTTOM_PANEL_SINGLE_WIDTH = 384;
@@ -69,9 +75,10 @@ function WorkflowNodeBottomPanelInner({
   const [outputsExpanded, setOutputsExpanded] = useState(true);
   const [errorExpanded, setErrorExpanded] = useState(true);
   const trimSession = useOptionalVideoTrimSession();
-  const retakeSession = useOptionalVideoRetakeSession();
   const isTrimPanelActive = trimSession?.isTrimActiveForNode(nodeId) ?? false;
-  const isRetakePanelActive = retakeSession?.isRetakeActiveForNode(nodeId) ?? false;
+  const isRetakePanelActive =
+    data.nodeType === AI_VIDEO_NODE_TYPE &&
+    isAiVideoRetakePanel(data.metadata);
 
   // AI generative nodes get a dedicated config panel
   if (data.nodeType === AI_TEXT_NODE_TYPE) {

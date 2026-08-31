@@ -10,7 +10,6 @@ import {
   GENERATIVE_NODE_PANEL_TOOLBAR_BUTTON_CLASS,
   GENERATIVE_NODE_PANEL_TOOLBAR_ICON_CLASS,
 } from "./generative-card-styles";
-import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
 import {
   readVideoSegmentPlaybackSeed,
   useVideoTrimSession,
@@ -30,8 +29,7 @@ export function VideoTrimToolbarButton({
 }: VideoTrimToolbarButtonProps) {
   const { t } = useTranslation();
   const { disabled: workflowDisabled } = useWorkflow();
-  const retakeSessionApi = useOptionalVideoRetakeSession();
-  const { openTrimSession, closeTrimSession, isTrimActiveForNode } =
+  const { session, openTrimSession, closeTrimSession, isTrimActiveForNode } =
     useVideoTrimSession();
   const active = isTrimActiveForNode(sourceNodeId);
 
@@ -42,11 +40,7 @@ export function VideoTrimToolbarButton({
         closeTrimSession();
         return;
       }
-      const seed = readVideoSegmentPlaybackSeed(
-        retakeSessionApi?.session,
-        sourceNodeId
-      );
-      retakeSessionApi?.closeRetakeSession();
+      const seed = readVideoSegmentPlaybackSeed(session, sourceNodeId);
       openTrimSession({
         sourceNodeId,
         sourceMedia: sourceVideo,
@@ -57,7 +51,7 @@ export function VideoTrimToolbarButton({
       active,
       closeTrimSession,
       openTrimSession,
-      retakeSessionApi,
+      session,
       sourceNodeId,
       sourceVideo,
     ]

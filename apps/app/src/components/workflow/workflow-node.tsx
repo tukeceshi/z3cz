@@ -49,7 +49,7 @@ import {
 } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
 import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
-import { useOptionalVideoRetakeSession } from "./video-retake-session-context";
+import { isAiVideoRetakePanel } from "@dafthunk/types";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { isAiVideoResultSiblingNodeId } from "./create-ai-video-node-from-manual-upload";
@@ -388,9 +388,10 @@ export const WorkflowNode = memo(
       [data.metadata]
     );
     const trimSession = useOptionalVideoTrimSession();
-    const retakeSession = useOptionalVideoRetakeSession();
     const isTrimPanelActive = trimSession?.isTrimActiveForNode(id) ?? false;
-    const isRetakePanelActive = retakeSession?.isRetakeActiveForNode(id) ?? false;
+    const isRetakePanel =
+      isAiVideoNode && isAiVideoRetakePanel(data.metadata);
+    const isRetakePanelActive = isRetakePanel && selected;
     const showBottomPanelContent =
       isTrimPanelActive ||
       isRetakePanelActive ||
@@ -518,7 +519,7 @@ export const WorkflowNode = memo(
         ? readGenerativeCardError(data.metadata)
         : undefined;
     const showTopToolbarContent =
-      isGenerativeCanvasNode && !generativeCardError;
+      isGenerativeCanvasNode && !generativeCardError && !isRetakePanel;
     const showBusyOverlay =
       isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
     const showProgressOverlay = showBusyOverlay;

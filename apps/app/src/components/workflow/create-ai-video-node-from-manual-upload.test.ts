@@ -1,6 +1,8 @@
+import { AI_VIDEO_NODE_TYPE, isAiVideoRetakePanel } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLockedRetakeCopyNode,
   isAiVideoResultSiblingNodeId,
   resolveRetakeSiblingNodeName,
   resolveTrimSiblingNodeName,
@@ -54,5 +56,38 @@ describe("isAiVideoResultSiblingNodeId", () => {
     expect(isAiVideoResultSiblingNodeId("ai-video-1787908538926-tn346y")).toBe(
       false
     );
+  });
+});
+
+const stubCatalog = {
+  type: AI_VIDEO_NODE_TYPE,
+  name: "AI Video",
+  icon: "video",
+  inputs: [],
+  outputs: [{ name: "videos", type: "json" as const }],
+};
+
+describe("buildLockedRetakeCopyNode", () => {
+  it("creates a locked copy with cover video only", () => {
+    const video = {
+      resourceId: "res-1",
+      mimeType: "video/mp4",
+    };
+    const node = buildLockedRetakeCopyNode({
+      catalog: stubCatalog,
+      nodeId: "ai-video-retake-1",
+      nodeName: "镜头A-重拍",
+      position: { x: 0, y: 0 },
+      video,
+      createObjectUrl: () => "blob:test",
+    });
+
+    expect(node.data.name).toBe("镜头A-重拍");
+    expect(isAiVideoRetakePanel(node.data.metadata)).toBe(true);
+    expect(node.data.inputs.find((input) => input.id === "retake_draft")?.value).toBeDefined();
+    expect(node.data.inputs.find((input) => input.id === "manual_videos")?.value).toEqual([
+      video,
+    ]);
+    expect(node.data.inputs.find((input) => input.id === "videos_history")?.value).toBeUndefined();
   });
 });

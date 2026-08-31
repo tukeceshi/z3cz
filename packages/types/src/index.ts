@@ -35,6 +35,7 @@ export * from "./video-trim-mediakit";
 export * from "./video-concat-mediakit";
 export * from "./video-generation-resolution";
 export * from "./ai-video-panel";
+export * from "./ai-video-retake-draft";
 export * from "./volcano-tos-regions";
 export * from "./volcano-tos-pricing";
 export * from "./volcano-tos-package-usage";

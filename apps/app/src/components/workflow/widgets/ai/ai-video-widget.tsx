@@ -1,5 +1,6 @@
 import {
   AI_VIDEO_NODE_TYPE,
+  isAiVideoRetakePanel,
   getResourceIdFromValue,
   hasDisplayableWorkflowMedia,
   hasFailedResource,
@@ -106,6 +107,7 @@ function AiVideoWidget({
   const { uploadVideoFileToNode } = useGenerativeVideoFileUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
+  const retakeLocked = isAiVideoRetakePanel(metadata);
   const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
@@ -287,6 +289,10 @@ function AiVideoWidget({
             event.stopPropagation();
             return;
           }
+          if (retakeLocked) {
+            event.stopPropagation();
+            return;
+          }
           if (!isGenerating) {
             event.stopPropagation();
             openCreativeStudio();
@@ -370,6 +376,7 @@ export const aiVideoWidget = createWidget({
     "videos_history",
     "reference_images",
     "ai_interface_id",
+    "retake_draft",
   ],
   extractConfig: (nodeId, inputs, outputs, metadata) => ({
     cardDisplay: readAiVideoCardDisplay(inputs, outputs, metadata),
