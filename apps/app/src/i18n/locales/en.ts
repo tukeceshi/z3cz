@@ -3854,6 +3854,10 @@ export const en = {
       createNodeFailed: "Could not create the retake node",
       referenceLinkFailed: "Could not link the original video node",
       generateFailed: "Retake failed",
+      resolutionMismatchTitle: "Resolution differs from source video",
+      resolutionMismatchDescription:
+        "Generation will work, but the result will not be stitched back into the original video. You will only get the retake clip and need to edit it yourself.",
+      resolutionMismatchConfirm: "Continue",
       promptPlaceholder:
         "Add: describe <element traits> + <when it appears> + <where it appears>\nModify: change <original trait> to <new trait>\nRemove: name what to remove; emphasize elements that should stay unchanged\nUse material references like normal video generation; type @ to reference an image",
     },

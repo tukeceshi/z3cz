@@ -79,6 +79,7 @@ export * from "./image-generation-option-label";
 export * from "./platform-ai-model";
 export * from "./platform-ai-model-channel";
 export * from "./platform-ai-model-channel-seed";
+export * from "./seedance-25-resolution-pixels";
 export * from "./seedance-output-pixels";
 export * from "./seedance-model-defaults";
 export * from "./homepage-video-scenario";

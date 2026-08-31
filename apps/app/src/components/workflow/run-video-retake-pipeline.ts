@@ -104,6 +104,7 @@ export interface RunVideoRetakePipelineParams {
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
+  readonly skipStitch: boolean;
   readonly updateNodeData: UpdateNodeDataFn;
   readonly uploadVideoFileToNode: (params: {
     readonly nodeId: string;
@@ -563,6 +564,33 @@ async function runLocalRetake(
   params: RunVideoRetakePipelineParams,
   segments: readonly VideoRetakeSegment[]
 ): Promise<void> {
+  if (params.skipStitch) {
+    const retakeSegment = segments.find((segment) => segment.role === "retake");
+    if (!retakeSegment) {
+      throw new Error("Retake segment is missing");
+    }
+    const { blob } = await trimVideoLocally({
+      sourceUrl: params.trimSourceVideoUrl,
+      startSec: retakeSegment.range.startSec,
+      endSec: retakeSegment.range.endSec,
+    });
+    const referenceVideoUrl = await resolveLocalRetakeReferenceUrl({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      cloudConfigured: params.cloudConfigured,
+      blob,
+    });
+    const generated = await generateRetakeClip({
+      pipeline: params,
+      referenceVideoUrl,
+    });
+    if (!generated.video) {
+      throw new Error("Video generation succeeded without a playable reference");
+    }
+    writeGeneratedVideoToNode({ pipeline: params, generated });
+    return;
+  }
+
   const blobs: Blob[] = [];
   for (const segment of segments) {
     const { blob } = await trimVideoLocally({
@@ -671,6 +699,27 @@ async function runCloudRetake(
   const sourceResourceId = getResourceIdFromValue(params.sourceMedia);
   if (!sourceResourceId || !isCloudSourceMedia(params.sourceMedia)) {
     throw new Error(params.t("workflow.videoTrim.sourceNotCloud"));
+  }
+
+  if (params.skipStitch) {
+    const retakeSegment = segments.find((segment) => segment.role === "retake");
+    if (!retakeSegment) {
+      throw new Error("Retake segment is missing");
+    }
+    const referenceVideoUrl = await trimCloudSegment({
+      pipeline: params,
+      sourceResourceId,
+      segment: retakeSegment,
+    });
+    const generated = await generateRetakeClip({
+      pipeline: params,
+      referenceVideoUrl,
+    });
+    if (!generated.video) {
+      throw new Error("Video generation succeeded without a playable reference");
+    }
+    writeGeneratedVideoToNode({ pipeline: params, generated });
+    return;
   }
 
   const clipUrls: string[] = [];

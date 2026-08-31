@@ -3669,6 +3669,10 @@ export const zh: TranslationDictionary = {
       createNodeFailed: "创建重拍节点失败",
       referenceLinkFailed: "未能连上原视频节点",
       generateFailed: "重拍失败",
+      resolutionMismatchTitle: "分辨率与原视频不一致",
+      resolutionMismatchDescription:
+        "可以正常生成，但不会自动拼接回原视频。最终只有重拍片段，需自行剪辑合成。",
+      resolutionMismatchConfirm: "继续生成",
       promptPlaceholder:
         "增加元素：清晰描述<元素特征> + <出现时机> + <出现位置>\n修改元素：将其中的<原特征>修改为<新特征>\n删除元素：点明需要删除的元素；对保持不变的元素加以强调，表现更佳\n与正常视频生成一样可使用素材参考，输入 @ 引用图片",
     },
