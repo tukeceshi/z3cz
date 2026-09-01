@@ -215,6 +215,25 @@ function keepLocalInputValues(
   );
 }
 
+/** Prompt follows remote; other inputs keep existing local-nonempty preservation. */
+function mergeNodeInputsFromRemote(
+  incoming: readonly WorkflowParameter[],
+  local: readonly WorkflowParameter[] | undefined
+): WorkflowParameter[] {
+  const withoutPrompt = (inputs: readonly WorkflowParameter[]) =>
+    inputs.filter((input) => input.id !== "prompt");
+
+  const mergedNonPrompt = keepLocalInputValues(
+    withoutPrompt(incoming),
+    local ? withoutPrompt(local) : undefined
+  );
+  const mergedById = new Map(mergedNonPrompt.map((input) => [input.id, input]));
+
+  return incoming.map((input) =>
+    input.id === "prompt" ? input : (mergedById.get(input.id) ?? input)
+  );
+}
+
 function mergeGenerativeNodeCatalogInputs(
   nodeType: string | undefined,
   inputs: readonly WorkflowParameter[],
@@ -744,7 +763,7 @@ export function useGraphOperations({
             ...newNode,
             data: {
               ...newNode.data,
-              inputs: keepLocalInputValues(
+              inputs: mergeNodeInputsFromRemote(
                 newNode.data.inputs,
                 currentNode.data.inputs
               ),
