@@ -1,6 +1,6 @@
 import type { ObjectReference } from "@dafthunk/types";
 import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, readNodeLayoutFromMetadata } from "@dafthunk/types";
-import { Handle, Position, useViewport } from "@xyflow/react";
+import { Handle, Position, useNodes, useViewport } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
 import { DynamicIcon } from "lucide-react/dynamic.mjs";
@@ -42,12 +42,18 @@ import {
   isAiAudioGenerating,
 } from "./ai-audio-node-utils";
 import {
+  AI_IMAGE_CARD_HEIGHT_PX,
+  AI_IMAGE_CARD_WIDTH_PX,
   readAiImageCardDisplay,
 } from "./ai-image-node-utils";
 import {
+  AI_VIDEO_CARD_HEIGHT_PX,
+  AI_VIDEO_CARD_WIDTH_PX,
+  hasRetakeOwnResource,
   readAiVideoCardDisplay,
 } from "./ai-video-node-utils";
 import { readGenerativeCardError } from "./generative-card-error-utils";
+import { snapMediaCardSize } from "./media-card-size";
 import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
 import { isAiVideoRetakePanel } from "@dafthunk/types";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
@@ -254,6 +260,21 @@ export const TypeBadge = memo(
 
 TypeBadge.displayName = "TypeBadge";
 
+function generativeCardBoxStyle(
+  layout: { readonly width: number; readonly height: number } | null,
+  fallbackWidth: number,
+  fallbackHeight: number
+): { width: number; height: number; boxSizing: "border-box" } {
+  const size = layout
+    ? snapMediaCardSize(layout)
+    : { width: fallbackWidth, height: fallbackHeight };
+  return {
+    width: size.width,
+    height: size.height,
+    boxSizing: "border-box",
+  };
+}
+
 interface WorkflowNodeBottomPanelHostProps {
   readonly nodeId: string;
   readonly data: CanvasWorkflowNodeType;
@@ -359,6 +380,8 @@ export const WorkflowNode = memo(
     const orgId = organization?.id;
     const { id: workflowId } = useParams<{ id: string }>();
     const { configured: cloudConfigured } = useCloudStorageCanvasContext();
+    const { edges } = useWorkflowGraph();
+    const flowNodes = useNodes();
     const connectedHandleKeys =
       (data.connectedHandleKeys as readonly string[] | undefined) ?? [];
     const showBottomPanelHost = data.showBottomPanelHost === true;
@@ -503,8 +526,27 @@ export const WorkflowNode = memo(
     const aiImageCardDisplay = isAiImageNode
       ? readAiImageCardDisplay(data.inputs, data.outputs, data.metadata)
       : null;
+    const aiVideoCardContext = useMemo(
+      () =>
+        isAiVideoNode
+          ? {
+              nodeId: id,
+              edges,
+              nodes: flowNodes.map((node) => ({
+                id: node.id,
+                data: node.data as CanvasWorkflowNodeType,
+              })),
+            }
+          : undefined,
+      [edges, flowNodes, id, isAiVideoNode]
+    );
     const aiVideoCardDisplay = isAiVideoNode
-      ? readAiVideoCardDisplay(data.inputs, data.outputs, data.metadata)
+      ? readAiVideoCardDisplay(
+          data.inputs,
+          data.outputs,
+          data.metadata,
+          aiVideoCardContext
+        )
       : null;
     const generativeCardPhase =
       aiImageCardDisplay?.cardPhase ?? aiVideoCardDisplay?.cardPhase ?? null;
@@ -519,7 +561,9 @@ export const WorkflowNode = memo(
         ? readGenerativeCardError(data.metadata)
         : undefined;
     const showTopToolbarContent =
-      isGenerativeCanvasNode && !generativeCardError && !isRetakePanel;
+      isGenerativeCanvasNode &&
+      !generativeCardError &&
+      (!isRetakePanel || hasRetakeOwnResource(data.inputs));
     const showBusyOverlay =
       isExecuting || isAiImageBusy || isAiVideoBusy || isAiAudioBusy;
     const showProgressOverlay = showBusyOverlay;
@@ -608,17 +652,30 @@ export const WorkflowNode = memo(
           )}
           style={
             isAiTextNode
-              ? {
-                  width: persistedLayout?.width ?? AI_TEXT_CARD_WIDTH_PX,
-                  height: persistedLayout?.height ?? AI_TEXT_CARD_HEIGHT_PX,
-                  boxSizing: "border-box",
-                }
-              : isAiAudioNode
-                ? {
-                    width: persistedLayout?.width ?? AI_AUDIO_CARD_WIDTH_PX,
-                    height: persistedLayout?.height ?? AI_AUDIO_CARD_HEIGHT_PX,
-                  }
-                : undefined
+              ? generativeCardBoxStyle(
+                  persistedLayout,
+                  AI_TEXT_CARD_WIDTH_PX,
+                  AI_TEXT_CARD_HEIGHT_PX
+                )
+              : isAiImageNode
+                ? generativeCardBoxStyle(
+                    persistedLayout,
+                    AI_IMAGE_CARD_WIDTH_PX,
+                    AI_IMAGE_CARD_HEIGHT_PX
+                  )
+                : isAiVideoNode
+                  ? generativeCardBoxStyle(
+                      persistedLayout,
+                      AI_VIDEO_CARD_WIDTH_PX,
+                      AI_VIDEO_CARD_HEIGHT_PX
+                    )
+                  : isAiAudioNode
+                    ? generativeCardBoxStyle(
+                        persistedLayout,
+                        AI_AUDIO_CARD_WIDTH_PX,
+                        AI_AUDIO_CARD_HEIGHT_PX
+                      )
+                    : undefined
           }
         >
           {/* Execution / generate overlay */}
@@ -666,7 +723,7 @@ export const WorkflowNode = memo(
                 "px-0 py-0",
                 isAiTextNode && "flex-1 min-h-0 overflow-hidden border-b",
                 (isAiImageNode || isAiVideoNode || isAiAudioNode) &&
-                  cn("overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS),
+                  cn("h-full overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS),
                 !isAiTextNode &&
                   !isAiImageNode &&
                   !isAiVideoNode &&

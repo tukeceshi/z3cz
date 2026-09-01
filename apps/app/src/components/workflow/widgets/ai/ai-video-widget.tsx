@@ -11,6 +11,7 @@ import {
 } from "@dafthunk/types";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useParams } from "react-router";
+import { useNodes } from "@xyflow/react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -61,6 +62,7 @@ import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-uploa
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
 import { useWorkflow } from "../../workflow-context";
 import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
+import type { WorkflowNodeType } from "../../workflow-types";
 import { CanvasMediaCover } from "../../canvas-media-cover";
 import { StudioVideoLightbox } from "../../studio-video-lightbox";
 import type { BaseWidgetProps } from "../widget";
@@ -92,7 +94,31 @@ function AiVideoWidget({
   const { id: workflowId } = useParams<{ id: string }>();
   const orgId = organization?.id;
   const { blocksGenerativeMedia } = useCloudStorageCanvasContext();
-  const { updateNodeData } = useWorkflow();
+  const { updateNodeData, edges = [] } = useWorkflow();
+  const flowNodes = useNodes();
+  const effectiveCardDisplay = useMemo(() => {
+    if (!isAiVideoRetakePanel(metadata)) {
+      return cardDisplay;
+    }
+    const node = flowNodes.find((entry) => entry.id === nodeId);
+    if (!node) {
+      return cardDisplay;
+    }
+    const nodeData = node.data as WorkflowNodeType;
+    return readAiVideoCardDisplay(
+      nodeData.inputs,
+      nodeData.outputs,
+      metadata,
+      {
+        nodeId,
+        edges,
+        nodes: flowNodes.map((entry) => ({
+          id: entry.id,
+          data: entry.data as WorkflowNodeType,
+        })),
+      }
+    );
+  }, [cardDisplay, edges, flowNodes, metadata, nodeId]);
   const initialLayout = useMemo(
     () => readNodeLayoutFromMetadata(metadata),
     [metadata]
@@ -155,10 +181,10 @@ function AiVideoWidget({
   const generateError =
     readGenerativeCardError(metadata) ?? restoredError ?? fallbackFailedError;
   const isGenerating =
-    (!historyFailed && !generateError && cardDisplay.isBusy) ||
+    (!historyFailed && !generateError && effectiveCardDisplay.isBusy) ||
     progressPhase === "cancelled";
   useGenerativeMediaWorkSession(
-    uploading || (!historyFailed && !generateError && cardDisplay.isBusy)
+    uploading || (!historyFailed && !generateError && effectiveCardDisplay.isBusy)
   );
   const showCancelledNotice = useSyncExternalStore(
     subscribeGenerativeCancelledNotice,
@@ -168,7 +194,7 @@ function AiVideoWidget({
   const handleDismissCancelledNotice = useCallback(() => {
     dismissGenerativeCancelledNotice(nodeId);
   }, [nodeId]);
-  const cardPhase = cardDisplay.cardPhase;
+  const cardPhase = effectiveCardDisplay.cardPhase;
   const cardPlaceholder = formatGenerativePhaseLabel({
     phase: cardPhase,
     progressKey: generativeCardProgressKey(cardPhase, "video"),
@@ -177,8 +203,8 @@ function AiVideoWidget({
   });
   const isPersistDownloading =
     persistPhase === "downloading" || progressPhase === "downloading";
-  const coverVideo = cardDisplay.coverMedia[0];
-  const hasVideo = cardDisplay.hasCover;
+  const coverVideo = effectiveCardDisplay.coverMedia[0];
+  const hasVideo = effectiveCardDisplay.hasCover;
   const activeVideoExpired = hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;
   const activeVideoKey = hasVideo && coverVideo ? getResourceIdFromValue(coverVideo) : null;
   const coverMediaRef =
@@ -192,8 +218,9 @@ function AiVideoWidget({
     kind: "video",
     hasMedia: hasVideo,
     mediaKey: activeVideoKey,
-    holdSize: cardDisplay.isBusy,
+    holdSize: effectiveCardDisplay.isBusy,
     initialLayout,
+    persistLayout: patchNodeLayout,
   });
 
   const handleClearPrompt = useCallback(() => {
@@ -270,15 +297,11 @@ function AiVideoWidget({
         }}
       />
       <div
-        className={cn(
-          "relative h-full w-full overflow-hidden cursor-grab select-none",
-          uploading && "opacity-70",
-          className
-        )}
-        style={{
-          width: cardSize.width,
-          height: cardSize.height,
-        }}
+          className={cn(
+            "relative h-full w-full overflow-hidden cursor-grab select-none",
+            uploading && "opacity-70",
+            className
+          )}
         onDoubleClick={(event) => {
           if (generateError) {
             event.stopPropagation();

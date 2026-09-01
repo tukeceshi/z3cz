@@ -596,12 +596,10 @@ function CanvasVideoCover({
           onFrameCapture={frameCapture.onFrameCapture}
           onExpandView={onExpandView}
           onLoadedMetadata={(video) => {
-            if (!playbackActive) {
+            if (retakeActive || !playbackActive) {
               return;
             }
-            const patchPlayback = retakeActive
-              ? patchRetakeDraft
-              : trimSessionApi?.patchTrimSession;
+            const patchPlayback = trimSessionApi?.patchTrimSession;
             if (!patchPlayback) {
               return;
             }
@@ -609,21 +607,7 @@ function CanvasVideoCover({
               patchPlayback({ loadPhase: "error" });
               return;
             }
-            const sourceVideoWidth =
-              video.videoWidth > 0 ? video.videoWidth : null;
-            const sourceVideoHeight =
-              video.videoHeight > 0 ? video.videoHeight : null;
             if (playbackSession?.loadPhase === "loading") {
-              if (retakeActive) {
-                patchPlayback({
-                  videoDurationSec: video.duration,
-                  sourceVideoWidth,
-                  sourceVideoHeight,
-                  loadPhase: "ready",
-                });
-                return;
-              }
-
               const defaultRange = createDefaultVideoTrimRange(video.duration);
               patchPlayback({
                 trimSourceVideoUrl:
@@ -636,26 +620,17 @@ function CanvasVideoCover({
               return;
             }
             patchPlayback({
-              ...(retakeActive
-                ? {}
-                : {
-                    trimSourceVideoUrl:
-                      video.currentSrc || playbackVideoUrl || undefined,
-                  }),
+              trimSourceVideoUrl:
+                video.currentSrc || playbackVideoUrl || undefined,
               videoDurationSec: video.duration,
-              ...(retakeActive
-                ? {
-                    sourceVideoWidth,
-                    sourceVideoHeight,
-                  }
-                : {}),
               loadPhase: "ready",
             });
           }}
           onError={() => {
             if (retakeActive) {
-              patchRetakeDraft({ loadPhase: "error" });
-            } else if (trimActive) {
+              return;
+            }
+            if (trimActive) {
               trimSessionApi?.patchTrimSession({ loadPhase: "error" });
             }
           }}

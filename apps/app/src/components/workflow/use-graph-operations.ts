@@ -41,6 +41,7 @@ import { collectAiTextFirstDegreeEdgeIds } from "./ai-text-edge-selection";
 import { collectAiImageFirstDegreeEdgeIds } from "./ai-image-edge-selection";
 import { collectAiAudioFirstDegreeEdgeIds } from "./ai-audio-edge-selection";
 import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
+import { isRetakePrimaryVideoEdge } from "./ai-video-retake-primary-ref";
 import { shouldSuppressGenerativePanelDeselect } from "./generative-panel-pointer-guard";
 import { buildGenerativeReferenceConnectionFromCardDrop } from "./generative-reference-connection";
 import {
@@ -1506,10 +1507,30 @@ export function useGraphOperations({
   const deleteEdge = useCallback(
     (edgeId: string) => {
       if (graphEditBlocked) return;
+      const edge = edgesRef.current.find((entry) => entry.id === edgeId);
+      if (edge?.target) {
+        const targetNode = nodesRef.current.find((node) => node.id === edge.target);
+        if (
+          targetNode &&
+          isRetakePrimaryVideoEdge({
+            edgeId,
+            targetNodeId: edge.target,
+            edges: edgesRef.current,
+            nodes: nodesRef.current.map((node) => ({
+              id: node.id,
+              data: node.data,
+            })),
+            inputs: targetNode.data.inputs,
+          })
+        ) {
+          toast.error("workflow.videoRetake.primaryReferenceLocked");
+          return;
+        }
+      }
       graphHistory.captureHistory();
       setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
     },
-    [graphEditBlocked, graphHistory, setEdges]
+    [graphEditBlocked, graphHistory, setEdges, toast]
   );
 
   const deleteSelected = useCallback(() => {
@@ -1518,6 +1539,29 @@ export function useGraphOperations({
     if (selectedNodes.length > 0) {
       commitRemoveNodes(selectedNodes.map((n) => n.id));
     } else if (selectedEdges.length > 0) {
+      const blocked = selectedEdges.some((edge) => {
+        if (!edge.target) {
+          return false;
+        }
+        const targetNode = nodesRef.current.find((node) => node.id === edge.target);
+        if (!targetNode) {
+          return false;
+        }
+        return isRetakePrimaryVideoEdge({
+          edgeId: edge.id,
+          targetNodeId: edge.target,
+          edges: edgesRef.current,
+          nodes: nodesRef.current.map((node) => ({
+            id: node.id,
+            data: node.data,
+          })),
+          inputs: targetNode.data.inputs,
+        });
+      });
+      if (blocked) {
+        toast.error("workflow.videoRetake.primaryReferenceLocked");
+        return;
+      }
       graphHistory.captureHistory();
       const edgeIds = selectedEdges.map((e) => e.id);
       setEdges((eds) => eds.filter((edge) => !edgeIds.includes(edge.id)));
@@ -1529,6 +1573,7 @@ export function useGraphOperations({
     selectedEdges,
     selectedNodes,
     setEdges,
+    toast,
   ]);
 
   const deselectAll = useCallback(() => {

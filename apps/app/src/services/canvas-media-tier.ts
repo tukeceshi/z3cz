@@ -1,7 +1,10 @@
+import {
+  MEDIA_CARD_SHORT_SIDE_PX,
+} from "@/components/workflow/media-card-size";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 
 /** Must match MEDIA_CARD_SHORT_SIDE_PX in media-card-size. */
-const CARD_SHORT_SIDE_PX = 270;
+const CARD_SHORT_SIDE_PX = MEDIA_CARD_SHORT_SIDE_PX;
 
 /** Canvas cover tiers by short-edge thumbnail size. */
 export type CanvasMediaTier = "s" | "m" | "l";
@@ -9,14 +12,14 @@ export type CanvasMediaTier = "s" | "m" | "l";
 /** Short-edge pixel sizes for generated thumbs. */
 export const CANVAS_TIER_SHORT_EDGE: Readonly<Record<CanvasMediaTier, number>> = {
   s: 80,
-  m: 270,
-  l: 540,
+  m: MEDIA_CARD_SHORT_SIDE_PX,
+  l: MEDIA_CARD_SHORT_SIDE_PX * 2,
 } as const;
 
 /** @deprecated Use CANVAS_TIER_SHORT_EDGE. */
 export const CANVAS_TIER_MAX_WIDTH = CANVAS_TIER_SHORT_EDGE;
 
-/** Screen size / card short side (270). */
+/** Screen size / card short side. */
 export const CANVAS_TIER_RATIO = {
   s: 0.35,
   m: 1.1,

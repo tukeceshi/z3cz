@@ -23,6 +23,7 @@ import {
   AI_VIDEO_CARD_HEIGHT_PX,
   AI_VIDEO_CARD_WIDTH_PX,
 } from "./ai-video-node-utils";
+import { snapMediaCardSize } from "./media-card-size";
 
 /**
  * Floating mini-header uses `-top-5` and sits above the card.
@@ -50,9 +51,9 @@ function fallbackContentSize(nodeType: string | undefined): {
 }
 
 /**
- * Shared content-card size for layout and edge anchors.
- * Text/audio use fixed constants (ignore measured border drift).
- * Image/video use measured adaptive size when available.
+ * Visible card size for placement, first paint, and edge midpoints.
+ * Saved layout when present; otherwise the type default.
+ * Never use React Flow measured size — it includes border/chrome drift.
  */
 export function resolveGenerativeLayoutContentSize(
   nodeType: string | undefined,
@@ -62,30 +63,12 @@ export function resolveGenerativeLayoutContentSize(
 ): { width: number; height: number } {
   const fromMetadata = readNodeLayoutFromMetadata(node?.data?.metadata);
   if (fromMetadata) {
-    return fromMetadata;
-  }
-
-  if (
-    nodeType === AI_TEXT_NODE_TYPE ||
-    nodeType === AI_AUDIO_NODE_TYPE
-  ) {
-    return fallbackContentSize(nodeType);
-  }
-
-  const measuredW = node?.measured?.width ?? node?.width;
-  const measuredH = node?.measured?.height ?? node?.height;
-  if (
-    typeof measuredW === "number" &&
-    measuredW > 0 &&
-    typeof measuredH === "number" &&
-    measuredH > 0
-  ) {
-    return { width: measuredW, height: measuredH };
+    return snapMediaCardSize(fromMetadata);
   }
   return fallbackContentSize(nodeType);
 }
 
-/** Content card size — measured body, not the floating title above. */
+/** Same box as layout — left/right anchors share one midpoint. */
 export function resolveGenerativeNodeContentSize(
   node: InternalNode<Node>
 ): { width: number; height: number } {
@@ -93,7 +76,7 @@ export function resolveGenerativeNodeContentSize(
   return resolveGenerativeLayoutContentSize(nodeType, node);
 }
 
-/** Left/right border midpoint of the content card (title excluded). */
+/** Left/right border midpoint of the visible card. */
 export function snapGenerativeContentBorderPoint(
   node: InternalNode<Node>,
   side: "left" | "right"

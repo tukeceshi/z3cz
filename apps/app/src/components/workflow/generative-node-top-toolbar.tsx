@@ -13,6 +13,7 @@ import HistoryIcon from "lucide-react/icons/history";
 import Maximize2Icon from "lucide-react/icons/maximize-2";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useParams } from "react-router";
+import { useEdges, useNodes } from "@xyflow/react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -78,7 +79,7 @@ import {
   useHistoryModelUnavailableToast,
 } from "./use-generative-history-models";
 import { useWorkflow } from "./workflow-context";
-import type { WorkflowNodeType } from "./workflow-types";
+import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 function TopToolbarDivider() {
   return (
@@ -134,6 +135,8 @@ export function GenerativeNodeTopToolbar({
   const orgId = organization?.id;
   const { id: workflowId } = useParams<{ id: string }>();
   const { updateNodeData, disabled = false } = useWorkflow();
+  const edges = useEdges<WorkflowEdgeType>();
+  const flowNodes = useNodes();
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -143,6 +146,20 @@ export function GenerativeNodeTopToolbar({
   const nodeType = data.nodeType ?? "";
   const metadata = data.metadata;
   const generateError = readGenerativeCardError(metadata);
+  const aiVideoCardContext = useMemo(
+    () =>
+      nodeType === AI_VIDEO_NODE_TYPE
+        ? {
+            nodeId,
+            edges,
+            nodes: flowNodes.map((node) => ({
+              id: node.id,
+              data: node.data as WorkflowNodeType,
+            })),
+          }
+        : undefined,
+    [edges, flowNodes, nodeId, nodeType]
+  );
 
   const imageCardDisplay =
     nodeType === AI_IMAGE_NODE_TYPE
@@ -150,7 +167,12 @@ export function GenerativeNodeTopToolbar({
       : null;
   const videoCardDisplay =
     nodeType === AI_VIDEO_NODE_TYPE
-      ? readAiVideoCardDisplay(data.inputs, data.outputs, metadata)
+      ? readAiVideoCardDisplay(
+          data.inputs,
+          data.outputs,
+          metadata,
+          aiVideoCardContext
+        )
       : null;
   const audioCardDisplay =
     nodeType === AI_AUDIO_NODE_TYPE
@@ -538,7 +560,6 @@ export function GenerativeNodeTopToolbar({
                 />
                 <VideoRetakeToolbarButton
                   sourceNodeId={nodeId}
-                  sourceVideo={videoForEnhance}
                   disabled={disabled}
                 />
                 <VideoEnhanceToolbarButton

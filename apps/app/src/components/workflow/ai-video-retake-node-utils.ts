@@ -4,7 +4,6 @@ import {
   isAiVideoRetakePanel,
   parseAiVideoRetakeDraft,
   readAiVideoRetakeDraftFromInputs,
-  withAiVideoPanelKind,
   type AiVideoRetakeDraft,
   type VideoTrimRangeSec,
 } from "@dafthunk/types";
@@ -68,16 +67,10 @@ export function withAiVideoRetakeDraftCommittedRange(
   });
 }
 
-export function withAiVideoRetakeNodeUnlocked(
+export function withRetakeGenerationComplete(
   current: WorkflowNodeType
 ): Partial<WorkflowNodeType> {
-  const inputs = current.inputs.filter(
-    (input) => input.id !== AI_VIDEO_RETAKE_DRAFT_INPUT_ID
-  );
-  return {
-    inputs,
-    metadata: withAiVideoPanelKind(current.metadata, "generate"),
-  };
+  return withAiVideoRetakeDraft(current, { cardPreview: "generated" });
 }
 
 export function parseAiVideoRetakeDraftValue(

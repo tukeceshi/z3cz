@@ -6,14 +6,18 @@ import type {
   WorkflowEditorViewport,
   WorkflowGenerativeDefaults,
   WorkflowGraphPatchBroadcast,
+  WorkflowPartialState,
+  WorkflowPublicState,
   WorkflowRuntime,
   WorkflowState,
   WorkflowTrigger,
 } from "@dafthunk/types";
 import {
   applyWorkflowGraphPatch,
+  buildWorkflowUpdateIdentity,
   diffWorkflowGraph,
   isEmptyWorkflowGraphPatch,
+  mergeWorkflowPartialState,
 } from "@dafthunk/types";
 
 import { buildApiUrl, getApiBaseUrl } from "@/config/api";
@@ -68,7 +72,8 @@ function getWebSocketBaseUrl(): string {
 export interface WorkflowWSOptions {
   // Message-level callbacks (happy path only)
   onInit?: (state: WorkflowState) => void;
-  onUpdate?: (state: WorkflowState) => void;
+  onUpdate?: (state: WorkflowPartialState) => void;
+  onPublic?: (state: WorkflowPublicState) => void;
   onPatchGraph?: (patch: WorkflowGraphPatchBroadcast) => void;
   onWorkflowError?: (error: { code: string; message: string }) => void;
 
@@ -194,10 +199,18 @@ export class WorkflowWebSocket {
           this.currentState = message.state;
           this.lastGraphRev = 0;
           this.options.onInit?.(message.state);
+          if (message.public) {
+            this.options.onPublic?.(message.public);
+          }
           break;
 
         case "update":
-          this.currentState = message.state;
+          if (this.currentState) {
+            this.currentState = mergeWorkflowPartialState(
+              this.currentState,
+              message.state
+            );
+          }
           this.options.onUpdate?.(message.state);
           break;
 
@@ -213,6 +226,10 @@ export class WorkflowWebSocket {
             };
           }
           this.options.onPatchGraph?.(message);
+          break;
+
+        case "public":
+          this.options.onPublic?.(message.public);
           break;
 
         case "execution_update":
@@ -301,19 +318,24 @@ export class WorkflowWebSocket {
       return;
     }
 
-    const updatedState: WorkflowState = {
-      ...this.currentState,
+    const timestamp = Date.now();
+    const partialState: WorkflowPartialState = {
+      ...buildWorkflowUpdateIdentity(this.currentState),
+      timestamp,
       editorViewport: viewport,
-      timestamp: Date.now(),
     };
 
     const success = this.sendMessage(
-      { type: "update", state: updatedState },
+      { type: "update", state: partialState },
       "send viewport update"
     );
 
     if (success) {
-      this.currentState = updatedState;
+      this.currentState = {
+        ...this.currentState,
+        editorViewport: viewport,
+        timestamp,
+      };
     }
   }
 
@@ -324,19 +346,24 @@ export class WorkflowWebSocket {
       return;
     }
 
-    const updatedState: WorkflowState = {
-      ...this.currentState,
+    const timestamp = Date.now();
+    const partialState: WorkflowPartialState = {
+      ...buildWorkflowUpdateIdentity(this.currentState),
+      timestamp,
       generativeDefaults: defaults,
-      timestamp: Date.now(),
     };
 
     const success = this.sendMessage(
-      { type: "update", state: updatedState },
+      { type: "update", state: partialState },
       "send generative defaults update"
     );
 
     if (success) {
-      this.currentState = updatedState;
+      this.currentState = {
+        ...this.currentState,
+        generativeDefaults: defaults,
+        timestamp,
+      };
     }
   }
 
@@ -357,24 +384,28 @@ export class WorkflowWebSocket {
       return;
     }
 
-    const updatedState: WorkflowState = {
-      ...this.currentState,
+    const timestamp = Date.now();
+    const partialState: WorkflowPartialState = {
+      ...buildWorkflowUpdateIdentity(this.currentState),
+      timestamp,
       ...(metadata.name !== undefined && { name: metadata.name }),
       ...(metadata.description !== undefined && {
         description: metadata.description,
       }),
       ...(metadata.trigger !== undefined && { trigger: metadata.trigger }),
       ...(metadata.runtime !== undefined && { runtime: metadata.runtime }),
-      timestamp: Date.now(),
     };
 
     const success = this.sendMessage(
-      { type: "update", state: updatedState },
+      { type: "update", state: partialState },
       "send metadata update"
     );
 
     if (success) {
-      this.currentState = updatedState;
+      this.currentState = mergeWorkflowPartialState(
+        this.currentState,
+        partialState
+      );
     }
   }
 

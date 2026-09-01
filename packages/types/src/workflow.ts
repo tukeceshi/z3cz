@@ -616,20 +616,37 @@ export interface WorkflowState extends Workflow {
   timestamp: number;
 }
 
+import type { WorkflowPublicMessage, WorkflowPublicState } from "./workflow-public-state";
+
+export type { WorkflowPublicMessage, WorkflowPublicState } from "./workflow-public-state";
+export { workflowPublicStateFromSiteSettings } from "./workflow-public-state";
+
 /**
  * Message sent from server to client with initial state
  */
 export interface WorkflowInitMessage {
   type: "init";
   state: WorkflowState;
+  public: WorkflowPublicState;
 }
 
+import type { WorkflowPartialState } from "./workflow-partial-update";
+
+export type { WorkflowPartialState } from "./workflow-partial-update";
+export {
+  buildWorkflowPartialBroadcast,
+  buildWorkflowUpdateIdentity,
+  hasWorkflowGraphInPartial,
+  mergeWorkflowPartialState,
+} from "./workflow-partial-update";
+
 /**
- * Message sent from client to server to update state
+ * Message sent from client to server to update state.
+ * `state` may omit nodes/edges for viewport, defaults, or metadata-only changes.
  */
 export interface WorkflowUpdateMessage {
   type: "update";
-  state: WorkflowState;
+  state: WorkflowPartialState;
 }
 
 import type {
@@ -693,7 +710,8 @@ export type ServerMessage =
   | WorkflowUpdateMessage
   | WorkflowGraphPatchBroadcast
   | WorkflowExecutionUpdateMessage
-  | WorkflowErrorMessage;
+  | WorkflowErrorMessage
+  | WorkflowPublicMessage;
 
 /**
  * Represents a workflow template

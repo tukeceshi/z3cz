@@ -1,4 +1,4 @@
-import { AI_VIDEO_NODE_TYPE, type WorkflowMediaValue } from "@dafthunk/types";
+import { AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
 import {
   useEdges,
   useNodes,
@@ -10,8 +10,12 @@ import { useCallback } from "react";
 import { useParams } from "react-router";
 
 import { useObjectService } from "@/services/object-service";
+import { useAppToast } from "@/hooks/use-app-toast";
 
-import { AI_VIDEO_OUTPUT_ID } from "./ai-video-node-utils";
+import {
+  AI_VIDEO_OUTPUT_ID,
+} from "./ai-video-node-utils";
+import { withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import {
   buildEmptyAiVideoSiblingNode,
   buildLockedRetakeCopyNode,
@@ -24,6 +28,7 @@ import {
   appendGenerativeReferenceConnection,
   buildPanelReferenceConnection,
 } from "./generative-reference-connection";
+import { prepareWorkflowConnectionAppend } from "./workflow-connection-commit";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 import {
@@ -187,14 +192,17 @@ export interface CreateLockedRetakeCopyNodeResult {
 }
 
 export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
-  const { nodeTypes = [], disabled } = useWorkflow();
+  const { nodeTypes = [], disabled, generativeReferenceCatalogs, updateNodeData } =
+    useWorkflow();
   const nodes = useNodes();
-  const { setNodes, getNode, getViewport, setCenter } = useReactFlow();
+  const edges = useEdges<ReactFlowEdge<WorkflowEdgeType>>();
+  const { setNodes, setEdges, getNode, getViewport, setCenter } = useReactFlow();
   const { createObjectUrl } = useObjectService();
+  const toast = useAppToast();
   const { id: workflowId } = useParams<{ id: string }>();
 
   const createLockedRetakeCopyNode = useCallback(
-    (coverVideo: WorkflowMediaValue): CreateLockedRetakeCopyNodeResult | null => {
+    (): CreateLockedRetakeCopyNodeResult | null => {
       if (disabled || !workflowId) {
         return null;
       }
@@ -228,7 +236,6 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
         nodeId,
         nodeName,
         position,
-        video: coverVideo,
         createObjectUrl: sourceData.createObjectUrl ?? createObjectUrl,
       });
 
@@ -236,6 +243,60 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
         ...current.map((node) => ({ ...node, selected: false })),
         newNode,
       ]);
+
+      const nextNodes: ReactFlowNode<WorkflowNodeType>[] = [
+        ...typedNodes.map((node) => ({ ...node, selected: false })),
+        newNode,
+      ];
+      const nodeRefs = nextNodes.map((node) => ({
+        id: node.id,
+        data: node.data,
+      }));
+      const connection = buildPanelReferenceConnection({
+        sourceNodeId,
+        sourceHandle: AI_VIDEO_OUTPUT_ID,
+        targetNodeId: nodeId,
+        nodes: nodeRefs,
+      });
+      if (!connection) {
+        toast.error("workflow.videoRetake.referenceLinkFailed");
+        return { nodeId };
+      }
+
+      const prepared = prepareWorkflowConnectionAppend({
+        connection,
+        nodes: nextNodes,
+        edges,
+        createObjectUrl: sourceData.createObjectUrl ?? createObjectUrl,
+        generativeReferenceCatalogs,
+        disabled,
+      });
+      if (!prepared) {
+        toast.error("workflow.videoRetake.referenceLinkFailed");
+        return { nodeId };
+      }
+
+      const referenceLinked = appendGenerativeReferenceConnection({
+        connection,
+        nodes: nextNodes,
+        edges,
+        setEdges,
+        createObjectUrl: sourceData.createObjectUrl ?? createObjectUrl,
+        generativeReferenceCatalogs,
+        disabled,
+      });
+      if (!referenceLinked) {
+        toast.error("workflow.videoRetake.referenceLinkFailed");
+        return { nodeId };
+      }
+
+      if (updateNodeData) {
+        updateNodeData(nodeId, (current) =>
+          withAiVideoRetakeDraft(current, {
+            primaryVideoEdgeId: prepared.edge.id,
+          })
+        );
+      }
 
       const { width, height } = resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
       const centerX = position.x + width / 2;
@@ -248,13 +309,18 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
     [
       createObjectUrl,
       disabled,
+      edges,
+      generativeReferenceCatalogs,
       getNode,
       getViewport,
       nodeTypes,
       nodes,
       setCenter,
+      setEdges,
       setNodes,
       sourceNodeId,
+      toast,
+      updateNodeData,
       workflowId,
     ]
   );

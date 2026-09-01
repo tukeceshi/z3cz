@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { MEDIA_CARD_SHORT_SIDE_PX } from "@/components/workflow/media-card-size";
+
 import {
+  CANVAS_TIER_RATIO,
   CANVAS_TIER_SHORT_EDGE,
   computeCanvasScreenShortEdge,
   pickCanvasMediaTier,
@@ -12,21 +15,25 @@ describe("canvas-media-tier", () => {
     expect(CANVAS_TIER_SHORT_EDGE.s).toBe(80);
   });
   it("computes on-screen short edge from zoom", () => {
-    expect(computeCanvasScreenShortEdge(1, 1)).toBe(270);
-    expect(computeCanvasScreenShortEdge(0.5, 1)).toBe(135);
-    expect(computeCanvasScreenShortEdge(0.1, 1)).toBe(27);
-    expect(computeCanvasScreenShortEdge(1.2, 1)).toBeCloseTo(324);
+    expect(computeCanvasScreenShortEdge(1, 1)).toBe(MEDIA_CARD_SHORT_SIDE_PX);
+    expect(computeCanvasScreenShortEdge(0.5, 1)).toBe(MEDIA_CARD_SHORT_SIDE_PX / 2);
+    expect(computeCanvasScreenShortEdge(0.1, 1)).toBeCloseTo(
+      MEDIA_CARD_SHORT_SIDE_PX * 0.1
+    );
+    expect(computeCanvasScreenShortEdge(1.2, 1)).toBeCloseTo(
+      MEDIA_CARD_SHORT_SIDE_PX * 1.2
+    );
   });
 
-  it("picks s/m/l from ratio to 270", () => {
-    expect(pickCanvasMediaTier(93)).toBe("s"); // ~34%
-    expect(pickCanvasMediaTier(100)).toBe("m"); // ~37%
-    expect(pickCanvasMediaTier(134)).toBe("m"); // ~49%
-    expect(pickCanvasMediaTier(135)).toBe("m"); // 50%
-    expect(pickCanvasMediaTier(270)).toBe("m"); // 100%
-    expect(pickCanvasMediaTier(296)).toBe("m"); // ~110%
-    expect(pickCanvasMediaTier(297)).toBe("l"); // >110%
-    expect(pickCanvasMediaTier(540)).toBe("l");
+  it("picks s/m/l from ratio to the card short side", () => {
+    const short = MEDIA_CARD_SHORT_SIDE_PX;
+    expect(pickCanvasMediaTier(short * CANVAS_TIER_RATIO.s - 1)).toBe("s");
+    expect(pickCanvasMediaTier(short * CANVAS_TIER_RATIO.s + 8)).toBe("m");
+    expect(pickCanvasMediaTier(short * 0.5)).toBe("m");
+    expect(pickCanvasMediaTier(short)).toBe("m");
+    expect(pickCanvasMediaTier(short * CANVAS_TIER_RATIO.m - 1)).toBe("m");
+    expect(pickCanvasMediaTier(short * CANVAS_TIER_RATIO.m)).toBe("l");
+    expect(pickCanvasMediaTier(short * 2)).toBe("l");
   });
 
   it("applies hysteresis to reduce tier churn", () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   appendVideoPromptRefToken,
+  buildRetakeStoredPrompt,
   buildVideoPromptImageEdgeIndexMap,
   compileRetakePromptForSubmit,
   compileVideoPromptForSubmit,
@@ -12,6 +13,8 @@ import {
   formatVideoPromptImageRef,
   hasBrokenVideoPromptRefs,
   listBrokenVideoPromptRefEdgeIds,
+  parseRetakePromptTimeRange,
+  replaceRetakePromptTimeRange,
   stripVideoPromptRefTokenPrefix,
 } from "./video-prompt-compile";
 
@@ -129,6 +132,8 @@ describe("stripVideoPromptRefTokenPrefix", () => {
 });
 
 describe("retake edit prompt prefix", () => {
+  const defaultRange = { startSec: 4, endSec: 8 } as const;
+
   it("formats display and submit prefixes", () => {
     expect(
       formatRetakeEditTimeRangeLabel({ startSec: 4.4, endSec: 8.4 })
@@ -136,15 +141,15 @@ describe("retake edit prompt prefix", () => {
     expect(formatRetakeEditSubmitPrefix()).toBe("编辑<视频1>");
   });
 
-  it("prepends submit prefix and compiles image refs", () => {
+  it("prepends submit prefix with time range and compiles image refs", () => {
     const indexMap = buildVideoPromptImageEdgeIndexMap([
       { edgeId: "edge-a", kind: "image" },
     ]);
     expect(
-      compileRetakePromptForSubmit("换{{ref:edge-a}}背景", indexMap)
+      compileRetakePromptForSubmit("换{{ref:edge-a}}背景", indexMap, defaultRange)
     ).toEqual({
       ok: true,
-      prompt: "编辑<视频1>换图片1背景",
+      prompt: "编辑<视频1>00:04—00:08换图片1背景",
     });
   });
 
@@ -152,9 +157,33 @@ describe("retake edit prompt prefix", () => {
     const indexMap = buildVideoPromptImageEdgeIndexMap([
       { edgeId: "edge-a", kind: "image" },
     ]);
-    expect(compiledRetakePromptLength("", indexMap)).toBe("编辑<视频1>".length);
-    expect(compiledRetakePromptLength("测试", indexMap)).toBe(
-      "编辑<视频1>测试".length
+    expect(compiledRetakePromptLength("", indexMap, defaultRange)).toBe(
+      "编辑<视频1>00:04—00:08".length
     );
+    expect(compiledRetakePromptLength("测试", indexMap, defaultRange)).toBe(
+      "编辑<视频1>00:04—00:08测试".length
+    );
+  });
+
+  it("replaces and parses time range in stored prompt", () => {
+    const stored = "编辑<视频1>00:04—00:08换背景";
+    expect(replaceRetakePromptTimeRange(stored, { startSec: 10, endSec: 15 })).toBe(
+      "编辑<视频1>00:10—00:15换背景"
+    );
+    expect(parseRetakePromptTimeRange(stored)).toEqual({
+      startSec: 4,
+      endSec: 8,
+    });
+  });
+
+  it("builds stored prompt via helper", () => {
+    const indexMap = buildVideoPromptImageEdgeIndexMap([]);
+    expect(
+      buildRetakeStoredPrompt({
+        range: defaultRange,
+        body: "测试",
+        indexMap,
+      })
+    ).toEqual({ ok: true, prompt: "编辑<视频1>00:04—00:08测试" });
   });
 });

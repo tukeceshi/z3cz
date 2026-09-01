@@ -7,12 +7,16 @@ import type {
   WorkflowGraphPatchBroadcast,
   WorkflowGraphPatchMessage,
   WorkflowInitMessage,
+  WorkflowPublicMessage,
+  WorkflowPublicState,
   WorkflowState,
   WorkflowUpdateMessage,
 } from "@dafthunk/types";
 import {
   applyWorkflowGraphPatch,
+  buildWorkflowPartialBroadcast,
   isEmptyWorkflowGraphPatch,
+  mergeWorkflowPartialState,
 } from "@dafthunk/types";
 import type { WSContext } from "hono/ws";
 
@@ -21,6 +25,7 @@ import type { OrgMembershipContext } from "../middleware/org-permissions";
 import { canEditWorkflows } from "../utils/sub-account-permissions";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
+import { loadWorkflowPublicState } from "./platform-public-state";
 
 interface NodeWsClient {
   readonly id: string;
@@ -117,9 +122,12 @@ class NodeWorkflowSessionHub {
     const client: NodeWsClient = { id: clientId, ws, membership };
     session.clients.set(clientId, client);
 
+    const publicState = await loadWorkflowPublicState(env);
+
     const initMessage: WorkflowInitMessage = {
       type: "init",
       state: { ...session.workflowState, timestamp: session.workflowState.timestamp },
+      public: publicState,
     };
     ws.send(JSON.stringify(initMessage));
   }
@@ -215,6 +223,25 @@ class NodeWorkflowSessionHub {
         client.ws.send(payload);
       } catch (error) {
         console.error("[NodeWorkflowSession] broadcast failed:", error);
+      }
+    }
+  }
+
+  /** Push site-wide public state to every connected editor client. */
+  broadcastPublicState(publicState: WorkflowPublicState): void {
+    const message: WorkflowPublicMessage = {
+      type: "public",
+      public: publicState,
+    };
+    const payload = JSON.stringify(message);
+
+    for (const session of this.sessions.values()) {
+      for (const client of session.clients.values()) {
+        try {
+          client.ws.send(payload);
+        } catch (error) {
+          console.error("[NodeWorkflowSession] public broadcast failed:", error);
+        }
       }
     }
   }
@@ -383,31 +410,20 @@ class NodeWorkflowSessionHub {
     if (!message.state.name || !message.state.trigger) {
       return;
     }
-    if (
-      !Array.isArray(message.state.nodes) ||
-      !Array.isArray(message.state.edges)
-    ) {
-      return;
-    }
 
-    const nodeIds = new Set(message.state.nodes.map((node) => node.id));
-    const filteredEdges = message.state.edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+    session.workflowState = mergeWorkflowPartialState(
+      session.workflowState,
+      message.state
     );
-
-    session.workflowState = {
-      ...message.state,
-      edges: filteredEdges,
-      editorViewport:
-        message.state.editorViewport ?? session.workflowState.editorViewport,
-      timestamp: message.state.timestamp ?? Date.now(),
-    };
 
     this.schedulePersist(session);
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
-      state: session.workflowState,
+      state: buildWorkflowPartialBroadcast(
+        session.workflowState,
+        message.state
+      ),
     };
     const payload = JSON.stringify(updateMsg);
     for (const client of session.clients.values()) {

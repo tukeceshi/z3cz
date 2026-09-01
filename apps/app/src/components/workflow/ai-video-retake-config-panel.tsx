@@ -27,6 +27,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
+import ArrowLeftIcon from "lucide-react/icons/arrow-left";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -71,11 +72,17 @@ import {
   AI_VIDEO_REFERENCE_HANDLE_ID,
   canGenerateAiVideo,
   countAiVideoReferenceCountsForNode,
+  hasRetakeOwnResource,
   isAiVideoGenerating,
-  readAiVideoCardPrimaryVideo,
   referencesFitVideoModelLimits,
   withAiVideoGenerateError,
 } from "./ai-video-node-utils";
+import {
+  annotateRetakePrimaryVideoChips,
+  collectRetakeSupplementalReferenceMedia,
+  isRetakePrimaryVideoEdge,
+  resolveRetakePrimaryVideoRef,
+} from "./ai-video-retake-primary-ref";
 import {
   annotateVideoReferenceChips,
   clearReferenceModeAutoSwitchNoticeIfResolved,
@@ -99,7 +106,6 @@ import {
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
 import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
-import { collectGenerativeReferenceMedia } from "./generative-reference-utils";
 import {
   resolveGenerativeNodeDefaultBaseName,
   resolveGenerativeNodeDisplayName,
@@ -111,6 +117,7 @@ import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import { useGenerativeVideoFileUpload } from "./use-generative-video-file-upload";
 import { useAiVideoRetakeDraft, withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
+import { useRetakePlaybackUrl } from "./retake-playback-url-context";
 import { applySelectedModelRecord } from "./generative-model-binding";
 import { runVideoRetakePipeline } from "./run-video-retake-pipeline";
 import {
@@ -124,13 +131,15 @@ import {
 import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
 import {
   appendVideoPromptRefToken,
+  buildRetakeStoredPrompt,
   buildVideoPromptImageEdgeIndexMap,
-  compileRetakePromptForSubmit,
-  compiledRetakePromptLength,
   formatRetakeEditTimeRangeLabel,
   hasBrokenVideoPromptRefs,
+  parseRetakePromptTimeRange,
+  parseRetakeStoredPrompt,
+  replaceRetakePromptTimeRange,
 } from "./video-prompt-compile";
-import { useWorkflow } from "./workflow-context";
+import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 
 const AI_VIDEO_RETAKE_PROMPT_MIN_HEIGHT_PX = 120 as const;
@@ -202,11 +211,7 @@ export function AiVideoRetakeConfigPanel({
     nodeId,
     data
   );
-  const sourceMedia = readAiVideoCardPrimaryVideo(
-    data.inputs,
-    data.outputs,
-    data.metadata
-  );
+  const retakePlaybackUrl = useRetakePlaybackUrl(nodeId);
   const { uploadVideoFileToNode } = useGenerativeVideoFileUpload();
   const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
     useOrgVolcanoMediaKitConfig(orgId);
@@ -226,6 +231,24 @@ export function AiVideoRetakeConfigPanel({
     isGenerativeProgressBusyPhase(progressPhase);
 
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+  const flowNodeRefs = useMemo(
+    () => typedNodes.map((node) => ({ id: node.id, data: node.data })),
+    [typedNodes]
+  );
+  const primaryVideoRef = useMemo(
+    () =>
+      resolveRetakePrimaryVideoRef({
+        targetNodeId: nodeId,
+        edges,
+        nodes: flowNodeRefs,
+        inputs: data.inputs,
+      }),
+    [data.inputs, edges, flowNodeRefs, nodeId]
+  );
+  const sourceMedia = primaryVideoRef?.media;
+  const primaryVideoEdgeId = primaryVideoRef?.edgeId ?? draft.primaryVideoEdgeId;
+  const promptValue = getInputString(data, "prompt");
+  const hasRetakeHistory = hasRetakeOwnResource(data.inputs);
 
   const hasPromptReference = useMemo(
     () => hasAiVideoPromptReference({ nodeId, edges }),
@@ -388,37 +411,6 @@ export function AiVideoRetakeConfigPanel({
     modelRules,
   ]);
 
-  useEffect(() => {
-    if (draft.resolutionManuallySet || !modelRules) {
-      return;
-    }
-    const resolution = resolveRetakeAutoResolution({
-      width: draft.sourceVideoWidth,
-      height: draft.sourceVideoHeight,
-      modelFallback: readModelResolutionFallback(modelRules.generationFields),
-    });
-    const currentResolution =
-      typeof draft.generationParams.resolution === "string"
-        ? draft.generationParams.resolution
-        : "";
-    if (currentResolution === resolution) {
-      return;
-    }
-    patchDraft({
-      generationParams: {
-        ...draft.generationParams,
-        resolution,
-      },
-    });
-  }, [
-    draft.generationParams,
-    draft.resolutionManuallySet,
-    draft.sourceVideoHeight,
-    draft.sourceVideoWidth,
-    modelRules,
-    patchDraft,
-  ]);
-
   const allGenerationFields = modelRules?.generationFields ?? [];
 
   const paramPopoverFields = useMemo(
@@ -502,13 +494,6 @@ export function AiVideoRetakeConfigPanel({
 
   const promptMaxLength = modelRules?.promptMaxChars ?? 1000;
 
-  const commitPrompt = useCallback(
-    (value: string) => {
-      patchDraft({ prompt: value });
-    },
-    [patchDraft]
-  );
-
   const paramsEditor = useGenerativeParamsEditor({
     visible: paramsVisible,
     disabled: disabled || isStarting || isGenerating,
@@ -532,9 +517,13 @@ export function AiVideoRetakeConfigPanel({
       modelRules,
       generationValues
     );
-    return annotateVideoReferenceChips(base, referenceMode, referenceCounts, {
-      firstFrame: t("workflow.aiVideoPanel.frameRoleFirst"),
-      lastFrame: t("workflow.aiVideoPanel.frameRoleLast"),
+    return annotateRetakePrimaryVideoChips({
+      chips: annotateVideoReferenceChips(base, referenceMode, referenceCounts, {
+        firstFrame: t("workflow.aiVideoPanel.frameRoleFirst"),
+        lastFrame: t("workflow.aiVideoPanel.frameRoleLast"),
+      }),
+      primaryEdgeId: primaryVideoEdgeId,
+      sourceLabel: t("workflow.videoRetake.source"),
     });
   }, [
     data,
@@ -542,6 +531,7 @@ export function AiVideoRetakeConfigPanel({
     modelRules,
     nodeId,
     paramsEditor.effectiveValues,
+    primaryVideoEdgeId,
     referenceCounts,
     t,
     typedNodes,
@@ -623,58 +613,130 @@ export function AiVideoRetakeConfigPanel({
     [imageReferenceChips]
   );
 
-  const promptBuffer = useBufferedTextValue(draft.prompt, commitPrompt);
+  const commitStoredPrompt = useCallback(
+    (body: string) => {
+      if (disabled || !updateNodeData) {
+        return;
+      }
+      const compiled = buildRetakeStoredPrompt({
+        range: draft.draftRange,
+        body,
+        indexMap: imageEdgeIndexMap,
+      });
+      if (!compiled.ok) {
+        return;
+      }
+      updateNodeInput(nodeId, "prompt", compiled.prompt, data.inputs, updateNodeData);
+    },
+    [
+      data.inputs,
+      disabled,
+      draft.draftRange,
+      imageEdgeIndexMap,
+      nodeId,
+      updateNodeData,
+    ]
+  );
+
+  const promptBody = useMemo(() => {
+    if (hasPromptReference) {
+      return referencedPrompt;
+    }
+    const parsed = parseRetakeStoredPrompt(promptValue);
+    return parsed?.body ?? promptValue;
+  }, [hasPromptReference, promptValue, referencedPrompt]);
+
+  const promptBuffer = useBufferedTextValue(promptBody, commitStoredPrompt);
 
   useEffect(() => {
     if (
       !hasPromptReference ||
       disabled ||
+      !updateNodeData ||
       referencedPromptLoading
     ) {
       return;
     }
-    if (referencedPrompt === draft.prompt) {
+    if (referencedPrompt === promptValue) {
       return;
     }
-    patchDraft({ prompt: referencedPrompt });
+    updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
   }, [
+    data.inputs,
     disabled,
-    draft.prompt,
     hasPromptReference,
-    patchDraft,
+    nodeId,
+    promptValue,
     referencedPrompt,
     referencedPromptLoading,
+    updateNodeData,
+  ]);
+
+  useEffect(() => {
+    if (hasPromptReference || disabled || !updateNodeData) {
+      return;
+    }
+    const parsedRange = parseRetakePromptTimeRange(promptValue);
+    if (!parsedRange) {
+      return;
+    }
+    if (
+      parsedRange.startSec === draft.draftRange.startSec &&
+      parsedRange.endSec === draft.draftRange.endSec
+    ) {
+      return;
+    }
+    patchDraft({
+      draftRange: parsedRange,
+      committedRange: parsedRange,
+    });
+  }, [
+    disabled,
+    draft.draftRange.endSec,
+    draft.draftRange.startSec,
+    hasPromptReference,
+    patchDraft,
+    promptValue,
+    updateNodeData,
+  ]);
+
+  useEffect(() => {
+    if (hasPromptReference || disabled || !updateNodeData || !promptValue.trim()) {
+      return;
+    }
+    const next = replaceRetakePromptTimeRange(promptValue, draft.draftRange);
+    if (next === promptValue) {
+      return;
+    }
+    updateNodeInput(nodeId, "prompt", next, data.inputs, updateNodeData);
+  }, [
+    data.inputs,
+    disabled,
+    draft.draftRange,
+    hasPromptReference,
+    nodeId,
+    promptValue,
+    updateNodeData,
   ]);
 
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
 
-  const hasPromptInput = displayPrompt.trim().length > 0;
+  const hasPromptInput = (hasPromptReference ? referencedPrompt : promptValue).trim()
+    .length > 0;
 
   const retakeEditTimeRangeLabel = useMemo(
     () => formatRetakeEditTimeRangeLabel(draft.draftRange),
     [draft.draftRange]
   );
 
-  const storedPromptCompile = useMemo(() => {
-    if (hasPromptReference) {
-      return { ok: true as const, prompt: referencedPrompt };
-    }
-    return compileRetakePromptForSubmit(displayPrompt, imageEdgeIndexMap);
-  }, [displayPrompt, hasPromptReference, imageEdgeIndexMap, referencedPrompt]);
-
   const hasBrokenPromptRefs =
     !hasPromptReference &&
     hasBrokenVideoPromptRefs(displayPrompt, imageEdgeIndexMap);
 
-  const promptForGenerate = storedPromptCompile.ok
-    ? storedPromptCompile.prompt.trim()
-    : "";
+  const promptForGenerate = (hasPromptReference ? referencedPrompt : promptValue).trim();
 
-  const promptCompiledLength = hasPromptReference
-    ? referencedPrompt.length
-    : compiledRetakePromptLength(displayPrompt, imageEdgeIndexMap) ??
-      displayPrompt.length;
+  const promptCompiledLength = promptForGenerate.length;
 
   const promptOverLimit = promptCompiledLength > promptMaxLength;
 
@@ -693,7 +755,8 @@ export function AiVideoRetakeConfigPanel({
     isRetakePanel &&
     draft.loadPhase === "ready" &&
     draft.videoDurationSec !== null &&
-    draft.videoDurationSec > 0;
+    draft.videoDurationSec > 0 &&
+    Boolean(retakePlaybackUrl);
 
   const mediaKitTrimAvailable = Boolean(
     mediaKitConfig &&
@@ -717,7 +780,6 @@ export function AiVideoRetakeConfigPanel({
       !isBusy &&
       hasPromptInput &&
       !hasBrokenPromptRefs &&
-      storedPromptCompile.ok &&
       generativePromptWithinModelLimit(promptForGenerate, promptMaxLength) &&
       canGenerateAiVideo({
         prompt: promptForGenerate,
@@ -748,10 +810,22 @@ export function AiVideoRetakeConfigPanel({
     useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
+    if (
+      isRetakePrimaryVideoEdge({
+        edgeId,
+        targetNodeId: nodeId,
+        edges,
+        nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+        inputs: data.inputs,
+      })
+    ) {
+      toast.error("workflow.videoRetake.primaryReferenceLocked");
+      return;
+    }
     const edge = edges.find((entry) => entry.id === edgeId);
     deleteEdge?.(edgeId);
-    if (edge?.targetHandle === AI_VIDEO_PROMPT_HANDLE_ID) {
-      patchDraft({ prompt: "" });
+    if (edge?.targetHandle === AI_VIDEO_PROMPT_HANDLE_ID && updateNodeData) {
+      updateNodeInput(nodeId, "prompt", "", data.inputs, updateNodeData);
     }
   };
 
@@ -925,6 +999,7 @@ export function AiVideoRetakeConfigPanel({
       readonly skipStitch: boolean;
     }) => {
       if (
+        draft.loadPhase !== "ready" ||
         draft.videoDurationSec === null ||
         !orgId ||
         !workflowId ||
@@ -942,21 +1017,24 @@ export function AiVideoRetakeConfigPanel({
       setIsStarting(true);
       void (async () => {
         try {
-          const trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
-            media: sourceMedia,
-            organizationId: orgId,
-            workflowId,
-          });
+          let trimSourceVideoUrl = retakePlaybackUrl;
+          if (!trimSourceVideoUrl) {
+            trimSourceVideoUrl = await resolveTrimSourceVideoUrl({
+              media: sourceMedia,
+              organizationId: orgId,
+              workflowId,
+            });
+          }
           if (!trimSourceVideoUrl) {
             toast.error("workflow.videoRetake.generateFailed");
             return;
           }
 
-          const referenceMedia = collectGenerativeReferenceMedia({
+          const referenceMedia = collectRetakeSupplementalReferenceMedia({
             nodeId,
-            targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
             edges,
-            nodes: typedNodes,
+            nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
+            inputs: data.inputs,
           });
 
           const resolved = await resolveMediaReferencesForVideoGenerate({
@@ -1019,11 +1097,13 @@ export function AiVideoRetakeConfigPanel({
       draft.draftRange.endSec,
       draft.draftRange.startSec,
       draft.highQuality,
+      draft.loadPhase,
       draft.videoDurationSec,
       edges,
       mediaKitInterfaceId,
       nodeId,
       orgId,
+      retakePlaybackUrl,
       selectedModel,
       sourceMedia,
       t,
@@ -1054,7 +1134,9 @@ export function AiVideoRetakeConfigPanel({
       return;
     }
     if (
+      draft.loadPhase !== "ready" ||
       draft.videoDurationSec === null ||
+      !retakePlaybackUrl ||
       !orgId ||
       !workflowId ||
       !sourceMedia
@@ -1064,11 +1146,6 @@ export function AiVideoRetakeConfigPanel({
     }
 
     if (hasBrokenPromptRefs) {
-      toast.error("workflow.aiVideoPanel.promptMentionBroken");
-      return;
-    }
-
-    if (!storedPromptCompile.ok) {
       toast.error("workflow.aiVideoPanel.promptMentionBroken");
       return;
     }
@@ -1174,9 +1251,22 @@ export function AiVideoRetakeConfigPanel({
     selectedModel,
     sourceMedia,
     startRetakeGeneration,
-    storedPromptCompile.ok,
     toast,
   ]);
+
+  const showGenerateAction =
+    !hasRetakeHistory || draft.cardPreview === "source";
+  const showRedoAction =
+    hasRetakeHistory && draft.cardPreview === "generated";
+  const showBackAction = hasRetakeHistory && draft.cardPreview === "source";
+
+  const handleRedo = useCallback(() => {
+    patchDraft({ cardPreview: "source" });
+  }, [patchDraft]);
+
+  const handleBackToGenerated = useCallback(() => {
+    patchDraft({ cardPreview: "generated" });
+  }, [patchDraft]);
 
   const generationValuesForEstimate = useMemo(() => {
     const merged = mergeImageGenerationParams(allGenerationFields, {
@@ -1479,16 +1569,44 @@ export function AiVideoRetakeConfigPanel({
             ) : null}
           </div>
 
-          <AiGenerateButton
-            disabled={!canGenerate}
-            isGenerating={isBusy}
-            isCancelling={false}
-            canCancel={false}
-            label={t("workflow.aiVideoPanel.generate")}
-            cancelLabel={t("workflow.generativeCancel.action")}
-            onClick={handleGenerate}
-            onCancel={() => {}}
-          />
+          <div className="flex items-center gap-2">
+            {showBackAction ? (
+              <button
+                type="button"
+                disabled={disabled || isBusy}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                aria-label={t("workflow.videoRetake.back")}
+                title={t("workflow.videoRetake.back")}
+                onClick={handleBackToGenerated}
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </button>
+            ) : null}
+            {showRedoAction ? (
+              <AiGenerateButton
+                disabled={disabled || isBusy}
+                isGenerating={false}
+                isCancelling={false}
+                canCancel={false}
+                label={t("workflow.videoRetake.redo")}
+                cancelLabel={t("workflow.generativeCancel.action")}
+                onClick={handleRedo}
+                onCancel={() => {}}
+              />
+            ) : null}
+            {showGenerateAction ? (
+              <AiGenerateButton
+                disabled={!canGenerate}
+                isGenerating={isBusy}
+                isCancelling={false}
+                canCancel={false}
+                label={t("workflow.aiVideoPanel.generate")}
+                cancelLabel={t("workflow.generativeCancel.action")}
+                onClick={handleGenerate}
+                onCancel={() => {}}
+              />
+            ) : null}
+          </div>
         </div>
       </GenerativeConfigPanelShell>
 

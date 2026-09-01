@@ -9,6 +9,7 @@ import {
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
   isAiVideoRetakePanel,
+  readAiVideoRetakeDraftFromInputs,
   type OrgVideoModelOption,
   hasGeneratingResource,
   hasDisplayableWorkflowMedia,
@@ -19,6 +20,7 @@ import {
   type MediaResourceKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
+import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 import {
@@ -51,6 +53,8 @@ import {
   markResourceRefFailed,
   stripGeneratingFlag,
 } from "./generative-resource-ref-utils";
+import { resolveRetakePrimaryVideoRef } from "./ai-video-retake-primary-ref";
+import type { WorkflowEdgeType } from "./workflow-types";
 
 import {
   AI_VIDEO_EMPTY_CARD_SIZE,
@@ -343,11 +347,100 @@ export function withAiVideoStagingPreview(
   return { inputs, outputs };
 }
 
+export interface ReadAiVideoCardDisplayContext {
+  readonly nodeId?: string;
+  readonly edges?: readonly Pick<
+    ReactFlowEdge<WorkflowEdgeType>,
+    "source" | "target" | "sourceHandle" | "targetHandle"
+  >[];
+  readonly nodes?: readonly Pick<
+    ReactFlowNode<WorkflowNodeType>,
+    "id" | "data"
+  >[];
+}
+
+export function hasRetakeOwnResource(
+  inputs: readonly WorkflowParameter[]
+): boolean {
+  const history = readAiVideoResultHistory(inputs);
+  return history.items.some((item) => hasDisplayableWorkflowMedia(item.videos));
+}
+
+function readRetakePanelCardDisplay(params: {
+  readonly inputs: readonly WorkflowParameter[];
+  readonly outputs?: readonly WorkflowParameter[];
+  readonly metadata?: Record<string, string>;
+  readonly context?: ReadAiVideoCardDisplayContext;
+}): GenerativeCardCoverRead<WorkflowMediaValue> {
+  const draft = readAiVideoRetakeDraftFromInputs(params.inputs);
+  const showGenerated =
+    draft.cardPreview === "generated" && hasRetakeOwnResource(params.inputs);
+
+  if (showGenerated) {
+    const history = readAiVideoResultHistory(params.inputs);
+    if (history.selectedId) {
+      return readGenerativeCardCoverFromHistory(history, (item) => item.videos, {
+        metadata: params.metadata,
+        isModalityGenerating: isAiVideoGenerating(params.metadata),
+      });
+    }
+    const fallback = readAiVideoResult(params.inputs, params.outputs);
+    const cardPhase = resolveGenerativeCardPhase(
+      params.metadata,
+      fallback,
+      isAiVideoGenerating(params.metadata)
+    );
+    return {
+      coverMedia: fallback,
+      isBusy:
+        (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)) ||
+        isAiVideoGenerating(params.metadata) ||
+        hasGeneratingResource(fallback),
+      hasCover: hasDisplayableWorkflowMedia(fallback),
+      cardPhase,
+    };
+  }
+
+  const sourceMedia =
+    params.context?.nodeId &&
+    params.context.edges &&
+    params.context.nodes
+      ? resolveRetakePrimaryVideoRef({
+          targetNodeId: params.context.nodeId,
+          edges: params.context.edges,
+          nodes: params.context.nodes,
+          inputs: params.inputs,
+        })?.media
+      : undefined;
+  const cover = sourceMedia ? [sourceMedia] : [];
+  const generating = isAiVideoGenerating(params.metadata);
+  const progressPhase = readGenerativeProgressPhase(params.metadata);
+  const cardPhase = resolveGenerativeCardPhase(
+    params.metadata,
+    cover,
+    generating
+  );
+  return {
+    coverMedia: cover,
+    isBusy:
+      generating ||
+      isGenerativeProgressBusyPhase(progressPhase) ||
+      (cardPhase !== null && isGenerativeCardBusyPhase(cardPhase)),
+    hasCover: hasDisplayableWorkflowMedia(cover),
+    cardPhase,
+  };
+}
+
 export function readAiVideoCardDisplay(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
-  metadata?: Record<string, string>
+  metadata?: Record<string, string>,
+  context?: ReadAiVideoCardDisplayContext
 ): GenerativeCardCoverRead<WorkflowMediaValue> {
+  if (isAiVideoRetakePanel(metadata)) {
+    return readRetakePanelCardDisplay({ inputs, outputs, metadata, context });
+  }
+
   if (isGenerativeManualContent(metadata)) {
     const manual = parseWorkflowMediaValues(
       inputs.find((input) => input.id === "manual_videos")?.value
@@ -407,18 +500,22 @@ export function readAiVideoCardDisplay(
 export function readAiVideoCardVideos(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
-  metadata?: Record<string, string>
+  metadata?: Record<string, string>,
+  context?: ReadAiVideoCardDisplayContext
 ): WorkflowMediaValue[] {
-  return [...readAiVideoCardDisplay(inputs, outputs, metadata).coverMedia];
+  return [
+    ...readAiVideoCardDisplay(inputs, outputs, metadata, context).coverMedia,
+  ];
 }
 
 /** Current card output — at most one video. */
 export function readAiVideoCardPrimaryVideo(
   inputs: readonly WorkflowParameter[],
   outputs?: readonly WorkflowParameter[],
-  metadata?: Record<string, string>
+  metadata?: Record<string, string>,
+  context?: ReadAiVideoCardDisplayContext
 ): WorkflowMediaValue | undefined {
-  return readAiVideoCardDisplay(inputs, outputs, metadata).coverMedia[0];
+  return readAiVideoCardDisplay(inputs, outputs, metadata, context).coverMedia[0];
 }
 
 export function withAiVideoManualUpload(
@@ -871,9 +968,6 @@ export function countAiVideoReferenceCounts(
   return counts;
 }
 
-/** Retake generation always submits one trimmed clip as a video reference. */
-export const RETAKE_RESERVED_VIDEO_REFERENCE_COUNT = 1 as const;
-
 export function countAiVideoReferenceCountsForNode(
   targetNodeId: string,
   edges: readonly {
@@ -884,14 +978,7 @@ export function countAiVideoReferenceCountsForNode(
   nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[],
   targetNodeData?: Pick<WorkflowNodeType, "metadata">
 ): SubmitAiVideoMediaReferenceCounts {
-  const base = countAiVideoReferenceCounts(targetNodeId, edges, nodes);
-  if (!isAiVideoRetakePanel(targetNodeData?.metadata)) {
-    return base;
-  }
-  return {
-    ...base,
-    videoCount: base.videoCount + RETAKE_RESERVED_VIDEO_REFERENCE_COUNT,
-  };
+  return countAiVideoReferenceCounts(targetNodeId, edges, nodes);
 }
 
 /** @deprecated Prefer countAiVideoReferenceCounts. */

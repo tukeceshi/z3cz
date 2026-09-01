@@ -3665,9 +3665,14 @@ export const zh: TranslationDictionary = {
     },
     videoRetake: {
       action: "重拍",
+      redo: "重做",
+      back: "返回",
+      source: "原片",
+      primaryReferenceLocked: "原片引用不可删除",
       loadFailed: "无法加载视频",
       createNodeFailed: "创建重拍节点失败",
       referenceLinkFailed: "未能连上原视频节点",
+      sourceResynced: "原片已更新，选区已自动调整",
       generateFailed: "重拍失败",
       resolutionMismatchTitle: "分辨率与原视频不一致",
       resolutionMismatchDescription:

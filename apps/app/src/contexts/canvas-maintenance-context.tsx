@@ -11,9 +11,8 @@ import {
 
 import { CanvasMaintenanceOverlay } from "@/components/workflow/canvas-maintenance-overlay";
 import { setCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
+import { subscribeWorkflowPublicState } from "@/lib/workflow-public-maintenance-bridge";
 import { makeRequest } from "@/services/utils";
-
-const MAINTENANCE_POLL_INTERVAL_MS = 15_000;
 
 interface CanvasMaintenanceContextValue {
   readonly isCanvasFrozen: boolean;
@@ -62,6 +61,17 @@ export function CanvasMaintenanceProvider({
   );
   const [statusFetchFailed, setStatusFetchFailed] = useState(false);
 
+  const applyPublicMaintenance = useCallback(
+    (frozen: boolean, message: string | null) => {
+      setMaintenanceChecked(true);
+      setIsCanvasFrozen(frozen);
+      setMaintenanceMessage(message);
+      setStatusFetchFailed(false);
+      setCanvasMaintenanceFrozen(frozen);
+    },
+    []
+  );
+
   const refreshMaintenanceStatus = useCallback(async () => {
     const result = await fetchCanvasMaintenanceStatus();
     setMaintenanceChecked(true);
@@ -73,14 +83,22 @@ export function CanvasMaintenanceProvider({
 
   useEffect(() => {
     void refreshMaintenanceStatus();
-    const intervalId = window.setInterval(() => {
-      void refreshMaintenanceStatus();
-    }, MAINTENANCE_POLL_INTERVAL_MS);
+  }, [refreshMaintenanceStatus]);
+
+  useEffect(() => {
+    return subscribeWorkflowPublicState((publicState) => {
+      applyPublicMaintenance(
+        publicState.maintenanceEnabled,
+        publicState.maintenanceMessage
+      );
+    });
+  }, [applyPublicMaintenance]);
+
+  useEffect(() => {
     return () => {
-      window.clearInterval(intervalId);
       setCanvasMaintenanceFrozen(false);
     };
-  }, [refreshMaintenanceStatus]);
+  }, []);
 
   const value = useMemo(
     () => ({

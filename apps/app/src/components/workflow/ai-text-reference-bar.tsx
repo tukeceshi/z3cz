@@ -415,7 +415,7 @@ export function AiTextReferenceBar({
               />
             </div>
           )}
-          {!disabled ? (
+          {!disabled && chip.disconnectable !== false ? (
             <button
               type="button"
               className="nodrag absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-sm bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
