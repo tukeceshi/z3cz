@@ -5,8 +5,11 @@ import {
   computeOptimalReferenceSeconds,
   computePackTokens,
   computeVideoPriceEstimateForModel,
+  formatOptimalReferenceSecondsDisplay,
   formatVideoBillingTokensDisplay,
   formatVideoPriceEstimateCostDisplay,
+  normalizeOutputDurationSecForEstimate,
+  normalizeReferenceInputDurationSecForEstimate,
   type VideoPriceEstimateResult,
 } from "@dafthunk/types";
 import type { WorkflowMediaValue } from "@dafthunk/types";
@@ -184,13 +187,13 @@ function PriceEstimateDetail({
   estimate,
   displayCostYuan,
   packTokens,
-  optimalReferenceSeconds,
+  optimalReferenceSecondsDisplay,
   showOptimalReferenceSeconds,
 }: {
   readonly estimate: VideoPriceEstimateResult;
   readonly displayCostYuan: number;
   readonly packTokens: number | null;
-  readonly optimalReferenceSeconds: number;
+  readonly optimalReferenceSecondsDisplay: string;
   readonly showOptimalReferenceSeconds: boolean;
 }) {
   const { t } = useTranslation();
@@ -209,7 +212,7 @@ function PriceEstimateDetail({
         <PriceEstimateDetailRow
           label={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSec")}
           value={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSecValue", {
-            seconds: optimalReferenceSeconds,
+            seconds: optimalReferenceSecondsDisplay,
           })}
           labelNode={
             <DashedHelpLabel
@@ -262,14 +265,20 @@ export function AiVideoPriceEstimateChip({
 }: AiVideoPriceEstimateChipProps) {
   const probedReferenceDurationSec =
     useSummedReferenceVideoDurationSeconds(referenceVideoMedia);
-  const inputDurationSec =
+  const rawInputDurationSec =
     referenceVideoDurationSec ?? probedReferenceDurationSec;
   const hasReferenceVideo = referenceVideoMedia.length > 0;
-  const outputDurationSec = readGenerationFieldNumber(
+  const rawOutputDurationSec = readGenerationFieldNumber(
     generationValues,
     "duration",
     5
   );
+  const outputDurationSec = normalizeOutputDurationSecForEstimate(
+    rawOutputDurationSec
+  );
+  const inputDurationSec = hasReferenceVideo
+    ? normalizeReferenceInputDurationSecForEstimate(rawInputDurationSec)
+    : 0;
   const resolution = readGenerationFieldString(
     generationValues,
     "resolution",
@@ -321,6 +330,10 @@ export function AiVideoPriceEstimateChip({
     () => computeOptimalReferenceSeconds(outputDurationSec),
     [outputDurationSec]
   );
+  const optimalReferenceSecondsDisplay = useMemo(
+    () => formatOptimalReferenceSecondsDisplay(optimalReferenceSeconds),
+    [optimalReferenceSeconds]
+  );
   const showOptimalReferenceSeconds =
     priceWithVideo > 0 && optimalReferenceSeconds > 0;
 
@@ -348,7 +361,7 @@ export function AiVideoPriceEstimateChip({
           estimate={estimate}
           displayCostYuan={displayCostYuan}
           packTokens={packTokens}
-          optimalReferenceSeconds={optimalReferenceSeconds}
+          optimalReferenceSecondsDisplay={optimalReferenceSecondsDisplay}
           showOptimalReferenceSeconds={showOptimalReferenceSeconds}
         />
       </PopoverContent>

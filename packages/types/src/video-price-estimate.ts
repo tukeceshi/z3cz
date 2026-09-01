@@ -32,6 +32,12 @@ import {
   readVideoPricePromoFold,
   type VideoModelPricePromo,
 } from "./video-price-promo";
+import {
+  ceilDurationStepSec,
+  fromDurationTenths,
+  snapVideoTrimSec,
+  toDurationTenths,
+} from "./video-trim";
 
 export type {
   VideoModelPriceEstimateConfig,
@@ -486,18 +492,49 @@ export function computeVideoOutputTokens(
   return Math.round(outputDurationSec * tps);
 }
 
+export function normalizeOutputDurationSecForEstimate(
+  outputDurationSec: number
+): number {
+  return fromDurationTenths(toDurationTenths(outputDurationSec));
+}
+
+export function normalizeReferenceInputDurationSecForEstimate(
+  inputDurationSec: number
+): number {
+  return ceilDurationStepSec(inputDurationSec);
+}
+
 export function computeReferenceVideoMinBillingDurationSec(
   outputDurationSec: number
 ): number {
-  return Math.ceil(Math.max(0, outputDurationSec) * (5 / 3));
+  const tenths = toDurationTenths(outputDurationSec);
+  if (tenths <= 0) {
+    return 0;
+  }
+  return Math.ceil(tenths / 6);
 }
 
 export function computeOptimalReferenceSeconds(
   outputDurationSec: number
 ): number {
-  const minBillingDurationSec =
-    computeReferenceVideoMinBillingDurationSec(outputDurationSec);
-  return Math.max(0, minBillingDurationSec - Math.max(0, outputDurationSec));
+  const tenths = toDurationTenths(outputDurationSec);
+  if (tenths <= 0) {
+    return 0;
+  }
+  const minBillingSec = Math.ceil(tenths / 6);
+  const optimalTenths = minBillingSec * 10 - tenths;
+  return fromDurationTenths(Math.max(0, optimalTenths));
+}
+
+export function formatOptimalReferenceSecondsDisplay(seconds: number): string {
+  const snapped = fromDurationTenths(Math.round(snapVideoTrimSec(seconds) * 10));
+  if (!Number.isFinite(snapped) || snapped <= 0) {
+    return "0";
+  }
+  if (Number.isInteger(snapped)) {
+    return String(snapped);
+  }
+  return snapped.toFixed(1);
 }
 
 export function computeVideoBillingTokens(params: {
