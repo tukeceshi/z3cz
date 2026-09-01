@@ -26,6 +26,7 @@ export interface GenerativeReferenceChip {
   readonly textExcerpt?: string;
   readonly media?: WorkflowMediaValue;
   readonly overlayLabel?: string;
+  readonly disconnectable?: boolean;
 }
 
 function firstWorkflowMedia(value: unknown): WorkflowMediaValue | null {

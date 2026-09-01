@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { AI_IMAGE_CARD_HEIGHT_PX, AI_IMAGE_CARD_WIDTH_PX } from "./ai-image-node-utils";
+import { AI_TEXT_CARD_HEIGHT_PX, AI_TEXT_CARD_WIDTH_PX } from "./ai-text-node-utils";
 import {
   collectOccupiedRects,
   findFallbackNodePosition,
@@ -150,10 +152,30 @@ describe("collectOccupiedRects", () => {
         data: { nodeType: "ai-image" } as never,
       },
     ]);
-    expect(rects[0]).toEqual({ x: 10, y: 20, width: 270, height: 270 });
+    expect(rects[0]).toEqual({
+      x: 10,
+      y: 20,
+      width: AI_IMAGE_CARD_WIDTH_PX,
+      height: AI_IMAGE_CARD_HEIGHT_PX,
+    });
   });
 
-  it("prefers measured size for adaptive image nodes", () => {
+  it("prefers persisted layout for adaptive image nodes", () => {
+    const rects = collectOccupiedRects([
+      {
+        id: "n1",
+        position: { x: 0, y: 0 },
+        measured: { width: 400, height: 300 },
+        data: {
+          nodeType: "ai-image",
+          metadata: { layoutWidth: "468", layoutHeight: "264" },
+        } as never,
+      },
+    ]);
+    expect(rects[0]).toEqual({ x: 0, y: 0, width: 468, height: 264 });
+  });
+
+  it("ignores measured size for image nodes without layout", () => {
     const rects = collectOccupiedRects([
       {
         id: "n1",
@@ -162,7 +184,12 @@ describe("collectOccupiedRects", () => {
         data: { nodeType: "ai-image" } as never,
       },
     ]);
-    expect(rects[0]).toEqual({ x: 0, y: 0, width: 480, height: 270 });
+    expect(rects[0]).toEqual({
+      x: 0,
+      y: 0,
+      width: AI_IMAGE_CARD_WIDTH_PX,
+      height: AI_IMAGE_CARD_HEIGHT_PX,
+    });
   });
 
   it("ignores measured size for ai-text nodes", () => {
@@ -174,7 +201,7 @@ describe("collectOccupiedRects", () => {
         data: { nodeType: "ai-text" } as never,
       },
     ]);
-    expect(rects[0]?.width).toBe(360);
-    expect(rects[0]?.height).toBe(196);
+    expect(rects[0]?.width).toBe(AI_TEXT_CARD_WIDTH_PX);
+    expect(rects[0]?.height).toBe(AI_TEXT_CARD_HEIGHT_PX);
   });
 });

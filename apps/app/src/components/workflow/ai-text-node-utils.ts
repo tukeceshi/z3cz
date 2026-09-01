@@ -80,7 +80,7 @@ export const AI_TEXT_HARD_OUTPUT_MAX_CHARS = 32_000;
 
 /** Canvas card size — matches reference site text cards. */
 export const AI_TEXT_CARD_WIDTH_PX = 360;
-export const AI_TEXT_CARD_HEIGHT_PX = 196;
+export const AI_TEXT_CARD_HEIGHT_PX = 192;
 
 /** Bottom editor panel — screen-fixed visual size (inverse-scaled vs canvas zoom). */
 export const AI_TEXT_PANEL_WIDTH_PX = 640;

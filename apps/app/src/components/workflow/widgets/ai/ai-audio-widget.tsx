@@ -6,7 +6,6 @@ import {
   hasGeneratingResource,
   type MediaReference,
   type ObjectReference,
-  readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -30,8 +29,6 @@ import {
   withGenerativeUploadProgress,
 } from "../../generative-progress-utils";
 import {
-  AI_AUDIO_CARD_HEIGHT_PX,
-  AI_AUDIO_CARD_WIDTH_PX,
   readAiAudioCardDisplay,
   readAiAudioResultHistory,
   withAiAudioGenerateError,
@@ -85,10 +82,6 @@ function AiAudioWidget({
   const { configured: cloudConfigured, blocksGenerativeMedia } =
     useCloudStorageCanvasContext();
   const { updateNodeData } = useWorkflow();
-  const persistedLayout = useMemo(
-    () => readNodeLayoutFromMetadata(metadata),
-    [metadata]
-  );
   const patchNodeLayout = useMemo(
     () =>
       updateNodeData
@@ -259,15 +252,11 @@ function AiAudioWidget({
         }}
       />
       <div
-        className={cn(
-          "relative h-full w-full overflow-hidden cursor-grab select-none",
-          uploading && "opacity-70",
-          className
-        )}
-        style={{
-          width: persistedLayout?.width ?? AI_AUDIO_CARD_WIDTH_PX,
-          height: persistedLayout?.height ?? AI_AUDIO_CARD_HEIGHT_PX,
-        }}
+          className={cn(
+            "relative h-full w-full overflow-hidden cursor-grab select-none",
+            uploading && "opacity-70",
+            className
+          )}
         onDoubleClick={(event) => {
           if (generateError) {
             event.stopPropagation();

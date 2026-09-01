@@ -48,7 +48,7 @@ export const AI_AUDIO_HISTORY_INPUT_ID = "audios_history" as const;
 
 /** Canvas card size — compact audio card. */
 export const AI_AUDIO_CARD_WIDTH_PX = 360;
-export const AI_AUDIO_CARD_HEIGHT_PX = 150;
+export const AI_AUDIO_CARD_HEIGHT_PX = 144;
 
 /** Bottom editor panel — same visual size as AI text / AI image / AI video. */
 export const AI_AUDIO_PANEL_WIDTH_PX = AI_GENERATIVE_PANEL_WIDTH_PX;

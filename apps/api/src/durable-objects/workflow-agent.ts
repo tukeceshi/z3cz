@@ -32,18 +32,27 @@ import type {
   WorkflowGraphPatchBroadcast,
   WorkflowGraphPatchMessage,
   WorkflowInitMessage,
+  WorkflowPublicMessage,
+  WorkflowPublicState,
   WorkflowState,
   WorkflowUpdateMessage,
 } from "@dafthunk/types";
 import {
   applyWorkflowGraphPatch,
+  buildWorkflowPartialBroadcast,
   isEmptyWorkflowGraphPatch,
+  mergeWorkflowPartialState,
 } from "@dafthunk/types";
 import { Agent } from "agents";
 import type { Connection, ConnectionContext } from "partyserver";
 
 import type { Bindings } from "../context";
 import { buildMultiplexWorkflowSendEvent } from "../runtime/workflow-event-utils";
+import { loadWorkflowPublicState } from "../runtime/platform-public-state";
+import {
+  registerActiveEditorWorkflow,
+  unregisterActiveEditorWorkflow,
+} from "../services/workflow-public-broadcast";
 import { ExecutionManager } from "../services/execution-manager";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
@@ -155,6 +164,14 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     this.hiddenMethods.broadcast(msg, exclude);
   }
 
+  private broadcastPublicState(publicState: WorkflowPublicState): void {
+    const message: WorkflowPublicMessage = {
+      type: "public",
+      public: publicState,
+    };
+    this.broadcastMessage(JSON.stringify(message));
+  }
+
   async executeWorkflow(params: RuntimeParams): Promise<string> {
     const id = crypto.randomUUID();
     return this.hiddenMethods.runWorkflow("EXECUTE", params, { id });
@@ -204,11 +221,14 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     }
 
     if (this.workflowState) {
+      const publicState = await loadWorkflowPublicState(this.env);
       const initMessage: WorkflowInitMessage = {
         type: "init",
         state: this.workflowState,
+        public: publicState,
       };
       connection.send(JSON.stringify(initMessage));
+      await registerActiveEditorWorkflow(this.env, workflowId);
     }
   }
 
@@ -266,12 +286,34 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     _wasClean: boolean
   ): Promise<void> {
     await this.flushPersist();
+
+    const workflowId = this.workflowState?.id ?? this.state?.workflowId;
+    if (!workflowId) {
+      return;
+    }
+
+    const remainingConnections = [...this.hiddenMethods.getConnections()];
+    if (remainingConnections.length === 0) {
+      await unregisterActiveEditorWorkflow(this.env, workflowId);
+    }
   }
 
   // ── HTTP fetch ────────────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    if (
+      url.pathname.endsWith("/internal/broadcast-public") &&
+      request.method === "POST"
+    ) {
+      const message = (await request.json()) as WorkflowPublicMessage;
+      if (message.type !== "public" || !message.public) {
+        return new Response("Invalid public payload", { status: 400 });
+      }
+      this.broadcastPublicState(message.public);
+      return new Response(null, { status: 204 });
+    }
 
     if (url.pathname.endsWith("/state") && request.method === "GET") {
       const pathParts = url.pathname.split("/").filter(Boolean);
@@ -500,32 +542,17 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     if (!this.workflowState) return;
     if (message.state.id !== this.workflowState.id) return;
     if (!message.state.name || !message.state.trigger) return;
-    if (
-      !Array.isArray(message.state.nodes) ||
-      !Array.isArray(message.state.edges)
-    )
-      return;
 
-    const nodeIds = new Set(message.state.nodes.map((node) => node.id));
-    const filteredEdges = message.state.edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+    this.workflowState = mergeWorkflowPartialState(
+      this.workflowState,
+      message.state
     );
-
-    this.workflowState = {
-      ...message.state,
-      edges: filteredEdges,
-      editorViewport:
-        message.state.editorViewport ?? this.workflowState.editorViewport,
-      generativeDefaults:
-        message.state.generativeDefaults ?? this.workflowState.generativeDefaults,
-      timestamp: message.state.timestamp ?? Date.now(),
-    };
 
     await this.schedulePersist();
 
     const updateMsg: WorkflowUpdateMessage = {
       type: "update",
-      state: this.workflowState,
+      state: buildWorkflowPartialBroadcast(this.workflowState, message.state),
     };
     this.broadcastMessage(JSON.stringify(updateMsg), [connection.id]);
   }

@@ -180,24 +180,30 @@ export function buildAiVideoNodeFromManualUpload(params: {
   };
 }
 
-/** Locked retake window — cover video only, no history, no edges. */
+/** Locked retake window — source video via primary reference edge, no manual copy. */
 export function buildLockedRetakeCopyNode(params: {
   readonly catalog: NodeType;
   readonly nodeId: string;
   readonly nodeName: string;
   readonly position: { readonly x: number; readonly y: number };
-  readonly video: WorkflowMediaValue;
   readonly createObjectUrl: (objectReference: ObjectReference) => string;
 }): ReactFlowNode<WorkflowNodeType> {
-  const node = buildAiVideoNodeFromManualUpload(params);
-  const hiddenPanel = withGenerativeBottomPanelHidden(node.data.metadata);
+  const baseData = buildCatalogAiVideoNodeData({
+    catalog: params.catalog,
+    nodeName: params.nodeName,
+    createObjectUrl: params.createObjectUrl,
+  });
+  const hiddenPanel = withGenerativeBottomPanelHidden(baseData.metadata);
   const draft = createDefaultAiVideoRetakeDraft();
   return {
-    ...node,
+    id: params.nodeId,
+    type: "workflowNode",
+    position: params.position,
+    selected: true,
     data: {
-      ...node.data,
+      ...baseData,
       inputs: [
-        ...node.data.inputs,
+        ...baseData.inputs,
         {
           id: "retake_draft",
           name: "retake_draft",

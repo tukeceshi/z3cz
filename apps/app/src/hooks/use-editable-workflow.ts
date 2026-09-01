@@ -4,17 +4,19 @@ import type {
   WorkflowEditorViewport,
   WorkflowGenerativeDefaults,
   WorkflowGraphPatchBroadcast,
+  WorkflowPartialState,
   WorkflowRuntime,
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { applyWorkflowGraphPatch, findFirstWorkflowCoverCandidate } from "@dafthunk/types";
+import { applyWorkflowGraphPatch, findFirstWorkflowCoverCandidate, hasWorkflowGraphInPartial } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
+import { publishWorkflowPublicState } from "@/lib/workflow-public-maintenance-bridge";
 import { stripTransientGenerativeMetadata, preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 import { buildWorkflowPayload } from "@/components/workflow/build-workflow-payload";
 import type {
@@ -520,8 +522,8 @@ export function useEditableWorkflow({
         return;
       }
 
-      const applyRemoteState = (
-        state: WorkflowState,
+      const applyRemotePartialState = (
+        state: WorkflowPartialState,
         options?: ApplyEditorViewportOptions
       ) => {
         if (state.id && state.trigger) {
@@ -529,7 +531,8 @@ export function useEditableWorkflow({
             id: state.id,
             name: state.name || "",
             description: state.description,
-            schemeId: state.schemeId,
+            schemeId:
+              state.schemeId ?? workflowMetadataRef.current?.schemeId ?? "",
             trigger: state.trigger,
             runtime: state.runtime as WorkflowRuntime | undefined,
           };
@@ -537,19 +540,35 @@ export function useEditableWorkflow({
           workflowMetadataRef.current = metadata;
         }
 
-        applyBackendGraphToEditorRef.current(
-          state.nodes,
-          state.edges,
-          state.timestamp ?? Date.now()
-        );
+        if (hasWorkflowGraphInPartial(state)) {
+          applyBackendGraphToEditorRef.current(
+            state.nodes,
+            state.edges,
+            state.timestamp ?? Date.now()
+          );
+        }
 
-        applyEditorViewportFromState(state, options);
+        if (state.editorViewport !== undefined) {
+          applyEditorViewportFromState(
+            { editorViewport: state.editorViewport },
+            options
+          );
+        }
 
-        generativeDefaultsRef.current = state.generativeDefaults;
-        lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
-          state.generativeDefaults ?? null
-        );
-        setGenerativeDefaults(state.generativeDefaults);
+        if (state.generativeDefaults !== undefined) {
+          generativeDefaultsRef.current = state.generativeDefaults;
+          lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
+            state.generativeDefaults ?? null
+          );
+          setGenerativeDefaults(state.generativeDefaults);
+        }
+      };
+
+      const applyRemoteState = (
+        state: WorkflowPartialState,
+        options?: ApplyEditorViewportOptions
+      ) => {
+        applyRemotePartialState(state, options);
       };
 
       const isLocalGraphDirty = (): boolean => {
@@ -576,6 +595,7 @@ export function useEditableWorkflow({
 
       void (async () => {
         const ws = await connectWorkflowWS(organization.id, workflowId, {
+          onPublic: publishWorkflowPublicState,
           onInit: (state: WorkflowState) => {
             notifyWorkflowSync();
             if (!hasInitializedRef.current) {
@@ -609,7 +629,7 @@ export function useEditableWorkflow({
               handleStateUpdate(state, { syncToCanvas: true });
             }
           },
-          onUpdate: (state: WorkflowState) => {
+          onUpdate: (state: WorkflowPartialState) => {
             notifyWorkflowSync();
             if (getCanvasMaintenanceFrozen()) {
               return;
@@ -620,10 +640,18 @@ export function useEditableWorkflow({
             ) {
               return;
             }
-            if (isLocalGraphDirty()) {
+
+            const hasGraph = hasWorkflowGraphInPartial(state);
+            if (hasGraph && isLocalGraphDirty()) {
               return;
             }
-            handleStateUpdate(state, { syncToCanvas: true });
+
+            try {
+              applyRemotePartialState(state, { syncToCanvas: true });
+              lastRemoteTimestampRef.current = state.timestamp;
+            } catch (error) {
+              console.error("Error processing WebSocket update:", error);
+            }
           },
           onPatchGraph: (patch: WorkflowGraphPatchBroadcast) => {
             if (getCanvasMaintenanceFrozen()) {

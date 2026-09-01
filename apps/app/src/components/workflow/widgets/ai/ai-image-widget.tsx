@@ -170,6 +170,7 @@ function AiImageWidget({
     mediaKey: primaryImageKey,
     holdSize: cardDisplay.isBusy,
     initialLayout,
+    persistLayout: patchNodeLayout,
   });
   const cardPhase = cardDisplay.cardPhase;
   const cardPlaceholder = formatGenerativePhaseLabel({
@@ -318,10 +319,6 @@ function AiImageWidget({
             uploading && "opacity-70",
             className
           )}
-          style={{
-            width: cardSize.width,
-            height: cardSize.height,
-          }}
           onDoubleClick={(event) => {
             if (generateError) {
               event.stopPropagation();

@@ -1,6 +1,7 @@
 import {
   applyVideoRetakeEditOverrides,
   getResourceIdFromValue,
+  isAiVideoRetakePanel,
   splitVideoRetakeSegments,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
   type MediaReference,
@@ -18,13 +19,14 @@ import {
   mediaUrlSupportsBrowserCache,
 } from "@/services/media-cache-fetch-utils";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
+import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 import {
   getGenerationJob,
   submitVideoConcat,
   submitVideoTrim,
 } from "@/services/platform-ai-model-service";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
-import { uploadGenerativeMediaFile } from "@/services/stage-generative-media";
+import { stageGenerativeCardUpload, uploadGenerativeMediaFile } from "@/services/stage-generative-media";
 
 import {
   appendAiVideoGeneratedHistoryItems,
@@ -46,9 +48,11 @@ import {
   clearGenerativeProgress,
   readGenerativeProgressJobId,
   withGenerativeProgress,
+  withGenerativeUploadProgress,
   type GenerativeProgressPhase,
 } from "./generative-progress-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
+import { resolveGenerativeCardUploadError } from "./generative-card-upload-utils";
 import {
   resolveAiVideoJobMedia,
   runAiVideoGeneration,
@@ -56,7 +60,7 @@ import {
 } from "./run-ai-video-generation";
 import { concatVideoLocally } from "./video-concat-local";
 import { trimVideoLocally } from "./video-trim-local";
-import { withAiVideoRetakeNodeUnlocked } from "./ai-video-retake-node-utils";
+import { withRetakeGenerationComplete } from "./ai-video-retake-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 
 type UpdateNodeDataFn = (
@@ -182,11 +186,16 @@ function clearRetakeBusyMetadata(
   return withAiVideoGeneratingFlag(clearGenerativeProgress(metadata), false);
 }
 
-function unlockRetakeNode(current: WorkflowNodeType): Partial<WorkflowNodeType> {
-  const unlocked = withAiVideoRetakeNodeUnlocked(current);
+function finalizeRetakeNode(
+  current: WorkflowNodeType,
+  patch: Partial<WorkflowNodeType>
+): Partial<WorkflowNodeType> {
+  const merged = { ...current, ...patch };
+  const withPreview = withRetakeGenerationComplete(merged);
   return {
-    ...unlocked,
-    metadata: clearRetakeBusyMetadata(unlocked.metadata),
+    ...merged,
+    ...withPreview,
+    metadata: clearRetakeBusyMetadata(withPreview.metadata ?? merged.metadata),
   };
 }
 
@@ -314,16 +323,27 @@ async function writeCloudResultToNode(params: {
       };
     }
 
-    const withMedia = withAiVideoManualUpload(
-      current,
-      resolved.media as unknown as readonly MediaReference[]
-    );
+    const withMedia = isAiVideoRetakePanel(current.metadata)
+      ? appendAiVideoGeneratedHistoryItems(
+          current,
+          resolved.media as unknown as WorkflowMediaValue[],
+          {
+            prompt:
+              typeof current.inputs.find((input) => input.id === "prompt")?.value ===
+              "string"
+                ? current.inputs.find((input) => input.id === "prompt")!.value
+                : "",
+          }
+        )
+      : withAiVideoManualUpload(
+          current,
+          resolved.media as unknown as readonly MediaReference[]
+        );
     const merged = { ...current, ...withMedia };
-    const unlocked = unlockRetakeNode(merged);
+    const finalized = finalizeRetakeNode(merged, {});
     return {
-      ...merged,
-      ...unlocked,
-      metadata: withAiVideoGenerateError(unlocked.metadata, null),
+      ...finalized,
+      metadata: withAiVideoGenerateError(finalized.metadata, null),
     };
   });
 
@@ -375,11 +395,10 @@ function writeGeneratedVideoToNode(params: {
       jobId: jobId ?? undefined,
     });
     const merged = { ...current, ...withResult };
-    const unlocked = unlockRetakeNode(merged);
+    const finalized = finalizeRetakeNode(merged, withResult);
     return {
-      ...merged,
-      ...unlocked,
-      metadata: withAiVideoGenerateError(unlocked.metadata, null),
+      ...finalized,
+      metadata: withAiVideoGenerateError(finalized.metadata, null),
     };
   });
 
@@ -546,18 +565,73 @@ async function finishLocalResult(
   blob: Blob
 ): Promise<void> {
   const file = new File([blob], "retake.mp4", { type: "video/mp4" });
-  await params.uploadVideoFileToNode({
-    nodeId: params.targetNodeId,
-    file,
-  });
-  params.updateNodeData(params.targetNodeId, (current) => {
-    const unlocked = unlockRetakeNode(current);
-    return {
-      ...unlocked,
-      metadata: withAiVideoGenerateError(unlocked.metadata, null),
-    };
-  });
-  params.toast.success("workflow.aiVideoPanel.generated");
+
+  params.updateNodeData(params.targetNodeId, (current) => ({
+    metadata: withGenerativeUploadProgress(current.metadata, true),
+  }));
+
+  try {
+    const staged = await stageGenerativeCardUpload({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      file,
+      cloudConfigured: params.cloudConfigured,
+      mediaKind: "ai-video",
+      nodeType: "ai-video",
+    });
+
+    warmCardUploadPersist({
+      organizationId: params.organizationId,
+      workflowId: params.workflowId,
+      staged,
+      nodeType: "ai-video",
+      cloudConfigured: params.cloudConfigured,
+    });
+
+    const uploadError = resolveGenerativeCardUploadError({
+      value: staged,
+      cloudConfigured: params.cloudConfigured,
+      t: params.t,
+    });
+
+    params.updateNodeData(params.targetNodeId, (current) => {
+      const withResult = isAiVideoRetakePanel(current.metadata)
+        ? appendAiVideoGeneratedHistoryItems(
+            current,
+            [staged as unknown as WorkflowMediaValue],
+            { prompt: params.prompt }
+          )
+        : withAiVideoManualUpload(current, [staged]);
+      const merged = { ...current, ...withResult };
+      const finalized = finalizeRetakeNode(merged, withResult);
+      return {
+        ...finalized,
+        metadata: withGenerativeUploadProgress(
+          withAiVideoGenerateError(finalized.metadata, uploadError),
+          false
+        ),
+      };
+    });
+
+    if (uploadError) {
+      params.toast.errorRaw(uploadError.summary);
+      return;
+    }
+    params.toast.success("workflow.aiVideoPanel.generated");
+  } catch (error) {
+    const formatted = prepareGenerativeCardError(
+      error instanceof Error ? error.message : String(error),
+      params.t,
+      "video"
+    );
+    params.updateNodeData(params.targetNodeId, (current) => ({
+      metadata: withGenerativeUploadProgress(
+        withAiVideoGenerateError(current.metadata, formatted),
+        false
+      ),
+    }));
+    params.toast.errorRaw(formatted.summary);
+  }
 }
 
 async function runLocalRetake(

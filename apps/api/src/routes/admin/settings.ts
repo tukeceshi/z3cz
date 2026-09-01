@@ -1,4 +1,5 @@
 import type { SiteSettings, UpdateSiteSettingsRequest } from "@dafthunk/types";
+import { workflowPublicStateFromSiteSettings } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import {
   getSiteSettings,
   updateSiteSettings,
 } from "../../db";
+import { broadcastWorkflowPublicState } from "../../services/workflow-public-broadcast";
 
 const adminSettingsRoutes = new Hono<ApiContext>();
 
@@ -77,6 +79,17 @@ adminSettingsRoutes.patch(
 
     try {
       const settings = await updateSiteSettings(db, input, jwtPayload.sub);
+
+      const maintenanceChanged =
+        body.maintenanceEnabled !== undefined ||
+        body.maintenanceMessage !== undefined;
+      if (maintenanceChanged) {
+        await broadcastWorkflowPublicState(
+          c.env,
+          workflowPublicStateFromSiteSettings(settings)
+        );
+      }
+
       return c.json(settings);
     } catch (error) {
       console.error("Error updating site settings:", error);

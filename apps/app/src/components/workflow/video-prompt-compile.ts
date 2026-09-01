@@ -10,6 +10,10 @@ export const VIDEO_PROMPT_REF_TOKEN_PATTERN = /\{\{ref:([^}]+)\}\}/g;
 /** Trim clip is always the first entry in retake referenceVideoUrls. */
 export const RETAKE_EDIT_TRIM_VIDEO_REF_INDEX = 1 as const;
 
+/** Matches time segment after retake submit prefix. */
+export const RETAKE_PROMPT_TIME_RANGE_PATTERN =
+  /^(编辑<视频\d+>)(\d{2}:\d{2}—\d{2}:\d{2})([\s\S]*)$/;
+
 export interface VideoPromptImageChipRef {
   readonly edgeId: string;
   readonly kind: string;
@@ -48,30 +52,102 @@ export function formatRetakeEditSubmitPrefix(
   return `编辑<视频${videoIndex}>`;
 }
 
-export function compileRetakePromptForSubmit(
-  userStored: string,
-  indexMap: ReadonlyMap<string, number>
-): VideoPromptCompileResult {
-  const userCompile = compileVideoPromptForSubmit(userStored, indexMap);
+function buildRetakeSubmitPrefixWithRange(range: VideoTrimRangeSec): string {
+  return `${formatRetakeEditSubmitPrefix()}${formatRetakeEditTimeRangeLabel(range)}`;
+}
+
+export function buildRetakeStoredPrompt(params: {
+  readonly range: VideoTrimRangeSec;
+  readonly body: string;
+  readonly indexMap: ReadonlyMap<string, number>;
+}): VideoPromptCompileResult {
+  const userCompile = compileVideoPromptForSubmit(params.body, params.indexMap);
   if (!userCompile.ok) {
     return userCompile;
   }
-
   const userPart = userCompile.prompt.trim();
-  const prefix = formatRetakeEditSubmitPrefix();
+  const prefix = buildRetakeSubmitPrefixWithRange(params.range);
   if (userPart.length === 0) {
     return { ok: true, prompt: prefix };
   }
-
   return { ok: true, prompt: `${prefix}${userPart}` };
+}
+
+export function compileRetakePromptForSubmit(
+  userStored: string,
+  indexMap: ReadonlyMap<string, number>,
+  range: VideoTrimRangeSec
+): VideoPromptCompileResult {
+  return buildRetakeStoredPrompt({ range, body: userStored, indexMap });
 }
 
 export function compiledRetakePromptLength(
   userStored: string,
-  indexMap: ReadonlyMap<string, number>
+  indexMap: ReadonlyMap<string, number>,
+  range: VideoTrimRangeSec
 ): number | null {
-  const result = compileRetakePromptForSubmit(userStored, indexMap);
+  const result = compileRetakePromptForSubmit(userStored, indexMap, range);
   return result.ok ? result.prompt.length : null;
+}
+
+export function parseRetakeStoredPrompt(stored: string): {
+  readonly prefix: string;
+  readonly timeRangeLabel: string;
+  readonly body: string;
+} | null {
+  const match = stored.match(RETAKE_PROMPT_TIME_RANGE_PATTERN);
+  if (!match) {
+    return null;
+  }
+  return {
+    prefix: match[1]!,
+    timeRangeLabel: match[2]!,
+    body: match[3] ?? "",
+  };
+}
+
+function parseClockSec(label: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(label.trim());
+  if (!match) {
+    return null;
+  }
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2]);
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) {
+    return null;
+  }
+  return minutes * 60 + seconds;
+}
+
+export function parseRetakePromptTimeRange(
+  stored: string
+): VideoTrimRangeSec | null {
+  const parsed = parseRetakeStoredPrompt(stored);
+  if (!parsed) {
+    return null;
+  }
+  const parts = parsed.timeRangeLabel.split("—");
+  if (parts.length !== 2) {
+    return null;
+  }
+  const startSec = parseClockSec(parts[0]!);
+  const endSec = parseClockSec(parts[1]!);
+  if (startSec === null || endSec === null || endSec <= startSec) {
+    return null;
+  }
+  return { startSec, endSec };
+}
+
+export function replaceRetakePromptTimeRange(
+  stored: string,
+  range: VideoTrimRangeSec
+): string {
+  const parsed = parseRetakeStoredPrompt(stored);
+  if (!parsed) {
+    return stored;
+  }
+  const nextLabel = formatRetakeEditTimeRangeLabel(range);
+  return `${parsed.prefix}${nextLabel}${parsed.body}`;
 }
 
 /** 1-based index of each image reference edge in connection order. */

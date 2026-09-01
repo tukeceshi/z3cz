@@ -68,26 +68,21 @@ const stubCatalog = {
 };
 
 describe("buildLockedRetakeCopyNode", () => {
-  it("creates a locked copy with cover video only", () => {
-    const video = {
-      resourceId: "res-1",
-      mimeType: "video/mp4",
-    };
+  it("creates a locked retake node without manual video copy", () => {
     const node = buildLockedRetakeCopyNode({
       catalog: stubCatalog,
       nodeId: "ai-video-retake-1",
       nodeName: "镜头A-重拍",
       position: { x: 0, y: 0 },
-      video,
       createObjectUrl: () => "blob:test",
     });
 
     expect(node.data.name).toBe("镜头A-重拍");
     expect(isAiVideoRetakePanel(node.data.metadata)).toBe(true);
-    expect(node.data.inputs.find((input) => input.id === "retake_draft")?.value).toBeDefined();
-    expect(node.data.inputs.find((input) => input.id === "manual_videos")?.value).toEqual([
-      video,
-    ]);
+    expect(node.data.inputs.find((input) => input.id === "retake_draft")?.value).toMatchObject({
+      primaryVideoEdgeId: null,
+    });
+    expect(node.data.inputs.find((input) => input.id === "manual_videos")?.value).toBeUndefined();
     expect(node.data.inputs.find((input) => input.id === "videos_history")?.value).toBeUndefined();
   });
 });

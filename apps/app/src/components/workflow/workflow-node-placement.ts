@@ -80,7 +80,7 @@ export function resolveWorkflowNodeDimensions(
   return { width: 200, height: isOutputNode ? 250 : 100 };
 }
 
-/** Card size for add-node placement; image/video prefer measured adaptive size. */
+/** Card size for add-node placement; same box as edge midpoints. */
 export function resolveWorkflowNodeCardSizeForPlacement(
   nodeType: string | undefined,
   node?: Pick<ReactFlowNode, "measured" | "width" | "height">

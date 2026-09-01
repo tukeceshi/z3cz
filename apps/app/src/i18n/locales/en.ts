@@ -3850,9 +3850,14 @@ export const en = {
     },
     videoRetake: {
       action: "Retake",
+      redo: "Redo",
+      back: "Back",
+      source: "Source",
+      primaryReferenceLocked: "The source video reference cannot be removed",
       loadFailed: "Unable to load video",
       createNodeFailed: "Could not create the retake node",
       referenceLinkFailed: "Could not link the original video node",
+      sourceResynced: "Source video updated; trim range adjusted",
       generateFailed: "Retake failed",
       resolutionMismatchTitle: "Resolution differs from source video",
       resolutionMismatchDescription:

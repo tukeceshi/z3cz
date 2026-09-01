@@ -2,7 +2,11 @@ import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@daft
 import type { InternalNode, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
-import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
+import {
+  AI_IMAGE_CARD_HEIGHT_PX,
+  AI_IMAGE_CARD_WIDTH_PX,
+  AI_IMAGE_OUTPUT_ID,
+} from "./ai-image-node-utils";
 import {
   resolveAiTextEdgeAnchors,
   snapAiTextKeywordsBorderPoint,
@@ -12,7 +16,7 @@ import {
   AI_TEXT_CARD_WIDTH_PX,
   AI_TEXT_KEYWORDS_HANDLE_ID,
 } from "./ai-text-node-utils";
-import { AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
+import { AI_VIDEO_CARD_HEIGHT_PX, AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
 
 function mockTextNode(
   id: string,
@@ -90,7 +94,7 @@ describe("ai-text-connection-utils", () => {
     expect(anchors.targetX).not.toBe(output.x);
   });
 
-  it("snaps image to video on content midpoints using measured size", () => {
+  it("snaps image to video on card midpoints, ignoring measured chrome", () => {
     const source = mockImageNode("image-1", { x: 0, y: 100 }, {
       width: 272,
       height: 277,
@@ -116,9 +120,9 @@ describe("ai-text-connection-utils", () => {
       nodeLookup,
     });
 
-    expect(anchors.sourceY).toBe(100 + 277 / 2);
-    expect(anchors.targetY).toBe(100 + 277 / 2);
-    expect(anchors.sourceX).toBe(272);
+    expect(anchors.sourceY).toBe(100 + AI_IMAGE_CARD_HEIGHT_PX / 2);
+    expect(anchors.targetY).toBe(100 + AI_VIDEO_CARD_HEIGHT_PX / 2);
+    expect(anchors.sourceX).toBe(AI_IMAGE_CARD_WIDTH_PX);
     expect(anchors.targetX).toBe(500);
   });
 });
