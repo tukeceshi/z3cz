@@ -12,6 +12,7 @@ import {
   computeVideoPriceEstimateForModel,
   applyVideoPriceEstimateDisplayFolds,
   EMPTY_PUBLIC_VIDEO_PRICE_ESTIMATES,
+  formatOptimalReferenceSecondsDisplay,
   formatVideoBillingTokensDisplay,
   formatVideoPriceEstimateCostDisplay,
   formatVideoPriceEstimateSummary,
@@ -35,6 +36,17 @@ describe("computeOptimalReferenceSeconds", () => {
   it("returns zero for non-positive output duration", () => {
     expect(computeOptimalReferenceSeconds(0)).toBe(0);
     expect(computeOptimalReferenceSeconds(-1)).toBe(0);
+  });
+
+  it("handles float drift from trim subtraction", () => {
+    expect(computeOptimalReferenceSeconds(3.999999999999999)).toBe(3);
+    expect(computeOptimalReferenceSeconds(4.000000000000002)).toBe(3);
+  });
+
+  it("formats optimal reference seconds for display", () => {
+    expect(formatOptimalReferenceSecondsDisplay(3)).toBe("3");
+    expect(formatOptimalReferenceSecondsDisplay(2.999999999999999)).toBe("3");
+    expect(formatOptimalReferenceSecondsDisplay(3.5)).toBe("3.5");
   });
 });
 

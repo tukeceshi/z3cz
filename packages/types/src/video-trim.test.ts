@@ -45,6 +45,12 @@ describe("video-trim", () => {
     expect(videoTrimSelectionDurationSec({ startSec: 5, endSec: 9 })).toBe(4);
   });
 
+  it("subtracts trim ranges in tenths to avoid float drift", () => {
+    expect(
+      videoTrimSelectionDurationSec({ startSec: 5.2, endSec: 9.2 })
+    ).toBe(4);
+  });
+
   it("clamps shifted selections at timeline edges", () => {
     expect(
       shiftVideoTrimRange({ startSec: 2, endSec: 6 }, -5, 10)

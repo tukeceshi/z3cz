@@ -14,8 +14,31 @@ export interface VideoTrimRangeSec {
 
 export type VideoTrimTimeField = "start" | "end" | "duration";
 
+export function toDurationTenths(valueSec: number): number {
+  if (!Number.isFinite(valueSec)) {
+    return 0;
+  }
+  return Math.round(snapVideoTrimSec(valueSec) / VIDEO_TRIM_SNAP_STEP_SEC);
+}
+
+export function fromDurationTenths(tenths: number): number {
+  return Math.max(0, tenths) * VIDEO_TRIM_SNAP_STEP_SEC;
+}
+
+/** Round up to the nearest 0.1 s step (conservative for billing estimates). */
+export function ceilDurationStepSec(valueSec: number): number {
+  if (!Number.isFinite(valueSec) || valueSec <= 0) {
+    return 0;
+  }
+  return fromDurationTenths(
+    Math.ceil(valueSec / VIDEO_TRIM_SNAP_STEP_SEC - 1e-9)
+  );
+}
+
 export function videoTrimSelectionDurationSec(range: VideoTrimRangeSec): number {
-  return Math.max(0, range.endSec - range.startSec);
+  const startTenths = toDurationTenths(range.startSec);
+  const endTenths = toDurationTenths(range.endSec);
+  return fromDurationTenths(Math.max(0, endTenths - startTenths));
 }
 
 function resolveVideoDurationSec(videoDurationSec: number): number {
