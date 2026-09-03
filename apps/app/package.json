@@ -59,7 +59,7 @@
     "@tanstack/react-ranger": "^0.0.5",
     "@tanstack/react-table": "^8.21.3",
     "mediabunny": "^1.25.0",
-    "@xyflow/react": "^12.10.2",
+    "@xyflow/react": "^12.11.5",
     "date-fns": "^4.1.0",
     "gsap": "^3.13.0",
     "lucide-react": "^0.562.0",
