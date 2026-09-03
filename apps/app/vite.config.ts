@@ -184,6 +184,9 @@ export default defineConfig(({ mode }) => {
         ),
       },
     },
+    optimizeDeps: {
+      include: ["remotion", "@remotion/player", "@babel/standalone"],
+    },
     test: {
       environment: "jsdom",
     },

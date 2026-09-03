@@ -48,7 +48,8 @@ export type AiMediaCacheNodeType =
   | "ai-video"
   | "ai-audio"
   | "ai-text"
-  | "agent-chat";
+  | "agent-chat"
+  | "remotion-preview";
 
 const DB_NAME = "dafthunk-ai-media-cache";
 const DB_VERSION = 4;
@@ -1580,7 +1581,7 @@ function mimeToExtension(
     if (base.includes("markdown")) return "md";
     return "txt";
   }
-  if (nodeType === "agent-chat") return "json";
+  if (nodeType === "agent-chat" || nodeType === "remotion-preview") return "json";
   const map: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
@@ -1613,7 +1614,9 @@ export function cacheEntryDownloadFilename(
           ? "text"
           : entry.nodeType === "agent-chat"
             ? "agent"
-            : "image";
+            : entry.nodeType === "remotion-preview"
+              ? "remotion"
+              : "image";
   const idPart = entry.mediaId.slice(0, 8);
   return `${prefix}-${idPart}-${index + 1}.${ext}`;
 }

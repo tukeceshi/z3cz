@@ -5,11 +5,18 @@ import type {
 
 import { cacheMediaFromBlob } from "@/services/ai-media-cache-service";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+import type { AgentSessionMode } from "@/services/agent-session-mode";
 
 const DB_NAME = "dafthunk-agent-chats";
 const DB_VERSION = 1;
 const STORE = "conversations";
 const META_STORE = "meta";
+
+export interface AgentExecutionTodo {
+  readonly id: string;
+  readonly content: string;
+  readonly done: boolean;
+}
 
 export interface LocalAgentConversation {
   readonly id: string;
@@ -19,6 +26,11 @@ export interface LocalAgentConversation {
   readonly messages: readonly AgentChatMessage[];
   readonly updatedAt: string;
   readonly activeInvocationId?: string;
+  readonly sessionMode?: AgentSessionMode;
+  readonly planDocument?: string;
+  readonly planPending?: boolean;
+  readonly consentedCapabilities?: readonly string[];
+  readonly executionTodos?: readonly AgentExecutionTodo[];
 }
 
 function conversationKey(
@@ -204,5 +216,6 @@ export function createEmptyLocalConversation(params: {
     title: "",
     messages: [],
     updatedAt: new Date().toISOString(),
+    sessionMode: "agent",
   };
 }
