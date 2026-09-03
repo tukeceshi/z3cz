@@ -245,8 +245,8 @@ describe("executeCanvasAgentTool", () => {
       capabilities: {
         sessionMode: "plan",
         consentedCapabilities: ["simple-animation"],
-        viewportOpen: true,
         requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource,
       },
@@ -255,8 +255,8 @@ describe("executeCanvasAgentTool", () => {
     expect(writeSource).not.toHaveBeenCalled();
   });
 
-  it("rejects write when the window is closed", async () => {
-    const writeSource = vi.fn();
+  it("writes while simple animation is on even if the window is hidden", async () => {
+    const writeSource = vi.fn(async () => ({ ok: true }));
     const text = await executeCanvasAgentTool({
       call: {
         name: "remotion_write",
@@ -268,17 +268,40 @@ describe("executeCanvasAgentTool", () => {
       capabilities: {
         sessionMode: "agent",
         consentedCapabilities: ["simple-animation"],
-        viewportOpen: false,
         requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource,
       },
     });
-    expect(JSON.parse(text).error).toContain("窗口已关闭");
+    expect(JSON.parse(text)).toEqual({ ok: true });
+    expect(writeSource).toHaveBeenCalled();
+  });
+
+  it("rejects write after simple animation is turned off", async () => {
+    const writeSource = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "remotion_write",
+        resourceId: "",
+        nodeId: "",
+        payload: "function Composition() { return null; }",
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "agent",
+        consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource,
+      },
+    });
+    expect(JSON.parse(text).error).toContain("未进入简易动画");
     expect(writeSource).not.toHaveBeenCalled();
   });
 
-  it("opens the simple animation window without a second allow step", async () => {
+  it("opens simple animation without a second allow step", async () => {
     const requestConsent = vi.fn(async () => ({
       authorized: true as const,
       open: true as const,
@@ -294,13 +317,39 @@ describe("executeCanvasAgentTool", () => {
       capabilities: {
         sessionMode: "agent",
         consentedCapabilities: [],
-        viewportOpen: false,
         requestConsent,
+        revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource: async () => ({ ok: true }),
       },
     });
     expect(requestConsent).toHaveBeenCalledWith("simple-animation");
     expect(JSON.parse(text)).toEqual({ authorized: true, open: true });
+  });
+
+  it("lets the agent exit simple animation without hiding the window", async () => {
+    const revokeConsent = vi.fn(async () => ({
+      authorized: true as const,
+      open: false as const,
+    }));
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "remotion_close",
+        resourceId: "",
+        nodeId: "",
+        payload: "",
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "agent",
+        consentedCapabilities: ["simple-animation"],
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent,
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+      },
+    });
+    expect(revokeConsent).toHaveBeenCalledWith("simple-animation");
+    expect(JSON.parse(text)).toEqual({ authorized: true, open: false });
   });
 });

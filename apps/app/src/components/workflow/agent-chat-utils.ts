@@ -69,6 +69,75 @@ export function contextLimitForModel(model: OrgTextModelOption): {
   };
 }
 
+export type AgentContextUsageTone = "normal" | "warn" | "full";
+
+export interface AgentContextUsage {
+  readonly used: number;
+  readonly limit: number;
+  readonly ratio: number;
+  readonly tone: AgentContextUsageTone;
+}
+
+export function resolveAgentContextModel(
+  modelId: string,
+  selectableModels: readonly OrgTextModelOption[]
+): OrgTextModelOption | null {
+  if (modelId !== AGENT_CHAT_AUTO_ID) {
+    const selected = selectableModels.find(
+      (model) => model.optionId === modelId
+    );
+    if (selected) {
+      return selected;
+    }
+  }
+  return selectableModels[0] ?? null;
+}
+
+export function estimateAgentContextUsedTokens(
+  messages: readonly Pick<AgentChatMessage, "content">[],
+  draft: string
+): number {
+  let used = 0;
+  for (const message of messages) {
+    if (message.content.length > 0) {
+      used += estimateAgentChatTokens(message.content);
+    }
+  }
+  if (draft.length > 0) {
+    used += estimateAgentChatTokens(draft);
+  }
+  return used;
+}
+
+export function agentContextUsage(params: {
+  readonly used: number;
+  readonly limit: number;
+}): AgentContextUsage {
+  const used = Math.max(0, Math.round(params.used));
+  const limit = Math.max(0, Math.round(params.limit));
+  const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
+  const tone: AgentContextUsageTone =
+    ratio >= 0.9 ? "full" : ratio >= 0.7 ? "warn" : "normal";
+  return { used, limit, ratio, tone };
+}
+
+export function formatAgentContextTokenCount(value: number): string {
+  const count = Math.max(0, Math.round(value));
+  if (count >= 1_000_000) {
+    return formatCompactTokenCount(count / 1_000_000, "m");
+  }
+  if (count >= 1000) {
+    return formatCompactTokenCount(count / 1000, "k");
+  }
+  return String(count);
+}
+
+function formatCompactTokenCount(scaled: number, suffix: "k" | "m"): string {
+  const rounded = Math.round(scaled * 10) / 10;
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return `${text}${suffix}`;
+}
+
 export function shouldFetchSealedAgentChatBody(params: {
   readonly sealed: boolean;
   readonly remoteFingerprint: string;

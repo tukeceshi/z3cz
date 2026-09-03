@@ -15,9 +15,11 @@ import type {
   WorkflowParameter,
 } from "@/components/workflow/workflow-types";
 import {
-  capabilityForTool,
-  isMakeTool,
   type AgentSessionMode,
+  capabilityForTool,
+  hasCapability,
+  isMakeTool,
+  SIMPLE_ANIMATION_CAPABILITY,
 } from "@/services/agent-session-mode";
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
@@ -27,6 +29,7 @@ export const CANVAS_WRITE_TEXT_TOOL = "canvas_write_text" as const;
 export const CANVAS_RUN_NODE_TOOL = "canvas_run_node" as const;
 export const CANVAS_STAGE_MEDIA_TOOL = "canvas_stage_media" as const;
 export const REMOTION_OPEN_TOOL = "remotion_open" as const;
+export const REMOTION_CLOSE_TOOL = "remotion_close" as const;
 export const REMOTION_GET_TOOL = "remotion_get" as const;
 export const REMOTION_WRITE_TOOL = "remotion_write" as const;
 export const AGENT_CANVAS_EXCERPT_MAX_CHARS = 120;
@@ -59,8 +62,11 @@ export interface AgentToolCall {
 export interface AgentCapabilityHandlers {
   readonly sessionMode: AgentSessionMode;
   readonly consentedCapabilities: readonly string[];
-  readonly viewportOpen: boolean;
   readonly requestConsent: (capabilityId: string) => Promise<{
+    readonly authorized: boolean;
+    readonly open: boolean;
+  }>;
+  readonly revokeConsent: (capabilityId: string) => Promise<{
     readonly authorized: boolean;
     readonly open: boolean;
   }>;
@@ -164,10 +170,7 @@ function labeledOnly(payload: string, key: string): string {
   return "";
 }
 
-function firstLabeledValue(
-  payload: string,
-  key: string
-): string {
+function firstLabeledValue(payload: string, key: string): string {
   const payloadLines = payload
     .split("\n")
     .map((line) => line.trim())
@@ -243,6 +246,16 @@ export async function executeCanvasAgentTool(params: {
     }
     return JSON.stringify(await handlers.requestConsent(capabilityId));
   }
+  if (params.call.name === REMOTION_CLOSE_TOOL) {
+    if (!handlers) {
+      return JSON.stringify({ error: "无法退出该能力" });
+    }
+    const capabilityId = capabilityForTool(params.call.name);
+    if (!capabilityId) {
+      return JSON.stringify({ error: "未知能力" });
+    }
+    return JSON.stringify(await handlers.revokeConsent(capabilityId));
+  }
   if (params.call.name === REMOTION_GET_TOOL) {
     if (!handlers) {
       return JSON.stringify({ error: "无法读取" });
@@ -253,8 +266,13 @@ export async function executeCanvasAgentTool(params: {
     if (!handlers) {
       return JSON.stringify({ error: "无法写入" });
     }
-    if (!handlers.viewportOpen) {
-      return JSON.stringify({ error: "窗口已关闭。先打开该能力。" });
+    if (
+      !hasCapability(
+        handlers.consentedCapabilities,
+        SIMPLE_ANIMATION_CAPABILITY
+      )
+    ) {
+      return JSON.stringify({ error: "未进入简易动画。先打开该能力。" });
     }
     const sourceCode = params.call.payload;
     if (!sourceCode.trim()) {
@@ -299,7 +317,9 @@ export async function executeCanvasAgentTool(params: {
     if (!handlers?.stageMedia) {
       return JSON.stringify({ error: "无法挂上媒体" });
     }
-    return JSON.stringify(await handlers.stageMedia(nodeId, sourceUrl, mimeType));
+    return JSON.stringify(
+      await handlers.stageMedia(nodeId, sourceUrl, mimeType)
+    );
   }
   if (params.call.name === CANVAS_RESOLVE_RESOURCE_TOOL) {
     const resourceId = params.call.resourceId.trim();

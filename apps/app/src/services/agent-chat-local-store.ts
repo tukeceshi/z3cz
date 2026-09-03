@@ -216,6 +216,6 @@ export function createEmptyLocalConversation(params: {
     title: "",
     messages: [],
     updatedAt: new Date().toISOString(),
-    sessionMode: "agent",
+    sessionMode: "plan",
   };
 }

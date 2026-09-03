@@ -16,6 +16,7 @@ export function isMakeTool(name: string): boolean {
 export function capabilityForTool(name: string): string | null {
   if (
     name === "remotion_open" ||
+    name === "remotion_close" ||
     name === "remotion_get" ||
     name === "remotion_write"
   ) {
@@ -24,8 +25,11 @@ export function capabilityForTool(name: string): string | null {
   return null;
 }
 
-export function capabilitiesGrantedOnExecute(): readonly string[] {
-  return [SIMPLE_ANIMATION_CAPABILITY];
+export function hasCapability(
+  consented: readonly string[] | undefined,
+  capabilityId: string
+): boolean {
+  return Boolean(consented?.includes(capabilityId));
 }
 
 export function isPlanConfirmPending(params: {
@@ -34,8 +38,41 @@ export function isPlanConfirmPending(params: {
   readonly streaming: boolean;
 }): boolean {
   return (
-    params.sessionMode === "plan" &&
-    params.planPending &&
-    !params.streaming
+    params.sessionMode === "plan" && params.planPending && !params.streaming
   );
+}
+
+export function modeOnOpenConversation(params: {
+  readonly sessionMode?: AgentSessionMode;
+  readonly activeInvocationId?: string;
+}): AgentSessionMode {
+  if (params.sessionMode === "agent" && params.activeInvocationId) {
+    return "agent";
+  }
+  return "plan";
+}
+
+export interface AgentRunSessionState {
+  readonly sessionMode: AgentSessionMode;
+  readonly planPending: boolean;
+  readonly planDocument: string | undefined;
+}
+
+export function stateAfterRun(params: {
+  readonly runMode: AgentSessionMode;
+  readonly talk: string;
+}): AgentRunSessionState {
+  if (params.runMode === "agent") {
+    return {
+      sessionMode: "plan",
+      planPending: false,
+      planDocument: undefined,
+    };
+  }
+  const talk = params.talk.trim();
+  return {
+    sessionMode: "plan",
+    planPending: Boolean(talk),
+    planDocument: talk || undefined,
+  };
 }

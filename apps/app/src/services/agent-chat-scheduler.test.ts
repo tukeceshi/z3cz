@@ -6,8 +6,8 @@ import {
 } from "./agent-canvas-state";
 import {
   AGENT_CHAT_MAX_MAIN_STEPS,
-  AGENT_MAIN_INSTRUCTION,
   AGENT_EXECUTE_STATUS,
+  AGENT_MAIN_INSTRUCTION,
   AGENT_PLAN_STATUS,
   buildAgentMainInstruction,
   buildMainSchedulerMessages,
@@ -114,6 +114,7 @@ describe("buildMainSchedulerMessages", () => {
     const messages = buildMainSchedulerMessages([], [], { mode: "agent" });
     expect(messages[0]?.content).toBe(buildAgentMainInstruction("agent"));
     expect(messages[0]?.content).toContain(AGENT_EXECUTE_STATUS);
+    expect(messages[0]?.content).toContain("remotion_close");
   });
 
   it("tells the model not to ask whether to execute in plan mode", () => {
