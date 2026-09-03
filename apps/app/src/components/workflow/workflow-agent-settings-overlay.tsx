@@ -8,14 +8,24 @@ import {
   fingerprintAgentChatBody,
   titleFromMessages,
 } from "@dafthunk/types";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 import ArrowUp from "lucide-react/icons/arrow-up";
 import ChevronDown from "lucide-react/icons/chevron-down";
+import Clapperboard from "lucide-react/icons/clapperboard";
 import Copy from "lucide-react/icons/copy";
 import History from "lucide-react/icons/history";
+import ListTodo from "lucide-react/icons/list-todo";
 import Plus from "lucide-react/icons/plus";
 import Square from "lucide-react/icons/square";
 import {
+  type FormEvent,
   forwardRef,
+  type KeyboardEvent,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -23,10 +33,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
-  type KeyboardEvent,
 } from "react";
-
+import { useTranslation } from "@/components/locale-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,35 +52,65 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTranslation } from "@/components/locale-provider";
-import { cn } from "@/utils/utils";
+import { Spinner } from "@/components/ui/spinner";
 import {
-  getAgentChatBody,
-  listAgentChats,
-  putAgentChatBody,
-  sealAgentChat,
-  resumeAgentChatStream,
-  stopAgentChatStream,
-  streamAgentChat,
-  switchAgentChat,
-  type StreamAgentChatResult,
-} from "@/services/agent-chat-service";
+  CANVAS_GET_STATE_TOOL,
+  CANVAS_RESOLVE_RESOURCE_TOOL,
+  CANVAS_RUN_NODE_TOOL,
+  CANVAS_STAGE_MEDIA_TOOL,
+  CANVAS_WRITE_TEXT_TOOL,
+  compactCanvasAgentState,
+  executeCanvasAgentTool,
+  formatCanvasInventory,
+  REMOTION_GET_TOOL,
+  REMOTION_OPEN_TOOL,
+  REMOTION_WRITE_TOOL,
+} from "@/services/agent-canvas-state";
 import {
   createEmptyLocalConversation,
   deleteLocalAgentConversation,
+  type LocalAgentConversation,
   listLocalAgentConversations,
   readLastOpenAgentConversationId,
   readLocalAgentConversation,
   writeLastOpenAgentConversationId,
   writeLocalAgentConversation,
-  type LocalAgentConversation,
 } from "@/services/agent-chat-local-store";
-import { useOrgTextModels } from "@/services/platform-ai-model-service";
-
 import {
-  isNearScrollBottom,
-  scrollContainerToBottom,
-} from "./ai-text-preview-scroll";
+  type AgentSchedulerMessage,
+  type AgentSchedulerStreamResult,
+  composeSavedAssistantContent,
+  parseAgentSchedulerOutput,
+  runAgentScheduler,
+  schedulerMessagesToChat,
+  splitSavedAssistantContent,
+} from "@/services/agent-chat-scheduler";
+import {
+  getAgentChatBody,
+  listAgentChats,
+  putAgentChatBody,
+  resumeAgentChatStream,
+  type StreamAgentChatResult,
+  sealAgentChat,
+  stopAgentChatStream,
+  streamAgentChat,
+  switchAgentChat,
+} from "@/services/agent-chat-service";
+import { useOrgTextModels } from "@/services/platform-ai-model-service";
+import {
+  capabilitiesGrantedOnExecute,
+  isPlanConfirmPending,
+  SIMPLE_ANIMATION_CAPABILITY,
+  type AgentSessionMode,
+} from "@/services/agent-session-mode";
+import { stageGenerativeMediaFromEphemeralUrl } from "@/services/stage-generative-media";
+import { compileRemotionSource } from "@/services/remotion-live-compile";
+import {
+  DEFAULT_REMOTION_SOURCE_CODE,
+  readRemotionViewportContent,
+  writeRemotionViewportContent,
+} from "@/services/remotion-viewport-staging";
+import { cn } from "@/utils/utils";
 import {
   AGENT_CHAT_AUTO_ID,
   contextLimitForModel,
@@ -82,8 +120,34 @@ import {
   shouldSubmitAgentChatOnEnter,
   trimMessagesForContext,
 } from "./agent-chat-utils";
+import {
+  isNearScrollBottom,
+  scrollContainerToBottom,
+} from "./ai-text-preview-scroll";
+import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
+import { commitAiTextValue } from "./commit-ai-text-value";
+import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
+import { useWorkflow } from "./workflow-context";
+import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+
+const RemotionViewportOverlay = lazy(() =>
+  import("./remotion-viewport-overlay").then((module) => ({
+    default: module.RemotionViewportOverlay,
+  }))
+);
+
+const REMOTION_COMPACT_PREVIEW_HEIGHT_PX = 225;
 
 type AgentStreamStatus = "idle" | "generating" | "reconnecting" | "stopped";
+type CanvasAgentToolActivity =
+  | "readCanvas"
+  | "resolveResource"
+  | "remotionOpen"
+  | "remotionGet"
+  | "remotionWrite"
+  | "writeText"
+  | "runNode"
+  | "stageMedia";
 
 const agentWidthClassName = "w-[20vw] min-w-[400px]";
 const agentExpandedHeightClassName = "h-[calc(100dvh-3.5rem-1rem)]";
@@ -92,7 +156,8 @@ const AGENT_LINE_HEIGHT_PX = 20;
 const AGENT_TEXTAREA_Y_PADDING_PX = 16;
 const AGENT_COLLAPSED_MAX_LINES = 2.5;
 const AGENT_COLLAPSED_MAX_HEIGHT_PX =
-  AGENT_TEXTAREA_Y_PADDING_PX + AGENT_LINE_HEIGHT_PX * AGENT_COLLAPSED_MAX_LINES;
+  AGENT_TEXTAREA_Y_PADDING_PX +
+  AGENT_LINE_HEIGHT_PX * AGENT_COLLAPSED_MAX_LINES;
 const AGENT_EXPANDED_MAX_HEIGHT_PX = 200;
 
 const agentBubbleShellClassName =
@@ -117,6 +182,14 @@ export interface WorkflowAgentSettingsOverlayProps {
   readonly orgId?: string;
   readonly workflowId?: string;
   readonly workflowName?: string;
+  readonly remotionViewportOpen?: boolean;
+  readonly onToggleRemotionViewport?: () => void;
+  readonly onOpenRemotionViewport?: () => void;
+  readonly onCloseRemotionViewport?: () => void;
+  readonly getCanvasGraph?: () => {
+    readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+    readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  };
 }
 
 export interface WorkflowAgentSettingsOverlayHandle {
@@ -131,10 +204,21 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   WorkflowAgentSettingsOverlayHandle,
   WorkflowAgentSettingsOverlayProps
 >(function WorkflowAgentSettingsOverlay(
-  { orgId, workflowId, workflowName = "" },
+  {
+    orgId,
+    workflowId,
+    workflowName = "",
+    remotionViewportOpen = false,
+    onToggleRemotionViewport,
+    onOpenRemotionViewport,
+    onCloseRemotionViewport,
+    getCanvasGraph,
+  },
   ref
 ) {
   const { t } = useTranslation();
+  const { updateNodeData, onRunNode } = useWorkflow();
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
   const { models } = useOrgTextModels(orgId, { enabled: Boolean(orgId) });
   const selectableModels = useMemo(
     () => selectableTextModelsInOrder(models),
@@ -146,16 +230,21 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [modelId, setModelId] = useState<string>(AGENT_CHAT_AUTO_ID);
-  const [conversation, setConversation] = useState<LocalAgentConversation | null>(
-    null
+  const [conversation, setConversation] =
+    useState<LocalAgentConversation | null>(null);
+  const [history, setHistory] = useState<readonly AgentChatDirectoryEntry[]>(
+    []
   );
-  const [history, setHistory] = useState<readonly AgentChatDirectoryEntry[]>([]);
   const [cloudEnabled, setCloudEnabled] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [streamStatus, setStreamStatus] = useState<AgentStreamStatus>("idle");
+  const [toolActivity, setToolActivity] =
+    useState<CanvasAgentToolActivity | null>(null);
   const [resendIndex, setResendIndex] = useState<number | null>(null);
+  const [sessionMode, setSessionMode] = useState<AgentSessionMode>("agent");
+  const [toolTrace, setToolTrace] = useState<readonly string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const userStopRef = useRef(false);
   const invocationIdRef = useRef<string | null>(null);
@@ -163,6 +252,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const sessionModeRef = useRef<AgentSessionMode>("agent");
+  const consentedRef = useRef<string[]>([]);
+  const remotionViewportOpenRef = useRef(false);
 
   useImperativeHandle(
     ref,
@@ -186,13 +278,201 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     setDimmed(false);
   }, []);
 
+  useEffect(() => {
+    sessionModeRef.current = sessionMode;
+  }, [sessionMode]);
+
+  useEffect(() => {
+    const consented = conversation?.consentedCapabilities;
+    consentedRef.current = consented ? [...consented] : [];
+    const mode: AgentSessionMode =
+      conversation?.sessionMode === "plan" && conversation.planPending
+        ? "plan"
+        : "agent";
+    sessionModeRef.current = mode;
+    setSessionMode(mode);
+    // Sync from the opened conversation, not from later local mode toggles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- conversation.id is the switch signal
+  }, [conversation?.id]);
+
+  useEffect(() => {
+    remotionViewportOpenRef.current = remotionViewportOpen;
+  }, [remotionViewportOpen]);
+
+  const openRemotionViewport = useCallback(() => {
+    remotionViewportOpenRef.current = true;
+    if (onOpenRemotionViewport) {
+      onOpenRemotionViewport();
+      return;
+    }
+    if (!remotionViewportOpen) {
+      onToggleRemotionViewport?.();
+    }
+  }, [onOpenRemotionViewport, onToggleRemotionViewport, remotionViewportOpen]);
+
+  const requestCapabilityConsent = useCallback(
+    async (capabilityId: string) => {
+      if (capabilityId === SIMPLE_ANIMATION_CAPABILITY) {
+        openRemotionViewport();
+      }
+      if (!consentedRef.current.includes(capabilityId)) {
+        consentedRef.current = [...consentedRef.current, capabilityId];
+        setConversation((current) =>
+          current
+            ? {
+                ...current,
+                consentedCapabilities: consentedRef.current,
+              }
+            : current
+        );
+      }
+      return {
+        authorized: true,
+        open: true,
+      };
+    },
+    [openRemotionViewport]
+  );
+
+  const handlePlanButtonClick = () => {
+    const nextMode: AgentSessionMode =
+      sessionModeRef.current === "plan" ? "agent" : "plan";
+    sessionModeRef.current = nextMode;
+    setSessionMode(nextMode);
+    if (nextMode === "plan") {
+      setOpen(true);
+    }
+    setConversation((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        sessionMode: nextMode,
+        planPending: nextMode === "plan" ? current.planPending : false,
+      };
+    });
+  };
+
+  const runCanvasAgentTool = useCallback(
+    async (call: {
+      readonly name: string;
+      readonly resourceId: string;
+      readonly nodeId: string;
+      readonly payload: string;
+    }) => {
+      const graph = getCanvasGraph?.() ?? { nodes: [], edges: [] };
+      return executeCanvasAgentTool({
+        call,
+        snapshot: compactCanvasAgentState(graph.nodes, graph.edges),
+        organizationId: orgId,
+        capabilities: {
+          sessionMode: sessionModeRef.current,
+          consentedCapabilities: consentedRef.current,
+          viewportOpen: remotionViewportOpenRef.current,
+          requestConsent: requestCapabilityConsent,
+          readSource: async () => {
+            if (!orgId || !workflowId) {
+              return DEFAULT_REMOTION_SOURCE_CODE;
+            }
+            const content = await readRemotionViewportContent({
+              organizationId: orgId,
+              workflowId,
+            });
+            return content.sourceCode;
+          },
+          writeSource: async (sourceCode) => {
+            if (!orgId || !workflowId) {
+              return { ok: false, compileError: "无法写入" };
+            }
+            await writeRemotionViewportContent({
+              organizationId: orgId,
+              workflowId,
+              workflowName: workflowName || workflowId,
+              content: { sourceCode },
+            });
+            const compiled = compileRemotionSource(sourceCode);
+            if (compiled.error) {
+              return { ok: true, compileError: compiled.error };
+            }
+            return { ok: true };
+          },
+          writeText: async (nodeId, text) => {
+            const current = graph.nodes.find((node) => node.id === nodeId);
+            if (!current || !orgId || !workflowId) {
+              return { ok: false, error: "找不到节点" };
+            }
+            await commitAiTextValue({
+              organizationId: orgId,
+              workflowId,
+              cloudConfigured,
+              nodeId,
+              value: text,
+              updateNodeData,
+              current: current.data,
+            });
+            return { ok: true };
+          },
+          runNode: async (nodeId) => {
+            if (!onRunNode) {
+              return { ok: false, error: "无法运行该节点" };
+            }
+            await onRunNode(nodeId);
+            return { ok: true };
+          },
+          stageMedia: async (nodeId, sourceUrl, mimeType) => {
+            const current = graph.nodes.find((node) => node.id === nodeId);
+            if (!current || !orgId || !workflowId) {
+              return { ok: false, error: "找不到节点" };
+            }
+            const nodeType = current.data.nodeType;
+            const mediaType =
+              nodeType === "ai-video"
+                ? "ai-video"
+                : nodeType === "ai-audio"
+                  ? "ai-audio"
+                  : "ai-image";
+            await stageGenerativeMediaFromEphemeralUrl({
+              organizationId: orgId,
+              workflowId,
+              sourceUrl,
+              mimeType:
+                mimeType ||
+                (mediaType === "ai-video"
+                  ? "video/mp4"
+                  : mediaType === "ai-audio"
+                    ? "audio/mpeg"
+                    : "image/png"),
+              nodeType: mediaType,
+              patchNodeLayout: createPatchNodeLayoutMetadata(
+                nodeId,
+                updateNodeData
+              ),
+            });
+            return { ok: true };
+          },
+        },
+      });
+    },
+    [
+      cloudConfigured,
+      getCanvasGraph,
+      onRunNode,
+      orgId,
+      requestCapabilityConsent,
+      updateNodeData,
+      workflowId,
+      workflowName,
+    ]
+  );
+
   const selectedModelLabel = useMemo(() => {
     if (modelId === AGENT_CHAT_AUTO_ID) {
       return t("workflow.canvas.agentModelAuto");
     }
     return (
-      selectableModels.find((model) => model.optionId === modelId)?.displayName ??
-      t("workflow.canvas.agentModelAuto")
+      selectableModels.find((model) => model.optionId === modelId)
+        ?.displayName ?? t("workflow.canvas.agentModelAuto")
     );
   }, [modelId, selectableModels, t]);
 
@@ -203,9 +483,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       if (!orgId || !workflowId) {
         return;
       }
-      if (
-        conversationHasMessages({ messages: next.messages })
-      ) {
+      if (conversationHasMessages({ messages: next.messages })) {
         await writeLocalAgentConversation({
           organizationId: orgId,
           workflowId,
@@ -411,7 +689,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     if (modelId === AGENT_CHAT_AUTO_ID) {
       return selectableModels;
     }
-    const selected = selectableModels.find((model) => model.optionId === modelId);
+    const selected = selectableModels.find(
+      (model) => model.optionId === modelId
+    );
     return selected ? [selected] : selectableModels.slice(0, 1);
   }, [modelId, selectableModels]);
 
@@ -510,6 +790,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       invocationIdRef.current = null;
       setStreaming(true);
       setStreamStatus("generating");
+      setToolActivity(null);
+      setToolTrace([]);
       setError(null);
 
       const assistantId = messageId();
@@ -535,114 +817,200 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         setConversation(working);
         void persistLocal(working);
       };
-      const handleDelta = (_delta: string, fullText: string) => {
+      const applyAssistantContent = (content: string) => {
         working = {
           ...working,
           messages: working.messages.map((message) =>
-            message.id === assistantId
-              ? { ...message, content: fullText }
-              : message
+            message.id === assistantId ? { ...message, content } : message
           ),
           updatedAt: new Date().toISOString(),
         };
         setConversation(working);
       };
 
-      let started = false;
-      let lastError = t("workflow.canvas.agentGenerateFailed");
-
-      for (const model of modelsToTry) {
-        if (controller.signal.aborted || userStopRef.current) {
-          break;
-        }
-        const limits = contextLimitForModel(model);
-        const trimmed = trimMessagesForContext({
-          messages: historyMessages,
-          contextWindowTokens: limits.contextWindowTokens,
-          outputMaxTokens: limits.outputMaxTokens,
-        });
-        try {
-          const result = await consumeWithResume(
-            controller,
-            () =>
-              streamAgentChat(
-                orgId,
-                {
-                  modelCanonicalId: model.canonicalId,
-                  aiInterfaceId: model.interfaceId,
-                  workflowId,
-                  messages: trimmed.map((message) => ({
-                    role: message.role,
-                    content: message.content,
-                  })),
-                },
-                {
-                  signal: controller.signal,
-                  onStarted: (id) => {
-                    started = true;
-                    handleStarted(id);
-                  },
-                  onDelta: (delta, fullText) => {
-                    started = true;
-                    handleDelta(delta, fullText);
-                  },
-                }
-              ),
-            {
-              onStarted: handleStarted,
-              onDelta: handleDelta,
-            }
-          );
-          working = {
-            ...working,
-            messages: working.messages.map((message) =>
-              message.id === assistantId
-                ? { ...message, content: result.text }
-                : message
-            ),
-            activeInvocationId: undefined,
-            updatedAt: new Date().toISOString(),
-          };
-          await applyConversation(working);
-          invocationIdRef.current = null;
-          setStreaming(false);
-          setStreamStatus(result.stopped ? "stopped" : "idle");
-          return;
-        } catch (error) {
+      const streamSchedulerMessages = async (
+        schedulerMessages: readonly AgentSchedulerMessage[],
+        onDelta: (fullText: string) => void
+      ): Promise<AgentSchedulerStreamResult> => {
+        let started = false;
+        let lastError = t("workflow.canvas.agentGenerateFailed");
+        for (const model of modelsToTry) {
           if (controller.signal.aborted || userStopRef.current) {
             break;
           }
-          lastError = error instanceof Error ? error.message : lastError;
-          if (started) {
-            break;
+          const limits = contextLimitForModel(model);
+          const trimmed = trimMessagesForContext({
+            messages: schedulerMessagesToChat(schedulerMessages),
+            contextWindowTokens: limits.contextWindowTokens,
+            outputMaxTokens: limits.outputMaxTokens,
+          });
+          try {
+            const result = await consumeWithResume(
+              controller,
+              () =>
+                streamAgentChat(
+                  orgId,
+                  {
+                    modelCanonicalId: model.canonicalId,
+                    aiInterfaceId: model.interfaceId,
+                    workflowId,
+                    messages: trimmed.map((message) => ({
+                      role: message.role,
+                      content: message.content,
+                    })),
+                  },
+                  {
+                    signal: controller.signal,
+                    onStarted: (id) => {
+                      started = true;
+                      handleStarted(id);
+                    },
+                    onDelta: (_delta, fullText) => {
+                      started = true;
+                      onDelta(fullText);
+                    },
+                  }
+                ),
+              {
+                onStarted: handleStarted,
+                onDelta: (_delta, fullText) => {
+                  onDelta(fullText);
+                },
+              }
+            );
+            return { text: result.text, stopped: result.stopped };
+          } catch (error) {
+            if (controller.signal.aborted || userStopRef.current) {
+              break;
+            }
+            lastError = error instanceof Error ? error.message : lastError;
+            if (started) {
+              break;
+            }
           }
         }
-      }
+        if (userStopRef.current || controller.signal.aborted) {
+          return { text: "", stopped: true };
+        }
+        throw new Error(lastError);
+      };
 
-      working = { ...working, activeInvocationId: undefined };
-      await persistLocal(working);
-      setConversation(working);
-      invocationIdRef.current = null;
-      setStreaming(false);
-      if (userStopRef.current) {
-        setStreamStatus("stopped");
-        return;
-      }
-      setStreamStatus("idle");
-      if (!controller.signal.aborted) {
-        setError(lastError);
+      try {
+        const result = await runAgentScheduler({
+          historyMessages: historyMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          isAborted: () => controller.signal.aborted || userStopRef.current,
+          getMode: () => sessionModeRef.current,
+          canvasInventory: (() => {
+            const graph = getCanvasGraph?.() ?? { nodes: [], edges: [] };
+            return formatCanvasInventory(
+              compactCanvasAgentState(graph.nodes, graph.edges)
+            );
+          })(),
+          planDocument: working.planDocument,
+          stream: streamSchedulerMessages,
+          runTool: (call) => runCanvasAgentTool(call),
+          onTool: (call) => {
+            setToolTrace((current) => [...current, call.name]);
+            if (call.name === CANVAS_GET_STATE_TOOL) {
+              setToolActivity("readCanvas");
+              return;
+            }
+            if (call.name === CANVAS_RESOLVE_RESOURCE_TOOL) {
+              setToolActivity("resolveResource");
+              return;
+            }
+            if (call.name === REMOTION_OPEN_TOOL) {
+              setToolActivity("remotionOpen");
+              return;
+            }
+            if (call.name === REMOTION_GET_TOOL) {
+              setToolActivity("remotionGet");
+              return;
+            }
+            if (call.name === REMOTION_WRITE_TOOL) {
+              setToolActivity("remotionWrite");
+              return;
+            }
+            if (call.name === CANVAS_WRITE_TEXT_TOOL) {
+              setToolActivity("writeText");
+              return;
+            }
+            if (call.name === CANVAS_RUN_NODE_TOOL) {
+              setToolActivity("runNode");
+              return;
+            }
+            if (call.name === CANVAS_STAGE_MEDIA_TOOL) {
+              setToolActivity("stageMedia");
+            }
+          },
+          onAssistantContent: applyAssistantContent,
+        });
+        const talk = splitSavedAssistantContent(result.content).talk;
+        working = {
+          ...working,
+          messages: working.messages.map((message) =>
+            message.id === assistantId
+              ? { ...message, content: result.content }
+              : message
+          ),
+          sessionMode: sessionModeRef.current,
+          consentedCapabilities: consentedRef.current,
+          planDocument:
+            sessionModeRef.current === "plan" && talk
+              ? talk
+              : working.planDocument,
+          planPending: sessionModeRef.current === "plan" && Boolean(talk),
+          activeInvocationId: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        await applyConversation(working);
+        invocationIdRef.current = null;
+        setStreaming(false);
+        setStreamStatus(
+          result.stopped || userStopRef.current ? "stopped" : "idle"
+        );
+      } catch (error) {
+        working = { ...working, activeInvocationId: undefined };
+        await persistLocal(working);
+        setConversation(working);
+        invocationIdRef.current = null;
+        setStreaming(false);
+        if (userStopRef.current) {
+          setStreamStatus("stopped");
+          return;
+        }
+        setStreamStatus("idle");
+        if (!controller.signal.aborted) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : t("workflow.canvas.agentGenerateFailed")
+          );
+        }
+      } finally {
+        setToolActivity(null);
       }
     },
     [
       applyConversation,
+      cloudConfigured,
       cloudEnabled,
       consumeWithResume,
+      getCanvasGraph,
+      onRunNode,
       orgId,
       persistLocal,
+      requestCapabilityConsent,
       resolveModelsToTry,
+      runCanvasAgentTool,
       stopActiveGeneration,
       t,
+      updateNodeData,
       workflowId,
+      workflowName,
     ]
   );
 
@@ -653,8 +1021,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         return;
       }
       const last = base.messages[base.messages.length - 1];
-      const assistantId =
-        last?.role === "assistant" ? last.id : messageId();
+      const assistantId = last?.role === "assistant" ? last.id : messageId();
       let working: LocalAgentConversation =
         last?.role === "assistant"
           ? base
@@ -705,13 +1072,25 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             }),
           { onStarted: handleStarted, onDelta: handleDelta }
         );
+        const parsed = parseAgentSchedulerOutput(result.text, {
+          complete: true,
+        });
+        const content = composeSavedAssistantContent(
+          parsed.thinking,
+          parsed.action === "talk" ? parsed.talk : parsed.thinking
+        );
+        const talk = parsed.action === "talk" ? parsed.talk : "";
         working = {
           ...working,
           messages: working.messages.map((message) =>
-            message.id === assistantId
-              ? { ...message, content: result.text }
-              : message
+            message.id === assistantId ? { ...message, content } : message
           ),
+          sessionMode: sessionModeRef.current,
+          planDocument:
+            sessionModeRef.current === "plan" && talk
+              ? talk
+              : working.planDocument,
+          planPending: sessionModeRef.current === "plan" && Boolean(talk),
           activeInvocationId: undefined,
           updatedAt: new Date().toISOString(),
         };
@@ -719,6 +1098,29 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         invocationIdRef.current = null;
         setStreaming(false);
         setStreamStatus(result.stopped ? "stopped" : "idle");
+        if (
+          parsed.action === "side" &&
+          !result.stopped &&
+          !userStopRef.current
+        ) {
+          const sideResult = await runCanvasAgentTool(parsed.toolCall);
+          const nextMessages = [
+            ...working.messages,
+            {
+              id: messageId(),
+              role: "user" as const,
+              content: `旁路结果 1：\n${sideResult}`,
+            },
+          ];
+          const next: LocalAgentConversation = {
+            ...working,
+            messages: nextMessages,
+            updatedAt: new Date().toISOString(),
+          };
+          await persistLocal(next);
+          setConversation(next);
+          await runGeneration(next, nextMessages);
+        }
       } catch {
         working = { ...working, activeInvocationId: undefined };
         await persistLocal(working);
@@ -733,7 +1135,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         setStreaming(false);
       }
     },
-    [applyConversation, consumeWithResume, orgId, persistLocal, t]
+    [applyConversation, consumeWithResume, orgId, persistLocal, runCanvasAgentTool, runGeneration, t]
   );
 
   const resumedKeyRef = useRef<string | null>(null);
@@ -845,6 +1247,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     stickToBottomRef.current = true;
     const content = draft.trim();
     setDraft("");
+    const nextMode = sessionModeRef.current;
     const userMessage: AgentChatMessage = {
       id: messageId(),
       role: "user",
@@ -854,12 +1257,41 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     const next: LocalAgentConversation = {
       ...conversation,
       messages: nextMessages,
+      sessionMode: nextMode,
+      planPending: nextMode === "plan" ? conversation.planPending : false,
       title: titleFromMessages(nextMessages, conversation.title),
       updatedAt: new Date().toISOString(),
     };
     await persistLocal(next);
     setConversation(next);
     await runGeneration(next, nextMessages);
+  };
+
+  const handleExecutePlan = async () => {
+    if (!conversation || streaming) {
+      return;
+    }
+    sessionModeRef.current = "agent";
+    setSessionMode("agent");
+    const granted = capabilitiesGrantedOnExecute();
+    let consented = consentedRef.current;
+    for (const capabilityId of granted) {
+      if (!consented.includes(capabilityId)) {
+        consented = [...consented, capabilityId];
+      }
+    }
+    consentedRef.current = consented;
+    const next: LocalAgentConversation = {
+      ...conversation,
+      sessionMode: "agent",
+      planPending: false,
+      consentedCapabilities: consented,
+      updatedAt: new Date().toISOString(),
+    };
+    await persistLocal(next);
+    setConversation(next);
+    setOpen(true);
+    await runGeneration(next, conversation.messages);
   };
 
   const resendFromIndex = async (index: number) => {
@@ -920,6 +1352,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         id: result.current.id,
       });
       setConversation(empty);
+      sessionModeRef.current = "agent";
+      setSessionMode("agent");
       await persistLocal(empty);
       await refreshHistory();
       setHistoryOpen(false);
@@ -936,6 +1370,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         workflowId,
       });
       setConversation(empty);
+      sessionModeRef.current = "agent";
+      setSessionMode("agent");
       await persistLocal(empty);
       await refreshHistory();
       setHistoryOpen(false);
@@ -1007,6 +1443,17 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       return;
     }
     event.preventDefault();
+    if (
+      isPlanConfirmPending({
+        sessionMode: sessionModeRef.current,
+        planPending: Boolean(conversation?.planPending),
+        streaming,
+      }) &&
+      !draft.trim()
+    ) {
+      void handleExecutePlan();
+      return;
+    }
     if (!canSend) {
       return;
     }
@@ -1044,229 +1491,415 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
 
   const turns = groupAgentChatTurns(conversation?.messages ?? []);
   const lastTurnIndex = turns.length - 1;
+  const planConfirmPending = isPlanConfirmPending({
+    sessionMode,
+    planPending: Boolean(conversation?.planPending),
+    streaming,
+  });
   const statusLabel =
     streamStatus === "generating"
-      ? t("workflow.canvas.agentStatusGenerating")
+      ? sessionMode === "agent"
+        ? t("workflow.canvas.agentStatusExecuting")
+        : t("workflow.canvas.agentStatusThinking")
       : streamStatus === "reconnecting"
         ? t("workflow.canvas.agentStatusReconnecting")
         : streamStatus === "stopped"
           ? t("workflow.canvas.agentStatusStopped")
-          : null;
+          : planConfirmPending
+            ? t("workflow.canvas.agentStatusWaitingPlan")
+            : null;
+  const toolActivityLabel =
+    toolActivity === "readCanvas"
+      ? t("workflow.canvas.agentToolReadCanvas")
+      : toolActivity === "resolveResource"
+        ? t("workflow.canvas.agentToolResolveResource")
+        : toolActivity === "remotionOpen"
+          ? t("workflow.canvas.agentToolRemotionOpen")
+          : toolActivity === "remotionGet"
+            ? t("workflow.canvas.agentToolRemotionGet")
+            : toolActivity === "remotionWrite"
+              ? t("workflow.canvas.agentToolRemotionWrite")
+              : toolActivity === "writeText"
+                ? t("workflow.canvas.agentToolWriteText")
+                : toolActivity === "runNode"
+                  ? t("workflow.canvas.agentToolRunNode")
+                  : toolActivity === "stageMedia"
+                    ? t("workflow.canvas.agentToolStageMedia")
+                    : null;
 
   return (
     <div
       className={cn(
-        "nodrag nowheel relative flex flex-col items-stretch rounded-lg border transition-opacity duration-200",
-        agentWidthClassName,
-        open
-          ? "overflow-hidden border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
-          : "border-transparent",
-        open && agentExpandedHeightClassName,
+        "relative flex items-start gap-2 transition-opacity duration-200",
         open && dimmed && "opacity-40"
       )}
-      role={open ? "dialog" : undefined}
-      aria-modal={open ? false : undefined}
-      aria-label={open ? t("workflow.canvas.agentDialogTitle") : undefined}
     >
-      {open ? (
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center gap-1 px-2 pt-2">
-            <button
-              type="button"
-              className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-              onClick={() => setHistoryOpen((value) => !value)}
-              aria-label={t("workflow.canvas.agentHistory")}
-            >
-              <History className="size-4" />
-            </button>
-            <button
-              type="button"
-              className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-              onClick={() => void handleNewConversation()}
-              aria-label={t("workflow.canvas.agentNew")}
-            >
-              <Plus className="size-4" />
-            </button>
-            <div className="flex-1" />
-            <button
-              type="button"
-              className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-              onClick={() => setOpen(false)}
-              aria-label={t("workflow.canvas.agentCollapse")}
-            >
-              <ChevronDown className="size-4" />
-            </button>
-          </div>
-
-          <div className="relative min-h-0 flex-1">
-            {historyOpen ? (
-              <div className="absolute inset-y-0 left-0 z-10 w-[70%] overflow-y-auto thin-scrollbar border-r border-neutral-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-900">
-                {history.length === 0 ? (
-                  <p className="px-2 py-3 text-xs text-neutral-500">
-                    {t("workflow.canvas.agentHistoryEmpty")}
-                  </p>
-                ) : (
-                  history.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onClick={() => void handleSelectHistory(entry)}
-                      className={cn(
-                        "mb-1 w-full rounded-md px-2 py-2 text-left text-sm",
-                        entry.id === conversation?.id
-                          ? "bg-neutral-100 dark:bg-neutral-800"
-                          : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60",
-                        entry.inUse && "opacity-60"
-                      )}
-                    >
-                      <div className="truncate">
-                        {entry.title || t("workflow.canvas.agentUntitled")}
-                      </div>
-                      {entry.inUse ? (
-                        <div className="text-xs text-amber-600">
-                          {t("workflow.canvas.agentInUse")}
-                        </div>
-                      ) : null}
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : null}
-
-            <div
-              ref={messagesScrollRef}
-              onScroll={handleMessagesScroll}
-              className="h-full overflow-y-auto thin-scrollbar px-3 py-2"
-            >
-              {turns.map((turn, turnIndex) => (
-                <div key={turn.user.id} className="mb-4">
-                  <HistoryUserMessage
-                    content={turn.user.content}
-                    disabled={streaming}
-                    sendLabel={t("workflow.canvas.agentSend")}
-                    onContentChange={(content) =>
-                      handleUserContentChange(turn.user.id, content)
-                    }
-                    onSend={() => handleResendClick(turn.userIndex)}
-                    onKeyDown={(event) =>
-                      handleHistoryKeyDown(event, turn.userIndex)
-                    }
-                  />
-                  {turnIndex === lastTurnIndex && statusLabel ? (
-                    <p className="mt-1 px-1 text-xs text-neutral-400">
-                      {statusLabel}
-                    </p>
-                  ) : null}
-                  {turn.assistant ? (
-                    <AssistantReply
-                      content={turn.assistant.content}
-                      copyLabel={t("workflow.canvas.agentCopy")}
-                      onCopy={handleCopyAssistant}
-                    />
-                  ) : null}
-                </div>
-              ))}
-              {error ? (
-                <p className="mb-2 text-xs text-red-600">{error}</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <form
-        className="p-2"
-        autoComplete="off"
-        onSubmit={(event) => void handleSendNew(event)}
+      <div
+        className={cn(
+          "nodrag nowheel relative flex flex-col items-stretch rounded-lg border",
+          agentWidthClassName,
+          open
+            ? "overflow-hidden border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+            : "border-transparent",
+          open && agentExpandedHeightClassName
+        )}
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? false : undefined}
+        aria-label={open ? t("workflow.canvas.agentDialogTitle") : undefined}
       >
-        <div
-          className={cn(
-            "rounded-2xl border border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800",
-            !open && "shadow-lg"
-          )}
-        >
-          <textarea
-            ref={composerTextareaRef}
-            id="workflow-agent-composer"
-            name="agent_composer_draft"
-            rows={1}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleComposerKeyDown}
-            onFocus={() => {
-              setOpen(true);
-              handleUndim();
-            }}
-            placeholder={t("workflow.canvas.agentInputPlaceholder")}
-            autoComplete="off"
-            className={cn(
-              agentTextareaClassName,
-              "thin-scrollbar placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
-            )}
-            style={{ maxHeight: AGENT_EXPANDED_MAX_HEIGHT_PX }}
-          />
-          <div className="flex items-center justify-between gap-2 px-2 pb-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                  aria-label={t("workflow.canvas.agentSwitchModel")}
-                >
-                  {selectedModelLabel}
-                  <ChevronDown className="size-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top">
-                <DropdownMenuRadioGroup
-                  value={modelId}
-                  onValueChange={setModelId}
-                >
-                  <DropdownMenuRadioItem value={AGENT_CHAT_AUTO_ID}>
-                    {t("workflow.canvas.agentModelAuto")}
-                  </DropdownMenuRadioItem>
-                  {selectableModels.map((model) => (
-                    <DropdownMenuRadioItem
-                      key={model.optionId}
-                      value={model.optionId}
-                    >
-                      {model.displayName}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {streaming ? (
+        {open ? (
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="flex items-center gap-1 px-2 pt-2">
               <button
                 type="button"
-                onClick={() => void handleStop()}
-                aria-label={t("workflow.canvas.agentStop")}
-                className={cn(
-                  "inline-flex size-7 items-center justify-center rounded-lg",
-                  "bg-neutral-800 text-white hover:bg-neutral-700",
-                  "dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white"
-                )}
+                className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                onClick={() => setHistoryOpen((value) => !value)}
+                aria-label={t("workflow.canvas.agentHistory")}
               >
-                <Square className="size-3 fill-current" />
+                <History className="size-4" />
               </button>
-            ) : (
               <button
-                type="submit"
-                disabled={!canSend}
-                aria-label={t("workflow.canvas.agentSend")}
-                className={cn(
-                  "inline-flex size-7 items-center justify-center rounded-lg",
-                  "bg-neutral-800 text-white hover:bg-neutral-700",
-                  "dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white",
-                  "disabled:pointer-events-none disabled:opacity-30"
-                )}
+                type="button"
+                className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                onClick={() => void handleNewConversation()}
+                aria-label={t("workflow.canvas.agentNew")}
               >
-                <ArrowUp className="size-4 stroke-[2.5]" />
+                <Plus className="size-4" />
               </button>
-            )}
+              <div className="flex-1" />
+              <button
+                type="button"
+                className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                onClick={() => setOpen(false)}
+                aria-label={t("workflow.canvas.agentCollapse")}
+              >
+                <ChevronDown className="size-4" />
+              </button>
+            </div>
+
+            <div className="relative min-h-0 flex-1">
+              {historyOpen ? (
+                <div className="absolute inset-y-0 left-0 z-10 w-[70%] overflow-y-auto thin-scrollbar border-r border-neutral-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-900">
+                  {history.length === 0 ? (
+                    <p className="px-2 py-3 text-xs text-neutral-500">
+                      {t("workflow.canvas.agentHistoryEmpty")}
+                    </p>
+                  ) : (
+                    history.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => void handleSelectHistory(entry)}
+                        className={cn(
+                          "mb-1 w-full rounded-md px-2 py-2 text-left text-sm",
+                          entry.id === conversation?.id
+                            ? "bg-neutral-100 dark:bg-neutral-800"
+                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60",
+                          entry.inUse && "opacity-60"
+                        )}
+                      >
+                        <div className="truncate">
+                          {entry.title || t("workflow.canvas.agentUntitled")}
+                        </div>
+                        {entry.inUse ? (
+                          <div className="text-xs text-amber-600">
+                            {t("workflow.canvas.agentInUse")}
+                          </div>
+                        ) : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
+
+              <div
+                ref={messagesScrollRef}
+                onScroll={handleMessagesScroll}
+                className="h-full overflow-y-auto thin-scrollbar px-3 py-2"
+              >
+                {turns.map((turn, turnIndex) => (
+                  <div key={turn.user.id} className="mb-4">
+                    <HistoryUserMessage
+                      content={turn.user.content}
+                      disabled={streaming}
+                      sendLabel={t("workflow.canvas.agentSend")}
+                      onContentChange={(content) =>
+                        handleUserContentChange(turn.user.id, content)
+                      }
+                      onSend={() => handleResendClick(turn.userIndex)}
+                      onKeyDown={(event) =>
+                        handleHistoryKeyDown(event, turn.userIndex)
+                      }
+                    />
+                    {turnIndex === lastTurnIndex && statusLabel ? (
+                      <p className="mt-1 px-1 text-xs text-neutral-400">
+                        {statusLabel}
+                      </p>
+                    ) : null}
+                    {turnIndex === lastTurnIndex && toolActivityLabel ? (
+                      <p className="mt-1 px-1 text-xs text-neutral-400">
+                        {toolActivityLabel}
+                      </p>
+                    ) : null}
+                    {turnIndex === lastTurnIndex && toolTrace.length > 0 ? (
+                      <details className="mt-1 px-1 text-xs text-neutral-400">
+                        <summary className="cursor-pointer">
+                          {toolTrace.length}
+                        </summary>
+                        <ul className="mt-1 space-y-0.5">
+                          {toolTrace.map((name, index) => (
+                            <li key={`${name}-${index}`}>{name}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                    {turn.assistant ? (
+                      <>
+                        <AssistantReply
+                          content={turn.assistant.content}
+                          copyLabel={t("workflow.canvas.agentCopy")}
+                          thinkingLabel={t("workflow.canvas.agentThinking")}
+                          streaming={streaming && turnIndex === lastTurnIndex}
+                          onCopy={handleCopyAssistant}
+                        />
+                        {turnIndex === lastTurnIndex && planConfirmPending ? (
+                          <div className="mt-2 flex flex-col items-start gap-1 px-1">
+                            <button
+                              type="button"
+                              className="inline-flex rounded-md bg-neutral-800 px-2 py-1 text-xs text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white"
+                              disabled={streaming}
+                              onClick={() => void handleExecutePlan()}
+                            >
+                              {t("workflow.canvas.agentExecute")}
+                            </button>
+                            <p className="text-[11px] text-neutral-400">
+                              {t("workflow.canvas.agentExecuteHint")}
+                            </p>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                ))}
+                {error ? (
+                  <p className="mb-2 text-xs text-red-600">{error}</p>
+                ) : null}
+              </div>
+            </div>
           </div>
-        </div>
-      </form>
+        ) : null}
+
+        <form
+          className="p-2"
+          autoComplete="off"
+          onSubmit={(event) => void handleSendNew(event)}
+        >
+          <div
+            className={cn(
+              "rounded-2xl border border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800",
+              !open && "shadow-lg"
+            )}
+          >
+            <textarea
+              ref={composerTextareaRef}
+              id="workflow-agent-composer"
+              name="agent_composer_draft"
+              rows={1}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              onFocus={() => {
+                setOpen(true);
+                handleUndim();
+              }}
+              placeholder={t("workflow.canvas.agentInputPlaceholder")}
+              autoComplete="off"
+              className={cn(
+                agentTextareaClassName,
+                "thin-scrollbar placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
+              )}
+              style={{ maxHeight: AGENT_EXPANDED_MAX_HEIGHT_PX }}
+            />
+            <div className="flex items-center justify-between gap-2 px-2 pb-2">
+              <div className="flex min-w-0 items-center gap-0.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      aria-label={t("workflow.canvas.agentSwitchModel")}
+                    >
+                      {selectedModelLabel}
+                      <ChevronDown className="size-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top">
+                    <DropdownMenuRadioGroup
+                      value={modelId}
+                      onValueChange={setModelId}
+                    >
+                      <DropdownMenuRadioItem value={AGENT_CHAT_AUTO_ID}>
+                        {t("workflow.canvas.agentModelAuto")}
+                      </DropdownMenuRadioItem>
+                      {selectableModels.map((model) => (
+                        <DropdownMenuRadioItem
+                          key={model.optionId}
+                          value={model.optionId}
+                        >
+                          {model.displayName}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button
+                  type="button"
+                  onClick={handlePlanButtonClick}
+                  aria-pressed={sessionMode === "plan"}
+                  aria-label={t("workflow.canvas.agentPlan")}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs",
+                    sessionMode === "plan"
+                      ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                      : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  )}
+                >
+                  <ListTodo className="size-3.5" />
+                  {t("workflow.canvas.agentPlan")}
+                </button>
+                {remotionViewportOpen ? (
+                  <button
+                    type="button"
+                    onClick={onToggleRemotionViewport}
+                    aria-label={t("workflow.canvas.agentSimpleAnimation")}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    <Clapperboard className="size-3.5" />
+                    {t("workflow.canvas.agentSimpleAnimation")}
+                  </button>
+                ) : null}
+              </div>
+              {streaming ? (
+                <button
+                  type="button"
+                  onClick={() => void handleStop()}
+                  aria-label={t("workflow.canvas.agentStop")}
+                  className={cn(
+                    "inline-flex size-7 items-center justify-center rounded-lg",
+                    "bg-neutral-800 text-white hover:bg-neutral-700",
+                    "dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white"
+                  )}
+                >
+                  <Square className="size-3 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSend}
+                  aria-label={t("workflow.canvas.agentSend")}
+                  className={cn(
+                    "inline-flex size-7 items-center justify-center rounded-lg",
+                    "bg-neutral-800 text-white hover:bg-neutral-700",
+                    "dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white",
+                    "disabled:pointer-events-none disabled:opacity-30"
+                  )}
+                >
+                  <ArrowUp className="size-4 stroke-[2.5]" />
+                </button>
+              )}
+            </div>
+          </div>
+        </form>
+
+        <AlertDialog
+          open={resendIndex !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setResendIndex(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("workflow.canvas.agentResendTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("workflow.canvas.agentResendConfirm")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void handleConfirmResend()}>
+                {t("workflow.canvas.agentResendAction")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={busyId !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setBusyId(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("workflow.canvas.agentInUseTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("workflow.canvas.agentInUse")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setBusyId(null)}>
+                {t("workflow.canvas.agentInUseOk")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {remotionViewportOpen && onCloseRemotionViewport ? (
+        <Suspense
+          fallback={
+            <div
+              className={cn(
+                "nodrag nopan nowheel flex h-auto w-[20vw] min-w-[400px] shrink-0 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900",
+                !open && "hidden"
+              )}
+              aria-hidden={!open}
+            >
+              <div className="flex items-center gap-1 px-2 py-1.5">
+                <Clapperboard className="size-3.5 shrink-0 text-neutral-500" />
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                  {t("workflow.canvas.remotionViewportTitle")}
+                </span>
+              </div>
+              <div
+                className="flex flex-col items-center justify-center gap-2 bg-black text-neutral-400"
+                style={{ height: REMOTION_COMPACT_PREVIEW_HEIGHT_PX }}
+              >
+                <Spinner className="size-6 text-neutral-400" />
+                <span className="text-[11px]">
+                  {t("workflow.canvas.remotionViewportLoading")}
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <RemotionViewportOverlay
+            organizationId={orgId}
+            workflowId={workflowId}
+            workflowName={workflowName}
+            visible={open}
+            onClose={onCloseRemotionViewport}
+          />
+        </Suspense>
+      ) : null}
 
       {open && dimmed ? (
         <button
@@ -1276,57 +1909,6 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           onClick={handleUndim}
         />
       ) : null}
-
-      <AlertDialog
-        open={resendIndex !== null}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setResendIndex(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("workflow.canvas.agentResendTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("workflow.canvas.agentResendConfirm")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleConfirmResend()}>
-              {t("workflow.canvas.agentResendAction")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={busyId !== null}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setBusyId(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("workflow.canvas.agentInUseTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("workflow.canvas.agentInUse")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setBusyId(null)}>
-              {t("workflow.canvas.agentInUseOk")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 });
@@ -1420,7 +2002,8 @@ function HistoryUserMessage({
           }}
           className={cn(
             agentBubbleShellClassName,
-            collapsedOverflows && "agent-history-collapsed-fade overflow-hidden",
+            collapsedOverflows &&
+              "agent-history-collapsed-fade overflow-hidden",
             !disabled && "cursor-text"
           )}
         >
@@ -1482,23 +2065,66 @@ function HistoryUserMessage({
 function AssistantReply({
   content,
   copyLabel,
+  thinkingLabel,
+  streaming,
   onCopy,
 }: {
   readonly content: string;
   readonly copyLabel: string;
+  readonly thinkingLabel: string;
+  readonly streaming: boolean;
   readonly onCopy: (content: string) => void;
 }) {
+  const { thinking, talk } = splitSavedAssistantContent(content, {
+    complete: !streaming,
+  });
+  const [expanded, setExpanded] = useState(() => !talk || streaming);
+
+  useEffect(() => {
+    if (streaming && !talk) {
+      setExpanded(true);
+      return;
+    }
+    if (!streaming && talk) {
+      setExpanded(false);
+    }
+  }, [streaming, talk]);
+
+  const copyText = talk || "";
+
   return (
     <div className="mt-2 px-1">
-      <div className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
-        {content}
-      </div>
-      {content ? (
+      {thinking ? (
+        <button
+          type="button"
+          className="mb-1 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+          onClick={() => setExpanded((open) => !open)}
+        >
+          <ChevronDown
+            className={cn(
+              "size-3 transition-transform",
+              !expanded && "-rotate-90"
+            )}
+          />
+          {thinkingLabel}
+        </button>
+      ) : null}
+      {thinking && expanded ? (
+        <div className="mb-2 whitespace-pre-wrap text-xs text-neutral-500 dark:text-neutral-400">
+          {thinking}
+        </div>
+      ) : null}
+      {talk ? (
+        <div className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
+          {talk}
+        </div>
+      ) : null}
+      {copyText ? (
         <button
           type="button"
           className="mt-1 p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
           aria-label={copyLabel}
-          onClick={() => onCopy(content)}
+          onClick={() => onCopy(copyText)}
         >
           <Copy className="size-3.5" />
         </button>

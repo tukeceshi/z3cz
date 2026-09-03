@@ -70,6 +70,9 @@ function cacheEntryTypeLabelKey(
   if (nodeType === "ai-audio") return "workflow.aiMediaCache.entryAudio";
   if (nodeType === "ai-text") return "workflow.aiMediaCache.entryText";
   if (nodeType === "agent-chat") return "workflow.aiMediaCache.entryAgent";
+  if (nodeType === "remotion-preview") {
+    return "workflow.aiMediaCache.entryRemotion";
+  }
   return "workflow.aiMediaCache.entryImage";
 }
 
@@ -83,6 +86,7 @@ function cacheResourceTypeBadge(
     return mimeType.toLowerCase().includes("markdown") ? "MD" : "TXT";
   }
   if (nodeType === "agent-chat") return "CHAT";
+  if (nodeType === "remotion-preview") return "REM";
   return "IMG";
 }
 
@@ -182,7 +186,9 @@ function WorkflowResourceList({
     <div className="space-y-2 border-t pt-2">
       {resources.map((resource) => {
         const isText =
-          resource.nodeType === "ai-text" || resource.nodeType === "agent-chat";
+          resource.nodeType === "ai-text" ||
+          resource.nodeType === "agent-chat" ||
+          resource.nodeType === "remotion-preview";
 
         return (
           <div

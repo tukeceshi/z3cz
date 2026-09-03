@@ -21,6 +21,7 @@ interface CodeEditorProps {
   language?: Language;
   readonly?: boolean;
   className?: string;
+  scrollerClassName?: string;
 }
 
 function getLanguageExtension(language: Language): Extension {
@@ -71,6 +72,7 @@ export function CodeEditor({
   language = "text",
   readonly = false,
   className,
+  scrollerClassName,
 }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -108,12 +110,16 @@ export function CodeEditor({
     });
 
     viewRef.current = view;
+    const scrollerClasses = scrollerClassName?.split(/\s+/).filter(Boolean) ?? [];
+    for (const className of scrollerClasses) {
+      view.scrollDOM.classList.add(className);
+    }
 
     return () => {
       view.destroy();
       viewRef.current = null;
     };
-  }, [language]);
+  }, [language, scrollerClassName]);
 
   // Update content when value changes externally
   useEffect(() => {

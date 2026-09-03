@@ -146,6 +146,9 @@ importers:
 
   apps/app:
     dependencies:
+      '@babel/standalone':
+        specifier: ^7.28.4
+        version: 7.29.8
       '@codemirror/lang-html':
         specifier: ^6.4.11
         version: 6.4.11
@@ -248,6 +251,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@remotion/player':
+        specifier: 4.0.520
+        version: 4.0.520(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@tanstack/react-ranger':
         specifier: ^0.0.5
         version: 0.0.5(react@19.2.6)
@@ -296,6 +302,9 @@ importers:
       recharts:
         specifier: ^3.8.1
         version: 3.8.1(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.6)(react@19.2.6)(redux@5.0.1)
+      remotion:
+        specifier: 4.0.520
+        version: 4.0.520(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -632,6 +641,10 @@ packages:
 
   '@babel/runtime@7.29.2':
     resolution: {integrity: sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/standalone@7.29.8':
+    resolution: {integrity: sha512-XgbPNz+u6JzB7cKGnPDoS1U24J5td8yp3HFWbT/6f4/ASZ0PqaQGIvts1o5v5AI+f6i3jdVB/L/o2CYLCv101A==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.28.6':
@@ -2651,6 +2664,12 @@ packages:
         optional: true
       react-redux:
         optional: true
+
+  '@remotion/player@4.0.520':
+    resolution: {integrity: sha512-EicD4D0anUAT2SWmx8otX1WiUpOanO6MQlt3fsiwo2hxjWSZCytJWiLrSAp2IO2Wvzi1W9ZQw/bAIk2gPwz/ig==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@rolldown/binding-android-arm64@1.0.2':
     resolution: {integrity: sha512-ZS4D1JPGn/MYQN/SYDWftIE/nVsM8j/AFOYEzAoOE2O3NktQOZru+/vYXGbR/qtdLdIfGCP0lcoJiYVzsEz+iQ==}
@@ -5484,6 +5503,12 @@ packages:
   remark-rehype@11.1.2:
     resolution: {integrity: sha512-Dh7l57ianaEoIpzbp0PC9UKAdCSVklD8E5Rpw7ETfbTl3FqcOOgq5q2LVDhgGCkaBv7p24JXikPdvhhmHvKMsw==}
 
+  remotion@4.0.520:
+    resolution: {integrity: sha512-dORllOm7QdlHW/ZHNNWNXfQnO7pk9lwWIlSJ8p9V1URvjI75+pX+pTbrs6tVyRz6KQIXwI8MaeE22pC5U4EXIw==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   require-from-string@2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
@@ -6370,6 +6395,8 @@ snapshots:
       core-js-pure: 3.49.0
 
   '@babel/runtime@7.29.2': {}
+
+  '@babel/standalone@7.29.8': {}
 
   '@babel/template@7.28.6':
     dependencies:
@@ -8459,6 +8486,12 @@ snapshots:
     optionalDependencies:
       react: 19.2.6
       react-redux: 9.3.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1)
+
+  '@remotion/player@4.0.520(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      remotion: 4.0.520(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
 
   '@rolldown/binding-android-arm64@1.0.2':
     optional: true
@@ -12269,6 +12302,11 @@ snapshots:
       mdast-util-to-hast: 13.2.1
       unified: 11.0.5
       vfile: 6.0.3
+
+  remotion@4.0.520(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   require-from-string@2.0.2: {}
 
