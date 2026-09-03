@@ -9,6 +9,7 @@ import {
   CANVAS_WRITE_TEXT_TOOL,
   emptyAgentToolCall,
   parseAgentToolCall,
+  REMOTION_CLOSE_TOOL,
   REMOTION_GET_TOOL,
   REMOTION_OPEN_TOOL,
   REMOTION_WRITE_TOOL,
@@ -27,7 +28,7 @@ export const AGENT_PLAN_STATUS = "模式：方案" as const;
 export const AGENT_EXECUTE_STATUS = "模式：执行" as const;
 
 const CANVAS_READ_HINT = `${CANVAS_GET_STATE_TOOL}（当前画布清单，不含地址）；${CANVAS_RESOLVE_RESOURCE_TOOL}（下一行 resourceId: 某个资源，只用这个资源时才调用，向服务端要这一条地址）`;
-const SIMPLE_ANIMATION_READ_HINT = `${REMOTION_GET_TOOL}（读当前简易动画源码）；${REMOTION_OPEN_TOOL}（打开简易动画窗口）`;
+const SIMPLE_ANIMATION_READ_HINT = `${REMOTION_GET_TOOL}（读当前简易动画源码）；${REMOTION_OPEN_TOOL}（进入简易动画，才能写）；${REMOTION_CLOSE_TOOL}（退出简易动画，不再写）`;
 const MAKE_HINT = `${REMOTION_WRITE_TOOL}（下一行起整段替换简易动画源码）；${CANVAS_WRITE_TEXT_TOOL}（第一行 nodeId: 节点，其后为文本）；${CANVAS_RUN_NODE_TOOL}（nodeId: 运行该节点已有生成）；${CANVAS_STAGE_MEDIA_TOOL}（nodeId: 与 url: / mimeType: 挂媒体）`;
 
 export function buildAgentMainInstruction(
