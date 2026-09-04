@@ -15,11 +15,14 @@ import type {
   WorkflowParameter,
 } from "@/components/workflow/workflow-types";
 import {
-  type AgentSessionMode,
   capabilityForTool,
+  capabilityLabel,
+  isToolAllowed,
+  lookupAgentTool,
+} from "@/services/agent-capabilities";
+import {
+  type AgentSessionMode,
   hasCapability,
-  isMakeTool,
-  SIMPLE_ANIMATION_CAPABILITY,
 } from "@/services/agent-session-mode";
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
@@ -126,10 +129,7 @@ export function formatCanvasInventory(
   if (snapshot.nodes.length === 0) {
     return "画布清单：空";
   }
-  const lines = snapshot.nodes.map((node) => {
-    return `- ${node.id} ${node.type} ${node.name}`;
-  });
-  return `画布清单：\n${lines.join("\n")}`;
+  return `画布清单：\n${JSON.stringify(snapshot)}`;
 }
 
 export function compactCanvasAgentState(
@@ -227,9 +227,24 @@ export async function executeCanvasAgentTool(params: {
   readonly capabilities?: AgentCapabilityHandlers;
 }): Promise<string> {
   const handlers = params.capabilities;
-  if (isMakeTool(params.call.name) && handlers?.sessionMode !== "agent") {
+  const catalogTool = lookupAgentTool(params.call.name);
+  if (
+    catalogTool &&
+    handlers &&
+    !isToolAllowed(params.call.name, handlers.sessionMode ?? "ask")
+  ) {
+    if (handlers?.sessionMode === "ask") {
+      return JSON.stringify({
+        error: "模式：问答，不能读写画布。",
+      });
+    }
+    if (handlers?.sessionMode !== "agent") {
+      return JSON.stringify({
+        error: "模式：方案，不能制作。先让用户确认方案并执行。",
+      });
+    }
     return JSON.stringify({
-      error: "模式：方案，不能制作。先让用户确认方案并执行。",
+      error: `该工具未启用：${params.call.name}`,
     });
   }
 
@@ -266,13 +281,13 @@ export async function executeCanvasAgentTool(params: {
     if (!handlers) {
       return JSON.stringify({ error: "无法写入" });
     }
+    const capabilityId = capabilityForTool(params.call.name);
     if (
-      !hasCapability(
-        handlers.consentedCapabilities,
-        SIMPLE_ANIMATION_CAPABILITY
-      )
+      !capabilityId ||
+      !hasCapability(handlers.consentedCapabilities, capabilityId)
     ) {
-      return JSON.stringify({ error: "未进入简易动画。先打开该能力。" });
+      const label = capabilityId ? capabilityLabel(capabilityId) : "该能力";
+      return JSON.stringify({ error: `未进入${label}。先打开该能力。` });
     }
     const sourceCode = params.call.payload;
     if (!sourceCode.trim()) {

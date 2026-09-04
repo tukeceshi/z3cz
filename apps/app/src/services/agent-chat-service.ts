@@ -277,7 +277,10 @@ export async function streamAgentChat(
   body: {
     readonly modelCanonicalId: string;
     readonly aiInterfaceId: string;
-    readonly messages: readonly { readonly role: "user" | "assistant"; readonly content: string }[];
+    readonly messages: readonly {
+      readonly role: "user" | "assistant" | "system";
+      readonly content: string;
+    }[];
     readonly workflowId?: string;
   },
   handlers: StreamAgentChatHandlers = {}

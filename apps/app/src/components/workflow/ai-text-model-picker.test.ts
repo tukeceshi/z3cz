@@ -40,6 +40,7 @@ function mockModel(
     description: "",
     sortOrder,
     brandIcon: null,
+    usesOfficialUrl: true,
   };
 }
 

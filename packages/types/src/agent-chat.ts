@@ -4,6 +4,55 @@ export interface AgentChatMessage {
   readonly content: string;
 }
 
+export interface AgentChatToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly args: string;
+  readonly result: string;
+}
+
+export interface AgentChatAnswer {
+  readonly thinking: string;
+  readonly tools: readonly AgentChatToolCall[];
+  readonly talk: string;
+}
+
+export function emptyAgentChatAnswer(): AgentChatAnswer {
+  return { thinking: "", tools: [], talk: "" };
+}
+
+export function agentChatAnswerIsEmpty(answer: AgentChatAnswer): boolean {
+  return (
+    answer.thinking.trim().length === 0 &&
+    answer.tools.length === 0 &&
+    answer.talk.trim().length === 0
+  );
+}
+
+export function mergeAgentChatAnswers(
+  answers: readonly AgentChatAnswer[]
+): AgentChatAnswer {
+  const thinkingParts: string[] = [];
+  const tools: AgentChatToolCall[] = [];
+  let talk = "";
+  for (const answer of answers) {
+    const thinking = answer.thinking.trim();
+    if (thinking) {
+      thinkingParts.push(thinking);
+    }
+    tools.push(...answer.tools);
+    const nextTalk = answer.talk.trim();
+    if (nextTalk) {
+      talk = nextTalk;
+    }
+  }
+  return {
+    thinking: thinkingParts.join("\n"),
+    tools,
+    talk,
+  };
+}
+
 export interface AgentChatConversationBody {
   readonly messages: readonly AgentChatMessage[];
 }
@@ -52,10 +101,15 @@ export interface GetAgentChatBodyResponse {
   readonly body: AgentChatConversationBody;
 }
 
+export interface AgentChatStreamMessage {
+  readonly role: "user" | "assistant" | "system";
+  readonly content: string;
+}
+
 export interface AgentChatStreamRequest {
   readonly modelCanonicalId: string;
   readonly aiInterfaceId: string;
-  readonly messages: readonly Pick<AgentChatMessage, "role" | "content">[];
+  readonly messages: readonly AgentChatStreamMessage[];
   readonly workflowId?: string;
 }
 
@@ -87,7 +141,9 @@ export interface StopAgentChatResponse {
 export function conversationHasMessages(
   body: AgentChatConversationBody | undefined
 ): boolean {
-  return (body?.messages ?? []).some((message) => message.content.trim().length > 0);
+  return (body?.messages ?? []).some(
+    (message) => message.content.trim().length > 0
+  );
 }
 
 export function fingerprintAgentChatBody(

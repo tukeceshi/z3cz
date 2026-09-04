@@ -37,6 +37,7 @@ function mockTextModel(
     description: "",
     sortOrder: 0,
     brandIcon: null,
+    usesOfficialUrl: true,
   };
 }
 

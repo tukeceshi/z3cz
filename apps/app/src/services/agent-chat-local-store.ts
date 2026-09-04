@@ -12,12 +12,6 @@ const DB_VERSION = 1;
 const STORE = "conversations";
 const META_STORE = "meta";
 
-export interface AgentExecutionTodo {
-  readonly id: string;
-  readonly content: string;
-  readonly done: boolean;
-}
-
 export interface LocalAgentConversation {
   readonly id: string;
   readonly organizationId: string;
@@ -30,7 +24,6 @@ export interface LocalAgentConversation {
   readonly planDocument?: string;
   readonly planPending?: boolean;
   readonly consentedCapabilities?: readonly string[];
-  readonly executionTodos?: readonly AgentExecutionTodo[];
 }
 
 function conversationKey(
@@ -216,6 +209,6 @@ export function createEmptyLocalConversation(params: {
     title: "",
     messages: [],
     updatedAt: new Date().toISOString(),
-    sessionMode: "plan",
+    sessionMode: "ask",
   };
 }

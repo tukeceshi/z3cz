@@ -1,7 +1,14 @@
-import type { AgentChatMessage, OrgTextModelOption } from "@dafthunk/types";
-import { contextWindowTokensForCanonicalId } from "@dafthunk/types";
+import type {
+  AgentChatAnswer,
+  AgentChatMessage,
+  OrgTextModelOption,
+} from "@dafthunk/types";
+import {
+  contextWindowTokensForCanonicalId,
+  mergeAgentChatAnswers,
+} from "@dafthunk/types";
 
-import { sortModelsForPicker } from "./ai-text-model-picker";
+import { parseSavedAnswer } from "@/services/agent-chat-scheduler";
 
 export const AGENT_CHAT_AUTO_ID = "auto" as const;
 
@@ -9,21 +16,29 @@ export function estimateAgentChatTokens(text: string): number {
   return Math.max(1, text.length);
 }
 
-export function trimMessagesForContext(params: {
-  readonly messages: readonly AgentChatMessage[];
+export function trimMessagesForContext<
+  T extends { readonly role: string; readonly content: string },
+>(params: {
+  readonly messages: readonly T[];
   readonly contextWindowTokens: number;
   readonly outputMaxTokens: number;
-}): readonly AgentChatMessage[] {
+}): readonly T[] {
   const budget = Math.max(
     1,
     params.contextWindowTokens - Math.max(0, params.outputMaxTokens)
   );
-  const messages = [...params.messages];
-  if (messages.length === 0) {
-    return messages;
+  const pinned = params.messages.filter((message) => message.role === "system");
+  const rest = params.messages.filter((message) => message.role !== "system");
+  if (rest.length === 0) {
+    return pinned;
   }
 
+  const messages = [...rest];
   const totalTokens = (): number =>
+    pinned.reduce(
+      (sum, message) => sum + estimateAgentChatTokens(message.content),
+      0
+    ) +
     messages.reduce(
       (sum, message) => sum + estimateAgentChatTokens(message.content),
       0
@@ -36,10 +51,11 @@ export function trimMessagesForContext(params: {
   if (totalTokens() > budget) {
     const last = messages[messages.length - 1];
     if (!last) {
-      return [];
+      return pinned;
     }
     const keep = Math.max(1, budget);
     return [
+      ...pinned,
       {
         ...last,
         content: last.content.slice(-keep),
@@ -47,13 +63,20 @@ export function trimMessagesForContext(params: {
     ];
   }
 
-  return messages;
+  return [...pinned, ...messages];
 }
 
 export function selectableTextModelsInOrder(
   models: readonly OrgTextModelOption[]
 ): readonly OrgTextModelOption[] {
-  return sortModelsForPicker(models).filter((model) => model.selectable);
+  return [...models]
+    .filter((model) => model.selectable)
+    .sort(
+      (a, b) =>
+        Number(b.usesOfficialUrl) - Number(a.usesOfficialUrl) ||
+        a.sortOrder - b.sortOrder ||
+        a.displayName.localeCompare(b.displayName)
+    );
 }
 
 export function contextLimitForModel(model: OrgTextModelOption): {
@@ -168,9 +191,12 @@ export function shouldSubmitAgentChatOnEnter(event: {
 }
 
 export interface AgentChatTurn {
-  readonly user: AgentChatMessage;
-  readonly userIndex: number;
-  readonly assistant: AgentChatMessage | null;
+  readonly send: AgentChatMessage;
+  readonly sendIndex: number;
+  readonly assistantId: string | undefined;
+  readonly answer: AgentChatAnswer;
+  readonly executed: boolean;
+  readonly hasReply: boolean;
 }
 
 export function groupAgentChatTurns(
@@ -182,12 +208,68 @@ export function groupAgentChatTurns(
     if (!message || message.role !== "user") {
       continue;
     }
-    const next = messages[index + 1];
+    const assistants: AgentChatMessage[] = [];
+    let nextIndex = index + 1;
+    while (nextIndex < messages.length) {
+      const next = messages[nextIndex];
+      if (!next || next.role !== "assistant") {
+        break;
+      }
+      assistants.push(next);
+      nextIndex += 1;
+    }
+    const answers = assistants.map((assistant) =>
+      parseSavedAnswer(assistant.content)
+    );
+    const answer = mergeAgentChatAnswers(answers);
     turns.push({
-      user: message,
-      userIndex: index,
-      assistant: next?.role === "assistant" ? next : null,
+      send: message,
+      sendIndex: index,
+      assistantId: assistants[0]?.id,
+      answer,
+      executed:
+        assistants.length > 1 ||
+        answer.tools.some((tool) => tool.name.trim().length > 0),
+      hasReply: assistants.length > 0,
     });
   }
   return turns;
+}
+
+export function isAgentThinkingLive(params: {
+  readonly streaming: boolean;
+  readonly hasTalk: boolean;
+  readonly hasTools: boolean;
+}): boolean {
+  return params.streaming && !params.hasTalk && !params.hasTools;
+}
+
+export function executeTraceTitle(answer: AgentChatAnswer): string {
+  return answer.talk.trim();
+}
+
+export function shouldShowExecuteTrace(hasReply: boolean): boolean {
+  return hasReply;
+}
+
+export function turnHasCompletedExecute(executed: boolean): boolean {
+  return executed;
+}
+
+export function answerHasProcess(answer: AgentChatAnswer): boolean {
+  return (
+    answer.thinking.trim().length > 0 ||
+    answer.tools.some(
+      (tool) =>
+        tool.name.trim().length > 0 || tool.result.trim().length > 0
+    )
+  );
+}
+
+export function shouldWrapAgentWorked(params: {
+  readonly streaming: boolean;
+  readonly hasThinking: boolean;
+  readonly hasTools: boolean;
+}): boolean {
+  return !params.streaming && (params.hasThinking || params.hasTools);
 }

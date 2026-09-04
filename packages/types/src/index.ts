@@ -19,6 +19,7 @@ export * from "./interpret-upstream-text-model-error";
 export * from "./generative-card-error";
 export * from "./format-platform-model-label";
 export * from "./org-model-label";
+export * from "./official-model-endpoint-host";
 export * from "./org-model-instance";
 export * from "./single-model-interface-metadata";
 export * from "./single-model-instances";
