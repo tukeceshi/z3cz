@@ -1,10 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
-
-import {
-  ensureVolcanoModelsIncludePlatformCatalog,
-  resolveOrgModelInterfaceBinding,
-  toVolcanoCatalogEntriesFromPlatform,
-} from "./resolve-text-model-interface";
 import type {
   PlatformAiModel,
   PlatformAiModelParameterRules,
@@ -12,8 +5,16 @@ import type {
 } from "@dafthunk/types";
 import {
   DEFAULT_TEXT_MODEL_PARAMETER_RULES,
+  isOfficialOrgModelEndpoint,
   VOLCANO_AGGREGATE_MODEL_CATALOG,
 } from "@dafthunk/types";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  ensureVolcanoModelsIncludePlatformCatalog,
+  resolveOrgModelInterfaceBinding,
+  toVolcanoCatalogEntriesFromPlatform,
+} from "./resolve-text-model-interface";
 
 const testTextRules =
   DEFAULT_TEXT_MODEL_PARAMETER_RULES as PlatformAiModelParameterRules;
@@ -254,5 +255,43 @@ describe("ensureVolcanoModelsIncludePlatformCatalog", () => {
       upstreamModelId: "glm-5.2",
       modality: "text",
     });
+  });
+});
+
+describe("isOfficialOrgModelEndpoint", () => {
+  it("treats aggregate as official", () => {
+    expect(
+      isOfficialOrgModelEndpoint({
+        channelKind: "aggregate",
+        baseUrl: "https://relay.example.com",
+      })
+    ).toBe(true);
+  });
+
+  it("matches single-model official root domains and rejects relays", () => {
+    expect(
+      isOfficialOrgModelEndpoint({
+        channelKind: "api",
+        baseUrl: "https://api.deepseek.com",
+      })
+    ).toBe(true);
+    expect(
+      isOfficialOrgModelEndpoint({
+        channelKind: "api",
+        baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      })
+    ).toBe(true);
+    expect(
+      isOfficialOrgModelEndpoint({
+        channelKind: "api",
+        baseUrl: "https://api.moonshot.cn/v1",
+      })
+    ).toBe(true);
+    expect(
+      isOfficialOrgModelEndpoint({
+        channelKind: "api",
+        baseUrl: "https://relay.example.com/v1",
+      })
+    ).toBe(false);
   });
 });

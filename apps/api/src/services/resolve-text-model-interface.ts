@@ -12,29 +12,29 @@ import type {
 import {
   findEnabledOrgModelInstanceByCanonicalId,
   isExternalBrandOnlyCanonicalId,
+  isOfficialOrgModelEndpoint,
   isVolcanoAiInterfaceProvider,
   listOrgModelEntries,
   pickLegacyOrgModelInterfaceId,
   readOrgModelUpstreamId,
   resolveVolcanoInferenceModelId,
 } from "@dafthunk/types";
-import { parseSingleModelMetadata } from "../integrations/single-model/metadata";
-
 import type { Database } from "../db";
+import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
+import { listAggregateVolcanoCatalogEntries } from "../db/platform-ai-model-channel-queries";
 import {
   getTextParameterRules,
   listPlatformAiModels,
 } from "../db/platform-ai-model-queries";
-import { listAggregateVolcanoCatalogEntries } from "../db/platform-ai-model-channel-queries";
-import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
+import { parseSingleModelMetadata } from "../integrations/single-model/metadata";
 import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
 import {
   buildOrgModelBindings,
-  toOrgBindingInterfaces,
   type OrgBindingInterface,
+  toOrgBindingInterfaces,
 } from "./build-org-model-bindings";
 
 export interface ResolvedOrgModelInterface<TRules> {
@@ -68,6 +68,7 @@ export interface VolcanoInterfaceCandidate {
   readonly models: Readonly<Record<string, VolcanoModelConfig>>;
   readonly arkEndpoints?: Readonly<Record<string, string>>;
   readonly arkApiKeyScope?: VolcanoArkApiKeyScope;
+  readonly baseUrl: string | null;
 }
 
 export interface SingleModelInterfaceCandidate {
@@ -77,6 +78,7 @@ export interface SingleModelInterfaceCandidate {
   readonly singleModelCategory?: string;
   readonly endpointRules?: SingleModelEndpointRules;
   readonly models: Readonly<Record<string, SingleModelModelConfig>>;
+  readonly baseUrl: string | null;
 }
 
 export function buildVolcanoCatalogEntriesFromPlatformModels(
@@ -142,6 +144,7 @@ export function collectVolcanoInterfaces(
           models: metadata.models,
           arkEndpoints: metadata.arkEndpoints,
           arkApiKeyScope: metadata.arkApiKeyScope,
+          baseUrl: row.baseUrl ?? null,
         },
       ];
     });
@@ -167,6 +170,7 @@ export function collectSingleModelInterfaces(
           singleModelCategory: metadata.singleModelCategory,
           endpointRules: metadata.endpointRules,
           models: metadata.models,
+          baseUrl: row.baseUrl ?? null,
         },
       ];
     });
@@ -190,11 +194,20 @@ export async function listOrgTextModelOptions(
     listOrganizationAiInterfaces(db, organizationId),
   ]);
 
+  const bindingInterfaces = collectOrgBindingInterfaces(interfaces);
+  const baseUrlByInterfaceId = new Map(
+    bindingInterfaces.map((iface) => [iface.id, iface.baseUrl])
+  );
+
   return buildOrgModelBindings({
     platformModels,
-    interfaces: collectOrgBindingInterfaces(interfaces),
+    interfaces: bindingInterfaces,
   }).map((binding) => ({
     ...binding,
+    usesOfficialUrl: isOfficialOrgModelEndpoint({
+      channelKind: binding.channelKind,
+      baseUrl: baseUrlByInterfaceId.get(binding.interfaceId) ?? null,
+    }),
     parameterRules: getTextParameterRules(
       platformModels.find(
         (model) => model.canonicalId === binding.canonicalId

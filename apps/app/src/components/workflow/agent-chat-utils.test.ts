@@ -1,15 +1,21 @@
-import { describe, expect, it } from "vitest";
 import type { OrgTextModelOption } from "@dafthunk/types";
 import { fingerprintAgentChatBody } from "@dafthunk/types";
+import { describe, expect, it } from "vitest";
 
 import {
   agentContextUsage,
   estimateAgentContextUsedTokens,
   formatAgentContextTokenCount,
+  executeTraceTitle,
+  shouldShowExecuteTrace,
+  turnHasCompletedExecute,
   groupAgentChatTurns,
+  isAgentThinkingLive,
   resolveAgentContextModel,
+  selectableTextModelsInOrder,
   shouldFetchSealedAgentChatBody,
   shouldSubmitAgentChatOnEnter,
+  shouldWrapAgentWorked,
   trimMessagesForContext,
 } from "./agent-chat-utils";
 
@@ -37,6 +43,21 @@ describe("trimMessagesForContext", () => {
 
     expect(trimmed).toHaveLength(1);
     expect(trimmed[0]?.content).toHaveLength(6);
+  });
+
+  it("keeps system messages when trimming history", () => {
+    const trimmed = trimMessagesForContext({
+      contextWindowTokens: 25,
+      outputMaxTokens: 5,
+      messages: [
+        { id: "sys", role: "system", content: "指令要留下" },
+        { id: "1", role: "user", content: "aaaaaaaaaa" },
+        { id: "2", role: "assistant", content: "bbbbbbbbbb" },
+        { id: "3", role: "user", content: "ccccc" },
+      ],
+    });
+
+    expect(trimmed.map((message) => message.id)).toEqual(["sys", "2", "3"]);
   });
 });
 
@@ -121,8 +142,71 @@ describe("groupAgentChatTurns", () => {
       { id: "u2", role: "user", content: "again" },
     ]);
     expect(turns).toHaveLength(2);
-    expect(turns[0]?.assistant?.id).toBe("a1");
-    expect(turns[1]?.assistant).toBeNull();
+    expect(turns[0]?.answer.talk).toBe("hello");
+    expect(turns[0]?.hasReply).toBe(true);
+    expect(turns[1]?.hasReply).toBe(false);
+    expect(turns[1]?.answer.talk).toBe("");
+  });
+
+  it("merges later assistants on the same turn into one answer", () => {
+    const turns = groupAgentChatTurns([
+      { id: "u1", role: "user", content: "hi" },
+      { id: "a1", role: "assistant", content: "plan" },
+      { id: "a2", role: "assistant", content: "run" },
+    ]);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.answer.talk).toBe("run");
+    expect(turns[0]?.executed).toBe(true);
+  });
+});
+
+describe("isAgentThinkingLive", () => {
+  it("is live only while streaming with no answer or tools", () => {
+    expect(
+      isAgentThinkingLive({ streaming: true, hasTalk: false, hasTools: false })
+    ).toBe(true);
+    expect(
+      isAgentThinkingLive({ streaming: true, hasTalk: true, hasTools: false })
+    ).toBe(false);
+    expect(
+      isAgentThinkingLive({ streaming: true, hasTalk: false, hasTools: true })
+    ).toBe(false);
+    expect(
+      isAgentThinkingLive({ streaming: false, hasTalk: false, hasTools: false })
+    ).toBe(false);
+  });
+});
+
+describe("shouldWrapAgentWorked", () => {
+  it("wraps finished process and leaves live turns unwrapped", () => {
+    expect(
+      shouldWrapAgentWorked({
+        streaming: false,
+        hasThinking: true,
+        hasTools: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldWrapAgentWorked({
+        streaming: false,
+        hasThinking: false,
+        hasTools: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldWrapAgentWorked({
+        streaming: true,
+        hasThinking: true,
+        hasTools: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldWrapAgentWorked({
+        streaming: false,
+        hasThinking: false,
+        hasTools: false,
+      })
+    ).toBe(false);
   });
 });
 
@@ -185,5 +269,134 @@ describe("resolveAgentContextModel", () => {
     expect(resolveAgentContextModel("auto", [first, second])).toBe(first);
     expect(resolveAgentContextModel("missing", [first, second])).toBe(first);
     expect(resolveAgentContextModel("auto", [])).toBeNull();
+  });
+});
+
+describe("selectableTextModelsInOrder", () => {
+  function model(params: {
+    readonly optionId: string;
+    readonly sortOrder: number;
+    readonly usesOfficialUrl: boolean;
+    readonly selectable?: boolean;
+  }): OrgTextModelOption {
+    return {
+      optionId: params.optionId,
+      instanceId: params.optionId,
+      canonicalId: params.optionId,
+      interfaceId: "iface",
+      channelKind: params.usesOfficialUrl ? "aggregate" : "api",
+      alias: params.optionId,
+      displayName: params.optionId,
+      modality: "text",
+      providerModelId: params.optionId,
+      parameterRules: {
+        schemaVersion: 1,
+        referenceInputs: [],
+        keywordsMaxChars: 1,
+        promptMaxChars: 1,
+        outputMaxTokens: 1,
+        outputMaxTokensLimit: 1,
+        outputMaxChars: 1,
+        contextWindowTokens: 1,
+        maxTextReferences: 0,
+        maxTextReferenceChars: 1,
+        maxImageReferences: 0,
+        maxImageReferenceBytes: 1,
+        maxVideoReferences: 0,
+        maxVideoReferenceBytes: 1,
+        maxVideoReferenceSeconds: 1,
+      },
+      selectable: params.selectable ?? true,
+      description: "",
+      sortOrder: params.sortOrder,
+      brandIcon: null,
+      usesOfficialUrl: params.usesOfficialUrl,
+    };
+  }
+
+  it("puts official endpoints first, then sortOrder", () => {
+    const sorted = selectableTextModelsInOrder([
+      model({ optionId: "relay", sortOrder: 0, usesOfficialUrl: false }),
+      model({ optionId: "official-b", sortOrder: 20, usesOfficialUrl: true }),
+      model({ optionId: "official-a", sortOrder: 10, usesOfficialUrl: true }),
+      model({
+        optionId: "disabled",
+        sortOrder: 0,
+        usesOfficialUrl: true,
+        selectable: false,
+      }),
+    ]);
+
+    expect(sorted.map((entry) => entry.optionId)).toEqual([
+      "official-a",
+      "official-b",
+      "relay",
+    ]);
+  });
+});
+
+describe("executeTraceTitle", () => {
+  it("uses the latest assistant talk", () => {
+    const turns = groupAgentChatTurns([
+      { id: "u1", role: "user", content: "hi" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: `${"<<<THINK>>>"}\n先看\n${"<<<TALK>>>"}\n改片头`,
+      },
+      {
+        id: "a2",
+        role: "assistant",
+        content: `${"<<<THINK>>>"}\n动手\n${"<<<TALK>>>"}\n已经改好`,
+      },
+    ]);
+    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
+      "已经改好"
+    );
+  });
+
+  it("is empty until a talk exists", () => {
+    const turns = groupAgentChatTurns([
+      { id: "u1", role: "user", content: "hi" },
+      { id: "a1", role: "assistant", content: `${"<<<THINK>>>"}\n还在想` },
+    ]);
+    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
+      ""
+    );
+  });
+});
+
+describe("shouldShowExecuteTrace", () => {
+  it("shows the bar once an assistant reply exists", () => {
+    expect(shouldShowExecuteTrace(false)).toBe(false);
+    expect(shouldShowExecuteTrace(true)).toBe(true);
+  });
+});
+
+describe("turnHasCompletedExecute", () => {
+  it("is true only after a follow-up assistant from execute", () => {
+    const planOnly = groupAgentChatTurns([
+      { id: "u1", role: "user", content: "hi" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: `${"<<<TALK>>>"}\n改片头`,
+      },
+    ]);
+    expect(turnHasCompletedExecute(planOnly[0]?.executed ?? false)).toBe(false);
+    const executed = groupAgentChatTurns([
+      { id: "u1", role: "user", content: "hi" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: `${"<<<TALK>>>"}\n改片头`,
+      },
+      {
+        id: "a2",
+        role: "assistant",
+        content: `${"<<<TALK>>>"}\n已经改好`,
+      },
+    ]);
+    expect(turnHasCompletedExecute(executed[0]?.executed ?? false)).toBe(true);
   });
 });

@@ -212,6 +212,7 @@ export interface OrgTextModelOption {
   readonly description: string;
   readonly sortOrder: number;
   readonly brandIcon: string | null;
+  readonly usesOfficialUrl: boolean;
 }
 
 export interface ListOrgTextModelsResponse {

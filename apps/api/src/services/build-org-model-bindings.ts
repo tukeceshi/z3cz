@@ -6,17 +6,18 @@ import type {
   PlatformAiModel,
 } from "@dafthunk/types";
 import {
-  formatCanvasModelLabel,
   buildOrgModelOptionId,
+  formatCanvasModelLabel,
   listOrgModelEntries,
-  resolveInterfaceModelAlias,
   type OrgModelChannelKind,
+  resolveInterfaceModelAlias,
 } from "@dafthunk/types";
 
 export interface OrgBindingInterface {
   readonly id: string;
   readonly channelKind: OrgModelChannelKind;
   readonly entries: readonly OrgModelInstanceEntry[];
+  readonly baseUrl: string | null;
 }
 
 export interface OrgModelBindingBase {
@@ -40,12 +41,14 @@ export interface OrgModelBindingBase {
 export interface VolcanoBindingInterface {
   readonly id: string;
   readonly models: Readonly<Record<string, OrgModelInstanceConfig>>;
+  readonly baseUrl?: string | null;
 }
 
 /** @deprecated Use OrgBindingInterface */
 export interface SingleModelBindingInterface {
   readonly id: string;
   readonly models: Readonly<Record<string, OrgModelInstanceConfig>>;
+  readonly baseUrl?: string | null;
 }
 
 function bindingFromEntry(params: {
@@ -126,11 +129,13 @@ export function toOrgBindingInterfaces(params: {
       id: iface.id,
       channelKind: "aggregate" as const,
       entries: listOrgModelEntries(iface.models),
+      baseUrl: iface.baseUrl ?? null,
     })),
     ...params.singleModelInterfaces.map((iface) => ({
       id: iface.id,
       channelKind: "api" as const,
       entries: listOrgModelEntries(iface.models),
+      baseUrl: iface.baseUrl ?? null,
     })),
   ];
 }

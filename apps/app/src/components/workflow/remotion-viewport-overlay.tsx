@@ -45,6 +45,10 @@ export interface RemotionViewportOverlayProps {
   readonly workflowName?: string;
   readonly visible?: boolean;
   readonly onClose: () => void;
+  readonly embedded?: boolean;
+  readonly fillHeight?: boolean;
+  readonly codeExpanded?: boolean;
+  readonly onCodeExpandedChange?: (expanded: boolean) => void;
 }
 
 function deferPaint(): Promise<void> {
@@ -61,6 +65,10 @@ export function RemotionViewportOverlay({
   workflowName = "",
   visible = true,
   onClose,
+  embedded = false,
+  fillHeight = false,
+  codeExpanded,
+  onCodeExpandedChange,
 }: RemotionViewportOverlayProps) {
   const { t } = useTranslation();
   const sourceSaveTimerRef = useRef<number | null>(null);
@@ -68,7 +76,9 @@ export function RemotionViewportOverlay({
   const initialLoadDoneRef = useRef(false);
   const [loadPhase, setLoadPhase] = useState<LoadPhase>("loading");
   const [sourceCode, setSourceCode] = useState(DEFAULT_REMOTION_SOURCE_CODE);
-  const [codeExpanded, setCodeExpanded] = useState(false);
+  const [internalCodeExpanded, setInternalCodeExpanded] = useState(false);
+  const expanded = codeExpanded ?? internalCodeExpanded;
+  const setExpanded = onCodeExpandedChange ?? setInternalCodeExpanded;
   const [compileError, setCompileError] = useState<string | null>(null);
   const [compiledComponent, setCompiledComponent] = useState<ComponentType>(
     () => () => null
@@ -256,8 +266,12 @@ export function RemotionViewportOverlay({
     <div
       className={cn(
         "nodrag nopan nowheel flex shrink-0 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900",
-        PANEL_WIDTH_CLASS,
-        codeExpanded ? PANEL_HEIGHT_CLASS : "h-auto",
+        embedded ? "w-full" : PANEL_WIDTH_CLASS,
+        fillHeight || expanded
+          ? embedded
+            ? "min-h-0 flex-1"
+            : PANEL_HEIGHT_CLASS
+          : "h-auto",
         !visible && "hidden"
       )}
       onPointerDown={(event) => event.stopPropagation()}
@@ -284,12 +298,12 @@ export function RemotionViewportOverlay({
       <div
         className={cn(
           "flex min-h-0 flex-col",
-          codeExpanded ? "min-h-0 flex-1" : undefined
+          expanded ? "min-h-0 flex-1" : undefined
         )}
       >
         {previewArea}
 
-        {codeExpanded ? (
+        {expanded ? (
           <div className="flex min-h-0 flex-1 flex-col border-t border-neutral-200 dark:border-neutral-700">
             <CodeEditor
               value={sourceCode}
@@ -305,21 +319,21 @@ export function RemotionViewportOverlay({
       <button
         type="button"
         className="flex w-full shrink-0 items-center justify-center gap-1 border-t border-neutral-200 py-1.5 text-[11px] text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800/60"
-        onClick={() => setCodeExpanded((expanded) => !expanded)}
-        aria-expanded={codeExpanded}
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         aria-label={
-          codeExpanded
+          expanded
             ? t("workflow.canvas.remotionViewportCollapseCode")
             : t("workflow.canvas.remotionViewportExpandCode")
         }
       >
-        {codeExpanded ? (
+        {expanded ? (
           <ChevronUp className="size-3.5" />
         ) : (
           <ChevronDown className="size-3.5" />
         )}
         <span>
-          {codeExpanded
+          {expanded
             ? t("workflow.canvas.remotionViewportCollapseCode")
             : t("workflow.canvas.remotionViewportExpandCode")}
         </span>

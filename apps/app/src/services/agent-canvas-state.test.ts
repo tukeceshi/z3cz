@@ -10,6 +10,10 @@ import type {
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
 import {
+  capabilityLabel,
+  SIMPLE_ANIMATION_CAPABILITY,
+} from "./agent-capabilities";
+import {
   AGENT_CANVAS_EXCERPT_MAX_CHARS,
   CANVAS_GET_STATE_TOOL,
   CANVAS_RESOLVE_RESOURCE_TOOL,
@@ -17,6 +21,7 @@ import {
   executeCanvasAgentTool,
   formatCanvasInventory,
   parseAgentToolCall,
+  REMOTION_OPEN_TOOL,
   truncateAgentCanvasExcerpt,
 } from "./agent-canvas-state";
 
@@ -110,12 +115,23 @@ describe("compactCanvasAgentState", () => {
 });
 
 describe("formatCanvasInventory", () => {
-  it("lists node id, type and name", () => {
+  it("lists node id, type, name, resourceId and edges", () => {
     const summary = compactCanvasAgentState(
       [imageNode("n1", "图1", "res-1")],
-      []
+      [
+        {
+          id: "e1",
+          source: "n1",
+          target: "n1",
+          data: {},
+        },
+      ]
     );
-    expect(formatCanvasInventory(summary)).toContain("n1 ai-image 图1");
+    const text = formatCanvasInventory(summary);
+    expect(text).toContain("res-1");
+    expect(text).toContain("ai-image");
+    expect(text).toContain("图1");
+    expect(text).toContain('"from":"n1"');
   });
 });
 
@@ -255,6 +271,50 @@ describe("executeCanvasAgentTool", () => {
     expect(writeSource).not.toHaveBeenCalled();
   });
 
+  it("rejects canvas reads in ask mode", async () => {
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_get_state",
+        resourceId: "",
+        nodeId: "",
+        payload: "",
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "ask",
+        consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: false }),
+      },
+    });
+    expect(JSON.parse(text).error).toContain("模式：问答");
+  });
+
+  it("rejects opening simple animation while still in plan mode", async () => {
+    const requestConsent = vi.fn(async () => ({ authorized: true, open: true }));
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: REMOTION_OPEN_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: "",
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "plan",
+        consentedCapabilities: [],
+        requestConsent,
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+      },
+    });
+    expect(JSON.parse(text).error).toContain("模式：方案");
+    expect(requestConsent).not.toHaveBeenCalled();
+  });
+
   it("writes while simple animation is on even if the window is hidden", async () => {
     const writeSource = vi.fn(async () => ({ ok: true }));
     const text = await executeCanvasAgentTool({
@@ -297,8 +357,34 @@ describe("executeCanvasAgentTool", () => {
         writeSource,
       },
     });
-    expect(JSON.parse(text).error).toContain("未进入简易动画");
+    expect(JSON.parse(text).error).toContain(
+      `未进入${capabilityLabel(SIMPLE_ANIMATION_CAPABILITY)}`
+    );
     expect(writeSource).not.toHaveBeenCalled();
+  });
+
+  it("rejects disabled make tools even while executing", async () => {
+    const writeText = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_write_text",
+        resourceId: "",
+        nodeId: "n1",
+        payload: "nodeId: n1\nhello",
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "agent",
+        consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+        writeText,
+      },
+    });
+    expect(JSON.parse(text).error).toContain("该工具未启用");
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it("opens simple animation without a second allow step", async () => {
