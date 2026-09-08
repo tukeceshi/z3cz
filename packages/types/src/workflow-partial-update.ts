@@ -1,8 +1,8 @@
+import type { WorkflowGenerativeDefaults } from "./workflow-generative-defaults";
 import type {
   Edge,
   Node,
   WorkflowEditorViewport,
-  WorkflowGenerativeDefaults,
   WorkflowRuntime,
   WorkflowState,
   WorkflowTrigger,
