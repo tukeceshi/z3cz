@@ -64,6 +64,7 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSiteSettings = {
   siteName: "z3cz.com",
   siteTagline: "Build serverless workflows visually.",
   supportEmail: null,
+  icpFilingNumber: null,
   newUserTourEnabled: false,
   wsBootstrapEnabled: false,
   maintenanceEnabled: false,
@@ -97,6 +98,7 @@ function rowToPublicSettings(
     siteName: row.siteName,
     siteTagline: row.siteTagline,
     supportEmail: row.supportEmail,
+    icpFilingNumber: row.icpFilingNumber,
     newUserTourEnabled: row.newUserTourEnabled,
     wsBootstrapEnabled: row.wsBootstrapEnabled,
     maintenanceEnabled: row.maintenanceEnabled,
@@ -171,6 +173,10 @@ export async function updateSiteSettings(
       input.supportEmail !== undefined
         ? input.supportEmail
         : (existing?.supportEmail ?? null),
+    icpFilingNumber:
+      input.icpFilingNumber !== undefined
+        ? input.icpFilingNumber
+        : (existing?.icpFilingNumber ?? null),
     newUserTourEnabled:
       input.newUserTourEnabled ??
       existing?.newUserTourEnabled ??

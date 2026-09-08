@@ -10,29 +10,163 @@ import {
   type UpstreamRequestLogSink,
 } from "./upstream-request-log";
 
+export interface AiInterfaceStreamToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly arguments: string;
+}
+
 export type AiInterfaceStreamEvent =
-  | { readonly type: "delta"; readonly text: string }
-  | { readonly type: "done"; readonly text: string }
+  | { readonly type: "delta"; readonly text: string; readonly thinking?: string }
+  | {
+      readonly type: "done";
+      readonly text: string;
+      readonly thinking?: string;
+      readonly toolCalls?: readonly AiInterfaceStreamToolCall[];
+    }
   | { readonly type: "error"; readonly error: string };
 
-function readOpenAiStreamDelta(payload: unknown): string {
+const THINK_OPEN = "<think>";
+const THINK_CLOSE = "</think>";
+
+function longestIncompleteSuffix(text: string, tag: string): number {
+  const max = Math.min(tag.length - 1, text.length);
+  for (let length = max; length > 0; length -= 1) {
+    if (text.endsWith(tag.slice(0, length))) {
+      return length;
+    }
+  }
+  return 0;
+}
+
+export function splitThinkTags(raw: string): {
+  readonly thinking: string;
+  readonly talk: string;
+} {
+  const thinkingParts: string[] = [];
+  const talkParts: string[] = [];
+  let index = 0;
+  let inThink = false;
+  while (index < raw.length) {
+    if (!inThink) {
+      const start = raw.indexOf(THINK_OPEN, index);
+      if (start < 0) {
+        const rest = raw.slice(index);
+        const hold = longestIncompleteSuffix(rest, THINK_OPEN);
+        talkParts.push(hold > 0 ? rest.slice(0, rest.length - hold) : rest);
+        break;
+      }
+      talkParts.push(raw.slice(index, start));
+      index = start + THINK_OPEN.length;
+      inThink = true;
+      continue;
+    }
+    const end = raw.indexOf(THINK_CLOSE, index);
+    if (end < 0) {
+      const rest = raw.slice(index);
+      const hold = longestIncompleteSuffix(rest, THINK_CLOSE);
+      thinkingParts.push(hold > 0 ? rest.slice(0, rest.length - hold) : rest);
+      break;
+    }
+    thinkingParts.push(raw.slice(index, end));
+    index = end + THINK_CLOSE.length;
+    inThink = false;
+  }
+  return {
+    thinking: thinkingParts.join(""),
+    talk: talkParts.join(""),
+  };
+}
+
+interface AccumulatedToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+function readChoiceDelta(payload: unknown): unknown {
   if (!payload || typeof payload !== "object") {
-    return "";
+    return undefined;
   }
   const choices = (payload as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || choices.length === 0) {
-    return "";
+    return undefined;
   }
   const first = choices[0];
   if (!first || typeof first !== "object") {
-    return "";
+    return undefined;
   }
-  const delta = (first as { delta?: unknown }).delta;
+  return (first as { delta?: unknown }).delta ?? (first as { message?: unknown }).message;
+}
+
+function readOpenAiStreamDelta(payload: unknown): string {
+  const delta = readChoiceDelta(payload);
   if (!delta || typeof delta !== "object") {
     return "";
   }
   const content = (delta as { content?: unknown }).content;
   return typeof content === "string" ? content : "";
+}
+
+export function readOpenAiReasoningDelta(payload: unknown): string {
+  const delta = readChoiceDelta(payload);
+  if (!delta || typeof delta !== "object") {
+    return "";
+  }
+  const row = delta as {
+    readonly reasoning_content?: unknown;
+    readonly reasoning?: unknown;
+    readonly thinking?: unknown;
+  };
+  if (typeof row.reasoning_content === "string") {
+    return row.reasoning_content;
+  }
+  if (typeof row.reasoning === "string") {
+    return row.reasoning;
+  }
+  if (typeof row.thinking === "string") {
+    return row.thinking;
+  }
+  return "";
+}
+
+function sliceNewSuffix(previous: string, next: string): string {
+  return next.startsWith(previous) ? next.slice(previous.length) : "";
+}
+
+function applyOpenAiToolCallDeltas(
+  acc: AccumulatedToolCall[],
+  payload: unknown
+): void {
+  const delta = readChoiceDelta(payload);
+  if (!delta || typeof delta !== "object") {
+    return;
+  }
+  const toolCalls = (delta as { tool_calls?: unknown }).tool_calls;
+  if (!Array.isArray(toolCalls)) {
+    return;
+  }
+  for (const raw of toolCalls) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+    const item = raw as {
+      readonly index?: unknown;
+      readonly id?: unknown;
+      readonly function?: { readonly name?: unknown; readonly arguments?: unknown };
+    };
+    const index = typeof item.index === "number" ? item.index : acc.length;
+    const current = acc[index] ?? { id: "", name: "", arguments: "" };
+    const fn = item.function;
+    acc[index] = {
+      id: typeof item.id === "string" && item.id ? item.id : current.id,
+      name:
+        fn && typeof fn.name === "string" && fn.name ? fn.name : current.name,
+      arguments:
+        current.arguments +
+        (fn && typeof fn.arguments === "string" ? fn.arguments : ""),
+    };
+  }
 }
 
 /**
@@ -99,7 +233,13 @@ export async function* iterateAiInterfaceChatStream(params: {
   };
   params.signal?.addEventListener("abort", onAbort);
 
+  let rawContent = "";
+  let emittedTalk = "";
+  let emittedTagThinking = "";
+  let reasoningAcc = "";
   let fullText = "";
+  let fullThinking = "";
+  const toolAcc: AccumulatedToolCall[] = [];
 
   try {
     const response = await fetchWithUpstreamLog(
@@ -163,21 +303,53 @@ export async function* iterateAiInterfaceChatStream(params: {
           continue;
         }
 
-        const delta = readOpenAiStreamDelta(parsed);
-        if (!delta) {
+        applyOpenAiToolCallDeltas(toolAcc, parsed);
+        const reasoningDelta = readOpenAiReasoningDelta(parsed);
+        const contentDelta = readOpenAiStreamDelta(parsed);
+        if (!reasoningDelta && !contentDelta) {
           continue;
         }
-        fullText += delta;
-        yield { type: "delta", text: delta };
+        reasoningAcc += reasoningDelta;
+        rawContent += contentDelta;
+        const split = splitThinkTags(rawContent);
+        const talkDelta = sliceNewSuffix(emittedTalk, split.talk);
+        const tagThinkingDelta = sliceNewSuffix(
+          emittedTagThinking,
+          split.thinking
+        );
+        emittedTalk = split.talk;
+        emittedTagThinking = split.thinking;
+        const thinkingDelta = reasoningDelta + tagThinkingDelta;
+        if (!talkDelta && !thinkingDelta) {
+          continue;
+        }
+        fullText += talkDelta;
+        fullThinking += thinkingDelta;
+        yield {
+          type: "delta",
+          text: talkDelta,
+          ...(thinkingDelta ? { thinking: thinkingDelta } : {}),
+        };
       }
     }
 
-    if (!fullText.trim()) {
+    const toolCalls = toolAcc.filter(
+      (call) => call.name.trim().length > 0 || call.arguments.trim().length > 0
+    );
+    const split = splitThinkTags(rawContent);
+    fullText = split.talk;
+    fullThinking = reasoningAcc + split.thinking;
+    if (!fullText.trim() && !fullThinking.trim() && toolCalls.length === 0) {
       yield { type: "error", error: "Upstream stream returned no text" };
       return;
     }
 
-    yield { type: "done", text: fullText };
+    yield {
+      type: "done",
+      text: fullText,
+      ...(fullThinking ? { thinking: fullThinking } : {}),
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown upstream error";

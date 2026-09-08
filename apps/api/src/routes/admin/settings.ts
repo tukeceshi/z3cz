@@ -20,6 +20,9 @@ const updateSiteSettingsSchema = z.object({
   supportEmail: z
     .union([z.string().trim().email(), z.literal(""), z.null()])
     .optional(),
+  icpFilingNumber: z
+    .union([z.string().trim().min(1).max(120), z.literal(""), z.null()])
+    .optional(),
   newUserTourEnabled: z.boolean().optional(),
   wsBootstrapEnabled: z.boolean().optional(),
   maintenanceEnabled: z.boolean().optional(),
@@ -58,6 +61,12 @@ adminSettingsRoutes.patch(
         ? {
             supportEmail:
               body.supportEmail === "" ? null : body.supportEmail,
+          }
+        : {}),
+      ...(body.icpFilingNumber !== undefined
+        ? {
+            icpFilingNumber:
+              body.icpFilingNumber === "" ? null : body.icpFilingNumber,
           }
         : {}),
       ...(body.newUserTourEnabled !== undefined

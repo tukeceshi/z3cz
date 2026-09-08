@@ -603,6 +603,13 @@
       "when": 1790360000000,
       "tag": "0091_add_minimax_h3_video_model",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1790440000000,
+      "tag": "0092_icp_filing_number",
+      "breakpoints": true
     }
   ]
 }

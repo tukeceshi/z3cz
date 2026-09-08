@@ -1,16 +1,22 @@
 import type {
-  AgentChatAnswer,
   AgentChatDirectoryEntry,
   AgentChatMessage,
   AgentChatToolCall,
+  AiGenerativeNodeType,
   OrgTextModelOption,
 } from "@dafthunk/types";
+import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import {
+  answerBlocks,
   conversationHasMessages,
+  dropUnfinishedAnswerTool,
+  fillLastAnswerToolResult,
   fingerprintAgentChatBody,
   titleFromMessages,
+  withAnswerStepIfNew,
 } from "@dafthunk/types";
 import type {
+  Connection,
   Edge as ReactFlowEdge,
   Node as ReactFlowNode,
 } from "@xyflow/react";
@@ -19,7 +25,7 @@ import ChevronDown from "lucide-react/icons/chevron-down";
 import Clapperboard from "lucide-react/icons/clapperboard";
 import Copy from "lucide-react/icons/copy";
 import History from "lucide-react/icons/history";
-import List from "lucide-react/icons/list";
+import Paperclip from "lucide-react/icons/paperclip";
 import Plus from "lucide-react/icons/plus";
 import Square from "lucide-react/icons/square";
 import X from "lucide-react/icons/x";
@@ -62,9 +68,16 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  ASK_QUESTION_TOOL,
+  CANVAS_MAKE_CAPABILITY,
+  isMakeTool,
+  SIMPLE_ANIMATION_TOOL,
+} from "@/services/agent-capabilities";
+import {
   compactCanvasAgentState,
   executeCanvasAgentTool,
   formatCanvasInventory,
+  toolCallFromFunctionArgs,
 } from "@/services/agent-canvas-state";
 import {
   createEmptyLocalConversation,
@@ -80,13 +93,14 @@ import {
   type AgentAskQuestion,
   type AgentSchedulerMessage,
   type AgentSchedulerStreamResult,
-  answerToHistoryContent,
+  type AgentSchedulerToolCall,
   composeSavedAnswer,
-  mergeLiveSchedulerAnswer,
-  parseAgentSchedulerOutput,
+  parseAskQuestionArgs,
   parseSavedAnswer,
   runAgentScheduler,
   schedulerMessagesToChat,
+  unansweredPendingWriteFromAnswer,
+  unansweredAskToolFromAnswer,
   splitSavedAssistantContent,
 } from "@/services/agent-chat-scheduler";
 import {
@@ -103,11 +117,10 @@ import {
 import {
   type AgentSessionMode,
   hasCapability,
-  isPlanConfirmPending,
-  isPlanRestriction,
   modeOnOpenConversation,
   SIMPLE_ANIMATION_CAPABILITY,
   stateAfterRun,
+  withoutWriteConsent,
 } from "@/services/agent-session-mode";
 import { useOrgTextModels } from "@/services/platform-ai-model-service";
 import { compileRemotionSource } from "@/services/remotion-live-compile";
@@ -127,20 +140,33 @@ import {
   formatAgentContextTokenCount,
   groupAgentChatTurns,
   isAgentThinkingLive,
+  nextAgentEventState,
+  shouldShowTalkCopy,
   resolveAgentContextModel,
   selectableTextModelsInOrder,
   shouldFetchSealedAgentChatBody,
   shouldSubmitAgentChatOnEnter,
+  splitLastUserTurn,
   trimMessagesForContext,
 } from "./agent-chat-utils";
 import {
   isNearScrollBottom,
   scrollContainerToBottom,
 } from "./ai-text-preview-scroll";
+import { AgentTalkCite } from "./agent-talk-cite";
+import { findAgentReferenceConnection, generationModeToNodeType } from "./agent-canvas-connect";
+import {
+  filterMentionNodes,
+  insertMention,
+  mentionQueryAtCaret,
+  type AgentMentionNode,
+} from "./agent-composer-mentions";
 import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import { commitAiTextValue } from "./commit-ai-text-value";
+import type { GenerativeNodeAddOptions } from "./creative-studio-context";
+import { validateWorkflowConnection } from "./workflow-connection-validation";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
-import { useWorkflow } from "./workflow-context";
+import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 const RemotionViewportOverlay = lazy(() =>
@@ -182,6 +208,28 @@ function syncTextareaHeight(
   return scrollHeight > maxHeightPx;
 }
 
+async function waitForCanvasNode(
+  getGraph: () => {
+    readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+    readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  },
+  nodeId: string
+): Promise<{
+  readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+}> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const latest = getGraph();
+    if (latest.nodes.some((node) => node.id === nodeId)) {
+      return latest;
+    }
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 16);
+    });
+  }
+  return getGraph();
+}
+
 export interface WorkflowAgentSettingsOverlayProps {
   readonly orgId?: string;
   readonly workflowId?: string;
@@ -194,6 +242,11 @@ export interface WorkflowAgentSettingsOverlayProps {
     readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
     readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
   };
+  readonly onCreateGenerativeNode?: (
+    nodeType: AiGenerativeNodeType,
+    options?: GenerativeNodeAddOptions
+  ) => string | null;
+  readonly onConnectWorkflow?: (connection: Connection) => void;
 }
 
 export interface WorkflowAgentSettingsOverlayHandle {
@@ -217,11 +270,18 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     onOpenRemotionViewport,
     onCloseRemotionViewport,
     getCanvasGraph,
+    onCreateGenerativeNode,
+    onConnectWorkflow,
   },
   ref
 ) {
-  const { t } = useTranslation();
-  const { updateNodeData, onRunNode } = useWorkflow();
+  const { t, locale } = useTranslation();
+  const {
+    updateNodeData,
+    onRunNode,
+    generativeReferenceCatalogs,
+    disabled: workflowDisabled,
+  } = useWorkflow();
   const { configured: cloudConfigured } = useCloudStorageCanvasContext();
   const { models } = useOrgTextModels(orgId, { enabled: Boolean(orgId) });
   const selectableModels = useMemo(
@@ -243,17 +303,43 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [hasStepTalk, setHasStepTalk] = useState(false);
   const [streamStatus, setStreamStatus] = useState<AgentStreamStatus>("idle");
   const [resendIndex, setResendIndex] = useState<number | null>(null);
   const [sessionMode, setSessionMode] = useState<AgentSessionMode>("ask");
-  const [planPanelOpen, setPlanPanelOpen] = useState(false);
-  const [confirmKind, setConfirmKind] = useState<"leave-plan" | "execute" | null>(
-    null
-  );
   const [pendingAsk, setPendingAsk] = useState<AgentAskQuestion | undefined>();
+  const [pendingAnimationWrite, setPendingAnimationWrite] = useState(false);
+  const [canvasReferences, setCanvasReferences] = useState<
+    readonly AgentMentionNode[]
+  >([]);
+  const [attachments, setAttachments] = useState<
+    readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly mimeType: string;
+      readonly url: string;
+    }[]
+  >([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      for (const item of attachments) {
+        URL.revokeObjectURL(item.url);
+      }
+    };
+    // Only revoke leftover previews when the overlay unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount cleanup
+  }, []);
   const [remotionCodeExpanded, setRemotionCodeExpanded] = useState(false);
+  const [citeRevealLine, setCiteRevealLine] = useState<number | undefined>(
+    undefined
+  );
   const abortRef = useRef<AbortController | null>(null);
   const userStopRef = useRef(false);
+  const generationSeqRef = useRef(0);
   const invocationIdRef = useRef<string | null>(null);
   const syncTimerRef = useRef<number | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
@@ -261,6 +347,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sessionModeRef = useRef<AgentSessionMode>("ask");
   const consentedRef = useRef<string[]>([]);
+  const draftSourceRef = useRef<string | undefined>(undefined);
 
   useImperativeHandle(
     ref,
@@ -297,9 +384,19 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     });
     sessionModeRef.current = mode;
     setSessionMode(mode);
-    setConfirmKind(null);
-    setPendingAsk(undefined);
-    setPlanPanelOpen(Boolean(conversation?.planDocument));
+    draftSourceRef.current = conversation?.draftSourceCode;
+    setPendingAsk(conversation?.pendingAsk);
+    const messages = conversation?.messages;
+    const lastMessage = messages?.[messages.length - 1];
+    const unansweredWrite =
+      lastMessage?.role === "assistant"
+        ? unansweredPendingWriteFromAnswer(
+            parseSavedAnswer(lastMessage.content)
+          )
+        : undefined;
+    setPendingAnimationWrite(
+      Boolean(conversation?.pendingAnimationWrite) || Boolean(unansweredWrite)
+    );
     // Sync from the opened conversation, not from later local mode toggles.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- conversation.id is the switch signal
   }, [conversation?.id]);
@@ -326,20 +423,23 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     );
   }, []);
 
+  const clearWriteConsent = useCallback(() => {
+    const next = withoutWriteConsent(consentedRef.current);
+    consentedRef.current = [...next];
+    return next;
+  }, []);
+
   const requestCapabilityConsent = useCallback(
     async (capabilityId: string) => {
       if (capabilityId === SIMPLE_ANIMATION_CAPABILITY) {
         openRemotionViewport();
       }
-      if (!consentedRef.current.includes(capabilityId)) {
-        patchConsentedCapabilities([...consentedRef.current, capabilityId]);
-      }
       return {
-        authorized: true,
+        authorized: false,
         open: true,
       };
     },
-    [openRemotionViewport, patchConsentedCapabilities]
+    [openRemotionViewport]
   );
 
   const revokeCapabilityConsent = useCallback(
@@ -371,20 +471,19 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       });
       sessionModeRef.current = after.sessionMode;
       setSessionMode(after.sessionMode);
-      if (after.sessionMode === "plan" && talk.trim()) {
-        setPlanPanelOpen(true);
-      }
-      if (options.preservePlan) {
-        setConfirmKind("leave-plan");
-      } else {
-        setConfirmKind(null);
-      }
       setPendingAsk(undefined);
+      setPendingAnimationWrite(false);
+      const writeConsent = withoutWriteConsent(consentedRef.current);
+      consentedRef.current = [...writeConsent];
       return {
         ...current,
         sessionMode: after.sessionMode,
         planPending: after.planPending,
         planDocument: after.planDocument,
+        draftSourceCode: draftSourceRef.current,
+        pendingAsk: undefined,
+        pendingAnimationWrite: undefined,
+        consentedCapabilities: writeConsent,
       };
     },
     []
@@ -403,31 +502,6 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
 
   const enterAskMode = useCallback(() => {
     patchSessionMode("ask");
-    setConfirmKind(null);
-  }, [patchSessionMode]);
-
-  const handleEnterPlan = useCallback(() => {
-    patchSessionMode("plan");
-    setPlanPanelOpen(true);
-    setConfirmKind(null);
-  }, [patchSessionMode]);
-
-  const handleRequestLeavePlan = useCallback(() => {
-    setConfirmKind("leave-plan");
-  }, []);
-
-  const handleLeavePlanToAsk = useCallback(() => {
-    patchSessionMode("ask");
-    setConfirmKind(null);
-    setConversation((current) =>
-      current
-        ? {
-            ...current,
-            sessionMode: "ask",
-            planPending: false,
-          }
-        : current
-    );
   }, [patchSessionMode]);
 
   const runCanvasAgentTool = useCallback(
@@ -445,6 +519,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         capabilities: {
           sessionMode: sessionModeRef.current,
           consentedCapabilities: consentedRef.current,
+          showViewport: openRemotionViewport,
+          hideViewport: onCloseRemotionViewport,
           requestConsent: requestCapabilityConsent,
           revokeConsent: revokeCapabilityConsent,
           readSource: async () => {
@@ -474,19 +550,33 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             return { ok: true };
           },
           writeText: async (nodeId, text) => {
-            const current = graph.nodes.find((node) => node.id === nodeId);
-            if (!current || !orgId || !workflowId) {
+            const latest = getCanvasGraph?.() ?? graph;
+            const current = latest.nodes.find((node) => node.id === nodeId);
+            if (!current) {
               return { ok: false, error: "找不到节点" };
             }
-            await commitAiTextValue({
-              organizationId: orgId,
-              workflowId,
-              cloudConfigured,
+            if (current.data.nodeType === AI_TEXT_NODE_TYPE) {
+              if (!orgId || !workflowId) {
+                return { ok: false, error: "找不到节点" };
+              }
+              await commitAiTextValue({
+                organizationId: orgId,
+                workflowId,
+                cloudConfigured,
+                nodeId,
+                value: text,
+                updateNodeData,
+                current: current.data,
+              });
+              return { ok: true };
+            }
+            updateNodeInput(
               nodeId,
-              value: text,
-              updateNodeData,
-              current: current.data,
-            });
+              "prompt",
+              text,
+              current.data.inputs,
+              updateNodeData
+            );
             return { ok: true };
           },
           runNode: async (nodeId) => {
@@ -497,7 +587,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             return { ok: true };
           },
           stageMedia: async (nodeId, sourceUrl, mimeType) => {
-            const current = graph.nodes.find((node) => node.id === nodeId);
+            const latest = getCanvasGraph?.() ?? graph;
+            const current = latest.nodes.find((node) => node.id === nodeId);
             if (!current || !orgId || !workflowId) {
               return { ok: false, error: "找不到节点" };
             }
@@ -527,17 +618,120 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             });
             return { ok: true };
           },
+          createGenerationFlow: async (input) => {
+            if (!onCreateGenerativeNode) {
+              return { ok: false, error: "无法创建节点" };
+            }
+            const nodeId = onCreateGenerativeNode(
+              generationModeToNodeType(input.mode),
+              {
+                prompt: input.prompt,
+                precedingText: "",
+                ...(input.x !== undefined && input.y !== undefined
+                  ? { positionFlowPoint: { x: input.x, y: input.y } }
+                  : {}),
+              }
+            );
+            if (!nodeId) {
+              return { ok: false, error: "无法创建节点" };
+            }
+            const latest = await waitForCanvasNode(
+              () => getCanvasGraph?.() ?? graph,
+              nodeId
+            );
+            for (const fromNodeId of input.referenceNodeIds) {
+              const connection = findAgentReferenceConnection({
+                fromNodeId,
+                toNodeId: nodeId,
+                nodes: latest.nodes,
+              });
+              if (!connection || !onConnectWorkflow) {
+                continue;
+              }
+              if (
+                !validateWorkflowConnection({
+                  connection,
+                  nodes: latest.nodes,
+                  edges: latest.edges,
+                  generativeReferenceCatalogs,
+                  disabled: workflowDisabled,
+                })
+              ) {
+                continue;
+              }
+              onConnectWorkflow(connection);
+            }
+            if (input.autoRun) {
+              if (!onRunNode) {
+                return { ok: false, nodeId, error: "无法运行该节点" };
+              }
+              await onRunNode(nodeId);
+            }
+            return { ok: true, nodeId };
+          },
+          connectNodes: async (connections) => {
+            if (!onConnectWorkflow) {
+              return { ok: false, error: "无法连线" };
+            }
+            let latest = getCanvasGraph?.() ?? graph;
+            for (const item of connections) {
+              if (
+                !latest.nodes.some((node) => node.id === item.toNodeId) ||
+                !latest.nodes.some((node) => node.id === item.fromNodeId)
+              ) {
+                latest = await waitForCanvasNode(
+                  () => getCanvasGraph?.() ?? graph,
+                  item.toNodeId
+                );
+                if (
+                  !latest.nodes.some((node) => node.id === item.fromNodeId)
+                ) {
+                  latest = await waitForCanvasNode(
+                    () => getCanvasGraph?.() ?? graph,
+                    item.fromNodeId
+                  );
+                }
+              }
+              const connection = findAgentReferenceConnection({
+                fromNodeId: item.fromNodeId,
+                toNodeId: item.toNodeId,
+                nodes: latest.nodes,
+              });
+              if (!connection) {
+                return { ok: false, error: "无法连线" };
+              }
+              if (
+                !validateWorkflowConnection({
+                  connection,
+                  nodes: latest.nodes,
+                  edges: latest.edges,
+                  generativeReferenceCatalogs,
+                  disabled: workflowDisabled,
+                })
+              ) {
+                return { ok: false, error: "无法连线" };
+              }
+              onConnectWorkflow(connection);
+            }
+            return { ok: true };
+          },
         },
       });
     },
     [
       cloudConfigured,
+      generativeReferenceCatalogs,
       getCanvasGraph,
+      onConnectWorkflow,
+      onCreateGenerativeNode,
       onRunNode,
+      openRemotionViewport,
+      onCloseRemotionViewport,
       orgId,
       requestCapabilityConsent,
       revokeCapabilityConsent,
       updateNodeData,
+      workflowDisabled,
       workflowId,
       workflowName,
     ]
@@ -564,25 +758,32 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     );
   }, [modelId, selectableModels, t]);
 
-  const canSend = draft.trim().length > 0 && !streaming && Boolean(orgId);
+  const canSend =
+    (draft.trim().length > 0 || attachments.length > 0) &&
+    !streaming &&
+    Boolean(orgId);
 
   const persistLocal = useCallback(
     async (next: LocalAgentConversation) => {
       if (!orgId || !workflowId) {
         return;
       }
-      if (conversationHasMessages({ messages: next.messages })) {
+      const merged: LocalAgentConversation = {
+        ...next,
+        draftSourceCode: draftSourceRef.current,
+      };
+      if (conversationHasMessages({ messages: merged.messages })) {
         await writeLocalAgentConversation({
           organizationId: orgId,
           workflowId,
           workflowName: workflowName || workflowId,
-          conversation: next,
+          conversation: merged,
         });
       }
       await writeLastOpenAgentConversationId({
         organizationId: orgId,
         workflowId,
-        conversationId: next.id,
+        conversationId: merged.id,
       });
     },
     [orgId, workflowId, workflowName]
@@ -699,9 +900,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
 
   const applyConversation = useCallback(
     async (next: LocalAgentConversation) => {
-      setConversation(next);
-      await persistLocal(next);
-      scheduleCloudSync(next);
+      const merged = {
+        ...next,
+        draftSourceCode: draftSourceRef.current,
+      };
+      setConversation(merged);
+      await persistLocal(merged);
+      scheduleCloudSync(merged);
     },
     [persistLocal, scheduleCloudSync]
   );
@@ -816,7 +1021,11 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       start: () => Promise<StreamAgentChatResult>,
       handlers: {
         readonly onStarted: (invocationId: string) => void;
-        readonly onDelta: (delta: string, fullText: string) => void;
+        readonly onDelta: (
+          delta: string,
+          fullText: string,
+          fullThinking?: string
+        ) => void;
       }
     ): Promise<StreamAgentChatResult> => {
       let next = start;
@@ -870,8 +1079,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       base: LocalAgentConversation,
       historyMessages: readonly AgentChatMessage[],
       options: {
-        readonly initialSideResults?: readonly string[];
+        readonly initialToolResults?: readonly string[];
         readonly continueLastAssistant?: boolean;
+        readonly pendingToolCalls?: readonly AgentSchedulerToolCall[];
       } = {}
     ) => {
       if (!orgId) {
@@ -888,6 +1098,18 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           });
           if (claimed.inUse) {
             setBusyId(base.id);
+            if (!options.continueLastAssistant) {
+              const last = historyMessages[historyMessages.length - 1];
+              if (last?.role === "user") {
+                const rolled: LocalAgentConversation = {
+                  ...base,
+                  messages: historyMessages.slice(0, -1),
+                  updatedAt: new Date().toISOString(),
+                };
+                await persistLocal(rolled);
+                setConversation(rolled);
+              }
+            }
             return;
           }
         } catch {
@@ -904,13 +1126,16 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const generationSeq = generationSeqRef.current + 1;
+      generationSeqRef.current = generationSeq;
       userStopRef.current = false;
       invocationIdRef.current = null;
       setStreaming(true);
+      setHasStepTalk(false);
       setStreamStatus("generating");
       setError(null);
-      setConfirmKind(null);
       setPendingAsk(undefined);
+      setPendingAnimationWrite(false);
 
       const lastHistory = historyMessages[historyMessages.length - 1];
       const continuing = Boolean(
@@ -922,6 +1147,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       const initialAnswer = continuing
         ? parseSavedAnswer(lastHistory.content)
         : undefined;
+      const writeConsent = continuing
+        ? consentedRef.current
+        : clearWriteConsent();
       let working: LocalAgentConversation = {
         ...base,
         messages: continuing
@@ -930,9 +1158,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               ...historyMessages,
               { id: assistantId, role: "assistant", content: "" },
             ],
-        title: titleFromMessages(historyMessages, base.title),
+        title: base.eventTitle?.trim() || titleFromMessages(historyMessages, base.title),
         updatedAt: new Date().toISOString(),
         activeInvocationId: undefined,
+        pendingAsk: undefined,
+        pendingAnimationWrite: undefined,
+        pendingEventSplit: undefined,
+        consentedCapabilities: writeConsent,
       };
       setConversation(working);
 
@@ -941,6 +1173,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         working = {
           ...working,
           activeInvocationId: id,
+          draftSourceCode: draftSourceRef.current,
           updatedAt: new Date().toISOString(),
         };
         setConversation(working);
@@ -952,6 +1185,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           messages: working.messages.map((message) =>
             message.id === assistantId ? { ...message, content } : message
           ),
+          draftSourceCode: draftSourceRef.current,
           updatedAt: new Date().toISOString(),
         };
         setConversation(working);
@@ -959,8 +1193,17 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
 
       const streamSchedulerMessages = async (
         schedulerMessages: readonly AgentSchedulerMessage[],
-        onDelta: (fullText: string) => void
+        tools: readonly {
+          readonly type: "function";
+          readonly function: {
+            readonly name: string;
+            readonly description: string;
+            readonly parameters: unknown;
+          };
+        }[],
+        onDelta: (fullText: string, fullThinking?: string) => void
       ): Promise<AgentSchedulerStreamResult> => {
+        setHasStepTalk(false);
         let started = false;
         let lastError = t("workflow.canvas.agentGenerateFailed");
         for (const model of modelsToTry) {
@@ -986,7 +1229,10 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                     messages: trimmed.map((message) => ({
                       role: message.role,
                       content: message.content,
+                      toolCallId: message.toolCallId,
+                      toolCalls: message.toolCalls,
                     })),
+                    tools,
                   },
                   {
                     signal: controller.signal,
@@ -994,20 +1240,27 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                       started = true;
                       handleStarted(id);
                     },
-                    onDelta: (_delta, fullText) => {
+                    onDelta: (_delta, fullText, fullThinking) => {
                       started = true;
-                      onDelta(fullText);
+                      setHasStepTalk(Boolean(fullText.trim()));
+                      onDelta(fullText, fullThinking);
                     },
                   }
                 ),
               {
                 onStarted: handleStarted,
-                onDelta: (_delta, fullText) => {
-                  onDelta(fullText);
+                onDelta: (_delta, fullText, fullThinking) => {
+                  setHasStepTalk(Boolean(fullText.trim()));
+                  onDelta(fullText, fullThinking);
                 },
               }
             );
-            return { text: result.text, stopped: result.stopped };
+            return {
+              text: result.text,
+              thinking: result.thinking,
+              toolCalls: result.toolCalls,
+              stopped: result.stopped,
+            };
           } catch (error) {
             if (controller.signal.aborted || userStopRef.current) {
               break;
@@ -1028,17 +1281,22 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         const result = await runAgentScheduler({
           historyMessages: historyMessages.map((message) => ({
             role: message.role,
-            content:
-              message.role === "assistant"
-                ? answerToHistoryContent(message.content)
-                : message.content,
+            content: message.content,
           })),
           isAborted: () => controller.signal.aborted || userStopRef.current,
           getMode: () => sessionModeRef.current,
           getCanvasInventory: readCanvasInventory,
-          planDocument: working.planDocument,
-          initialSideResults: options.initialSideResults,
+          previousEvent:
+            base.eventEnded === undefined
+              ? undefined
+              : {
+                  title: base.eventTitle?.trim() || base.title || "未命名",
+                  ended: base.eventEnded,
+                },
+          locale,
+          initialToolResults: options.initialToolResults,
           initialAnswer,
+          pendingToolCalls: options.pendingToolCalls,
           stream: streamSchedulerMessages,
           runTool: (call) => runCanvasAgentTool(call),
           applyMode: (mode) => {
@@ -1046,14 +1304,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             setSessionMode(mode);
             working = { ...working, sessionMode: mode };
             setConversation(working);
-            if (mode === "plan") {
-              setPlanPanelOpen(true);
-            }
           },
           onAssistantContent: applyAssistantContent,
         });
         const talk = splitSavedAssistantContent(result.content).talk;
-        const paused = Boolean(result.pendingAsk || result.pendingSwitch);
+        const paused = Boolean(
+          result.pendingAsk || result.pendingAnimationWrite
+        );
         working = {
           ...working,
           messages: working.messages.map((message) =>
@@ -1067,34 +1324,56 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         };
         if (!paused) {
           working = applyRunSessionState(working, talk);
+          if (result.eventJudged) {
+            working = {
+              ...working,
+              ...nextAgentEventState({
+                title: working.title,
+                eventTitle: result.eventTitle,
+                eventEnded: result.eventEnded,
+                previousEventTitle: base.eventTitle,
+                previousEventEnded: base.eventEnded,
+              }),
+            };
+          }
         } else {
           working = {
             ...working,
             sessionMode: sessionModeRef.current,
+            pendingAsk: result.pendingAsk,
+            pendingAnimationWrite: result.pendingAnimationWrite,
           };
+        }
+        if (result.pendingAsk) {
+          setPendingAsk(result.pendingAsk);
+        }
+        if (result.pendingAnimationWrite) {
+          setPendingAnimationWrite(true);
+        }
+        if (generationSeq !== generationSeqRef.current) {
+          return;
         }
         await applyConversation(working);
         invocationIdRef.current = null;
         setStreaming(false);
+        setHasStepTalk(false);
         setStreamStatus(
           result.stopped || userStopRef.current ? "stopped" : "idle"
         );
-        if (result.pendingAsk) {
-          setPendingAsk(result.pendingAsk);
-        }
-        if (result.pendingSwitch) {
-          setConfirmKind("leave-plan");
-        }
       } catch (error) {
+        if (generationSeq !== generationSeqRef.current) {
+          return;
+        }
         working = applyRunSessionState(
           { ...working, activeInvocationId: undefined },
           "",
-          { preservePlan: sessionModeRef.current === "agent" }
+          { preservePlan: sessionModeRef.current === "real" }
         );
         await persistLocal(working);
         setConversation(working);
         invocationIdRef.current = null;
         setStreaming(false);
+        setHasStepTalk(false);
         if (userStopRef.current) {
           setStreamStatus("stopped");
           return;
@@ -1112,11 +1391,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     [
       applyConversation,
       applyRunSessionState,
+      clearWriteConsent,
       cloudConfigured,
       cloudEnabled,
       consumeWithResume,
       readCanvasInventory,
       onRunNode,
+      locale,
       orgId,
       persistLocal,
       requestCapabilityConsent,
@@ -1148,16 +1429,19 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                 { id: assistantId, role: "assistant", content: "" },
               ],
             };
-      const seedAnswer = dropLiveTail(
+      const seedAnswer = dropUnfinishedAnswerTool(
         parseSavedAnswer(last?.role === "assistant" ? last.content : "")
       );
 
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const generationSeq = generationSeqRef.current + 1;
+      generationSeqRef.current = generationSeq;
       userStopRef.current = false;
       invocationIdRef.current = base.activeInvocationId;
       setStreaming(true);
+      setHasStepTalk(false);
       setStreamStatus("reconnecting");
       setError(null);
       setConversation(working);
@@ -1169,10 +1453,14 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           setConversation(working);
           void persistLocal(working);
         };
-        const handleDelta = (_delta: string, fullText: string) => {
-          const live = parseAgentSchedulerOutput(fullText, { complete: false });
+        const handleDelta = (
+          _delta: string,
+          fullText: string,
+          fullThinking = ""
+        ) => {
+          setHasStepTalk(Boolean(fullText.trim()));
           const content = composeSavedAnswer(
-            mergeLiveSchedulerAnswer(seedAnswer, live)
+            withAnswerStepIfNew(seedAnswer, fullThinking, fullText)
           );
           working = {
             ...working,
@@ -1193,15 +1481,20 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             }),
           { onStarted: handleStarted, onDelta: handleDelta }
         );
-        const parsed = parseAgentSchedulerOutput(result.text, {
-          complete: true,
-        });
-        const content = composeSavedAnswer(
-          mergeLiveSchedulerAnswer(seedAnswer, parsed)
+        const stepped = withAnswerStepIfNew(
+          seedAnswer,
+          result.thinking,
+          result.text
         );
-        const talk = parsed.action === "talk" ? parsed.talk : "";
-        const willContinueSide =
-          parsed.action === "side" && !result.stopped && !userStopRef.current;
+        const talk = stepped.talk;
+        const content = composeSavedAnswer(stepped);
+        const pendingToolCalls = result.toolCalls.filter((call) =>
+          call.name.trim()
+        );
+        const willContinue =
+          pendingToolCalls.length > 0 &&
+          !result.stopped &&
+          !userStopRef.current;
         working = {
           ...working,
           messages: working.messages.map((message) =>
@@ -1211,52 +1504,32 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           activeInvocationId: undefined,
           updatedAt: new Date().toISOString(),
         };
-        if (!willContinueSide) {
+        if (!willContinue) {
           working = applyRunSessionState(working, talk);
+        }
+        if (generationSeq !== generationSeqRef.current) {
+          return;
         }
         await applyConversation(working);
         invocationIdRef.current = null;
-        setStreaming(false);
-        setStreamStatus(result.stopped ? "stopped" : "idle");
-        if (willContinueSide) {
-          const sideResult = await runCanvasAgentTool(parsed.toolCall);
-          if (userStopRef.current || abortRef.current?.signal.aborted) {
-            working = applyRunSessionState(working, "", {
-              preservePlan: sessionModeRef.current === "agent",
-            });
-            await applyConversation(working);
-            setStreamStatus("stopped");
-            return;
-          }
-          await persistLocal(working);
-          setConversation(working);
-          const filled = fillLastToolResult(
-            parseSavedAnswer(
-              working.messages.find((message) => message.id === assistantId)
-                ?.content ?? ""
-            ),
-            sideResult
-          );
-          working = {
-            ...working,
-            messages: working.messages.map((message) =>
-              message.id === assistantId
-                ? { ...message, content: composeSavedAnswer(filled) }
-                : message
-            ),
-          };
-          await persistLocal(working);
-          setConversation(working);
-          await runGeneration(working, working.messages, {
-            initialSideResults: [sideResult],
-            continueLastAssistant: true,
-          });
+        if (!willContinue) {
+          setStreaming(false);
+          setHasStepTalk(false);
+          setStreamStatus(result.stopped ? "stopped" : "idle");
+          return;
         }
+        await runGeneration(working, working.messages, {
+          continueLastAssistant: true,
+          pendingToolCalls,
+        });
       } catch {
+        if (generationSeq !== generationSeqRef.current) {
+          return;
+        }
         working = applyRunSessionState(
           { ...working, activeInvocationId: undefined },
           "",
-          { preservePlan: sessionModeRef.current === "agent" }
+          { preservePlan: sessionModeRef.current === "real" }
         );
         await persistLocal(working);
         setConversation(working);
@@ -1268,6 +1541,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         }
         invocationIdRef.current = null;
         setStreaming(false);
+        setHasStepTalk(false);
       }
     },
     [
@@ -1276,7 +1550,6 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       consumeWithResume,
       orgId,
       persistLocal,
-      runCanvasAgentTool,
       runGeneration,
       t,
     ]
@@ -1360,21 +1633,23 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     if (!conversation) {
       enterAskMode();
       setStreaming(false);
+      setHasStepTalk(false);
       setStreamStatus("stopped");
       return;
     }
     const last = conversation.messages[conversation.messages.length - 1];
+    const kept =
+      last?.role === "assistant"
+        ? dropUnfinishedAnswerTool(parseSavedAnswer(last.content))
+        : undefined;
     const messages =
-      stoppedText !== undefined && last?.role === "assistant"
+      stoppedText !== undefined && last?.role === "assistant" && kept
         ? conversation.messages.map((message) =>
             message.id === last.id
               ? {
                   ...message,
                   content: composeSavedAnswer(
-                    mergeLiveSchedulerAnswer(
-                      dropLiveTail(parseSavedAnswer(last.content)),
-                      parseAgentSchedulerOutput(stoppedText, { complete: true })
-                    )
+                    withAnswerStepIfNew(kept, "", stoppedText)
                   ),
                 }
               : message
@@ -1388,12 +1663,105 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         updatedAt: new Date().toISOString(),
       },
       "",
-      { preservePlan: sessionModeRef.current === "agent" }
+      { preservePlan: sessionModeRef.current === "real" }
     );
     invocationIdRef.current = null;
     await applyConversation(next);
     setStreaming(false);
+    setHasStepTalk(false);
     setStreamStatus("stopped");
+  };
+
+  const mentionNodes = useMemo((): readonly AgentMentionNode[] => {
+    const graph = getCanvasGraph?.() ?? { nodes: [], edges: [] };
+    return graph.nodes.map((node) => ({
+      id: node.id,
+      name: node.data.name || node.id,
+      type: node.data.nodeType ?? node.type ?? "",
+    }));
+  }, [getCanvasGraph, conversation?.updatedAt]);
+
+  const activeMention = mentionQueryAtCaret(
+    draft,
+    composerTextareaRef.current?.selectionStart ?? draft.length
+  );
+  const mentionChoices = activeMention
+    ? filterMentionNodes(mentionNodes, activeMention.query)
+    : [];
+
+  const handleDraftChange = (value: string, caret?: number) => {
+    setDraft(value);
+    const mention = mentionQueryAtCaret(value, caret ?? value.length);
+    setMentionOpen(Boolean(mention));
+    setMentionIndex(0);
+  };
+
+  const handlePickMention = (node: AgentMentionNode) => {
+    const caret = composerTextareaRef.current?.selectionStart ?? draft.length;
+    const mention = mentionQueryAtCaret(draft, caret);
+    if (!mention) {
+      return;
+    }
+    const next = insertMention(draft, caret, mention, node);
+    handleDraftChange(next.text, next.caret);
+    setCanvasReferences((current) =>
+      current.some((item) => item.id === node.id) ? current : [...current, node]
+    );
+    setMentionOpen(false);
+    requestAnimationFrame(() => {
+      const textarea = composerTextareaRef.current;
+      if (!textarea) {
+        return;
+      }
+      textarea.focus();
+      textarea.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  const handleAddFiles = (files: readonly File[]) => {
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    if (images.length === 0) {
+      return;
+    }
+    setAttachments((current) => [
+      ...current,
+      ...images.map((file) => ({
+        id: messageId(),
+        name: file.name || "image",
+        mimeType: file.type || "image/png",
+        url: URL.createObjectURL(file),
+      })),
+    ]);
+    setOpen(true);
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((current) => {
+      const match = current.find((item) => item.id === id);
+      if (match) {
+        URL.revokeObjectURL(match.url);
+      }
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
+  const composeOutgoingContent = (text: string): string => {
+    const parts = [text.trim()];
+    if (canvasReferences.length > 0) {
+      parts.push(
+        `引用节点：\n${canvasReferences
+          .map((node) => `- ${node.id} ${node.name} (${node.type})`)
+          .join("\n")}`
+      );
+    }
+    if (attachments.length > 0) {
+      parts.push(
+        `本轮图片：\n${attachments
+          .map((item) => `- ${item.id} ${item.mimeType} ${item.url}`)
+          .join("\n")}`
+      );
+    }
+    return parts.filter((part) => part.length > 0).join("\n\n");
   };
 
   const handleSendNew = async (event: FormEvent) => {
@@ -1402,77 +1770,126 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       return;
     }
     stickToBottomRef.current = true;
-    const content = draft.trim();
+    const content = composeOutgoingContent(draft);
     setDraft("");
+    setMentionOpen(false);
+    setCanvasReferences([]);
+    setAttachments([]);
+    const last = conversation.messages[conversation.messages.length - 1];
+    const cancelledWrite =
+      pendingAnimationWrite && last?.role === "assistant"
+        ? fillLastAnswerToolResult(
+            parseSavedAnswer(last.content),
+            JSON.stringify({ cancelled: true })
+          )
+        : undefined;
+    const historyMessages =
+      cancelledWrite && last
+        ? conversation.messages.map((message) =>
+            message.id === last.id
+              ? { ...message, content: composeSavedAnswer(cancelledWrite) }
+              : message
+          )
+        : conversation.messages;
+    setPendingAnimationWrite(false);
     const userMessage: AgentChatMessage = {
       id: messageId(),
       role: "user",
       content,
     };
-    const nextMessages = [...conversation.messages, userMessage];
+    const nextMessages = [...historyMessages, userMessage];
     const next: LocalAgentConversation = {
       ...conversation,
       messages: nextMessages,
       sessionMode: sessionModeRef.current,
-      title: titleFromMessages(nextMessages, conversation.title),
+      title:
+        conversation.eventTitle?.trim() ||
+        titleFromMessages(nextMessages, conversation.title),
+      pendingAnimationWrite: undefined,
+      pendingEventSplit: undefined,
       updatedAt: new Date().toISOString(),
     };
     await persistLocal(next);
     setConversation(next);
-    if (sessionModeRef.current === "agent") {
-      setConfirmKind("execute");
-      return;
-    }
     await runGeneration(next, nextMessages);
-  };
-
-  const handleExecutePlan = async () => {
-    if (!conversation || streaming) {
-      return;
-    }
-    setConfirmKind(null);
-    sessionModeRef.current = "agent";
-    setSessionMode("agent");
-    const next: LocalAgentConversation = {
-      ...conversation,
-      sessionMode: "agent",
-      planPending: false,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistLocal(next);
-    setConversation(next);
-    setOpen(true);
-    const last = next.messages[next.messages.length - 1];
-    const continueLastAssistant = last?.role === "assistant";
-    await runGeneration(next, next.messages, {
-      continueLastAssistant,
-    });
-  };
-
-  const handleConfirmAgentRun = async () => {
-    if (!conversation || streaming) {
-      return;
-    }
-    setConfirmKind(null);
-    await runGeneration(conversation, conversation.messages);
   };
 
   const handleAnswerAsk = async (option: {
     readonly id: string;
     readonly label: string;
   }) => {
-    if (!conversation || streaming || !pendingAsk) {
+    if (!conversation || streaming) {
       return;
     }
-    const last = conversation.messages[conversation.messages.length - 1];
-    if (!last || last.role !== "assistant") {
+    const target = [...conversation.messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "assistant" &&
+          unansweredAskToolFromAnswer(parseSavedAnswer(message.content))
+      );
+    if (!target) {
       return;
     }
     const result = JSON.stringify({
       selected: option.id,
       label: option.label,
     });
-    const filled = fillLastToolResult(parseSavedAnswer(last.content), result);
+    const filled = fillLastAnswerToolResult(
+      parseSavedAnswer(target.content),
+      result
+    );
+    const next: LocalAgentConversation = {
+      ...conversation,
+      messages: conversation.messages.map((message) =>
+        message.id === target.id
+          ? { ...message, content: composeSavedAnswer(filled) }
+          : message
+      ),
+      draftSourceCode: draftSourceRef.current,
+      pendingAsk: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    const last = conversation.messages[conversation.messages.length - 1];
+    setPendingAsk(undefined);
+    await persistLocal(next);
+    setConversation(next);
+    await runGeneration(next, next.messages, {
+      continueLastAssistant: last?.id === target.id,
+    });
+  };
+
+  const handleConfirmAnimationWrite = async () => {
+    if (!conversation || streaming) {
+      return;
+    }
+    const last = conversation.messages[conversation.messages.length - 1];
+    if (last?.role !== "assistant") {
+      setPendingAnimationWrite(false);
+      return;
+    }
+    const parsed = parseSavedAnswer(last.content);
+    const tool = unansweredPendingWriteFromAnswer(parsed);
+    if (!tool) {
+      setPendingAnimationWrite(false);
+      return;
+    }
+    const nextConsented = new Set(consentedRef.current);
+    if (tool.name === SIMPLE_ANIMATION_TOOL || tool.name.startsWith("remotion_")) {
+      nextConsented.add(SIMPLE_ANIMATION_CAPABILITY);
+      openRemotionViewport();
+    }
+    if (isMakeTool(tool.name)) {
+      nextConsented.add(CANVAS_MAKE_CAPABILITY);
+      patchSessionMode("real");
+    }
+    if (nextConsented.size !== consentedRef.current.length) {
+      patchConsentedCapabilities([...nextConsented]);
+    }
+    const result = await runCanvasAgentTool(
+      toolCallFromFunctionArgs(tool.name, tool.args)
+    );
+    const filled = fillLastAnswerToolResult(parsed, result);
     const next: LocalAgentConversation = {
       ...conversation,
       messages: conversation.messages.map((message) =>
@@ -1480,15 +1897,86 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
           ? { ...message, content: composeSavedAnswer(filled) }
           : message
       ),
+      consentedCapabilities: consentedRef.current,
+      pendingAnimationWrite: undefined,
+      draftSourceCode: draftSourceRef.current,
       updatedAt: new Date().toISOString(),
     };
-    setPendingAsk(undefined);
+    setPendingAnimationWrite(false);
     await persistLocal(next);
     setConversation(next);
     await runGeneration(next, next.messages, {
-      initialSideResults: [result],
       continueLastAssistant: true,
     });
+  };
+
+  const handleConfirmEventSplit = async () => {
+    if (!orgId || !workflowId || !conversation || streaming) {
+      return;
+    }
+    const pending = conversation.pendingEventSplit;
+    const { kept, moved } = splitLastUserTurn(conversation.messages);
+    if (!pending || moved.length === 0) {
+      const cleared: LocalAgentConversation = {
+        ...conversation,
+        pendingEventSplit: undefined,
+        updatedAt: new Date().toISOString(),
+      };
+      await applyConversation(cleared);
+      return;
+    }
+    const oldConversation: LocalAgentConversation = {
+      ...conversation,
+      messages: kept,
+      pendingEventSplit: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await flushCloudSync(oldConversation);
+    const opened = createEmptyLocalConversation({
+      organizationId: orgId,
+      workflowId,
+    });
+    const next: LocalAgentConversation = {
+      ...opened,
+      title:
+        pending.title?.trim() ||
+        titleFromMessages(moved, conversation.title),
+      messages: moved,
+      eventTitle: pending.title,
+      eventEnded: pending.ended,
+      sessionMode: "ask",
+    };
+    const openNext = async (conversationId: string) => {
+      const created: LocalAgentConversation = {
+        ...next,
+        id: conversationId,
+      };
+      await writeLocalAgentConversation({
+        organizationId: orgId,
+        workflowId,
+        workflowName: workflowName || workflowId,
+        conversation: oldConversation,
+      });
+      enterAskMode();
+      await applyConversation(created);
+      await refreshHistory();
+    };
+    try {
+      const result = await switchAgentChat(orgId, {
+        workflowId,
+        currentConversationId: conversation.id,
+        currentTitle: oldConversation.title,
+        currentBody: { messages: kept },
+      });
+      if (result.inUse) {
+        setBusyId(result.current.id);
+        await refreshHistory();
+        return;
+      }
+      await openNext(result.current.id);
+    } catch {
+      await openNext(opened.id);
+    }
   };
 
   const resendFromIndex = async (index: number) => {
@@ -1504,18 +1992,16 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       ...conversation,
       messages: nextMessages,
       sessionMode: sessionModeRef.current,
-      title: titleFromMessages(nextMessages, conversation.title),
+      title:
+        conversation.eventTitle?.trim() ||
+        titleFromMessages(nextMessages, conversation.title),
+      pendingEventSplit: undefined,
       updatedAt: new Date().toISOString(),
     };
     setResendIndex(null);
-    setConfirmKind(null);
     setPendingAsk(undefined);
     await persistLocal(next);
     setConversation(next);
-    if (sessionModeRef.current === "agent") {
-      setConfirmKind("execute");
-      return;
-    }
     await runGeneration(next, nextMessages);
   };
 
@@ -1530,6 +2016,12 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     if (!orgId || !workflowId || !conversation) {
       return;
     }
+    generationSeqRef.current += 1;
+    userStopRef.current = true;
+    abortRef.current?.abort();
+    await stopActiveGeneration();
+    setStreaming(false);
+    setHasStepTalk(false);
     await flushCloudSync(conversation);
     try {
       const result = await switchAgentChat(orgId, {
@@ -1588,6 +2080,12 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       setHistoryOpen(false);
       return;
     }
+    generationSeqRef.current += 1;
+    userStopRef.current = true;
+    abortRef.current?.abort();
+    await stopActiveGeneration();
+    setStreaming(false);
+    setHasStepTalk(false);
     await flushCloudSync(conversation);
     if (cloudEnabled) {
       if (!entry.sealed) {
@@ -1634,6 +2132,33 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionOpen && mentionChoices.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionIndex((index) => (index + 1) % mentionChoices.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionIndex(
+          (index) => (index - 1 + mentionChoices.length) % mentionChoices.length
+        );
+        return;
+      }
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const choice = mentionChoices[mentionIndex];
+        if (choice) {
+          handlePickMention(choice);
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMentionOpen(false);
+        return;
+      }
+    }
     if (
       !shouldSubmitAgentChatOnEnter({
         key: event.key,
@@ -1645,15 +2170,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       return;
     }
     event.preventDefault();
-    if ((confirmKind || isPlanRestriction(sessionModeRef.current)) && !draft.trim()) {
-      if (confirmKind === "execute") {
-        void handleConfirmAgentRun();
-        return;
-      }
-      if (confirmKind === "leave-plan" || conversation?.planPending) {
-        void handleExecutePlan();
-        return;
-      }
+    if (pendingAnimationWrite && !draft.trim()) {
+      void handleConfirmAnimationWrite();
+      return;
+    }
+    if (conversation?.pendingEventSplit && !draft.trim()) {
+      void handleConfirmEventSplit();
+      return;
     }
     if (!canSend) {
       return;
@@ -1692,16 +2215,19 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
 
   const turns = groupAgentChatTurns(conversation?.messages ?? []);
   const lastTurnIndex = turns.length - 1;
-  const planRestricted = isPlanRestriction(sessionMode);
-  const planConfirmPending = isPlanConfirmPending({
-    sessionMode,
-    planPending: Boolean(conversation?.planPending),
-    streaming,
-  });
-  const showConfirm =
-    (Boolean(confirmKind) || planConfirmPending) && !streaming;
-  const confirmIsLeavePlan = confirmKind === "leave-plan";
-  const confirmIsAgentRun = confirmKind === "execute";
+  const storedAsk = pendingAsk ?? conversation?.pendingAsk;
+  const visibleAsk =
+    storedAsk && storedAsk.options.length === 0
+      ? parseAskQuestionArgs(storedAsk.prompt) ?? storedAsk
+      : storedAsk;
+  const showAnimationConfirm =
+    pendingAnimationWrite && !streaming && !visibleAsk;
+  const showEventSplitConfirm =
+    Boolean(conversation?.pendingEventSplit) &&
+    !streaming &&
+    !visibleAsk &&
+    !showAnimationConfirm;
+  const showConfirm = showAnimationConfirm || showEventSplitConfirm;
   const simpleAnimationActive = hasCapability(
     conversation?.consentedCapabilities,
     SIMPLE_ANIMATION_CAPABILITY
@@ -1711,11 +2237,26 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       ? t("workflow.canvas.agentStatusReconnecting")
       : streamStatus === "stopped"
         ? t("workflow.canvas.agentStatusStopped")
-        : showConfirm
-          ? confirmIsLeavePlan
-            ? t("workflow.canvas.agentLeavePlanHint")
-            : t("workflow.canvas.agentStatusWaitingPlan")
-          : null;
+        : null;
+  const confirmStrip = (
+    <ConfirmStrip
+      kind="execute"
+      leaveLabel={t("workflow.canvas.agentLeavePlan")}
+      runLabel={t("workflow.canvas.agentExecute")}
+      hint={
+        showEventSplitConfirm
+          ? t("workflow.canvas.agentEventEndHint")
+          : t("workflow.canvas.agentExecuteHint")
+      }
+      disabled={streaming}
+      onLeave={() => undefined}
+      onRun={() =>
+        void (showEventSplitConfirm
+          ? handleConfirmEventSplit()
+          : handleConfirmAnimationWrite())
+      }
+    />
+  );
 
   return (
     <div
@@ -1776,32 +2317,6 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                   />
                 ) : null}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!planRestricted) {
-                    handleEnterPlan();
-                    return;
-                  }
-                  setPlanPanelOpen((value) => !value);
-                }}
-                aria-pressed={planRestricted || planPanelOpen}
-                aria-label={t("workflow.canvas.agentPlan")}
-                className={cn(
-                  "relative inline-flex size-7 items-center justify-center rounded-md",
-                  planRestricted || planPanelOpen
-                    ? "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"
-                    : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-                )}
-              >
-                <List className="size-4" />
-                {planRestricted || planPanelOpen ? (
-                  <span
-                    className="absolute top-1 right-1 size-1.5 rounded-full bg-violet-500"
-                    aria-hidden
-                  />
-                ) : null}
-              </button>
               <div className="flex-1" />
               <button
                 type="button"
@@ -1855,6 +2370,27 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               >
                 {turns.map((turn, turnIndex) => {
                   const isLastTurn = turnIndex === lastTurnIndex;
+                  const thinkingLive =
+                    isLastTurn &&
+                    isAgentThinkingLive({
+                      streaming,
+                      hasStepTalk,
+                    });
+                  const blocks = answerBlocks(turn.answer);
+                  const lastBlock = blocks[blocks.length - 1];
+                  const liveThoughtAtEnd =
+                    thinkingLive && lastBlock?.kind !== "think";
+                  const askedInBlocks = blocks.some(
+                    (block) =>
+                      block.kind === "tool" &&
+                      block.tool.name === ASK_QUESTION_TOOL &&
+                      !block.tool.result.trim()
+                  );
+                  const lastTalkIndex = blocks.reduce(
+                    (found, block, index) =>
+                      block.kind === "talk" ? index : found,
+                    -1
+                  );
                   return (
                     <div key={turn.send.id} className="mb-4">
                       <HistoryUserMessage
@@ -1869,75 +2405,110 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                           handleHistoryKeyDown(event, turn.sendIndex)
                         }
                       />
-                      <ThoughtBar
-                        thinking={turn.answer.thinking}
-                        live={
-                          isLastTurn &&
-                          isAgentThinkingLive({
-                            streaming,
-                            hasTalk: Boolean(turn.answer.talk),
-                            hasTools: turn.answer.tools.length > 0,
-                          })
+                      {blocks.map((block, blockIndex) => {
+                        if (block.kind === "think") {
+                          return (
+                            <ThoughtBar
+                              key={`think-${blockIndex}`}
+                              thinking={block.text}
+                              live={
+                                thinkingLive &&
+                                blockIndex === blocks.length - 1
+                              }
+                              thinkingLabel={t(
+                                "workflow.canvas.agentStatusThinking"
+                              )}
+                              thoughtLabel={t("workflow.canvas.agentThought")}
+                            />
+                          );
                         }
-                        thinkingLabel={t("workflow.canvas.agentStatusThinking")}
-                        thoughtLabel={t("workflow.canvas.agentThought")}
-                      />
-                      {turn.answer.tools.map((tool) => (
-                        <ToolBar
-                          key={tool.id}
-                          tool={tool}
-                          running={
+                        if (block.kind === "tool") {
+                          if (
+                            block.tool.name === ASK_QUESTION_TOOL &&
                             isLastTurn &&
-                            streaming &&
-                            !tool.result.trim()
+                            visibleAsk &&
+                            !block.tool.result.trim()
+                          ) {
+                            return (
+                              <AskCard
+                                key={block.tool.id}
+                                prompt={visibleAsk.prompt}
+                                options={visibleAsk.options}
+                                disabled={streaming}
+                                onSelect={(option) =>
+                                  void handleAnswerAsk(option)
+                                }
+                              />
+                            );
                           }
-                          toolLabel={t("workflow.canvas.agentToolCall")}
-                        />
-                      ))}
-                      {isLastTurn && pendingAsk ? (
+                          return (
+                            <ToolBar
+                              key={block.tool.id}
+                              tool={block.tool}
+                              running={
+                                isLastTurn &&
+                                streaming &&
+                                !block.tool.result.trim()
+                              }
+                              toolLabel={t("workflow.canvas.agentToolCall")}
+                            />
+                          );
+                        }
+                        if (
+                          isLastTurn &&
+                          visibleAsk &&
+                          parseAskQuestionArgs(block.text)
+                        ) {
+                          return null;
+                        }
+                        return (
+                          <div key={`talk-${blockIndex}`} className="mt-2">
+                            <AgentTalkCite
+                              talk={block.text}
+                              onOpenCite={(cite) => {
+                                setCiteRevealLine(cite.startLine);
+                                setRemotionCodeExpanded(true);
+                                openRemotionViewport();
+                              }}
+                            />
+                            {shouldShowTalkCopy({
+                              streaming,
+                              isLastTurn,
+                              isLastTalk: blockIndex === lastTalkIndex,
+                            }) ? (
+                              <button
+                                type="button"
+                                className="mt-1 p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                                aria-label={t("workflow.canvas.agentCopy")}
+                                onClick={() =>
+                                  void handleCopyAssistant(block.text)
+                                }
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                      {isLastTurn && visibleAsk && !askedInBlocks ? (
                         <AskCard
-                          prompt={pendingAsk.prompt}
-                          options={pendingAsk.options}
+                          prompt={visibleAsk.prompt}
+                          options={visibleAsk.options}
                           disabled={streaming}
                           onSelect={(option) => void handleAnswerAsk(option)}
                         />
                       ) : null}
-                      {turn.answer.talk ? (
-                        <div className="mt-2">
-                          <div className="whitespace-pre-wrap text-sm text-neutral-800 dark:text-neutral-100">
-                            {turn.answer.talk}
-                          </div>
-                          <button
-                            type="button"
-                            className="mt-1 p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                            aria-label={t("workflow.canvas.agentCopy")}
-                            onClick={() =>
-                              void handleCopyAssistant(turn.answer.talk)
-                            }
-                          >
-                            <Copy className="size-3.5" />
-                          </button>
-                        </div>
-                      ) : null}
-                      {isLastTurn && showConfirm ? (
-                        <ConfirmStrip
-                          kind={confirmIsLeavePlan ? "leave-plan" : "execute"}
-                          leaveLabel={t("workflow.canvas.agentLeavePlan")}
-                          runLabel={t("workflow.canvas.agentExecute")}
-                          hint={
-                            confirmIsLeavePlan
-                              ? t("workflow.canvas.agentLeavePlanHint")
-                              : t("workflow.canvas.agentExecuteHint")
-                          }
-                          disabled={streaming}
-                          onLeave={handleLeavePlanToAsk}
-                          onRun={() =>
-                            void (confirmIsAgentRun
-                              ? handleConfirmAgentRun()
-                              : handleExecutePlan())
-                          }
+                      {liveThoughtAtEnd ? (
+                        <ThoughtBar
+                          thinking=""
+                          live
+                          thinkingLabel={t(
+                            "workflow.canvas.agentStatusThinking"
+                          )}
+                          thoughtLabel={t("workflow.canvas.agentThought")}
                         />
                       ) : null}
+                      {isLastTurn && showConfirm ? confirmStrip : null}
                       {isLastTurn && statusLabel ? (
                         <p className="mt-1 px-1 text-xs text-neutral-400">
                           {statusLabel}
@@ -1949,25 +2520,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                 {error ? (
                   <p className="mb-2 text-xs text-red-600">{error}</p>
                 ) : null}
-                {showConfirm && turns.length === 0 ? (
-                  <ConfirmStrip
-                    kind={confirmIsLeavePlan ? "leave-plan" : "execute"}
-                    leaveLabel={t("workflow.canvas.agentLeavePlan")}
-                    runLabel={t("workflow.canvas.agentExecute")}
-                    hint={
-                      confirmIsLeavePlan
-                        ? t("workflow.canvas.agentLeavePlanHint")
-                        : t("workflow.canvas.agentExecuteHint")
-                    }
-                    disabled={streaming}
-                    onLeave={handleLeavePlanToAsk}
-                    onRun={() =>
-                      void (confirmIsAgentRun
-                        ? handleConfirmAgentRun()
-                        : handleExecutePlan())
-                    }
-                  />
-                ) : null}
+                {showConfirm && turns.length === 0 ? confirmStrip : null}
               </div>
             </div>
           </div>
@@ -1984,28 +2537,128 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               !open && "shadow-lg"
             )}
           >
-            <textarea
-              ref={composerTextareaRef}
-              id="workflow-agent-composer"
-              name="agent_composer_draft"
-              rows={1}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              onFocus={() => {
-                setOpen(true);
-                handleUndim();
-              }}
-              placeholder={t("workflow.canvas.agentInputPlaceholder")}
-              autoComplete="off"
-              className={cn(
-                agentTextareaClassName,
-                "thin-scrollbar placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
-              )}
-              style={{ maxHeight: AGENT_EXPANDED_MAX_HEIGHT_PX }}
-            />
+            {canvasReferences.length > 0 || attachments.length > 0 ? (
+              <div className="flex flex-wrap gap-1 px-3 pt-2">
+                {canvasReferences.map((node) => (
+                  <span
+                    key={node.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-neutral-200/70 px-2 py-0.5 text-xs text-neutral-700 dark:bg-white/10 dark:text-neutral-200"
+                  >
+                    @{node.name}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCanvasReferences((current) =>
+                          current.filter((item) => item.id !== node.id)
+                        )
+                      }
+                      className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                      aria-label={node.name}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+                {attachments.map((item) => (
+                  <span
+                    key={item.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-neutral-200/70 px-2 py-0.5 text-xs text-neutral-700 dark:bg-white/10 dark:text-neutral-200"
+                  >
+                    {item.name}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(item.id)}
+                      className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                      aria-label={item.name}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="relative">
+              {mentionOpen && mentionChoices.length > 0 ? (
+                <div className="absolute inset-x-2 bottom-full z-20 mb-1 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                  {mentionChoices.map((node, index) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between px-3 py-1.5 text-left text-xs",
+                        index === mentionIndex
+                          ? "bg-neutral-100 dark:bg-neutral-800"
+                          : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
+                      )}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        handlePickMention(node);
+                      }}
+                    >
+                      <span className="truncate text-neutral-800 dark:text-neutral-100">
+                        {node.name}
+                      </span>
+                      <span className="ml-2 shrink-0 text-neutral-400">
+                        {node.type}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <textarea
+                ref={composerTextareaRef}
+                id="workflow-agent-composer"
+                name="agent_composer_draft"
+                rows={1}
+                value={draft}
+                onChange={(event) =>
+                  handleDraftChange(
+                    event.target.value,
+                    event.target.selectionStart
+                  )
+                }
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData.files);
+                  if (files.some((file) => file.type.startsWith("image/"))) {
+                    event.preventDefault();
+                    handleAddFiles(files);
+                  }
+                }}
+                onKeyDown={handleComposerKeyDown}
+                onFocus={() => {
+                  setOpen(true);
+                  handleUndim();
+                }}
+                placeholder={t("workflow.canvas.agentInputPlaceholder")}
+                autoComplete="off"
+                className={cn(
+                  agentTextareaClassName,
+                  "thin-scrollbar placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
+                )}
+                style={{ maxHeight: AGENT_EXPANDED_MAX_HEIGHT_PX }}
+              />
+            </div>
             <div className="flex items-center justify-between gap-2 px-2 pb-2">
               <div className="flex min-w-0 items-center gap-1 pl-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    handleAddFiles(Array.from(event.target.files ?? []));
+                    event.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-200/70 hover:text-neutral-800 dark:hover:bg-white/10 dark:hover:text-neutral-100"
+                  aria-label={t("workflow.canvas.agentAttachImage")}
+                >
+                  <Paperclip className="size-3.5" />
+                </button>
                 {contextUsage ? (
                   <AgentContextUsageRing
                     usage={contextUsage}
@@ -2048,19 +2701,6 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                {planRestricted ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-neutral-200/80 py-0.5 pl-2 pr-1 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
-                    {t("workflow.canvas.agentPlanChip")}
-                    <button
-                      type="button"
-                      onClick={handleRequestLeavePlan}
-                      aria-label={t("workflow.canvas.agentLeavePlan")}
-                      className="inline-flex size-4 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-300/80 dark:hover:bg-white/10"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ) : null}
                 {simpleAnimationActive ? (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#f3eadf] py-0.5 pl-2 pr-1 text-xs text-[#8d6e4a] dark:bg-[#3a3228] dark:text-[#d4b896]">
                     <Clapperboard className="size-3.5" />
@@ -2160,14 +2800,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
         </AlertDialog>
       </div>
 
-      {(Boolean(remotionViewportOpen && onCloseRemotionViewport) ||
-        planPanelOpen) ? (
+      {remotionViewportOpen && onCloseRemotionViewport ? (
         <div
           className={cn(
             "flex min-h-0 flex-col gap-2",
             agentWidthClassName,
             open
-              ? remotionCodeExpanded || planPanelOpen
+              ? remotionCodeExpanded
                 ? agentExpandedHeightClassName
                 : undefined
               : "hidden"
@@ -2211,41 +2850,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                 fillHeight={remotionCodeExpanded}
                 codeExpanded={remotionCodeExpanded}
                 onCodeExpandedChange={setRemotionCodeExpanded}
+                revealLine={citeRevealLine}
               />
             </Suspense>
-          ) : null}
-          {planPanelOpen ? (
-            remotionViewportOpen && remotionCodeExpanded ? (
-              <button
-                type="button"
-                className="flex shrink-0 items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs font-medium text-neutral-600 shadow-lg hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                onClick={() => setRemotionCodeExpanded(false)}
-              >
-                <List className="size-3.5" />
-                {t("workflow.canvas.agentPlanPanel")}
-              </button>
-            ) : (
-              <div className="nodrag nowheel flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                <div className="flex shrink-0 items-center gap-1 px-2 py-1.5">
-                  <List className="size-3.5 shrink-0 text-neutral-500" />
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                    {t("workflow.canvas.agentPlanPanel")}
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-                    onClick={() => setPlanPanelOpen(false)}
-                    aria-label={t("workflow.canvas.agentCollapse")}
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto thin-scrollbar px-3 py-2 text-sm whitespace-pre-wrap text-neutral-800 dark:text-neutral-100">
-                  {conversation?.planDocument?.trim() ||
-                    t("workflow.canvas.agentUntitled")}
-                </div>
-              </div>
-            )
           ) : null}
         </div>
       ) : null}
@@ -2449,9 +3056,7 @@ function ThoughtBar({
   const hasThinking = thinking.trim().length > 0;
   const [open, setOpen] = useState(live);
   useEffect(() => {
-    if (live) {
-      setOpen(true);
-    }
+    setOpen(live);
   }, [live]);
   if (!hasThinking && !live) {
     return null;
@@ -2521,19 +3126,21 @@ function AskCard({
   return (
     <div className="mt-2 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-2 dark:border-neutral-700 dark:bg-neutral-800/80">
       <p className="text-sm text-neutral-800 dark:text-neutral-100">{prompt}</p>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {options.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(option)}
-            className="rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {options.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(option)}
+              className="rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2580,28 +3187,6 @@ function ConfirmStrip({
       </div>
     </div>
   );
-}
-
-function dropLiveTail(answer: AgentChatAnswer): AgentChatAnswer {
-  const last = answer.tools[answer.tools.length - 1];
-  if (last && !last.result.trim()) {
-    return { ...answer, tools: answer.tools.slice(0, -1) };
-  }
-  return answer;
-}
-
-function fillLastToolResult(
-  answer: AgentChatAnswer,
-  result: string
-): AgentChatAnswer {
-  const last = answer.tools[answer.tools.length - 1];
-  if (!last || last.result.trim()) {
-    return answer;
-  }
-  return {
-    ...answer,
-    tools: [...answer.tools.slice(0, -1), { ...last, result }],
-  };
 }
 
 const CONTEXT_RING_SIZE = 14;

@@ -1,10 +1,17 @@
 import {
+  CANVAS_MAKE_CAPABILITY,
   capabilityForTool as capabilityForToolFromCatalog,
   isMakeTool as isMakeToolFromCatalog,
   SIMPLE_ANIMATION_CAPABILITY as CATALOG_SIMPLE_ANIMATION,
 } from "@/services/agent-capabilities";
 
-export type AgentSessionMode = "ask" | "plan" | "agent";
+export type AgentSessionMode = "ask" | "draft" | "real";
+
+export const SESSION_PHASE_LABEL: Record<AgentSessionMode, string> = {
+  ask: "问答",
+  draft: "草案",
+  real: "执行",
+};
 
 export const SIMPLE_ANIMATION_CAPABILITY = CATALOG_SIMPLE_ANIMATION;
 
@@ -23,8 +30,20 @@ export function hasCapability(
   return Boolean(consented?.includes(capabilityId));
 }
 
+export function withoutWriteConsent(
+  consented: readonly string[] | undefined
+): readonly string[] {
+  return (consented ?? []).filter(
+    (id) => id !== CATALOG_SIMPLE_ANIMATION && id !== CANVAS_MAKE_CAPABILITY
+  );
+}
+
+export function isDraftPhase(mode: AgentSessionMode): boolean {
+  return mode === "draft";
+}
+
 export function isPlanRestriction(mode: AgentSessionMode): boolean {
-  return mode === "plan";
+  return isDraftPhase(mode);
 }
 
 export function isPlanConfirmPending(params: {
@@ -33,34 +52,22 @@ export function isPlanConfirmPending(params: {
   readonly streaming: boolean;
 }): boolean {
   return (
-    params.sessionMode === "plan" && params.planPending && !params.streaming
+    params.sessionMode === "draft" && params.planPending && !params.streaming
   );
 }
 
-export function isExecuteConfirmPending(params: {
-  readonly sessionMode: AgentSessionMode;
-  readonly executePending: boolean;
-  readonly streaming: boolean;
-}): boolean {
-  return (
-    params.sessionMode === "agent" &&
-    params.executePending &&
-    !params.streaming
-  );
+export function isSessionMode(value: string): value is AgentSessionMode {
+  return value === "ask" || value === "draft" || value === "real";
 }
 
 export function modeOnOpenConversation(params: {
-  readonly sessionMode?: AgentSessionMode;
+  readonly sessionMode?: string;
   readonly activeInvocationId?: string;
 }): AgentSessionMode {
-  if (params.sessionMode === "agent" && params.activeInvocationId) {
-    return "agent";
+  if (params.sessionMode === "view") {
+    return "ask";
   }
-  if (
-    params.sessionMode === "ask" ||
-    params.sessionMode === "plan" ||
-    params.sessionMode === "agent"
-  ) {
+  if (params.sessionMode && isSessionMode(params.sessionMode)) {
     return params.sessionMode;
   }
   return "ask";
@@ -88,17 +95,17 @@ export function stateAfterRun(params: {
   readonly preservePlan?: boolean;
   readonly previousPlanDocument?: string;
 }): AgentRunSessionState {
-  if (params.runMode === "agent") {
+  if (params.runMode === "real") {
     if (params.preservePlan) {
       const planDocument = params.previousPlanDocument?.trim();
       return {
-        sessionMode: "plan",
+        sessionMode: "draft",
         planPending: Boolean(planDocument),
         planDocument: planDocument || undefined,
       };
     }
     return {
-      sessionMode: "agent",
+      sessionMode: "real",
       planPending: false,
       planDocument: undefined,
     };
@@ -112,68 +119,8 @@ export function stateAfterRun(params: {
   }
   const talk = params.talk.trim();
   return {
-    sessionMode: "plan",
+    sessionMode: "draft",
     planPending: Boolean(talk),
     planDocument: talk || params.previousPlanDocument,
   };
-}
-
-export interface AgentModeSwitch {
-  readonly from: AgentSessionMode;
-  readonly to: AgentSessionMode;
-}
-
-const ALLOWED_MODE_SWITCHES: ReadonlySet<string> = new Set([
-  "ask:agent",
-  "ask:plan",
-  "agent:plan",
-  "agent:ask",
-  "plan:agent",
-]);
-
-export function isAllowedModeSwitch(
-  from: AgentSessionMode,
-  to: AgentSessionMode
-): boolean {
-  return ALLOWED_MODE_SWITCHES.has(`${from}:${to}`);
-}
-
-export function formatSwitchModeArgs(params: {
-  readonly from: AgentSessionMode;
-  readonly to: AgentSessionMode;
-}): string {
-  return `from: ${params.from}\nto: ${params.to}`;
-}
-
-function asSessionMode(value: string): AgentSessionMode | undefined {
-  if (value === "ask" || value === "plan" || value === "agent") {
-    return value;
-  }
-  return undefined;
-}
-
-export function parseSwitchModeTarget(
-  raw: string
-): AgentModeSwitch | undefined {
-  let from: AgentSessionMode | undefined;
-  let to: AgentSessionMode | undefined;
-  for (const line of raw.trim().split(/\r?\n/)) {
-    const match = /^(from|to)\s*:\s*(\S+)/i.exec(line.trim());
-    if (!match) {
-      continue;
-    }
-    const value = asSessionMode(match[2]?.toLowerCase() ?? "");
-    if (!value) {
-      return undefined;
-    }
-    if (match[1]?.toLowerCase() === "from") {
-      from = value;
-    } else {
-      to = value;
-    }
-  }
-  if (!from || !to) {
-    return undefined;
-  }
-  return { from, to };
 }

@@ -1,5 +1,8 @@
 import { isClientCancelledTextModelError } from "@dafthunk/types";
-import type { AgentChatStreamEvent } from "@dafthunk/types";
+import type {
+  AgentChatStreamEvent,
+  AgentChatStreamToolCall,
+} from "@dafthunk/types";
 import type { AiInterfaceStreamEvent } from "@dafthunk/runtime/ai-interface/execute-stream";
 
 export type AgentChatLiveJobStatus = "running" | "done" | "stopped" | "error";
@@ -13,6 +16,7 @@ export interface AgentChatLiveFinishResult {
 
 export interface AgentChatLiveSnapshot {
   readonly text: string;
+  readonly thinking: string;
   readonly status: AgentChatLiveJobStatus;
   readonly error: string | null;
 }
@@ -33,6 +37,8 @@ interface LiveJobRecord {
   readonly abort: AbortController;
   readonly listeners: Set<(event: AgentChatStreamEvent) => void>;
   text: string;
+  thinking: string;
+  toolCalls: AgentChatStreamToolCall[];
   status: AgentChatLiveJobStatus;
   error: string | null;
   finished: Promise<void>;
@@ -51,6 +57,7 @@ function toPublicJob(record: LiveJobRecord): AgentChatLiveJob {
     finished: record.finished,
     getSnapshot: () => ({
       text: record.text,
+      thinking: record.thinking,
       status: record.status,
       error: record.error,
     }),
@@ -104,6 +111,7 @@ export function subscribeAgentChatLiveJob(
   listener({
     type: "snapshot",
     text: record.text,
+    ...(record.thinking ? { thinking: record.thinking } : {}),
     invocationId: record.invocationId,
   });
 
@@ -111,6 +119,8 @@ export function subscribeAgentChatLiveJob(
     listener({
       type: "done",
       text: record.text,
+      ...(record.thinking ? { thinking: record.thinking } : {}),
+      toolCalls: record.toolCalls.length > 0 ? record.toolCalls : undefined,
       invocationId: record.invocationId,
       aiInterfaceId: record.aiInterfaceId,
     });
@@ -120,6 +130,7 @@ export function subscribeAgentChatLiveJob(
     listener({
       type: "stopped",
       text: record.text,
+      ...(record.thinking ? { thinking: record.thinking } : {}),
       invocationId: record.invocationId,
     });
     return () => undefined;
@@ -159,6 +170,8 @@ export function startAgentChatLiveJob(params: {
     aiInterfaceId: params.aiInterfaceId,
     abort,
     text: "",
+    thinking: "",
+    toolCalls: [],
     status: "running",
     error: null,
     listeners: new Set(),
@@ -196,12 +209,23 @@ export function startAgentChatLiveJob(params: {
           break;
         }
         if (event.type === "delta") {
-          record.text += event.text;
-          broadcast(record, { type: "delta", text: event.text });
+          if (event.text) {
+            record.text += event.text;
+          }
+          if (event.thinking) {
+            record.thinking += event.thinking;
+          }
+          broadcast(record, {
+            type: "delta",
+            text: event.text,
+            ...(event.thinking ? { thinking: event.thinking } : {}),
+          });
           continue;
         }
         if (event.type === "done") {
           record.text = event.text;
+          record.thinking = event.thinking ?? record.thinking;
+          record.toolCalls = event.toolCalls ? [...event.toolCalls] : [];
           await finish(
             "done",
             {
@@ -212,6 +236,9 @@ export function startAgentChatLiveJob(params: {
             {
               type: "done",
               text: record.text,
+              ...(record.thinking ? { thinking: record.thinking } : {}),
+              toolCalls:
+                record.toolCalls.length > 0 ? record.toolCalls : undefined,
               invocationId: record.invocationId,
               aiInterfaceId: record.aiInterfaceId,
             }
@@ -249,6 +276,7 @@ export function startAgentChatLiveJob(params: {
           {
             type: "stopped",
             text: record.text,
+            ...(record.thinking ? { thinking: record.thinking } : {}),
             invocationId: record.invocationId,
           }
         );
@@ -278,6 +306,7 @@ export function startAgentChatLiveJob(params: {
           {
             type: "stopped",
             text: record.text,
+            ...(record.thinking ? { thinking: record.thinking } : {}),
             invocationId: record.invocationId,
           }
         );

@@ -40,6 +40,7 @@ export async function prepareTextModelStream(params: {
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
+  readonly tools?: unknown;
 }): Promise<
   | { readonly ok: true; readonly prepared: PreparedTextModelStream }
   | { readonly ok: false; readonly error: string; readonly invocationError?: string }
@@ -116,9 +117,12 @@ export async function prepareTextModelStream(params: {
           ? { referenceVideoUrls: params.referenceVideoUrls }
           : {}),
       },
-      bodyExtensions: params.outputMaxTokens
-        ? { max_tokens: params.outputMaxTokens }
-        : undefined,
+      bodyExtensions: {
+        ...(params.outputMaxTokens
+          ? { max_tokens: params.outputMaxTokens }
+          : {}),
+        ...(params.tools ? { tools: params.tools } : {}),
+      },
     },
   };
 }

@@ -11,11 +11,15 @@ import {
   turnHasCompletedExecute,
   groupAgentChatTurns,
   isAgentThinkingLive,
+  nextAgentEventState,
+  shouldOfferEventSplit,
+  shouldShowTalkCopy,
   resolveAgentContextModel,
   selectableTextModelsInOrder,
   shouldFetchSealedAgentChatBody,
   shouldSubmitAgentChatOnEnter,
   shouldWrapAgentWorked,
+  splitLastUserTurn,
   trimMessagesForContext,
 } from "./agent-chat-utils";
 
@@ -155,25 +159,57 @@ describe("groupAgentChatTurns", () => {
       { id: "a2", role: "assistant", content: "run" },
     ]);
     expect(turns).toHaveLength(1);
-    expect(turns[0]?.answer.talk).toBe("run");
+    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
+      "run"
+    );
     expect(turns[0]?.executed).toBe(true);
   });
 });
 
 describe("isAgentThinkingLive", () => {
-  it("is live only while streaming with no answer or tools", () => {
+  it("is live while streaming before this step talks", () => {
     expect(
-      isAgentThinkingLive({ streaming: true, hasTalk: false, hasTools: false })
+      isAgentThinkingLive({ streaming: true, hasStepTalk: false })
     ).toBe(true);
     expect(
-      isAgentThinkingLive({ streaming: true, hasTalk: true, hasTools: false })
+      isAgentThinkingLive({ streaming: true, hasStepTalk: true })
     ).toBe(false);
     expect(
-      isAgentThinkingLive({ streaming: true, hasTalk: false, hasTools: true })
+      isAgentThinkingLive({ streaming: false, hasStepTalk: false })
+    ).toBe(false);
+  });
+});
+
+describe("shouldShowTalkCopy", () => {
+  it("shows copy only on the last talk of a finished turn", () => {
+    expect(
+      shouldShowTalkCopy({
+        streaming: false,
+        isLastTurn: true,
+        isLastTalk: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldShowTalkCopy({
+        streaming: false,
+        isLastTurn: true,
+        isLastTalk: false,
+      })
     ).toBe(false);
     expect(
-      isAgentThinkingLive({ streaming: false, hasTalk: false, hasTools: false })
+      shouldShowTalkCopy({
+        streaming: true,
+        isLastTurn: true,
+        isLastTalk: true,
+      })
     ).toBe(false);
+    expect(
+      shouldShowTalkCopy({
+        streaming: true,
+        isLastTurn: false,
+        isLastTalk: true,
+      })
+    ).toBe(true);
   });
 });
 
@@ -398,5 +434,79 @@ describe("turnHasCompletedExecute", () => {
       },
     ]);
     expect(turnHasCompletedExecute(executed[0]?.executed ?? false)).toBe(true);
+  });
+});
+
+describe("shouldOfferEventSplit", () => {
+  it("only splits when a prior judgment exists and this turn ended", () => {
+    expect(shouldOfferEventSplit(undefined, true)).toBe(false);
+    expect(shouldOfferEventSplit(false, true)).toBe(true);
+    expect(shouldOfferEventSplit(true, true)).toBe(true);
+    expect(shouldOfferEventSplit(false, false)).toBe(false);
+  });
+});
+
+describe("nextAgentEventState", () => {
+  it("renames from the event title and does not split the first ended turn", () => {
+    expect(
+      nextAgentEventState({
+        title: "用户第一句",
+        eventTitle: "片头",
+        eventEnded: true,
+      })
+    ).toEqual({
+      title: "片头",
+      eventTitle: "片头",
+      eventEnded: true,
+    });
+  });
+
+  it("keeps the old title and stores a pending split when a later turn ends", () => {
+    expect(
+      nextAgentEventState({
+        title: "片头",
+        eventTitle: "片尾",
+        eventEnded: true,
+        previousEventTitle: "片头",
+        previousEventEnded: false,
+      })
+    ).toEqual({
+      title: "片头",
+      eventTitle: "片头",
+      eventEnded: false,
+      pendingEventSplit: { title: "片尾", ended: true },
+    });
+  });
+});
+
+describe("splitLastUserTurn", () => {
+  it("moves the latest user turn and keeps earlier messages", () => {
+    const messages = [
+      { id: "u1", role: "user" },
+      { id: "a1", role: "assistant" },
+      { id: "u2", role: "user" },
+      { id: "a2", role: "assistant" },
+    ];
+    expect(splitLastUserTurn(messages)).toEqual({
+      kept: [
+        { id: "u1", role: "user" },
+        { id: "a1", role: "assistant" },
+      ],
+      moved: [
+        { id: "u2", role: "user" },
+        { id: "a2", role: "assistant" },
+      ],
+    });
+  });
+
+  it("does not move a single-turn conversation", () => {
+    const messages = [
+      { id: "u1", role: "user" },
+      { id: "a1", role: "assistant" },
+    ];
+    expect(splitLastUserTurn(messages)).toEqual({
+      kept: messages,
+      moved: [],
+    });
   });
 });

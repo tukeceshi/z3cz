@@ -7,7 +7,7 @@ import {
 export const REMOTION_VIEWPORT_MEDIA_ID = "remotion-viewport";
 export const REMOTION_VIEWPORT_MIME_TYPE = "application/json";
 
-export const DEFAULT_REMOTION_SOURCE_CODE = `function Composition() {
+export const DEFAULT_REMOTION_SOURCE_CODE = `function Scene() {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -111,6 +111,19 @@ export const DEFAULT_REMOTION_SOURCE_CODE = `function Composition() {
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
+  );
+}
+
+function RemotionRoot() {
+  return (
+    <Composition
+      id="Main"
+      component={Scene}
+      durationInFrames={90}
+      fps={30}
+      width={1280}
+      height={720}
+    />
   );
 }`;
 

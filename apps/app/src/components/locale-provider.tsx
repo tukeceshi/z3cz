@@ -44,6 +44,7 @@ const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   siteName: "z3cz.com",
   siteTagline: "Build serverless workflows visually.",
   supportEmail: null,
+  icpFilingNumber: null,
   newUserTourEnabled: false,
   wsBootstrapEnabled: false,
   maintenanceEnabled: false,

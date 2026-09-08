@@ -4,7 +4,6 @@ import ChevronUp from "lucide-react/icons/chevron-up";
 import Clapperboard from "lucide-react/icons/clapperboard";
 import X from "lucide-react/icons/x";
 import {
-  type ComponentType,
   useCallback,
   useEffect,
   useMemo,
@@ -18,7 +17,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 import {
   compileRemotionSource,
+  REMOTION_DEFAULT_DURATION_FRAMES,
+  REMOTION_DEFAULT_FPS,
+  REMOTION_DEFAULT_HEIGHT,
+  REMOTION_DEFAULT_WIDTH,
   renderRemotionCompileError,
+  type RemotionCompiledComposition,
 } from "@/services/remotion-live-compile";
 import {
   DEFAULT_REMOTION_SOURCE_CODE,
@@ -30,10 +34,6 @@ import { cn } from "@/utils/utils";
 const PANEL_WIDTH_CLASS = "w-[20vw] min-w-[400px]";
 const PANEL_HEIGHT_CLASS = "h-[calc(100dvh-3.5rem-1rem)]";
 const COMPACT_PREVIEW_HEIGHT_PX = 225;
-const COMPOSITION_WIDTH = 1280;
-const COMPOSITION_HEIGHT = 720;
-const COMPOSITION_FPS = 30;
-const COMPOSITION_DURATION_FRAMES = 90;
 const SOURCE_SAVE_DELAY_MS = 400;
 const COMPILE_DELAY_MS = 400;
 
@@ -49,6 +49,7 @@ export interface RemotionViewportOverlayProps {
   readonly fillHeight?: boolean;
   readonly codeExpanded?: boolean;
   readonly onCodeExpandedChange?: (expanded: boolean) => void;
+  readonly revealLine?: number;
 }
 
 function deferPaint(): Promise<void> {
@@ -69,6 +70,7 @@ export function RemotionViewportOverlay({
   fillHeight = false,
   codeExpanded,
   onCodeExpandedChange,
+  revealLine,
 }: RemotionViewportOverlayProps) {
   const { t } = useTranslation();
   const sourceSaveTimerRef = useRef<number | null>(null);
@@ -80,9 +82,13 @@ export function RemotionViewportOverlay({
   const expanded = codeExpanded ?? internalCodeExpanded;
   const setExpanded = onCodeExpandedChange ?? setInternalCodeExpanded;
   const [compileError, setCompileError] = useState<string | null>(null);
-  const [compiledComponent, setCompiledComponent] = useState<ComponentType>(
-    () => () => null
-  );
+  const [compiled, setCompiled] = useState<RemotionCompiledComposition>({
+    component: () => null,
+    durationInFrames: REMOTION_DEFAULT_DURATION_FRAMES,
+    fps: REMOTION_DEFAULT_FPS,
+    width: REMOTION_DEFAULT_WIDTH,
+    height: REMOTION_DEFAULT_HEIGHT,
+  });
   const [playerKey, setPlayerKey] = useState(0);
 
   const canPersist = Boolean(organizationId && workflowId);
@@ -128,12 +134,20 @@ export function RemotionViewportOverlay({
       const result = compileRemotionSource(nextSource);
       if (result.error) {
         setCompileError(result.error);
-        setCompiledComponent(
-          () => () => renderRemotionCompileError(result.error ?? "")
-        );
+        const error = result.error;
+        setCompiled((current) => ({
+          ...current,
+          component: () => renderRemotionCompileError(error),
+        }));
       } else {
         setCompileError(null);
-        setCompiledComponent(() => result.component);
+        setCompiled({
+          component: result.component,
+          durationInFrames: result.durationInFrames,
+          fps: result.fps,
+          width: result.width,
+          height: result.height,
+        });
         setPlayerKey((key) => key + 1);
       }
       initialLoadDoneRef.current = true;
@@ -182,7 +196,13 @@ export function RemotionViewportOverlay({
         return;
       }
       setCompileError(null);
-      setCompiledComponent(() => result.component);
+      setCompiled({
+        component: result.component,
+        durationInFrames: result.durationInFrames,
+        fps: result.fps,
+        width: result.width,
+        height: result.height,
+      });
       setPlayerKey((key) => key + 1);
     }, COMPILE_DELAY_MS);
 
@@ -243,11 +263,11 @@ export function RemotionViewportOverlay({
         <>
           <Player
             key={playerKey}
-            component={compiledComponent}
-            compositionWidth={COMPOSITION_WIDTH}
-            compositionHeight={COMPOSITION_HEIGHT}
-            durationInFrames={COMPOSITION_DURATION_FRAMES}
-            fps={COMPOSITION_FPS}
+            component={compiled.component}
+            compositionWidth={compiled.width}
+            compositionHeight={compiled.height}
+            durationInFrames={compiled.durationInFrames}
+            fps={compiled.fps}
             inputProps={{}}
             style={{ width: "100%", height: "100%" }}
             controls
@@ -311,6 +331,7 @@ export function RemotionViewportOverlay({
               language="javascript"
               scrollerClassName="thin-scrollbar"
               className="min-h-0 flex-1"
+              revealLine={revealLine}
             />
           </div>
         ) : null}

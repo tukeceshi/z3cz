@@ -8,6 +8,7 @@ export interface PublicSiteSettings {
   siteName: string;
   siteTagline: string;
   supportEmail: string | null;
+  icpFilingNumber: string | null;
   newUserTourEnabled: boolean;
   /** Experimental: load app JS over WebSocket instead of HTTP script tags. */
   wsBootstrapEnabled: boolean;
@@ -25,6 +26,7 @@ export interface UpdateSiteSettingsRequest {
   siteName?: string;
   siteTagline?: string;
   supportEmail?: string | null;
+  icpFilingNumber?: string | null;
   newUserTourEnabled?: boolean;
   wsBootstrapEnabled?: boolean;
   maintenanceEnabled?: boolean;

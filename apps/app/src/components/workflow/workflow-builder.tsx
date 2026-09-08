@@ -806,6 +806,10 @@ export function WorkflowBuilder({
                   onMoveEnd={handleViewportMoveEnd}
                   onInit={handleReactFlowInit}
                   onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
+                  onCreateGenerativeNode={
+                    readOnly ? undefined : handleAddGenerativeNode
+                  }
+                  onConnectWorkflow={readOnly ? undefined : onConnect}
                   onUndo={readOnly ? undefined : undo}
                   onRedo={readOnly ? undefined : redo}
                   canUndo={canUndo}
