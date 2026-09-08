@@ -10,18 +10,19 @@ import type {
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
 import {
-  capabilityLabel,
   SIMPLE_ANIMATION_CAPABILITY,
+  SIMPLE_ANIMATION_TOOL,
 } from "./agent-capabilities";
 import {
   AGENT_CANVAS_EXCERPT_MAX_CHARS,
   CANVAS_GET_STATE_TOOL,
   CANVAS_RESOLVE_RESOURCE_TOOL,
   compactCanvasAgentState,
+  EMPTY_SIMPLE_ANIMATION_SOURCE,
   executeCanvasAgentTool,
   formatCanvasInventory,
   parseAgentToolCall,
-  REMOTION_OPEN_TOOL,
+  toolCallFromFunctionArgs,
   truncateAgentCanvasExcerpt,
 } from "./agent-canvas-state";
 
@@ -52,7 +53,8 @@ function textNode(
 function imageNode(
   id: string,
   name: string,
-  resourceId: string
+  resourceId: string,
+  prompt = ""
 ): ReactFlowNode<WorkflowNodeType> {
   return {
     id,
@@ -62,10 +64,18 @@ function imageNode(
       nodeType: "ai-image",
       inputs: [
         {
+          id: "prompt",
+          name: "prompt",
+          type: "string",
+          value: prompt,
+        },
+        {
           id: "images_result",
           name: "images_result",
           type: "any",
-          value: [{ resourceId, mimeType: "image/png" }],
+          value: resourceId
+            ? [{ resourceId, mimeType: "image/png" }]
+            : [],
         },
       ],
       outputs: [{ id: "images", name: "images", type: "image" }],
@@ -105,12 +115,44 @@ describe("compactCanvasAgentState", () => {
       id: "n1",
       type: "ai-image",
       name: "图1",
+      x: 0,
+      y: 0,
       resourceId: "res-1",
     });
     expect(JSON.stringify(summary)).not.toContain("blob:");
     expect(JSON.stringify(summary)).not.toContain("http");
     expect(summary.nodes[1]?.excerpt).toBe("一段说明");
+    expect(summary.nodes[0]?.empty).toBeUndefined();
+    expect(summary.nodes[1]?.empty).toBeUndefined();
     expect(summary.edges).toEqual([{ from: "n1", to: "n2" }]);
+  });
+
+  it("marks nodes without prompt or media as empty and keeps prompt text", () => {
+    const summary = compactCanvasAgentState(
+      [
+        imageNode("empty-1", "视频 8", ""),
+        imageNode("filled-1", "图1", "", "一只猫"),
+      ],
+      []
+    );
+    expect(summary.nodes[0]).toEqual({
+      id: "empty-1",
+      type: "ai-image",
+      name: "视频 8",
+      x: 0,
+      y: 0,
+      empty: true,
+    });
+    expect(summary.nodes[1]).toEqual({
+      id: "filled-1",
+      type: "ai-image",
+      name: "图1",
+      x: 0,
+      y: 0,
+      prompt: "一只猫",
+    });
+    expect(formatCanvasInventory(summary)).toContain('"empty":true');
+    expect(formatCanvasInventory(summary)).toContain("一只猫");
   });
 });
 
@@ -154,13 +196,25 @@ describe("parseAgentToolCall", () => {
   });
 
   it("keeps remotion source indentation after the tool name", () => {
-    const source = `function Composition() {\n  return (\n    <AbsoluteFill />\n  );\n}`;
+    const source = `function Scene() {
+  return <AbsoluteFill />;
+}
+function RemotionRoot() {
+  return (
+    <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />
+  );
+}`;
     expect(parseAgentToolCall(`remotion_write\n${source}`)).toEqual({
       name: "remotion_write",
       resourceId: "",
       nodeId: "",
       payload: source,
     });
+    expect(
+      parseAgentToolCall(
+        `${SIMPLE_ANIMATION_TOOL}\n${JSON.stringify({ action: "write", source })}`
+      ).name
+    ).toBe(SIMPLE_ANIMATION_TOOL);
   });
 });
 
@@ -248,31 +302,34 @@ describe("executeCanvasAgentTool", () => {
     });
   });
 
-  it("rejects writes while still in plan mode", async () => {
-    const writeSource = vi.fn();
+  it("writes live remotion source in draft after open, not a draft copy", async () => {
+    const writeSource = vi.fn(async () => ({ ok: true }));
     const text = await executeCanvasAgentTool({
       call: {
-        name: "remotion_write",
+        name: SIMPLE_ANIMATION_TOOL,
         resourceId: "",
         nodeId: "",
-        payload: "function Composition() { return null; }",
+        payload: JSON.stringify({
+          action: "write",
+          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+        }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "plan",
-        consentedCapabilities: ["simple-animation"],
+        sessionMode: "draft",
+        consentedCapabilities: [SIMPLE_ANIMATION_CAPABILITY],
         requestConsent: async () => ({ authorized: false, open: false }),
         revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource,
       },
     });
-    expect(JSON.parse(text).error).toContain("模式：方案");
-    expect(writeSource).not.toHaveBeenCalled();
+    expect(JSON.parse(text)).toEqual({ ok: true });
+    expect(writeSource).toHaveBeenCalled();
   });
 
-  it("rejects canvas reads in ask mode", async () => {
-    const text = await executeCanvasAgentTool({
+  it("allows canvas reads in ask and still allows animation", async () => {
+    const read = await executeCanvasAgentTool({
       call: {
         name: "canvas_get_state",
         resourceId: "",
@@ -289,45 +346,86 @@ describe("executeCanvasAgentTool", () => {
         writeSource: async () => ({ ok: false }),
       },
     });
-    expect(JSON.parse(text).error).toContain("模式：问答");
-  });
+    expect(JSON.parse(read)).toEqual({ nodes: [], edges: [] });
 
-  it("rejects opening simple animation while still in plan mode", async () => {
-    const requestConsent = vi.fn(async () => ({ authorized: true, open: true }));
-    const text = await executeCanvasAgentTool({
+    const write = await executeCanvasAgentTool({
       call: {
-        name: REMOTION_OPEN_TOOL,
+        name: SIMPLE_ANIMATION_TOOL,
         resourceId: "",
         nodeId: "",
-        payload: "",
+        payload: JSON.stringify({
+          action: "write",
+          source: "export const A = 1;",
+        }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "plan",
+        sessionMode: "ask",
         consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+      },
+    });
+    expect(JSON.parse(write)).toEqual({ pendingConfirm: true });
+  });
+
+  it("keeps simple_animation function args as json", () => {
+    const args = JSON.stringify({
+      action: "write",
+      source: "export const A = 1;",
+    });
+    expect(toolCallFromFunctionArgs(SIMPLE_ANIMATION_TOOL, args)).toEqual({
+      name: SIMPLE_ANIMATION_TOOL,
+      resourceId: "",
+      nodeId: "",
+      payload: args,
+    });
+  });
+
+  it("opens simple animation viewport without granting write", async () => {
+    const requestConsent = vi.fn(async () => ({ authorized: true, open: true }));
+    const showViewport = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({ action: "open" }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "draft",
+        consentedCapabilities: [],
+        showViewport,
         requestConsent,
         revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource: async () => ({ ok: true }),
       },
     });
-    expect(JSON.parse(text).error).toContain("模式：方案");
+    expect(showViewport).toHaveBeenCalled();
     expect(requestConsent).not.toHaveBeenCalled();
+    expect(JSON.parse(text)).toEqual({ ok: true, open: true });
   });
 
   it("writes while simple animation is on even if the window is hidden", async () => {
     const writeSource = vi.fn(async () => ({ ok: true }));
     const text = await executeCanvasAgentTool({
       call: {
-        name: "remotion_write",
+        name: SIMPLE_ANIMATION_TOOL,
         resourceId: "",
         nodeId: "",
-        payload: "function Composition() { return null; }",
+        payload: JSON.stringify({
+          action: "write",
+          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+        }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "agent",
-        consentedCapabilities: ["simple-animation"],
+        sessionMode: "real",
+        consentedCapabilities: [SIMPLE_ANIMATION_CAPABILITY],
         requestConsent: async () => ({ authorized: true, open: true }),
         revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
@@ -338,18 +436,70 @@ describe("executeCanvasAgentTool", () => {
     expect(writeSource).toHaveBeenCalled();
   });
 
-  it("rejects write after simple animation is turned off", async () => {
-    const writeSource = vi.fn();
+  it("clears to a blank composition without returning old source", async () => {
+    const writeSource = vi.fn(async () => ({ ok: true }));
+    const readSource = vi.fn(async () => EMPTY_SIMPLE_ANIMATION_SOURCE);
     const text = await executeCanvasAgentTool({
       call: {
-        name: "remotion_write",
+        name: SIMPLE_ANIMATION_TOOL,
         resourceId: "",
         nodeId: "",
-        payload: "function Composition() { return null; }",
+        payload: JSON.stringify({ action: "clear" }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "agent",
+        sessionMode: "ask",
+        consentedCapabilities: [SIMPLE_ANIMATION_CAPABILITY],
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource,
+        writeSource,
+      },
+    });
+    expect(JSON.parse(text)).toEqual({ ok: true, cleared: true });
+    expect(JSON.parse(text).sourceCode).toBeUndefined();
+    expect(writeSource).toHaveBeenCalledWith(EMPTY_SIMPLE_ANIMATION_SOURCE);
+    expect(readSource).not.toHaveBeenCalled();
+  });
+
+  it("pauses clear until the user confirms", async () => {
+    const writeSource = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({ action: "clear" }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "ask",
+        consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "old",
+        writeSource,
+      },
+    });
+    expect(JSON.parse(text)).toEqual({ pendingConfirm: true });
+    expect(writeSource).not.toHaveBeenCalled();
+  });
+
+  it("pauses write until the user confirms", async () => {
+    const writeSource = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          action: "write",
+          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
         consentedCapabilities: [],
         requestConsent: async () => ({ authorized: true, open: true }),
         revokeConsent: async () => ({ authorized: true, open: false }),
@@ -357,24 +507,22 @@ describe("executeCanvasAgentTool", () => {
         writeSource,
       },
     });
-    expect(JSON.parse(text).error).toContain(
-      `未进入${capabilityLabel(SIMPLE_ANIMATION_CAPABILITY)}`
-    );
+    expect(JSON.parse(text)).toEqual({ pendingConfirm: true });
     expect(writeSource).not.toHaveBeenCalled();
   });
 
-  it("rejects disabled make tools even while executing", async () => {
+  it("pauses canvas writes until the user confirms", async () => {
     const writeText = vi.fn();
     const text = await executeCanvasAgentTool({
       call: {
         name: "canvas_write_text",
         resourceId: "",
         nodeId: "n1",
-        payload: "nodeId: n1\nhello",
+        payload: JSON.stringify({ nodeId: "n1", text: "hello" }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "agent",
+        sessionMode: "real",
         consentedCapabilities: [],
         requestConsent: async () => ({ authorized: false, open: false }),
         revokeConsent: async () => ({ authorized: true, open: false }),
@@ -383,59 +531,146 @@ describe("executeCanvasAgentTool", () => {
         writeText,
       },
     });
-    expect(JSON.parse(text).error).toContain("该工具未启用");
+    expect(JSON.parse(text)).toEqual({ pendingConfirm: true });
     expect(writeText).not.toHaveBeenCalled();
   });
 
-  it("opens simple animation without a second allow step", async () => {
-    const requestConsent = vi.fn(async () => ({
-      authorized: true as const,
-      open: true as const,
+  it("creates a generation flow after canvas write is confirmed", async () => {
+    const createGenerationFlow = vi.fn(async () => ({
+      ok: true,
+      nodeId: "n-new",
     }));
     const text = await executeCanvasAgentTool({
       call: {
-        name: "remotion_open",
+        name: "canvas_create_generation_flow",
         resourceId: "",
         nodeId: "",
-        payload: "",
+        payload: JSON.stringify({
+          mode: "image",
+          prompt: "一只猫",
+          autoRun: true,
+        }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "agent",
-        consentedCapabilities: [],
-        requestConsent,
+        sessionMode: "real",
+        consentedCapabilities: ["canvas-make"],
+        requestConsent: async () => ({ authorized: false, open: false }),
         revokeConsent: async () => ({ authorized: true, open: false }),
         readSource: async () => "",
         writeSource: async () => ({ ok: true }),
+        createGenerationFlow,
       },
     });
-    expect(requestConsent).toHaveBeenCalledWith("simple-animation");
-    expect(JSON.parse(text)).toEqual({ authorized: true, open: true });
+    expect(JSON.parse(text)).toEqual({ ok: true, nodeId: "n-new" });
+    expect(createGenerationFlow).toHaveBeenCalledWith({
+      mode: "image",
+      prompt: "一只猫",
+      referenceNodeIds: [],
+      autoRun: true,
+    });
   });
 
-  it("lets the agent exit simple animation without hiding the window", async () => {
+  it("does not grant write when opening the viewport", async () => {
+    const writeSource = vi.fn();
+    const showViewport = vi.fn();
+    const open = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({ action: "open" }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: [],
+        showViewport,
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource,
+      },
+    });
+    expect(JSON.parse(open)).toEqual({ ok: true, open: true });
+    expect(showViewport).toHaveBeenCalled();
+
+    const write = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          action: "write",
+          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: [],
+        showViewport,
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource,
+      },
+    });
+    expect(JSON.parse(write)).toEqual({ pendingConfirm: true });
+    expect(writeSource).not.toHaveBeenCalled();
+  });
+
+  it("closes the simple animation window without revoking write", async () => {
     const revokeConsent = vi.fn(async () => ({
       authorized: true as const,
       open: false as const,
     }));
-    const text = await executeCanvasAgentTool({
+    const hideViewport = vi.fn();
+    const writeSource = vi.fn(async () => ({ ok: true }));
+    const close = await executeCanvasAgentTool({
       call: {
-        name: "remotion_close",
+        name: SIMPLE_ANIMATION_TOOL,
         resourceId: "",
         nodeId: "",
-        payload: "",
+        payload: JSON.stringify({ action: "close" }),
       },
       snapshot: { nodes: [], edges: [] },
       capabilities: {
-        sessionMode: "agent",
-        consentedCapabilities: ["simple-animation"],
+        sessionMode: "real",
+        consentedCapabilities: [SIMPLE_ANIMATION_CAPABILITY],
+        hideViewport,
         requestConsent: async () => ({ authorized: true, open: true }),
         revokeConsent,
         readSource: async () => "",
-        writeSource: async () => ({ ok: true }),
+        writeSource,
       },
     });
-    expect(revokeConsent).toHaveBeenCalledWith("simple-animation");
-    expect(JSON.parse(text)).toEqual({ authorized: true, open: false });
+    expect(revokeConsent).not.toHaveBeenCalled();
+    expect(hideViewport).toHaveBeenCalled();
+    expect(JSON.parse(close)).toEqual({ ok: true, open: false });
+
+    const write = await executeCanvasAgentTool({
+      call: {
+        name: SIMPLE_ANIMATION_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          action: "write",
+          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: [SIMPLE_ANIMATION_CAPABILITY],
+        hideViewport,
+        requestConsent: async () => ({ authorized: true, open: true }),
+        revokeConsent,
+        readSource: async () => "",
+        writeSource,
+      },
+    });
+    expect(JSON.parse(write)).toEqual({ ok: true });
+    expect(writeSource).toHaveBeenCalled();
   });
 });

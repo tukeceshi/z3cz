@@ -2664,14 +2664,34 @@ function replayFinishedAgentChatSse(invocation: AiModelInvocation): Response {
 }
 
 const agentChatMessageSchema = z.object({
-  role: z.enum(["user", "assistant", "system"]),
-  content: z.string().min(1),
+  role: z.enum(["user", "assistant", "system", "tool"]),
+  content: z.string(),
+  toolCallId: z.string().optional(),
+  toolCalls: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        arguments: z.string(),
+      })
+    )
+    .optional(),
+});
+
+const agentChatToolSchema = z.object({
+  type: z.literal("function"),
+  function: z.object({
+    name: z.string(),
+    description: z.string(),
+    parameters: z.unknown(),
+  }),
 });
 
 const agentChatStreamSchema = z.object({
   modelCanonicalId: z.string().min(1),
   aiInterfaceId: z.string().min(1),
   messages: z.array(agentChatMessageSchema).min(1),
+  tools: z.array(agentChatToolSchema).optional(),
   workflowId: z.string().optional(),
 });
 
@@ -2722,6 +2742,7 @@ platformAiRoutes.post(
       canonicalId: body.modelCanonicalId,
       interfaceId: body.aiInterfaceId,
       messages: body.messages,
+      tools: body.tools,
       outputMaxTokens: modelOption.parameterRules.outputMaxTokens,
     });
 

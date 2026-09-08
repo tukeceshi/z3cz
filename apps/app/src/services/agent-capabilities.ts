@@ -1,8 +1,16 @@
 import type { AgentSessionMode } from "@/services/agent-session-mode";
 
 export const SIMPLE_ANIMATION_CAPABILITY = "simple-animation" as const;
+export const CANVAS_MAKE_CAPABILITY = "canvas-make" as const;
+export const SIMPLE_ANIMATION_TOOL = "simple_animation" as const;
 export const ASK_QUESTION_TOOL = "ask_question" as const;
-export const SWITCH_MODE_TOOL = "switch_mode" as const;
+export const SCHEDULE_ROLE_TOOL = "schedule_role" as const;
+export const ENTER_DRAFT_TOOL = "enter_draft" as const;
+
+export type ScheduledAgentRole = "canvas" | "animation";
+export const CANVAS_CREATE_GENERATION_FLOW_TOOL =
+  "canvas_create_generation_flow" as const;
+export const CANVAS_CONNECT_NODES_TOOL = "canvas_connect_nodes" as const;
 
 export type AgentToolKind =
   | "read"
@@ -10,14 +18,24 @@ export type AgentToolKind =
   | "consent-open"
   | "consent-close"
   | "ask"
-  | "mode";
+  | "enter"
+  | "use"
+  | "schedule";
+
+export interface AgentToolParameters {
+  readonly type: "object";
+  readonly properties: Readonly<Record<string, unknown>>;
+  readonly required?: readonly string[];
+  readonly additionalProperties: false;
+}
 
 export interface AgentCapabilityTool {
   readonly name: string;
   readonly kind: AgentToolKind;
   readonly capabilityId: string;
   readonly enabled: boolean;
-  readonly hint: string;
+  readonly description: string;
+  readonly parameters: AgentToolParameters;
 }
 
 export interface AgentCapability {
@@ -25,13 +43,27 @@ export interface AgentCapability {
   readonly label: string;
 }
 
+export interface AgentRequestTool {
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly description: string;
+    readonly parameters: AgentToolParameters;
+  };
+}
+
+const EMPTY_OBJECT: AgentToolParameters = {
+  type: "object",
+  properties: {},
+  additionalProperties: false,
+};
+
 const CAPABILITIES: readonly AgentCapability[] = [
   { id: "canvas", label: "画布" },
   { id: SIMPLE_ANIMATION_CAPABILITY, label: "简易动画" },
-  { id: "canvas-edit", label: "画布文字" },
-  { id: "canvas-run", label: "运行节点" },
-  { id: "canvas-media", label: "挂媒体" },
+  { id: CANVAS_MAKE_CAPABILITY, label: "画布" },
   { id: "ask", label: "提问" },
+  { id: "schedule", label: "调度" },
   { id: "mode", label: "模式" },
 ];
 
@@ -41,77 +73,204 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     kind: "read",
     capabilityId: "canvas",
     enabled: true,
-    hint: "当前画布清单，不含地址",
+    description:
+      "只在清单明显过期时再取。和清单同一份：名字、提示词摘要、有没有素材、是不是空的。再取不会多出内容，不含资源地址。不够就直说，不要反复取。",
+    parameters: EMPTY_OBJECT,
   },
   {
     name: "canvas_resolve_resource",
     kind: "read",
     capabilityId: "canvas",
     enabled: true,
-    hint: "下一行 resourceId: 某个资源，只用这个资源时才调用",
+    description: "只有真正要用这个资源的地址时才调用。参数 resourceId。",
+    parameters: {
+      type: "object",
+      properties: {
+        resourceId: { type: "string", description: "资源 id" },
+      },
+      required: ["resourceId"],
+      additionalProperties: false,
+    },
   },
   {
-    name: "remotion_get",
-    kind: "read",
+    name: SIMPLE_ANIMATION_TOOL,
+    kind: "use",
     capabilityId: SIMPLE_ANIMATION_CAPABILITY,
     enabled: true,
-    hint: "读当前源码",
+    description:
+      "简易动画。get 读源码，立刻做。open 只开窗。write 整段替换（参数 source）。clear 清空成空白画面，重做时先用、不要读旧源码。close 只关窗，不撤执行。",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["get", "write", "open", "close", "clear"],
+          description: "get 读，open 开窗，write 写，clear 清空，close 关窗",
+        },
+        source: { type: "string", description: "write 时的完整源码" },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
   },
   {
-    name: "remotion_open",
-    kind: "consent-open",
-    capabilityId: SIMPLE_ANIMATION_CAPABILITY,
-    enabled: true,
-    hint: "进入后才能写",
-  },
-  {
-    name: "remotion_close",
-    kind: "consent-close",
-    capabilityId: SIMPLE_ANIMATION_CAPABILITY,
-    enabled: true,
-    hint: "退出后不再写",
-  },
-  {
-    name: "remotion_write",
+    name: CANVAS_CREATE_GENERATION_FLOW_TOOL,
     kind: "make",
-    capabilityId: SIMPLE_ANIMATION_CAPABILITY,
+    capabilityId: CANVAS_MAKE_CAPABILITY,
     enabled: true,
-    hint: "下一行起整段替换源码",
+    description:
+      "在画布上搭一条生成：参数 mode 为 text/image/video/audio，prompt 为提示词。可选 referenceNodeIds 连已有节点作参考，autoRun 默认 true 会立刻运行。",
+    parameters: {
+      type: "object",
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["text", "image", "video", "audio"],
+          description: "生成类型",
+        },
+        prompt: { type: "string", description: "提示词" },
+        referenceNodeIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "参考节点 id",
+        },
+        autoRun: { type: "boolean", description: "是否立刻运行，默认 true" },
+        x: { type: "number" },
+        y: { type: "number" },
+      },
+      required: ["mode", "prompt"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: CANVAS_CONNECT_NODES_TOOL,
+    kind: "make",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description:
+      "把已有节点连成参考。参数 connections 为 {fromNodeId,toNodeId}。",
+    parameters: {
+      type: "object",
+      properties: {
+        connections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              fromNodeId: { type: "string" },
+              toNodeId: { type: "string" },
+            },
+            required: ["fromNodeId", "toNodeId"],
+          },
+        },
+      },
+      required: ["connections"],
+      additionalProperties: false,
+    },
   },
   {
     name: "canvas_write_text",
     kind: "make",
-    capabilityId: "canvas-edit",
-    enabled: false,
-    hint: "第一行 nodeId: 节点，其后为文本",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description: "写入节点文字或提示词。参数 nodeId、text。",
+    parameters: {
+      type: "object",
+      properties: {
+        nodeId: { type: "string" },
+        text: { type: "string" },
+      },
+      required: ["nodeId", "text"],
+      additionalProperties: false,
+    },
   },
   {
     name: "canvas_run_node",
     kind: "make",
-    capabilityId: "canvas-run",
-    enabled: false,
-    hint: "nodeId: 运行该节点已有生成",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description: "运行该节点已有生成。参数 nodeId。",
+    parameters: {
+      type: "object",
+      properties: {
+        nodeId: { type: "string" },
+      },
+      required: ["nodeId"],
+      additionalProperties: false,
+    },
   },
   {
     name: "canvas_stage_media",
     kind: "make",
-    capabilityId: "canvas-media",
-    enabled: false,
-    hint: "nodeId: 与 url: / mimeType: 挂媒体",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description:
+      "把图片或媒体挂到节点上。参数 nodeId、url，可选 mimeType。本轮上传的图用附件地址。",
+    parameters: {
+      type: "object",
+      properties: {
+        nodeId: { type: "string" },
+        url: { type: "string" },
+        mimeType: { type: "string" },
+      },
+      required: ["nodeId", "url"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: SCHEDULE_ROLE_TOOL,
+    kind: "schedule",
+    capabilityId: "schedule",
+    enabled: true,
+    description:
+      "要改画布或做简易视频时先调度。参数 role 为 canvas 或 animation。只问不调度。",
+    parameters: {
+      type: "object",
+      properties: {
+        role: {
+          type: "string",
+          enum: ["canvas", "animation"],
+          description: "canvas 画布，animation 简易视频",
+        },
+      },
+      required: ["role"],
+      additionalProperties: false,
+    },
   },
   {
     name: ASK_QUESTION_TOOL,
     kind: "ask",
     capabilityId: "ask",
     enabled: true,
-    hint: '下一行短 JSON：prompt 与 options（id/label），一次一事',
+    description:
+      "缺关键选择、无法继续时才问。一次一事。参数 prompt，options 为 {id,label} 短标签。能直接答就别问。",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: { type: "string" },
+        options: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+            },
+            required: ["id", "label"],
+          },
+        },
+      },
+      required: ["prompt", "options"],
+      additionalProperties: false,
+    },
   },
   {
-    name: SWITCH_MODE_TOOL,
-    kind: "mode",
+    name: ENTER_DRAFT_TOOL,
+    kind: "enter",
     capabilityId: "mode",
-    enabled: true,
-    hint: "其后两行 from: 与 to:，值为 ask、plan 或 agent",
+    enabled: false,
+    description: "进入草案。当前未启用。",
+    parameters: EMPTY_OBJECT,
   },
 ];
 
@@ -162,6 +321,7 @@ export function isCanvasReadWriteTool(name: string): boolean {
   return (
     kind === "read" ||
     kind === "make" ||
+    kind === "use" ||
     kind === "consent-open" ||
     kind === "consent-close"
   );
@@ -172,65 +332,149 @@ export function isToolAllowed(name: string, mode: AgentSessionMode): boolean {
   if (!tool || !tool.enabled) {
     return false;
   }
-  if (tool.kind === "ask" || tool.kind === "mode") {
+  if (tool.kind === "enter") {
+    return false;
+  }
+  if (
+    tool.kind === "ask" ||
+    tool.kind === "use" ||
+    tool.kind === "make" ||
+    tool.kind === "schedule"
+  ) {
     return true;
   }
   if (mode === "ask") {
-    return false;
+    return tool.kind === "read";
   }
-  if (mode === "plan" && (tool.kind === "make" || tool.kind === "consent-open")) {
-    return false;
+  if (mode === "draft") {
+    return tool.kind === "read" || tool.kind === "make";
   }
   return true;
 }
 
+export const AGENT_ROLE_BASE = "base" as const;
+export const AGENT_ROLE_CANVAS = "canvas" as const;
+export const AGENT_ROLE_ANIMATION = "animation" as const;
+
+export type AgentRoleId =
+  | typeof AGENT_ROLE_BASE
+  | typeof AGENT_ROLE_CANVAS
+  | typeof AGENT_ROLE_ANIMATION;
+
+export interface AgentRolePack {
+  readonly id: AgentRoleId;
+  readonly identity: string;
+  readonly toolNames: readonly string[];
+}
+
+export const AGENT_BASE_IDENTITY =
+  "按 <user_query> 做事。做事用请求里给的工具，不要在正文里写调用。只是问就直接答。要改画布或做简易视频，先调度对应角色。要做就先说清楚做什么，再调工具，不要让用户点执行。第一次写，界面拿这段话出确认。";
+
+export const AGENT_CANVAS_IDENTITY =
+  "你是画布助手。清单已有节点和是否为空，不要反复取画布。";
+
+export const AGENT_ANIMATION_IDENTITY = "你负责简易动画。";
+
+const BASE_ROLE: AgentRolePack = {
+  id: AGENT_ROLE_BASE,
+  identity: AGENT_BASE_IDENTITY,
+  toolNames: [SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL],
+};
+
+const CANVAS_ROLE: AgentRolePack = {
+  id: AGENT_ROLE_CANVAS,
+  identity: AGENT_CANVAS_IDENTITY,
+  toolNames: [
+    "canvas_get_state",
+    "canvas_resolve_resource",
+    CANVAS_CREATE_GENERATION_FLOW_TOOL,
+    CANVAS_CONNECT_NODES_TOOL,
+    "canvas_write_text",
+    "canvas_run_node",
+    "canvas_stage_media",
+  ],
+};
+
+const ANIMATION_ROLE: AgentRolePack = {
+  id: AGENT_ROLE_ANIMATION,
+  identity: AGENT_ANIMATION_IDENTITY,
+  toolNames: [SIMPLE_ANIMATION_TOOL],
+};
+
+export interface AgentRoleOptions {
+  readonly canvas?: boolean;
+  readonly animation?: boolean;
+}
+
+export function parseScheduledRole(value: string): ScheduledAgentRole | undefined {
+  const text = value.trim();
+  let raw = text;
+  try {
+    const parsed = JSON.parse(text) as { role?: unknown };
+    if (typeof parsed.role === "string") {
+      raw = parsed.role;
+    }
+  } catch {
+    // keep raw text
+  }
+  const key = raw.trim().toLowerCase();
+  if (key === "canvas" || key === "画布") {
+    return "canvas";
+  }
+  if (key === "animation" || key === "简易视频" || key === "简易动画") {
+    return "animation";
+  }
+  return undefined;
+}
+
+export function activeAgentRoles(
+  options: AgentRoleOptions = {}
+): readonly AgentRolePack[] {
+  const roles: AgentRolePack[] = [BASE_ROLE];
+  if (options.canvas) {
+    roles.push(CANVAS_ROLE);
+  }
+  if (options.animation) {
+    roles.push(ANIMATION_ROLE);
+  }
+  return roles;
+}
+
+export function agentRoleIdentities(
+  options: AgentRoleOptions = {}
+): readonly string[] {
+  return activeAgentRoles(options).map((role) => role.identity);
+}
+
+function toolNamesForRoles(options: AgentRoleOptions): ReadonlySet<string> {
+  return new Set(
+    activeAgentRoles(options).flatMap((role) => role.toolNames)
+  );
+}
+
 export function toolsForInform(
-  mode: AgentSessionMode
+  mode: AgentSessionMode,
+  options: AgentRoleOptions = {}
 ): readonly AgentCapabilityTool[] {
+  const allowed = toolNamesForRoles(options);
   return TOOLS.filter((tool) => {
-    if (!tool.enabled) {
+    if (!tool.enabled || !allowed.has(tool.name)) {
       return false;
     }
     return isToolAllowed(tool.name, mode);
   });
 }
 
-export function formatInformToolList(mode: AgentSessionMode): string {
-  return toolsForInform(mode)
-    .map((tool) => `${tool.name}（${tool.hint}）`)
-    .join("；");
-}
-
-export function describeCapabilityBoundary(mode: AgentSessionMode): string {
-  const labels = enabledMakeCapabilityLabels();
-  const makeList = labels.length > 0 ? labels.join("、") : "无";
-  const askRules = [
-    "不虚构、不猜测。看不懂输入框刚发来的话（不含工具结果、不含画布清单）才能 ask_question，选项必须是短标签、一次一事。",
-    "不要问是否执行。",
-  ];
-  if (mode === "ask") {
-    return [
-      "你在工作流画布上协助用户。<<<THINK>>> 从全局梳理后直接回答。",
-      "本模式不能读写画布。只能思考和回答。",
-      ...askRules,
-    ].join("\n");
-  }
-  if (mode === "plan") {
-    return [
-      "你在工作流画布上协助用户。<<<THINK>>> 从全局梳理：用户要什么、画布上有什么、节点与资源如何配合、各段怎么衔接。",
-      `当前可执行的制作能力：${makeList}。本模式只读，把可做的部分和其他待办分开写进方案，不要声称已改。`,
-      ...askRules,
-      "路线多样或有更优做法时，先在 THINK 写清这次提问是否必要，答必要才 ask_question。",
-    ].join("\n");
-  }
-  return [
-    "你在工作流画布上协助用户。<<<THINK>>> 从全局梳理：用户要什么、画布上有什么、节点与资源如何配合、各段怎么衔接。",
-    `当前可执行的制作能力：${makeList}。按已确认方案去做，不要声称做了没做的事。`,
-    ...askRules,
-    "执行和当前方案严重不符时，先在 THINK 写清这次提问是否必要，答必要才 ask_question。轻微偏差自己收。",
-  ].join("\n");
-}
-
-export function thinkingHasAskAudit(thinking: string): boolean {
-  return /提问是否必要|必要性审计|问：必要/.test(thinking);
+export function toolsForRequest(
+  mode: AgentSessionMode,
+  options: AgentRoleOptions = {}
+): readonly AgentRequestTool[] {
+  return toolsForInform(mode, options).map((tool) => ({
+    type: "function" as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    },
+  }));
 }

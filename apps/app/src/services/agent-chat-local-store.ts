@@ -5,6 +5,7 @@ import type {
 
 import { cacheMediaFromBlob } from "@/services/ai-media-cache-service";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+import type { AgentAskQuestion } from "@/services/agent-chat-scheduler";
 import type { AgentSessionMode } from "@/services/agent-session-mode";
 
 const DB_NAME = "dafthunk-agent-chats";
@@ -23,7 +24,16 @@ export interface LocalAgentConversation {
   readonly sessionMode?: AgentSessionMode;
   readonly planDocument?: string;
   readonly planPending?: boolean;
+  readonly pendingAsk?: AgentAskQuestion;
+  readonly pendingAnimationWrite?: boolean;
+  readonly eventTitle?: string;
+  readonly eventEnded?: boolean;
+  readonly pendingEventSplit?: {
+    readonly title?: string;
+    readonly ended?: boolean;
+  };
   readonly consentedCapabilities?: readonly string[];
+  readonly draftSourceCode?: string;
 }
 
 function conversationKey(

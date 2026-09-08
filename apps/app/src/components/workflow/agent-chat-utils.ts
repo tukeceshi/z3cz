@@ -4,6 +4,7 @@ import type {
   OrgTextModelOption,
 } from "@dafthunk/types";
 import {
+  answerBlocks,
   contextWindowTokensForCanonicalId,
   mergeAgentChatAnswers,
 } from "@dafthunk/types";
@@ -238,14 +239,26 @@ export function groupAgentChatTurns(
 
 export function isAgentThinkingLive(params: {
   readonly streaming: boolean;
-  readonly hasTalk: boolean;
-  readonly hasTools: boolean;
+  readonly hasStepTalk: boolean;
 }): boolean {
-  return params.streaming && !params.hasTalk && !params.hasTools;
+  return params.streaming && !params.hasStepTalk;
+}
+
+export function shouldShowTalkCopy(params: {
+  readonly streaming: boolean;
+  readonly isLastTurn: boolean;
+  readonly isLastTalk: boolean;
+}): boolean {
+  if (!params.isLastTalk) {
+    return false;
+  }
+  return !(params.streaming && params.isLastTurn);
 }
 
 export function executeTraceTitle(answer: AgentChatAnswer): string {
-  return answer.talk.trim();
+  const talks = answerBlocks(answer).filter((block) => block.kind === "talk");
+  const last = talks[talks.length - 1];
+  return last?.kind === "talk" ? last.text.trim() : "";
 }
 
 export function shouldShowExecuteTrace(hasReply: boolean): boolean {
@@ -272,4 +285,63 @@ export function shouldWrapAgentWorked(params: {
   readonly hasTools: boolean;
 }): boolean {
   return !params.streaming && (params.hasThinking || params.hasTools);
+}
+
+export function shouldOfferEventSplit(
+  previousEnded: boolean | undefined,
+  nextEnded: boolean | undefined
+): boolean {
+  return previousEnded !== undefined && nextEnded === true;
+}
+
+export function nextAgentEventState(params: {
+  readonly title: string;
+  readonly eventTitle?: string;
+  readonly eventEnded?: boolean;
+  readonly previousEventTitle?: string;
+  readonly previousEventEnded?: boolean;
+}): {
+  readonly title: string;
+  readonly eventTitle?: string;
+  readonly eventEnded?: boolean;
+  readonly pendingEventSplit?: {
+    readonly title?: string;
+    readonly ended?: boolean;
+  };
+} {
+  if (shouldOfferEventSplit(params.previousEventEnded, params.eventEnded)) {
+    return {
+      title: params.title,
+      eventTitle: params.previousEventTitle,
+      eventEnded: params.previousEventEnded,
+      pendingEventSplit: {
+        title: params.eventTitle,
+        ended: params.eventEnded,
+      },
+    };
+  }
+  return {
+    title: params.eventTitle?.trim() || params.title,
+    eventTitle: params.eventTitle,
+    eventEnded: params.eventEnded,
+  };
+}
+
+export function splitLastUserTurn<T extends { readonly role: string }>(
+  messages: readonly T[]
+): { readonly kept: readonly T[]; readonly moved: readonly T[] } {
+  let lastUser = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      lastUser = index;
+      break;
+    }
+  }
+  if (lastUser <= 0) {
+    return { kept: messages, moved: [] };
+  }
+  return {
+    kept: messages.slice(0, lastUser),
+    moved: messages.slice(lastUser),
+  };
 }

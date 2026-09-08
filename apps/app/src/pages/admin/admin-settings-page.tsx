@@ -34,6 +34,7 @@ export function AdminSettingsPage() {
   const [siteName, setSiteName] = useState("");
   const [siteTagline, setSiteTagline] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [icpFilingNumber, setIcpFilingNumber] = useState("");
   const [newUserTourEnabled, setNewUserTourEnabled] = useState(false);
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
@@ -51,6 +52,7 @@ export function AdminSettingsPage() {
     setSiteName(settings.siteName);
     setSiteTagline(settings.siteTagline);
     setSupportEmail(settings.supportEmail ?? "");
+    setIcpFilingNumber(settings.icpFilingNumber ?? "");
     setNewUserTourEnabled(settings.newUserTourEnabled);
     setMaintenanceEnabled(settings.maintenanceEnabled);
     setMaintenanceMessage(settings.maintenanceMessage ?? "");
@@ -64,6 +66,7 @@ export function AdminSettingsPage() {
       siteName: siteName.trim(),
       siteTagline: siteTagline.trim(),
       supportEmail: supportEmail.trim() ? supportEmail.trim() : null,
+      icpFilingNumber: icpFilingNumber.trim() ? icpFilingNumber.trim() : null,
       newUserTourEnabled,
       maintenanceEnabled,
       maintenanceMessage: maintenanceMessage.trim()
@@ -159,6 +162,21 @@ export function AdminSettingsPage() {
               />
               <p className="text-sm text-muted-foreground">
                 {t("siteSettings.supportEmailHelp")}
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="icpFilingNumber">
+                {t("siteSettings.icpFilingNumber")}
+              </Label>
+              <Input
+                id="icpFilingNumber"
+                value={icpFilingNumber}
+                onChange={(event) => setIcpFilingNumber(event.target.value)}
+                placeholder={t("siteSettings.icpFilingNumberPlaceholder")}
+              />
+              <p className="text-sm text-muted-foreground">
+                {t("siteSettings.icpFilingNumberHelp")}
               </p>
             </div>
 

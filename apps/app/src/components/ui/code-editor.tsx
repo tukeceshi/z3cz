@@ -22,6 +22,7 @@ interface CodeEditorProps {
   readonly?: boolean;
   className?: string;
   scrollerClassName?: string;
+  revealLine?: number;
 }
 
 function getLanguageExtension(language: Language): Extension {
@@ -73,6 +74,7 @@ export function CodeEditor({
   readonly = false,
   className,
   scrollerClassName,
+  revealLine,
 }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -135,6 +137,19 @@ export function CodeEditor({
       isProgrammaticUpdate.current = false;
     }
   }, [value]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !revealLine || revealLine < 1) {
+      return;
+    }
+    const lineNumber = Math.min(revealLine, view.state.doc.lines);
+    const line = view.state.doc.line(lineNumber);
+    view.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: "start" }),
+    });
+  }, [revealLine]);
 
   // Update readonly state
   useEffect(() => {

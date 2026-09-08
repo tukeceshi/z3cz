@@ -1,6 +1,8 @@
 import "@xyflow/react/dist/style.css";
 
+import type { AiGenerativeNodeType } from "@dafthunk/types";
 import type {
+  Connection,
   IsValidConnection,
   NodeChange,
   OnConnect,
@@ -45,6 +47,7 @@ import {
 } from "./canvas-shortcut-hint";
 import type { CanvasFileDropPreviewState } from "./generative-card-upload-utils";
 import { useShiftSelectGate } from "./use-shift-select-gate";
+import type { GenerativeNodeAddOptions } from "./creative-studio-context";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
@@ -136,6 +139,11 @@ export interface WorkflowCanvasProps {
   onCanvasFileDrop?: (event: React.DragEvent) => void;
   /** Shrink the live pane to 1×1 so off-screen nodes unmount; do not persist. */
   parked?: boolean;
+  readonly onCreateGenerativeNode?: (
+    nodeType: AiGenerativeNodeType,
+    options?: GenerativeNodeAddOptions
+  ) => string | null;
+  readonly onConnectWorkflow?: (connection: Connection) => void;
 }
 
 export function WorkflowCanvas({
@@ -184,6 +192,8 @@ export function WorkflowCanvas({
   onCanvasFileDragLeave,
   onCanvasFileDrop,
   parked = false,
+  onCreateGenerativeNode,
+  onConnectWorkflow,
 }: WorkflowCanvasProps) {
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
@@ -396,6 +406,8 @@ export function WorkflowCanvas({
                   onOpenRemotionViewport={handleOpenRemotionViewport}
                   onCloseRemotionViewport={() => setRemotionViewportOpen(false)}
                   getCanvasGraph={getCanvasGraph}
+                  onCreateGenerativeNode={onCreateGenerativeNode}
+                  onConnectWorkflow={onConnectWorkflow}
                 />
               </div>
             </Panel>

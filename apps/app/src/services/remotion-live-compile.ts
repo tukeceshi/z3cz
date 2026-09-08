@@ -3,8 +3,20 @@ import * as React from "react";
 import { type ComponentType, createElement, type ReactNode } from "react";
 import * as Remotion from "remotion";
 
-export interface RemotionCompileSuccess {
+export const REMOTION_DEFAULT_DURATION_FRAMES = 90;
+export const REMOTION_DEFAULT_FPS = 30;
+export const REMOTION_DEFAULT_WIDTH = 1280;
+export const REMOTION_DEFAULT_HEIGHT = 720;
+
+export interface RemotionCompiledComposition {
   readonly component: ComponentType;
+  readonly durationInFrames: number;
+  readonly fps: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface RemotionCompileSuccess extends RemotionCompiledComposition {
   readonly error?: undefined;
 }
 
@@ -21,6 +33,7 @@ const REMOTION_BINDINGS = `
 const {
   AbsoluteFill,
   Audio,
+  Composition,
   Img,
   OffthreadVideo,
   Sequence,
@@ -40,6 +53,69 @@ function formatCompileError(error: unknown): string {
   return String(error);
 }
 
+function CompositionMarker(_props: Record<string, unknown>): null {
+  return null;
+}
+
+function isReactElement(
+  value: unknown
+): value is { readonly type: unknown; readonly props: { children?: unknown } } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    "props" in value
+  );
+}
+
+function walkElements(
+  node: unknown,
+  visit: (props: Record<string, unknown>) => void
+): void {
+  if (node == null) {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      walkElements(child, visit);
+    }
+    return;
+  }
+  if (!isReactElement(node)) {
+    return;
+  }
+  if (node.type === CompositionMarker) {
+    visit(node.props as Record<string, unknown>);
+    return;
+  }
+  walkElements(node.props.children, visit);
+}
+
+function readPositiveInt(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function compositionFromProps(
+  props: Record<string, unknown>
+): RemotionCompiledComposition | string {
+  if (typeof props.component !== "function") {
+    return "Composition is missing a component.";
+  }
+  return {
+    component: props.component as ComponentType,
+    durationInFrames: readPositiveInt(
+      props.durationInFrames,
+      REMOTION_DEFAULT_DURATION_FRAMES
+    ),
+    fps: readPositiveInt(props.fps, REMOTION_DEFAULT_FPS),
+    width: readPositiveInt(props.width, REMOTION_DEFAULT_WIDTH),
+    height: readPositiveInt(props.height, REMOTION_DEFAULT_HEIGHT),
+  };
+}
+
 export function compileRemotionSource(source: string): RemotionCompileResult {
   const trimmed = source.trim();
   if (!trimmed) {
@@ -56,14 +132,34 @@ export function compileRemotionSource(source: string): RemotionCompileResult {
       return { error: "Transpilation produced no output." };
     }
 
+    const remotionApi = {
+      ...Remotion,
+      Composition: CompositionMarker,
+    };
     const run = new Function(
       "React",
       "remotion",
-      `${transformed}\nif (typeof Composition !== "function") { throw new Error("Define a function named Composition."); }\nreturn Composition;`
-    ) as (react: typeof import("react"), remotion: typeof Remotion) => ComponentType;
+      `${transformed}
+var root = typeof RemotionRoot === "function" ? RemotionRoot : typeof Root === "function" ? Root : null;
+if (!root) { throw new Error("Define RemotionRoot that returns <Composition />."); }
+return root();`
+    ) as (react: typeof import("react"), remotion: typeof remotionApi) => unknown;
 
-    const component = run(React, Remotion);
-    return { component };
+    const tree = run(React, remotionApi);
+    let found: Record<string, unknown> | undefined;
+    walkElements(tree, (props) => {
+      if (!found) {
+        found = props;
+      }
+    });
+    if (!found) {
+      return { error: "RemotionRoot must return <Composition />." };
+    }
+    const composition = compositionFromProps(found);
+    if (typeof composition === "string") {
+      return { error: composition };
+    }
+    return composition;
   } catch (error) {
     return { error: formatCompileError(error) };
   }

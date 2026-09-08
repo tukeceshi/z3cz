@@ -5,27 +5,99 @@ import type {
 } from "@dafthunk/types";
 import { buildOpenAiMultimodalUserContent } from "@dafthunk/types";
 
+function readToolCalls(
+  value: unknown
+): Array<{
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const calls: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }> = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    const name =
+      typeof record.name === "string"
+        ? record.name
+        : typeof (record.function as { name?: unknown } | undefined)?.name ===
+            "string"
+          ? (record.function as { name: string }).name
+          : "";
+    if (!name) {
+      continue;
+    }
+    const args =
+      typeof record.arguments === "string"
+        ? record.arguments
+        : typeof (record.function as { arguments?: unknown } | undefined)
+              ?.arguments === "string"
+          ? (record.function as { arguments: string }).arguments
+          : "";
+    calls.push({
+      id: typeof record.id === "string" ? record.id : `call-${calls.length}`,
+      type: "function",
+      function: { name, arguments: args },
+    });
+  }
+  return calls;
+}
+
 function readChatMessages(
   value: unknown
-): Array<{ role: string; content: string }> | null {
+): Array<Record<string, unknown>> | null {
   if (!Array.isArray(value) || value.length === 0) {
     return null;
   }
-  const messages: Array<{ role: string; content: string }> = [];
+  const messages: Array<Record<string, unknown>> = [];
   for (const entry of value) {
     if (!entry || typeof entry !== "object") {
       continue;
     }
     const record = entry as Record<string, unknown>;
     const role = record.role;
-    const content = record.content;
-    if (
-      (role === "user" || role === "assistant" || role === "system") &&
-      typeof content === "string" &&
-      content.trim().length > 0
-    ) {
-      messages.push({ role, content });
+    const content = typeof record.content === "string" ? record.content : "";
+    if (role === "tool") {
+      const toolCallId =
+        typeof record.toolCallId === "string"
+          ? record.toolCallId
+          : typeof record.tool_call_id === "string"
+            ? record.tool_call_id
+            : "";
+      if (!toolCallId) {
+        continue;
+      }
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCallId,
+        content,
+      });
+      continue;
     }
+    if (role !== "user" && role !== "assistant" && role !== "system") {
+      continue;
+    }
+    const toolCalls = readToolCalls(record.toolCalls ?? record.tool_calls);
+    if (role === "assistant" && toolCalls.length > 0) {
+      messages.push({
+        role,
+        content: content || null,
+        tool_calls: toolCalls,
+      });
+      continue;
+    }
+    if (content.trim().length === 0) {
+      continue;
+    }
+    messages.push({ role, content });
   }
   return messages.length > 0 ? messages : null;
 }

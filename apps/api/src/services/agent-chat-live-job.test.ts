@@ -63,6 +63,35 @@ describe("agent-chat-live-job", () => {
     expect(second[1]).toBe("done:hello");
   });
 
+  it("forwards thinking separately from talk", async () => {
+    const job = startAgentChatLiveJob({
+      invocationId: "inv-think",
+      organizationId: "org-1",
+      aiInterfaceId: "iface-1",
+      createStream: async function* () {
+        yield { type: "delta", text: "", thinking: "先看" };
+        yield { type: "delta", text: "可以" };
+        yield { type: "done", text: "可以", thinking: "先看" };
+      },
+      onFinish: async () => undefined,
+    });
+    await job.finished;
+    expect(job.getSnapshot()).toMatchObject({
+      text: "可以",
+      thinking: "先看",
+      status: "done",
+    });
+
+    const replay: string[] = [];
+    subscribeAgentChatLiveJob(job, (event) => {
+      replay.push(
+        `${event.type}:${"text" in event ? event.text : ""}:${"thinking" in event ? event.thinking ?? "" : ""}`
+      );
+    });
+    expect(replay[0]).toBe("snapshot:可以:先看");
+    expect(replay[1]).toBe("done:可以:先看");
+  });
+
   it("stop aborts the upstream signal and cannot continue as running", async () => {
     let seenAbort = false;
     const job = startAgentChatLiveJob({

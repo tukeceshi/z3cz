@@ -95,13 +95,23 @@ export async function putAgentChatBody(
 }
 
 export interface StreamAgentChatHandlers {
-  readonly onDelta?: (delta: string, fullText: string) => void;
+  readonly onDelta?: (
+    delta: string,
+    fullText: string,
+    fullThinking?: string
+  ) => void;
   readonly onStarted?: (invocationId: string) => void;
   readonly signal?: AbortSignal;
 }
 
 export interface StreamAgentChatResult {
   readonly text: string;
+  readonly thinking: string;
+  readonly toolCalls: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly arguments: string;
+  }[];
   readonly aiInterfaceId: string;
   readonly invocationId: string;
   readonly stopped: boolean;
@@ -127,6 +137,12 @@ export function isAgentChatStreamDisconnectedError(
 
 interface StreamReadState {
   fullText: string;
+  thinking: string;
+  toolCalls: {
+    id: string;
+    name: string;
+    arguments: string;
+  }[];
   aiInterfaceId: string;
   invocationId: string;
   stopped: boolean;
@@ -146,30 +162,39 @@ function applyAgentChatStreamEvent(
   }
   if (event.type === "snapshot") {
     state.fullText = event.text;
+    state.thinking = event.thinking ?? "";
     state.invocationId = event.invocationId;
     handlers.onStarted?.(event.invocationId);
-    handlers.onDelta?.("", state.fullText);
+    handlers.onDelta?.("", state.fullText, state.thinking);
     return;
   }
   if (event.type === "delta") {
-    state.fullText += event.text;
-    handlers.onDelta?.(event.text, state.fullText);
+    if (event.text) {
+      state.fullText += event.text;
+    }
+    if (event.thinking) {
+      state.thinking += event.thinking;
+    }
+    handlers.onDelta?.(event.text, state.fullText, state.thinking);
     return;
   }
   if (event.type === "done") {
     state.fullText = event.text;
+    state.thinking = event.thinking ?? state.thinking;
+    state.toolCalls = event.toolCalls ? [...event.toolCalls] : [];
     state.aiInterfaceId = event.aiInterfaceId;
     state.invocationId = event.invocationId;
     state.terminal = true;
-    handlers.onDelta?.("", state.fullText);
+    handlers.onDelta?.("", state.fullText, state.thinking);
     return;
   }
   if (event.type === "stopped") {
     state.fullText = event.text;
+    state.thinking = event.thinking ?? state.thinking;
     state.invocationId = event.invocationId;
     state.stopped = true;
     state.terminal = true;
-    handlers.onDelta?.("", state.fullText);
+    handlers.onDelta?.("", state.fullText, state.thinking);
     return;
   }
   state.streamError = event.error;
@@ -203,6 +228,8 @@ async function readAgentChatSse(
   let buffer = "";
   const state: StreamReadState = {
     fullText: "",
+    thinking: "",
+    toolCalls: [],
     aiInterfaceId: initial.aiInterfaceId,
     invocationId: initial.invocationId ?? "",
     stopped: false,
@@ -258,6 +285,8 @@ async function readAgentChatSse(
   if (state.terminal) {
     return {
       text: state.fullText,
+      thinking: state.thinking,
+      toolCalls: state.toolCalls,
       aiInterfaceId: state.aiInterfaceId,
       invocationId: state.invocationId,
       stopped: state.stopped,
@@ -278,8 +307,22 @@ export async function streamAgentChat(
     readonly modelCanonicalId: string;
     readonly aiInterfaceId: string;
     readonly messages: readonly {
-      readonly role: "user" | "assistant" | "system";
+      readonly role: "user" | "assistant" | "system" | "tool";
       readonly content: string;
+      readonly toolCallId?: string;
+      readonly toolCalls?: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly arguments: string;
+      }[];
+    }[];
+    readonly tools?: readonly {
+      readonly type: "function";
+      readonly function: {
+        readonly name: string;
+        readonly description: string;
+        readonly parameters: unknown;
+      };
     }[];
     readonly workflowId?: string;
   },

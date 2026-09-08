@@ -30,6 +30,7 @@ import { logoFitScale } from "@/utils/logo-fit-scale";
 import { cn } from "@/utils/utils";
 
 const LANDING_HEADER_CHIP = "rounded-md border border-border bg-transparent";
+const ICP_FILING_URL = "https://beian.miit.gov.cn/";
 const LANDING_HEADER_HOVER =
   "transition-colors hover:bg-[#f0ede6] hover:text-foreground dark:hover:bg-neutral-800 data-[state=open]:bg-[#f0ede6] dark:data-[state=open]:bg-neutral-800";
 const LANDING_LOGIN_BUTTON =
@@ -336,24 +337,36 @@ export function LandingPage() {
       </main>
 
       <footer className="border-t border-[#e2ded4] py-8 dark:border-neutral-800">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted-foreground md:px-6">
-          <span>{siteSettings.siteName}</span>
-          <div className="flex gap-4">
-            <button
-              type="button"
-              className="underline-offset-4 hover:text-foreground hover:underline"
-              onClick={() => setLegalType("terms")}
-            >
-              {t("landing.footerTerms")}
-            </button>
-            <button
-              type="button"
-              className="underline-offset-4 hover:text-foreground hover:underline"
-              onClick={() => setLegalType("privacy")}
-            >
-              {t("landing.footerPrivacy")}
-            </button>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 text-sm text-muted-foreground md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{siteSettings.siteName}</span>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                className="underline-offset-4 hover:text-foreground hover:underline"
+                onClick={() => setLegalType("terms")}
+              >
+                {t("landing.footerTerms")}
+              </button>
+              <button
+                type="button"
+                className="underline-offset-4 hover:text-foreground hover:underline"
+                onClick={() => setLegalType("privacy")}
+              >
+                {t("landing.footerPrivacy")}
+              </button>
+            </div>
           </div>
+          {siteSettings.icpFilingNumber ? (
+            <a
+              href={ICP_FILING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground no-underline hover:text-muted-foreground"
+            >
+              {siteSettings.icpFilingNumber}
+            </a>
+          ) : null}
         </div>
       </footer>
 

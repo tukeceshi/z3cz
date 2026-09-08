@@ -260,6 +260,7 @@ export const platformSettings = pgTable("platform_settings", {
     .default("Build serverless workflows visually."),
   defaultLocale: text("default_locale").notNull().default("en"),
   supportEmail: text("support_email"),
+  icpFilingNumber: text("icp_filing_number"),
   featureConfig: text("feature_config"),
   authConfig: text("auth_config"),
   newUserTourEnabled: boolean("new_user_tour_enabled").notNull().default(false),
