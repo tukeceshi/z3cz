@@ -149,17 +149,20 @@ reset_install() {
 if [[ "$RESET" -eq 1 ]]; then
   reset_install
 else
-  log "git pull ${BRANCH}"
+  # fetch + reset: bootstrap may have dirtied scripts/host; keep untracked app.yml and certs
+  log "git fetch + reset --hard ${BRANCH}"
+  info "Discards local edits to tracked files (not app.yml / certs)"
   pull_ok=0
   for url in "${GIT_TRY[@]}"; do
     info "Trying ${url}"
-    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" pull --progress "$url" "$BRANCH"; then
+    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" fetch --progress --depth 1 "$url" "$BRANCH"; then
+      git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
       pull_ok=1
       break
     fi
     info "Failed: ${url}"
   done
-  [[ "$pull_ok" -eq 1 ]] || die "git pull failed"
+  [[ "$pull_ok" -eq 1 ]] || die "git fetch failed"
 fi
 
 if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
