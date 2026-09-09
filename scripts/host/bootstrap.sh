@@ -22,19 +22,24 @@ mem_mib() {
 }
 
 ensure_swap() {
-  local ram swap total
+  local ram swap total need
+  local target=5800
   ram="$(mem_mib MemTotal)"
   swap="$(mem_mib SwapTotal)"
   total=$((ram + swap))
   info "Memory ${ram}M + swap ${swap}M"
-  if ((total >= 3800)) || swapon --show 2>/dev/null | grep -q .; then
+  if ((total >= target)) || swapon --show 2>/dev/null | grep -q .; then
     return 0
   fi
-  log "Adding 2G swap at /swapfile"
+  need=$((target - ram))
+  if ((need < 1)); then
+    return 0
+  fi
+  log "Adding ${need}M swap at /swapfile"
   if need_cmd fallocate; then
-    fallocate -l 2G /swapfile
+    fallocate -l "${need}M" /swapfile
   else
-    dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    dd if=/dev/zero of=/swapfile bs=1M count="$need" status=none
   fi
   chmod 600 /swapfile
   mkswap /swapfile >/dev/null

@@ -215,5 +215,10 @@ test("renderCompose is host project without smtp", () => {
   assert.doesNotMatch(yaml, /smtp/i);
   assert.doesNotMatch(yaml, /prod-www/);
   assert.match(yaml, /VITE_WS_VIA_PROXY: "1"/);
+  assert.equal(
+    [...yaml.matchAll(/VITE_APP_URL: "http:\/\/localhost:8080"/g)].length,
+    2
+  );
+  assert.equal([...yaml.matchAll(/NODE_MAX_OLD_SPACE_SIZE: "2048"/g)].length, 2);
   assert.match(yaml, /app\.static\.conf/);
 });

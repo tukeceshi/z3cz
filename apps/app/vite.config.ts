@@ -114,6 +114,7 @@ export default defineConfig(({ mode }) => {
         ? {
             minify: false,
             cssMinify: false,
+            assetsInlineLimit: 0,
             rollupOptions: {
               maxParallelFileOps: 1,
             },
@@ -122,11 +123,18 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       tailwindcss(),
-      react({
-        babel: {
-          plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
-        },
-      }),
+      // babel-plugin-react-compiler holds ASTs for the whole graph (~5600
+      // modules). Skip it in docker-prod so transform stays under typical
+      // Docker Desktop RAM (exit 137 = kernel OOM killer).
+      react(
+        isDockerProd
+          ? {}
+          : {
+              babel: {
+                plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
+              },
+            }
+      ),
       bootstrapManifestPlugin(),
       bootstrapArchivePreviewPlugin(),
       maintenanceHomepagePlugin(apiProxyTarget),

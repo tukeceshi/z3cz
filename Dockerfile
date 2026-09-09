@@ -91,10 +91,12 @@ ENV VITE_API_HOST=${VITE_API_HOST}
 ENV VITE_WEBSITE_URL=${VITE_WEBSITE_URL}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_WS_VIA_PROXY=${VITE_WS_VIA_PROXY}
-# Vite transform peak ~2–3GB (5600+ modules). Keep below typical Docker Desktop
-# RAM so the kernel OOM killer (exit 137) does not fire before V8 can GC.
-# Raise if the host has headroom: docker build --build-arg NODE_MAX_OLD_SPACE_SIZE=6144 ...
-ARG NODE_MAX_OLD_SPACE_SIZE=3072
+# Vite RSS ≈ heap + native. A 3072 heap on 4GB Docker Desktop is killed (137)
+# before V8 can GC. 2048 forces earlier GC; docker-prod also skips React Compiler.
+# Raise if the host has headroom: docker build --build-arg NODE_MAX_OLD_SPACE_SIZE=4096 ...
+# Pass the same VITE_* args to prod-api and prod-app so BuildKit shares this stage
+# (two parallel Vite builds will OOM even when a single one would fit).
+ARG NODE_MAX_OLD_SPACE_SIZE=2048
 ENV NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}
 
 RUN pnpm --filter '@dafthunk/types' build \
