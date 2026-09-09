@@ -11,8 +11,8 @@ REBUILD_LOG="${INSTALL_DIR}/rebuild.log"
 TMUX_SESSION="dafthunk-deploy"
 DETACH=0
 
-log() { printf '==> %s\n' "$*"; }
-info() { printf ' -> %s\n' "$*"; }
+log() { printf '==> %s\n' "$*" >&2; }
+info() { printf ' -> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do

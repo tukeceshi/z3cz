@@ -20,16 +20,17 @@ RESET=0
 ASSUME_YES=0
 DEPLOY_ARGS=()
 
-log() { printf '==> %s\n' "$*"; }
-info() { printf ' -> %s\n' "$*"; }
+log() { printf '==> %s\n' "$*" >&2; }
+info() { printf ' -> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
 GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
 GIT_TRY=()
 
-github_ping_ok() {
-  ping -c 1 -W 2 github.com >/dev/null 2>&1
+github_reachable() {
+  command -v curl >/dev/null 2>&1 || return 1
+  curl -fsS -o /dev/null --connect-timeout 3 --max-time 8 https://github.com/ >/dev/null 2>&1
 }
 
 github_mirror_url() {
@@ -44,7 +45,9 @@ prepare_github_git() {
   local origin mirrored
   origin="$(git -C "$INSTALL_DIR" remote get-url origin)"
   mirrored="$(github_mirror_url "$origin")"
-  if github_ping_ok; then
+  info "origin ${origin}"
+  info "Checking GitHub..."
+  if github_reachable; then
     GIT_TRY=("$origin")
     [[ "$mirrored" != "$origin" ]] && GIT_TRY+=("$mirrored")
   else
@@ -107,6 +110,8 @@ fi
 
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: sudo bash $0"
 [[ -d "${INSTALL_DIR}/.git" ]] || die "Not a git repo: ${INSTALL_DIR}"
+
+log "Update ${INSTALL_DIR}"
 prepare_github_git
 
 reset_install() {
@@ -131,10 +136,12 @@ reset_install() {
   log "git fetch + reset --hard ${BRANCH}"
   local url
   for url in "${GIT_TRY[@]}"; do
-    if git -C "$INSTALL_DIR" fetch --depth 1 "$url" "$BRANCH"; then
+    info "Trying ${url}"
+    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" fetch --progress --depth 1 "$url" "$BRANCH"; then
       git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
       return 0
     fi
+    info "Failed: ${url}"
   done
   die "git fetch failed"
 }
@@ -142,13 +149,15 @@ reset_install() {
 if [[ "$RESET" -eq 1 ]]; then
   reset_install
 else
-  log "git pull"
+  log "git pull ${BRANCH}"
   pull_ok=0
   for url in "${GIT_TRY[@]}"; do
-    if git -C "$INSTALL_DIR" pull "$url" "$BRANCH"; then
+    info "Trying ${url}"
+    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" pull --progress "$url" "$BRANCH"; then
       pull_ok=1
       break
     fi
+    info "Failed: ${url}"
   done
   [[ "$pull_ok" -eq 1 ]] || die "git pull failed"
 fi
