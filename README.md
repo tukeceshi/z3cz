@@ -62,7 +62,12 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 #### 更新
 
 ```bash
-# pull → 预检/按序迁移 → rebuild
+# 工作区有改动时先对齐远程（不删 app.yml / 证书）
+sudo git -C /var/dafthunk fetch --progress origin main
+sudo git -C /var/dafthunk reset --hard FETCH_HEAD
+# origin 连不上时把 origin 换成：
+# https://ghfast.top/https://github.com/tukeceshi/z3cz.git
+
 sudo bash /var/dafthunk/scripts/host/update.sh
 
 # 重置安装：清 DB 与上传，保留域名配置与证书
@@ -151,6 +156,20 @@ docker compose up -d --build --wait   # 或 pnpm dev
 
 
 请用 **3101** 使用产品；勿把浏览器 API 指到 3102（Cookie 同源）。验证单域名时用 **8080**，勿与 3101 混用 Cookie。
+
+#### 更新
+
+```bash
+git pull
+docker compose up -d --build --wait
+```
+
+`origin` 连不上时：
+
+```bash
+git pull --progress https://ghfast.top/https://github.com/tukeceshi/z3cz.git main
+docker compose up -d --build --wait
+```
 
 #### 登录
 
