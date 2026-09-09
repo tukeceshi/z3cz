@@ -17,8 +17,8 @@ APP_YML="${HOST_DIR}/containers/app.yml"
 MIG_DIR="${INSTALL_DIR}/apps/api/src/db/migrations"
 JOURNAL="${MIG_DIR}/meta/_journal.json"
 
-log() { printf '==> %s\n' "$*"; }
-info() { printf ' -> %s\n' "$*"; }
+log() { printf '==> %s\n' "$*" >&2; }
+info() { printf ' -> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 compose() {
@@ -46,12 +46,16 @@ prepare_postgres_data_dir "${HOST_DIR}/shared/postgres"
 log "Start Postgres"
 compose up -d postgres
 
-info "Wait for Postgres healthy"
+info "Wait for Postgres healthy (up to 120s)"
 postgres_ready=0
-for _ in $(seq 1 120); do
+for i in $(seq 1 120); do
   if compose exec -T postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; then
     postgres_ready=1
+    info "Postgres ready (${i}s)"
     break
+  fi
+  if (( i % 15 == 0 )); then
+    info "Still waiting for Postgres... ${i}s"
   fi
   sleep 1
 done
