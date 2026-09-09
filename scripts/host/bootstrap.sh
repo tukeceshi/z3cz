@@ -11,6 +11,7 @@ RAW_BASE="${DAFTHUNK_RAW_BASE:-https://raw.githubusercontent.com/tukeceshi/z3cz/
 
 log() { printf '==> %s\n' "$*"; }
 info() { printf ' -> %s\n' "$*"; }
+warn() { printf 'WARN: %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root (sudo)"
@@ -110,6 +111,33 @@ ensure_packages() {
   need_cmd git || die "Git install failed"
 }
 
+# Docker Hub is the official image registry (registry-1.docker.io).
+# Registry mirrors only affect docker pull; they do not install Node on the host.
+ensure_docker_registry_mirrors() {
+  need_cmd docker || return 0
+  local conf=/etc/docker/daemon.json
+  mkdir -p /etc/docker
+  if [[ -f "$conf" ]] && grep -q 'registry-mirrors' "$conf"; then
+    info "Docker registry-mirrors already set"
+    return 0
+  fi
+  if [[ -f "$conf" ]]; then
+    warn "Existing $conf has no registry-mirrors — leave it; image pull will try mirrors by name"
+    return 0
+  fi
+  log "Configuring Docker registry mirrors (Docker Hub fallback)"
+  cat >"$conf" <<'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://mirror.ccs.tencentyun.com"
+  ]
+}
+EOF
+  systemctl restart docker 2>/dev/null || true
+}
+
 ensure_repo() {
   local url
   if [[ -d "${INSTALL_DIR}/.git" ]]; then
@@ -166,6 +194,7 @@ sync_host_scripts() {
 
 log "Bootstrap"
 ensure_packages
+ensure_docker_registry_mirrors
 ensure_swap
 prepare_github
 ensure_repo

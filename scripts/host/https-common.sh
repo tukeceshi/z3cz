@@ -49,8 +49,12 @@ apply_caddy() {
   docker compose -f "$COMPOSE" --env-file "$ENV_FILE" up -d --force-recreate caddy
 }
 
+stack_generated() {
+  [[ -f "$COMPOSE" && -f "$ENV_FILE" ]]
+}
+
 apply_caddy_if_running() {
-  [[ -f "$COMPOSE" && -f "$ENV_FILE" ]] || return 0
+  stack_generated || return 0
   apply_caddy
 }
 

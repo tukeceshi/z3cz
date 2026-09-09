@@ -33,7 +33,6 @@ done
 hostname="$(grep -E '^hostname:' "$APP_YML" | head -1 | sed 's/^hostname:[[:space:]]*//')"
 
 log "Deploy (log: $REBUILD_LOG)"
-docker pull "${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}" >/dev/null 2>&1 || true
 
 cd "$HOST_DIR"
 rebuild_cmd="./launcher rebuild 2>&1 | tee -a '${REBUILD_LOG}'"

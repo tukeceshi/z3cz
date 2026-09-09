@@ -67,7 +67,9 @@ if cert_files_valid "$CERT_DIR" && [[ "$FORCE" != "1" ]]; then
     set_tls_mode fallback
     info "Set tls: fallback to use existing cert files on deploy"
   fi
-  apply_caddy_if_running
+  if ! apply_caddy_if_running; then
+    warn "Caddy reload failed — certs are on disk; continue with deploy"
+  fi
   info "Next: sudo bash ${INSTALL_DIR}/scripts/host/deploy.sh"
   exit 0
 fi
@@ -102,11 +104,16 @@ if [[ "$issued" != "1" ]]; then
 fi
 
 copy_acme_to_cert_dir "$hostname" "$CERT_DIR" || die "Could not copy cert files"
-install_acme_renew_hook "$hostname" "$CERT_DIR" "${SCRIPT_DIR}/https-renew-hook.sh"
 set_tls_mode fallback
+if ! install_acme_renew_hook "$hostname" "$CERT_DIR" "${SCRIPT_DIR}/https-renew-hook.sh"; then
+  warn "Renewal hook failed — certs are on disk"
+fi
 
 info "Wrote certs to ${CERT_DIR} (tls: fallback)"
-apply_caddy_if_running
+if ! apply_caddy_if_running; then
+  warn "Caddy reload failed — certs are on disk; continue with deploy"
+  start_caddy
+fi
 
 if [[ -f "$COMPOSE" ]] && verify_https "$hostname"; then
   info "HTTPS https://${hostname} is up"
@@ -115,4 +122,3 @@ else
 fi
 
 info "Next: sudo bash ${INSTALL_DIR}/scripts/host/deploy.sh"
-info "Renewal will try Caddy auto first, then renew fallback cert."

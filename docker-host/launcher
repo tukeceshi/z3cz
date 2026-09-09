@@ -9,6 +9,8 @@ APP_YML="$HOST_DIR/containers/app.yml"
 COMPOSE_FILE="$HOST_DIR/docker-compose.generated.yml"
 ENV_FILE="$HOST_DIR/.env.generated"
 NODE_IMAGE="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
+# Prefix hosts used when docker.io is unreachable (no Node installed on the host).
+NODE_PULL_MIRRORS="${DAFTHUNK_DOCKER_PULL_MIRRORS:-docker.m.daocloud.io docker.1ms.run}"
 
 COMMAND="${1:-help}"
 shift || true
@@ -71,6 +73,45 @@ compose() {
   fi
 }
 
+docker_pull() {
+  local ref="$1"
+  local secs="${2:-90}"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" docker pull "$ref" || return 1
+    return 0
+  fi
+  docker pull "$ref" || return 1
+}
+
+# Pull $NODE_IMAGE from Docker Hub, then public mirrors. Never installs Node on the host.
+ensure_node_image() {
+  if docker image inspect "$NODE_IMAGE" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "→ Pulling $NODE_IMAGE ..."
+  if docker_pull "$NODE_IMAGE" 30; then
+    return 0
+  fi
+  echo "→ Docker Hub failed, trying mirrors..."
+  local path="$NODE_IMAGE"
+  if [[ "$path" != */* ]]; then
+    path="library/${path}"
+  fi
+  local m mirrored
+  for m in $NODE_PULL_MIRRORS; do
+    m="${m#https://}"
+    m="${m%/}"
+    mirrored="${m}/${path}"
+    echo "→ Pulling $mirrored"
+    if docker_pull "$mirrored" 90; then
+      docker tag "$mirrored" "$NODE_IMAGE"
+      return 0
+    fi
+  done
+  echo "ERROR: could not pull $NODE_IMAGE from Docker Hub or mirrors" >&2
+  exit 1
+}
+
 run_render() {
   require_app_yml
   mkdir -p \
@@ -86,11 +127,12 @@ run_render() {
   fi
 
   if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker is required (and Node is not installed for local render)." >&2
+    echo "Docker is required to render config (Node is not installed on the host)." >&2
     exit 1
   fi
 
-  echo "→ Rendering config with $NODE_IMAGE (no host Node)..."
+  ensure_node_image
+  echo "→ Rendering config with $NODE_IMAGE ..."
   docker run --rm \
     -v "$REPO_ROOT:/repo:rw" \
     -w /repo \
