@@ -17,6 +17,41 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
 
+GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
+GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
+REPO_TRY=()
+RAW_TRY=()
+
+github_ping_ok() {
+  ping -c 1 -W 2 github.com >/dev/null 2>&1
+}
+
+github_mirror_url() {
+  local url="$1"
+  case "$url" in
+    "${GITHUB_MIRROR}"*) printf '%s' "$url" ;;
+    *) printf '%s%s' "$GITHUB_MIRROR" "$url" ;;
+  esac
+}
+
+prepare_github() {
+  local mirrored_repo mirrored_raw
+  mirrored_repo="$(github_mirror_url "$REPO")"
+  mirrored_raw="$(github_mirror_url "$RAW_BASE")"
+  if github_ping_ok; then
+    REPO_TRY=("$REPO")
+    RAW_TRY=("$RAW_BASE")
+    [[ "$mirrored_repo" != "$REPO" ]] && REPO_TRY+=("$mirrored_repo")
+    [[ "$mirrored_raw" != "$RAW_BASE" ]] && RAW_TRY+=("$mirrored_raw")
+  else
+    info "github.com unreachable, using mirror"
+    REPO_TRY=("$mirrored_repo")
+    RAW_TRY=("$mirrored_raw")
+    [[ "$mirrored_repo" != "$REPO" ]] && REPO_TRY+=("$REPO")
+    [[ "$mirrored_raw" != "$RAW_BASE" ]] && RAW_TRY+=("$RAW_BASE")
+  fi
+}
+
 mem_mib() {
   awk -v key="$1" '$1 == key ":" { print int($2 / 1024); exit }' /proc/meminfo
 }
@@ -28,10 +63,17 @@ ensure_swap() {
   swap="$(mem_mib SwapTotal)"
   total=$((ram + swap))
   info "Memory ${ram}M + swap ${swap}M"
-  if ((total >= target)) || swapon --show 2>/dev/null | grep -q .; then
+  if ((total >= target)); then
     return 0
   fi
-  need=$((target - ram))
+  if [[ -e /swapfile ]]; then
+    if swapon --show 2>/dev/null | grep -q '^/swapfile'; then
+      swapoff /swapfile || die "Could not disable /swapfile to resize"
+    fi
+    rm -f /swapfile
+    swap="$(mem_mib SwapTotal)"
+  fi
+  need=$((target - ram - swap))
   if ((need < 1)); then
     return 0
   fi
@@ -69,17 +111,38 @@ ensure_packages() {
 }
 
 ensure_repo() {
+  local url
   if [[ -d "${INSTALL_DIR}/.git" ]]; then
     log "Updating ${INSTALL_DIR}"
-    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
-    git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}"
-    return 0
+    for url in "${REPO_TRY[@]}"; do
+      if git -C "$INSTALL_DIR" fetch --depth 1 "$url" "$BRANCH"; then
+        git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
+        return 0
+      fi
+    done
+    die "git fetch failed"
   fi
   if [[ -e "$INSTALL_DIR" ]]; then
     mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)"
   fi
-  log "Cloning ${REPO}"
-  git clone --branch "$BRANCH" --depth 1 "$REPO" "$INSTALL_DIR"
+  for url in "${REPO_TRY[@]}"; do
+    log "Cloning ${url}"
+    if git clone --branch "$BRANCH" --depth 1 "$url" "$INSTALL_DIR"; then
+      return 0
+    fi
+    rm -rf "$INSTALL_DIR"
+  done
+  die "git clone failed"
+}
+
+curl_host_script() {
+  local name="$1" dest="$2" base
+  for base in "${RAW_TRY[@]}"; do
+    if curl -fsSL --connect-timeout 15 "${base}/${name}" -o "$dest"; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 sync_host_scripts() {
@@ -88,13 +151,13 @@ sync_host_scripts() {
   mkdir -p "$dir"
   log "Syncing scripts/host from GitHub"
   for name in bootstrap configure https-setup deploy update https-fallback https-reload https-try-auto https-renew-hook; do
-    if curl -fsSL "${RAW_BASE}/${name}.sh" -o "${dir}/${name}.sh"; then
+    if curl_host_script "${name}.sh" "${dir}/${name}.sh"; then
       chmod +x "${dir}/${name}.sh"
     else
-      info "Skip ${name}.sh (not on ${RAW_BASE} yet — use git pull after clone)"
+      info "Skip ${name}.sh (not on GitHub yet — use git pull after clone)"
     fi
   done
-  if curl -fsSL "${RAW_BASE}/https-common.sh" -o "${dir}/https-common.sh"; then
+  if curl_host_script "https-common.sh" "${dir}/https-common.sh"; then
     :
   else
     info "Skip https-common.sh (use git pull after clone)"
@@ -104,6 +167,7 @@ sync_host_scripts() {
 log "Bootstrap"
 ensure_packages
 ensure_swap
+prepare_github
 ensure_repo
 sync_host_scripts
 info "Done. Next: sudo bash ${INSTALL_DIR}/scripts/host/configure.sh"

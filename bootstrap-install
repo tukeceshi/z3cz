@@ -4,14 +4,36 @@ set -euo pipefail
 
 URL="${DAFTHUNK_BOOTSTRAP_URL:-https://raw.githubusercontent.com/tukeceshi/z3cz/main/scripts/host/bootstrap.sh}"
 TARGET="${DAFTHUNK_BOOTSTRAP_SCRIPT:-/tmp/dafthunk-bootstrap.sh}"
+MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
+MIRROR="${MIRROR%/}/"
 
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$URL" -o "$TARGET"
-elif command -v wget >/dev/null 2>&1; then
-  wget -qO "$TARGET" "$URL"
+mirror_url() {
+  case "$1" in
+    "${MIRROR}"*) printf '%s' "$1" ;;
+    *) printf '%s%s' "$MIRROR" "$1" ;;
+  esac
+}
+
+fetch() {
+  local url="$1"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --connect-timeout 15 "$url" -o "$TARGET"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$TARGET" --timeout=15 "$url"
+  else
+    echo "Need curl or wget." >&2
+    exit 1
+  fi
+}
+
+ALT="$(mirror_url "$URL")"
+if ping -c 1 -W 2 github.com >/dev/null 2>&1; then
+  fetch "$URL" || { [[ "$ALT" != "$URL" ]] && fetch "$ALT"; } \
+    || { echo "ERROR: failed to download bootstrap.sh" >&2; exit 1; }
 else
-  echo "Need curl or wget." >&2
-  exit 1
+  echo " -> github.com unreachable, using mirror"
+  fetch "$ALT" || { [[ "$ALT" != "$URL" ]] && fetch "$URL"; } \
+    || { echo "ERROR: failed to download bootstrap.sh" >&2; exit 1; }
 fi
 
 chmod +x "$TARGET"
