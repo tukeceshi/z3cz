@@ -48,12 +48,16 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 # 2. 写域名配置
 sudo bash /var/dafthunk/scripts/host/configure.sh
 
-# 3. 申请 HTTPS 证书
+# 3. 申请 HTTPS 证书（须先把域名 A 记录指到本机公网 IP）
 sudo bash /var/dafthunk/scripts/host/https-setup.sh
 
 # 4. 构建并启动（较慢；后台：加 --detach）
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
+
+证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
+
+渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。
 
 #### 更新
 
@@ -67,13 +71,13 @@ sudo bash /var/dafthunk/scripts/host/update.sh --reset
 
 #### HTTPS 模式
 
-自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。请勿使用 HTTP 访问或 `--http` 模式。
+自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。请勿使用 HTTP 访问或 `--http` 模式。签发前确认域名已解析到 **正在申请证书的这台机器**（见上方安装步骤）。
 
 
 | 模式  | `tls`      | 说明                                                  |
 | --- | ---------- | --------------------------------------------------- |
 | 自动  | `auto`     | configure 默认；**https-setup** 会预申请并改为 `fallback`（推荐） |
-| 备用  | `fallback` | acme.sh 证书文件；续期先试回 Caddy                            |
+| 备用  | `fallback` | acme.sh 证书文件；续期重载 Caddy                              |
 | 手动  | `manual`   | 自行上传文件，不自动续期                                        |
 
 
