@@ -41,6 +41,9 @@ log "Ensure compose files"
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $COMPOSE_FILE after render"
 [[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE after render"
 
+log "Pull images (Docker Hub, then mirrors)"
+(cd "$HOST_DIR" && ./launcher pull-images)
+
 prepare_postgres_data_dir "${HOST_DIR}/shared/postgres"
 
 log "Start Postgres"

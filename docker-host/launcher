@@ -9,8 +9,7 @@ APP_YML="$HOST_DIR/containers/app.yml"
 COMPOSE_FILE="$HOST_DIR/docker-compose.generated.yml"
 ENV_FILE="$HOST_DIR/.env.generated"
 NODE_IMAGE="${DAFTHUNK_NODE_IMAGE:-node:22.12.0-bookworm-slim}"
-# Prefix hosts used when docker.io is unreachable (no Node installed on the host).
-NODE_PULL_MIRRORS="${DAFTHUNK_DOCKER_PULL_MIRRORS:-docker.m.daocloud.io docker.1ms.run}"
+HUB_PULL_MIRRORS="${DAFTHUNK_DOCKER_PULL_MIRRORS:-docker.m.daocloud.io docker.1ms.run}"
 
 COMMAND="${1:-help}"
 shift || true
@@ -23,6 +22,7 @@ Usage: ./launcher <command>
 
 Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
+  pull-images Pull postgres/caddy/nginx/node (Docker Hub, then mirrors)
   bootstrap   Alias of rebuild (first install)
   rebuild     Build images, recreate stack (keeps shared/ data)
   start       Start existing stack
@@ -83,33 +83,41 @@ docker_pull() {
   docker pull "$ref" || return 1
 }
 
-# Pull $NODE_IMAGE from Docker Hub, then public mirrors. Never installs Node on the host.
-ensure_node_image() {
-  if docker image inspect "$NODE_IMAGE" >/dev/null 2>&1; then
+# Pull an official image from Docker Hub, then public mirrors. Does not install Node on the host.
+ensure_hub_image() {
+  local img="$1"
+  if docker image inspect "$img" >/dev/null 2>&1; then
     return 0
   fi
-  echo "→ Pulling $NODE_IMAGE ..."
-  if docker_pull "$NODE_IMAGE" 30; then
+  echo "→ Pulling $img ..."
+  if docker_pull "$img" 30; then
     return 0
   fi
-  echo "→ Docker Hub failed, trying mirrors..."
-  local path="$NODE_IMAGE"
+  echo "→ Docker Hub failed, trying mirrors for $img ..."
+  local path="${img#docker.io/}"
   if [[ "$path" != */* ]]; then
     path="library/${path}"
   fi
   local m mirrored
-  for m in $NODE_PULL_MIRRORS; do
+  for m in $HUB_PULL_MIRRORS; do
     m="${m#https://}"
     m="${m%/}"
     mirrored="${m}/${path}"
     echo "→ Pulling $mirrored"
     if docker_pull "$mirrored" 90; then
-      docker tag "$mirrored" "$NODE_IMAGE"
+      docker tag "$mirrored" "$img"
       return 0
     fi
   done
-  echo "ERROR: could not pull $NODE_IMAGE from Docker Hub or mirrors" >&2
+  echo "ERROR: could not pull $img from Docker Hub or mirrors" >&2
   exit 1
+}
+
+ensure_hub_images() {
+  ensure_hub_image "$NODE_IMAGE"
+  ensure_hub_image "postgres:16-alpine"
+  ensure_hub_image "nginx:1.27-alpine"
+  ensure_hub_image "caddy:2.9-alpine"
 }
 
 run_render() {
@@ -131,7 +139,7 @@ run_render() {
     exit 1
   fi
 
-  ensure_node_image
+  ensure_hub_image "$NODE_IMAGE"
   echo "→ Rendering config with $NODE_IMAGE ..."
   docker run --rm \
     -v "$REPO_ROOT:/repo:rw" \
@@ -154,12 +162,16 @@ case "$COMMAND" in
   render)
     run_render
     ;;
+  pull-images)
+    ensure_hub_images
+    ;;
   bootstrap|rebuild)
     echo ""
     echo "Note: if SSH disconnects, reconnect and run: ./launcher rebuild"
     echo "      (shared/ data is kept; logs: ../install.log, ../setup.log, ../rebuild.log)"
     echo ""
     run_render
+    ensure_hub_images
     # Build one service at a time — parallel bake OOMs on 2GB VPS.
     echo "Building images sequentially (api → app)..."
     compose build api
@@ -168,6 +180,7 @@ case "$COMMAND" in
     ;;
   start)
     run_render
+    ensure_hub_images
     compose up -d
     ;;
   stop)

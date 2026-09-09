@@ -165,6 +165,7 @@ name: dafthunk-host
 services:
   postgres:
     image: postgres:16-alpine
+    pull_policy: missing
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -230,6 +231,7 @@ ${imageBuildArgs}
 
   caddy:
     image: caddy:2.9-alpine
+    pull_policy: missing
     depends_on:
       - app
       - api
