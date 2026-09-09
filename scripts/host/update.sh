@@ -49,11 +49,15 @@ prepare_github_git() {
   info "Checking GitHub..."
   if github_reachable; then
     GIT_TRY=("$origin")
-    [[ "$mirrored" != "$origin" ]] && GIT_TRY+=("$mirrored")
+    if [[ "$mirrored" != "$origin" ]]; then
+      GIT_TRY+=("$mirrored")
+    fi
   else
     info "github.com unreachable, using mirror"
     GIT_TRY=("$mirrored")
-    [[ "$mirrored" != "$origin" ]] && GIT_TRY+=("$origin")
+    if [[ "$mirrored" != "$origin" ]]; then
+      GIT_TRY+=("$origin")
+    fi
   fi
 }
 

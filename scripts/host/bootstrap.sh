@@ -42,14 +42,22 @@ prepare_github() {
   if github_ping_ok; then
     REPO_TRY=("$REPO")
     RAW_TRY=("$RAW_BASE")
-    [[ "$mirrored_repo" != "$REPO" ]] && REPO_TRY+=("$mirrored_repo")
-    [[ "$mirrored_raw" != "$RAW_BASE" ]] && RAW_TRY+=("$mirrored_raw")
+    if [[ "$mirrored_repo" != "$REPO" ]]; then
+      REPO_TRY+=("$mirrored_repo")
+    fi
+    if [[ "$mirrored_raw" != "$RAW_BASE" ]]; then
+      RAW_TRY+=("$mirrored_raw")
+    fi
   else
     info "github.com unreachable, using mirror"
     REPO_TRY=("$mirrored_repo")
     RAW_TRY=("$mirrored_raw")
-    [[ "$mirrored_repo" != "$REPO" ]] && REPO_TRY+=("$REPO")
-    [[ "$mirrored_raw" != "$RAW_BASE" ]] && RAW_TRY+=("$RAW_BASE")
+    if [[ "$mirrored_repo" != "$REPO" ]]; then
+      REPO_TRY+=("$REPO")
+    fi
+    if [[ "$mirrored_raw" != "$RAW_BASE" ]]; then
+      RAW_TRY+=("$RAW_BASE")
+    fi
   fi
 }
 
