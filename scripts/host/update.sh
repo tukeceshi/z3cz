@@ -24,6 +24,36 @@ log() { printf '==> %s\n' "$*"; }
 info() { printf ' -> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
+GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
+GIT_TRY=()
+
+github_ping_ok() {
+  ping -c 1 -W 2 github.com >/dev/null 2>&1
+}
+
+github_mirror_url() {
+  local url="$1"
+  case "$url" in
+    "${GITHUB_MIRROR}"*) printf '%s' "$url" ;;
+    *) printf '%s%s' "$GITHUB_MIRROR" "$url" ;;
+  esac
+}
+
+prepare_github_git() {
+  local origin mirrored
+  origin="$(git -C "$INSTALL_DIR" remote get-url origin)"
+  mirrored="$(github_mirror_url "$origin")"
+  if github_ping_ok; then
+    GIT_TRY=("$origin")
+    [[ "$mirrored" != "$origin" ]] && GIT_TRY+=("$mirrored")
+  else
+    info "github.com unreachable, using mirror"
+    GIT_TRY=("$mirrored")
+    [[ "$mirrored" != "$origin" ]] && GIT_TRY+=("$origin")
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --detach)
@@ -77,6 +107,7 @@ fi
 
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: sudo bash $0"
 [[ -d "${INSTALL_DIR}/.git" ]] || die "Not a git repo: ${INSTALL_DIR}"
+prepare_github_git
 
 reset_install() {
   if [[ "$ASSUME_YES" -ne 1 ]]; then
@@ -97,16 +128,29 @@ reset_install() {
   rm -rf "${HOST_DIR}/shared/storage"/*
   mkdir -p "${HOST_DIR}/shared/storage"
 
-  log "git fetch + reset --hard origin/${BRANCH}"
-  git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
-  git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}"
+  log "git fetch + reset --hard ${BRANCH}"
+  local url
+  for url in "${GIT_TRY[@]}"; do
+    if git -C "$INSTALL_DIR" fetch --depth 1 "$url" "$BRANCH"; then
+      git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
+      return 0
+    fi
+  done
+  die "git fetch failed"
 }
 
 if [[ "$RESET" -eq 1 ]]; then
   reset_install
 else
   log "git pull"
-  git -C "$INSTALL_DIR" pull
+  pull_ok=0
+  for url in "${GIT_TRY[@]}"; do
+    if git -C "$INSTALL_DIR" pull "$url" "$BRANCH"; then
+      pull_ok=1
+      break
+    fi
+  done
+  [[ "$pull_ok" -eq 1 ]] || die "git pull failed"
 fi
 
 if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
