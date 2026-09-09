@@ -6,6 +6,15 @@
 #
 # 启动：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up -d --build
 
+x-prod-build-args: &prod-build-args
+  NODE_VERSION: ${NODE_VERSION:-22.12.0}
+  PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
+  NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-2048}
+  VITE_API_HOST: /api
+  VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3101}
+  VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
+  VITE_WS_VIA_PROXY: "1"
+
 services:
   supabase-db:
     image: postgres:16-alpine
@@ -32,9 +41,7 @@ services:
       dockerfile: Dockerfile
       target: prod-api
       args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-        NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-3072}
+        <<: *prod-build-args
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -75,13 +82,7 @@ services:
       dockerfile: Dockerfile
       target: prod-app
       args:
-        NODE_VERSION: ${NODE_VERSION:-22.12.0}
-        PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
-        NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-3072}
-        VITE_API_HOST: /api
-        VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3101}
-        VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
-        VITE_WS_VIA_PROXY: "1"
+        <<: *prod-build-args
     depends_on:
       api:
         condition: service_healthy

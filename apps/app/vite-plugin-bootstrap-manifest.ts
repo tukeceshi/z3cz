@@ -136,7 +136,7 @@ function writeCompressedPack(
   }
 
   const archive = buildShellArchive(assetPaths, entry, css, assetsDir);
-  const compressed = gzipSync(archive, { level: 9 });
+  const compressed = gzipSync(archive, { level: 6 });
   const hash = createHash("sha256")
     .update(compressed)
     .digest("hex")
@@ -160,7 +160,7 @@ function buildShellAsset(
   outAssetsDir: string
 ): { shell: string; shellHash: string } {
   const archive = buildShellArchive(shellPaths, entry, css, assetsDir);
-  const compressed = gzipSync(archive, { level: 9 });
+  const compressed = gzipSync(archive, { level: 6 });
   const shellHash = createHash("sha256")
     .update(compressed)
     .digest("hex")
