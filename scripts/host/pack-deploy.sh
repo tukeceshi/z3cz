@@ -51,6 +51,11 @@ copy_host_files() {
   rm -f "$stage/docker-host/lib/"*.test.mjs
   cp "$ROOT/docker/nginx/app.static.conf" "$stage/docker/nginx/app.static.conf"
   chmod +x "$stage/scripts/host/"*.sh "$stage/docker-host/launcher" "$stage/docker-host/dafthunk-setup"
+  if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
+    git -C "$ROOT" rev-parse HEAD >"$stage/DEPLOY_REVISION"
+  else
+    date -u +"%Y-%m-%dT%H:%M:%SZ" >"$stage/DEPLOY_REVISION"
+  fi
 }
 
 save_images() {

@@ -75,6 +75,7 @@ download_and_extract_pack() {
   for url in "${ARCHIVE_TRY[@]}"; do
     info "Trying ${url}"
     if curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 --progress-bar \
+      -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
       "$url" -o "$tmp" \
       && tar -tzf "$tmp" >/dev/null 2>&1; then
       mkdir -p "$INSTALL_DIR"
@@ -82,6 +83,9 @@ download_and_extract_pack() {
         rm -f "$tmp"
         chmod +x "${INSTALL_DIR}/scripts/host/"*.sh "${INSTALL_DIR}/docker-host/launcher" 2>/dev/null || true
         load_packaged_images
+        if [[ -f "${INSTALL_DIR}/DEPLOY_REVISION" ]]; then
+          info "Pack $(cat "${INSTALL_DIR}/DEPLOY_REVISION")"
+        fi
         return 0
       fi
       info "Extract failed: ${url}"

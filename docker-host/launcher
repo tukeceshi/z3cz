@@ -171,6 +171,8 @@ case "$COMMAND" in
     echo ""
     run_render
     ensure_hub_images
+    compose up -d --wait --remove-orphans postgres
+    compose up -d --force-recreate --no-deps api app
     compose up -d --remove-orphans
     ;;
   start)
