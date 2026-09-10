@@ -46,7 +46,7 @@ describe("parseResourcePackages", () => {
     expect(parseVolcanoPackageAmount("invalid")).toBe(0);
   });
 
-  it("maps package match keys from model ids with three exceptions", () => {
+  it("maps package match keys from model ids with Seedance and GLM exceptions", () => {
     expect(volcanoPackageMatchKeyForCanonicalId("doubao-seed-evolving")).toBe(
       "doubao_seed_evolving"
     );
@@ -60,6 +60,9 @@ describe("parseResourcePackages", () => {
     expect(
       volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-mini")
     ).toBe("doubao_seedance_2.0_mini");
+    expect(volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-5")).toBe(
+      "doubao_seedance_2.5"
+    );
     expect(
       volcanoPackageProvisionModeForCanonicalId("doubao-seed-evolving")
     ).toBe("required");
@@ -83,6 +86,14 @@ describe("parseResourcePackages", () => {
         "doubao-seedance-2-mini",
       ])
     ).toBe("doubao-seedance-2");
+    expect(
+      pickVolcanoPackageOwnerCanonicalId("Doubao_Seedance_2.5_pack_free_infer", [
+        "doubao-seedance-2",
+        "doubao-seedance-2-fast",
+        "doubao-seedance-2-mini",
+        "doubao-seedance-2-5",
+      ])
+    ).toBe("doubao-seedance-2-5");
   });
 
   it("aggregates Seed Evolving free and collaboration packages", () => {

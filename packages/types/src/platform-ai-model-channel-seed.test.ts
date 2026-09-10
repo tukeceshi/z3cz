@@ -13,11 +13,18 @@ describe("platform-ai-model-channel-seed", () => {
     );
   });
 
-  it("keeps Seedance 2.5 on api only", () => {
+  it("registers Seedance 2.5 on aggregate and api", () => {
     const rows = PLATFORM_AI_MODEL_CHANNEL_SEED.filter(
       (row) => row.canonicalId === "doubao-seedance-2-5"
     );
     expect(rows).toEqual([
+      {
+        canonicalId: "doubao-seedance-2-5",
+        channel: "aggregate",
+        presetId: VOLCANO_AGGREGATE_PRESET_ID,
+        upstreamModelId: "doubao-seedance-2-5-260628",
+        channelEnabled: true,
+      },
       {
         canonicalId: "doubao-seedance-2-5",
         channel: "api",

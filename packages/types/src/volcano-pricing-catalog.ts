@@ -96,6 +96,15 @@ export const VOLCANO_MODEL_PRICING_CATALOG: readonly VolcanoModelPricingRow[] = 
     monthlyFreeQuota: null,
   },
   {
+    canonicalId: "doubao-seedance-2-5",
+    alias: "Seedance 2.5",
+    modality: "video",
+    unitLabel: "元/百万 tokens",
+    priceLabel: "按实际输出 tokens 计费",
+    pricingNotes: ["价格以火山引擎官网为准"],
+    monthlyFreeQuota: null,
+  },
+  {
     canonicalId: "doubao-seedream-5",
     alias: "Seedream 5.0",
     modality: "image",

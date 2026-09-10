@@ -390,6 +390,12 @@ export const VOLCANO_AI_MODEL_CATALOG: readonly AiModelCatalogEntry[] = [
     providerModelId: "doubao-seedance-2-0-mini-260615",
   },
   {
+    canonicalId: "doubao-seedance-2-5",
+    alias: "Seedance 2.5",
+    modality: "video",
+    providerModelId: "doubao-seedance-2-5-260628",
+  },
+  {
     canonicalId: "doubao-seedream-5",
     alias: "Seedream 5.0 lite",
     modality: "image",
