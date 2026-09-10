@@ -55,17 +55,10 @@ prepare_archive_urls() {
   fi
 }
 
-load_packaged_images() {
-  local f found=0
-  [[ -d "${INSTALL_DIR}/images" ]] || die "Deploy pack missing images/"
-  for f in "${INSTALL_DIR}/images/"*.tar.gz; do
-    [[ -f "$f" ]] || continue
-    found=1
-    log "Loading $(basename "$f")"
-    gzip -dc "$f" | docker load
-  done
-  [[ "$found" -eq 1 ]] || die "Deploy pack has no image files"
-  rm -rf "${INSTALL_DIR}/images"
+pull_packaged_images() {
+  [[ -x "${INSTALL_DIR}/docker-host/launcher" ]] || die "Missing docker-host/launcher"
+  log "Pulling api/app images"
+  (cd "${INSTALL_DIR}/docker-host" && ./launcher pull-app-images)
 }
 
 download_and_extract_pack() {
@@ -82,7 +75,7 @@ download_and_extract_pack() {
       if tar -xzf "$tmp" -C "$INSTALL_DIR"; then
         rm -f "$tmp"
         chmod +x "${INSTALL_DIR}/scripts/host/"*.sh "${INSTALL_DIR}/docker-host/launcher" 2>/dev/null || true
-        load_packaged_images
+        pull_packaged_images
         if [[ -f "${INSTALL_DIR}/DEPLOY_REVISION" ]]; then
           info "Pack $(cat "${INSTALL_DIR}/DEPLOY_REVISION")"
         fi

@@ -57,7 +57,7 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
 
-渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。api / app 使用部署包里的镜像，服务器上不再编译。
+渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。api / app 镜像在 Docker Hub（`tukeceshi/z3cz-api`、`tukeceshi/z3cz-app`），更新时只拉有变化的层。
 
 #### 更新
 
@@ -67,6 +67,8 @@ sudo bash /var/dafthunk/scripts/host/update.sh
 # 重置安装：清 DB 与上传，保留域名配置与证书
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
 ```
+
+打包镜像需要在 GitHub 仓库 Secrets 中配置 `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并确保该账号能推送 `tukeceshi/z3cz-api` 与 `tukeceshi/z3cz-app`。
 
 #### HTTPS 模式
 

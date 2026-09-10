@@ -22,8 +22,9 @@ Usage: ./launcher <command>
 
 Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
-  pull-images Pull postgres/caddy/node (Docker Hub, then mirrors)
-  bootstrap   Alias of rebuild (first install)
+  pull-images     Pull postgres/caddy/node (Docker Hub, then mirrors)
+  pull-app-images Pull api/app (always; changed layers only)
+  bootstrap       Alias of rebuild (first install)
   rebuild     Start packaged images, recreate stack (keeps shared/ data)
   start       Start existing stack
   stop        Stop stack
@@ -89,8 +90,16 @@ ensure_hub_image() {
   if docker image inspect "$img" >/dev/null 2>&1; then
     return 0
   fi
+  pull_hub_image "$img" 30 90
+}
+
+# Always pull (reuse unchanged layers). Used for api/app updates.
+pull_hub_image() {
+  local img="$1"
+  local hub_secs="${2:-300}"
+  local mirror_secs="${3:-300}"
   echo "→ Pulling $img ..."
-  if docker_pull "$img" 30; then
+  if docker_pull "$img" "$hub_secs"; then
     return 0
   fi
   echo "→ Docker Hub failed, trying mirrors for $img ..."
@@ -104,13 +113,32 @@ ensure_hub_image() {
     m="${m%/}"
     mirrored="${m}/${path}"
     echo "→ Pulling $mirrored"
-    if docker_pull "$mirrored" 90; then
+    if docker_pull "$mirrored" "$mirror_secs"; then
       docker tag "$mirrored" "$img"
       return 0
     fi
   done
   echo "ERROR: could not pull $img from Docker Hub or mirrors" >&2
   exit 1
+}
+
+packaged_app_images() {
+  local api_image="${DAFTHUNK_API_IMAGE:-tukeceshi/z3cz-api:latest}"
+  local app_image="${DAFTHUNK_APP_IMAGE:-tukeceshi/z3cz-app:latest}"
+  if [[ -f "$HOST_DIR/packaged-images.env" ]]; then
+    # shellcheck disable=SC1091
+    source "$HOST_DIR/packaged-images.env"
+    api_image="${API_IMAGE:-$api_image}"
+    app_image="${APP_IMAGE:-$app_image}"
+  fi
+  printf '%s %s\n' "$api_image" "$app_image"
+}
+
+pull_app_images() {
+  local api_image app_image
+  read -r api_image app_image <<<"$(packaged_app_images)"
+  pull_hub_image "$api_image" 300 300
+  pull_hub_image "$app_image" 300 300
 }
 
 ensure_hub_images() {
@@ -164,6 +192,9 @@ case "$COMMAND" in
   pull-images)
     ensure_hub_images
     ;;
+  pull-app-images)
+    pull_app_images
+    ;;
   bootstrap|rebuild)
     echo ""
     echo "Note: if SSH disconnects, reconnect and run: ./launcher rebuild"
@@ -171,6 +202,7 @@ case "$COMMAND" in
     echo ""
     run_render
     ensure_hub_images
+    pull_app_images
     compose up -d --wait --remove-orphans postgres
     compose up -d --force-recreate --no-deps api app
     compose up -d --remove-orphans
