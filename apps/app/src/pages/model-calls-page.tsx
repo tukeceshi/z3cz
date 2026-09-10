@@ -54,6 +54,7 @@ function ModelCallsPageContent() {
   const { organization } = useAuth();
   const { getOrgUrl } = useOrgUrl();
   const orgId = organization?.id;
+  const workflowsUrl = getOrgUrl("/workflows");
   const setBreadcrumbs = useBreadcrumbsSetter();
   const [page, setPage] = useState(1);
   const [draftRange, setDraftRange] = useState<DateRange | undefined>(undefined);
@@ -82,11 +83,11 @@ function ModelCallsPageContent() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: t("sidebar.workflows"), to: getOrgUrl("/workflows") },
+      { label: t("sidebar.workflows"), to: workflowsUrl },
       { label: t("pages.modelCalls.title") },
     ]);
     return () => setBreadcrumbs([]);
-  }, [getOrgUrl, setBreadcrumbs, t]);
+  }, [setBreadcrumbs, t, workflowsUrl]);
 
   const handleSearch = () => {
     setAppliedRange(draftRange);
@@ -97,6 +98,12 @@ function ModelCallsPageContent() {
     setDraftRange(undefined);
     setAppliedRange(undefined);
     setPage(1);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedId(null);
+    setDetailTitle("");
+    setDetailContent("");
   };
 
   const handleOpenDetail = async (id: string) => {
@@ -170,7 +177,14 @@ function ModelCallsPageContent() {
         </>
       )}
 
-      <Dialog open={selectedId !== null} onOpenChange={() => setSelectedId(null)}>
+      <Dialog
+        open={selectedId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseDetail();
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{detailTitle}</DialogTitle>
