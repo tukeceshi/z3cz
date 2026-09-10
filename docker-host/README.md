@@ -21,7 +21,7 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 **证书必须在域名实际解析到本机后才能签发。** CA 按公网 DNS 访问 `http://域名/.well-known/acme-challenge/`；有两台（或多台）服务器时，先把 A 记录改到要出证的那台，生效后再跑 `https-setup.sh`。旧机上申请会打到旧 IP；新机 DNS 未切过去会校验失败。同时放行入站 80，申请期间不要把该路径强制跳 HTTPS。
 
-渲染配置用 Docker 跑 Node 镜像，系统不装 Node。bootstrap 会配 Docker 镜像加速；连不上 Docker Hub 时走加速源。api / app 使用部署包里的镜像，服务器上不再编译。
+渲染配置用 Docker 跑 Node 镜像，系统不装 Node。bootstrap 会配 Docker 镜像加速；连不上 Docker Hub 时走加速源。api / app 镜像在 Docker Hub，更新时只拉有变化的层。
 
 跳过预申请：`sudo bash .../https-setup.sh --caddy-only`（Caddy 在 deploy 后自行申请，可能遇 LE 限流）。
 

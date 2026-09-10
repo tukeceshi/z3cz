@@ -209,8 +209,8 @@ test("renderCompose is host project without smtp", () => {
     origin: "http://localhost:8080",
   });
   assert.match(yaml, /name: dafthunk-host/);
-  assert.match(yaml, /image: z3cz-api:latest/);
-  assert.match(yaml, /image: z3cz-app:latest/);
+  assert.match(yaml, /image: tukeceshi\/z3cz-api:latest/);
+  assert.match(yaml, /image: tukeceshi\/z3cz-app:latest/);
   assert.match(yaml, /image: caddy:2\.9-alpine/);
   assert.doesNotMatch(yaml, /smtp/i);
   assert.doesNotMatch(yaml, /prod-www/);
