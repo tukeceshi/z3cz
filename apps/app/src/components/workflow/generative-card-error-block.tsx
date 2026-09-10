@@ -33,6 +33,17 @@ interface FitState {
   readonly truncateTitle: boolean;
 }
 
+export function sameGenerativeCardFit(
+  left: FitState,
+  right: FitState
+): boolean {
+  return (
+    left.visibleBodyLineCount === right.visibleBodyLineCount &&
+    left.truncateLastLine === right.truncateLastLine &&
+    left.truncateTitle === right.truncateTitle
+  );
+}
+
 function ErrorLine({
   text,
   className,
@@ -88,6 +99,7 @@ export function GenerativeCardErrorBlock({
   const { t } = useTranslation();
   const cardLines = getGenerativeCardLines(error);
   const [title, ...bodyLines] = cardLines;
+  const linesKey = cardLines.join("\n");
   const rootRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLParagraphElement>(null);
@@ -194,14 +206,16 @@ export function GenerativeCardErrorBlock({
         };
       }
 
-      setFit(nextFit);
+      setFit((current) =>
+        sameGenerativeCardFit(current, nextFit) ? current : nextFit
+      );
     };
 
     computeFit();
     const observer = new ResizeObserver(computeFit);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [bodyLines, title]);
+  }, [linesKey, title]);
 
   return (
     <div

@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth-context";
 import { InsetError } from "@/components/inset-error";
 import { InsetLoading } from "@/components/inset-loading";
 import { useTranslation } from "@/components/locale-provider";
+import { useBreadcrumbsSetter } from "@/components/page-context";
 import { ChangeCoverDialog } from "@/components/workflow/change-cover-dialog";
 import { DeleteFolderDialog } from "@/components/workflow/delete-folder-dialog";
 import { RenameLibraryItemDialog } from "@/components/workflow/rename-library-item-dialog";
@@ -36,7 +37,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { useOrgPermissions } from "@/hooks/use-org-permissions";
 import { useOrgUrl } from "@/hooks/use-org-url";
-import { usePageBreadcrumbs } from "@/hooks/use-page";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useOrgCloudStorageConfigured } from "@/services/platform-ai-model-service";
 import {
@@ -86,7 +86,8 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
   const { organization } = useAuth();
   const orgId = organization?.id ?? "";
   const { getOrgUrl } = useOrgUrl();
-  const { setBreadcrumbs } = usePageBreadcrumbs([]);
+  const workflowsUrl = getOrgUrl("workflows");
+  const setBreadcrumbs = useBreadcrumbsSetter();
 
   const isRoot = folderId === null;
   const listFolderId = isRoot ? null : folderId;
@@ -126,13 +127,14 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
   useEffect(() => {
     if (isRoot) {
       setBreadcrumbs([{ label: t("pages.workflows.title") }]);
-      return;
+    } else {
+      setBreadcrumbs([
+        { label: t("pages.workflows.title"), to: workflowsUrl },
+        { label: folder?.name ?? t("pages.workflows.folders.loading") },
+      ]);
     }
-    setBreadcrumbs([
-      { label: t("pages.workflows.title"), to: getOrgUrl("workflows") },
-      { label: folder?.name ?? t("pages.workflows.folders.loading") },
-    ]);
-  }, [isRoot, setBreadcrumbs, t, getOrgUrl, folder?.name]);
+    return () => setBreadcrumbs([]);
+  }, [folder?.name, isRoot, setBreadcrumbs, t, workflowsUrl]);
 
   const term = searchQuery.toLowerCase().trim();
 
