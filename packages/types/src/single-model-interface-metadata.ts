@@ -61,7 +61,7 @@ export const SEEDANCE_CANONICAL_IDS = [
 
 export type SeedanceCanonicalId = (typeof SEEDANCE_CANONICAL_IDS)[number];
 
-/** 单 API Seedance 上游 Model ID；不进火山聚合 catalog。 */
+/** 单 API Seedance 上游 Model ID。 */
 export const SEEDANCE_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
   Record<SeedanceCanonicalId, string>
 > = {

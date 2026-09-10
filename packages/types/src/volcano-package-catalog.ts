@@ -7,6 +7,7 @@ const VOLCANO_PACKAGE_MATCH_KEY_EXCEPTIONS: Readonly<Record<string, string>> = {
   "glm-5-2": "glm_5.2",
   "doubao-seedance-2-fast": "doubao_seedance_2.0_fast",
   "doubao-seedance-2-mini": "doubao_seedance_2.0_mini",
+  "doubao-seedance-2-5": "doubao_seedance_2.5",
 };
 
 export function volcanoPackageMatchKeyForCanonicalId(
@@ -62,6 +63,7 @@ export const VOLCANO_PACKAGE_PROVISION_MODE_BY_CANONICAL_ID = {
   "doubao-seedance-2": "required",
   "doubao-seedance-2-fast": "required",
   "doubao-seedance-2-mini": "required",
+  "doubao-seedance-2-5": "required",
   "doubao-seedream-5": "required",
   "doubao-seed-evolving": "required",
 } as const satisfies Readonly<Record<string, VolcanoPackageProvisionMode>>;
