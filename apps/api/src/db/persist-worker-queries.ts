@@ -10,13 +10,19 @@ import { and, asc, eq, sql } from "drizzle-orm";
 
 import { hashPassword, verifyPassword } from "../auth/password";
 import type { Database } from "./index";
-import { persistWorkers, platformSettings, PLATFORM_SETTINGS_ID } from "./schema";
+import {
+  organizations,
+  persistWorkers,
+  platformSettings,
+  PLATFORM_SETTINGS_ID,
+} from "./schema";
 
 function rowToPersistWorker(
   row: typeof persistWorkers.$inferSelect
 ): PersistWorker {
   return {
     id: row.id,
+    organizationId: row.organizationId ?? null,
     name: row.name,
     enabled: row.enabled,
     maxConcurrentJobs: row.maxConcurrentJobs,
@@ -78,23 +84,74 @@ export async function updatePersistWorkerPoolSettings(
   return { enabled };
 }
 
-export async function listPersistWorkers(db: Database): Promise<PersistWorker[]> {
-  const rows = await db
-    .select()
-    .from(persistWorkers)
-    .orderBy(asc(persistWorkers.name));
+export async function getOrgPersistWorkerPoolSettings(
+  db: Database,
+  organizationId: string
+): Promise<PersistWorkerPoolSettings> {
+  const [row] = await db
+    .select({ enabled: organizations.persistWorkerPoolEnabled })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+
+  return { enabled: row?.enabled ?? false };
+}
+
+export async function updateOrgPersistWorkerPoolSettings(
+  db: Database,
+  organizationId: string,
+  enabled: boolean
+): Promise<PersistWorkerPoolSettings> {
+  const [row] = await db
+    .update(organizations)
+    .set({
+      persistWorkerPoolEnabled: enabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(organizations.id, organizationId))
+    .returning({ enabled: organizations.persistWorkerPoolEnabled });
+
+  if (!row) {
+    throw new Error("Organization not found");
+  }
+
+  return { enabled: row.enabled };
+}
+
+export async function listPersistWorkers(
+  db: Database,
+  organizationId?: string
+): Promise<PersistWorker[]> {
+  const rows = organizationId
+    ? await db
+        .select()
+        .from(persistWorkers)
+        .where(eq(persistWorkers.organizationId, organizationId))
+        .orderBy(asc(persistWorkers.name))
+    : await db
+        .select()
+        .from(persistWorkers)
+        .orderBy(asc(persistWorkers.name));
 
   return rows.map(rowToPersistWorker);
 }
 
 export async function getPersistWorkerById(
   db: Database,
-  id: string
+  id: string,
+  organizationId?: string
 ): Promise<PersistWorker | undefined> {
   const [row] = await db
     .select()
     .from(persistWorkers)
-    .where(eq(persistWorkers.id, id))
+    .where(
+      organizationId
+        ? and(
+            eq(persistWorkers.id, id),
+            eq(persistWorkers.organizationId, organizationId)
+          )
+        : eq(persistWorkers.id, id)
+    )
     .limit(1);
 
   return row ? rowToPersistWorker(row) : undefined;
@@ -113,11 +170,21 @@ export async function getPersistWorkerRowById(
   return row;
 }
 
-export async function hasEnabledPersistWorkers(db: Database): Promise<boolean> {
+export async function hasEnabledPersistWorkers(
+  db: Database,
+  organizationId?: string
+): Promise<boolean> {
   const [row] = await db
     .select({ id: persistWorkers.id })
     .from(persistWorkers)
-    .where(eq(persistWorkers.enabled, true))
+    .where(
+      organizationId
+        ? and(
+            eq(persistWorkers.enabled, true),
+            eq(persistWorkers.organizationId, organizationId)
+          )
+        : eq(persistWorkers.enabled, true)
+    )
     .limit(1);
 
   return Boolean(row);
@@ -141,6 +208,7 @@ export async function createPersistWorker(
   db: Database,
   input: CreatePersistWorkerRequest & {
     readonly id: string;
+    readonly organizationId?: string | null;
     readonly secretHash: string;
     readonly host?: string | null;
     readonly sshPort?: number;
@@ -157,6 +225,7 @@ export async function createPersistWorker(
     .insert(persistWorkers)
     .values({
       id: input.id,
+      organizationId: input.organizationId ?? null,
       name: input.name,
       enabled: input.enabled ?? true,
       secretHash: input.secretHash,
@@ -222,14 +291,20 @@ export function slugPersistWorkerId(value: string): string {
 }
 
 export function buildBootstrapPersistWorkerInput(
-  input: BootstrapPersistWorkerRequest
+  input: BootstrapPersistWorkerRequest,
+  organizationId?: string
 ): {
   readonly id: string;
   readonly host: string;
   readonly sshPort: number;
 } {
   const host = input.host.trim();
-  const id = slugPersistWorkerId(input.id ?? host);
+  const orgPrefix = organizationId
+    ? organizationId.replace(/[^a-z0-9]+/gi, "").slice(0, 12).toLowerCase()
+    : "";
+  const id = slugPersistWorkerId(
+    input.id ?? (orgPrefix ? `${orgPrefix}-${host}` : host)
+  );
   return {
     id,
     host,
@@ -267,11 +342,19 @@ export async function updatePersistWorker(
 
 export async function deletePersistWorker(
   db: Database,
-  id: string
+  id: string,
+  organizationId?: string
 ): Promise<void> {
   const result = await db
     .delete(persistWorkers)
-    .where(eq(persistWorkers.id, id))
+    .where(
+      organizationId
+        ? and(
+            eq(persistWorkers.id, id),
+            eq(persistWorkers.organizationId, organizationId)
+          )
+        : eq(persistWorkers.id, id)
+    )
     .returning({ id: persistWorkers.id });
 
   if (result.length === 0) {

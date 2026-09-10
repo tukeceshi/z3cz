@@ -22,9 +22,9 @@ Usage: ./launcher <command>
 
 Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
-  pull-images Pull postgres/caddy/nginx/node (Docker Hub, then mirrors)
+  pull-images Pull postgres/caddy/node (Docker Hub, then mirrors)
   bootstrap   Alias of rebuild (first install)
-  rebuild     Build images, recreate stack (keeps shared/ data)
+  rebuild     Start packaged images, recreate stack (keeps shared/ data)
   start       Start existing stack
   stop        Stop stack
   restart     Restart stack
@@ -37,7 +37,7 @@ Commands:
 First install:
   ./dafthunk-setup
 
-If rebuild is interrupted (SSH drop):
+If start is interrupted (SSH drop):
   ./launcher rebuild
   # shared/ data is kept
 EOF
@@ -116,7 +116,6 @@ ensure_hub_image() {
 ensure_hub_images() {
   ensure_hub_image "$NODE_IMAGE"
   ensure_hub_image "postgres:16-alpine"
-  ensure_hub_image "nginx:1.27-alpine"
   ensure_hub_image "caddy:2.9-alpine"
 }
 
@@ -172,10 +171,6 @@ case "$COMMAND" in
     echo ""
     run_render
     ensure_hub_images
-    # Build one service at a time — parallel bake OOMs on 2GB VPS.
-    echo "Building images sequentially (api → app)..."
-    compose build api
-    compose build app
     compose up -d --remove-orphans
     ;;
   start)

@@ -226,6 +226,7 @@ export interface CreateOrganizationAiInterfaceRequest {
   readonly mediaKit?: VolcanoMediaKitConfig;
   /** @deprecated Use mediaKit */
   readonly mediaKitEnhance?: VolcanoMediaKitConfig;
+  readonly mediaKitApiKey?: string;
 }
 
 export interface UpdateOrganizationAiInterfaceRequest {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 3: Build and start stack.
+# Step 4: Start stack from packaged images.
 #   sudo /var/dafthunk/scripts/host/deploy.sh
 #   sudo /var/dafthunk/scripts/host/deploy.sh --detach
 set -euo pipefail

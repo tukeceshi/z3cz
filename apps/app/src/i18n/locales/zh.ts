@@ -909,7 +909,7 @@ export const zh: TranslationDictionary = {
         "开启后，超时或浏览器无法完成的 AI 图片/视频下载上传任务会分派到下方服务器执行；关闭则仍由主 API 内联处理。默认关闭。",
       initialize: "初始化服务器",
       initializeDescription:
-        "填写服务器 SSH 账号后，平台会自动部署负载节点，负责从上游拉取生成结果并上传到组织 TOS。按需安装 Node.js，并以 systemd（或后台进程）启动。SSH 密码不会被保存。",
+        "填写服务器 SSH 账号后，平台会自动部署负载节点，负责从上游拉取生成结果并上传到组织 TOS。按需安装 Node.js，并以 systemd（或后台进程）启动。非 root 账号需要 sudo（免密，或与 SSH 相同的密码）。SSH 密码不会被保存。",
       initializeSubmit: "立即初始化",
       redeploy: "重新部署",
       redeploySubmit: "立即重新部署",
@@ -944,7 +944,7 @@ export const zh: TranslationDictionary = {
         sshPassword: "SSH 密码",
         maxConcurrentJobs: "最大并发任务数",
         apiBaseUrl: "API 地址（可选）",
-        apiBaseUrlPlaceholder: "https://api.example.com",
+        apiBaseUrlPlaceholder: "https://example.com/api 或 http://公网IP:3102",
       },
       columns: {
         name: "名称",
@@ -2169,6 +2169,7 @@ export const zh: TranslationDictionary = {
         apiKeyGenerateLink: "点击生成专用 key",
         apiKeyPlaceholder: "粘贴 AI MediaKit API Key",
         apiKeyConfigured: "已配置（留空保持不变）",
+        apiKeyRequired: "请配置 AI MediaKit API Key",
         modeRequired: "请至少选择一种功能",
         saved: "AI MediaKit 配置已保存",
         pricingTitle: "价格",

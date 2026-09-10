@@ -940,7 +940,7 @@ export const en = {
         "When enabled, AI image/video download-and-upload tasks that time out or cannot be completed in the browser are dispatched to the servers below. When disabled, the main API handles persist inline. Off by default.",
       initialize: "Initialize server",
       initializeDescription:
-        "Enter SSH credentials to deploy a load node that pulls generated media from upstream URLs and uploads it to org TOS. Node.js is installed if needed; the service runs via systemd (or a background process). SSH passwords are not stored.",
+        "Enter SSH credentials to deploy a load node that pulls generated media from upstream URLs and uploads it to org TOS. Node.js is installed if needed; the service runs via systemd (or a background process). Non-root accounts need sudo (passwordless, or the same password as SSH). SSH passwords are not stored.",
       initializeSubmit: "Initialize now",
       redeploy: "Redeploy",
       redeploySubmit: "Redeploy now",
@@ -975,7 +975,7 @@ export const en = {
         sshPassword: "SSH password",
         maxConcurrentJobs: "Max concurrent jobs",
         apiBaseUrl: "API base URL (optional)",
-        apiBaseUrlPlaceholder: "https://api.example.com",
+        apiBaseUrlPlaceholder: "https://example.com/api or http://public-ip:3102",
       },
       columns: {
         name: "Name",
@@ -2269,6 +2269,7 @@ export const en = {
         apiKeyGenerateLink: "Generate a dedicated key",
         apiKeyPlaceholder: "Paste your AI MediaKit API key",
         apiKeyConfigured: "Configured (leave blank to keep)",
+        apiKeyRequired: "Enter an AI MediaKit API key",
         modeRequired: "Select at least one feature",
         saved: "AI MediaKit settings saved",
         pricingTitle: "Pricing",

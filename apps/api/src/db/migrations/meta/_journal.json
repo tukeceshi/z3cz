@@ -617,6 +617,13 @@
       "when": 1790520000000,
       "tag": "0093_seedance_2_5_volcano_aggregate",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1790600000000,
+      "tag": "0094_org_persist_workers",
+      "breakpoints": true
     }
   ]
 }

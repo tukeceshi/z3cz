@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import type { BootstrapPersistWorkerRequest, PersistWorker } from "@dafthunk/types";
 import { Client } from "ssh2";
 
@@ -14,7 +11,10 @@ import {
   hashPersistWorkerSecret,
   updatePersistWorkerDeployState,
 } from "../db/persist-worker-queries";
-import { getApiRootPath } from "../env/api-root";
+import {
+  buildPersistWorkerInstallScript,
+  derivePersistWorkerApiBaseUrlFromWebHost,
+} from "./persist-worker-install-script";
 
 interface SshExecResult {
   readonly stdout: string;
@@ -44,116 +44,13 @@ function resolvePersistWorkerApiBaseUrl(
   for (const candidate of [env.WEB_HOST, env.WEBSITE_URL]) {
     const trimmed = candidate?.trim().replace(/\/$/, "");
     if (trimmed) {
-      return trimmed;
+      return derivePersistWorkerApiBaseUrlFromWebHost(trimmed);
     }
   }
 
   throw new Error(
     "API base URL is not configured. Set WEB_HOST or provide apiBaseUrl."
   );
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function readPersistWorkerBundleSource(): string {
-  const bundlePath = path.resolve(
-    getApiRootPath(),
-    "../persist-worker/worker.mjs"
-  );
-
-  if (!fs.existsSync(bundlePath)) {
-    throw new Error(`Persist worker bundle not found at ${bundlePath}`);
-  }
-
-  return fs.readFileSync(bundlePath, "utf8");
-}
-
-export function buildPersistWorkerInstallScript(
-  params: DeployPersistWorkerParams
-): string {
-  const workerSource = readPersistWorkerBundleSource();
-  const installDir = "/opt/dafthunk-persist-worker";
-
-  return `# dafthunk persist worker bootstrap
-set -euo pipefail
-INSTALL_DIR=${shellQuote(installDir)}
-mkdir -p "$INSTALL_DIR"
-
-cat > "$INSTALL_DIR/worker.mjs" <<'__DAFTHUNK_WORKER__'
-${workerSource}
-__DAFTHUNK_WORKER__
-
-cat > "$INSTALL_DIR/env" <<EOF
-API_BASE_URL=${params.apiBaseUrl}
-WORKER_ID=${params.workerId}
-WORKER_SECRET=${params.workerSecret}
-POLL_INTERVAL_MS=5000
-EOF
-chmod 600 "$INSTALL_DIR/env"
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "Installing Node.js..."
-  if command -v apt-get >/dev/null 2>&1; then
-    export DEBIAN_FRONTEND=noninteractive
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-  elif command -v yum >/dev/null 2>&1; then
-    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    yum install -y nodejs
-  else
-    echo "Node.js 18+ is required but automatic install is unsupported on this OS."
-    exit 1
-  fi
-fi
-
-NODE_BIN="$(command -v node)"
-echo "Using node: $NODE_BIN ($($NODE_BIN -v))"
-
-if command -v systemctl >/dev/null 2>&1 && { [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1; }; then
-  SUDO=""
-  if [ "$(id -u)" -ne 0 ]; then
-    SUDO="sudo -n"
-  fi
-
-  $SUDO tee /etc/systemd/system/dafthunk-persist-worker.service >/dev/null <<EOF
-[Unit]
-Description=Dafthunk Persist Worker
-After=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=${installDir}
-EnvironmentFile=${installDir}/env
-ExecStart=${installDir}/worker-placeholder
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  $SUDO sed -i "s|^ExecStart=.*|ExecStart=$NODE_BIN ${installDir}/worker.mjs|" /etc/systemd/system/dafthunk-persist-worker.service
-  $SUDO systemctl daemon-reload
-  $SUDO systemctl enable dafthunk-persist-worker
-  $SUDO systemctl restart dafthunk-persist-worker
-  $SUDO systemctl is-active --quiet dafthunk-persist-worker
-  echo "systemd service active"
-else
-  if [ -f "$INSTALL_DIR/worker.pid" ]; then
-    OLD_PID="$(cat "$INSTALL_DIR/worker.pid" || true)"
-    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-      kill "$OLD_PID" || true
-    fi
-  fi
-  nohup "$NODE_BIN" "$INSTALL_DIR/worker.mjs" >> "$INSTALL_DIR/worker.log" 2>&1 &
-  echo $! > "$INSTALL_DIR/worker.pid"
-  sleep 1
-  kill -0 "$(cat "$INSTALL_DIR/worker.pid")"
-  echo "background worker started"
-fi
-`;
 }
 
 async function execSshScript(
@@ -224,13 +121,14 @@ export async function bootstrapPersistWorker(
   env: Bindings,
   db: Database,
   input: BootstrapPersistWorkerRequest,
-  updatedBy: string
+  updatedBy: string,
+  organizationId?: string
 ): Promise<{ readonly worker: PersistWorker; readonly deployLog: string }> {
   if (env.RUNTIME === "workers") {
     throw new Error("SSH bootstrap requires the Node API runtime");
   }
 
-  const normalized = buildBootstrapPersistWorkerInput(input);
+  const normalized = buildBootstrapPersistWorkerInput(input, organizationId);
   const existing = await getPersistWorkerById(db, normalized.id);
   if (existing) {
     throw new Error(`Persist worker id "${normalized.id}" already exists`);
@@ -244,6 +142,7 @@ export async function bootstrapPersistWorker(
     db,
     {
       id: normalized.id,
+      organizationId: organizationId ?? null,
       name: input.name.trim(),
       enabled: true,
       maxConcurrentJobs: input.maxConcurrentJobs ?? 1,
@@ -292,13 +191,14 @@ export async function redeployPersistWorker(
   env: Bindings,
   db: Database,
   workerId: string,
-  input: { readonly sshPassword: string; readonly apiBaseUrl?: string }
+  input: { readonly sshPassword: string; readonly apiBaseUrl?: string },
+  organizationId?: string
 ): Promise<{ readonly worker: PersistWorker; readonly deployLog: string }> {
   if (env.RUNTIME === "workers") {
     throw new Error("SSH bootstrap requires the Node API runtime");
   }
 
-  const worker = await getPersistWorkerById(db, workerId);
+  const worker = await getPersistWorkerById(db, workerId, organizationId);
   if (!worker) {
     throw new Error("Persist worker not found");
   }

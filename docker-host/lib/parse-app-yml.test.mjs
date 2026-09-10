@@ -209,16 +209,13 @@ test("renderCompose is host project without smtp", () => {
     origin: "http://localhost:8080",
   });
   assert.match(yaml, /name: dafthunk-host/);
-  assert.match(yaml, /target: prod-api/);
-  assert.match(yaml, /target: prod-app/);
+  assert.match(yaml, /image: z3cz-api:latest/);
+  assert.match(yaml, /image: z3cz-app:latest/);
   assert.match(yaml, /image: caddy:2\.9-alpine/);
   assert.doesNotMatch(yaml, /smtp/i);
   assert.doesNotMatch(yaml, /prod-www/);
-  assert.match(yaml, /VITE_WS_VIA_PROXY: "1"/);
-  assert.equal(
-    [...yaml.matchAll(/VITE_APP_URL: "http:\/\/localhost:8080"/g)].length,
-    2
-  );
-  assert.equal([...yaml.matchAll(/NODE_MAX_OLD_SPACE_SIZE: "2048"/g)].length, 2);
+  assert.doesNotMatch(yaml, /target: prod-api/);
+  assert.doesNotMatch(yaml, /dockerfile:/);
+  assert.match(yaml, /WEB_HOST: "http:\/\/localhost:8080"/);
   assert.match(yaml, /app\.static\.conf/);
 });
