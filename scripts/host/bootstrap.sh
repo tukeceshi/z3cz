@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-# Step 1: Docker/Git + swap + clone repo.
+# Step 1: Docker + swap + download deploy pack.
 #   curl -fsSL .../bootstrap-install | sudo bash
 #   或: curl -fsSL ".../bootstrap.sh" -o "/tmp/bootstrap.sh" && sudo bash "/tmp/bootstrap.sh"
 set -euo pipefail
 
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
-REPO="${DAFTHUNK_REPO:-https://github.com/tukeceshi/z3cz.git}"
-BRANCH="${DAFTHUNK_BRANCH:-main}"
-RAW_BASE="${DAFTHUNK_RAW_BASE:-https://raw.githubusercontent.com/tukeceshi/z3cz/main/scripts/host}"
+ARCHIVE_URL="${DAFTHUNK_ARCHIVE:-https://github.com/tukeceshi/z3cz/releases/download/self-host/z3cz-deploy.tar.gz}"
 
 log() { printf '==> %s\n' "$*"; }
 info() { printf ' -> %s\n' "$*"; }
@@ -20,11 +18,11 @@ need_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
 GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
-REPO_TRY=()
-RAW_TRY=()
+ARCHIVE_TRY=()
 
-github_ping_ok() {
-  ping -c 1 -W 2 github.com >/dev/null 2>&1
+github_reachable() {
+  command -v curl >/dev/null 2>&1 || return 1
+  curl -fsS -o /dev/null --connect-timeout 3 --max-time 8 https://github.com/ >/dev/null 2>&1
 }
 
 github_mirror_url() {
@@ -35,28 +33,19 @@ github_mirror_url() {
   esac
 }
 
-prepare_github() {
-  local mirrored_repo mirrored_raw
-  mirrored_repo="$(github_mirror_url "$REPO")"
-  mirrored_raw="$(github_mirror_url "$RAW_BASE")"
-  if github_ping_ok; then
-    REPO_TRY=("$REPO")
-    RAW_TRY=("$RAW_BASE")
-    if [[ "$mirrored_repo" != "$REPO" ]]; then
-      REPO_TRY+=("$mirrored_repo")
-    fi
-    if [[ "$mirrored_raw" != "$RAW_BASE" ]]; then
-      RAW_TRY+=("$mirrored_raw")
+prepare_archive_urls() {
+  local mirrored
+  mirrored="$(github_mirror_url "$ARCHIVE_URL")"
+  if github_reachable; then
+    ARCHIVE_TRY=("$ARCHIVE_URL")
+    if [[ "$mirrored" != "$ARCHIVE_URL" ]]; then
+      ARCHIVE_TRY+=("$mirrored")
     fi
   else
     info "github.com unreachable, using mirror"
-    REPO_TRY=("$mirrored_repo")
-    RAW_TRY=("$mirrored_raw")
-    if [[ "$mirrored_repo" != "$REPO" ]]; then
-      REPO_TRY+=("$REPO")
-    fi
-    if [[ "$mirrored_raw" != "$RAW_BASE" ]]; then
-      RAW_TRY+=("$RAW_BASE")
+    ARCHIVE_TRY=("$mirrored")
+    if [[ "$mirrored" != "$ARCHIVE_URL" ]]; then
+      ARCHIVE_TRY+=("$ARCHIVE_URL")
     fi
   fi
 }
@@ -99,24 +88,25 @@ ensure_swap() {
 }
 
 ensure_packages() {
-  if need_cmd docker && need_cmd git; then
-    info "Docker and Git already installed"
-    return 0
+  if need_cmd docker && need_cmd curl && need_cmd tar && need_cmd gzip; then
+    info "Docker already installed"
+  else
+    need_cmd apt-get || die "Need apt-get to install Docker"
+    log "Installing Docker"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq docker.io ca-certificates curl tar gzip
+    systemctl enable --now docker 2>/dev/null || true
+    need_cmd docker || die "Docker install failed"
+    need_cmd curl || die "curl install failed"
+    need_cmd tar || die "tar install failed"
   fi
-  need_cmd apt-get || die "Need apt-get to install Docker/Git"
-  log "Installing Docker and Git"
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y -qq docker.io git ca-certificates curl
-  systemctl enable --now docker 2>/dev/null || true
   if ! docker compose version >/dev/null 2>&1 && ! need_cmd docker-compose; then
     apt-get install -y -qq docker-compose-v2 2>/dev/null \
       || apt-get install -y -qq docker-compose-plugin 2>/dev/null \
       || apt-get install -y -qq docker-compose 2>/dev/null \
       || true
   fi
-  need_cmd docker || die "Docker install failed"
-  need_cmd git || die "Git install failed"
 }
 
 # Docker Hub is the official image registry (registry-1.docker.io).
@@ -146,66 +136,61 @@ EOF
   systemctl restart docker 2>/dev/null || true
 }
 
-ensure_repo() {
-  local url
-  if [[ -d "${INSTALL_DIR}/.git" ]]; then
-    log "Updating ${INSTALL_DIR}"
-    for url in "${REPO_TRY[@]}"; do
-      if git -C "$INSTALL_DIR" fetch --depth 1 "$url" "$BRANCH"; then
-        git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
+looks_like_install() {
+  [[ -d "${INSTALL_DIR}/docker-host" && -d "${INSTALL_DIR}/scripts/host" ]]
+}
+
+load_packaged_images() {
+  local f found=0
+  [[ -d "${INSTALL_DIR}/images" ]] || die "Deploy pack missing images/"
+  for f in "${INSTALL_DIR}/images/"*.tar.gz; do
+    [[ -f "$f" ]] || continue
+    found=1
+    log "Loading $(basename "$f")"
+    gzip -dc "$f" | docker load
+  done
+  [[ "$found" -eq 1 ]] || die "Deploy pack has no image files"
+  rm -rf "${INSTALL_DIR}/images"
+}
+
+download_and_extract_pack() {
+  local url tmp
+  tmp="$(mktemp /tmp/dafthunk-deploy.XXXXXX.tar.gz)"
+  prepare_archive_urls
+  for url in "${ARCHIVE_TRY[@]}"; do
+    info "Trying ${url}"
+    if curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 --progress-bar \
+      "$url" -o "$tmp" \
+      && tar -tzf "$tmp" >/dev/null 2>&1; then
+      mkdir -p "$INSTALL_DIR"
+      if tar -xzf "$tmp" -C "$INSTALL_DIR"; then
+        rm -f "$tmp"
+        chmod +x "${INSTALL_DIR}/scripts/host/"*.sh "${INSTALL_DIR}/docker-host/launcher" 2>/dev/null || true
+        load_packaged_images
         return 0
       fi
-    done
-    die "git fetch failed"
-  fi
-  if [[ -e "$INSTALL_DIR" ]]; then
+      info "Extract failed: ${url}"
+    else
+      info "Failed: ${url}"
+    fi
+  done
+  rm -f "$tmp"
+  die "deploy pack download failed"
+}
+
+ensure_pack() {
+  if [[ -e "$INSTALL_DIR" ]] && ! looks_like_install; then
+    log "Backing up ${INSTALL_DIR}"
     mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)"
   fi
-  for url in "${REPO_TRY[@]}"; do
-    log "Cloning ${url}"
-    if git clone --branch "$BRANCH" --depth 1 "$url" "$INSTALL_DIR"; then
-      return 0
-    fi
-    rm -rf "$INSTALL_DIR"
-  done
-  die "git clone failed"
-}
-
-curl_host_script() {
-  local name="$1" dest="$2" base
-  for base in "${RAW_TRY[@]}"; do
-    if curl -fsSL --connect-timeout 15 "${base}/${name}" -o "$dest"; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-sync_host_scripts() {
-  need_cmd curl || return 0
-  local dir="${INSTALL_DIR}/scripts/host"
-  mkdir -p "$dir"
-  log "Syncing scripts/host from GitHub"
-  for name in bootstrap configure https-setup deploy update https-fallback https-reload https-try-auto https-renew-hook; do
-    if curl_host_script "${name}.sh" "${dir}/${name}.sh"; then
-      chmod +x "${dir}/${name}.sh"
-    else
-      info "Skip ${name}.sh (not on GitHub yet — use git pull after clone)"
-    fi
-  done
-  if curl_host_script "https-common.sh" "${dir}/https-common.sh"; then
-    :
-  else
-    info "Skip https-common.sh (use git pull after clone)"
-  fi
+  log "Downloading deploy pack to ${INSTALL_DIR}"
+  download_and_extract_pack
 }
 
 log "Bootstrap"
 ensure_packages
 ensure_docker_registry_mirrors
 ensure_swap
-prepare_github
-ensure_repo
-sync_host_scripts
+ensure_pack
 info "Done. Next: sudo bash ${INSTALL_DIR}/scripts/host/configure.sh"
 info "Then: sudo bash ${INSTALL_DIR}/scripts/host/https-setup.sh"

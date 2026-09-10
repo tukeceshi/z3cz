@@ -865,7 +865,8 @@ async function runServerGenerationJobPersist(
   }
 
   const useWorkerPool =
-    !options?.forceInline && (await isPersistWorkerPoolActive(db));
+    !options?.forceInline &&
+    (await isPersistWorkerPoolActive(db, job.organizationId));
 
   const resultJson: GenerationJobResultJson = {
     ...(job.resultJson ?? {}),

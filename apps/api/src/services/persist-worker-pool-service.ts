@@ -19,6 +19,7 @@ import {
 } from "../db/generation-job-queries";
 import {
   decrementPersistWorkerActiveJobs,
+  getOrgPersistWorkerPoolSettings,
   getPersistWorkerPoolSettings,
   hasEnabledPersistWorkers,
   incrementPersistWorkerActiveJobs,
@@ -62,13 +63,14 @@ export function shouldFallbackWorkerPersistToApi(
 }
 
 export async function isPersistWorkerPoolActive(
-  db: Database
+  db: Database,
+  organizationId: string
 ): Promise<boolean> {
-  const settings = await getPersistWorkerPoolSettings(db);
+  const settings = await getOrgPersistWorkerPoolSettings(db, organizationId);
   if (!settings.enabled) {
     return false;
   }
-  return hasEnabledPersistWorkers(db);
+  return hasEnabledPersistWorkers(db, organizationId);
 }
 
 interface ClaimableJobRow {
@@ -86,7 +88,7 @@ export async function claimPersistJobForWorker(
   readonly pendingMedia: readonly GenerationJobPendingMedia[];
 } | null> {
   const worker = await verifyPersistWorkerSecret(db, workerId, secret);
-  if (!worker) {
+  if (!worker?.organizationId) {
     return null;
   }
 
@@ -103,6 +105,7 @@ export async function claimPersistJobForWorker(
         SELECT id, organization_id, result_json
         FROM generation_jobs
         WHERE status = 'uploading'
+          AND organization_id = ${worker.organizationId}
           AND result_json->>'persistOwner' = 'server'
           AND result_json->>'persistDispatch' = 'worker'
           AND (
@@ -202,7 +205,9 @@ export async function presignPersistJobUploadsForWorker(
   if (
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
-    mapped.resultJson.persistWorkerId !== params.workerId
+    mapped.resultJson.persistWorkerId !== params.workerId ||
+    !worker.organizationId ||
+    mapped.organizationId !== worker.organizationId
   ) {
     return null;
   }
@@ -271,7 +276,9 @@ export async function completePersistJobFromWorker(
   if (
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
-    mapped.resultJson.persistWorkerId !== params.workerId
+    mapped.resultJson.persistWorkerId !== params.workerId ||
+    !worker.organizationId ||
+    mapped.organizationId !== worker.organizationId
   ) {
     return null;
   }
@@ -361,7 +368,9 @@ export async function failPersistJobFromWorker(
   if (
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
-    mapped.resultJson.persistWorkerId !== params.workerId
+    mapped.resultJson.persistWorkerId !== params.workerId ||
+    !worker.organizationId ||
+    mapped.organizationId !== worker.organizationId
   ) {
     return null;
   }

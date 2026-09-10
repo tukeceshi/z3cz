@@ -34,7 +34,7 @@ Usage: ./launcher <command>
 Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
   bootstrap   Alias of rebuild (first install)
-  rebuild     Build images, recreate stack (keeps shared/ data)
+  rebuild     Start packaged images, recreate stack (keeps shared/ data)
   start       Start existing stack
   stop        Stop stack
   restart     Restart stack
@@ -125,14 +125,6 @@ async function main() {
     case "bootstrap":
     case "rebuild": {
       render();
-      // Sequential builds avoid OOM on small VPS (parallel bake).
-      console.log("Building images sequentially (api → app)...");
-      for (const service of ["api", "app"]) {
-        const buildCode = compose(["build", service]);
-        if (buildCode !== 0) {
-          process.exit(buildCode);
-        }
-      }
       process.exit(compose(["up", "-d", "--remove-orphans"]) === 0 ? 0 : 1);
       return;
     }

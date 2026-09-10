@@ -18,7 +18,9 @@ export type WizardMediaKitConfig = VolcanoMediaKitConfig;
 
 interface VolcanoWizardMediaKitCardProps {
   readonly config: WizardMediaKitConfig;
+  readonly apiKey: string;
   readonly onConfigChange: (config: WizardMediaKitConfig) => void;
+  readonly onApiKeyChange: (apiKey: string) => void;
 }
 
 export function createDefaultWizardMediaKitConfig(): WizardMediaKitConfig {
@@ -33,7 +35,9 @@ export function isWizardMediaKitConfigValid(
 
 export function VolcanoWizardMediaKitCard({
   config,
+  apiKey,
   onConfigChange,
+  onApiKeyChange,
 }: VolcanoWizardMediaKitCardProps) {
   const { t } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -48,9 +52,12 @@ export function VolcanoWizardMediaKitCard({
 
   const handleSettingsSave = async (
     next: WizardMediaKitConfig,
-    _mediaKitApiKey?: string
+    mediaKitApiKey?: string
   ) => {
     onConfigChange({ ...next, enabled: config.enabled });
+    if (mediaKitApiKey?.trim()) {
+      onApiKeyChange(mediaKitApiKey.trim());
+    }
   };
 
   return (
@@ -86,6 +93,8 @@ export function VolcanoWizardMediaKitCard({
       <VolcanoMediaKitSettingsDialog
         open={settingsOpen}
         config={config}
+        hasApiKey={Boolean(apiKey.trim())}
+        requireApiKey
         onOpenChange={setSettingsOpen}
         onSave={async (next, mediaKitApiKey) => handleSettingsSave(next, mediaKitApiKey)}
         isSaving={false}

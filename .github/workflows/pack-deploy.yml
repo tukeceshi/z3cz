@@ -1,0 +1,31 @@
+name: Pack deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and pack
+        run: bash scripts/host/pack-deploy.sh
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: self-host
+          name: Self-host
+          body: Deploy pack from ${{ github.sha }}
+          files: z3cz-deploy.tar.gz
+          fail_on_unmatched_files: true
+          make_latest: true
+          target_commitish: ${{ github.sha }}

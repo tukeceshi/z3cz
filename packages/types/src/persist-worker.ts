@@ -11,6 +11,7 @@ export type PersistWorkerDeployStatus =
 
 export interface PersistWorker {
   readonly id: string;
+  readonly organizationId: string | null;
   readonly name: string;
   readonly enabled: boolean;
   readonly maxConcurrentJobs: number;

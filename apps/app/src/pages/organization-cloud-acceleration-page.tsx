@@ -6,8 +6,7 @@ import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { OrgPermissionGate } from "@/components/org-permission-gate";
 import { useTranslation } from "@/components/locale-provider";
-import { useOrgPermissions } from "@/hooks/use-org-permissions";
-import { usePageBreadcrumbs } from "@/hooks/use-page";
+import { PersistWorkersPanel } from "@/components/persist-workers-panel";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,10 +17,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { useOrgPermissions } from "@/hooks/use-org-permissions";
+import { usePageBreadcrumbs } from "@/hooks/use-page";
 import {
   disableOrgInterfaceCloudAcceleration,
   useOrgCloudAccelerationInterfaces,
 } from "@/services/cloud-acceleration-service";
+import {
+  bootstrapOrgPersistWorker,
+  deleteOrgPersistWorker,
+  redeployOrgPersistWorker,
+  updateOrgPersistWorkerPoolSettings,
+  useOrgPersistWorkers,
+} from "@/services/persist-worker-service";
 
 export function OrganizationCloudAccelerationPage() {
   const { t } = useTranslation();
@@ -53,20 +61,22 @@ function OrganizationCloudAccelerationPageContent() {
     isInterfacesLoading,
     refreshInterfaces,
   } = useOrgCloudAccelerationInterfaces(organizationId);
+  const { workers, settings, workersError, isWorkersLoading, refreshWorkers } =
+    useOrgPersistWorkers(organizationId);
 
   if (!organizationId) {
     return <InsetLoading />;
   }
 
-  if (isInterfacesLoading) {
+  if (isInterfacesLoading || isWorkersLoading) {
     return <InsetLoading title={t("pages.cloudAcceleration.title")} />;
   }
 
-  if (interfacesError) {
+  if (interfacesError || workersError) {
     return (
       <InsetError
         title={t("pages.cloudAcceleration.title")}
-        message={t("pages.cloudAcceleration.loadFailed")}
+        errorMessage={t("pages.cloudAcceleration.loadFailed")}
       />
     );
   }
@@ -76,9 +86,9 @@ function OrganizationCloudAccelerationPageContent() {
     try {
       await disableOrgInterfaceCloudAcceleration(organizationId, aiInterfaceId);
       await refreshInterfaces();
-      toast.success(t("pages.cloudAcceleration.interfaceDisabled"));
+      toast.success("pages.cloudAcceleration.interfaceDisabled");
     } catch {
-      toast.error(t("pages.cloudAcceleration.interfaceDisableFailed"));
+      toast.error("pages.cloudAcceleration.interfaceDisableFailed");
     } finally {
       setDisablingId(null);
     }
@@ -86,10 +96,27 @@ function OrganizationCloudAccelerationPageContent() {
 
   return (
     <InsetLayout title={t("pages.cloudAcceleration.title")}>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-6">
         <p className="text-sm text-muted-foreground">
           {t("pages.cloudAcceleration.description")}
         </p>
+
+        <PersistWorkersPanel
+          idPrefix="org_cloud_accel"
+          workers={workers}
+          settings={settings}
+          onUpdatePool={(enabled) =>
+            updateOrgPersistWorkerPoolSettings(organizationId, enabled)
+          }
+          onBootstrap={(input) =>
+            bootstrapOrgPersistWorker(organizationId, input)
+          }
+          onRedeploy={(id, input) =>
+            redeployOrgPersistWorker(organizationId, id, input)
+          }
+          onDelete={(id) => deleteOrgPersistWorker(organizationId, id)}
+          onRefresh={refreshWorkers}
+        />
 
         <div className="space-y-3">
           <div>

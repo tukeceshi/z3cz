@@ -42,7 +42,7 @@
 #### 安装（四步）
 
 ```bash
-# 1. 环境 + 拉代码
+# 1. 环境 + 下载部署包
 curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
 
 # 2. 写域名配置
@@ -51,23 +51,17 @@ sudo bash /var/dafthunk/scripts/host/configure.sh
 # 3. 申请 HTTPS 证书（须先把域名 A 记录指到本机公网 IP）
 sudo bash /var/dafthunk/scripts/host/https-setup.sh
 
-# 4. 构建并启动（较慢；后台：加 --detach）
+# 4. 启动（后台：加 --detach）
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
 
 证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
 
-渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。
+渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。api / app 使用部署包里的镜像，服务器上不再编译。
 
 #### 更新
 
 ```bash
-# 工作区有改动时先对齐远程（不删 app.yml / 证书）
-sudo git -C /var/dafthunk fetch --progress origin main
-sudo git -C /var/dafthunk reset --hard FETCH_HEAD
-# origin 连不上时把 origin 换成：
-# https://ghfast.top/https://github.com/tukeceshi/z3cz.git
-
 sudo bash /var/dafthunk/scripts/host/update.sh
 
 # 重置安装：清 DB 与上传，保留域名配置与证书

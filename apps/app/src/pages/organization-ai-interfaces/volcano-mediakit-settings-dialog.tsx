@@ -25,6 +25,7 @@ interface VolcanoMediaKitSettingsDialogProps {
   readonly open: boolean;
   readonly config: VolcanoMediaKitConfig;
   readonly hasApiKey?: boolean;
+  readonly requireApiKey?: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onSave: (
     config: VolcanoMediaKitConfig,
@@ -45,6 +46,7 @@ export function VolcanoMediaKitSettingsDialog({
   open,
   config,
   hasApiKey = false,
+  requireApiKey = false,
   onOpenChange,
   onSave,
   isSaving,
@@ -86,6 +88,10 @@ export function VolcanoMediaKitSettingsDialog({
     }));
   };
 
+  const hasKeyForSave = Boolean(apiKeyDraft.trim()) || hasApiKey;
+  const canSave =
+    hasSelectedMediaKitFeature(draft) && (!requireApiKey || hasKeyForSave);
+
   const handleSave = async () => {
     if (!canSave) {
       return;
@@ -93,8 +99,6 @@ export function VolcanoMediaKitSettingsDialog({
     await onSave(draft, apiKeyDraft.trim() || undefined);
     onOpenChange(false);
   };
-
-  const canSave = hasSelectedMediaKitFeature(draft);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,9 +202,13 @@ export function VolcanoMediaKitSettingsDialog({
             ))}
           </div>
 
-          {!canSave ? (
+          {!hasSelectedMediaKitFeature(draft) ? (
             <p className="text-destructive text-xs">
               {t("pages.aiInterfaces.mediaKitEnhance.modeRequired")}
+            </p>
+          ) : requireApiKey && !hasKeyForSave ? (
+            <p className="text-destructive text-xs">
+              {t("pages.aiInterfaces.mediaKitEnhance.apiKeyRequired")}
             </p>
           ) : null}
         </div>

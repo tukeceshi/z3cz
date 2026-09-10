@@ -117,9 +117,6 @@ else
   info "Prechecks passed (${precheck_ran})"
 fi
 
-log "Build api image (includes pending migration SQL)"
-compose build api
-
 log "Apply migrations (journal order; only pending)"
 compose run --rm --no-deps \
   -e RUN_DB_MIGRATE=true \

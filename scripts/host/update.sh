@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Pull latest code, migrate DB (journal order), then redeploy.
+# Download latest deploy pack, load images, then start.
 #   sudo bash /var/dafthunk/scripts/host/update.sh
 #   sudo bash /var/dafthunk/scripts/host/update.sh --detach
-#   sudo bash /var/dafthunk/scripts/host/update.sh --skip-migrate
-#   sudo bash /var/dafthunk/scripts/host/update.sh --migrate-only
 #   sudo bash /var/dafthunk/scripts/host/update.sh --reset
 #   sudo bash /var/dafthunk/scripts/host/update.sh --reset -y
 set -euo pipefail
@@ -12,10 +10,8 @@ INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 HOST_DIR="${INSTALL_DIR}/docker-host"
 # shellcheck source=postgres-data-dir.sh
 source "${INSTALL_DIR}/scripts/host/postgres-data-dir.sh"
-BRANCH="${DAFTHUNK_BRANCH:-main}"
+ARCHIVE_URL="${DAFTHUNK_ARCHIVE:-https://github.com/tukeceshi/z3cz/releases/download/self-host/z3cz-deploy.tar.gz}"
 DETACH=0
-SKIP_MIGRATE=0
-MIGRATE_ONLY=0
 RESET=0
 ASSUME_YES=0
 DEPLOY_ARGS=()
@@ -26,7 +22,7 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
 GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
-GIT_TRY=()
+ARCHIVE_TRY=()
 
 github_reachable() {
   command -v curl >/dev/null 2>&1 || return 1
@@ -41,24 +37,60 @@ github_mirror_url() {
   esac
 }
 
-prepare_github_git() {
-  local origin mirrored
-  origin="$(git -C "$INSTALL_DIR" remote get-url origin)"
-  mirrored="$(github_mirror_url "$origin")"
-  info "origin ${origin}"
+prepare_archive_urls() {
+  local mirrored
+  mirrored="$(github_mirror_url "$ARCHIVE_URL")"
   info "Checking GitHub..."
   if github_reachable; then
-    GIT_TRY=("$origin")
-    if [[ "$mirrored" != "$origin" ]]; then
-      GIT_TRY+=("$mirrored")
+    ARCHIVE_TRY=("$ARCHIVE_URL")
+    if [[ "$mirrored" != "$ARCHIVE_URL" ]]; then
+      ARCHIVE_TRY+=("$mirrored")
     fi
   else
     info "github.com unreachable, using mirror"
-    GIT_TRY=("$mirrored")
-    if [[ "$mirrored" != "$origin" ]]; then
-      GIT_TRY+=("$origin")
+    ARCHIVE_TRY=("$mirrored")
+    if [[ "$mirrored" != "$ARCHIVE_URL" ]]; then
+      ARCHIVE_TRY+=("$ARCHIVE_URL")
     fi
   fi
+}
+
+load_packaged_images() {
+  local f found=0
+  [[ -d "${INSTALL_DIR}/images" ]] || die "Deploy pack missing images/"
+  for f in "${INSTALL_DIR}/images/"*.tar.gz; do
+    [[ -f "$f" ]] || continue
+    found=1
+    log "Loading $(basename "$f")"
+    gzip -dc "$f" | docker load
+  done
+  [[ "$found" -eq 1 ]] || die "Deploy pack has no image files"
+  rm -rf "${INSTALL_DIR}/images"
+}
+
+download_and_extract_pack() {
+  local url tmp
+  tmp="$(mktemp /tmp/dafthunk-deploy.XXXXXX.tar.gz)"
+  prepare_archive_urls
+  for url in "${ARCHIVE_TRY[@]}"; do
+    info "Trying ${url}"
+    if curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 --progress-bar \
+      "$url" -o "$tmp" \
+      && tar -tzf "$tmp" >/dev/null 2>&1; then
+      mkdir -p "$INSTALL_DIR"
+      if tar -xzf "$tmp" -C "$INSTALL_DIR"; then
+        rm -f "$tmp"
+        chmod +x "${INSTALL_DIR}/scripts/host/"*.sh "${INSTALL_DIR}/docker-host/launcher" 2>/dev/null || true
+        load_packaged_images
+        return 0
+      fi
+      info "Extract failed: ${url}"
+    else
+      info "Failed: ${url}"
+    fi
+  done
+  rm -f "$tmp"
+  die "deploy pack download failed"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -66,14 +98,6 @@ while [[ $# -gt 0 ]]; do
     --detach)
       DETACH=1
       DEPLOY_ARGS+=(--detach)
-      shift
-      ;;
-    --skip-migrate)
-      SKIP_MIGRATE=1
-      shift
-      ;;
-    --migrate-only)
-      MIGRATE_ONLY=1
       shift
       ;;
     --reset)
@@ -88,11 +112,9 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: sudo bash update.sh [options]
 
-  (default)       git pull → precheck + migrate → rebuild
-  --detach        rebuild in tmux (passed to deploy.sh)
-  --skip-migrate  git pull → rebuild only (no DB migrate)
-  --migrate-only  git pull → precheck + migrate, no rebuild
-  --reset         stop stack, wipe DB + uploads, hard reset code, migrate, rebuild
+  (default)       download pack → load images → start
+  --detach        start in tmux (passed to deploy.sh)
+  --reset         stop stack, wipe DB + uploads, refresh pack, start
                   (keeps containers/app.yml and HTTPS certs)
   -y, --yes       skip confirmation (for --reset)
 EOF
@@ -104,19 +126,10 @@ EOF
   esac
 done
 
-if [[ "$SKIP_MIGRATE" -eq 1 && "$MIGRATE_ONLY" -eq 1 ]]; then
-  die "Use only one of --skip-migrate or --migrate-only"
-fi
-
-if [[ "$RESET" -eq 1 && ( "$SKIP_MIGRATE" -eq 1 || "$MIGRATE_ONLY" -eq 1 ) ]]; then
-  die "--reset cannot be combined with --skip-migrate or --migrate-only"
-fi
-
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: sudo bash $0"
-[[ -d "${INSTALL_DIR}/.git" ]] || die "Not a git repo: ${INSTALL_DIR}"
+[[ -d "$INSTALL_DIR" ]] || die "Install dir missing: ${INSTALL_DIR}"
 
 log "Update ${INSTALL_DIR}"
-prepare_github_git
 
 reset_install() {
   if [[ "$ASSUME_YES" -ne 1 ]]; then
@@ -137,48 +150,16 @@ reset_install() {
   rm -rf "${HOST_DIR}/shared/storage"/*
   mkdir -p "${HOST_DIR}/shared/storage"
 
-  log "git fetch + reset --hard ${BRANCH}"
-  local url
-  for url in "${GIT_TRY[@]}"; do
-    info "Trying ${url}"
-    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" fetch --progress --depth 1 "$url" "$BRANCH"; then
-      git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
-      return 0
-    fi
-    info "Failed: ${url}"
-  done
-  die "git fetch failed"
+  log "Downloading deploy pack"
+  download_and_extract_pack
 }
 
 if [[ "$RESET" -eq 1 ]]; then
   reset_install
 else
-  # fetch + reset: bootstrap may have dirtied scripts/host; keep untracked app.yml and certs
-  log "git fetch + reset --hard ${BRANCH}"
-  info "Discards local edits to tracked files (not app.yml / certs)"
-  pull_ok=0
-  for url in "${GIT_TRY[@]}"; do
-    info "Trying ${url}"
-    if GIT_TERMINAL_PROMPT=0 git -C "$INSTALL_DIR" fetch --progress --depth 1 "$url" "$BRANCH"; then
-      git -C "$INSTALL_DIR" reset --hard FETCH_HEAD
-      pull_ok=1
-      break
-    fi
-    info "Failed: ${url}"
-  done
-  [[ "$pull_ok" -eq 1 ]] || die "git fetch failed"
-fi
-
-if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
-  log "database migrate"
-  bash "${INSTALL_DIR}/scripts/host/db-migrate.sh"
-else
-  info "Skipping migrate (--skip-migrate)"
-fi
-
-if [[ "$MIGRATE_ONLY" -eq 1 ]]; then
-  info "Done (--migrate-only; no rebuild)"
-  exit 0
+  log "Downloading deploy pack"
+  info "Overwrites host files (not app.yml / certs)"
+  download_and_extract_pack
 fi
 
 log "deploy"

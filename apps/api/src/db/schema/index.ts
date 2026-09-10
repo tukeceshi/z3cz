@@ -183,6 +183,9 @@ export const organizations = pgTable(
     platformCloudAccelerationEnabled: boolean("platform_cloud_acceleration_enabled")
       .notNull()
       .default(false),
+    persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
+      .notNull()
+      .default(false),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -586,6 +589,9 @@ export const persistWorkers = pgTable(
   "persist_workers",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     name: text("name").notNull(),
     enabled: boolean("enabled").notNull().default(true),
     secretHash: text("secret_hash").notNull(),
@@ -603,7 +609,10 @@ export const persistWorkers = pgTable(
     updatedAt: createUpdatedAt(),
     updatedBy: text("updated_by").references(() => users.id),
   },
-  (table) => [index("persist_workers_enabled_idx").on(table.enabled)]
+  (table) => [
+    index("persist_workers_enabled_idx").on(table.enabled),
+    index("persist_workers_organization_id_idx").on(table.organizationId),
+  ]
 );
 
 export const generationJobs = pgTable(

@@ -325,6 +325,7 @@ export function VolcanoWizardFlow({
   const [mediaKitConfig, setMediaKitConfig] = useState<WizardMediaKitConfig>(
     () => createDefaultWizardMediaKitConfig()
   );
+  const [mediaKitApiKey, setMediaKitApiKey] = useState("");
 
   const [tosServiceStatus, setTosServiceStatus] =
     useState<VolcanoTosServiceStatus | null>(null);
@@ -856,6 +857,13 @@ export function VolcanoWizardFlow({
       return;
     }
 
+    const includeMediaKit =
+      mediaKitConfig.enabled && isWizardMediaKitConfigValid(mediaKitConfig);
+    if (includeMediaKit && !mediaKitApiKey.trim()) {
+      appToast.error("pages.aiInterfaces.mediaKitEnhance.apiKeyRequired");
+      return;
+    }
+
     saveInFlightRef.current = true;
     setIsSaving(true);
     setSetupWaitError(null);
@@ -864,9 +872,6 @@ export function VolcanoWizardFlow({
     try {
       const includeTos =
         tosConfig.enabled && tosServiceStatus !== "not_opened";
-
-      const includeMediaKit =
-        mediaKitConfig.enabled && isWizardMediaKitConfigValid(mediaKitConfig);
 
       const created = await createOrganizationAiInterface(
         organizationId,
@@ -889,7 +894,12 @@ export function VolcanoWizardFlow({
                 },
               }
             : {}),
-          ...(includeMediaKit ? { mediaKit: mediaKitConfig } : {}),
+          ...(includeMediaKit
+            ? {
+                mediaKit: mediaKitConfig,
+                mediaKitApiKey: mediaKitApiKey.trim(),
+              }
+            : {}),
         },
         { idempotencyKey: setupIdempotencyKeyRef.current }
       );
@@ -1144,11 +1154,10 @@ export function VolcanoWizardFlow({
                   <div className="mb-3 break-inside-avoid">
 
                     <VolcanoWizardMediaKitCard
-
                       config={mediaKitConfig}
-
+                      apiKey={mediaKitApiKey}
                       onConfigChange={setMediaKitConfig}
-
+                      onApiKeyChange={setMediaKitApiKey}
                     />
 
                   </div>

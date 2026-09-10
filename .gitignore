@@ -28,3 +28,6 @@ logs/
 # Local-only: agent/SSH diagnostics + dev test artifacts (cookies, probe dumps, one-off scripts)
 # Layout: .local/dev-test/ — see docs/local-dev-test.md
 .local/
+
+# Local / CI deploy pack output
+z3cz-deploy.tar.gz

@@ -32,18 +32,17 @@ import {
   bootstrapPersistWorker,
   redeployPersistWorker,
 } from "../../services/bootstrap-persist-worker";
+import {
+  persistWorkerBootstrapSchema,
+  persistWorkerIdSchema,
+  persistWorkerPoolSettingsSchema,
+  persistWorkerRedeploySchema,
+} from "../persist-worker-route-schemas";
 
 const adminPersistWorkerRoutes = new Hono<ApiContext>();
 
-const workerIdSchema = z
-  .string()
-  .trim()
-  .min(2)
-  .max(64)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens");
-
 const createWorkerSchema = z.object({
-  id: workerIdSchema.optional(),
+  id: persistWorkerIdSchema.optional(),
   name: z.string().trim().min(1).max(120),
   enabled: z.boolean().optional(),
   maxConcurrentJobs: z.number().int().min(1).max(32).optional(),
@@ -56,29 +55,9 @@ const updateWorkerSchema = z.object({
   rotateSecret: z.boolean().optional(),
 });
 
-const poolSettingsSchema = z.object({
-  enabled: z.boolean(),
-});
-
-const bootstrapWorkerSchema = z.object({
-  id: workerIdSchema.optional(),
-  name: z.string().trim().min(1).max(120),
-  host: z.string().trim().min(1).max(255),
-  sshPort: z.number().int().min(1).max(65535).optional(),
-  sshUsername: z.string().trim().min(1).max(120),
-  sshPassword: z.string().min(1).max(256),
-  maxConcurrentJobs: z.number().int().min(1).max(32).optional(),
-  apiBaseUrl: z.string().trim().url().optional(),
-});
-
-const redeployWorkerSchema = z.object({
-  sshPassword: z.string().min(1).max(256),
-  apiBaseUrl: z.string().trim().url().optional(),
-});
-
 adminPersistWorkerRoutes.post(
   "/bootstrap",
-  zValidator("json", bootstrapWorkerSchema),
+  zValidator("json", persistWorkerBootstrapSchema),
   async (c) => {
     const jwtPayload = c.get("jwtPayload");
     if (!jwtPayload) {
@@ -111,7 +90,7 @@ adminPersistWorkerRoutes.post(
 
 adminPersistWorkerRoutes.post(
   "/:id/redeploy",
-  zValidator("json", redeployWorkerSchema),
+  zValidator("json", persistWorkerRedeploySchema),
   async (c) => {
     const jwtPayload = c.get("jwtPayload");
     if (!jwtPayload) {
@@ -164,7 +143,7 @@ adminPersistWorkerRoutes.get("/", async (c) => {
 
 adminPersistWorkerRoutes.put(
   "/settings",
-  zValidator("json", poolSettingsSchema),
+  zValidator("json", persistWorkerPoolSettingsSchema),
   async (c) => {
     const jwtPayload = c.get("jwtPayload");
     if (!jwtPayload) {

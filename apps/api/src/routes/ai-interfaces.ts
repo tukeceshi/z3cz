@@ -256,6 +256,7 @@ const createSchema = z
       .optional(),
     mediaKit: volcanoMediaKitSchema.optional(),
     mediaKitEnhance: volcanoMediaKitLegacyEnhanceSchema.optional(),
+    mediaKitApiKey: z.string().trim().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     if (isVolcanoAiInterfaceProvider(value.provider)) {
@@ -264,6 +265,16 @@ const createSchema = z
           code: "custom",
           message: "Access Key ID and Secret are required for Volcano",
           path: ["accessKeyId"],
+        });
+      }
+      const mediaKitEnabled =
+        value.mediaKit?.enabled === true ||
+        value.mediaKitEnhance?.enabled === true;
+      if (mediaKitEnabled && !value.mediaKitApiKey) {
+        ctx.addIssue({
+          code: "custom",
+          message: "AI MediaKit API key is required when MediaKit is enabled",
+          path: ["mediaKitApiKey"],
         });
       }
       return;
@@ -1043,10 +1054,22 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
             normalizeMediaKitRequestBody(mediaKitInput)
           )
         : metadataWithActivation;
+      const mediaKitApiKey = body.mediaKitApiKey?.trim();
+      const metadataWithMediaKitKey =
+        mediaKitApiKey && isVolcanoMetadata(metadataWithMediaKit)
+          ? {
+              ...metadataWithMediaKit,
+              mediaKitApiKeyEncrypted: await encryptSecret(
+                mediaKitApiKey,
+                c.env,
+                organizationId
+              ),
+            }
+          : metadataWithMediaKit;
 
       const interfaceId = crypto.randomUUID();
       const metadataPending = {
-        ...metadataWithMediaKit,
+        ...metadataWithMediaKitKey,
         arkApiKeyPending: true,
         setupStatus: "pending" as const,
         setupError: null,
