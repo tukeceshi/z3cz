@@ -125,6 +125,12 @@ async function main() {
     case "bootstrap":
     case "rebuild": {
       render();
+      if (compose(["up", "-d", "--wait", "--remove-orphans", "postgres"]) !== 0) {
+        process.exit(1);
+      }
+      if (compose(["up", "-d", "--force-recreate", "--no-deps", "api", "app"]) !== 0) {
+        process.exit(1);
+      }
       process.exit(compose(["up", "-d", "--remove-orphans"]) === 0 ? 0 : 1);
       return;
     }
