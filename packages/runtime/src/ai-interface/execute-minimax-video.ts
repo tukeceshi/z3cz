@@ -41,6 +41,7 @@ interface MinimaxVideoTask {
 }
 
 interface MinimaxVideoSubmitResponse {
+  readonly task_id?: string;
   readonly task?: MinimaxVideoTask;
   readonly base_resp?: MinimaxBaseResponse;
 }
@@ -48,6 +49,10 @@ interface MinimaxVideoSubmitResponse {
 interface MinimaxVideoPollResponse {
   readonly task?: MinimaxVideoTask;
   readonly base_resp?: MinimaxBaseResponse;
+}
+
+function readMinimaxSubmitTaskId(parsed: MinimaxVideoSubmitResponse): string {
+  return parsed.task_id?.trim() || parsed.task?.id?.trim() || "";
 }
 
 function readMinimaxTaskStatus(task: MinimaxVideoTask | undefined): string {
@@ -228,9 +233,9 @@ export async function submitMinimaxVideoTask(params: {
     };
   }
 
-  const taskId = parsed.task?.id?.trim();
+  const taskId = readMinimaxSubmitTaskId(parsed);
   if (!taskId) {
-    return { status: "failed", error: "No task.id in upstream response" };
+    return { status: "failed", error: "No task_id in upstream response" };
   }
 
   return {

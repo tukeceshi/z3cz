@@ -1,6 +1,62 @@
-import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_VIDEO_MODEL_PARAMETER_RULES } from "@dafthunk/types";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { pollMinimaxVideoTask } from "./execute-minimax-video";
+import {
+  pollMinimaxVideoTask,
+  submitMinimaxVideoTask,
+} from "./execute-minimax-video";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("submitMinimaxVideoTask", () => {
+  it("reads task_id from the official create response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ task_id: "2097927490929795072" }), {
+        status: 200,
+      })
+    );
+
+    const result = await submitMinimaxVideoTask({
+      apiKey: "test-key",
+      baseUrl: "https://api.minimaxi.com",
+      providerModelId: "MiniMax-H3",
+      prompt: "A cinematic sunset",
+      parameterRules: DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+    });
+
+    expect(result).toEqual({
+      status: "submitted",
+      taskId: "2097927490929795072",
+      pollUrl:
+        "https://api.minimaxi.com/v2/query/video_generation/2097927490929795072",
+    });
+  });
+
+  it("falls back to task.id when task_id is absent", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ task: { id: "2092606496913080320" } }), {
+        status: 200,
+      })
+    );
+
+    const result = await submitMinimaxVideoTask({
+      apiKey: "test-key",
+      baseUrl: "https://api.minimaxi.com",
+      providerModelId: "MiniMax-H3",
+      prompt: "A cinematic sunset",
+      parameterRules: DEFAULT_VIDEO_MODEL_PARAMETER_RULES,
+    });
+
+    expect(result).toEqual({
+      status: "submitted",
+      taskId: "2092606496913080320",
+      pollUrl:
+        "https://api.minimaxi.com/v2/query/video_generation/2092606496913080320",
+    });
+  });
+});
 
 describe("pollMinimaxVideoTask", () => {
   it("returns completed when task.status is succeeded and content.url is present", async () => {

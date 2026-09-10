@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import { useAuth } from "@/components/auth-context";
 
 /**
@@ -7,7 +9,7 @@ export const useOrgUrl = () => {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
-  const getOrgUrl = (path: string): string => {
+  const getOrgUrl = useCallback((path: string): string => {
     if (!orgId) {
       console.warn("No organization ID available for URL generation");
       return "/";
@@ -28,7 +30,7 @@ export const useOrgUrl = () => {
 
     // Otherwise, prepend org/:organizationId
     return `/org/${orgId}/${cleanPath}`;
-  };
+  }, [orgId]);
 
   return {
     orgId,
