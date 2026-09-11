@@ -19,10 +19,10 @@ import {
 } from "../db/generation-job-queries";
 import {
   decrementPersistWorkerActiveJobs,
-  getOrgPersistWorkerPoolSettings,
   getPersistWorkerPoolSettings,
   hasEnabledPersistWorkers,
   incrementPersistWorkerActiveJobs,
+  persistWorkerServesOrganization,
   touchPersistWorkerHeartbeat,
   verifyPersistWorkerSecret,
 } from "../db/persist-worker-queries";
@@ -37,39 +37,10 @@ import {
   validateGenerationJobUploadMedia,
 } from "./validate-generation-job-upload";
 
-export function shouldFallbackWorkerPersistToApi(
-  job: GenerationJobRecord,
-  nowMs: number = Date.now()
-): boolean {
-  if (job.status !== "uploading") {
-    return false;
-  }
-  if (job.resultJson?.persistOwner !== "server") {
-    return false;
-  }
-  if (job.resultJson?.persistDispatch !== "worker") {
-    return false;
-  }
-
-  const anchor =
-    job.resultJson.workerClaimedAt ?? job.resultJson.workerDispatchedAt;
-  if (!anchor) {
-    return false;
-  }
-
-  return (
-    Date.parse(anchor) + GENERATION_JOB_WORKER_CLAIM_TIMEOUT_MS <= nowMs
-  );
-}
-
 export async function isPersistWorkerPoolActive(
   db: Database,
   organizationId: string
 ): Promise<boolean> {
-  const settings = await getOrgPersistWorkerPoolSettings(db, organizationId);
-  if (!settings.enabled) {
-    return false;
-  }
   return hasEnabledPersistWorkers(db, organizationId);
 }
 
@@ -88,7 +59,7 @@ export async function claimPersistJobForWorker(
   readonly pendingMedia: readonly GenerationJobPendingMedia[];
 } | null> {
   const worker = await verifyPersistWorkerSecret(db, workerId, secret);
-  if (!worker?.organizationId) {
+  if (!worker) {
     return null;
   }
 
@@ -99,13 +70,21 @@ export async function claimPersistJobForWorker(
     return null;
   }
 
+  const orgClaimFilter = worker.organizationId
+    ? sql`AND organization_id = ${worker.organizationId}`
+    : sql`AND NOT EXISTS (
+        SELECT 1 FROM persist_workers AS org_workers
+        WHERE org_workers.organization_id = generation_jobs.organization_id
+          AND org_workers.enabled = true
+      )`;
+
   try {
     const claimed = await db.transaction(async (tx) => {
       const rows = (await tx.execute(sql`
         SELECT id, organization_id, result_json
         FROM generation_jobs
         WHERE status = 'uploading'
-          AND organization_id = ${worker.organizationId}
+          ${orgClaimFilter}
           AND result_json->>'persistOwner' = 'server'
           AND result_json->>'persistDispatch' = 'worker'
           AND (
@@ -206,8 +185,7 @@ export async function presignPersistJobUploadsForWorker(
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
     mapped.resultJson.persistWorkerId !== params.workerId ||
-    !worker.organizationId ||
-    mapped.organizationId !== worker.organizationId
+    !persistWorkerServesOrganization(worker, mapped.organizationId)
   ) {
     return null;
   }
@@ -277,8 +255,7 @@ export async function completePersistJobFromWorker(
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
     mapped.resultJson.persistWorkerId !== params.workerId ||
-    !worker.organizationId ||
-    mapped.organizationId !== worker.organizationId
+    !persistWorkerServesOrganization(worker, mapped.organizationId)
   ) {
     return null;
   }
@@ -369,8 +346,7 @@ export async function failPersistJobFromWorker(
     mapped.status !== "uploading" ||
     mapped.resultJson?.persistDispatch !== "worker" ||
     mapped.resultJson.persistWorkerId !== params.workerId ||
-    !worker.organizationId ||
-    mapped.organizationId !== worker.organizationId
+    !persistWorkerServesOrganization(worker, mapped.organizationId)
   ) {
     return null;
   }

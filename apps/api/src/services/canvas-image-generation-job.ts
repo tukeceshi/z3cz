@@ -23,6 +23,7 @@ import {
 import { upsertMediaResources } from "../db/media-resource-queries";
 import { finalizeAiModelInvocation } from "../db/platform-ai-model-queries";
 import { createUpstreamRequestLogger } from "./create-upstream-request-logger";
+import { withOrgApiForwarding } from "./org-api-forwarding";
 import { buildReadyToPersistJobPayload } from "./generation-job-service";
 import { markMediaResourcesFailed } from "./mark-media-resources-failed";
 import { registerMediaResources } from "./media-resource-catalog-service";
@@ -203,7 +204,15 @@ export async function runCanvasImageGenerationJob(params: {
     operation: "submit",
   });
 
-  const result = await executeVolcanoImageGeneration({
+  const result = await withOrgApiForwarding(
+    {
+      db,
+      env: params.env,
+      organizationId: params.organizationId,
+      aiInterfaceId: params.interfaceId,
+    },
+    () =>
+      executeVolcanoImageGeneration({
     apiKey: params.apiKey,
     baseUrl: params.baseUrl,
     providerModelId: params.providerModelId,
@@ -217,7 +226,8 @@ export async function runCanvasImageGenerationJob(params: {
     workflowId: params.workflowId,
     upstreamLog,
     useFullSubmitUrl: params.useFullSubmitUrl,
-  });
+      })
+  );
 
   if (result.status === "failed") {
     await markResourcesFailed(db, {

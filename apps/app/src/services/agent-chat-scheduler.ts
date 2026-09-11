@@ -14,6 +14,7 @@ import {
 
 import {
   type AgentToolCall,
+  attachMakeToolInventory,
   isPendingAnimationConfirm,
   toolCallFromFunctionArgs,
 } from "@/services/agent-canvas-state";
@@ -1063,10 +1064,15 @@ export async function runAgentScheduler(
       publish();
       return undefined;
     }
-    const toolResult = await params.runTool(toolCall);
+    const rawToolResult = await params.runTool(toolCall);
     if (aborted()) {
       return { content: publish(), stopped: true };
     }
+    const toolResult = attachMakeToolInventory(
+      toolName,
+      rawToolResult,
+      canvasInventory()
+    );
     if (isPendingAnimationConfirm(toolResult)) {
       if (!canPauseForExecuteConfirm(answer.talk)) {
         const result = JSON.stringify({ error: EXECUTE_TALK_REQUIRED });

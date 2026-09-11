@@ -15,13 +15,18 @@ import {
 } from "./agent-capabilities";
 import {
   AGENT_CANVAS_EXCERPT_MAX_CHARS,
+  attachMakeToolInventory,
   CANVAS_GET_STATE_TOOL,
+  CANVAS_IMPORT_NOT_SUPPORTED,
   CANVAS_RESOLVE_RESOURCE_TOOL,
   compactCanvasAgentState,
   EMPTY_SIMPLE_ANIMATION_SOURCE,
   executeCanvasAgentTool,
   formatCanvasInventory,
+  generationPromptIsCanvasImport,
+  mapWriteNodeConnections,
   parseAgentToolCall,
+  parseWriteNodesInput,
   toolCallFromFunctionArgs,
   truncateAgentCanvasExcerpt,
 } from "./agent-canvas-state";
@@ -562,12 +567,205 @@ describe("executeCanvasAgentTool", () => {
         createGenerationFlow,
       },
     });
-    expect(JSON.parse(text)).toEqual({ ok: true, nodeId: "n-new" });
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      nodeId: "n-new",
+      created: {
+        kind: "generation",
+        mode: "image",
+        prompt: "一只猫",
+      },
+    });
     expect(createGenerationFlow).toHaveBeenCalledWith({
       mode: "image",
       prompt: "一只猫",
       referenceNodeIds: [],
       autoRun: true,
+    });
+  });
+
+  it("rejects using generation flow to import a public canvas", async () => {
+    const createGenerationFlow = vi.fn();
+    const prompt =
+      "导入公开画布内容并恢复其全部节点、文字、提示词、素材引用和连接关系： https://xj.quantv.com/api/canvas/public/featured/cmtspfjjq1yo8gizq7e4j3nfo";
+    expect(generationPromptIsCanvasImport(prompt)).toBe(true);
+    expect(
+      generationPromptIsCanvasImport("一只穿橙色衬衫的模特三视图")
+    ).toBe(false);
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_create_generation_flow",
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          mode: "text",
+          prompt,
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: ["canvas-make"],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+        createGenerationFlow,
+      },
+    });
+    expect(JSON.parse(text)).toEqual({ error: CANVAS_IMPORT_NOT_SUPPORTED });
+    expect(createGenerationFlow).not.toHaveBeenCalled();
+  });
+
+  it("attaches fresh inventory to make results but not confirm pauses", () => {
+    expect(
+      attachMakeToolInventory(
+        "canvas_create_generation_flow",
+        JSON.stringify({ ok: true, nodeId: "n1" }),
+        "画布清单：\n新的"
+      )
+    ).toBe(
+      JSON.stringify({
+        ok: true,
+        nodeId: "n1",
+        canvasInventory: "画布清单：\n新的",
+      })
+    );
+    expect(
+      attachMakeToolInventory(
+        "canvas_write_text",
+        JSON.stringify({ pendingConfirm: true }),
+        "画布清单：空"
+      )
+    ).toBe(JSON.stringify({ pendingConfirm: true }));
+    expect(
+      attachMakeToolInventory(
+        "canvas_get_state",
+        JSON.stringify({ nodes: [] }),
+        "画布清单：空"
+      )
+    ).toBe(JSON.stringify({ nodes: [] }));
+  });
+
+  it("parses batch nodes and connections with aliases", () => {
+    expect(
+      parseWriteNodesInput(
+        JSON.stringify({
+          nodes: [
+            { id: "a", mode: "image", prompt: "模特", url: "https://cdn/a.png" },
+            { id: "b", mode: "text", prompt: "脚本", x: 10, y: 20 },
+          ],
+          connections: [{ from: "a", to: "b" }],
+        })
+      )
+    ).toEqual({
+      nodes: [
+        {
+          id: "a",
+          mode: "image",
+          prompt: "模特",
+          url: "https://cdn/a.png",
+          mimeType: "",
+        },
+        {
+          id: "b",
+          mode: "text",
+          prompt: "脚本",
+          url: "",
+          mimeType: "",
+          x: 10,
+          y: 20,
+        },
+      ],
+      connections: [{ fromNodeId: "a", toNodeId: "b" }],
+    });
+    expect(
+      mapWriteNodeConnections(
+        [
+          { id: "a", nodeId: "real-a", mode: "image" },
+          { id: "b", nodeId: "real-b", mode: "text" },
+        ],
+        [{ fromNodeId: "a", toNodeId: "b" }]
+      )
+    ).toEqual([{ fromNodeId: "real-a", toNodeId: "real-b" }]);
+  });
+
+  it("writes two nodes, stages media, connects by alias, and does not run", async () => {
+    const writeNodes = vi.fn(async (input) => ({
+      ok: true,
+      nodes: input.nodes.map((node) => ({
+        id: node.id,
+        nodeId: `real-${node.id}`,
+        mode: node.mode,
+      })),
+      connected: input.connections.length,
+    }));
+    const runNode = vi.fn();
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_write_nodes",
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          nodes: [
+            {
+              id: "img",
+              mode: "image",
+              url: "https://cdn/a.png",
+              mimeType: "image/png",
+            },
+            { id: "copy", mode: "text", prompt: "文案" },
+          ],
+          connections: [{ from: "img", to: "copy" }],
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: ["canvas-make"],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+        runNode,
+        writeNodes,
+      },
+    });
+    expect(writeNodes).toHaveBeenCalledWith({
+      nodes: [
+        {
+          id: "img",
+          mode: "image",
+          prompt: "",
+          url: "https://cdn/a.png",
+          mimeType: "image/png",
+        },
+        {
+          id: "copy",
+          mode: "text",
+          prompt: "文案",
+          url: "",
+          mimeType: "",
+        },
+      ],
+      connections: [{ fromNodeId: "img", toNodeId: "copy" }],
+    });
+    expect(runNode).not.toHaveBeenCalled();
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      nodes: [
+        { id: "img", nodeId: "real-img", mode: "image" },
+        { id: "copy", nodeId: "real-copy", mode: "text" },
+      ],
+      connected: 1,
+      created: {
+        kind: "nodes",
+        nodes: [
+          { id: "img", nodeId: "real-img", mode: "image" },
+          { id: "copy", nodeId: "real-copy", mode: "text" },
+        ],
+        connected: 1,
+      },
     });
   });
 

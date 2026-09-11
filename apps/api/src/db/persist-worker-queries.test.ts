@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBootstrapPersistWorkerInput } from "./persist-worker-queries";
+import {
+  buildBootstrapPersistWorkerInput,
+  persistWorkerServesOrganization,
+} from "./persist-worker-queries";
 
 describe("buildBootstrapPersistWorkerInput", () => {
   it("prefixes worker id with organization when adding for an org", () => {
@@ -28,5 +31,22 @@ describe("buildBootstrapPersistWorkerInput", () => {
     });
 
     expect(result.id).toBe("203-0-113-10");
+  });
+});
+
+describe("persistWorkerServesOrganization", () => {
+  it("lets platform workers serve any organization", () => {
+    expect(
+      persistWorkerServesOrganization({ organizationId: null }, "org-a")
+    ).toBe(true);
+  });
+
+  it("lets org workers serve only their organization", () => {
+    expect(
+      persistWorkerServesOrganization({ organizationId: "org-a" }, "org-a")
+    ).toBe(true);
+    expect(
+      persistWorkerServesOrganization({ organizationId: "org-a" }, "org-b")
+    ).toBe(false);
   });
 });

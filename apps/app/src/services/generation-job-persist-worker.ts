@@ -8,7 +8,6 @@ import type {
 import {
   isCloudAccelerationInProgress,
   isCloudStoredResource,
-  isGenerationJobReadyAtExpired,
   isServerPersistInProgress,
   shouldDeferClientPersistToServer,
   VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
@@ -274,10 +273,7 @@ async function waitForJobReadyToPersist(params: {
       throw new GenerativeGenerationCancelledError();
     }
 
-    if (
-      isGenerationJobReadyAtExpired(response.job.readyAt) &&
-      isServerPersistInProgress(response.job)
-    ) {
+    if (isServerPersistInProgress(response.job)) {
       params.onProgressPhase?.("server_persisting");
     } else if (response.job.status === "cancelling") {
       params.onProgressPhase?.("cancelling");
@@ -439,6 +435,11 @@ export async function runGenerationJobPersistWorker(params: {
     return preDownloadAcceleration;
   }
 
+  const onDownloadSlow =
+    ready.cloudAccelerationEnabled === true
+      ? params.onDownloadSlow
+      : undefined;
+
   const stagedRefs: (ResourceIdReference | undefined)[] = [];
   const pendingResourceIds = pendingMediaResourceIds(pendingMedia);
   const catalogAlreadyCloud =
@@ -520,7 +521,7 @@ export async function runGenerationJobPersistWorker(params: {
           onPhase: params.onPhase,
           onDownloadProgress: params.onDownloadProgress,
           shouldAbortDownload: params.shouldAbortDownload,
-          onDownloadSlow: params.onDownloadSlow,
+          onDownloadSlow,
         });
         params.onStaged?.(
           stagedRefs.filter((ref): ref is ResourceIdReference => Boolean(ref))
@@ -595,7 +596,7 @@ export async function runGenerationJobPersistWorker(params: {
           onPhase: params.onPhase,
           onDownloadProgress: params.onDownloadProgress,
           shouldAbortDownload: params.shouldAbortDownload,
-          onDownloadSlow: params.onDownloadSlow,
+          onDownloadSlow,
           onStaged: params.onStaged,
         });
       }

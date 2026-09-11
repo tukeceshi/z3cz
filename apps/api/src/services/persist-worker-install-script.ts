@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { PERSIST_WORKER_FORWARD_PORT } from "@dafthunk/types";
+
 import { getApiRootPath } from "../env/api-root";
 
 export const PERSIST_WORKER_INSTALL_DIR = "/opt/dafthunk-persist-worker";
@@ -10,6 +12,7 @@ export interface PersistWorkerInstallScriptParams {
   readonly workerSecret: string;
   readonly apiBaseUrl: string;
   readonly sshPassword: string;
+  readonly forwardHmacKey: string;
 }
 
 function shellQuote(value: string): string {
@@ -80,6 +83,8 @@ API_BASE_URL=${params.apiBaseUrl}
 WORKER_ID=${params.workerId}
 WORKER_SECRET=${params.workerSecret}
 POLL_INTERVAL_MS=5000
+FORWARD_PORT=${PERSIST_WORKER_FORWARD_PORT}
+FORWARD_HMAC_KEY=${params.forwardHmacKey}
 __DAFTHUNK_ENV__
 
 cat > "$STAGE_DIR/install.sh" <<'__DAFTHUNK_INSTALL__'

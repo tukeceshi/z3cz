@@ -15,6 +15,7 @@ import {
   buildPersistWorkerInstallScript,
   derivePersistWorkerApiBaseUrlFromWebHost,
 } from "./persist-worker-install-script";
+import { derivePersistWorkerForwardHmacKey } from "./persist-worker-forward-crypto";
 
 interface SshExecResult {
   readonly stdout: string;
@@ -30,17 +31,10 @@ interface DeployPersistWorkerParams {
   readonly workerId: string;
   readonly workerSecret: string;
   readonly apiBaseUrl: string;
+  readonly forwardHmacKey: string;
 }
 
-function resolvePersistWorkerApiBaseUrl(
-  env: Bindings,
-  override?: string
-): string {
-  const trimmedOverride = override?.trim().replace(/\/$/, "");
-  if (trimmedOverride) {
-    return trimmedOverride;
-  }
-
+function resolvePersistWorkerApiBaseUrl(env: Bindings): string {
   for (const candidate of [env.WEB_HOST, env.WEBSITE_URL]) {
     const trimmed = candidate?.trim().replace(/\/$/, "");
     if (trimmed) {
@@ -48,9 +42,7 @@ function resolvePersistWorkerApiBaseUrl(
     }
   }
 
-  throw new Error(
-    "API base URL is not configured. Set WEB_HOST or provide apiBaseUrl."
-  );
+  throw new Error("Site URL is not configured. Set WEB_HOST or WEBSITE_URL.");
 }
 
 async function execSshScript(
@@ -136,7 +128,7 @@ export async function bootstrapPersistWorker(
 
   const secret = generatePersistWorkerSecret();
   const secretHash = await hashPersistWorkerSecret(secret);
-  const apiBaseUrl = resolvePersistWorkerApiBaseUrl(env, input.apiBaseUrl);
+  const apiBaseUrl = resolvePersistWorkerApiBaseUrl(env);
 
   const worker = await createPersistWorker(
     db,
@@ -165,6 +157,7 @@ export async function bootstrapPersistWorker(
       workerId: worker.id,
       workerSecret: secret,
       apiBaseUrl,
+      forwardHmacKey: derivePersistWorkerForwardHmacKey(env.JWT_SECRET),
     });
 
     const active = await updatePersistWorkerDeployState(db, worker.id, {
@@ -191,7 +184,7 @@ export async function redeployPersistWorker(
   env: Bindings,
   db: Database,
   workerId: string,
-  input: { readonly sshPassword: string; readonly apiBaseUrl?: string },
+  input: { readonly sshPassword: string },
   organizationId?: string
 ): Promise<{ readonly worker: PersistWorker; readonly deployLog: string }> {
   if (env.RUNTIME === "workers") {
@@ -199,7 +192,7 @@ export async function redeployPersistWorker(
   }
 
   const worker = await getPersistWorkerById(db, workerId, organizationId);
-  if (!worker) {
+  if (!worker || (!organizationId && worker.organizationId !== null)) {
     throw new Error("Persist worker not found");
   }
   if (!worker.host || !worker.sshUsername) {
@@ -208,7 +201,7 @@ export async function redeployPersistWorker(
 
   const secret = generatePersistWorkerSecret();
   const secretHash = await hashPersistWorkerSecret(secret);
-  const apiBaseUrl = resolvePersistWorkerApiBaseUrl(env, input.apiBaseUrl);
+  const apiBaseUrl = resolvePersistWorkerApiBaseUrl(env);
 
   await updatePersistWorkerDeployState(db, workerId, {
     deployStatus: "deploying",
@@ -226,6 +219,7 @@ export async function redeployPersistWorker(
       workerId: worker.id,
       workerSecret: secret,
       apiBaseUrl,
+      forwardHmacKey: derivePersistWorkerForwardHmacKey(env.JWT_SECRET),
     });
 
     const active = await updatePersistWorkerDeployState(db, workerId, {

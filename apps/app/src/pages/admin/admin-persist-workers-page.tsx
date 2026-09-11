@@ -10,12 +10,11 @@ import {
   bootstrapAdminPersistWorker,
   deleteAdminPersistWorker,
   redeployAdminPersistWorker,
-  updateAdminPersistWorkerPoolSettings,
   useAdminPersistWorkers,
 } from "@/services/persist-worker-service";
 
 export function AdminPersistWorkersPage() {
-  const { workers, settings, workersError, isWorkersLoading, refreshWorkers } =
+  const { workers, workersError, isWorkersLoading, refreshWorkers } =
     useAdminPersistWorkers();
 
   const setBreadcrumbs = useBreadcrumbsSetter();
@@ -47,8 +46,6 @@ export function AdminPersistWorkersPage() {
       <PersistWorkersPanel
         idPrefix="admin_persist_worker"
         workers={workers}
-        settings={settings}
-        onUpdatePool={updateAdminPersistWorkerPoolSettings}
         onBootstrap={bootstrapAdminPersistWorker}
         onRedeploy={redeployAdminPersistWorker}
         onDelete={deleteAdminPersistWorker}

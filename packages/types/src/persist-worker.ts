@@ -2,6 +2,7 @@ import type { GenerationJobPendingMedia, GenerationJobRecord } from "./generatio
 import type { MediaReference } from "./media-reference";
 
 export const GENERATION_JOB_WORKER_CLAIM_TIMEOUT_MS = 900_000;
+export const PERSIST_WORKER_FORWARD_PORT = 3103;
 
 export type PersistWorkerDeployStatus =
   | "manual"
@@ -59,7 +60,6 @@ export interface BootstrapPersistWorkerRequest {
   readonly sshUsername: string;
   readonly sshPassword: string;
   readonly maxConcurrentJobs?: number;
-  readonly apiBaseUrl?: string;
 }
 
 export interface BootstrapPersistWorkerResponse {
@@ -69,7 +69,6 @@ export interface BootstrapPersistWorkerResponse {
 
 export interface RedeployPersistWorkerRequest {
   readonly sshPassword: string;
-  readonly apiBaseUrl?: string;
 }
 
 export interface RedeployPersistWorkerResponse {

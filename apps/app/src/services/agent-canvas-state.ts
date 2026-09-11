@@ -20,6 +20,7 @@ import {
   CANVAS_CONNECT_NODES_TOOL,
   CANVAS_CREATE_GENERATION_FLOW_TOOL,
   CANVAS_MAKE_CAPABILITY,
+  CANVAS_WRITE_NODES_TOOL,
   isMakeTool,
   isToolAllowed,
   lookupAgentTool,
@@ -41,6 +42,7 @@ export {
   CANVAS_CONNECT_NODES_TOOL,
   CANVAS_CREATE_GENERATION_FLOW_TOOL,
   CANVAS_MAKE_CAPABILITY,
+  CANVAS_WRITE_NODES_TOOL,
 };
 export const REMOTION_OPEN_TOOL = "remotion_open" as const;
 export const REMOTION_CLOSE_TOOL = "remotion_close" as const;
@@ -48,6 +50,8 @@ export const REMOTION_GET_TOOL = "remotion_get" as const;
 export const REMOTION_WRITE_TOOL = "remotion_write" as const;
 export { SIMPLE_ANIMATION_TOOL };
 export const AGENT_CANVAS_EXCERPT_MAX_CHARS = 120;
+export const CANVAS_IMPORT_NOT_SUPPORTED =
+  "不能导入或恢复外部画布。这个工具只新建一条生成，prompt 必须是要生成的内容。当前没有导入工具，直接告诉用户。";
 
 export interface CanvasAgentNodeSummary {
   readonly id: string;
@@ -74,6 +78,27 @@ export interface AgentGenerationFlowInput {
 export interface AgentConnectInput {
   readonly fromNodeId: string;
   readonly toNodeId: string;
+}
+
+export interface AgentWriteNodeInput {
+  readonly id: string;
+  readonly mode: AgentGenerationMode;
+  readonly prompt: string;
+  readonly url: string;
+  readonly mimeType: string;
+  readonly x?: number;
+  readonly y?: number;
+}
+
+export interface AgentWriteNodesInput {
+  readonly nodes: readonly AgentWriteNodeInput[];
+  readonly connections: readonly AgentConnectInput[];
+}
+
+export interface AgentWriteNodesCreated {
+  readonly id: string;
+  readonly nodeId: string;
+  readonly mode: AgentGenerationMode;
 }
 
 export interface CanvasAgentEdgeSummary {
@@ -133,6 +158,14 @@ export interface AgentCapabilityHandlers {
   readonly connectNodes?: (
     connections: readonly AgentConnectInput[]
   ) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  readonly writeNodes?: (
+    input: AgentWriteNodesInput
+  ) => Promise<{
+    readonly ok: boolean;
+    readonly nodes?: readonly AgentWriteNodesCreated[];
+    readonly connected?: number;
+    readonly error?: string;
+  }>;
 }
 
 export function emptyAgentToolCall(): AgentToolCall {
@@ -173,6 +206,43 @@ export function formatCanvasInventory(
     return "画布清单：空";
   }
   return `画布清单：\n${JSON.stringify(snapshot)}`;
+}
+
+export function generationPromptIsCanvasImport(prompt: string): boolean {
+  const text = prompt.trim();
+  if (!/导入|恢复/.test(text)) {
+    return false;
+  }
+  if (!/画布|canvas/i.test(text)) {
+    return false;
+  }
+  return /https?:\/\//i.test(text) || /全部节点|连接关系|公开画布/.test(text);
+}
+
+export function attachMakeToolInventory(
+  toolName: string,
+  result: string,
+  inventory: string | undefined
+): string {
+  if (!isMakeTool(toolName) || !inventory) {
+    return result;
+  }
+  try {
+    const parsed: unknown = JSON.parse(result);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const record = parsed as { readonly pendingConfirm?: unknown };
+      if (record.pendingConfirm === true) {
+        return result;
+      }
+      return JSON.stringify({
+        ...(parsed as Record<string, unknown>),
+        canvasInventory: inventory,
+      });
+    }
+  } catch {
+    // keep raw
+  }
+  return `${result}\n${inventory}`;
 }
 
 function promptFromNodeData(data: WorkflowNodeType): string | undefined {
@@ -352,6 +422,9 @@ function parseGenerationFlowInput(
   if (!prompt) {
     return { error: "缺少 prompt" };
   }
+  if (generationPromptIsCanvasImport(prompt)) {
+    return { error: CANVAS_IMPORT_NOT_SUPPORTED };
+  }
   const x = typeof record.x === "number" ? record.x : undefined;
   const y = typeof record.y === "number" ? record.y : undefined;
   return {
@@ -374,24 +447,110 @@ function parseConnectInputs(
   if (!Array.isArray(record.connections)) {
     return { error: "缺少 connections" };
   }
+  const connections = connectPairsFromUnknown(record.connections);
+  if (connections.length === 0) {
+    return { error: "缺少 connections" };
+  }
+  return connections;
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function connectPairsFromUnknown(value: unknown): readonly AgentConnectInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
   const connections: AgentConnectInput[] = [];
-  for (const item of record.connections) {
+  for (const item of value) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       continue;
     }
-    const row = item as { readonly fromNodeId?: unknown; readonly toNodeId?: unknown };
-    const fromNodeId =
-      typeof row.fromNodeId === "string" ? row.fromNodeId.trim() : "";
-    const toNodeId = typeof row.toNodeId === "string" ? row.toNodeId.trim() : "";
+    const row = item as {
+      readonly from?: unknown;
+      readonly to?: unknown;
+      readonly fromNodeId?: unknown;
+      readonly toNodeId?: unknown;
+    };
+    const fromNodeId = stringField(row.fromNodeId) || stringField(row.from);
+    const toNodeId = stringField(row.toNodeId) || stringField(row.to);
     if (!fromNodeId || !toNodeId) {
       continue;
     }
     connections.push({ fromNodeId, toNodeId });
   }
-  if (connections.length === 0) {
-    return { error: "缺少 connections" };
-  }
   return connections;
+}
+
+export function parseWriteNodesInput(
+  payload: string
+): AgentWriteNodesInput | { readonly error: string } {
+  const record = readJsonRecord(payload);
+  if (!record) {
+    return { error: "缺少参数" };
+  }
+  if (!Array.isArray(record.nodes) || record.nodes.length === 0) {
+    return { error: "缺少 nodes" };
+  }
+  const nodes: AgentWriteNodeInput[] = [];
+  const seen = new Set<string>();
+  for (const [index, item] of record.nodes.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const row = item as {
+      readonly id?: unknown;
+      readonly mode?: unknown;
+      readonly prompt?: unknown;
+      readonly url?: unknown;
+      readonly mimeType?: unknown;
+      readonly x?: unknown;
+      readonly y?: unknown;
+    };
+    const mode = parseGenerationMode(row.mode);
+    if (!mode) {
+      return { error: "缺少 mode" };
+    }
+    const id = stringField(row.id) || `n${index + 1}`;
+    if (seen.has(id)) {
+      return { error: "节点 id 重复" };
+    }
+    seen.add(id);
+    const x = typeof row.x === "number" ? row.x : undefined;
+    const y = typeof row.y === "number" ? row.y : undefined;
+    nodes.push({
+      id,
+      mode,
+      prompt: stringField(row.prompt),
+      url: stringField(row.url),
+      mimeType: stringField(row.mimeType),
+      ...(x !== undefined ? { x } : {}),
+      ...(y !== undefined ? { y } : {}),
+    });
+  }
+  if (nodes.length === 0) {
+    return { error: "缺少 nodes" };
+  }
+  return {
+    nodes,
+    connections: connectPairsFromUnknown(record.connections),
+  };
+}
+
+export function mapWriteNodeConnections(
+  created: readonly AgentWriteNodesCreated[],
+  connections: readonly AgentConnectInput[]
+): readonly AgentConnectInput[] {
+  const aliases = new Map<string, string>();
+  for (const node of created) {
+    aliases.set(node.id, node.nodeId);
+    aliases.set(node.nodeId, node.nodeId);
+  }
+  return connections.map((item) => ({
+    fromNodeId: aliases.get(item.fromNodeId) ?? item.fromNodeId,
+    toNodeId: aliases.get(item.toNodeId) ?? item.toNodeId,
+  }));
 }
 
 function writeTextFromCall(call: AgentToolCall): string {
@@ -590,7 +749,18 @@ export async function executeCanvasAgentTool(params: {
     if (!handlers?.createGenerationFlow) {
       return JSON.stringify({ error: "无法创建节点" });
     }
-    return JSON.stringify(await handlers.createGenerationFlow(input));
+    const made = await handlers.createGenerationFlow(input);
+    if (!made.ok) {
+      return JSON.stringify(made);
+    }
+    return JSON.stringify({
+      ...made,
+      created: {
+        kind: "generation",
+        mode: input.mode,
+        prompt: truncateAgentCanvasExcerpt(input.prompt) ?? input.prompt,
+      },
+    });
   }
   if (params.call.name === CANVAS_CONNECT_NODES_TOOL) {
     const connections = parseConnectInputs(params.call.payload);
@@ -601,6 +771,27 @@ export async function executeCanvasAgentTool(params: {
       return JSON.stringify({ error: "无法连线" });
     }
     return JSON.stringify(await handlers.connectNodes(connections));
+  }
+  if (params.call.name === CANVAS_WRITE_NODES_TOOL) {
+    const input = parseWriteNodesInput(params.call.payload);
+    if ("error" in input) {
+      return JSON.stringify({ error: input.error });
+    }
+    if (!handlers?.writeNodes) {
+      return JSON.stringify({ error: "无法写入节点" });
+    }
+    const made = await handlers.writeNodes(input);
+    if (!made.ok) {
+      return JSON.stringify(made);
+    }
+    return JSON.stringify({
+      ...made,
+      created: {
+        kind: "nodes",
+        nodes: made.nodes ?? [],
+        connected: made.connected ?? 0,
+      },
+    });
   }
   if (params.call.name === CANVAS_WRITE_TEXT_TOOL) {
     const record = readJsonRecord(params.call.payload);

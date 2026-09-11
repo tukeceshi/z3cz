@@ -31,12 +31,40 @@ export interface ListAiInterfaceCloudAccelerationResponse {
   readonly entries: readonly AiInterfaceCloudAccelerationEntry[];
 }
 
+export interface CloudAccelerationAvailableEntry {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface ListAiInterfaceCloudAccelerationAvailableResponse {
+  readonly interfaces: readonly CloudAccelerationAvailableEntry[];
+}
+
 export interface EnableAlwaysAiInterfaceCloudAccelerationRequest {
   readonly aiInterfaceId: string;
 }
 
 export interface EnableAlwaysAiInterfaceCloudAccelerationResponse {
   readonly entry: AiInterfaceCloudAccelerationEntry;
+}
+
+export interface ApiForwardingInterfaceEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly enabled: boolean;
+}
+
+export interface ListApiForwardingInterfacesResponse {
+  readonly interfaces: readonly ApiForwardingInterfaceEntry[];
+}
+
+export interface ApiForwardingAvailableEntry {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface ListApiForwardingAvailableResponse {
+  readonly interfaces: readonly ApiForwardingAvailableEntry[];
 }
 
 export const CLOUD_ACCELERATION_DOWNLOAD_SLOW_MS = 2_000 as const;

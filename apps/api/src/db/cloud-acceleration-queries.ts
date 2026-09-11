@@ -1,5 +1,5 @@
 import type { CloudAccelerationStatus } from "@dafthunk/types";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 
 import type { Database } from "../db";
 import {
@@ -67,6 +67,50 @@ export async function listActiveAiInterfaceCloudAccelerations(
     aiInterfaceId: row.aiInterfaceId,
     interfaceName: row.interfaceName,
     enabledAt: row.enabledAt.toISOString(),
+  }));
+}
+
+export async function listOrgCloudAccelerationAvailable(
+  db: Database,
+  organizationId: string
+): Promise<
+  readonly {
+    readonly id: string;
+    readonly name: string;
+  }[]
+> {
+  const active = await db
+    .select({
+      aiInterfaceId: aiInterfaceCloudAcceleration.aiInterfaceId,
+    })
+    .from(aiInterfaceCloudAcceleration)
+    .where(
+      and(
+        eq(aiInterfaceCloudAcceleration.organizationId, organizationId),
+        isNull(aiInterfaceCloudAcceleration.disabledAt)
+      )
+    );
+
+  const activeIds = active.map((row) => row.aiInterfaceId);
+  const rows = await db
+    .select({
+      id: organizationAiInterfaces.id,
+      name: organizationAiInterfaces.name,
+    })
+    .from(organizationAiInterfaces)
+    .where(
+      activeIds.length === 0
+        ? eq(organizationAiInterfaces.organizationId, organizationId)
+        : and(
+            eq(organizationAiInterfaces.organizationId, organizationId),
+            notInArray(organizationAiInterfaces.id, activeIds)
+          )
+    )
+    .orderBy(organizationAiInterfaces.name);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
   }));
 }
 
@@ -190,4 +234,90 @@ export function resourceIdsFromPendingMedia(
     return ids;
   }
   return placeholderResourceIds ?? [];
+}
+
+export async function listOrgApiForwardingInterfaces(
+  db: Database,
+  organizationId: string
+): Promise<
+  readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: boolean;
+  }[]
+> {
+  const rows = await db
+    .select({
+      id: organizationAiInterfaces.id,
+      name: organizationAiInterfaces.name,
+      enabled: organizationAiInterfaces.apiForwardingEnabled,
+    })
+    .from(organizationAiInterfaces)
+    .where(
+      and(
+        eq(organizationAiInterfaces.organizationId, organizationId),
+        eq(organizationAiInterfaces.apiForwardingEnabled, true)
+      )
+    )
+    .orderBy(organizationAiInterfaces.name);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    enabled: row.enabled,
+  }));
+}
+
+export async function listOrgApiForwardingAvailable(
+  db: Database,
+  organizationId: string
+): Promise<
+  readonly {
+    readonly id: string;
+    readonly name: string;
+  }[]
+> {
+  const rows = await db
+    .select({
+      id: organizationAiInterfaces.id,
+      name: organizationAiInterfaces.name,
+    })
+    .from(organizationAiInterfaces)
+    .where(
+      and(
+        eq(organizationAiInterfaces.organizationId, organizationId),
+        eq(organizationAiInterfaces.apiForwardingEnabled, false)
+      )
+    )
+    .orderBy(organizationAiInterfaces.name);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+  }));
+}
+
+export async function setOrgInterfaceApiForwarding(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly aiInterfaceId: string;
+    readonly enabled: boolean;
+  }
+): Promise<boolean> {
+  const result = await db
+    .update(organizationAiInterfaces)
+    .set({
+      apiForwardingEnabled: params.enabled,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(organizationAiInterfaces.organizationId, params.organizationId),
+        eq(organizationAiInterfaces.id, params.aiInterfaceId)
+      )
+    )
+    .returning({ id: organizationAiInterfaces.id });
+
+  return result.length > 0;
 }

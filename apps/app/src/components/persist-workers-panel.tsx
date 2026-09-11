@@ -2,10 +2,9 @@ import type {
   BootstrapPersistWorkerRequest,
   PersistWorker,
   PersistWorkerDeployStatus,
-  PersistWorkerPoolSettings,
   RedeployPersistWorkerRequest,
 } from "@dafthunk/types";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import {
@@ -21,7 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -31,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAppToast } from "@/hooks/use-app-toast";
+import { cn } from "@/utils/utils";
 
 export interface PersistWorkerBootstrapFormState {
   name: string;
@@ -39,7 +38,6 @@ export interface PersistWorkerBootstrapFormState {
   sshUsername: string;
   sshPassword: string;
   maxConcurrentJobs: number;
-  apiBaseUrl: string;
 }
 
 export const emptyPersistWorkerBootstrapForm =
@@ -47,10 +45,9 @@ export const emptyPersistWorkerBootstrapForm =
     name: "",
     host: "",
     sshPort: 22,
-    sshUsername: "root",
+    sshUsername: "",
     sshPassword: "",
     maxConcurrentJobs: 1,
-    apiBaseUrl: "",
   });
 
 function formatTimestamp(value: string | null): string {
@@ -77,9 +74,9 @@ function deployStatusVariant(
 
 interface PersistWorkersPanelProps {
   readonly idPrefix: string;
+  readonly title?: string;
+  readonly description?: string;
   readonly workers: readonly PersistWorker[];
-  readonly settings: PersistWorkerPoolSettings;
-  readonly onUpdatePool: (enabled: boolean) => Promise<PersistWorkerPoolSettings>;
   readonly onBootstrap: (
     input: BootstrapPersistWorkerRequest
   ) => Promise<{ readonly deployLog: string }>;
@@ -93,16 +90,14 @@ interface PersistWorkersPanelProps {
 
 export function PersistWorkersPanel({
   idPrefix,
+  title,
+  description,
   workers,
-  settings,
-  onUpdatePool,
   onBootstrap,
   onRedeploy,
   onDelete,
   onRefresh,
 }: PersistWorkersPanelProps) {
-  const [poolEnabled, setPoolEnabled] = useState(false);
-  const [isUpdatingPool, setIsUpdatingPool] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deployLogOpen, setDeployLogOpen] = useState(false);
   const [deployLog, setDeployLog] = useState("");
@@ -119,28 +114,6 @@ export function PersistWorkersPanel({
   const { t } = useTranslation();
   const appToast = useAppToast();
 
-  useEffect(() => {
-    setPoolEnabled(settings.enabled);
-  }, [settings.enabled]);
-
-  const handlePoolToggle = async (enabled: boolean) => {
-    setIsUpdatingPool(true);
-    try {
-      await onUpdatePool(enabled);
-      setPoolEnabled(enabled);
-      await onRefresh();
-      appToast.success("admin.persistWorkers.poolUpdated");
-    } catch (error) {
-      appToast.errorRaw(
-        error instanceof Error
-          ? error.message
-          : t("admin.persistWorkers.poolUpdateFailed")
-      );
-    } finally {
-      setIsUpdatingPool(false);
-    }
-  };
-
   const handleOpenBootstrap = () => {
     setForm(emptyPersistWorkerBootstrapForm());
     setDialogOpen(true);
@@ -156,9 +129,6 @@ export function PersistWorkersPanel({
         sshUsername: form.sshUsername.trim(),
         sshPassword: form.sshPassword,
         maxConcurrentJobs: form.maxConcurrentJobs,
-        ...(form.apiBaseUrl.trim()
-          ? { apiBaseUrl: form.apiBaseUrl.trim() }
-          : {}),
       });
 
       setDeployLog(result.deployLog);
@@ -229,30 +199,24 @@ export function PersistWorkersPanel({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          {t("admin.persistWorkers.description")}
-        </p>
-        <Button type="button" onClick={handleOpenBootstrap}>
-          {t("admin.persistWorkers.initialize")}
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between rounded-lg border bg-background p-4">
-        <div>
-          <div className="font-medium">{t("admin.persistWorkers.poolToggle")}</div>
-          <p className="text-sm text-muted-foreground">
-            {t("admin.persistWorkers.poolDescription")}
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          {title ? (
+            <h2 className="text-sm font-medium">{title}</h2>
+          ) : null}
+          <p
+            className={cn(
+              "text-muted-foreground",
+              title ? "text-xs" : "text-sm"
+            )}
+          >
+            {description ?? t("admin.persistWorkers.description")}
           </p>
         </div>
-        <Switch
-          checked={poolEnabled}
-          disabled={isUpdatingPool}
-          onCheckedChange={(enabled) => {
-            void handlePoolToggle(enabled);
-          }}
-        />
+        <Button type="button" className="shrink-0" onClick={handleOpenBootstrap}>
+          {t("admin.persistWorkers.add")}
+        </Button>
       </div>
 
       <div className="rounded-lg border bg-background">
@@ -274,7 +238,10 @@ export function PersistWorkersPanel({
           <TableBody>
             {workers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="py-10 text-center text-muted-foreground"
+                >
                   {t("admin.persistWorkers.empty")}
                 </TableCell>
               </TableRow>
@@ -352,11 +319,11 @@ export function PersistWorkersPanel({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("admin.persistWorkers.initialize")}</DialogTitle>
+            <DialogTitle>{t("admin.persistWorkers.add")}</DialogTitle>
           </DialogHeader>
 
           <p className="text-sm text-muted-foreground">
-            {t("admin.persistWorkers.initializeDescription")}
+            {t("admin.persistWorkers.addDescription")}
           </p>
 
           <form
@@ -472,24 +439,6 @@ export function PersistWorkersPanel({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor={`${idPrefix}-api-url`}>
-                {t("admin.persistWorkers.form.apiBaseUrl")}
-              </Label>
-              <CredentialPlainInput
-                id={`${idPrefix}-api-url`}
-                name={`${idPrefix}_api_base_url`}
-                value={form.apiBaseUrl}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    apiBaseUrl: event.target.value,
-                  }))
-                }
-                placeholder={t("admin.persistWorkers.form.apiBaseUrlPlaceholder")}
-              />
-            </div>
-
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -508,7 +457,7 @@ export function PersistWorkersPanel({
                   !form.sshPassword
                 }
               >
-                {t("admin.persistWorkers.initializeSubmit")}
+                {t("admin.persistWorkers.addSubmit")}
               </Button>
             </div>
           </form>

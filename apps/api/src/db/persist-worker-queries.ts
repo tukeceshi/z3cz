@@ -6,7 +6,7 @@ import type {
   PersistWorkerPoolSettings,
   UpdatePersistWorkerRequest,
 } from "@dafthunk/types";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { hashPassword, verifyPassword } from "../auth/password";
 import type { Database } from "./index";
@@ -131,9 +131,34 @@ export async function listPersistWorkers(
     : await db
         .select()
         .from(persistWorkers)
+        .where(isNull(persistWorkers.organizationId))
         .orderBy(asc(persistWorkers.name));
 
   return rows.map(rowToPersistWorker);
+}
+
+export async function getPlatformPersistWorkerById(
+  db: Database,
+  id: string
+): Promise<PersistWorker | undefined> {
+  const [row] = await db
+    .select()
+    .from(persistWorkers)
+    .where(
+      and(eq(persistWorkers.id, id), isNull(persistWorkers.organizationId))
+    )
+    .limit(1);
+
+  return row ? rowToPersistWorker(row) : undefined;
+}
+
+export function persistWorkerServesOrganization(
+  worker: { readonly organizationId: string | null },
+  organizationId: string
+): boolean {
+  return (
+    worker.organizationId === null || worker.organizationId === organizationId
+  );
 }
 
 export async function getPersistWorkerById(
@@ -174,20 +199,82 @@ export async function hasEnabledPersistWorkers(
   db: Database,
   organizationId?: string
 ): Promise<boolean> {
-  const [row] = await db
+  if (!organizationId) {
+    const [row] = await db
+      .select({ id: persistWorkers.id })
+      .from(persistWorkers)
+      .where(
+        and(
+          eq(persistWorkers.enabled, true),
+          isNull(persistWorkers.organizationId)
+        )
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
+  const [orgRow] = await db
     .select({ id: persistWorkers.id })
     .from(persistWorkers)
     .where(
-      organizationId
-        ? and(
-            eq(persistWorkers.enabled, true),
-            eq(persistWorkers.organizationId, organizationId)
-          )
-        : eq(persistWorkers.enabled, true)
+      and(
+        eq(persistWorkers.enabled, true),
+        eq(persistWorkers.organizationId, organizationId)
+      )
     )
     .limit(1);
 
-  return Boolean(row);
+  if (orgRow) {
+    return true;
+  }
+
+  const [platformRow] = await db
+    .select({ id: persistWorkers.id })
+    .from(persistWorkers)
+    .where(
+      and(
+        eq(persistWorkers.enabled, true),
+        isNull(persistWorkers.organizationId)
+      )
+    )
+    .limit(1);
+
+  return Boolean(platformRow);
+}
+
+async function pickForwardWorkerHost(
+  db: Database,
+  organizationId: string | null
+): Promise<{ readonly host: string } | null> {
+  const [row] = await db
+    .select({ host: persistWorkers.host })
+    .from(persistWorkers)
+    .where(
+      and(
+        eq(persistWorkers.enabled, true),
+        organizationId
+          ? eq(persistWorkers.organizationId, organizationId)
+          : isNull(persistWorkers.organizationId),
+        isNotNull(persistWorkers.host),
+        ne(persistWorkers.host, "")
+      )
+    )
+    .orderBy(desc(persistWorkers.lastHeartbeatAt))
+    .limit(1);
+
+  const host = row?.host?.trim();
+  return host ? { host } : null;
+}
+
+export async function pickOrgApiForwardWorker(
+  db: Database,
+  organizationId: string
+): Promise<{ readonly host: string } | null> {
+  const orgWorker = await pickForwardWorkerHost(db, organizationId);
+  if (orgWorker) {
+    return orgWorker;
+  }
+  return pickForwardWorkerHost(db, null);
 }
 
 export async function verifyPersistWorkerSecret(
@@ -353,7 +440,7 @@ export async function deletePersistWorker(
             eq(persistWorkers.id, id),
             eq(persistWorkers.organizationId, organizationId)
           )
-        : eq(persistWorkers.id, id)
+        : and(eq(persistWorkers.id, id), isNull(persistWorkers.organizationId))
     )
     .returning({ id: persistWorkers.id });
 
