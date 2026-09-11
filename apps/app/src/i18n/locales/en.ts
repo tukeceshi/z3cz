@@ -935,7 +935,8 @@ export const en = {
       title: "Platform acceleration servers",
       description: "Accelerate access and downloads for every user.",
       add: "Add",
-      addDescription: "Enter SSH details to install and start automatically. Passwords are not saved.",
+      addDescription:
+        "Enter SSH details to install and start automatically. Passwords are not saved. Open port 3103 for interface acceleration.",
       addSubmit: "Add",
       redeploy: "Redeploy",
       redeploySubmit: "Redeploy",
@@ -1804,6 +1805,7 @@ export const en = {
       workersTitle: "Acceleration servers",
       workersHint:
         "Installed automatically after you fill in the form. Passwords are not saved. Platform servers are used if you have none of your own.",
+      platformWorkerName: "Platform",
       interfaceListTitle: "Download acceleration & unattended download",
       interfaceListHint:
         "The server downloads for you. You can also accelerate once from the canvas.",

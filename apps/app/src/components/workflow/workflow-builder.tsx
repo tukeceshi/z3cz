@@ -332,6 +332,7 @@ export function WorkflowBuilder({
     deleteSelected,
     selectNode,
     selectNodes,
+    removeNodesWithoutConfirm,
     applyLayout,
     copySelected,
     cutSelected,
@@ -810,6 +811,9 @@ export function WorkflowBuilder({
                     readOnly ? undefined : handleAddGenerativeNode
                   }
                   onConnectWorkflow={readOnly ? undefined : onConnect}
+                  onRemoveNodes={
+                    readOnly ? undefined : removeNodesWithoutConfirm
+                  }
                   onUndo={readOnly ? undefined : undo}
                   onRedo={readOnly ? undefined : redo}
                   canUndo={canUndo}

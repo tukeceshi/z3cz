@@ -128,6 +128,28 @@ describe("agent-chat-live-job", () => {
     expect(replay).toEqual(["snapshot", "stopped"]);
   });
 
+  it("surfaces an empty upstream stream instead of wrapping it as cancelled", async () => {
+    const finishes: string[] = [];
+    const job = startAgentChatLiveJob({
+      invocationId: "inv-empty",
+      organizationId: "org-1",
+      aiInterfaceId: "iface-1",
+      createStream: async function* () {
+        yield { type: "error", error: "Upstream stream returned no text" };
+      },
+      onFinish: async (result) => {
+        finishes.push(`${result.status}:${result.error ?? ""}`);
+      },
+    });
+
+    await job.finished;
+    expect(job.getSnapshot()).toMatchObject({
+      status: "error",
+      error: "Upstream stream returned no text",
+    });
+    expect(finishes).toEqual(["failed:Upstream stream returned no text"]);
+  });
+
   it("ignores stop for another organization", async () => {
     startAgentChatLiveJob({
       invocationId: "inv-3",

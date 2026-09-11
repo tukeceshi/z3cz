@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBootstrapPersistWorkerInput,
   persistWorkerServesOrganization,
+  summarizePlatformPersistWorkerStatus,
 } from "./persist-worker-queries";
 
 describe("buildBootstrapPersistWorkerInput", () => {
@@ -48,5 +49,21 @@ describe("persistWorkerServesOrganization", () => {
     expect(
       persistWorkerServesOrganization({ organizationId: "org-a" }, "org-b")
     ).toBe(false);
+  });
+});
+
+describe("summarizePlatformPersistWorkerStatus", () => {
+  it("is running when any platform server is active", () => {
+    expect(
+      summarizePlatformPersistWorkerStatus(["failed", "active", "deploying"])
+    ).toBe("active");
+  });
+
+  it("falls back when none are active", () => {
+    expect(summarizePlatformPersistWorkerStatus(["failed", "deploying"])).toBe(
+      "deploying"
+    );
+    expect(summarizePlatformPersistWorkerStatus(["failed"])).toBe("failed");
+    expect(summarizePlatformPersistWorkerStatus(["manual"])).toBe("manual");
   });
 });

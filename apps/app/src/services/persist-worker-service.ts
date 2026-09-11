@@ -3,6 +3,7 @@ import type {
   BootstrapPersistWorkerResponse,
   ListPersistWorkersResponse,
   PersistWorker,
+  PersistWorkerPlatformSummary,
   PersistWorkerPoolSettings,
   RedeployPersistWorkerRequest,
   RedeployPersistWorkerResponse,
@@ -91,6 +92,7 @@ export function useOrgPersistWorkers(organizationId: string | undefined) {
 
   return {
     workers: data?.workers ?? [],
+    platform: data?.platform ?? null,
     settings: data?.settings ?? { enabled: false },
     workersError: error,
     isWorkersLoading: isLoading,
@@ -145,4 +147,4 @@ export async function deleteOrgPersistWorker(
   });
 }
 
-export type { PersistWorker, PersistWorkerPoolSettings };
+export type { PersistWorker, PersistWorkerPlatformSummary, PersistWorkerPoolSettings };

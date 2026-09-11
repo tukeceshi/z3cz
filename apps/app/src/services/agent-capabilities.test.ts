@@ -12,6 +12,7 @@ import {
   ENTER_DRAFT_TOOL,
   parseScheduledRole,
   SCHEDULE_ROLE_TOOL,
+  READ_URL_TOOL,
   capabilityForTool,
   capabilityLabel,
   enabledMakeCapabilityLabels,
@@ -27,6 +28,7 @@ describe("agent capabilities catalog", () => {
   it("treats canvas writes as make tools and animation as its own tool", () => {
     expect(isMakeTool("canvas_write_text")).toBe(true);
     expect(isMakeTool("canvas_write_nodes")).toBe(true);
+    expect(isMakeTool("canvas_import")).toBe(true);
     expect(isMakeTool("canvas_get_state")).toBe(false);
     expect(isMakeTool(SIMPLE_ANIMATION_TOOL)).toBe(false);
     expect(isMakeTool("remotion_write")).toBe(false);
@@ -37,11 +39,14 @@ describe("agent capabilities catalog", () => {
       SIMPLE_ANIMATION_CAPABILITY
     );
     expect(capabilityForTool("canvas_get_state")).toBe("canvas");
+    expect(capabilityForTool(READ_URL_TOOL)).toBe("web");
     expect(capabilityForTool("remotion_open")).toBeNull();
   });
 
   it("allows animation in every mode, and ask to read and question", () => {
     expect(isToolAllowed("canvas_get_state", "ask")).toBe(true);
+    expect(isToolAllowed(READ_URL_TOOL, "ask")).toBe(true);
+    expect(isToolAllowed(READ_URL_TOOL, "draft")).toBe(true);
     expect(isToolAllowed(SIMPLE_ANIMATION_TOOL, "ask")).toBe(true);
     expect(isToolAllowed(SIMPLE_ANIMATION_TOOL, "draft")).toBe(true);
     expect(isToolAllowed(SIMPLE_ANIMATION_TOOL, "real")).toBe(true);
@@ -65,7 +70,11 @@ describe("agent capabilities catalog", () => {
 
   it("lists only schedule and ask until a role is on", () => {
     const askNames = toolsForInform("ask").map((tool) => tool.name);
-    expect(askNames).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(askNames).toEqual([
+      READ_URL_TOOL,
+      SCHEDULE_ROLE_TOOL,
+      ASK_QUESTION_TOOL,
+    ]);
     expect(askNames).not.toContain("canvas_get_state");
     expect(askNames).not.toContain(SIMPLE_ANIMATION_TOOL);
     const canvasNames = toolsForInform("ask", { canvas: true }).map(
@@ -90,18 +99,21 @@ describe("agent capabilities catalog", () => {
     const withAnimation = toolsForRequest("ask", { animation: true });
     expect(ask.every((tool) => tool.type === "function")).toBe(true);
     expect(ask.map((tool) => tool.function.name)).toEqual([
+      READ_URL_TOOL,
       SCHEDULE_ROLE_TOOL,
       ASK_QUESTION_TOOL,
     ]);
     expect(withCanvas.map((tool) => tool.function.name)).toEqual([
       "canvas_get_state",
       "canvas_resolve_resource",
+      "canvas_import",
       "canvas_create_generation_flow",
       "canvas_write_nodes",
       "canvas_connect_nodes",
       "canvas_write_text",
       "canvas_run_node",
       "canvas_stage_media",
+      READ_URL_TOOL,
       SCHEDULE_ROLE_TOOL,
       ASK_QUESTION_TOOL,
     ]);
@@ -119,6 +131,10 @@ describe("agent capabilities catalog", () => {
       withCanvas.find((tool) => tool.function.name === "canvas_resolve_resource")
         ?.function.description
     ).toContain("地址");
+    expect(
+      ask.find((tool) => tool.function.name === READ_URL_TOOL)?.function
+        .description
+    ).toContain("读取网页链接");
     expect(
       ask.find((tool) => tool.function.name === ASK_QUESTION_TOOL)?.function
         .description
@@ -144,11 +160,31 @@ describe("agent capabilities catalog", () => {
       withCanvas.find(
         (tool) => tool.function.name === "canvas_create_generation_flow"
       )?.function.description
-    ).toContain("不是导入");
+    ).toContain("导入用 canvas_import");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_import")
+        ?.function.description
+    ).toContain("从链接或 JSON 导入");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_import")
+        ?.function.description
+    ).toContain("canvas_stage_media");
     expect(
       withCanvas.find((tool) => tool.function.name === "canvas_write_nodes")
         ?.function.description
     ).toContain("一次写入多个节点");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_write_nodes")
+        ?.function.description
+    ).toContain("要挂上的资源链接");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_stage_media")
+        ?.function.description
+    ).toContain("外部节点上的资源链接");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_stage_media")
+        ?.function.description
+    ).not.toContain("本轮上传的图用附件地址");
     expect(
       withAnimation.find((tool) => tool.function.name === SIMPLE_ANIMATION_TOOL)
         ?.function.description
@@ -193,13 +229,16 @@ describe("agent capabilities catalog", () => {
     ).toEqual([AGENT_ROLE_BASE, AGENT_ROLE_CANVAS, AGENT_ROLE_ANIMATION]);
     expect(activeAgentRoles()[0]?.identity).toBe(AGENT_BASE_IDENTITY);
     expect(AGENT_BASE_IDENTITY).toContain("工具对不上就直说做不了");
+    expect(AGENT_BASE_IDENTITY).toContain("read_url");
     expect(AGENT_BASE_IDENTITY).toContain("不要把用户原话写进生成提示词");
     expect(AGENT_BASE_IDENTITY).toContain("只确认是否改画布");
     expect(activeAgentRoles({ canvas: true })[1]?.identity).toBe(
       AGENT_CANVAS_IDENTITY
     );
     expect(AGENT_CANVAS_IDENTITY).toContain("刚写完先看最新清单");
+    expect(AGENT_CANVAS_IDENTITY).toContain("canvas_import");
     expect(AGENT_CANVAS_IDENTITY).toContain("canvas_write_nodes");
+    expect(AGENT_CANVAS_IDENTITY).toContain("外部素材用链接挂到节点");
     expect(activeAgentRoles({ animation: true })[1]?.identity).toBe(
       AGENT_ANIMATION_IDENTITY
     );

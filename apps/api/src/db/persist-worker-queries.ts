@@ -152,6 +152,55 @@ export async function getPlatformPersistWorkerById(
   return row ? rowToPersistWorker(row) : undefined;
 }
 
+export function summarizePlatformPersistWorkerStatus(
+  statuses: readonly PersistWorkerDeployStatus[]
+): PersistWorkerDeployStatus {
+  if (statuses.includes("active")) {
+    return "active";
+  }
+  if (statuses.includes("deploying")) {
+    return "deploying";
+  }
+  if (statuses.includes("failed")) {
+    return "failed";
+  }
+  return "manual";
+}
+
+export async function getPlatformPersistWorkerSummary(
+  db: Database
+): Promise<{
+  readonly deployStatus: PersistWorkerDeployStatus;
+  readonly lastHeartbeatAt: string | null;
+} | null> {
+  const rows = await db
+    .select({
+      deployStatus: persistWorkers.deployStatus,
+      lastHeartbeatAt: persistWorkers.lastHeartbeatAt,
+    })
+    .from(persistWorkers)
+    .where(isNull(persistWorkers.organizationId));
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  let lastHeartbeatAt: string | null = null;
+  for (const row of rows) {
+    const value = row.lastHeartbeatAt?.toISOString() ?? null;
+    if (value && (!lastHeartbeatAt || value > lastHeartbeatAt)) {
+      lastHeartbeatAt = value;
+    }
+  }
+
+  return {
+    deployStatus: summarizePlatformPersistWorkerStatus(
+      rows.map((row) => row.deployStatus as PersistWorkerDeployStatus)
+    ),
+    lastHeartbeatAt,
+  };
+}
+
 export function persistWorkerServesOrganization(
   worker: { readonly organizationId: string | null },
   organizationId: string

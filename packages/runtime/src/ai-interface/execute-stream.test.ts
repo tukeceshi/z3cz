@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyOpenAiStreamToolCalls,
   artifactSupportsChatStream,
   readOpenAiReasoningDelta,
   splitThinkTags,
@@ -60,6 +61,119 @@ describe("readOpenAiReasoningDelta", () => {
         choices: [{ delta: { content: "你好" } }],
       })
     ).toBe("");
+  });
+});
+
+describe("applyOpenAiStreamToolCalls", () => {
+  it("reads tool_calls from the final message when delta is empty", () => {
+    const acc: { id: string; name: string; arguments: string }[] = [];
+    applyOpenAiStreamToolCalls(acc, {
+      choices: [
+        {
+          delta: {},
+          message: {
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: {
+                  name: "canvas_import",
+                  arguments: '{"url":"https://example.com"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(acc).toEqual([
+      {
+        id: "call_1",
+        name: "canvas_import",
+        arguments: '{"url":"https://example.com"}',
+      },
+    ]);
+  });
+
+  it("concatenates incremental delta arguments", () => {
+    const acc: { id: string; name: string; arguments: string }[] = [];
+    applyOpenAiStreamToolCalls(acc, {
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_1",
+                function: { name: "canvas_import", arguments: '{"url":' },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    applyOpenAiStreamToolCalls(acc, {
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              { index: 0, function: { arguments: '"https://example.com"}' } },
+            ],
+          },
+        },
+      ],
+    });
+    expect(acc).toEqual([
+      {
+        id: "call_1",
+        name: "canvas_import",
+        arguments: '{"url":"https://example.com"}',
+      },
+    ]);
+  });
+
+  it("prefers a complete message snapshot over concatenated deltas", () => {
+    const acc: { id: string; name: string; arguments: string }[] = [];
+    applyOpenAiStreamToolCalls(acc, {
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_1",
+                function: { name: "canvas_import", arguments: '{"url":' },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    applyOpenAiStreamToolCalls(acc, {
+      choices: [
+        {
+          delta: {},
+          message: {
+            tool_calls: [
+              {
+                id: "call_1",
+                function: {
+                  name: "canvas_import",
+                  arguments: '{"url":"https://example.com"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(acc).toEqual([
+      {
+        id: "call_1",
+        name: "canvas_import",
+        arguments: '{"url":"https://example.com"}',
+      },
+    ]);
   });
 });
 

@@ -627,7 +627,7 @@ export function readAiImageCardPrimaryImage(
 
 export function withAiImageManualUpload(
   current: WorkflowNodeType,
-  images: readonly MediaReference[]
+  images: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   let inputs = upsertInputValue(
     current.inputs,

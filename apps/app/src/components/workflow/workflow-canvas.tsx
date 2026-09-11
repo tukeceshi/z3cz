@@ -144,6 +144,7 @@ export interface WorkflowCanvasProps {
     options?: GenerativeNodeAddOptions
   ) => string | null;
   readonly onConnectWorkflow?: (connection: Connection) => void;
+  readonly onRemoveNodes?: (nodeIds: readonly string[]) => void;
 }
 
 export function WorkflowCanvas({
@@ -194,6 +195,7 @@ export function WorkflowCanvas({
   parked = false,
   onCreateGenerativeNode,
   onConnectWorkflow,
+  onRemoveNodes,
 }: WorkflowCanvasProps) {
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
@@ -221,7 +223,17 @@ export function WorkflowCanvas({
   });
   const [displayNodes, setDisplayNodes] =
     useState<ReactFlowNode<WorkflowNodeType>[]>(nodes);
-  const getCanvasGraph = useCallback(() => ({ nodes, edges }), [nodes, edges]);
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+  const getCanvasGraph = useCallback(
+    () => ({
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+    }),
+    []
+  );
   const blockCardInteraction = useShiftSelectGate(selectedNodes.length);
 
   useEffect(() => {
@@ -408,6 +420,7 @@ export function WorkflowCanvas({
                   getCanvasGraph={getCanvasGraph}
                   onCreateGenerativeNode={onCreateGenerativeNode}
                   onConnectWorkflow={onConnectWorkflow}
+                  onRemoveNodes={onRemoveNodes}
                 />
               </div>
             </Panel>

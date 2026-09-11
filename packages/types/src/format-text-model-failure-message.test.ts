@@ -47,6 +47,12 @@ describe("isClientCancelledTextModelError", () => {
   it("does not treat auth failures as client cancel", () => {
     expect(isClientCancelledTextModelError("Invalid API key")).toBe(false);
   });
+
+  it("does not treat an empty upstream stream as client cancel", () => {
+    expect(
+      isClientCancelledTextModelError("Upstream stream returned no text")
+    ).toBe(false);
+  });
 });
 
 describe("isTransientTextModelUpstreamError", () => {

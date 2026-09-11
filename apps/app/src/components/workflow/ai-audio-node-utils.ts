@@ -348,7 +348,7 @@ export function readAiAudioCardAudios(
 
 export function withAiAudioManualUpload(
   current: WorkflowNodeType,
-  audios: readonly MediaReference[]
+  audios: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   let inputs = upsertInputValue(
     current.inputs,
