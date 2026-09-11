@@ -19,10 +19,8 @@ export const persistWorkerBootstrapSchema = z.object({
   sshUsername: z.string().trim().min(1).max(120),
   sshPassword: z.string().min(1).max(256),
   maxConcurrentJobs: z.number().int().min(1).max(32).optional(),
-  apiBaseUrl: z.string().trim().url().optional(),
 });
 
 export const persistWorkerRedeploySchema = z.object({
   sshPassword: z.string().min(1).max(256),
-  apiBaseUrl: z.string().trim().url().optional(),
 });

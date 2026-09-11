@@ -27,7 +27,6 @@ import {
   createEphemeralMediaExpiresAt,
   type MediaReference,
 } from "@dafthunk/types";
-import { executeAiInterfaceSync } from "@dafthunk/runtime/ai-interface/execute-sync";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -99,6 +98,7 @@ import {
   pollOrgVideoTask,
   submitOrgVideoTask,
 } from "../services/org-video-task";
+import { withOrgApiForwarding } from "../services/org-api-forwarding";
 import { resolveAiImageStorage } from "../services/ai-image-storage";
 import { resolveAiAudioStorage } from "../services/ai-audio-storage";
 import { resolveAiVideoStorage } from "../services/ai-video-storage";
@@ -129,6 +129,7 @@ import {
   refreshGenerationJob,
   cancelUserGenerationJob,
   cancelUserGenerationJobByClientRequestId,
+  CloudAccelerationUnavailableError,
   requestServerGenerationJobPersist,
 } from "../services/generation-job-service";
 import {
@@ -899,6 +900,8 @@ platformAiRoutes.post(
 
           for await (const event of streamPreparedTextModel({
             prepared: prepared.prepared,
+            env: c.env,
+            db,
             signal: clientSignal,
             upstreamLog,
           })) {
@@ -1451,7 +1454,15 @@ platformAiRoutes.post(
       operation: "submit",
     });
 
-    const result = await executeMinimaxSpeech({
+    const result = await withOrgApiForwarding(
+      {
+        db,
+        env: c.env,
+        organizationId,
+        aiInterfaceId: resolvedModel.interfaceId,
+      },
+      () =>
+        executeMinimaxSpeech({
       apiKey: iface.apiKey,
       baseUrl: iface.baseUrl,
       providerModelId: resolvedModel.providerModelId,
@@ -1460,7 +1471,8 @@ platformAiRoutes.post(
       generationParams: body.params,
       upstreamLog,
       useFullSubmitUrl: iface.useFullSubmitUrl,
-    });
+        })
+    );
 
     if (result.status === "failed" || !result.audio || !result.mimeType) {
       const message = result.error ?? "Generation failed";
@@ -1778,7 +1790,15 @@ platformAiRoutes.post(
 
     let submitResult;
     try {
-      submitResult = await submitOrgVideoTask({
+      submitResult = await withOrgApiForwarding(
+        {
+          db,
+          env: c.env,
+          organizationId,
+          aiInterfaceId: resolvedModel.interfaceId,
+        },
+        () =>
+          submitOrgVideoTask({
         apiKey: iface.apiKey,
         baseUrl: iface.baseUrl,
         canonicalId: resolvedModel.canonicalId,
@@ -1793,7 +1813,8 @@ platformAiRoutes.post(
         upstreamLog,
         videoEndpoints: iface.videoEndpoints,
         formatTransform: iface.formatTransform,
-      });
+          })
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Upstream request failed";
@@ -2343,15 +2364,22 @@ platformAiRoutes.post(
     const organizationId = c.get("organizationId")!;
     const jobId = c.req.param("jobId");
 
-    const response = await requestServerGenerationJobPersist(
-      c.env,
-      organizationId,
-      jobId
-    );
-    if (!response) {
-      return c.json({ error: "Generation job not found" }, 404);
+    try {
+      const response = await requestServerGenerationJobPersist(
+        c.env,
+        organizationId,
+        jobId
+      );
+      if (!response) {
+        return c.json({ error: "Generation job not found" }, 404);
+      }
+      return c.json(response);
+    } catch (error) {
+      if (error instanceof CloudAccelerationUnavailableError) {
+        return c.json({ error: error.message }, 409);
+      }
+      throw error;
     }
-    return c.json(response);
   }
 );
 
@@ -2470,7 +2498,15 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
         operation: "poll",
       });
 
-  const pollResult = await pollOrgVideoTask({
+  const pollResult = await withOrgApiForwarding(
+    {
+      db,
+      env: c.env,
+      organizationId,
+      aiInterfaceId: interfaceId,
+    },
+    () =>
+      pollOrgVideoTask({
     apiKey: iface.apiKey,
     canonicalId: modelCanonicalId,
     baseUrl: iface.baseUrl,
@@ -2479,7 +2515,8 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     videoEndpoints: iface.videoEndpoints,
     formatTransform: iface.formatTransform,
     upstreamLog: pollLog,
-  });
+      })
+  );
 
   if (pollResult.status === "failed") {
     if (trackedJob) {
@@ -2545,7 +2582,15 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
 
     const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
 
-    const downloadResult = await downloadOrgVideo({
+    const downloadResult = await withOrgApiForwarding(
+      {
+        db,
+        env: c.env,
+        organizationId,
+        aiInterfaceId: interfaceId,
+      },
+      () =>
+        downloadOrgVideo({
       apiKey: iface.apiKey,
       canonicalId: modelCanonicalId,
       videoUrl: pollResult.videoUrl,
@@ -2554,7 +2599,8 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
       organizationId,
       workflowId,
       cloudUpload: storageResolution.cloudUpload,
-    });
+        })
+    );
 
     if (downloadResult.status === "failed") {
       return c.json({
@@ -2770,6 +2816,8 @@ platformAiRoutes.post(
       createStream: async function* (signal) {
         for await (const event of streamPreparedTextModel({
           prepared: prepared.prepared,
+          env: c.env,
+          db,
           signal,
           upstreamLog,
         })) {

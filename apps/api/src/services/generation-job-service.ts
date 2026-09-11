@@ -26,7 +26,6 @@ import {
 } from "@dafthunk/types";
 import { pollOrgVideoTask, cancelOrgVideoTask } from "./org-video-task";
 import { createJobUpstreamRequestLogger } from "./job-upstream-request-logger";
-import { fetchWithUpstreamLog } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import { createDatabase, type Database } from "../db";
@@ -40,9 +39,6 @@ import {
 } from "../db/generation-job-queries";
 import { upsertMediaResources } from "../db/media-resource-queries";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
-import { resolveAiAudioStorage } from "./ai-audio-storage";
-import { resolveAiImageStorage } from "./ai-image-storage";
-import { resolveAiVideoStorage } from "./ai-video-storage";
 import { assertCloudStorageHealthyForGenerativeMedia } from "./assert-cloud-storage-healthy-for-generative-media";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
 import { ensureFailedJobPlaceholderResourcesMarked } from "./ensure-failed-job-placeholder-resources";
@@ -61,11 +57,8 @@ import {
   markJobResourcesCloudAccelerationStatus,
   resolveJobCloudAccelerationFlags,
 } from "./cloud-acceleration-service";
-import {
-  isPersistWorkerPoolActive,
-  releaseWorkerPersistJobAssignment,
-  shouldFallbackWorkerPersistToApi,
-} from "./persist-worker-pool-service";
+import { isPersistWorkerPoolActive } from "./persist-worker-pool-service";
+import { withOrgApiForwarding } from "./org-api-forwarding";
 import {
   assertGenerationJobUploadKeysBelongToOrg,
   GenerationJobUploadValidationError,
@@ -75,6 +68,13 @@ import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 import { pollVideoEnhanceGenerationJob } from "./video-enhance-service";
 import { pollVideoConcatGenerationJob } from "./video-concat-service";
 import { pollVideoTrimGenerationJob } from "./video-trim-service";
+
+export class CloudAccelerationUnavailableError extends Error {
+  constructor() {
+    super("No persist workers available");
+    this.name = "CloudAccelerationUnavailableError";
+  }
+}
 
 function inferVideoMimeType(url: string): string {
   const lower = url.split("?")[0]?.toLowerCase() ?? "";
@@ -194,15 +194,20 @@ async function toGetGenerationJobResponse(
   db: Database,
   job: GenerationJobRecord
 ): Promise<GetGenerationJobResponse> {
-  const cloudAccel = await resolveJobCloudAccelerationFlags(db, job);
+  const [cloudAccel, workerPoolActive] = await Promise.all([
+    resolveJobCloudAccelerationFlags(db, job),
+    isPersistWorkerPoolActive(db, job.organizationId),
+  ]);
   return {
     job,
     pendingMedia: extractPendingMediaFromJob(job),
     finalMedia: toWorkflowFinalMedia(extractFinalMediaFromJob(job)),
     displayPhase: resolveGenerationJobDisplayPhase(job),
     deferClientPersistToServer: shouldDeferClientPersistToServer(job),
-    cloudAccelerationEnabled: cloudAccel.cloudAccelerationEnabled,
-    shouldUseCloudAcceleration: cloudAccel.shouldUseCloudAcceleration,
+    cloudAccelerationEnabled:
+      cloudAccel.cloudAccelerationEnabled && workerPoolActive,
+    shouldUseCloudAcceleration:
+      cloudAccel.shouldUseCloudAcceleration && workerPoolActive,
   };
 }
 
@@ -248,99 +253,6 @@ function buildMediaResourceTransitionsFromJobComplete(
     fromResourceId: pendingMedia[index]?.resourceId,
     reference,
   }));
-}
-
-async function persistPendingMediaOnServer(
-  env: Bindings,
-  db: Database,
-  job: GenerationJobRecord,
-  pendingMedia: readonly GenerationJobPendingMedia[]
-): Promise<readonly MediaReference[]> {
-  const workflowId = job.workflowId?.trim() || "unknown";
-  const finalMedia: MediaReference[] = [];
-  const downloadLog = createJobUpstreamRequestLogger(db, job, "download");
-
-  for (const item of pendingMedia) {
-    const response = await fetchWithUpstreamLog(
-      item.sourceUrl,
-      { method: "GET" },
-      downloadLog,
-      { responseMode: "stream" }
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to download generated media (${response.status})`);
-    }
-
-    const mimeType =
-      response.headers.get("content-type")?.split(";")[0]?.trim() ??
-      item.mimeType;
-    const data = new Uint8Array(await response.arrayBuffer());
-
-    if (item.mediaKind === "ai-video") {
-      const storageResolution = await resolveAiVideoStorage(env, {
-        organizationId: job.organizationId,
-        workflowId: job.workflowId ?? undefined,
-      });
-      if (
-        storageResolution.storageMode !== "cloud" ||
-        !storageResolution.cloudUpload
-      ) {
-        throw new Error("Cloud storage is not available for server persist");
-      }
-      finalMedia.push(
-        await storageResolution.cloudUpload.upload({
-          workflowId,
-          data,
-          mimeType,
-          objectId: persistObjectIdForPendingMedia(item),
-        })
-      );
-      continue;
-    }
-
-    if (item.mediaKind === "ai-audio") {
-      const storageResolution = await resolveAiAudioStorage(env, {
-        organizationId: job.organizationId,
-        workflowId: job.workflowId ?? undefined,
-      });
-      if (
-        storageResolution.storageMode !== "cloud" ||
-        !storageResolution.cloudUpload
-      ) {
-        throw new Error("Cloud storage is not available for server persist");
-      }
-      finalMedia.push(
-        await storageResolution.cloudUpload.upload({
-          workflowId,
-          data,
-          mimeType,
-          objectId: persistObjectIdForPendingMedia(item),
-        })
-      );
-      continue;
-    }
-
-    const storageResolution = await resolveAiImageStorage(env, {
-      organizationId: job.organizationId,
-      workflowId: job.workflowId ?? undefined,
-    });
-    if (
-      storageResolution.storageMode !== "cloud" ||
-      !storageResolution.cloudUpload
-    ) {
-      throw new Error("Cloud storage is not available for server persist");
-    }
-    finalMedia.push(
-      await storageResolution.cloudUpload.upload({
-        workflowId,
-        data,
-        mimeType,
-        objectId: persistObjectIdForPendingMedia(item),
-      })
-    );
-  }
-
-  return finalMedia;
 }
 
 async function toCancelGenerationJobResponse(
@@ -490,7 +402,15 @@ async function tryCancelUpstreamVideoTask(
       useFullSubmitUrl: videoEndpoints.useFullSubmitUrl,
     });
 
-  const result = await cancelOrgVideoTask({
+  const result = await withOrgApiForwarding(
+    {
+      db,
+      env,
+      organizationId: job.organizationId,
+      aiInterfaceId: job.interfaceId,
+    },
+    () =>
+      cancelOrgVideoTask({
     apiKey: iface.apiKey,
     canonicalId: job.modelCanonicalId,
     pollUrl,
@@ -498,7 +418,8 @@ async function tryCancelUpstreamVideoTask(
     upstreamTaskId: job.upstreamTaskId,
     videoEndpoints,
     upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
-  });
+      })
+  );
 
   if (result.status === "skipped") {
     return { deleted: false, skipped: true };
@@ -637,7 +558,15 @@ export async function pollVideoGenerationJob(
   }
 
   const baseUrl = iface.baseUrl.replace(/\/$/, "");
-  const pollResult = await pollOrgVideoTask({
+  const pollResult = await withOrgApiForwarding(
+    {
+      db,
+      env,
+      organizationId: job.organizationId,
+      aiInterfaceId: job.interfaceId,
+    },
+    () =>
+      pollOrgVideoTask({
     apiKey: iface.apiKey,
     canonicalId: job.modelCanonicalId,
     baseUrl,
@@ -646,7 +575,8 @@ export async function pollVideoGenerationJob(
     videoEndpoints: iface.videoEndpoints,
     formatTransform: iface.formatTransform,
     upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
-  });
+      })
+  );
 
   const activeStatuses =
     job.status === "cancelling"
@@ -760,87 +690,17 @@ export async function pollVideoGenerationJob(
   );
 }
 
-async function completeInlineServerGenerationJobPersist(
-  env: Bindings,
-  db: Database,
-  claimed: GenerationJobRecord,
-  pendingMedia: readonly GenerationJobPendingMedia[]
-): Promise<GenerationJobRecord> {
-  try {
-    const finalMedia = await persistPendingMediaOnServer(
-      env,
-      db,
-      claimed,
-      pendingMedia
-    );
-    const succeededResultJson: GenerationJobResultJson = {
-      ...(claimed.resultJson ?? {}),
-      pendingMedia,
-      finalMedia,
-      persistOwner: "server",
-      persistDispatch: "api",
-    };
-    const succeeded = await updateGenerationJob(db, {
-      id: claimed.id,
-      organizationId: claimed.organizationId,
-      status: "succeeded",
-      expectedStatuses: ["uploading"],
-      resultJson: succeededResultJson,
-    });
-    if (succeeded) {
-      await markJobResourcesCloudAccelerationStatus(db, succeeded, "done");
-      await registerMediaResourceTransitions(db, {
-        organizationId: claimed.organizationId,
-        transitions: buildMediaResourceTransitionsFromJobComplete(
-          pendingMedia,
-          finalMedia
-        ),
-      });
-      try {
-        await persistJobFinalizedGeneratingContent(
-          env,
-          succeeded,
-          pendingMedia,
-          finalMedia
-        );
-      } catch {
-        // Catalog already transitioned; node JSON is aligned by client or a later sync.
-      }
-      await syncGenerationJobInvocation(db, succeeded);
-      return succeeded;
-    }
-    return claimed;
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Server persist failed";
-    const failed = await updateGenerationJob(db, {
-      id: claimed.id,
-      organizationId: claimed.organizationId,
-      status: "failed",
-      expectedStatuses: ["uploading"],
-      failureReason: message,
-    });
-    if (failed) {
-      await markJobResourcesCloudAccelerationStatus(db, failed, "failed");
-      await markMediaResourcesFailed(db, {
-        organizationId: failed.organizationId,
-        resourceIds: failed.resultJson?.placeholderResourceIds ?? [],
-        mimeType: placeholderMimeTypeForModality(failed.modality),
-      });
-      await syncGenerationJobInvocation(db, failed);
-    }
-    return failed ?? claimed;
-  }
-}
-
 async function runServerGenerationJobPersist(
   env: Bindings,
   db: Database,
-  job: GenerationJobRecord,
-  options?: { readonly forceInline?: boolean }
+  job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
   const pendingMedia = extractPendingMediaFromJob(job);
   if (!pendingMedia || pendingMedia.length === 0) {
+    return job;
+  }
+
+  if (!(await isPersistWorkerPoolActive(db, job.organizationId))) {
     return job;
   }
 
@@ -864,26 +724,14 @@ async function runServerGenerationJobPersist(
     return cancelled ?? job;
   }
 
-  const useWorkerPool =
-    !options?.forceInline &&
-    (await isPersistWorkerPoolActive(db, job.organizationId));
-
   const resultJson: GenerationJobResultJson = {
     ...(job.resultJson ?? {}),
     persistOwner: "server",
     clientPersistStartedAt: undefined,
-    persistDispatch: useWorkerPool ? "worker" : "api",
-    ...(useWorkerPool
-      ? {
-          workerDispatchedAt: new Date().toISOString(),
-          persistWorkerId: undefined,
-          workerClaimedAt: undefined,
-        }
-      : {
-          persistWorkerId: undefined,
-          workerClaimedAt: undefined,
-          workerDispatchedAt: undefined,
-        }),
+    persistDispatch: "worker",
+    workerDispatchedAt: new Date().toISOString(),
+    persistWorkerId: undefined,
+    workerClaimedAt: undefined,
   };
 
   const claimed = await updateGenerationJob(db, {
@@ -899,51 +747,7 @@ async function runServerGenerationJobPersist(
 
   await markJobResourcesCloudAccelerationStatus(db, claimed, "active");
   await syncJobCloudAccelerationToWorkflow(env, claimed, "active");
-
-  if (useWorkerPool) {
-    return claimed;
-  }
-
-  return completeInlineServerGenerationJobPersist(
-    env,
-    db,
-    claimed,
-    pendingMedia
-  );
-}
-
-async function maybeFallbackStaleWorkerPersist(
-  env: Bindings,
-  db: Database,
-  job: GenerationJobRecord
-): Promise<GenerationJobRecord> {
-  if (!shouldFallbackWorkerPersistToApi(job)) {
-    return job;
-  }
-
-  await releaseWorkerPersistJobAssignment(db, job);
-
-  const resetJson: GenerationJobResultJson = {
-    ...(job.resultJson ?? {}),
-    persistDispatch: "api",
-    persistWorkerId: undefined,
-    workerClaimedAt: undefined,
-    workerDispatchedAt: undefined,
-  };
-
-  const reset = await updateGenerationJob(db, {
-    id: job.id,
-    organizationId: job.organizationId,
-    status: "uploading",
-    expectedStatuses: ["uploading"],
-    resultJson: resetJson,
-  });
-
-  if (!reset) {
-    return job;
-  }
-
-  return runServerGenerationJobPersist(env, db, reset, { forceInline: true });
+  return claimed;
 }
 
 async function maybeRunServerPersistFallback(
@@ -1049,9 +853,19 @@ export async function requestServerGenerationJobPersist(
     return toGetGenerationJobResponse(db, job);
   }
 
+  if (!(await isPersistWorkerPoolActive(db, job.organizationId))) {
+    throw new CloudAccelerationUnavailableError();
+  }
+
   await markJobResourcesCloudAccelerationStatus(db, job, "pending");
   await syncJobCloudAccelerationToWorkflow(env, job, "pending");
   const persisted = await runServerGenerationJobPersist(env, db, job);
+  if (
+    readPersistOwner(persisted) !== "server" &&
+    persisted.status !== "cancelled"
+  ) {
+    throw new CloudAccelerationUnavailableError();
+  }
   return toGetGenerationJobResponse(db, persisted);
 }
 
@@ -1106,13 +920,6 @@ export async function refreshGenerationJob(
 
   if (job.status === "uploading" && readPersistOwner(job) === "client") {
     job = await maybeReleaseStaleClientClaim(env, db, job);
-  }
-
-  if (
-    job.status === "uploading" &&
-    job.resultJson?.persistDispatch === "worker"
-  ) {
-    job = await maybeFallbackStaleWorkerPersist(env, db, job);
   }
 
   if (job.status === "ready_to_persist") {

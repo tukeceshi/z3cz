@@ -412,6 +412,9 @@ export const organizationAiInterfaces = pgTable(
     metadata: text("metadata"),
     volcanoSetupStatus: text("volcano_setup_status"),
     enabled: boolean("enabled").notNull().default(true),
+    apiForwardingEnabled: boolean("api_forwarding_enabled")
+      .notNull()
+      .default(false),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),

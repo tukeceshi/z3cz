@@ -26,6 +26,7 @@ import {
 describe("agent capabilities catalog", () => {
   it("treats canvas writes as make tools and animation as its own tool", () => {
     expect(isMakeTool("canvas_write_text")).toBe(true);
+    expect(isMakeTool("canvas_write_nodes")).toBe(true);
     expect(isMakeTool("canvas_get_state")).toBe(false);
     expect(isMakeTool(SIMPLE_ANIMATION_TOOL)).toBe(false);
     expect(isMakeTool("remotion_write")).toBe(false);
@@ -96,6 +97,7 @@ describe("agent capabilities catalog", () => {
       "canvas_get_state",
       "canvas_resolve_resource",
       "canvas_create_generation_flow",
+      "canvas_write_nodes",
       "canvas_connect_nodes",
       "canvas_write_text",
       "canvas_run_node",
@@ -108,7 +110,7 @@ describe("agent capabilities catalog", () => {
     expect(
       withCanvas.find((tool) => tool.function.name === "canvas_get_state")
         ?.function.description
-    ).toContain("不要反复取");
+    ).toContain("没改过别取");
     expect(
       withCanvas.find((tool) => tool.function.name === "canvas_get_state")
         ?.function.description
@@ -138,6 +140,15 @@ describe("agent capabilities catalog", () => {
         (tool) => tool.function.name === "canvas_create_generation_flow"
       )?.function.description
     ).not.toContain("实做");
+    expect(
+      withCanvas.find(
+        (tool) => tool.function.name === "canvas_create_generation_flow"
+      )?.function.description
+    ).toContain("不是导入");
+    expect(
+      withCanvas.find((tool) => tool.function.name === "canvas_write_nodes")
+        ?.function.description
+    ).toContain("一次写入多个节点");
     expect(
       withAnimation.find((tool) => tool.function.name === SIMPLE_ANIMATION_TOOL)
         ?.function.description
@@ -181,9 +192,14 @@ describe("agent capabilities catalog", () => {
       activeAgentRoles({ canvas: true, animation: true }).map((role) => role.id)
     ).toEqual([AGENT_ROLE_BASE, AGENT_ROLE_CANVAS, AGENT_ROLE_ANIMATION]);
     expect(activeAgentRoles()[0]?.identity).toBe(AGENT_BASE_IDENTITY);
+    expect(AGENT_BASE_IDENTITY).toContain("工具对不上就直说做不了");
+    expect(AGENT_BASE_IDENTITY).toContain("不要把用户原话写进生成提示词");
+    expect(AGENT_BASE_IDENTITY).toContain("只确认是否改画布");
     expect(activeAgentRoles({ canvas: true })[1]?.identity).toBe(
       AGENT_CANVAS_IDENTITY
     );
+    expect(AGENT_CANVAS_IDENTITY).toContain("刚写完先看最新清单");
+    expect(AGENT_CANVAS_IDENTITY).toContain("canvas_write_nodes");
     expect(activeAgentRoles({ animation: true })[1]?.identity).toBe(
       AGENT_ANIMATION_IDENTITY
     );

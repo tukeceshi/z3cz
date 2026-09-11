@@ -10,16 +10,52 @@ import {
   enableAlwaysAiInterfaceCloudAcceleration,
   isAiInterfaceCloudAccelerationActive,
   listActiveAiInterfaceCloudAccelerations,
+  listOrgApiForwardingAvailable,
+  listOrgApiForwardingInterfaces,
+  listOrgCloudAccelerationAvailable,
   resourceIdsFromPendingMedia,
+  setOrgInterfaceApiForwarding,
   updateMediaResourceCloudAccelerationStatus,
 } from "../db/cloud-acceleration-queries";
 import { extractPendingMediaFromJob } from "../db/generation-job-queries";
+
+export async function listOrgInterfaceApiForwarding(
+  db: Database,
+  organizationId: string
+) {
+  return listOrgApiForwardingInterfaces(db, organizationId);
+}
+
+export async function listOrgInterfaceApiForwardingAvailable(
+  db: Database,
+  organizationId: string
+) {
+  return listOrgApiForwardingAvailable(db, organizationId);
+}
+
+export async function setOrgInterfaceApiForwardingEnabled(
+  db: Database,
+  params: {
+    readonly organizationId: string;
+    readonly aiInterfaceId: string;
+    readonly enabled: boolean;
+  }
+): Promise<boolean> {
+  return setOrgInterfaceApiForwarding(db, params);
+}
 
 export async function listOrgAiInterfaceCloudAccelerations(
   db: Database,
   organizationId: string
 ): Promise<readonly AiInterfaceCloudAccelerationEntry[]> {
   return listActiveAiInterfaceCloudAccelerations(db, organizationId);
+}
+
+export async function listOrgAiInterfaceCloudAccelerationAvailable(
+  db: Database,
+  organizationId: string
+) {
+  return listOrgCloudAccelerationAvailable(db, organizationId);
 }
 
 export async function disableOrgAiInterfaceCloudAcceleration(
@@ -87,12 +123,4 @@ export async function markJobResourcesCloudAccelerationStatus(
     resourceIds,
     status,
   });
-}
-
-export async function shouldAutoCloudAccelerateJob(
-  db: Database,
-  job: GenerationJobRecord
-): Promise<boolean> {
-  const flags = await resolveJobCloudAccelerationFlags(db, job);
-  return flags.shouldUseCloudAcceleration;
 }

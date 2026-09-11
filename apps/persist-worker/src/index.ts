@@ -1,21 +1,50 @@
+import { createHmac } from "node:crypto";
+import http from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 import type {
   MediaReference,
   PersistWorkerClaimJobResponse,
   PersistWorkerPresignUploadsResponse,
 } from "@dafthunk/types";
+import { PERSIST_WORKER_FORWARD_PORT } from "@dafthunk/types";
 
 interface WorkerConfig {
   readonly apiBaseUrl: string;
   readonly workerId: string;
   readonly workerSecret: string;
   readonly pollIntervalMs: number;
+  readonly forwardPort: number;
+  readonly forwardHmacKey: string | null;
 }
+
+const FORWARD_MAX_SKEW_MS = 5 * 60 * 1000;
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+  "host",
+  "content-length",
+  "x-forward-url",
+  "x-forward-method",
+  "x-forward-ts",
+  "x-forward-sig",
+]);
 
 function readConfig(): WorkerConfig {
   const apiBaseUrl = process.env.API_BASE_URL?.trim().replace(/\/$/, "");
   const workerId = process.env.WORKER_ID?.trim();
   const workerSecret = process.env.WORKER_SECRET?.trim();
   const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "5000");
+  const forwardPort = Number(
+    process.env.FORWARD_PORT ?? String(PERSIST_WORKER_FORWARD_PORT)
+  );
+  const forwardHmacKey = process.env.FORWARD_HMAC_KEY?.trim() || null;
 
   if (!apiBaseUrl || !workerId || !workerSecret) {
     throw new Error(
@@ -23,7 +52,14 @@ function readConfig(): WorkerConfig {
     );
   }
 
-  return { apiBaseUrl, workerId, workerSecret, pollIntervalMs };
+  return {
+    apiBaseUrl,
+    workerId,
+    workerSecret,
+    pollIntervalMs,
+    forwardPort,
+    forwardHmacKey,
+  };
 }
 
 function workerHeaders(config: WorkerConfig): HeadersInit {
@@ -32,6 +68,131 @@ function workerHeaders(config: WorkerConfig): HeadersInit {
     "X-Worker-Id": config.workerId,
     "X-Worker-Secret": config.workerSecret,
   };
+}
+
+function signForward(params: {
+  readonly hmacKey: string;
+  readonly timestampMs: number;
+  readonly method: string;
+  readonly url: string;
+}): string {
+  return createHmac("sha256", params.hmacKey)
+    .update(`${params.timestampMs}\n${params.method}\n${params.url}`)
+    .digest("hex");
+}
+
+function isForwardSignatureValid(params: {
+  readonly hmacKey: string;
+  readonly timestampMs: number;
+  readonly method: string;
+  readonly url: string;
+  readonly signature: string;
+}): boolean {
+  if (
+    !Number.isFinite(params.timestampMs) ||
+    Math.abs(Date.now() - params.timestampMs) > FORWARD_MAX_SKEW_MS
+  ) {
+    return false;
+  }
+  return (
+    signForward({
+      hmacKey: params.hmacKey,
+      timestampMs: params.timestampMs,
+      method: params.method,
+      url: params.url,
+    }) === params.signature
+  );
+}
+
+async function handleForwardRequest(
+  config: WorkerConfig,
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  if (req.method !== "POST" || req.url?.split("?")[0] !== "/forward") {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+
+  const hmacKey = config.forwardHmacKey;
+  const targetUrl = String(req.headers["x-forward-url"] ?? "").trim();
+  const method = String(req.headers["x-forward-method"] ?? "GET")
+    .trim()
+    .toUpperCase();
+  const timestampMs = Number(req.headers["x-forward-ts"] ?? "");
+  const signature = String(req.headers["x-forward-sig"] ?? "").trim();
+
+  if (
+    !hmacKey ||
+    !targetUrl ||
+    !isForwardSignatureValid({
+      hmacKey,
+      timestampMs,
+      method,
+      url: targetUrl,
+      signature,
+    })
+  ) {
+    res.writeHead(401);
+    res.end("unauthorized");
+    return;
+  }
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (!value || HOP_BY_HOP.has(key.toLowerCase())) {
+      continue;
+    }
+    headers.set(key, Array.isArray(value) ? value.join(",") : value);
+  }
+
+  const hasBody = method !== "GET" && method !== "HEAD";
+  const upstream = await fetch(targetUrl, {
+    method,
+    headers,
+    body: hasBody ? Readable.toWeb(req) : undefined,
+    duplex: hasBody ? "half" : undefined,
+  } as RequestInit);
+
+  const responseHeaders: Record<string, string> = {};
+  upstream.headers.forEach((value, key) => {
+    if (key === "transfer-encoding") {
+      return;
+    }
+    responseHeaders[key] = value;
+  });
+  res.writeHead(upstream.status, responseHeaders);
+  if (!upstream.body) {
+    res.end();
+    return;
+  }
+  Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream).pipe(
+    res
+  );
+}
+
+function startForwardServer(config: WorkerConfig): void {
+  if (!config.forwardHmacKey) {
+    console.warn("FORWARD_HMAC_KEY missing; API forward disabled");
+    return;
+  }
+
+  const server = http.createServer((req, res) => {
+    void handleForwardRequest(config, req, res).catch((error) => {
+      console.error(
+        error instanceof Error ? error.message : "Forward request failed"
+      );
+      if (!res.headersSent) {
+        res.writeHead(502);
+      }
+      res.end();
+    });
+  });
+
+  server.listen(config.forwardPort, "0.0.0.0", () => {
+    console.info(`API forward listening on ${config.forwardPort}`);
+  });
 }
 
 async function sendHeartbeat(config: WorkerConfig): Promise<void> {
@@ -201,6 +362,7 @@ async function runLoop(config: WorkerConfig): Promise<void> {
 async function main(): Promise<void> {
   const config = readConfig();
   console.info(`Persist worker ${config.workerId} starting`);
+  startForwardServer(config);
 
   for (;;) {
     try {

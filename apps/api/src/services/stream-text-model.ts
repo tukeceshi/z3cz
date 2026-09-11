@@ -10,7 +10,7 @@ import {
   iterateAiInterfaceChatStream,
   type AiInterfaceStreamEvent,
 } from "@dafthunk/runtime/ai-interface/execute-stream";
-import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
+import { runWithUpstreamFetch, type UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
@@ -20,12 +20,14 @@ import {
   resolveOrgModelInterfaceCandidate,
   type TextModelInterfaceCandidate,
 } from "./resolve-text-model-interface";
+import { createOrgApiForwardFetch } from "./org-api-forwarding";
 
 export interface PreparedTextModelStream {
   readonly candidate: TextModelInterfaceCandidate;
   readonly resolved: ResolvedOrgAiInterface;
   readonly inputs: Readonly<Record<string, unknown>>;
   readonly bodyExtensions?: Readonly<Record<string, unknown>>;
+  readonly organizationId: string;
 }
 
 export async function prepareTextModelStream(params: {
@@ -104,6 +106,7 @@ export async function prepareTextModelStream(params: {
     prepared: {
       candidate,
       resolved: withSelectedModel(iface, inferenceModelId),
+      organizationId: params.organizationId,
       inputs: {
         ...(hasMessages ? { messages: params.messages } : { prompt }),
         ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
@@ -129,16 +132,32 @@ export async function prepareTextModelStream(params: {
 
 export async function* streamPreparedTextModel(params: {
   readonly prepared: PreparedTextModelStream;
+  readonly env: Bindings;
+  readonly db: Database;
   readonly signal?: AbortSignal;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): AsyncGenerator<AiInterfaceStreamEvent> {
-  yield* iterateAiInterfaceChatStream({
-    resolved: params.prepared.resolved,
-    inputs: params.prepared.inputs,
-    bodyExtensions: params.prepared.bodyExtensions,
-    signal: params.signal,
-    upstreamLog: params.upstreamLog,
+  const iterate = () =>
+    iterateAiInterfaceChatStream({
+      resolved: params.prepared.resolved,
+      inputs: params.prepared.inputs,
+      bodyExtensions: params.prepared.bodyExtensions,
+      signal: params.signal,
+      upstreamLog: params.upstreamLog,
+    });
+
+  const fetchImpl = await createOrgApiForwardFetch({
+    db: params.db,
+    env: params.env,
+    organizationId: params.prepared.organizationId,
+    aiInterfaceId: params.prepared.candidate.interfaceId,
   });
+  if (!fetchImpl) {
+    yield* iterate();
+    return;
+  }
+
+  yield* runWithUpstreamFetch(fetchImpl, iterate);
 }
 
 export function handleTextModelStreamFailure(params: {

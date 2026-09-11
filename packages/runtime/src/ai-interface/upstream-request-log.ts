@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 const RESPONSE_EXCERPT_MAX = 2048;
 const BASE64_REDACT_MIN_CHARS = 256;
 
@@ -123,6 +125,28 @@ export function extractUpstreamRequestId(
   return match?.[1] ?? null;
 }
 
+export type UpstreamFetch = (
+  url: string,
+  init?: RequestInit
+) => Promise<Response>;
+
+const upstreamFetchStore = new AsyncLocalStorage<UpstreamFetch>();
+
+export function runWithUpstreamFetch<T>(
+  fetchImpl: UpstreamFetch,
+  fn: () => T
+): T {
+  return upstreamFetchStore.run(fetchImpl, fn);
+}
+
+function callUpstreamFetch(
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  const impl = upstreamFetchStore.getStore();
+  return (impl ?? fetch)(url, init);
+}
+
 export interface FetchWithUpstreamLogOptions {
   /** When "stream", success responses are returned untouched (body not buffered). */
   readonly responseMode?: "json" | "stream";
@@ -144,11 +168,11 @@ export async function fetchWithUpstreamLog(
   const responseMode = options?.responseMode ?? "json";
 
   if (!sink) {
-    return fetch(url, init);
+    return callUpstreamFetch(url, init);
   }
 
   try {
-    const response = await fetch(url, init);
+    const response = await callUpstreamFetch(url, init);
     const durationMs = Date.now() - started;
 
     if (responseMode === "stream" && response.ok) {

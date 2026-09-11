@@ -10,6 +10,7 @@ export const ENTER_DRAFT_TOOL = "enter_draft" as const;
 export type ScheduledAgentRole = "canvas" | "animation";
 export const CANVAS_CREATE_GENERATION_FLOW_TOOL =
   "canvas_create_generation_flow" as const;
+export const CANVAS_WRITE_NODES_TOOL = "canvas_write_nodes" as const;
 export const CANVAS_CONNECT_NODES_TOOL = "canvas_connect_nodes" as const;
 
 export type AgentToolKind =
@@ -74,7 +75,7 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     capabilityId: "canvas",
     enabled: true,
     description:
-      "只在清单明显过期时再取。和清单同一份：名字、提示词摘要、有没有素材、是不是空的。再取不会多出内容，不含资源地址。不够就直说，不要反复取。",
+      "和清单同一份：名字、提示词摘要、有没有素材、是不是空的。没改过别取。刚写过若工具结果已带最新清单就别再取。不含资源地址。",
     parameters: EMPTY_OBJECT,
   },
   {
@@ -119,7 +120,7 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     capabilityId: CANVAS_MAKE_CAPABILITY,
     enabled: true,
     description:
-      "在画布上搭一条生成：参数 mode 为 text/image/video/audio，prompt 为提示词。可选 referenceNodeIds 连已有节点作参考，autoRun 默认 true 会立刻运行。",
+      "只新建一条生成，不是导入或恢复已有画布。参数 mode 为 text/image/video/audio，prompt 为要生成的内容，不要写用户任务原话。可选 referenceNodeIds，autoRun 默认 true 会立刻运行。没有导入工具。",
     parameters: {
       type: "object",
       properties: {
@@ -139,6 +140,51 @@ const TOOLS: readonly AgentCapabilityTool[] = [
         y: { type: "number" },
       },
       required: ["mode", "prompt"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: CANVAS_WRITE_NODES_TOOL,
+    kind: "make",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description:
+      "一次写入多个节点并连线，默认不跑生成。参数 nodes 为 {id,mode,prompt,x,y,url,mimeType}，id 给本批连线用；connections 为 {from,to}，可以是本批 id 或画布已有节点。多节点用这个，不要反复新建一条。",
+    parameters: {
+      type: "object",
+      properties: {
+        nodes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "本批别名" },
+              mode: {
+                type: "string",
+                enum: ["text", "image", "video", "audio"],
+              },
+              prompt: { type: "string" },
+              x: { type: "number" },
+              y: { type: "number" },
+              url: { type: "string" },
+              mimeType: { type: "string" },
+            },
+            required: ["mode"],
+          },
+        },
+        connections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+            },
+            required: ["from", "to"],
+          },
+        },
+      },
+      required: ["nodes"],
       additionalProperties: false,
     },
   },
@@ -368,10 +414,10 @@ export interface AgentRolePack {
 }
 
 export const AGENT_BASE_IDENTITY =
-  "按 <user_query> 做事。做事用请求里给的工具，不要在正文里写调用。只是问就直接答。要改画布或做简易视频，先调度对应角色。要做就先说清楚做什么，再调工具，不要让用户点执行。第一次写，界面拿这段话出确认。";
+  "按 <user_query> 做事。做事用请求里给的工具，不要在正文里写调用。只是问就直接答。要改画布或做简易视频，先调度对应角色。要做就先说清楚做什么，再调工具，不要让用户点执行。工具对不上就直说做不了，不要拿附近的工具顶替。不要把用户原话写进生成提示词。第一次写，界面只确认是否改画布。";
 
 export const AGENT_CANVAS_IDENTITY =
-  "你是画布助手。清单已有节点和是否为空，不要反复取画布。";
+  "你是画布助手。清单已有节点和是否为空。没改过别反复取。刚写完先看最新清单，对不上不要声称已导入或已恢复。多个节点用 canvas_write_nodes 一次写入并连线。canvas_create_generation_flow 只新建一条生成。";
 
 export const AGENT_ANIMATION_IDENTITY = "你负责简易动画。";
 
@@ -388,6 +434,7 @@ const CANVAS_ROLE: AgentRolePack = {
     "canvas_get_state",
     "canvas_resolve_resource",
     CANVAS_CREATE_GENERATION_FLOW_TOOL,
+    CANVAS_WRITE_NODES_TOOL,
     CANVAS_CONNECT_NODES_TOOL,
     "canvas_write_text",
     "canvas_run_node",

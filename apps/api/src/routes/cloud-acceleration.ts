@@ -2,7 +2,10 @@ import type {
   BootstrapPersistWorkerRequest,
   BootstrapPersistWorkerResponse,
   EnableAlwaysAiInterfaceCloudAccelerationResponse,
+  ListAiInterfaceCloudAccelerationAvailableResponse,
   ListAiInterfaceCloudAccelerationResponse,
+  ListApiForwardingAvailableResponse,
+  ListApiForwardingInterfacesResponse,
   ListPersistWorkersResponse,
   PersistWorker,
   PersistWorkerPoolSettings,
@@ -10,6 +13,7 @@ import type {
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
@@ -29,7 +33,11 @@ import {
 import {
   disableOrgAiInterfaceCloudAcceleration,
   enableOrgAlwaysAiInterfaceCloudAcceleration,
+  listOrgAiInterfaceCloudAccelerationAvailable,
   listOrgAiInterfaceCloudAccelerations,
+  listOrgInterfaceApiForwarding,
+  listOrgInterfaceApiForwardingAvailable,
+  setOrgInterfaceApiForwardingEnabled,
 } from "../services/cloud-acceleration-service";
 import {
   persistWorkerBootstrapSchema,
@@ -50,6 +58,58 @@ cloudAccelerationRoutes.get("/interfaces", async (c) => {
   const response: ListAiInterfaceCloudAccelerationResponse = { entries };
   return c.json(response);
 });
+
+cloudAccelerationRoutes.get("/interfaces/available", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const db = createDatabase(c.env);
+  const interfaces = await listOrgAiInterfaceCloudAccelerationAvailable(
+    db,
+    organizationId
+  );
+  const response: ListAiInterfaceCloudAccelerationAvailableResponse = {
+    interfaces,
+  };
+  return c.json(response);
+});
+
+cloudAccelerationRoutes.get("/api-forwarding", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const db = createDatabase(c.env);
+  const interfaces = await listOrgInterfaceApiForwarding(db, organizationId);
+  const response: ListApiForwardingInterfacesResponse = { interfaces };
+  return c.json(response);
+});
+
+cloudAccelerationRoutes.get("/api-forwarding/available", async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const db = createDatabase(c.env);
+  const interfaces = await listOrgInterfaceApiForwardingAvailable(
+    db,
+    organizationId
+  );
+  const response: ListApiForwardingAvailableResponse = { interfaces };
+  return c.json(response);
+});
+
+cloudAccelerationRoutes.post(
+  "/api-forwarding/:aiInterfaceId",
+  zValidator("json", z.object({ enabled: z.boolean() })),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const aiInterfaceId = c.req.param("aiInterfaceId");
+    const { enabled } = c.req.valid("json");
+    const db = createDatabase(c.env);
+    const updated = await setOrgInterfaceApiForwardingEnabled(db, {
+      organizationId,
+      aiInterfaceId,
+      enabled,
+    });
+    if (!updated) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+    return c.json({ success: true, enabled });
+  }
+);
 
 cloudAccelerationRoutes.post("/interfaces/:aiInterfaceId/disable", async (c) => {
   const organizationId = c.get("organizationId")!;
@@ -186,7 +246,6 @@ cloudAccelerationRoutes.post(
         id,
         {
           sshPassword: body.sshPassword,
-          apiBaseUrl: body.apiBaseUrl,
         },
         organizationId
       );

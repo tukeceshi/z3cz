@@ -10,6 +10,7 @@ import {
   AGENT_ANIMATION_IDENTITY,
   AGENT_CANVAS_IDENTITY,
   ASK_QUESTION_TOOL,
+  CANVAS_CREATE_GENERATION_FLOW_TOOL,
   ENTER_DRAFT_TOOL,
   SCHEDULE_ROLE_TOOL,
   SIMPLE_ANIMATION_TOOL,
@@ -408,7 +409,7 @@ describe("buildMainSchedulerMessages", () => {
     expect(messages[0]?.content).toBe(buildAgentMainInstruction("ask"));
     expect(messages[0]?.content).toBe(buildAgentMainInstruction("real"));
     expect(AGENT_IDENTITY).toContain("不要在正文里写调用");
-    expect(AGENT_CANVAS_IDENTITY).toContain("不要反复取画布");
+    expect(AGENT_CANVAS_IDENTITY).toContain("没改过别反复取");
     expect(messages.some((message) => message.content.includes("<<<THINK>>>"))).toBe(
       false
     );
@@ -430,8 +431,9 @@ describe("buildMainSchedulerMessages", () => {
     expect(buildModeSystemReminder("ask")).toContain("先说清楚做什么");
     expect(buildModeSystemReminder("ask")).toContain("再调工具");
     expect(buildModeSystemReminder("ask")).toContain("不要让用户点执行");
-    expect(buildModeSystemReminder("ask")).toContain("拿这段话出确认");
+    expect(buildModeSystemReminder("ask")).toContain("只确认是否改画布");
     expect(AGENT_IDENTITY).toContain("先调度对应角色");
+    expect(AGENT_IDENTITY).toContain("工具对不上就直说做不了");
     expect(buildModeSystemReminder("ask")).not.toContain("不要反复取画布");
     expect(buildModeSystemReminder("ask")).not.toContain("等用户点");
     expect(buildModeSystemReminder("real")).not.toContain("remotion_open");
@@ -1238,6 +1240,63 @@ describe("runAgentScheduler", () => {
     expect(toolLists[0]).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
     expect(toolLists[1]).toContain("canvas_get_state");
     expect(toolLists[1]).not.toContain(SIMPLE_ANIMATION_TOOL);
+  });
+
+  it("puts fresh canvas inventory on make tool results", async () => {
+    let inventory = "画布清单：空";
+    const seenToolResults: string[] = [];
+    await runAgentScheduler({
+      historyMessages: [{ role: "user", content: "做一张猫的图" }],
+      getCanvasInventory: () => inventory,
+      stream: async (messages) => {
+        const tool = [...messages]
+          .reverse()
+          .find((message) => message.role === "tool");
+        if (tool) {
+          seenToolResults.push(tool.content);
+        }
+        if (seenToolResults.length === 0) {
+          return {
+            text: "先调度画布",
+            toolCalls: [
+              {
+                id: "sched-1",
+                name: SCHEDULE_ROLE_TOOL,
+                arguments: JSON.stringify({ role: "canvas" }),
+              },
+            ],
+            stopped: false,
+          };
+        }
+        if (seenToolResults.length === 1) {
+          return {
+            text: "新建一条图片生成",
+            toolCalls: [
+              {
+                id: "make-1",
+                name: CANVAS_CREATE_GENERATION_FLOW_TOOL,
+                arguments: JSON.stringify({
+                  mode: "image",
+                  prompt: "一只猫",
+                }),
+              },
+            ],
+            stopped: false,
+          };
+        }
+        return { text: "已建一条图片生成", stopped: false };
+      },
+      runTool: async () => {
+        inventory = '画布清单：\n{"nodes":[{"id":"ai-image-1"}]}';
+        return JSON.stringify({ ok: true, nodeId: "ai-image-1" });
+      },
+      onAssistantContent: () => undefined,
+    });
+    expect(JSON.parse(seenToolResults[1] ?? "{}")).toEqual({
+      ok: true,
+      nodeId: "ai-image-1",
+      canvasInventory: '画布清单：\n{"nodes":[{"id":"ai-image-1"}]}',
+    });
   });
 
   it("schedules the animation role without giving canvas tools", async () => {

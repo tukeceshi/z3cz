@@ -11,6 +11,7 @@ import type { Bindings } from "../context";
 import type { Database } from "../db";
 import { resolveOrgModelInferenceModelId } from "./resolve-org-model-inference-id";
 import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface-service";
+import { withOrgApiForwarding } from "./org-api-forwarding";
 import {
   listOrgTextModelOptions,
   resolveOrgModelInterfaceCandidate,
@@ -70,25 +71,34 @@ async function executeTextModelCandidate(params: {
     };
   }
 
-  const result = await executeAiInterfaceSync({
-    resolved: withSelectedModel(iface, inferenceModelId),
-    inputs: {
-      prompt: params.effectivePrompt,
-      ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
-        ? { referenceImageUrls: params.referenceImageUrls }
-        : {}),
-      ...(params.referenceImageInline && params.referenceImageInline.length > 0
-        ? { referenceImageInline: params.referenceImageInline }
-        : {}),
-      ...(params.referenceVideoUrls && params.referenceVideoUrls.length > 0
-        ? { referenceVideoUrls: params.referenceVideoUrls }
-        : {}),
+  const result = await withOrgApiForwarding(
+    {
+      db: params.db,
+      env: params.env,
+      organizationId: params.organizationId,
+      aiInterfaceId: params.candidate.interfaceId,
     },
-    bodyExtensions: params.outputMaxTokens
-      ? { max_tokens: params.outputMaxTokens }
-      : undefined,
-    upstreamLog: params.upstreamLog,
-  });
+    () =>
+      executeAiInterfaceSync({
+        resolved: withSelectedModel(iface, inferenceModelId),
+        inputs: {
+          prompt: params.effectivePrompt,
+          ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
+            ? { referenceImageUrls: params.referenceImageUrls }
+            : {}),
+          ...(params.referenceImageInline && params.referenceImageInline.length > 0
+            ? { referenceImageInline: params.referenceImageInline }
+            : {}),
+          ...(params.referenceVideoUrls && params.referenceVideoUrls.length > 0
+            ? { referenceVideoUrls: params.referenceVideoUrls }
+            : {}),
+        },
+        bodyExtensions: params.outputMaxTokens
+          ? { max_tokens: params.outputMaxTokens }
+          : undefined,
+        upstreamLog: params.upstreamLog,
+      })
+  );
 
   if (result.status !== "completed" || !result.outputs) {
     return { ok: false, error: result.error ?? "Generation failed" };

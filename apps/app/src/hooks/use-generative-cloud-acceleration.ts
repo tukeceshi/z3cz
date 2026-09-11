@@ -49,12 +49,6 @@ export function useGenerativeCloudAcceleration(
         return;
       }
 
-      pendingServerPersistRef.current = true;
-      abortDownloadRef.current = true;
-      setDialogOpen(false);
-      setOfferVisible(false);
-      options.onServerPersistTriggered?.();
-
       try {
         if (alwaysForInterface && options.aiInterfaceId) {
           await enableAlwaysOrgInterfaceCloudAcceleration(
@@ -67,9 +61,12 @@ export function useGenerativeCloudAcceleration(
           options.organizationId,
           options.jobId
         );
+        pendingServerPersistRef.current = true;
+        abortDownloadRef.current = true;
+        setDialogOpen(false);
+        setOfferVisible(false);
+        options.onServerPersistTriggered?.();
       } catch {
-        pendingServerPersistRef.current = false;
-        abortDownloadRef.current = false;
         toast.error(t("pages.cloudAcceleration.requestFailed"));
       }
     },

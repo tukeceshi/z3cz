@@ -21,8 +21,8 @@ import {
   createPersistWorker,
   deletePersistWorker,
   generatePersistWorkerSecret,
-  getPersistWorkerById,
   getPersistWorkerPoolSettings,
+  getPlatformPersistWorkerById,
   hashPersistWorkerSecret,
   listPersistWorkers,
   updatePersistWorker,
@@ -104,7 +104,6 @@ adminPersistWorkerRoutes.post(
     try {
       const result = await redeployPersistWorker(c.env, db, id, {
         sshPassword: body.sshPassword,
-        apiBaseUrl: body.apiBaseUrl,
       });
       return c.json(result satisfies RedeployPersistWorkerResponse);
     } catch (error) {
@@ -172,7 +171,7 @@ adminPersistWorkerRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
 
   try {
-    const worker = await getPersistWorkerById(db, id);
+    const worker = await getPlatformPersistWorkerById(db, id);
     if (!worker) {
       return c.json({ error: "Persist worker not found" }, 404);
     }
@@ -240,6 +239,11 @@ adminPersistWorkerRoutes.patch(
       if (body.rotateSecret) {
         secret = generatePersistWorkerSecret();
         secretHash = await hashPersistWorkerSecret(secret);
+      }
+
+      const existing = await getPlatformPersistWorkerById(db, id);
+      if (!existing) {
+        return c.json({ error: "Persist worker not found" }, 404);
       }
 
       const worker = await updatePersistWorker(

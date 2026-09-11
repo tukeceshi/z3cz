@@ -77,6 +77,7 @@ import {
   compactCanvasAgentState,
   executeCanvasAgentTool,
   formatCanvasInventory,
+  mapWriteNodeConnections,
   toolCallFromFunctionArgs,
 } from "@/services/agent-canvas-state";
 import {
@@ -512,6 +513,86 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       readonly payload: string;
     }) => {
       const graph = getCanvasGraph?.() ?? { nodes: [], edges: [] };
+      const readGraph = () => getCanvasGraph?.() ?? graph;
+      const stageOntoNode = async (
+        nodeId: string,
+        sourceUrl: string,
+        mimeType: string
+      ) => {
+        const latest = readGraph();
+        const current = latest.nodes.find((node) => node.id === nodeId);
+        if (!current || !orgId || !workflowId) {
+          return { ok: false as const, error: "找不到节点" };
+        }
+        const nodeType = current.data.nodeType;
+        const mediaType =
+          nodeType === "ai-video"
+            ? "ai-video"
+            : nodeType === "ai-audio"
+              ? "ai-audio"
+              : "ai-image";
+        await stageGenerativeMediaFromEphemeralUrl({
+          organizationId: orgId,
+          workflowId,
+          sourceUrl,
+          mimeType:
+            mimeType ||
+            (mediaType === "ai-video"
+              ? "video/mp4"
+              : mediaType === "ai-audio"
+                ? "audio/mpeg"
+                : "image/png"),
+          nodeType: mediaType,
+          patchNodeLayout: createPatchNodeLayoutMetadata(
+            nodeId,
+            updateNodeData
+          ),
+        });
+        return { ok: true as const };
+      };
+      const connectAgentPairs = async (
+        connections: readonly {
+          readonly fromNodeId: string;
+          readonly toNodeId: string;
+        }[]
+      ) => {
+        if (!onConnectWorkflow) {
+          return { ok: false as const, error: "无法连线" };
+        }
+        let latest = readGraph();
+        for (const item of connections) {
+          if (
+            !latest.nodes.some((node) => node.id === item.toNodeId) ||
+            !latest.nodes.some((node) => node.id === item.fromNodeId)
+          ) {
+            latest = await waitForCanvasNode(readGraph, item.toNodeId);
+            if (!latest.nodes.some((node) => node.id === item.fromNodeId)) {
+              latest = await waitForCanvasNode(readGraph, item.fromNodeId);
+            }
+          }
+          const connection = findAgentReferenceConnection({
+            fromNodeId: item.fromNodeId,
+            toNodeId: item.toNodeId,
+            nodes: latest.nodes,
+          });
+          if (!connection) {
+            return { ok: false as const, error: "无法连线" };
+          }
+          if (
+            !validateWorkflowConnection({
+              connection,
+              nodes: latest.nodes,
+              edges: latest.edges,
+              generativeReferenceCatalogs,
+              disabled: workflowDisabled,
+            })
+          ) {
+            return { ok: false as const, error: "无法连线" };
+          }
+          onConnectWorkflow(connection);
+        }
+        return { ok: true as const };
+      };
       return executeCanvasAgentTool({
         call,
         snapshot: compactCanvasAgentState(graph.nodes, graph.edges),
@@ -587,36 +668,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             return { ok: true };
           },
           stageMedia: async (nodeId, sourceUrl, mimeType) => {
-            const latest = getCanvasGraph?.() ?? graph;
-            const current = latest.nodes.find((node) => node.id === nodeId);
-            if (!current || !orgId || !workflowId) {
-              return { ok: false, error: "找不到节点" };
-            }
-            const nodeType = current.data.nodeType;
-            const mediaType =
-              nodeType === "ai-video"
-                ? "ai-video"
-                : nodeType === "ai-audio"
-                  ? "ai-audio"
-                  : "ai-image";
-            await stageGenerativeMediaFromEphemeralUrl({
-              organizationId: orgId,
-              workflowId,
-              sourceUrl,
-              mimeType:
-                mimeType ||
-                (mediaType === "ai-video"
-                  ? "video/mp4"
-                  : mediaType === "ai-audio"
-                    ? "audio/mpeg"
-                    : "image/png"),
-              nodeType: mediaType,
-              patchNodeLayout: createPatchNodeLayoutMetadata(
-                nodeId,
-                updateNodeData
-              ),
-            });
-            return { ok: true };
+            return stageOntoNode(nodeId, sourceUrl, mimeType);
           },
           createGenerationFlow: async (input) => {
             if (!onCreateGenerativeNode) {
@@ -670,50 +722,63 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             return { ok: true, nodeId };
           },
           connectNodes: async (connections) => {
-            if (!onConnectWorkflow) {
-              return { ok: false, error: "无法连线" };
+            return connectAgentPairs(connections);
+          },
+          writeNodes: async (input) => {
+            if (!onCreateGenerativeNode) {
+              return { ok: false, error: "无法创建节点" };
             }
-            let latest = getCanvasGraph?.() ?? graph;
-            for (const item of connections) {
-              if (
-                !latest.nodes.some((node) => node.id === item.toNodeId) ||
-                !latest.nodes.some((node) => node.id === item.fromNodeId)
-              ) {
-                latest = await waitForCanvasNode(
-                  () => getCanvasGraph?.() ?? graph,
-                  item.toNodeId
+            const created: {
+              id: string;
+              nodeId: string;
+              mode: (typeof input.nodes)[number]["mode"];
+            }[] = [];
+            for (const node of input.nodes) {
+              const nodeId = onCreateGenerativeNode(
+                generationModeToNodeType(node.mode),
+                {
+                  prompt: node.prompt,
+                  precedingText: "",
+                  selected: false,
+                  ...(node.x !== undefined && node.y !== undefined
+                    ? { positionFlowPoint: { x: node.x, y: node.y } }
+                    : {}),
+                }
+              );
+              if (!nodeId) {
+                return { ok: false, error: "无法创建节点" };
+              }
+              await waitForCanvasNode(
+                () => getCanvasGraph?.() ?? graph,
+                nodeId
+              );
+              if (node.url) {
+                const staged = await stageOntoNode(
+                  nodeId,
+                  node.url,
+                  node.mimeType
                 );
-                if (
-                  !latest.nodes.some((node) => node.id === item.fromNodeId)
-                ) {
-                  latest = await waitForCanvasNode(
-                    () => getCanvasGraph?.() ?? graph,
-                    item.fromNodeId
-                  );
+                if (!staged.ok) {
+                  return staged;
                 }
               }
-              const connection = findAgentReferenceConnection({
-                fromNodeId: item.fromNodeId,
-                toNodeId: item.toNodeId,
-                nodes: latest.nodes,
-              });
-              if (!connection) {
-                return { ok: false, error: "无法连线" };
-              }
-              if (
-                !validateWorkflowConnection({
-                  connection,
-                  nodes: latest.nodes,
-                  edges: latest.edges,
-                  generativeReferenceCatalogs,
-                  disabled: workflowDisabled,
-                })
-              ) {
-                return { ok: false, error: "无法连线" };
-              }
-              onConnectWorkflow(connection);
+              created.push({ id: node.id, nodeId, mode: node.mode });
             }
-            return { ok: true };
+            const connections = mapWriteNodeConnections(
+              created,
+              input.connections
+            );
+            if (connections.length > 0) {
+              const linked = await connectAgentPairs(connections);
+              if (!linked.ok) {
+                return linked;
+              }
+            }
+            return {
+              ok: true,
+              nodes: created,
+              connected: connections.length,
+            };
           },
         },
       });

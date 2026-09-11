@@ -88,7 +88,7 @@ describe("resolveGenerationJobDisplayPhase", () => {
 });
 
 describe("shouldDeferClientPersistToServer", () => {
-  it("defers only when server is persisting or job succeeded", () => {
+  it("does not defer on timeout until persist is owned by the worker pool", () => {
     const readyAt = new Date(
       Date.now() - GENERATION_JOB_SERVER_PERSIST_AFTER_MS - 1_000
     ).toISOString();
@@ -104,7 +104,7 @@ describe("shouldDeferClientPersistToServer", () => {
         makeJob({
           status: "uploading",
           readyAt,
-          resultJson: { persistOwner: "server" },
+          resultJson: { persistOwner: "server", persistDispatch: "worker" },
         })
       )
     ).toBe(true);

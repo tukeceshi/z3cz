@@ -12,6 +12,7 @@ const params = {
   workerSecret: "secret-value",
   apiBaseUrl: "https://api.example.com",
   sshPassword: "ssh-pass",
+  forwardHmacKey: "hmac-key",
 } as const;
 
 describe("buildPersistWorkerInstallScript", () => {
@@ -29,7 +30,8 @@ describe("buildPersistWorkerInstallScript", () => {
     expect(mkdirIndex).toBeGreaterThan(installShIndex);
     expect(sudoIndex).toBeGreaterThan(mkdirIndex);
     expect(passwordSudoIndex).toBeGreaterThan(sudoIndex);
-    expect(script).toContain(PERSIST_WORKER_INSTALL_DIR);
+    expect(script).toContain("FORWARD_PORT=3103");
+    expect(script).toContain("FORWARD_HMAC_KEY=hmac-key");
     expect(script).toContain("export default {};");
     expect(script.includes(`mkdir -p ${PERSIST_WORKER_INSTALL_DIR}`)).toBe(
       false
