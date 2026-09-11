@@ -163,9 +163,7 @@ import {
   scrollContainerToBottom,
 } from "./ai-text-preview-scroll";
 import { AgentTalkCite } from "./agent-talk-cite";
-import { withAiAudioManualUpload } from "./ai-audio-node-utils";
-import { withAiImageManualUpload } from "./ai-image-node-utils";
-import { withAiVideoManualUpload } from "./ai-video-node-utils";
+import { patchGenerativeNodeWithHungMedia } from "./patch-generative-node-with-hung-media";
 import { findAgentReferenceConnection, generationModeToNodeType } from "./agent-canvas-connect";
 import {
   filterMentionNodes,
@@ -582,11 +580,11 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                 : "image/png"),
         });
         updateNodeData(nodeId, (nodeData) =>
-          mediaType === "ai-video"
-            ? withAiVideoManualUpload(nodeData, [staged])
-            : mediaType === "ai-audio"
-              ? withAiAudioManualUpload(nodeData, [staged])
-              : withAiImageManualUpload(nodeData, [staged])
+          patchGenerativeNodeWithHungMedia({
+            current: nodeData,
+            media: staged,
+            nodeType: mediaType,
+          })
         );
         return { ok: true as const };
       };
