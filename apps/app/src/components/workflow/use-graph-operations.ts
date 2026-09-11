@@ -95,6 +95,7 @@ import {
   resolveWorkflowNodeDimensions,
 } from "./workflow-node-placement";
 import { computeViewportForFlowCenter } from "./workflow-viewport-utils";
+import { applyWorkflowNodeDataUpdate } from "./apply-workflow-node-data-update";
 import type {
   NodeExecutionState,
   NodeExecutionUpdate,
@@ -1473,20 +1474,11 @@ export function useGraphOperations({
         | Partial<WorkflowNodeType>
         | ((current: WorkflowNodeType) => Partial<WorkflowNodeType>)
     ) => {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id !== nodeId) return node;
-          const update =
-            typeof dataOrFn === "function" ? dataOrFn(node.data) : dataOrFn;
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              ...update,
-            },
-          };
-        })
-      );
+      setNodes((nds) => {
+        const next = applyWorkflowNodeDataUpdate(nds, nodeId, dataOrFn);
+        nodesRef.current = next;
+        return next;
+      });
     },
     [setNodes]
   );

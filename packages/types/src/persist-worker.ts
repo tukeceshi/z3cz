@@ -34,9 +34,15 @@ export interface PersistWorkerPoolSettings {
   readonly enabled: boolean;
 }
 
+export interface PersistWorkerPlatformSummary {
+  readonly deployStatus: PersistWorkerDeployStatus;
+  readonly lastHeartbeatAt: string | null;
+}
+
 export interface ListPersistWorkersResponse {
   readonly workers: readonly PersistWorker[];
   readonly settings: PersistWorkerPoolSettings;
+  readonly platform?: PersistWorkerPlatformSummary | null;
 }
 
 export interface CreatePersistWorkerRequest {

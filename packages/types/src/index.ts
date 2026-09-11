@@ -2,6 +2,9 @@ export * from "./ai-text-storage";
 export * from "./text-content";
 export * from "./agent";
 export * from "./agent-chat";
+export * from "./canvas-import";
+export * from "./web-read";
+
 export * from "./text-model-context-windows";
 export * from "./ai-interface";
 export * from "./ai-interface-channels";

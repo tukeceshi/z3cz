@@ -520,7 +520,7 @@ export function readAiVideoCardPrimaryVideo(
 
 export function withAiVideoManualUpload(
   current: WorkflowNodeType,
-  videos: readonly MediaReference[]
+  videos: readonly WorkflowMediaValue[]
 ): Partial<WorkflowNodeType> {
   let inputs = upsertInputValue(
     current.inputs,

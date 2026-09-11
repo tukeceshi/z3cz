@@ -2,6 +2,7 @@ import type {
   BootstrapPersistWorkerRequest,
   PersistWorker,
   PersistWorkerDeployStatus,
+  PersistWorkerPlatformSummary,
   RedeployPersistWorkerRequest,
 } from "@dafthunk/types";
 import { useState } from "react";
@@ -77,6 +78,7 @@ interface PersistWorkersPanelProps {
   readonly title?: string;
   readonly description?: string;
   readonly workers: readonly PersistWorker[];
+  readonly platform?: PersistWorkerPlatformSummary | null;
   readonly onBootstrap: (
     input: BootstrapPersistWorkerRequest
   ) => Promise<{ readonly deployLog: string }>;
@@ -93,6 +95,7 @@ export function PersistWorkersPanel({
   title,
   description,
   workers,
+  platform,
   onBootstrap,
   onRedeploy,
   onDelete,
@@ -236,7 +239,7 @@ export function PersistWorkersPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {workers.length === 0 ? (
+            {workers.length === 0 && !platform ? (
               <TableRow>
                 <TableCell
                   colSpan={6}
@@ -246,71 +249,99 @@ export function PersistWorkersPanel({
                 </TableCell>
               </TableRow>
             ) : (
-              workers.map((worker) => (
-                <TableRow key={worker.id}>
-                  <TableCell>
-                    <div className="font-medium">{worker.name}</div>
-                    <div className="text-xs text-muted-foreground">{worker.id}</div>
-                  </TableCell>
-                  <TableCell>
-                    {worker.host ? (
-                      <div>
-                        <div>{worker.host}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {worker.sshUsername}@{worker.sshPort}
-                        </div>
+              <>
+                {platform ? (
+                  <TableRow>
+                    <TableCell>
+                      <div className="font-medium">
+                        {t("pages.cloudAcceleration.platformWorkerName")}
                       </div>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {worker.activeJobCount} / {worker.maxConcurrentJobs}
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant={deployStatusVariant(worker.deployStatus)}>
+                    </TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell>
+                      <Badge variant={deployStatusVariant(platform.deployStatus)}>
                         {t(
-                          `admin.persistWorkers.deployStatus.${worker.deployStatus}`
+                          `admin.persistWorkers.deployStatus.${platform.deployStatus}`
                         )}
                       </Badge>
-                      {worker.deployError ? (
-                        <div className="max-w-xs truncate text-xs text-destructive">
-                          {worker.deployError}
-                        </div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatTimestamp(worker.lastHeartbeatAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    </TableCell>
+                    <TableCell>
+                      {formatTimestamp(platform.lastHeartbeatAt)}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                ) : null}
+                {workers.map((worker) => (
+                  <TableRow key={worker.id}>
+                    <TableCell>
+                      <div className="font-medium">{worker.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {worker.id}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       {worker.host ? (
+                        <div>
+                          <div>{worker.host}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {worker.sshUsername}@{worker.sshPort}
+                          </div>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {worker.activeJobCount} / {worker.maxConcurrentJobs}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <Badge variant={deployStatusVariant(worker.deployStatus)}>
+                          {t(
+                            `admin.persistWorkers.deployStatus.${worker.deployStatus}`
+                          )}
+                        </Badge>
+                        {worker.deployError ? (
+                          <div className="max-w-xs truncate text-xs text-destructive">
+                            {worker.deployError}
+                          </div>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {formatTimestamp(worker.lastHeartbeatAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {worker.host ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setRedeployWorker(worker);
+                              setRedeployPassword("");
+                            }}
+                          >
+                            {t("admin.persistWorkers.redeploy")}
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
                           onClick={() => {
-                            setRedeployWorker(worker);
-                            setRedeployPassword("");
+                            void handleDelete(worker);
                           }}
                         >
-                          {t("admin.persistWorkers.redeploy")}
+                          {t("common.delete")}
                         </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          void handleDelete(worker);
-                        }}
-                      >
-                        {t("common.delete")}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
             )}
           </TableBody>
         </Table>

@@ -12,6 +12,7 @@ import {
   ASK_QUESTION_TOOL,
   CANVAS_CREATE_GENERATION_FLOW_TOOL,
   ENTER_DRAFT_TOOL,
+  READ_URL_TOOL,
   SCHEDULE_ROLE_TOOL,
   SIMPLE_ANIMATION_TOOL,
   toolsForRequest,
@@ -641,7 +642,7 @@ describe("parseCiteHeader", () => {
 describe("toolsForRequest", () => {
   it("lists schedule and ask until a role is on", () => {
     const ask = toolsForRequest("ask").map((tool) => tool.function.name);
-    expect(ask).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(ask).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
     expect(ask).not.toContain(SIMPLE_ANIMATION_TOOL);
     expect(ask).not.toContain("canvas_get_state");
     expect(ask).not.toContain("switch_mode");
@@ -806,7 +807,7 @@ describe("runAgentScheduler", () => {
       )
     ).toBe(true);
     expect(toolNames).toEqual([CANVAS_GET_STATE_TOOL]);
-    expect(toolLists[0]).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
   });
 
   it("stores tool output on the saved answer", async () => {
@@ -1237,7 +1238,7 @@ describe("runAgentScheduler", () => {
     expect(seen[0]).toBe("");
     expect(seen[1]).toBe("画布清单：空");
     expect(seen[2]).toContain("新的");
-    expect(toolLists[0]).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
     expect(toolLists[1]).toContain("canvas_get_state");
     expect(toolLists[1]).not.toContain(SIMPLE_ANIMATION_TOOL);
   });
@@ -1334,7 +1335,7 @@ describe("runAgentScheduler", () => {
       },
       onAssistantContent: () => undefined,
     });
-    expect(toolLists[0]).toEqual([SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
     expect(toolLists[1]).toContain(SIMPLE_ANIMATION_TOOL);
     expect(toolLists[1]).not.toContain("canvas_get_state");
     expect(identities[0]?.some((text) => text === AGENT_ANIMATION_IDENTITY)).toBe(

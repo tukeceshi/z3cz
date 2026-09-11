@@ -32,7 +32,6 @@ export function isClientCancelledTextModelError(raw: string): boolean {
     /the operation was aborted/iu.test(haystack) ||
     /request was aborted/iu.test(haystack) ||
     /stream ended without completion event/iu.test(haystack) ||
-    /stream returned no text/iu.test(haystack) ||
     /network error when attempting to fetch resource/iu.test(haystack) ||
     /ECONNRESET|ECONNABORTED|connection reset|broken pipe/iu.test(haystack)
   );

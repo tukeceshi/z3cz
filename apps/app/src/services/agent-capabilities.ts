@@ -6,12 +6,14 @@ export const SIMPLE_ANIMATION_TOOL = "simple_animation" as const;
 export const ASK_QUESTION_TOOL = "ask_question" as const;
 export const SCHEDULE_ROLE_TOOL = "schedule_role" as const;
 export const ENTER_DRAFT_TOOL = "enter_draft" as const;
+export const READ_URL_TOOL = "read_url" as const;
 
 export type ScheduledAgentRole = "canvas" | "animation";
 export const CANVAS_CREATE_GENERATION_FLOW_TOOL =
   "canvas_create_generation_flow" as const;
 export const CANVAS_WRITE_NODES_TOOL = "canvas_write_nodes" as const;
 export const CANVAS_CONNECT_NODES_TOOL = "canvas_connect_nodes" as const;
+export const CANVAS_IMPORT_TOOL = "canvas_import" as const;
 
 export type AgentToolKind =
   | "read"
@@ -65,6 +67,7 @@ const CAPABILITIES: readonly AgentCapability[] = [
   { id: CANVAS_MAKE_CAPABILITY, label: "画布" },
   { id: "ask", label: "提问" },
   { id: "schedule", label: "调度" },
+  { id: "web", label: "链接" },
   { id: "mode", label: "模式" },
 ];
 
@@ -115,12 +118,33 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     },
   },
   {
+    name: CANVAS_IMPORT_TOOL,
+    kind: "make",
+    capabilityId: CANVAS_MAKE_CAPABILITY,
+    enabled: true,
+    description:
+      "从链接或 JSON 导入整张画布。不要把画布内容抄进参数。参数 url 或 json，mode 为 append 或 replace。画布已有节点时先问追加还是替换。源节点带资源链接的会一并挂上；没挂上再用 canvas_stage_media，url 看工具结果。默认不跑生成。",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "画布 JSON 地址" },
+        json: { type: "string", description: "画布 JSON 文本" },
+        mode: {
+          type: "string",
+          enum: ["append", "replace"],
+          description: "追加或替换",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: CANVAS_CREATE_GENERATION_FLOW_TOOL,
     kind: "make",
     capabilityId: CANVAS_MAKE_CAPABILITY,
     enabled: true,
     description:
-      "只新建一条生成，不是导入或恢复已有画布。参数 mode 为 text/image/video/audio，prompt 为要生成的内容，不要写用户任务原话。可选 referenceNodeIds，autoRun 默认 true 会立刻运行。没有导入工具。",
+      "只新建一条生成，不是导入或恢复已有画布。参数 mode 为 text/image/video/audio，prompt 为要生成的内容，不要写用户任务原话。可选 referenceNodeIds，autoRun 默认 true 会立刻运行。导入用 canvas_import。",
     parameters: {
       type: "object",
       properties: {
@@ -149,7 +173,7 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     capabilityId: CANVAS_MAKE_CAPABILITY,
     enabled: true,
     description:
-      "一次写入多个节点并连线，默认不跑生成。参数 nodes 为 {id,mode,prompt,x,y,url,mimeType}，id 给本批连线用；connections 为 {from,to}，可以是本批 id 或画布已有节点。多节点用这个，不要反复新建一条。",
+      "一次写入多个节点并连线，默认不跑生成。参数 nodes 为 {id,mode,prompt,x,y,url,mimeType}，url 为要挂上的资源链接（外部节点链接或本轮附件）；id 给本批连线用；connections 为 {from,to}，可以是本批 id 或画布已有节点。多节点用这个，不要反复新建一条。",
     parameters: {
       type: "object",
       properties: {
@@ -166,8 +190,8 @@ const TOOLS: readonly AgentCapabilityTool[] = [
               prompt: { type: "string" },
               x: { type: "number" },
               y: { type: "number" },
-              url: { type: "string" },
-              mimeType: { type: "string" },
+              url: { type: "string", description: "要挂上的资源链接" },
+              mimeType: { type: "string", description: "可选" },
             },
             required: ["mode"],
           },
@@ -251,15 +275,34 @@ const TOOLS: readonly AgentCapabilityTool[] = [
     capabilityId: CANVAS_MAKE_CAPABILITY,
     enabled: true,
     description:
-      "把图片或媒体挂到节点上。参数 nodeId、url，可选 mimeType。本轮上传的图用附件地址。",
+      "把图片或媒体挂到已有节点。参数 nodeId、url，可选 mimeType。url 可以是外部节点上的资源链接，或本轮附件。不要把外链当 resourceId。",
     parameters: {
       type: "object",
       properties: {
-        nodeId: { type: "string" },
-        url: { type: "string" },
-        mimeType: { type: "string" },
+        nodeId: { type: "string", description: "画布节点 id" },
+        url: {
+          type: "string",
+          description: "外部资源链接或本轮附件地址",
+        },
+        mimeType: { type: "string", description: "可选" },
       },
       required: ["nodeId", "url"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: READ_URL_TOOL,
+    kind: "read",
+    capabilityId: "web",
+    enabled: true,
+    description:
+      "读取网页链接并整理成标题、要点和正文。参数 url。用户给了链接、需要看页面内容时用。不要假装已经读过。",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "http 或 https 地址" },
+      },
+      required: ["url"],
       additionalProperties: false,
     },
   },
@@ -414,17 +457,17 @@ export interface AgentRolePack {
 }
 
 export const AGENT_BASE_IDENTITY =
-  "按 <user_query> 做事。做事用请求里给的工具，不要在正文里写调用。只是问就直接答。要改画布或做简易视频，先调度对应角色。要做就先说清楚做什么，再调工具，不要让用户点执行。工具对不上就直说做不了，不要拿附近的工具顶替。不要把用户原话写进生成提示词。第一次写，界面只确认是否改画布。";
+  "按 <user_query> 做事。做事用请求里给的工具，不要在正文里写调用。只是问就直接答。用户给了网页链接、需要看内容时用 read_url，不要假装读过。要改画布或做简易视频，先调度对应角色。要做就先说清楚做什么，再调工具，不要让用户点执行。工具对不上就直说做不了，不要拿附近的工具顶替。不要把用户原话写进生成提示词。第一次写，界面只确认是否改画布。";
 
 export const AGENT_CANVAS_IDENTITY =
-  "你是画布助手。清单已有节点和是否为空。没改过别反复取。刚写完先看最新清单，对不上不要声称已导入或已恢复。多个节点用 canvas_write_nodes 一次写入并连线。canvas_create_generation_flow 只新建一条生成。";
+  "你是画布助手。清单已有节点和是否为空。没改过别反复取。刚写完先看最新清单，对不上不要声称已导入或已恢复。整图导入用 canvas_import，不要用 canvas_write_nodes 抄整图。画布已有内容时先问追加还是替换。多个节点新建用 canvas_write_nodes 一次写入并连线。外部素材用链接挂到节点，不要只建空节点。canvas_create_generation_flow 只新建一条生成。";
 
 export const AGENT_ANIMATION_IDENTITY = "你负责简易动画。";
 
 const BASE_ROLE: AgentRolePack = {
   id: AGENT_ROLE_BASE,
   identity: AGENT_BASE_IDENTITY,
-  toolNames: [SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL],
+  toolNames: [READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL],
 };
 
 const CANVAS_ROLE: AgentRolePack = {
@@ -433,6 +476,7 @@ const CANVAS_ROLE: AgentRolePack = {
   toolNames: [
     "canvas_get_state",
     "canvas_resolve_resource",
+    CANVAS_IMPORT_TOOL,
     CANVAS_CREATE_GENERATION_FLOW_TOOL,
     CANVAS_WRITE_NODES_TOOL,
     CANVAS_CONNECT_NODES_TOOL,

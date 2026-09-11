@@ -5,7 +5,7 @@ import type {
   AiGenerativeNodeType,
   OrgTextModelOption,
 } from "@dafthunk/types";
-import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import {
   answerBlocks,
   conversationHasMessages,
@@ -73,6 +73,13 @@ import {
   isMakeTool,
   SIMPLE_ANIMATION_TOOL,
 } from "@/services/agent-capabilities";
+import { fetchCanvasImportSourceDocument } from "@/services/agent-canvas-import-client";
+import { fetchAgentWebRead } from "@/services/agent-web-read-client";
+import {
+  imageMentionIndexMap,
+  rewritePromptImageMentions,
+  sortImportConnections,
+} from "@/services/agent-canvas-import";
 import {
   compactCanvasAgentState,
   executeCanvasAgentTool,
@@ -130,7 +137,8 @@ import {
   readRemotionViewportContent,
   writeRemotionViewportContent,
 } from "@/services/remotion-viewport-staging";
-import { stageGenerativeMediaFromEphemeralUrl } from "@/services/stage-generative-media";
+import { hangEphemeralUrlAsResource } from "@/services/hang-ephemeral-url-as-resource";
+import { ApiRequestError } from "@/services/utils";
 import { cn } from "@/utils/utils";
 import {
   AGENT_CHAT_AUTO_ID,
@@ -155,6 +163,9 @@ import {
   scrollContainerToBottom,
 } from "./ai-text-preview-scroll";
 import { AgentTalkCite } from "./agent-talk-cite";
+import { withAiAudioManualUpload } from "./ai-audio-node-utils";
+import { withAiImageManualUpload } from "./ai-image-node-utils";
+import { withAiVideoManualUpload } from "./ai-video-node-utils";
 import { findAgentReferenceConnection, generationModeToNodeType } from "./agent-canvas-connect";
 import {
   filterMentionNodes,
@@ -166,7 +177,6 @@ import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import { commitAiTextValue } from "./commit-ai-text-value";
 import type { GenerativeNodeAddOptions } from "./creative-studio-context";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
-import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
@@ -231,6 +241,33 @@ async function waitForCanvasNode(
   return getGraph();
 }
 
+async function waitForCanvasEdge(
+  getGraph: () => {
+    readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+    readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  },
+  fromNodeId: string,
+  toNodeId: string
+): Promise<{
+  readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+}> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const latest = getGraph();
+    if (
+      latest.edges.some(
+        (edge) => edge.source === fromNodeId && edge.target === toNodeId
+      )
+    ) {
+      return latest;
+    }
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 16);
+    });
+  }
+  return getGraph();
+}
+
 export interface WorkflowAgentSettingsOverlayProps {
   readonly orgId?: string;
   readonly workflowId?: string;
@@ -248,6 +285,7 @@ export interface WorkflowAgentSettingsOverlayProps {
     options?: GenerativeNodeAddOptions
   ) => string | null;
   readonly onConnectWorkflow?: (connection: Connection) => void;
+  readonly onRemoveNodes?: (nodeIds: readonly string[]) => void;
 }
 
 export interface WorkflowAgentSettingsOverlayHandle {
@@ -273,6 +311,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     getCanvasGraph,
     onCreateGenerativeNode,
     onConnectWorkflow,
+    onRemoveNodes,
   },
   ref
 ) {
@@ -521,7 +560,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       ) => {
         const latest = readGraph();
         const current = latest.nodes.find((node) => node.id === nodeId);
-        if (!current || !orgId || !workflowId) {
+        if (!current || !orgId) {
           return { ok: false as const, error: "找不到节点" };
         }
         const nodeType = current.data.nodeType;
@@ -531,9 +570,8 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             : nodeType === "ai-audio"
               ? "ai-audio"
               : "ai-image";
-        await stageGenerativeMediaFromEphemeralUrl({
+        const staged = await hangEphemeralUrlAsResource({
           organizationId: orgId,
-          workflowId,
           sourceUrl,
           mimeType:
             mimeType ||
@@ -542,12 +580,14 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               : mediaType === "ai-audio"
                 ? "audio/mpeg"
                 : "image/png"),
-          nodeType: mediaType,
-          patchNodeLayout: createPatchNodeLayoutMetadata(
-            nodeId,
-            updateNodeData
-          ),
         });
+        updateNodeData(nodeId, (nodeData) =>
+          mediaType === "ai-video"
+            ? withAiVideoManualUpload(nodeData, [staged])
+            : mediaType === "ai-audio"
+              ? withAiAudioManualUpload(nodeData, [staged])
+              : withAiImageManualUpload(nodeData, [staged])
+        );
         return { ok: true as const };
       };
       const connectAgentPairs = async (
@@ -780,6 +820,212 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               connected: connections.length,
             };
           },
+          fetchImportSource: async (url) => {
+            if (!orgId) {
+              return { ok: false, error: "无法读取画布" };
+            }
+            try {
+              return {
+                ok: true as const,
+                document: await fetchCanvasImportSourceDocument(orgId, url),
+              };
+            } catch (error) {
+              const message =
+                error instanceof ApiRequestError
+                  ? error.message
+                  : "无法读取画布";
+              return { ok: false as const, error: message };
+            }
+          },
+          readUrl: async (url) => {
+            if (!orgId) {
+              return { ok: false, error: "无法读取链接" };
+            }
+            const models =
+              modelId === AGENT_CHAT_AUTO_ID
+                ? selectableModels
+                : selectableModels.filter(
+                    (model) => model.optionId === modelId
+                  );
+            const model = models[0] ?? selectableModels[0];
+            if (!model) {
+              return { ok: false, error: "没有可用模型" };
+            }
+            try {
+              const read = await fetchAgentWebRead(orgId, {
+                url,
+                modelCanonicalId: model.canonicalId,
+                aiInterfaceId: model.interfaceId,
+              });
+              return { ok: true as const, text: read.text };
+            } catch (error) {
+              const message =
+                error instanceof ApiRequestError
+                  ? error.message
+                  : "无法读取链接";
+              return { ok: false as const, error: message };
+            }
+          },
+          applyImport: async (input) => {
+            if (!onCreateGenerativeNode) {
+              return { ok: false, error: "无法创建节点" };
+            }
+            if (input.replace) {
+              const existingIds = readGraph().nodes.map((node) => node.id);
+              if (existingIds.length > 0) {
+                if (!onRemoveNodes) {
+                  return { ok: false, error: "无法替换画布" };
+                }
+                onRemoveNodes(existingIds);
+                for (let attempt = 0; attempt < 12; attempt += 1) {
+                  const leftover = readGraph().nodes.some((node) =>
+                    existingIds.includes(node.id)
+                  );
+                  if (!leftover) {
+                    break;
+                  }
+                  await new Promise<void>((resolve) => {
+                    window.setTimeout(resolve, 16);
+                  });
+                }
+              }
+            }
+            const skipped = [...input.plan.skipped];
+            const created: {
+              id: string;
+              nodeId: string;
+              mode: (typeof input.plan.nodes)[number]["mode"];
+            }[] = [];
+            for (const node of input.plan.nodes) {
+              const nodeId = onCreateGenerativeNode(
+                generationModeToNodeType(node.mode),
+                {
+                  prompt: node.prompt,
+                  precedingText: "",
+                  selected: false,
+                  ...(node.x !== undefined && node.y !== undefined
+                    ? { positionFlowPoint: { x: node.x, y: node.y } }
+                    : {}),
+                }
+              );
+              if (!nodeId) {
+                return { ok: false, error: "无法创建节点" };
+              }
+              await waitForCanvasNode(readGraph, nodeId);
+              if (node.name) {
+                updateNodeData(nodeId, { name: node.name });
+              }
+              created.push({ id: node.id, nodeId, mode: node.mode });
+            }
+            for (const node of input.plan.nodes) {
+              if (!node.url) {
+                continue;
+              }
+              const createdNode = created.find((item) => item.id === node.id);
+              if (!createdNode) {
+                continue;
+              }
+              const skipMedia = `素材未挂上：${node.name || node.id} nodeId=${createdNode.nodeId} url=${node.url}`;
+              try {
+                const staged = await stageOntoNode(
+                  createdNode.nodeId,
+                  node.url,
+                  node.mimeType
+                );
+                if (!staged.ok) {
+                  skipped.push(
+                    staged.error ? `${skipMedia} ${staged.error}` : skipMedia
+                  );
+                }
+              } catch (error) {
+                const message =
+                  error instanceof Error ? error.message : "无法挂上素材";
+                skipped.push(`${skipMedia} ${message}`);
+              }
+            }
+            const mapped = mapWriteNodeConnections(
+              created,
+              sortImportConnections(input.plan.connections).map((item) => ({
+                fromNodeId: item.fromNodeId,
+                toNodeId: item.toNodeId,
+              }))
+            );
+            let connected = 0;
+            for (const item of mapped) {
+              const linked = await connectAgentPairs([item]);
+              if (!linked.ok) {
+                skipped.push(`未连线：${item.fromNodeId} → ${item.toNodeId}`);
+                continue;
+              }
+              await waitForCanvasEdge(
+                readGraph,
+                item.fromNodeId,
+                item.toNodeId
+              );
+              connected += 1;
+            }
+            const latest = readGraph();
+            for (const node of created) {
+              const source = input.plan.nodes.find((item) => item.id === node.id);
+              if (!source?.prompt.includes("@图片")) {
+                continue;
+              }
+              const imageEdgeIds: string[] = [];
+              for (const edge of latest.edges) {
+                if (edge.target !== node.nodeId) {
+                  continue;
+                }
+                const from = latest.nodes.find(
+                  (entry) => entry.id === edge.source
+                );
+                if (from?.data.nodeType === AI_IMAGE_NODE_TYPE) {
+                  imageEdgeIds.push(edge.id);
+                }
+              }
+              const rewritten = rewritePromptImageMentions(
+                source.prompt,
+                imageMentionIndexMap(imageEdgeIds)
+              );
+              if (rewritten === source.prompt) {
+                continue;
+              }
+              const current = latest.nodes.find(
+                (entry) => entry.id === node.nodeId
+              );
+              if (!current) {
+                continue;
+              }
+              if (current.data.nodeType === AI_TEXT_NODE_TYPE) {
+                if (!orgId || !workflowId) {
+                  continue;
+                }
+                await commitAiTextValue({
+                  organizationId: orgId,
+                  workflowId,
+                  cloudConfigured,
+                  nodeId: node.nodeId,
+                  value: rewritten,
+                  updateNodeData,
+                  current: current.data,
+                });
+              } else {
+                updateNodeInput(
+                  node.nodeId,
+                  "prompt",
+                  rewritten,
+                  current.data.inputs,
+                  updateNodeData
+                );
+              }
+            }
+            return {
+              ok: true,
+              title: input.plan.title,
+              nodes: created,
+              connected,
+              skipped,
+            };
+          },
         },
       });
     },
@@ -787,14 +1033,17 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       cloudConfigured,
       generativeReferenceCatalogs,
       getCanvasGraph,
+      modelId,
       onConnectWorkflow,
       onCreateGenerativeNode,
+      onRemoveNodes,
       onRunNode,
       openRemotionViewport,
       onCloseRemotionViewport,
       orgId,
       requestCapabilityConsent,
       revokeCapabilityConsent,
+      selectableModels,
       updateNodeData,
       workflowDisabled,
       workflowId,

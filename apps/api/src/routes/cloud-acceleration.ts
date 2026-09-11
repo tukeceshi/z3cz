@@ -21,6 +21,7 @@ import {
   createDatabase,
   deletePersistWorker,
   getOrgPersistWorkerPoolSettings,
+  getPlatformPersistWorkerSummary,
   listPersistWorkers,
   updateOrgPersistWorkerPoolSettings,
 } from "../db";
@@ -152,11 +153,16 @@ cloudAccelerationRoutes.get("/workers", async (c) => {
   const db = createDatabase(c.env);
 
   try {
-    const [workers, settings] = await Promise.all([
+    const [workers, settings, platform] = await Promise.all([
       listPersistWorkers(db, organizationId),
       getOrgPersistWorkerPoolSettings(db, organizationId),
+      getPlatformPersistWorkerSummary(db),
     ]);
-    return c.json({ workers, settings } satisfies ListPersistWorkersResponse);
+    return c.json({
+      workers,
+      settings,
+      platform,
+    } satisfies ListPersistWorkersResponse);
   } catch (error) {
     console.error("Error listing organization persist workers:", error);
     return c.json({ error: "Failed to list persist workers" }, 500);

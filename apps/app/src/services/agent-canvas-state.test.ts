@@ -10,6 +10,7 @@ import type {
 import { resolveResourceIdsOnServer } from "@/services/resolve-resource-ids-on-server";
 
 import {
+  READ_URL_TOOL,
   SIMPLE_ANIMATION_CAPABILITY,
   SIMPLE_ANIMATION_TOOL,
 } from "./agent-capabilities";
@@ -17,6 +18,7 @@ import {
   AGENT_CANVAS_EXCERPT_MAX_CHARS,
   attachMakeToolInventory,
   CANVAS_GET_STATE_TOOL,
+  CANVAS_IMPORT_NEEDS_MODE,
   CANVAS_IMPORT_NOT_SUPPORTED,
   CANVAS_RESOLVE_RESOURCE_TOOL,
   compactCanvasAgentState,
@@ -258,6 +260,49 @@ describe("executeCanvasAgentTool", () => {
       snapshot: { nodes: [], edges: [] },
     });
     expect(JSON.parse(text).error).toContain("未知工具");
+  });
+
+  it("reads a url through the handler", async () => {
+    const readUrl = vi.fn(async () => ({
+      ok: true as const,
+      text: "标题：示例\n要点：一",
+    }));
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: READ_URL_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({ url: "https://example.com/page" }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "ask",
+        consentedCapabilities: [],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: false, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: false }),
+        readUrl,
+      },
+    });
+    expect(readUrl).toHaveBeenCalledWith("https://example.com/page");
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      text: "标题：示例\n要点：一",
+    });
+  });
+
+  it("rejects read_url without a url", async () => {
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: READ_URL_TOOL,
+        resourceId: "",
+        nodeId: "",
+        payload: "{}",
+      },
+      snapshot: { nodes: [], edges: [] },
+    });
+    expect(JSON.parse(text).error).toContain("url");
   });
 
   it("does not resolve when resourceId is missing", async () => {
@@ -615,6 +660,120 @@ describe("executeCanvasAgentTool", () => {
     });
     expect(JSON.parse(text)).toEqual({ error: CANVAS_IMPORT_NOT_SUPPORTED });
     expect(createGenerationFlow).not.toHaveBeenCalled();
+  });
+
+  it("asks for append or replace when importing onto a non-empty canvas", async () => {
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_import",
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          url: "https://xj.quantv.com/api/canvas/public/featured/abc",
+        }),
+      },
+      snapshot: {
+        nodes: [
+          {
+            id: "n1",
+            type: "ai-image",
+            name: "已有",
+            x: 0,
+            y: 0,
+          },
+        ],
+        edges: [],
+      },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: ["canvas-make"],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+      },
+    });
+    expect(JSON.parse(text)).toEqual({ error: CANVAS_IMPORT_NEEDS_MODE });
+  });
+
+  it("fetches and applies an imported canvas without running generation", async () => {
+    const fetchImportSource = vi.fn(async () => ({
+      ok: true as const,
+      document: {
+        title: "色卡旋转换装视频",
+        nodes: [
+          { id: "a", mode: "image", prompt: "模特", url: "https://cdn/a.png" },
+          { id: "b", mode: "video", prompt: "参考@图片1" },
+        ],
+        connections: [{ from: "a", to: "b" }],
+      },
+    }));
+    const applyImport = vi.fn(async (input) => ({
+      ok: true,
+      title: input.plan.title,
+      nodes: input.plan.nodes.map((node) => ({
+        id: node.id,
+        nodeId: `real-${node.id}`,
+        mode: node.mode,
+      })),
+      connected: input.plan.connections.length,
+      skipped: input.plan.skipped,
+    }));
+    const text = await executeCanvasAgentTool({
+      call: {
+        name: "canvas_import",
+        resourceId: "",
+        nodeId: "",
+        payload: JSON.stringify({
+          url: "https://xj.quantv.com/api/canvas/public/featured/cmtspfjjq1yo8gizq7e4j3nfo",
+          mode: "replace",
+        }),
+      },
+      snapshot: { nodes: [], edges: [] },
+      capabilities: {
+        sessionMode: "real",
+        consentedCapabilities: ["canvas-make"],
+        requestConsent: async () => ({ authorized: false, open: false }),
+        revokeConsent: async () => ({ authorized: true, open: false }),
+        readSource: async () => "",
+        writeSource: async () => ({ ok: true }),
+        fetchImportSource,
+        applyImport,
+      },
+    });
+    expect(fetchImportSource).toHaveBeenCalledWith(
+      "https://xj.quantv.com/api/canvas/public/featured/cmtspfjjq1yo8gizq7e4j3nfo"
+    );
+    expect(applyImport).toHaveBeenCalledWith({
+      replace: true,
+      plan: expect.objectContaining({
+        title: "色卡旋转换装视频",
+        nodes: expect.arrayContaining([
+          expect.objectContaining({ id: "a", mode: "image" }),
+          expect.objectContaining({ id: "b", mode: "video" }),
+        ]),
+      }),
+    });
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      title: "色卡旋转换装视频",
+      nodes: [
+        { id: "a", nodeId: "real-a", mode: "image" },
+        { id: "b", nodeId: "real-b", mode: "video" },
+      ],
+      connected: 1,
+      skipped: [],
+      created: {
+        kind: "import",
+        title: "色卡旋转换装视频",
+        nodes: [
+          { id: "a", nodeId: "real-a", mode: "image" },
+          { id: "b", nodeId: "real-b", mode: "video" },
+        ],
+        connected: 1,
+        skipped: [],
+      },
+    });
   });
 
   it("attaches fresh inventory to make results but not confirm pauses", () => {

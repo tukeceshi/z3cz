@@ -2659,6 +2659,54 @@ platformAiRoutes.get("/media/proxy", async (c) => {
   });
 });
 
+const canvasImportSourceSchema = z.object({
+  url: z.string().min(1),
+});
+
+platformAiRoutes.post(
+  "/canvas-import/source",
+  zValidator("json", canvasImportSourceSchema),
+  async (c) => {
+    const { fetchCanvasImportSource } = await import(
+      "../services/fetch-canvas-import-source"
+    );
+    const result = await fetchCanvasImportSource(c.req.valid("json").url);
+    if (!result.ok) {
+      return c.json({ error: result.error }, result.status);
+    }
+    return c.json({ document: result.document });
+  }
+);
+
+const webReadSchema = z.object({
+  url: z.string().min(1),
+  modelCanonicalId: z.string().min(1),
+  aiInterfaceId: z.string().min(1),
+});
+
+platformAiRoutes.post(
+  "/web/read",
+  zValidator("json", webReadSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const db = createDatabase(c.env);
+    const body = c.req.valid("json");
+    const { readUrlForAgent } = await import("../services/read-url-for-agent");
+    const result = await readUrlForAgent({
+      env: c.env,
+      db,
+      organizationId,
+      url: body.url,
+      modelCanonicalId: body.modelCanonicalId,
+      aiInterfaceId: body.aiInterfaceId,
+    });
+    if (!result.ok) {
+      return c.json({ error: result.error }, result.status);
+    }
+    return c.json(result);
+  }
+);
+
 const AGENT_CHAT_SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",

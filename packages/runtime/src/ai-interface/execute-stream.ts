@@ -28,6 +28,30 @@ export type AiInterfaceStreamEvent =
 
 const THINK_OPEN = "<think>";
 const THINK_CLOSE = "</think>";
+const EMPTY_STREAM_EXCERPT_MAX = 512;
+
+function appendEmptyStreamExcerpt(excerpt: string, data: string): string {
+  if (excerpt.length >= EMPTY_STREAM_EXCERPT_MAX) {
+    return excerpt;
+  }
+  const piece =
+    data.length > EMPTY_STREAM_EXCERPT_MAX
+      ? data.slice(0, EMPTY_STREAM_EXCERPT_MAX)
+      : data;
+  const next = excerpt ? `${excerpt}\n${piece}` : piece;
+  if (next.length <= EMPTY_STREAM_EXCERPT_MAX) {
+    return next;
+  }
+  return `${next.slice(0, EMPTY_STREAM_EXCERPT_MAX)}…`;
+}
+
+function emptyStreamError(excerpt: string): string {
+  const clipped = excerpt.trim();
+  if (!clipped) {
+    return "Upstream stream returned no text";
+  }
+  return `Upstream stream returned no text (${clipped})`;
+}
 
 function longestIncompleteSuffix(text: string, tag: string): number {
   const max = Math.min(tag.length - 1, text.length);
@@ -84,7 +108,7 @@ interface AccumulatedToolCall {
   arguments: string;
 }
 
-function readChoiceDelta(payload: unknown): unknown {
+function readFirstChoice(payload: unknown): Record<string, unknown> | undefined {
   if (!payload || typeof payload !== "object") {
     return undefined;
   }
@@ -96,7 +120,15 @@ function readChoiceDelta(payload: unknown): unknown {
   if (!first || typeof first !== "object") {
     return undefined;
   }
-  return (first as { delta?: unknown }).delta ?? (first as { message?: unknown }).message;
+  return first as Record<string, unknown>;
+}
+
+function readChoiceDelta(payload: unknown): unknown {
+  const first = readFirstChoice(payload);
+  if (!first) {
+    return undefined;
+  }
+  return first.delta ?? first.message;
 }
 
 function readOpenAiStreamDelta(payload: unknown): string {
@@ -134,17 +166,21 @@ function sliceNewSuffix(previous: string, next: string): string {
   return next.startsWith(previous) ? next.slice(previous.length) : "";
 }
 
-function applyOpenAiToolCallDeltas(
-  acc: AccumulatedToolCall[],
-  payload: unknown
-): void {
-  const delta = readChoiceDelta(payload);
-  if (!delta || typeof delta !== "object") {
-    return;
+function readToolCallsField(value: unknown): unknown[] | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
   }
-  const toolCalls = (delta as { tool_calls?: unknown }).tool_calls;
-  if (!Array.isArray(toolCalls)) {
-    return;
+  const toolCalls = (value as { tool_calls?: unknown }).tool_calls;
+  return Array.isArray(toolCalls) && toolCalls.length > 0 ? toolCalls : undefined;
+}
+
+function mergeOpenAiToolCallItems(
+  acc: AccumulatedToolCall[],
+  toolCalls: readonly unknown[],
+  mode: "append" | "replace"
+): void {
+  if (mode === "replace") {
+    acc.length = 0;
   }
   for (const raw of toolCalls) {
     if (!raw || typeof raw !== "object") {
@@ -158,14 +194,33 @@ function applyOpenAiToolCallDeltas(
     const index = typeof item.index === "number" ? item.index : acc.length;
     const current = acc[index] ?? { id: "", name: "", arguments: "" };
     const fn = item.function;
+    const nextArgs =
+      fn && typeof fn.arguments === "string" ? fn.arguments : "";
     acc[index] = {
       id: typeof item.id === "string" && item.id ? item.id : current.id,
       name:
         fn && typeof fn.name === "string" && fn.name ? fn.name : current.name,
-      arguments:
-        current.arguments +
-        (fn && typeof fn.arguments === "string" ? fn.arguments : ""),
+      arguments: mode === "append" ? current.arguments + nextArgs : nextArgs,
     };
+  }
+}
+
+/** Merge OpenAI stream tool_calls from delta chunks or a final message snapshot. */
+export function applyOpenAiStreamToolCalls(
+  acc: AccumulatedToolCall[],
+  payload: unknown
+): void {
+  const first = readFirstChoice(payload);
+  if (!first) {
+    return;
+  }
+  const deltaTools = readToolCallsField(first.delta);
+  const messageTools = readToolCallsField(first.message);
+  if (deltaTools) {
+    mergeOpenAiToolCallItems(acc, deltaTools, "append");
+  }
+  if (messageTools) {
+    mergeOpenAiToolCallItems(acc, messageTools, "replace");
   }
 }
 
@@ -275,10 +330,61 @@ export async function* iterateAiInterfaceChatStream(params: {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let sseExcerpt = "";
+
+    const handleDataLine = (
+      rawLine: string
+    ): Extract<AiInterfaceStreamEvent, { type: "delta" }> | undefined => {
+      const line = rawLine.trim();
+      if (!line.startsWith("data:")) {
+        return undefined;
+      }
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") {
+        return undefined;
+      }
+      sseExcerpt = appendEmptyStreamExcerpt(sseExcerpt, data);
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data) as unknown;
+      } catch {
+        return undefined;
+      }
+
+      applyOpenAiStreamToolCalls(toolAcc, parsed);
+      const reasoningDelta = readOpenAiReasoningDelta(parsed);
+      const contentDelta = readOpenAiStreamDelta(parsed);
+      if (!reasoningDelta && !contentDelta) {
+        return undefined;
+      }
+      reasoningAcc += reasoningDelta;
+      rawContent += contentDelta;
+      const split = splitThinkTags(rawContent);
+      const talkDelta = sliceNewSuffix(emittedTalk, split.talk);
+      const tagThinkingDelta = sliceNewSuffix(
+        emittedTagThinking,
+        split.thinking
+      );
+      emittedTalk = split.talk;
+      emittedTagThinking = split.thinking;
+      const thinkingDelta = reasoningDelta + tagThinkingDelta;
+      if (!talkDelta && !thinkingDelta) {
+        return undefined;
+      }
+      fullText += talkDelta;
+      fullThinking += thinkingDelta;
+      return {
+        type: "delta",
+        text: talkDelta,
+        ...(thinkingDelta ? { thinking: thinkingDelta } : {}),
+      };
+    };
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        buffer += decoder.decode();
         break;
       }
 
@@ -287,49 +393,17 @@ export async function* iterateAiInterfaceChatStream(params: {
       buffer = lines.pop() ?? "";
 
       for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line.startsWith("data:")) {
-          continue;
+        const event = handleDataLine(rawLine);
+        if (event) {
+          yield event;
         }
-        const data = line.slice(5).trim();
-        if (!data || data === "[DONE]") {
-          continue;
-        }
+      }
+    }
 
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(data) as unknown;
-        } catch {
-          continue;
-        }
-
-        applyOpenAiToolCallDeltas(toolAcc, parsed);
-        const reasoningDelta = readOpenAiReasoningDelta(parsed);
-        const contentDelta = readOpenAiStreamDelta(parsed);
-        if (!reasoningDelta && !contentDelta) {
-          continue;
-        }
-        reasoningAcc += reasoningDelta;
-        rawContent += contentDelta;
-        const split = splitThinkTags(rawContent);
-        const talkDelta = sliceNewSuffix(emittedTalk, split.talk);
-        const tagThinkingDelta = sliceNewSuffix(
-          emittedTagThinking,
-          split.thinking
-        );
-        emittedTalk = split.talk;
-        emittedTagThinking = split.thinking;
-        const thinkingDelta = reasoningDelta + tagThinkingDelta;
-        if (!talkDelta && !thinkingDelta) {
-          continue;
-        }
-        fullText += talkDelta;
-        fullThinking += thinkingDelta;
-        yield {
-          type: "delta",
-          text: talkDelta,
-          ...(thinkingDelta ? { thinking: thinkingDelta } : {}),
-        };
+    if (buffer.trim()) {
+      const event = handleDataLine(buffer);
+      if (event) {
+        yield event;
       }
     }
 
@@ -340,7 +414,7 @@ export async function* iterateAiInterfaceChatStream(params: {
     fullText = split.talk;
     fullThinking = reasoningAcc + split.thinking;
     if (!fullText.trim() && !fullThinking.trim() && toolCalls.length === 0) {
-      yield { type: "error", error: "Upstream stream returned no text" };
+      yield { type: "error", error: emptyStreamError(sseExcerpt) };
       return;
     }
 

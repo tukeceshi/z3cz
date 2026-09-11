@@ -80,7 +80,7 @@ function OrganizationCloudAccelerationPageContent() {
     isAvailableDownloadLoading,
     refreshAvailableDownload,
   } = useOrgCloudAccelerationAvailable(organizationId);
-  const { workers, workersError, isWorkersLoading, refreshWorkers } =
+  const { workers, platform, workersError, isWorkersLoading, refreshWorkers } =
     useOrgPersistWorkers(organizationId);
   const {
     forwardingInterfaces,
@@ -179,6 +179,7 @@ function OrganizationCloudAccelerationPageContent() {
           title={t("pages.cloudAcceleration.workersTitle")}
           description={t("pages.cloudAcceleration.workersHint")}
           workers={workers}
+          platform={platform}
           onBootstrap={(input) =>
             bootstrapOrgPersistWorker(organizationId, input)
           }

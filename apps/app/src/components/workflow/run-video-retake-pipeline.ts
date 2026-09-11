@@ -335,10 +335,7 @@ async function writeCloudResultToNode(params: {
                 : "",
           }
         )
-      : withAiVideoManualUpload(
-          current,
-          resolved.media as unknown as readonly MediaReference[]
-        );
+      : withAiVideoManualUpload(current, resolved.media as unknown as WorkflowMediaValue[]);
     const merged = { ...current, ...withMedia };
     const finalized = finalizeRetakeNode(merged, {});
     return {

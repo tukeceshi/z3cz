@@ -19,14 +19,21 @@ import type {
 import {
   CANVAS_CONNECT_NODES_TOOL,
   CANVAS_CREATE_GENERATION_FLOW_TOOL,
+  CANVAS_IMPORT_TOOL,
   CANVAS_MAKE_CAPABILITY,
   CANVAS_WRITE_NODES_TOOL,
   isMakeTool,
   isToolAllowed,
   lookupAgentTool,
+  READ_URL_TOOL,
   SIMPLE_ANIMATION_CAPABILITY,
   SIMPLE_ANIMATION_TOOL,
 } from "@/services/agent-capabilities";
+import {
+  adaptCanvasImportDocument,
+  parseCanvasImportInput,
+} from "@/services/agent-canvas-import";
+import type { AgentCanvasImportPlan } from "@/services/agent-canvas-import";
 import {
   type AgentSessionMode,
   hasCapability,
@@ -41,6 +48,7 @@ export const CANVAS_STAGE_MEDIA_TOOL = "canvas_stage_media" as const;
 export {
   CANVAS_CONNECT_NODES_TOOL,
   CANVAS_CREATE_GENERATION_FLOW_TOOL,
+  CANVAS_IMPORT_TOOL,
   CANVAS_MAKE_CAPABILITY,
   CANVAS_WRITE_NODES_TOOL,
 };
@@ -48,10 +56,12 @@ export const REMOTION_OPEN_TOOL = "remotion_open" as const;
 export const REMOTION_CLOSE_TOOL = "remotion_close" as const;
 export const REMOTION_GET_TOOL = "remotion_get" as const;
 export const REMOTION_WRITE_TOOL = "remotion_write" as const;
-export { SIMPLE_ANIMATION_TOOL };
+export { READ_URL_TOOL, SIMPLE_ANIMATION_TOOL };
 export const AGENT_CANVAS_EXCERPT_MAX_CHARS = 120;
 export const CANVAS_IMPORT_NOT_SUPPORTED =
-  "不能导入或恢复外部画布。这个工具只新建一条生成，prompt 必须是要生成的内容。当前没有导入工具，直接告诉用户。";
+  "不能导入或恢复外部画布。这个工具只新建一条生成，prompt 必须是要生成的内容。导入用 canvas_import。";
+export const CANVAS_IMPORT_NEEDS_MODE =
+  "画布已有节点。先问用户追加还是替换，再带 mode。";
 
 export interface CanvasAgentNodeSummary {
   readonly id: string;
@@ -166,6 +176,35 @@ export interface AgentCapabilityHandlers {
     readonly connected?: number;
     readonly error?: string;
   }>;
+  readonly fetchImportSource?: (
+    url: string
+  ) => Promise<
+    | { readonly ok: true; readonly document: unknown }
+    | { readonly ok: false; readonly error: string }
+  >;
+  readonly readUrl?: (
+    url: string
+  ) => Promise<
+    | { readonly ok: true; readonly text: string }
+    | { readonly ok: false; readonly error: string }
+  >;
+  readonly applyImport?: (
+    input: AgentApplyImportInput
+  ) => Promise<AgentApplyImportResult>;
+}
+
+export interface AgentApplyImportInput {
+  readonly replace: boolean;
+  readonly plan: AgentCanvasImportPlan;
+}
+
+export interface AgentApplyImportResult {
+  readonly ok: boolean;
+  readonly title?: string;
+  readonly nodes?: readonly AgentWriteNodesCreated[];
+  readonly connected?: number;
+  readonly skipped?: readonly string[];
+  readonly error?: string;
 }
 
 export function emptyAgentToolCall(): AgentToolCall {
@@ -344,7 +383,9 @@ export function toolCallFromFunctionArgs(
     if (
       name === SIMPLE_ANIMATION_TOOL ||
       name === CANVAS_CREATE_GENERATION_FLOW_TOOL ||
-      name === CANVAS_CONNECT_NODES_TOOL
+      name === CANVAS_CONNECT_NODES_TOOL ||
+      name === CANVAS_WRITE_NODES_TOOL ||
+      name === CANVAS_IMPORT_TOOL
     ) {
       return { name, resourceId, nodeId, payload: trimmed };
     }
@@ -575,6 +616,18 @@ function stageUrlFromCall(call: AgentToolCall): {
   return { url, mimeType };
 }
 
+function parseReadUrlInput(
+  payload: string
+): { readonly url: string } | { readonly error: string } {
+  const record = readJsonRecord(payload);
+  const url =
+    typeof record?.url === "string" ? record.url.trim() : labeledOnly(payload, "url");
+  if (!url) {
+    return { error: "缺少 url" };
+  }
+  return { url };
+}
+
 type SimpleAnimationAction = "get" | "write" | "open" | "close" | "clear";
 
 export const EMPTY_SIMPLE_ANIMATION_SOURCE = `function Scene() {
@@ -731,6 +784,20 @@ export async function executeCanvasAgentTool(params: {
   if (params.call.name === CANVAS_GET_STATE_TOOL) {
     return JSON.stringify(params.snapshot);
   }
+  if (params.call.name === READ_URL_TOOL) {
+    const input = parseReadUrlInput(params.call.payload);
+    if ("error" in input) {
+      return JSON.stringify({ error: input.error });
+    }
+    if (!handlers?.readUrl) {
+      return JSON.stringify({ error: "无法读取链接" });
+    }
+    const read = await handlers.readUrl(input.url);
+    if (!read.ok) {
+      return JSON.stringify({ error: read.error });
+    }
+    return JSON.stringify({ ok: true, text: read.text });
+  }
   const animation = simpleAnimationCall(params.call);
   if (animation) {
     return executeSimpleAnimation(animation, handlers);
@@ -790,6 +857,50 @@ export async function executeCanvasAgentTool(params: {
         kind: "nodes",
         nodes: made.nodes ?? [],
         connected: made.connected ?? 0,
+      },
+    });
+  }
+  if (params.call.name === CANVAS_IMPORT_TOOL) {
+    const input = parseCanvasImportInput(params.call.payload);
+    if ("error" in input) {
+      return JSON.stringify({ error: input.error });
+    }
+    if (params.snapshot.nodes.length > 0 && !input.mode) {
+      return JSON.stringify({ error: CANVAS_IMPORT_NEEDS_MODE });
+    }
+    let document = input.document;
+    if (input.url) {
+      if (!handlers?.fetchImportSource) {
+        return JSON.stringify({ error: "无法读取画布" });
+      }
+      const fetched = await handlers.fetchImportSource(input.url);
+      if (!fetched.ok) {
+        return JSON.stringify({ error: fetched.error });
+      }
+      document = fetched.document;
+    }
+    const plan = adaptCanvasImportDocument(document);
+    if ("error" in plan) {
+      return JSON.stringify({ error: plan.error });
+    }
+    if (!handlers?.applyImport) {
+      return JSON.stringify({ error: "无法导入画布" });
+    }
+    const made = await handlers.applyImport({
+      replace: input.mode === "replace",
+      plan,
+    });
+    if (!made.ok) {
+      return JSON.stringify(made);
+    }
+    return JSON.stringify({
+      ...made,
+      created: {
+        kind: "import",
+        title: made.title ?? plan.title,
+        nodes: made.nodes ?? [],
+        connected: made.connected ?? 0,
+        skipped: made.skipped ?? plan.skipped,
       },
     });
   }

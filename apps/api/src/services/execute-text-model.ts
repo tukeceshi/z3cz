@@ -40,6 +40,7 @@ async function executeTextModelCandidate(params: {
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
+  readonly tools?: unknown;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<
   { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }
@@ -93,9 +94,12 @@ async function executeTextModelCandidate(params: {
             ? { referenceVideoUrls: params.referenceVideoUrls }
             : {}),
         },
-        bodyExtensions: params.outputMaxTokens
-          ? { max_tokens: params.outputMaxTokens }
-          : undefined,
+        bodyExtensions: {
+          ...(params.outputMaxTokens
+            ? { max_tokens: params.outputMaxTokens }
+            : {}),
+          ...(params.tools ? { tools: params.tools } : {}),
+        },
         upstreamLog: params.upstreamLog,
       })
   );
@@ -123,6 +127,7 @@ export async function executeTextModel(params: {
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
+  readonly tools?: unknown;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<ExecuteTextModelResult> {
   const [candidate, options] = await Promise.all([
@@ -159,6 +164,7 @@ export async function executeTextModel(params: {
     referenceImageUrls: params.referenceImageUrls,
     referenceImageInline: params.referenceImageInline,
     referenceVideoUrls: params.referenceVideoUrls,
+    tools: params.tools,
     upstreamLog: params.upstreamLog,
   });
 
