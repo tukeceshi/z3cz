@@ -95,15 +95,15 @@ export function parseOfficialVolcanoPollBody(
     };
   }
 
+  const readVideoUrl = (level: Record<string, unknown> | null): string =>
+    (typeof asRecord(level?.content)?.video_url === "string"
+      ? String(asRecord(level?.content)?.video_url).trim()
+      : "") ||
+    (typeof level?.video_url === "string" ? String(level.video_url).trim() : "");
+
   const record = asRecord(body);
   const nested = asRecord(record?.data);
-  const videoUrl =
-    (typeof asRecord(record?.content)?.video_url === "string"
-      ? String(asRecord(record?.content)?.video_url).trim()
-      : "") ||
-    (typeof asRecord(nested?.content)?.video_url === "string"
-      ? String(asRecord(nested?.content)?.video_url).trim()
-      : "");
+  const videoUrl = readVideoUrl(record) || readVideoUrl(nested);
 
   if (status === "succeeded" || status === "success") {
     if (!videoUrl) {
