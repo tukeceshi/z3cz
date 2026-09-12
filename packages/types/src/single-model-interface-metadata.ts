@@ -328,6 +328,10 @@ export interface SingleModelProviderMetadata {
   readonly singleModelCategory?: string;
   readonly models: Readonly<Record<string, SingleModelModelConfig>>;
   readonly endpointRules?: SingleModelEndpointRules;
+  /** Character library toggle for this model platform. Absent = off. */
+  readonly supportsCharacterLibrary?: boolean;
+  /** Character library asset group created in the Volcano private asset library. */
+  readonly characterLibraryAssetGroupId?: string;
   /** @deprecated Migrated to models[canonicalId].formatTransform */
   readonly formatTemplateId?: string | null;
   readonly tos?: {
@@ -660,6 +664,17 @@ export function mergeSingleModelEndpointRules(
 
   const { endpointRules: _removed, ...rest } = cleared;
   return rest;
+}
+
+export function mergeSingleModelSupportsCharacterLibrary(
+  metadata: SingleModelProviderMetadata,
+  enabled: boolean | undefined
+): SingleModelProviderMetadata {
+  if (enabled !== true) {
+    const { supportsCharacterLibrary: _removed, ...rest } = metadata;
+    return rest;
+  }
+  return { ...metadata, supportsCharacterLibrary: true };
 }
 
 export function readSingleModelFormatTemplateId(

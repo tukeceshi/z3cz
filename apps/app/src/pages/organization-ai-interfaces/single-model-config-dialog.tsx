@@ -46,6 +46,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
   updateOrganizationAiInterface,
@@ -96,6 +97,10 @@ export function SingleModelConfigDialog({
   const { t } = useTranslation();
   const appToast = useAppToast();
   const [name, setName] = useState(iface.name);
+  const [supportsCharacterLibrary, setSupportsCharacterLibrary] = useState(
+    isSingleModelProviderMetadata(iface.metadata) &&
+      iface.metadata.supportsCharacterLibrary === true
+  );
   const [baseUrl, setBaseUrl] = useState(iface.baseUrl ?? "");
   const [apiKey, setApiKey] = useState("");
   const [modelInstances, setModelInstances] = useState<
@@ -320,6 +325,7 @@ export function SingleModelConfigDialog({
             }
           : {}),
         singleModelEndpointRules: endpointRules ?? {},
+        singleModelSupportsCharacterLibrary: supportsCharacterLibrary,
       });
       appToast.success("pages.aiInterfaces.updated");
       onOpenChange(false);
@@ -415,6 +421,23 @@ export function SingleModelConfigDialog({
               onChange={(event) => setName(event.target.value)}
             />
           </div>
+          {isVideoCategory ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="single-model-config-character-library">
+                  {t("pages.aiInterfaces.singleModel.characterLibrary")}
+                </Label>
+                <Switch
+                  id="single-model-config-character-library"
+                  checked={supportsCharacterLibrary}
+                  onCheckedChange={setSupportsCharacterLibrary}
+                />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {t("pages.aiInterfaces.singleModel.characterLibraryHint")}
+              </p>
+            </div>
+          ) : null}
           {isMultiModelProvider ? (
             <div className="space-y-2">
               <Label>{t("pages.aiInterfaces.singleModel.selectModels")}</Label>

@@ -99,7 +99,10 @@ export function parseOfficialVolcanoPollBody(
     (typeof asRecord(level?.content)?.video_url === "string"
       ? String(asRecord(level?.content)?.video_url).trim()
       : "") ||
-    (typeof level?.video_url === "string" ? String(level.video_url).trim() : "");
+    (typeof level?.video_url === "string" ? String(level.video_url).trim() : "") ||
+    (typeof level?.result_url === "string"
+      ? String(level.result_url).trim()
+      : "");
 
   const record = asRecord(body);
   const nested = asRecord(record?.data);

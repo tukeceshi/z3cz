@@ -72,6 +72,8 @@ export interface VolcanoInterfaceMetadata {
   readonly setupStatus?: VolcanoSetupStatus;
   readonly setupError?: string | null;
   readonly setupIdempotencyKey?: string;
+  /** Character library asset group created in the Volcano private asset library. */
+  readonly characterLibraryAssetGroupId?: string;
 }
 
 /** TOS resource package usage (storage capacity or traffic). */

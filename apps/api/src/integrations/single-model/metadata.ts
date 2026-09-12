@@ -5,6 +5,7 @@ import {
   mergeSingleModelFormatTransformsByCanonicalId,
   mergeSingleModelModelAlias,
   mergeSingleModelModelEnabled,
+  mergeSingleModelSupportsCharacterLibrary,
   mergeSingleModelUpstreamModelIds,
   normalizeOrgModelInstancesMap,
   type SingleModelCapabilityLimits,
@@ -80,4 +81,11 @@ export function mergeSingleModelModelsMetadata(
   models: SingleModelProviderMetadata["models"]
 ): SingleModelProviderMetadata {
   return { ...metadata, models };
+}
+
+export function mergeSingleModelSupportsCharacterLibraryMetadata(
+  metadata: SingleModelProviderMetadata,
+  enabled: boolean | undefined
+): SingleModelProviderMetadata {
+  return mergeSingleModelSupportsCharacterLibrary(metadata, enabled);
 }

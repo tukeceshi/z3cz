@@ -1987,6 +1987,9 @@ export const en = {
           "Images {{images}} / Videos {{videos}} / Audio {{audios}}",
         platformCancelDisabled:
           "Task cancellation is disabled for this model on the platform.",
+        characterLibrary: "Character library",
+        characterLibraryHint:
+          "When enabled, video models under this model platform can use the character library on the canvas to reference existing resources.",
         rulesNotConfigured: "Rules not configured. Open settings to configure.",
         resolutionLimitRequired: "Select at least one allowed resolution.",
         durationLimitRequired: "Select at least one allowed duration.",
@@ -3459,6 +3462,25 @@ export const en = {
       manualTextPlaceholder: "Return this text directly without calling AI…",
       running: "Running…",
       run: "Run",
+    },
+    characterLibrary: {
+      title: "Character library",
+      openTooltip: "Character library",
+      empty: "Character library is empty",
+      add: "Add character",
+      addFromExisting: "Pick from existing resources",
+      backToList: "Back to library",
+      availableEmpty: "No resources available to reference",
+      insertToCanvas: "Insert to canvas",
+      delete: "Remove",
+      deleteConfirmTitle: "Remove this character from the library?",
+      deleteConfirmDescription:
+        "Only the library record is removed; the resource itself is kept.",
+      statusImporting: "Importing",
+      statusActive: "Ready",
+      statusFailed: "Failed",
+      retryImport: "Retry import",
+      loadFailed: "Failed to load",
     },
     aiTextPanel: {
       promptTitle: "Prompt",

@@ -243,6 +243,7 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly singleModelModelAlias?: Readonly<Record<string, string>>;
   readonly singleModelUpstreamModelIds?: Readonly<Record<string, string>>;
   readonly singleModelEndpointRules?: SingleModelEndpointRules;
+  readonly singleModelSupportsCharacterLibrary?: boolean;
   readonly singleModelFormatTransformsByCanonicalId?: Readonly<
     Record<string, SingleModelFormatTransform | null>
   >;

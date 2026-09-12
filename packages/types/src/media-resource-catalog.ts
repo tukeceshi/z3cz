@@ -19,6 +19,10 @@ export interface MediaResourceRecord {
   readonly failed: boolean;
   readonly cloudAccelerationStatus: CloudAccelerationStatus | null;
   readonly modelCanonicalId: string | null;
+  /** Owning org AI-interface instance (character library provenance). */
+  readonly interfaceId: string | null;
+  /** Catalog tag, e.g. "character_library". Null = ordinary resource. */
+  readonly source: string | null;
   readonly createdAt: string;
 }
 

@@ -84,6 +84,7 @@ import {
   mergeSingleModelEndpointRulesMetadata,
   mergeSingleModelFormatTransformsMetadata,
   mergeSingleModelModelsMetadata,
+  mergeSingleModelSupportsCharacterLibraryMetadata,
   mergeSingleModelUpstreamModelIdsMetadata,
   parseSingleModelMetadata,
 } from "../integrations/single-model/metadata";
@@ -387,6 +388,7 @@ const updateSchema = z
         useFullSubmitUrl: z.boolean().optional(),
       })
       .optional(),
+    singleModelSupportsCharacterLibrary: z.boolean().optional(),
     singleModelFormatTransformsByCanonicalId: z
       .record(z.string(), singleModelFormatTransformSchema.nullable())
       .optional(),
@@ -1386,6 +1388,19 @@ aiInterfaceRoutes.patch(
             400
           );
         }
+      }
+
+      if (body.singleModelSupportsCharacterLibrary !== undefined) {
+        let current = parseSingleModelMetadata(
+          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+        );
+        if (!current) {
+          return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        metadataUpdate = mergeSingleModelSupportsCharacterLibraryMetadata(
+          current,
+          body.singleModelSupportsCharacterLibrary
+        );
       }
 
       if (body.singleModelFormatTransformsByCanonicalId !== undefined) {

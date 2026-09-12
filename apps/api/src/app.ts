@@ -142,6 +142,10 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
     lazyRoute(() => import("./routes/resources"))
   );
   app.route(
+    "/:organizationId/character-library",
+    lazyRoute(() => import("./routes/character-library"))
+  );
+  app.route(
     "/:organizationId/text-content",
     lazyRoute(() => import("./routes/text-content"))
   );

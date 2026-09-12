@@ -27,6 +27,13 @@ import { Link, useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
+import UserRoundIcon from "lucide-react/icons/user-round";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAppToast } from "@/hooks/use-app-toast";
 import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { useOrgUrl } from "@/hooks/use-org-url";
@@ -36,6 +43,8 @@ import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storag
 import { useObjectService } from "@/services/object-service";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
+import { CharacterLibraryDialog } from "./character-library-dialog";
+import { fetchCharacterLibraryStatus } from "@/services/character-library";
 import { runAiVideoGeneration } from "./run-ai-video-generation";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
@@ -319,6 +328,27 @@ export function AiVideoConfigPanel({
       models: videoModelCatalog,
     });
   }, [data, effectiveModel, videoModelCatalog]);
+
+  const [characterLibraryOpen, setCharacterLibraryOpen] = useState(false);
+  const [characterLibraryEnabled, setCharacterLibraryEnabled] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setCharacterLibraryEnabled(false);
+    if (!orgId || !effectiveModel?.interfaceId) return;
+    fetchCharacterLibraryStatus({
+      organizationId: orgId,
+      interfaceId: effectiveModel.interfaceId,
+    })
+      .then((enabled) => {
+        if (!cancelled) setCharacterLibraryEnabled(enabled);
+      })
+      .catch(() => {
+        if (!cancelled) setCharacterLibraryEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, effectiveModel?.interfaceId]);
 
   const referenceChips = useMemo(() => {
     const base = collectAiVideoUnifiedReferenceChips({
@@ -717,10 +747,104 @@ export function AiVideoConfigPanel({
     setPickNodeOpen(false);
   };
 
+  const addImageReferenceNode = (
+    value: ResourceIdReference,
+    offset: number
+  ): boolean => {
+    const host = getNode(nodeId);
+    if (!host) return false;
+
+    const catalog = nodeTypes.find((entry) => entry.type === AI_IMAGE_NODE_TYPE);
+    if (!catalog) return false;
+
+    const newId = `${AI_IMAGE_NODE_TYPE}-${Date.now()}-${offset}`;
+    const position = {
+      x: host.position.x - 280,
+      y: host.position.y + offset * 100,
+    };
+
+    const catalogInputs = mergeAiImageNodeCatalogInputs(
+      catalog.type,
+      mergeAiTextNodeCatalogInputs(
+        catalog.type,
+        catalog.inputs.map((param) => ({
+          ...param,
+          id: param.name,
+          value: param.name === "manual_images" ? [value] : param.value,
+        })),
+        catalog
+      ),
+      catalog
+    );
+    const catalogOutputs = catalog.outputs.map((param) => ({
+      ...param,
+      id: param.name,
+      value:
+        param.name === AI_IMAGE_OUTPUT_ID
+          ? [value]
+          : param.value,
+    }));
+
+    const newNode = {
+      id: newId,
+      type: "workflowNode" as const,
+      position,
+      data: {
+        name: resolveGenerativeNodeDisplayName({
+          nodeType: catalog.type,
+          baseName: resolveGenerativeNodeDefaultBaseName(
+            catalog.type,
+            catalog.name,
+            t
+          ),
+          existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
+          additionalSameTypeCount: offset,
+        }),
+        nodeType: catalog.type,
+        icon: catalog.icon,
+        inputs: catalogInputs,
+        outputs: catalogOutputs,
+        executionState: "idle" as const,
+        createObjectUrl,
+      },
+    };
+
+    setNodes((current) => [...current, newNode]);
+
+    return appendReferenceConnection(
+      {
+        source: newId,
+        sourceHandle: AI_IMAGE_OUTPUT_ID,
+        target: nodeId,
+        targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+      },
+      { nodes: [...nodes, newNode] }
+    );
+  };
+
+  const handleInsertCharacter = (resourceId: string, mimeType: string) => {
+    if (disabled) return;
+    if (!canAcceptAiVideoReference({
+      rules: modelRules,
+      kind: "image",
+      currentCounts: referenceCounts,
+      targetNodeData: data,
+    }).ok) {
+      toast.error("workflow.aiVideoPanel.referenceRejected");
+      return;
+    }
+    const value: ResourceIdReference = {
+      resourceId,
+      kind: "cloud",
+      mimeType,
+    };
+    if (!addImageReferenceNode(value, 0)) {
+      toast.error("workflow.aiVideoPanel.referenceRejected");
+    }
+  };
+
   const handleUploadFiles = async (files: FileList) => {
     if (disabled) return;
-    const host = getNode(nodeId);
-    if (!host) return;
 
     let offset = 0;
     let added = 0;
@@ -751,12 +875,6 @@ export function AiVideoConfigPanel({
         continue;
       }
 
-      const catalog = nodeTypes.find((entry) => entry.type === AI_IMAGE_NODE_TYPE);
-      if (!catalog) {
-        toast.error("workflow.aiVideoPanel.referenceRejected");
-        continue;
-      }
-
       try {
         if (!orgId) {
           toast.error("workflow.aiVideoPanel.referenceRejected");
@@ -771,71 +889,7 @@ export function AiVideoConfigPanel({
           mediaKind: "reference",
         });
 
-        const newId = `${AI_IMAGE_NODE_TYPE}-${Date.now()}-${offset}`;
-        const position = {
-          x: host.position.x - 280,
-          y: host.position.y + offset * 100,
-        };
-
-        const catalogInputs = mergeAiImageNodeCatalogInputs(
-          catalog.type,
-          mergeAiTextNodeCatalogInputs(
-            catalog.type,
-            catalog.inputs.map((param) => ({
-              ...param,
-              id: param.name,
-              value: param.name === "manual_images" ? [value] : param.value,
-            })),
-            catalog
-          ),
-          catalog
-        );
-        const catalogOutputs = catalog.outputs.map((param) => ({
-          ...param,
-          id: param.name,
-          value:
-            param.name === AI_IMAGE_OUTPUT_ID
-              ? [value]
-              : param.value,
-        }));
-
-        const newNode = {
-          id: newId,
-          type: "workflowNode" as const,
-          position,
-          data: {
-            name: resolveGenerativeNodeDisplayName({
-              nodeType: catalog.type,
-              baseName: resolveGenerativeNodeDefaultBaseName(
-                catalog.type,
-                catalog.name,
-                t
-              ),
-              existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
-              additionalSameTypeCount: offset,
-            }),
-            nodeType: catalog.type,
-            icon: catalog.icon,
-            inputs: catalogInputs,
-            outputs: catalogOutputs,
-            executionState: "idle" as const,
-            createObjectUrl,
-          },
-        };
-
-        setNodes((current) => [...current, newNode]);
-
-        if (
-          !appendReferenceConnection(
-            {
-              source: newId,
-              sourceHandle: AI_IMAGE_OUTPUT_ID,
-              target: nodeId,
-              targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
-            },
-            { nodes: [...nodes, newNode] }
-          )
-        ) {
+        if (!addImageReferenceNode(value, offset)) {
           toast.error("workflow.aiVideoPanel.referenceRejected");
           continue;
         }
@@ -1520,6 +1574,29 @@ export function AiVideoConfigPanel({
                   onUploadFiles={(files) => {
                     void handleUploadFiles(files);
                   }}
+                  afterAddButton={
+                    characterLibraryEnabled && !disabled ? (
+                      <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="nodrag flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCharacterLibraryOpen(true);
+                              }}
+                            >
+                              <UserRoundIcon className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {t("workflow.characterLibrary.openTooltip")}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : null
+                  }
                   onInjectChip={handleInjectChip}
                 />
               </div>
@@ -1691,6 +1768,16 @@ export function AiVideoConfigPanel({
         emptyMessage={t("workflow.aiVideoPanel.noPickableNodes")}
         entries={pickableOutputs}
         onPick={handlePickNode}
+      />
+
+      <CharacterLibraryDialog
+        open={characterLibraryOpen}
+        onOpenChange={setCharacterLibraryOpen}
+        organizationId={orgId ?? ""}
+        interfaceId={effectiveModel?.interfaceId}
+        onInsert={(entry) =>
+          handleInsertCharacter(entry.resourceId, entry.mimeType)
+        }
       />
     </>
   );
