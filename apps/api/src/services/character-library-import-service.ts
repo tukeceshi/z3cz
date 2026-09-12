@@ -197,16 +197,11 @@ async function createInvocation(params: {
   return id;
 }
 
-async function finalizeInvocationByResource(
+async function findInvocationIdByResource(
   db: Database,
   organizationId: string,
-  resourceId: string,
-  update: {
-    readonly status: "completed" | "failed";
-    readonly content?: string;
-    readonly error?: string;
-  }
-): Promise<void> {
+  resourceId: string
+): Promise<string | null> {
   const [invocation] = await db
     .select({ id: aiModelInvocations.id })
     .from(aiModelInvocations)
@@ -219,9 +214,27 @@ async function finalizeInvocationByResource(
     )
     .orderBy(desc(aiModelInvocations.createdAt))
     .limit(1);
-  if (!invocation) return;
+  return invocation?.id ?? null;
+}
+
+async function finalizeInvocationByResource(
+  db: Database,
+  organizationId: string,
+  resourceId: string,
+  update: {
+    readonly status: "completed" | "failed";
+    readonly content?: string;
+    readonly error?: string;
+  }
+): Promise<void> {
+  const invocationId = await findInvocationIdByResource(
+    db,
+    organizationId,
+    resourceId
+  );
+  if (!invocationId) return;
   await finalizeAiModelInvocation(db, {
-    id: invocation.id,
+    id: invocationId,
     organizationId,
     status: update.status,
     ...(update.content !== undefined ? { content: update.content } : {}),
@@ -372,9 +385,15 @@ export async function refreshCharacterResourceImportStatus(
     );
   }
 
+  const invocationId = await findInvocationIdByResource(
+    db,
+    params.organizationId,
+    params.resourceId
+  );
   const requestLogSink = createUpstreamRequestLogger(db, {
     organizationId: params.organizationId,
     interfaceId: context.interfaceId,
+    invocationId,
     operation: "poll",
   }) as unknown as VolcanoAssetRequestLogSink;
 
