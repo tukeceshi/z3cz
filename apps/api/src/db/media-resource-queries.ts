@@ -17,6 +17,8 @@ export interface UpsertMediaResourceParams {
   readonly failed?: boolean;
   readonly cloudAccelerationStatus?: CloudAccelerationStatus | null;
   readonly modelCanonicalId?: string | null;
+  readonly interfaceId?: string | null;
+  readonly source?: string | null;
 }
 
 function mapMediaResourceRow(
@@ -35,6 +37,8 @@ function mapMediaResourceRow(
     failed: row.failed,
     cloudAccelerationStatus: row.cloudAccelerationStatus ?? null,
     modelCanonicalId: row.modelCanonicalId ?? null,
+    interfaceId: row.interfaceId ?? null,
+    source: row.source ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -67,6 +71,8 @@ export async function upsertMediaResources(
         failed: resource.failed ?? false,
         cloudAccelerationStatus: resource.cloudAccelerationStatus ?? null,
         modelCanonicalId: resource.modelCanonicalId ?? null,
+        interfaceId: resource.interfaceId ?? null,
+        source: resource.source ?? null,
       }))
     )
     .onConflictDoUpdate({
@@ -82,6 +88,8 @@ export async function upsertMediaResources(
         failed: sql`excluded.failed`,
         cloudAccelerationStatus: sql`excluded.cloud_acceleration_status`,
         modelCanonicalId: sql`coalesce(excluded.model_canonical_id, ${mediaResources.modelCanonicalId})`,
+        interfaceId: sql`coalesce(excluded.interface_id, ${mediaResources.interfaceId})`,
+        source: sql`coalesce(excluded.source, ${mediaResources.source})`,
       },
     });
 }

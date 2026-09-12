@@ -199,6 +199,8 @@ export interface AiTextReferenceBarProps {
   readonly onPickCanvasNode: () => void;
   readonly onUploadFiles?: (files: FileList) => void;
   /** When omitted, chips are preview-only (AI Text). */
+  /** When set, this component is shown right after the add-reference button. */
+  readonly afterAddButton?: ReactNode;
   readonly onInjectChip?: (chip: AiTextReferenceChip) => void;
   readonly showStudioReferenceHints?: boolean;
   readonly detailRole?: CreativeStudioDetailViewRole;
@@ -214,6 +216,7 @@ export function AiTextReferenceBar({
   onDisconnect,
   onPickCanvasNode,
   onUploadFiles,
+  afterAddButton,
   onInjectChip,
   showStudioReferenceHints = false,
   detailRole,
@@ -434,6 +437,8 @@ export function AiTextReferenceBar({
       {showStudioReferenceHints
         ? studioAddReferencePlaceholder
         : canvasAddReferenceMenu}
+
+      {afterAddButton}
 
       {allowUpload ? (
         <input

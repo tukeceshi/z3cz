@@ -675,10 +675,18 @@ export const mediaResources = pgTable(
       "pending" | "active" | "done" | "failed" | null
     >(),
     modelCanonicalId: text("model_canonical_id"),
+    interfaceId: text("interface_id"),
+    source: text("source"),
+    upstreamAssetId: text("upstream_asset_id"),
+    upstreamAssetStatus: text("upstream_asset_status"),
     createdAt: createCreatedAt(),
   },
   (table) => [
     index("media_resources_organization_id_idx").on(table.organizationId),
+    index("media_resources_org_source_idx").on(
+      table.organizationId,
+      table.source
+    ),
   ]
 );
 

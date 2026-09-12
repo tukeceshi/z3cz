@@ -631,6 +631,20 @@
       "when": 1790680000000,
       "tag": "0095_api_forwarding",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1790760000000,
+      "tag": "0096_media_resource_character_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1790840000000,
+      "tag": "0097_media_resource_upstream_asset",
+      "breakpoints": true
     }
   ]
 }
