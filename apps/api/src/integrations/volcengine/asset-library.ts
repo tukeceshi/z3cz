@@ -98,6 +98,23 @@ async function callStandaloneAssetApi<T>(
       errorMessage = String(message);
       throw new Error(errorMessage);
     }
+    // Gateway wraps upstream failures in HTTP 200 + {error: {...}}.
+    if (
+      payload &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "error" in (payload as Record<string, unknown>)
+    ) {
+      const errorPayload = (payload as Record<string, unknown>)["error"];
+      errorMessage =
+        typeof errorPayload === "object" && errorPayload !== null
+          ? String(
+              (errorPayload as Record<string, unknown>)["message"] ??
+                JSON.stringify(errorPayload)
+            )
+          : String(errorPayload);
+      throw new Error(errorMessage);
+    }
     return payload as T;
   } catch (error) {
     if (!errorMessage && error instanceof Error) {
@@ -182,7 +199,7 @@ export async function getStandaloneAssetStatus(params: {
       action: "GetAsset",
       body: {
         model: "volc-asset",
-        AssetId: params.assetId,
+        Id: params.assetId,
       },
     },
     params.requestLogSink
