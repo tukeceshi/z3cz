@@ -797,11 +797,19 @@ export function VolcanoInterfacePanel({
       (model) => model.canonicalId === canonicalId
     );
 
-    if (enabled && row) {
-      if (isVolcanoModelActivationBlocking(row)) {
-        return;
-      }
+    // Optimistic flip so the switch reacts immediately; failure paths below revert it.
+    if (snapshot) {
+      setSnapshot({
+        ...snapshot,
+        models: snapshot.models.map((modelRow) =>
+          modelRow.canonicalId === canonicalId
+            ? { ...modelRow, enabled }
+            : modelRow
+        ),
+      });
+    }
 
+    if (enabled && row) {
       const alreadyOpen = getVolcanoEffectiveActivationStatus(row) === "open";
       if (!alreadyOpen) {
         setTogglingId(canonicalId);
@@ -838,6 +846,9 @@ export function VolcanoInterfacePanel({
             error.code === CREDENTIALS_DECRYPT_FAILED
           ) {
             appToast.error("pages.aiInterfaces.volcano.credentialsDecryptFailed");
+            if (snapshot) {
+              setSnapshot(snapshot);
+            }
             return;
           }
 
@@ -846,6 +857,9 @@ export function VolcanoInterfacePanel({
               ? error.message
               : t("pages.aiInterfaces.volcano.activation.probeFailed")
           );
+          if (snapshot) {
+            setSnapshot(snapshot);
+          }
           return;
         } finally {
           setTogglingId(null);
@@ -872,6 +886,9 @@ export function VolcanoInterfacePanel({
       }
     } catch {
       appToast.error("pages.aiInterfaces.volcano.toggleFailed");
+      if (snapshot) {
+        setSnapshot(snapshot);
+      }
     } finally {
       setTogglingId(null);
     }

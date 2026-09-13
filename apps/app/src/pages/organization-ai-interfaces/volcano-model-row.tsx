@@ -7,7 +7,7 @@ import type {
 import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { getVolcanoEffectiveActivationStatus, isVolcanoModelActivationBlocking } from "@/utils/volcano-activation";
+import { getVolcanoEffectiveActivationStatus } from "@/utils/volcano-activation";
 
 import { ModelAliasInlineEdit } from "./model-alias-inline-edit";
 import { VolcanoPricingPopover } from "./volcano-pricing-popover";
@@ -55,7 +55,6 @@ export function VolcanoModelRow({
   );
   const isWizard = hintVariant === "wizard";
   const effectiveActivation = getVolcanoEffectiveActivationStatus(row);
-  const enableBlocked = !isWizard && isVolcanoModelActivationBlocking(row);
   const wizardStatus = isWizard
     ? wizardDisplayStatus(effectiveActivation)
     : null;
@@ -73,12 +72,7 @@ export function VolcanoModelRow({
         <Switch
           checked={row.enabled}
           disabled={disabled || !onEnabledChange}
-          onCheckedChange={(checked) => {
-            if (checked && enableBlocked) {
-              return;
-            }
-            onEnabledChange?.(checked);
-          }}
+          onCheckedChange={onEnabledChange}
         />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
