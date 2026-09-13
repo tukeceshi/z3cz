@@ -72,8 +72,21 @@ export interface VolcanoInterfaceMetadata {
   readonly setupStatus?: VolcanoSetupStatus;
   readonly setupError?: string | null;
   readonly setupIdempotencyKey?: string;
+  /** Character library toggle for this aggregate interface. Absent = off. */
+  readonly supportsCharacterLibrary?: boolean;
   /** Character library asset group created in the Volcano private asset library. */
   readonly characterLibraryAssetGroupId?: string;
+}
+
+export function mergeVolcanoSupportsCharacterLibrary(
+  metadata: VolcanoInterfaceMetadata,
+  enabled: boolean | undefined
+): VolcanoInterfaceMetadata {
+  if (enabled !== true) {
+    const { supportsCharacterLibrary: _removed, ...rest } = metadata;
+    return rest;
+  }
+  return { ...metadata, supportsCharacterLibrary: true };
 }
 
 /** TOS resource package usage (storage capacity or traffic). */
@@ -180,4 +193,8 @@ export interface VolcanoSnapshotResponse {
   readonly mediaKit?: VolcanoMediaKitSnapshot;
   /** @deprecated Alias for mediaKit */
   readonly mediaKitEnhance?: VolcanoMediaKitSnapshot;
+  /** Character library toggle state on this aggregate interface. */
+  readonly supportsCharacterLibrary?: boolean;
+  /** Asset group id stored on the interface (brand) metadata. */
+  readonly characterLibraryAssetGroupId?: string | null;
 }

@@ -16,6 +16,8 @@ export interface CharacterLibraryEntry {
 
 export interface ListCharacterLibraryResponse {
   readonly entries: readonly CharacterLibraryEntry[];
+  /** Asset group id stored on the interface (brand) metadata, if created. */
+  readonly groupId?: string | null;
 }
 
 export interface AddCharacterLibraryRequest {

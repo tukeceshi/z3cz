@@ -50,6 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
   updateOrganizationAiInterface,
+  updateSingleModelSupportsCharacterLibrary,
   useOrganizationFormatTransformTemplates,
 } from "@/services/organization-ai-interface-service";
 import {
@@ -101,6 +102,13 @@ export function SingleModelConfigDialog({
     isSingleModelProviderMetadata(iface.metadata) &&
       iface.metadata.supportsCharacterLibrary === true
   );
+  const [characterLibraryAssetGroupId, setCharacterLibraryAssetGroupId] =
+    useState<string | null>(() => {
+      if (!isSingleModelProviderMetadata(iface.metadata)) return null;
+      const value = iface.metadata.characterLibraryAssetGroupId;
+      return typeof value === "string" && value ? value : null;
+    });
+  const [characterLibrarySaving, setCharacterLibrarySaving] = useState(false);
   const [baseUrl, setBaseUrl] = useState(iface.baseUrl ?? "");
   const [apiKey, setApiKey] = useState("");
   const [modelInstances, setModelInstances] = useState<
@@ -325,7 +333,6 @@ export function SingleModelConfigDialog({
             }
           : {}),
         singleModelEndpointRules: endpointRules ?? {},
-        singleModelSupportsCharacterLibrary: supportsCharacterLibrary,
       });
       appToast.success("pages.aiInterfaces.updated");
       onOpenChange(false);
@@ -338,6 +345,33 @@ export function SingleModelConfigDialog({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCharacterLibraryToggle = async (enabled: boolean) => {
+    setCharacterLibrarySaving(true);
+    try {
+      const updated = await updateSingleModelSupportsCharacterLibrary(
+        organizationId,
+        iface.id,
+        enabled
+      );
+      setSupportsCharacterLibrary(enabled);
+      if (
+        isSingleModelProviderMetadata(updated.metadata) &&
+        typeof updated.metadata.characterLibraryAssetGroupId === "string" &&
+        updated.metadata.characterLibraryAssetGroupId
+      ) {
+        setCharacterLibraryAssetGroupId(
+          updated.metadata.characterLibraryAssetGroupId
+        );
+      }
+    } catch (error) {
+      appToast.errorRaw(
+        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+      );
+    } finally {
+      setCharacterLibrarySaving(false);
     }
   };
 
@@ -430,12 +464,27 @@ export function SingleModelConfigDialog({
                 <Switch
                   id="single-model-config-character-library"
                   checked={supportsCharacterLibrary}
-                  onCheckedChange={setSupportsCharacterLibrary}
+                  disabled={characterLibrarySaving}
+                  onCheckedChange={(checked) =>
+                    void handleCharacterLibraryToggle(checked)
+                  }
                 />
               </div>
               <p className="text-muted-foreground text-xs">
                 {t("pages.aiInterfaces.singleModel.characterLibraryHint")}
               </p>
+              <p className="font-mono text-muted-foreground text-xs">
+                {t("pages.aiInterfaces.singleModel.assetGroupId")}：
+                {characterLibraryAssetGroupId ??
+                  t("pages.aiInterfaces.singleModel.groupNotCreated")}
+              </p>
+              {!characterLibraryAssetGroupId ? (
+                <p className="text-muted-foreground text-xs">
+                  {t(
+                    "pages.aiInterfaces.singleModel.characterLibraryRequirement"
+                  )}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {isMultiModelProvider ? (

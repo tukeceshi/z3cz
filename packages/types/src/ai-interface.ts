@@ -244,6 +244,7 @@ export interface UpdateOrganizationAiInterfaceRequest {
   readonly singleModelUpstreamModelIds?: Readonly<Record<string, string>>;
   readonly singleModelEndpointRules?: SingleModelEndpointRules;
   readonly singleModelSupportsCharacterLibrary?: boolean;
+  readonly volcanoSupportsCharacterLibrary?: boolean;
   readonly singleModelFormatTransformsByCanonicalId?: Readonly<
     Record<string, SingleModelFormatTransform | null>
   >;

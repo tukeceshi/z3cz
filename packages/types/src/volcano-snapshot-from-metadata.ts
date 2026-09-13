@@ -184,5 +184,7 @@ export function buildVolcanoSnapshotFromMetadata(
     models,
     tosStorage: buildTosStorageSnapshot({ metadata, packageRows }),
     mediaKit: buildVolcanoMediaKitSnapshot({ metadata }),
+    supportsCharacterLibrary: metadata.supportsCharacterLibrary === true,
+    characterLibraryAssetGroupId: metadata.characterLibraryAssetGroupId ?? null,
   };
 }

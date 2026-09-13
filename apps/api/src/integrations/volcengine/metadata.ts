@@ -3,6 +3,7 @@ import {
   VOLCANO_AGGREGATE_MODEL_CATALOG,
   normalizeVolcanoArkEndpoints,
   normalizeOrgModelInstancesMap,
+  mergeVolcanoSupportsCharacterLibrary as mergeVolcanoSupportsCharacterLibraryFlag,
   type AiModelCatalogEntry,
   type OrgModelInstanceConfig,
   type VolcanoActivationProbeResult,
@@ -143,6 +144,13 @@ export function mergeVolcanoModelEnabled(
     };
   }
   return pruneVolcanoMetadataToCatalog({ ...metadata, models }, catalogEntries);
+}
+
+export function mergeVolcanoSupportsCharacterLibrary(
+  metadata: VolcanoInterfaceMetadata,
+  enabled: boolean | undefined
+): VolcanoInterfaceMetadata {
+  return mergeVolcanoSupportsCharacterLibraryFlag(metadata, enabled);
 }
 
 export function mergeVolcanoModelAlias(

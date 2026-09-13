@@ -71,6 +71,7 @@ import {
   createVolcanoMetadata,
   isVolcanoMetadata,
   mergeVolcanoModelEnabled,
+  mergeVolcanoSupportsCharacterLibrary,
   mergeVolcanoModelAlias,
   mergeVolcanoActivationCache,
   parseInterfaceMetadata,
@@ -117,6 +118,7 @@ import {
 } from "../integrations/volcengine/tos-errors";
 import { getVolcanoCredentials } from "../integrations/volcengine/ensure-api-key";
 import { ensureVolcanoTosBucketCreated } from "../integrations/volcengine/create-volcano-tos-bucket";
+import { ensureCharacterLibraryAssetGroup } from "../services/character-library-import-service";
 import { VOLCANO_TOS_DEFAULT_PREFIX } from "@dafthunk/types";
 import type { VolcanoInterfaceSetupQueueMessage } from "@dafthunk/types";
 import {
@@ -389,6 +391,7 @@ const updateSchema = z
       })
       .optional(),
     singleModelSupportsCharacterLibrary: z.boolean().optional(),
+    volcanoSupportsCharacterLibrary: z.boolean().optional(),
     singleModelFormatTransformsByCanonicalId: z
       .record(z.string(), singleModelFormatTransformSchema.nullable())
       .optional(),
@@ -1297,6 +1300,46 @@ aiInterfaceRoutes.patch(
         );
       }
 
+      if (body.volcanoSupportsCharacterLibrary !== undefined) {
+        const parsed = parseInterfaceMetadata(
+          metadataUpdate ?? existing.metadata
+        );
+        if (!parsed || !isVolcanoMetadata(parsed)) {
+          return c.json({ error: "Volcano metadata not configured" }, 400);
+        }
+        let current = parsed;
+        if (
+          body.volcanoSupportsCharacterLibrary &&
+          !current.characterLibraryAssetGroupId
+        ) {
+          try {
+            current = {
+              ...current,
+              characterLibraryAssetGroupId: await ensureCharacterLibraryAssetGroup(
+                c.env,
+                db,
+                organizationId,
+                id
+              ),
+            };
+          } catch (error) {
+            return c.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to create asset group",
+              },
+              400
+            );
+          }
+        }
+        metadataUpdate = mergeVolcanoSupportsCharacterLibrary(
+          current,
+          body.volcanoSupportsCharacterLibrary
+        ) as unknown as Record<string, unknown>;
+      }
+
       if (body.volcanoModelAlias) {
         const current = parseInterfaceMetadata(
           metadataUpdate ?? existing.metadata
@@ -1396,6 +1439,32 @@ aiInterfaceRoutes.patch(
         );
         if (!current) {
           return c.json({ error: "Single-model metadata not configured" }, 400);
+        }
+        if (
+          body.singleModelSupportsCharacterLibrary &&
+          !current.characterLibraryAssetGroupId
+        ) {
+          try {
+            current = {
+              ...current,
+              characterLibraryAssetGroupId: await ensureCharacterLibraryAssetGroup(
+                c.env,
+                db,
+                organizationId,
+                id
+              ),
+            };
+          } catch (error) {
+            return c.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to create asset group",
+              },
+              400
+            );
+          }
         }
         metadataUpdate = mergeSingleModelSupportsCharacterLibraryMetadata(
           current,

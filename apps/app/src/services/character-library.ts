@@ -10,14 +10,17 @@ import { makeRequest } from "@/services/utils";
 export async function listCharacterLibraryEntries(params: {
   readonly organizationId: string;
   readonly interfaceId?: string;
-}): Promise<readonly CharacterLibraryEntry[]> {
+}): Promise<{
+  readonly entries: readonly CharacterLibraryEntry[];
+  readonly groupId: string | null;
+}> {
   const query = params.interfaceId
     ? `?interfaceId=${encodeURIComponent(params.interfaceId)}`
     : "";
   const response = await makeRequest<ListCharacterLibraryResponse>(
     `/${params.organizationId}/character-library${query}`
   );
-  return response.entries;
+  return { entries: response.entries, groupId: response.groupId ?? null };
 }
 
 export async function fetchCharacterLibraryStatus(params: {

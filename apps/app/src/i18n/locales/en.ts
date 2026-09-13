@@ -1989,7 +1989,11 @@ export const en = {
           "Task cancellation is disabled for this model on the platform.",
         characterLibrary: "Character library",
         characterLibraryHint:
-          "When enabled, video models under this model platform can use the character library on the canvas to reference existing resources.",
+          "When enabled and saved, an asset group is created automatically; the group ID is stored in the brand configuration.",
+        characterLibraryRequirement:
+          "Requires the private asset library service enabled on the upstream account.",
+        assetGroupId: "Asset group ID",
+        groupNotCreated: "Not created",
         rulesNotConfigured: "Rules not configured. Open settings to configure.",
         resolutionLimitRequired: "Select at least one allowed resolution.",
         durationLimitRequired: "Select at least one allowed duration.",
@@ -2108,6 +2112,11 @@ export const en = {
         credentialsUpdated: "Volcano credentials updated",
         credentialsUpdateFailed: "Failed to update Volcano credentials",
         toggleFailed: "Failed to update model enablement",
+        characterLibrary: "Character library",
+        groupNotCreated: "Not created",
+        characterLibraryRequirement: "Requires the private asset library service enabled on your Volcano account. Go to",
+        characterLibraryRequirementLink: "Enable private asset library",
+        characterLibraryRequirementAfterLink: ".",
         aliasSaveFailed: "Failed to save model alias",
         disabledHint: "Disabled",
         noUsageData: "No usage data",
@@ -3480,6 +3489,8 @@ export const en = {
       statusActive: "Ready",
       statusFailed: "Failed",
       retryImport: "Retry import",
+      assetGroupId: "Asset group ID",
+      groupNotCreated: "Not created",
       loadFailed: "Failed to load",
     },
     aiTextPanel: {

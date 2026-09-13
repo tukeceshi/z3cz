@@ -19,7 +19,10 @@ import {
 import { requireModelCallsAccess } from "../middleware/org-permissions";
 import { createRequireFeatureMiddleware } from "../middleware/require-feature";
 import { isSingleModelProviderMetadata } from "@dafthunk/types";
-import { parseInterfaceMetadata } from "../integrations/volcengine/metadata";
+import {
+  isVolcanoMetadata,
+  parseInterfaceMetadata,
+} from "../integrations/volcengine/metadata";
 import {
   importCharacterResourceToVolcano,
   refreshCharacterResourceImportStatus,
@@ -46,7 +49,28 @@ characterLibraryRoutes.get("/", async (c) => {
     organizationId,
     interfaceId,
   });
-  const response: ListCharacterLibraryResponse = { entries };
+
+  let groupId: string | null = null;
+  if (interfaceId?.trim()) {
+    const row = await getOrganizationAiInterfaceRow(
+      db,
+      organizationId,
+      interfaceId.trim()
+    );
+    if (row?.metadata) {
+      try {
+        const metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+        const value = metadata["characterLibraryAssetGroupId"];
+        if (typeof value === "string" && value) {
+          groupId = value;
+        }
+      } catch {
+        groupId = null;
+      }
+    }
+  }
+
+  const response: ListCharacterLibraryResponse = { entries, groupId };
   return c.json(response);
 });
 
@@ -65,6 +89,8 @@ characterLibraryRoutes.get("/status", async (c) => {
     if (row) {
       const metadata = parseInterfaceMetadata(row.metadata);
       if (isSingleModelProviderMetadata(metadata)) {
+        enabled = metadata.supportsCharacterLibrary === true;
+      } else if (isVolcanoMetadata(metadata)) {
         enabled = metadata.supportsCharacterLibrary === true;
       }
     }
