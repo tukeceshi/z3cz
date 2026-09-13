@@ -1,4 +1,5 @@
 import {
+  VIDEO_JOB_CLIENT_POLL_INTERVAL_MS,
   VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSION_LABEL_KEYS,
   VOLCANO_MEDIKIT_SUBTITLE_ERASE_OUTPUT_ENCODE_MODE_LABEL_KEYS,
   VOLCANO_MEDIKIT_SUBTITLE_ERASE_SCOPE_LABEL_KEYS,
@@ -11,6 +12,7 @@ import {
   type VolcanoMediaKitSubtitleEraseModelVersion,
   type VolcanoMediaKitSubtitleEraseOutputEncodeMode,
   type VolcanoMediaKitSubtitleEraseScope,
+  type WorkflowMediaValue,
 } from "@dafthunk/types";
 import LoaderIcon from "lucide-react/icons/loader";
 import RotateCcwIcon from "lucide-react/icons/rotate-ccw";
@@ -23,7 +25,17 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { submitVideoSubtitleErase } from "@/services/platform-ai-model-service";
+import {
+  getGenerationJob,
+  submitVideoSubtitleErase,
+} from "@/services/platform-ai-model-service";
+import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
+import {
+  releaseGenerativeJobResume,
+  tryClaimGenerativeJobFinalize,
+  tryClaimGenerativeJobResume,
+} from "@/services/generative-cloud-job-resume-registry";
+import { resolveCloudGenerationJobMedia } from "@/services/persist-generative-media-from-url";
 import { useOrgVolcanoMediaKitConfig } from "@/hooks/use-volcano-mediakit-config";
 import { useDismissOnCanvasPointerDown } from "@/hooks/use-dismiss-on-canvas-pointer-down";
 import { Switch } from "@/components/ui/switch";
@@ -36,9 +48,14 @@ import {
 } from "@/components/ui/select";
 
 import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
-import { withAiVideoGenerateError, withAiVideoGeneratingFlag } from "./ai-video-node-utils";
+import {
+  appendAiVideoGeneratedHistoryItems,
+  withAiVideoGenerateError,
+  withAiVideoGeneratingFlag,
+} from "./ai-video-node-utils";
 import { cn } from "@/utils/utils";
 import { withGenerativeBottomPanelHidden } from "./generative-card-mode-utils";
+import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import {
   clearGenerativeProgress,
   withGenerativeProgress,
@@ -61,6 +78,10 @@ export interface AiVideoSubtitleEraseConfigPanelProps {
 
 const SELECT_TRIGGER_CLASS =
   "h-7 w-auto min-w-[5.5rem] max-w-[9rem] border-0 bg-muted/40 px-2 text-xs shadow-none focus:ring-0";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 type OpenParamSelect = "modelVersion" | "eraseScope" | "outputEncodeMode" | null;
 
@@ -126,6 +147,7 @@ export function AiVideoSubtitleEraseConfigPanel({
 
   const [isStarting, setIsStarting] = useState(false);
   const [openSelect, setOpenSelect] = useState<OpenParamSelect>(null);
+  const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   useDismissOnCanvasPointerDown(openSelect !== null, () => setOpenSelect(null));
 
@@ -257,8 +279,119 @@ export function AiVideoSubtitleEraseConfigPanel({
             { jobId: response.jobId, phase: "generating" }
           ),
         }));
-      } else if (response.jobId) {
+      } else {
         writeBusyMetadata(response.jobId);
+      }
+
+      if (!response.jobId) {
+        throw new Error(t("workflow.subtitleErase.submitFailed"));
+      }
+
+      const jobId = response.jobId;
+      const claimed = tryClaimGenerativeJobResume(jobId);
+      let media: readonly WorkflowMediaValue[];
+      try {
+        if (!claimed) {
+          while (true) {
+            const jobResponse = await getGenerationJob(orgId, jobId);
+            if (jobResponse.job.status === "succeeded") {
+              media = jobResponse.finalMedia ?? [];
+              break;
+            }
+            if (
+              jobResponse.job.status === "failed" ||
+              jobResponse.job.status === "cancelled"
+            ) {
+              throw new Error(
+                jobResponse.job.failureReason ??
+                  t("workflow.subtitleErase.submitFailed")
+              );
+            }
+            await sleep(VIDEO_JOB_CLIENT_POLL_INTERVAL_MS);
+          }
+        } else {
+          media = await resolveCloudGenerationJobMedia({
+            organizationId: orgId,
+            jobId,
+            workflowId,
+            cloudConfigured,
+            onProgressPhase: (phase) => {
+              updateNodeData?.(shell.nodeId, (current) => ({
+                metadata: withGenerativeProgress(
+                  withAiVideoGeneratingFlag(
+                    withGenerativeBottomPanelHidden(current.metadata),
+                    true
+                  ),
+                  { jobId, phase }
+                ),
+              }));
+            },
+          });
+        }
+      } finally {
+        releaseGenerativeJobResume(jobId);
+      }
+
+      if (media.length === 0) {
+        throw new Error(t("workflow.subtitleErase.submitFailed"));
+      }
+
+      const canWriteHistory = tryClaimGenerativeJobFinalize(jobId);
+      if (canWriteHistory) {
+        persistMediaForNodeInBackground({
+          organizationId: orgId,
+          workflowId,
+          media,
+          nodeType: "ai-video",
+          cloudConfigured,
+        });
+      }
+
+      if (updateNodeData) {
+        updateNodeData(shell.nodeId, (current) => {
+          if (!canWriteHistory) {
+            return {
+              metadata: withAiVideoGenerateError(
+                withAiVideoGeneratingFlag(
+                  withGenerativeBottomPanelHidden(
+                    clearGenerativeProgress(current.metadata)
+                  ),
+                  false
+                ),
+                null
+              ),
+            };
+          }
+
+          const withResult = appendAiVideoGeneratedHistoryItems(
+            current,
+            media,
+            {
+              prompt: "",
+              params: {
+                ...effectiveConfig,
+              } as Readonly<Record<string, unknown>>,
+              aiInterfaceId: mediaKitInterfaceId,
+              jobId,
+            }
+          );
+          return {
+            ...withResult,
+            metadata: withAiVideoGenerateError(
+              withAiVideoGeneratingFlag(
+                withGenerativeBottomPanelHidden(
+                  clearGenerativeProgress(withResult.metadata)
+                ),
+                false
+              ),
+              null
+            ),
+          };
+        });
+      }
+
+      if (canWriteHistory) {
+        toast.success("workflow.aiVideoPanel.generated");
       }
     } catch (error) {
       toast.errorRaw(
@@ -277,6 +410,7 @@ export function AiVideoSubtitleEraseConfigPanel({
       setIsStarting(false);
     }
   }, [
+    cloudConfigured,
     createSubtitleEraseSiblingNodeShell,
     disabled,
     draftConfig,
