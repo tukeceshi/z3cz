@@ -146,6 +146,26 @@ export async function updateVolcanoModelEnabled(
   });
 }
 
+export async function updateVolcanoSupportsCharacterLibrary(
+  organizationId: string,
+  interfaceId: string,
+  enabled: boolean
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    volcanoSupportsCharacterLibrary: enabled,
+  });
+}
+
+export async function updateSingleModelSupportsCharacterLibrary(
+  organizationId: string,
+  interfaceId: string,
+  enabled: boolean
+): Promise<OrganizationAiInterface> {
+  return updateOrganizationAiInterface(organizationId, interfaceId, {
+    singleModelSupportsCharacterLibrary: enabled,
+  });
+}
+
 export async function updateVolcanoModelAlias(
   organizationId: string,
   interfaceId: string,

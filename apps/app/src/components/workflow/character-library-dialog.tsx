@@ -99,6 +99,7 @@ export function CharacterLibraryDialog({
   const { t } = useTranslation();
   const { id: workflowId } = useParams<{ id: string }>();
   const [entries, setEntries] = useState<readonly CharacterLibraryEntry[]>([]);
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [available, setAvailable] = useState<readonly CharacterLibraryEntry[]>(
     []
   );
@@ -118,10 +119,12 @@ export function CharacterLibraryDialog({
         listCharacterLibraryEntries({ organizationId, interfaceId }),
         loadCachedCanvasResources({ organizationId, workflowId }),
       ]);
-      setEntries(library);
+      setEntries(library.entries);
+      setGroupId(library.groupId);
       setAvailable(resources);
     } catch {
       setEntries([]);
+      setGroupId(null);
       setAvailable([]);
     } finally {
       setLoading(false);
@@ -248,7 +251,10 @@ export function CharacterLibraryDialog({
               {t("workflow.characterLibrary.backToList")}
             </Button>
           ) : (
-            <span />
+            <span className="truncate text-xs text-muted-foreground">
+              {t("workflow.characterLibrary.assetGroupId")}
+              {groupId ? `：${groupId}` : `：${t("workflow.characterLibrary.groupNotCreated")}`}
+            </span>
           )}
           <Button
             variant="outline"

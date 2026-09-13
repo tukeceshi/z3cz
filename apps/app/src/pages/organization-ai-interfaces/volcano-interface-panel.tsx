@@ -35,6 +35,7 @@ import { toast } from "sonner";
 
 
 import { useTranslation } from "@/components/locale-provider";
+import { Switch } from "@/components/ui/switch";
 
 import { Button } from "@/components/ui/button";
 
@@ -51,6 +52,7 @@ import {
   probeVolcanoActivation,
 
   updateVolcanoModelEnabled,
+  updateVolcanoSupportsCharacterLibrary,
   updateVolcanoModelAlias,
   VOLCANO_ARK_NOT_OPENED_CODE,
 
@@ -258,6 +260,7 @@ export function VolcanoInterfacePanel({
   const [isProbingTos, setIsProbingTos] = useState(false);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [characterLibrarySaving, setCharacterLibrarySaving] = useState(false);
   const [aliasSavingId, setAliasSavingId] = useState<string | null>(null);
 
   const loadInFlightRef = useRef(false);
@@ -876,6 +879,30 @@ export function VolcanoInterfacePanel({
 
 
 
+  const handleCharacterLibraryToggle = async (enabled: boolean) => {
+    setCharacterLibrarySaving(true);
+    try {
+      await updateVolcanoSupportsCharacterLibrary(
+        organizationId,
+        iface.id,
+        enabled
+      );
+      await onUpdated();
+      if (snapshot) {
+        setSnapshot({
+          ...snapshot,
+          supportsCharacterLibrary: enabled,
+        });
+      }
+    } catch (error) {
+      appToast.errorRaw(
+        error instanceof Error ? error.message : t("pages.aiInterfaces.volcano.toggleFailed")
+      );
+    } finally {
+      setCharacterLibrarySaving(false);
+    }
+  };
+
   const handleAliasChange = async (canonicalId: string, alias: string) => {
     setAliasSavingId(canonicalId);
     try {
@@ -1071,6 +1098,47 @@ export function VolcanoInterfacePanel({
 
                   />
 
+                </div>
+
+                <div className="mb-3 rounded-lg border p-3">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={snapshot.supportsCharacterLibrary === true}
+                      disabled={characterLibrarySaving}
+                      onCheckedChange={(checked) =>
+                        void handleCharacterLibraryToggle(checked)
+                      }
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <span className="text-sm font-medium">
+                        {t("pages.aiInterfaces.volcano.characterLibrary")}
+                      </span>
+                      {snapshot.characterLibraryAssetGroupId ? (
+                        <span className="text-muted-foreground block truncate font-mono text-xs">
+                          {snapshot.characterLibraryAssetGroupId}
+                        </span>
+                      ) : (
+                        <p className="text-muted-foreground text-xs">
+                          {t(
+                            "pages.aiInterfaces.volcano.characterLibraryRequirement"
+                          )}{" "}
+                          <a
+                            href="https://console.volcengine.com/ark/region:cn-beijing/openManagement?LLM=%7B%7D&advancedActiveKey=mediaAsset"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary font-medium underline-offset-4 hover:underline"
+                          >
+                            {t(
+                              "pages.aiInterfaces.volcano.characterLibraryRequirementLink"
+                            )}
+                          </a>
+                          {t(
+                            "pages.aiInterfaces.volcano.characterLibraryRequirementAfterLink"
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {snapshot.models.map((row) => (

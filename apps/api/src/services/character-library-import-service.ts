@@ -8,6 +8,7 @@ import {
   getCharacterLibraryEntry,
   setCharacterLibraryAssetImport,
 } from "../db/character-library-queries";
+import { getOrganizationAiInterfaceRow } from "../db/ai-interface-queries";
 import {
   createAiModelInvocation,
   finalizeAiModelInvocation,
@@ -48,6 +49,57 @@ interface ResolvedAssetContext {
   readonly credentials?: VolcengineCredentials;
 }
 
+async function resolveContextFromRow(
+  env: Bindings,
+  db: Database,
+  organizationId: string,
+  row: typeof organizationAiInterfaces.$inferSelect
+): Promise<ResolvedAssetContext | null> {
+  const metadata = parseInterfaceMetadata(row.metadata);
+  if (isVolcanoMetadata(metadata)) {
+    const credentials = await getVolcanoCredentials(
+      env,
+      organizationId,
+      row.metadata
+    );
+    if (credentials) {
+      return {
+        mode: "aggregate",
+        interfaceId: row.id,
+        interfaceName: row.name,
+        metadataRaw: row.metadata ?? "{}",
+        credentials,
+      };
+    }
+    return null;
+  }
+  if (isSingleModelProviderMetadata(metadata)) {
+    const apiKey = await decryptSecret(
+      row.apiKeyEncrypted,
+      env,
+      organizationId
+    );
+    if (!apiKey) return null;
+    let gatewayOrigin: string | null = null;
+    if (row.baseUrl) {
+      try {
+        gatewayOrigin = new URL(row.baseUrl).origin;
+      } catch {
+        gatewayOrigin = null;
+      }
+    }
+    if (!gatewayOrigin) return null;
+    return {
+      mode: "standalone",
+      interfaceId: row.id,
+      interfaceName: row.name,
+      metadataRaw: row.metadata ?? "{}",
+      standalone: { gatewayOrigin, apiKey },
+    };
+  }
+  return null;
+}
+
 async function resolveAssetContext(
   env: Bindings,
   db: Database,
@@ -75,47 +127,9 @@ async function resolveAssetContext(
 
   for (const row of candidates) {
     if (!row.enabled) continue;
-    const metadata = parseInterfaceMetadata(row.metadata);
-    if (isVolcanoMetadata(metadata)) {
-      const credentials = await getVolcanoCredentials(
-        env,
-        organizationId,
-        row.metadata
-      );
-      if (credentials) {
-        return {
-          mode: "aggregate",
-          interfaceId: row.id,
-          interfaceName: row.name,
-          metadataRaw: row.metadata ?? "{}",
-          credentials,
-        };
-      }
-      continue;
-    }
-    if (isSingleModelProviderMetadata(metadata)) {
-      const apiKey = await decryptSecret(
-        row.apiKeyEncrypted,
-        env,
-        organizationId
-      );
-      if (!apiKey) continue;
-      let gatewayOrigin: string | null = null;
-      if (row.baseUrl) {
-        try {
-          gatewayOrigin = new URL(row.baseUrl).origin;
-        } catch {
-          gatewayOrigin = null;
-        }
-      }
-      if (!gatewayOrigin) continue;
-      return {
-        mode: "standalone",
-        interfaceId: row.id,
-        interfaceName: row.name,
-        metadataRaw: row.metadata ?? "{}",
-        standalone: { gatewayOrigin, apiKey },
-      };
+    const context = await resolveContextFromRow(env, db, organizationId, row);
+    if (context) {
+      return context;
     }
   }
   return null;
@@ -172,6 +186,41 @@ async function ensureAssetGroupId(
 
   await persistMetadata(db, context, { characterLibraryAssetGroupId: groupId });
   return groupId;
+}
+
+/**
+ * Ensure the per-org asset group exists for the given AI interface
+ * (standalone API key or Volcano IAM AK/SK, dispatched by metadata type).
+ * The group id is persisted on the interface (brand) metadata.
+ * Called when the character library toggle is turned on, and as a
+ * lazy fallback before the first import.
+ */
+export async function ensureCharacterLibraryAssetGroup(
+  env: Bindings,
+  db: Database,
+  organizationId: string,
+  interfaceId: string
+): Promise<string> {
+  const row = await getOrganizationAiInterfaceRow(
+    db,
+    organizationId,
+    interfaceId
+  );
+  if (!row) {
+    throw new Error("AI interface not found");
+  }
+  const context = await resolveContextFromRow(env, db, organizationId, row);
+  if (!context) {
+    throw new Error(
+      "该接口未配置可用凭据（独立 API Key 或火山 AK/SK），无法创建素材组"
+    );
+  }
+  const requestLogSink = createUpstreamRequestLogger(db, {
+    organizationId,
+    interfaceId: context.interfaceId,
+    operation: "submit",
+  }) as unknown as VolcanoAssetRequestLogSink;
+  return ensureAssetGroupId(db, env, organizationId, context, requestLogSink);
 }
 
 async function createInvocation(params: {
