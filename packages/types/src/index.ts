@@ -34,6 +34,7 @@ export * from "./single-model-snapshot";
 export * from "./volcano-mediakit-enhance";
 export * from "./volcano-mediakit-pricing-catalog";
 export * from "./video-enhance";
+export * from "./video-subtitle-erase";
 export * from "./video-trim";
 export * from "./video-retake-edit";
 export * from "./video-trim-mediakit";

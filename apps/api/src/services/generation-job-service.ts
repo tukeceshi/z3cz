@@ -66,6 +66,7 @@ import {
 } from "./validate-generation-job-upload";
 import { writeGenerationJobCancelLog } from "./write-generation-job-cancel-log";
 import { pollVideoEnhanceGenerationJob } from "./video-enhance-service";
+import { pollVideoSubtitleEraseGenerationJob } from "./video-subtitle-erase-service";
 import { pollVideoConcatGenerationJob } from "./video-concat-service";
 import { pollVideoTrimGenerationJob } from "./video-trim-service";
 
@@ -508,6 +509,10 @@ export async function pollVideoGenerationJob(
 ): Promise<GenerationJobRecord> {
   if (job.resultJson?.jobKind === "video_enhance") {
     return pollVideoEnhanceGenerationJob(env, db, job);
+  }
+
+  if (job.resultJson?.jobKind === "video_subtitle_erase") {
+    return pollVideoSubtitleEraseGenerationJob(env, db, job);
   }
 
   if (job.resultJson?.jobKind === "video_trim") {

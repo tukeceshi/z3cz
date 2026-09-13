@@ -72,10 +72,21 @@ export function resolveRetakeSiblingNodeName(params: {
   );
 }
 
+export function resolveSubtitleEraseSiblingNodeName(params: {
+  readonly sourceNodeName: string;
+  readonly existingNodes: ReadonlyArray<GenerativeNamingNode>;
+}): string {
+  return resolveNumberedSiblingNodeName(
+    `${params.sourceNodeName}-字幕擦除`,
+    params.existingNodes
+  );
+}
+
 export function isAiVideoResultSiblingNodeId(nodeId: string): boolean {
   return (
     nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-retake-`) ||
-    nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-trim-`)
+    nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-trim-`) ||
+    nodeId.startsWith(`${AI_VIDEO_NODE_TYPE}-subtitle-erase-`)
   );
 }
 

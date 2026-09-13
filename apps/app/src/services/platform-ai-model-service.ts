@@ -25,6 +25,8 @@ import type {
   SubmitAiVideoResponse,
   SubmitVideoEnhanceRequest,
   SubmitVideoEnhanceResponse,
+  SubmitVideoSubtitleEraseRequest,
+  SubmitVideoSubtitleEraseResponse,
   SubmitVideoTrimRequest,
   SubmitVideoTrimResponse,
   SubmitVideoConcatRequest,
@@ -486,6 +488,21 @@ export async function submitVideoEnhance(
 ): Promise<SubmitVideoEnhanceResponse> {
   return makeRequest<SubmitVideoEnhanceResponse>(
     `${platformAiEndpoint(orgId)}/mediakit/video-enhance/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    }
+  );
+}
+
+export async function submitVideoSubtitleErase(
+  orgId: string,
+  body: SubmitVideoSubtitleEraseRequest,
+  options?: { readonly signal?: AbortSignal }
+): Promise<SubmitVideoSubtitleEraseResponse> {
+  return makeRequest<SubmitVideoSubtitleEraseResponse>(
+    `${platformAiEndpoint(orgId)}/mediakit/subtitle-erase/submit`,
     {
       method: "POST",
       body: JSON.stringify(body),

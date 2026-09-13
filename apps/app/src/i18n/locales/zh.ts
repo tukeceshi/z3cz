@@ -3713,6 +3713,37 @@ export const zh: TranslationDictionary = {
       submitFailed: "画质增强提交失败",
       notConfigured: "未开启画质增强",
     },
+    subtitleErase: {
+      action: "字幕擦除",
+      mode: "版本",
+      eraseMode: {
+        subtitle: "仅字幕",
+        text: "字幕与文字",
+      },
+      modelVersion: {
+        v4: "V4",
+        v5: "V5",
+      },
+      outputEncodeMode: {
+        quality: "优先画质",
+        size: "优先体积",
+      },
+      eraseRatioLocation: "擦除区域",
+      refinedToggle: "精细化",
+      regionModeToggle: "框选区域",
+      regionModeHint: "开启后在节点画面上拖拽框选字幕区域",
+      regionReset: "重置",
+      regionDelete: "删除该区域",
+      generate: "生成",
+      notConfiguredHint:
+        "请在 AI/资源 接口中使用火山引擎 AI MediaKit 开启字幕擦除，并配置 API Key",
+      openAiInterfaces: "打开接口设置",
+      sourceMissing: "缺少源视频",
+      createNodeFailed: "创建字幕擦除节点失败",
+      referenceLinkFailed: "节点已创建，但未能自动连接源视频引用",
+      submitFailed: "字幕擦除提交失败",
+      notConfigured: "未开启字幕擦除",
+    },
     videoTrim: {
       action: "截取",
       startTime: "开始",
