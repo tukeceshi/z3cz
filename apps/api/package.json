@@ -52,7 +52,7 @@
     "@dafthunk/types": "workspace:*",
     "@google/genai": "^1.52.0",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^2.1.1",
     "@hono/node-ws": "^1.2.0",
     "@hono/oauth-providers": "^0.8.5",
     "@hono/zod-validator": "^0.7.6",
