@@ -26,6 +26,8 @@ import { cn } from "@/utils/utils";
 import { useWorkflowVideoFrameCapture } from "./use-workflow-video-frame-capture";
 import { withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
+import { useOptionalSubtitleEraseSession } from "./video-subtitle-erase-session-context";
+import { SubtitleEraseRegionOverlay } from "./subtitle-erase-region-overlay";
 import { useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType } from "./workflow-types";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
@@ -433,6 +435,11 @@ function CanvasVideoCover({
     trimActive && trimSessionApi?.session?.sourceNodeId === nodeId
       ? trimSessionApi.session
       : null;
+  const subtitleEraseApi = useOptionalSubtitleEraseSession();
+  const eraseRegionModeActive =
+    Boolean(nodeId && subtitleEraseApi?.isSubtitleEraseActiveForNode(nodeId)) &&
+    subtitleEraseApi?.session?.draftConfig.mode === "refined" &&
+    subtitleEraseApi?.session?.regionMode === true;
   const flowNode = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
   const nodeSelected = flowNode?.selected === true;
   const nodeData = flowNode?.data as WorkflowNodeType | undefined;
@@ -466,7 +473,7 @@ function CanvasVideoCover({
       : null;
   const [isHovered, setIsHovered] = useState(false);
   const ensureFullOnHover =
-    trimActive || retakeActive || (!staticCover && isHovered);
+    trimActive || retakeActive || eraseRegionModeActive || (!staticCover && isHovered);
   const {
     displayUrl,
     phase,
@@ -502,7 +509,7 @@ function CanvasVideoCover({
     : (trimSession?.trimSourceVideoUrl ?? hoverVideoUrl);
   const showVideoPlayer =
     Boolean(playbackVideoUrl) &&
-    (playbackActive || hoverPreviewEnabled);
+    (playbackActive || eraseRegionModeActive || hoverPreviewEnabled);
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
@@ -575,12 +582,18 @@ function CanvasVideoCover({
           variant="card"
           objectFit={objectFit}
           initialHovered
-          externalPlaybackControl={playbackActive}
+          externalPlaybackControl={playbackActive || eraseRegionModeActive}
           playbackRange={
-            playbackActive ? playbackSession?.committedRange ?? null : null
+            playbackActive && !eraseRegionModeActive
+              ? playbackSession?.committedRange ?? null
+              : null
           }
           playbackPaused={
-            playbackActive ? playbackSession?.playbackPaused ?? false : false
+            eraseRegionModeActive
+              ? true
+              : playbackActive
+                ? playbackSession?.playbackPaused ?? false
+                : false
           }
           onPlaybackPausedChange={
             retakeActive
@@ -636,6 +649,8 @@ function CanvasVideoCover({
           }}
         />
       ) : null}
+
+      {eraseRegionModeActive ? <SubtitleEraseRegionOverlay /> : null}
 
       {showHoverLoading ? (
         <div className="absolute inset-0 z-20">

@@ -57,6 +57,7 @@ import { snapMediaCardSize } from "./media-card-size";
 import { GenerativeNodeTopToolbar } from "./generative-node-top-toolbar";
 import { isAiVideoRetakePanel } from "@dafthunk/types";
 import { useOptionalVideoTrimSession } from "./video-trim-session-context";
+import { useOptionalSubtitleEraseSession } from "./video-subtitle-erase-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { isAiVideoResultSiblingNodeId } from "./create-ai-video-node-from-manual-upload";
 import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
@@ -412,11 +413,15 @@ export const WorkflowNode = memo(
     );
     const trimSession = useOptionalVideoTrimSession();
     const isTrimPanelActive = trimSession?.isTrimActiveForNode(id) ?? false;
+    const subtitleEraseSession = useOptionalSubtitleEraseSession();
+    const isSubtitleErasePanelActive =
+      subtitleEraseSession?.isSubtitleEraseActiveForNode(id) ?? false;
     const isRetakePanel =
       isAiVideoNode && isAiVideoRetakePanel(data.metadata);
     const isRetakePanelActive = isRetakePanel && selected;
     const showBottomPanelContent =
       isTrimPanelActive ||
+      isSubtitleErasePanelActive ||
       isRetakePanelActive ||
       ((!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode
         ? true

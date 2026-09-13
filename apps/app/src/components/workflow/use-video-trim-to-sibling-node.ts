@@ -21,6 +21,7 @@ import {
   buildLockedRetakeCopyNode,
   findAiVideoCatalog,
   resolveRetakeSiblingNodeName,
+  resolveSubtitleEraseSiblingNodeName,
   resolveTrimSiblingNodeName,
   type AiVideoSiblingBusyKind,
 } from "./create-ai-video-node-from-manual-upload";
@@ -44,11 +45,11 @@ export interface CreateAiVideoSiblingNodeShellResult {
 export type CreateTrimSiblingNodeShellResult = CreateAiVideoSiblingNodeShellResult;
 
 interface CreateAiVideoSiblingNodeShellParams {
-  readonly kind: "trim" | "retake";
+  readonly kind: "trim" | "retake" | "subtitle-erase";
   readonly initialBusy?: AiVideoSiblingBusyKind;
 }
 
-function useCreateAiVideoSiblingNode(sourceNodeId: string) {
+export function useCreateAiVideoSiblingNode(sourceNodeId: string) {
   const { nodeTypes = [], disabled, generativeReferenceCatalogs } =
     useWorkflow();
   const nodes = useNodes();
@@ -84,10 +85,15 @@ function useCreateAiVideoSiblingNode(sourceNodeId: string) {
               sourceNodeName: sourceName,
               existingNodes: typedNodes,
             })
-          : resolveTrimSiblingNodeName({
-              sourceNodeName: sourceName,
-              existingNodes: typedNodes,
-            });
+          : params.kind === "subtitle-erase"
+            ? resolveSubtitleEraseSiblingNodeName({
+                sourceNodeName: sourceName,
+                existingNodes: typedNodes,
+              })
+            : resolveTrimSiblingNodeName({
+                sourceNodeName: sourceName,
+                existingNodes: typedNodes,
+              });
       const nodeId = `${AI_VIDEO_NODE_TYPE}-${params.kind}-${Date.now()}`;
       const position = findOpenNodePositionFromSource({
         sourceNode,

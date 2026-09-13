@@ -139,6 +139,20 @@ export function readVideoEnhanceSourceResourceId(
   return null;
 }
 
+/** Full source media reference (connected reference chip first, then manual videos). */
+export function readVideoEnhanceSourceMedia(
+  data: WorkflowNodeType,
+  graph?: VideoEnhanceSourceGraphContext
+): WorkflowMediaValue | null {
+  if (graph) {
+    const connected = readConnectedVideoEnhanceSource(graph);
+    if (connected) {
+      return connected;
+    }
+  }
+  return readManualVideoReferences(data)[0] ?? null;
+}
+
 export function readVideoEnhanceSourceTierFromNode(
   data: WorkflowNodeType
 ): VolcanoMediaKitPricingResolution | null {

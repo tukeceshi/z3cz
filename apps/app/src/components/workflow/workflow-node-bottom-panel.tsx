@@ -22,6 +22,8 @@ import { AiAudioConfigPanel } from "./ai-audio-config-panel";
 import { AiVideoConfigPanel } from "./ai-video-config-panel";
 import { AiVideoEnhanceConfigPanel } from "./ai-video-enhance-config-panel";
 import { AiVideoRetakeBottomPanel } from "./ai-video-retake-bottom-panel";
+import { AiVideoSubtitleEraseConfigPanel } from "./ai-video-subtitle-erase-config-panel";
+import { useOptionalSubtitleEraseSession } from "./video-subtitle-erase-session-context";
 import { AiVideoTrimBottomPanel } from "./ai-video-trim-bottom-panel";
 import { AiNodeConfigPanel } from "./ai-node-config-panel";
 import { PropertyField } from "./fields";
@@ -76,6 +78,9 @@ function WorkflowNodeBottomPanelInner({
   const [errorExpanded, setErrorExpanded] = useState(true);
   const trimSession = useOptionalVideoTrimSession();
   const isTrimPanelActive = trimSession?.isTrimActiveForNode(nodeId) ?? false;
+  const subtitleEraseSession = useOptionalSubtitleEraseSession();
+  const isSubtitleErasePanelActive =
+    subtitleEraseSession?.isSubtitleEraseActiveForNode(nodeId) ?? false;
   const isRetakePanelActive =
     data.nodeType === AI_VIDEO_NODE_TYPE &&
     isAiVideoRetakePanel(data.metadata);
@@ -92,6 +97,9 @@ function WorkflowNodeBottomPanelInner({
   if (data.nodeType === AI_VIDEO_NODE_TYPE) {
     if (isRetakePanelActive) {
       return <AiVideoRetakeBottomPanel nodeId={nodeId} data={data} />;
+    }
+    if (isSubtitleErasePanelActive) {
+      return <AiVideoSubtitleEraseConfigPanel nodeId={nodeId} data={data} />;
     }
     if (isTrimPanelActive) {
       return <AiVideoTrimBottomPanel nodeId={nodeId} data={data} />;

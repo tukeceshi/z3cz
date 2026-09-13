@@ -1,4 +1,11 @@
-import type { VolcanoMediaKitVideoEnhanceMode } from "@dafthunk/types";
+import type {
+  VolcanoMediaKitSubtitleEraseMode,
+  VolcanoMediaKitSubtitleEraseModelVersion,
+  VolcanoMediaKitSubtitleEraseOutputEncodeMode,
+  VolcanoMediaKitSubtitleEraseScope,
+  VolcanoMediaKitVideoEnhanceMode,
+  VideoSubtitleEraseRect,
+} from "@dafthunk/types";
 import {
   fetchWithUpstreamLog,
   type UpstreamRequestLogSink,
@@ -15,6 +22,13 @@ const MODE_ENDPOINTS: Readonly<
   standard: "/api/v1/tools/enhance-video",
   pro: "/api/v1/tools/enhance-video",
   llm: "/api/v1/tools/enhance-video-generative",
+};
+
+const SUBTITLE_ERASE_ENDPOINTS: Readonly<
+  Record<VolcanoMediaKitSubtitleEraseMode, string>
+> = {
+  standard: "/api/v1/tools/erase-video-subtitle",
+  refined: "/api/v1/tools/erase-video-subtitle-pro",
 };
 
 export class VolcanoMediaKitApiError extends Error {
@@ -228,8 +242,81 @@ export async function pollMediaKitVideoEnhanceTask(params: {
   return pollMediaKitTask(params);
 }
 
-export interface SubmitMediaKitVideoTrimParams {
+export interface SubmitMediaKitSubtitleEraseParams {
   readonly apiKey: string;
+  readonly videoUrl: string;
+  readonly mode: VolcanoMediaKitSubtitleEraseMode;
+  readonly eraseMode?: VolcanoMediaKitSubtitleEraseScope;
+  readonly modelVersion?: VolcanoMediaKitSubtitleEraseModelVersion;
+  readonly outputEncodeMode?: VolcanoMediaKitSubtitleEraseOutputEncodeMode;
+  readonly eraseRatioLocation?: readonly VideoSubtitleEraseRect[];
+  readonly clientToken?: string;
+  readonly upstreamLog?: UpstreamRequestLogSink;
+}
+
+export async function submitMediaKitSubtitleEraseTask(
+  params: SubmitMediaKitSubtitleEraseParams
+): Promise<{ readonly taskId: string }> {
+  const path = SUBTITLE_ERASE_ENDPOINTS[params.mode];
+  const body: Record<string, unknown> = {
+    video_url: params.videoUrl,
+  };
+
+  if (params.clientToken) {
+    body.client_token = params.clientToken;
+  }
+  if (params.mode === "refined") {
+    if (params.eraseMode) {
+      body.mode = params.eraseMode === "text" ? "Text" : "Subtitle";
+    }
+    if (params.modelVersion) {
+      body.model_version = params.modelVersion;
+    }
+    if (params.outputEncodeMode) {
+      body.output_encode_mode =
+        params.outputEncodeMode === "size" ? "Size" : "Quality";
+    }
+    if (params.eraseRatioLocation && params.eraseRatioLocation.length > 0) {
+      body.erase_ratio_location = params.eraseRatioLocation.map((rect) => ({
+        top_left_x: rect.topLeftX,
+        top_left_y: rect.topLeftY,
+        bottom_right_x: rect.bottomRightX,
+        bottom_right_y: rect.bottomRightY,
+      }));
+    }
+  }
+
+  const response = await fetchWithUpstreamLog(
+    `${VOLCANO_MEDIKIT_API_BASE_URL}${path}`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey.trim()}`,
+      },
+      body: JSON.stringify(body),
+    },
+    params.upstreamLog
+  );
+
+  const payload = (await response.json()) as MediaKitTaskSubmitResponse;
+  if (!response.ok || payload.success === false) {
+    throw new VolcanoMediaKitApiError(
+      readErrorMessage(payload),
+      response.status
+    );
+  }
+
+  const taskId = payload.task_id?.trim();
+  if (!taskId) {
+    throw new VolcanoMediaKitApiError("MediaKit submit did not return task_id");
+  }
+
+  return { taskId };
+}
+
+export interface SubmitMediaKitVideoTrimParams {  readonly apiKey: string;
   readonly videoUrl: string;
   readonly startSec: number;
   readonly endSec: number;

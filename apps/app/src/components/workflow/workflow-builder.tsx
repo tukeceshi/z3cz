@@ -45,6 +45,7 @@ import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
 import { VideoTrimSessionProvider, useVideoTrimSession } from "./video-trim-session-context";
+import { SubtitleEraseSessionProvider } from "./video-subtitle-erase-session-context";
 import { RetakePlaybackUrlProvider } from "./retake-playback-url-context";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
 import { WorkflowSettingsDialog } from "./workflow-settings-dialog";
@@ -764,6 +765,7 @@ export function WorkflowBuilder({
           <div className="relative flex min-h-0 flex-1 flex-col">
           <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
           <RetakePlaybackUrlProvider>
+          <SubtitleEraseSessionProvider>
           <VideoTrimSessionProvider>
             <InlineAiTextMigrationHost
               organizationId={orgId}
@@ -868,6 +870,7 @@ export function WorkflowBuilder({
             disabledWorkflow={readOnly}
           />
           </VideoTrimSessionProvider>
+          </SubtitleEraseSessionProvider>
           </RetakePlaybackUrlProvider>
           </CloudStorageCanvasProvider>
         </div>

@@ -1,11 +1,13 @@
 import {
   isVolcanoAiInterfaceProvider,
   isVolcanoMediaKitActive,
+  listEnabledVolcanoMediaKitSubtitleEraseModes,
   listEnabledVolcanoMediaKitVideoEnhanceModes,
   resolveVolcanoMediaKitFromMetadata,
   type OrganizationAiInterface,
   type VolcanoInterfaceMetadata,
   type VolcanoMediaKitSnapshot,
+  type VolcanoMediaKitSubtitleEraseMode,
   type VolcanoMediaKitVideoEnhanceMode,
 } from "@dafthunk/types";
 import { useMemo } from "react";
@@ -20,6 +22,7 @@ export interface VolcanoMediaKitConfigState {
   readonly snapshot: VolcanoMediaKitSnapshot;
   readonly active: boolean;
   readonly enabledVideoModes: readonly VolcanoMediaKitVideoEnhanceMode[];
+  readonly enabledSubtitleEraseModes: readonly VolcanoMediaKitSubtitleEraseMode[];
   readonly hasApiKey: boolean;
 }
 
@@ -31,6 +34,8 @@ export function resolveMediaKitConfigFromInterface(
     snapshot,
     active: isVolcanoMediaKitActive(snapshot),
     enabledVideoModes: listEnabledVolcanoMediaKitVideoEnhanceModes(snapshot),
+    enabledSubtitleEraseModes:
+      listEnabledVolcanoMediaKitSubtitleEraseModes(snapshot),
     hasApiKey: Boolean(metadata?.mediaKitApiKeyEncrypted?.trim()),
   };
 }
@@ -127,6 +132,8 @@ export async function fetchVolcanoMediaKitConfigState(
     snapshot,
     active: isVolcanoMediaKitActive(snapshot),
     enabledVideoModes: listEnabledVolcanoMediaKitVideoEnhanceModes(snapshot),
+    enabledSubtitleEraseModes:
+      listEnabledVolcanoMediaKitSubtitleEraseModes(snapshot),
     hasApiKey: Boolean(metadata?.mediaKitApiKeyEncrypted?.trim()),
   };
 }

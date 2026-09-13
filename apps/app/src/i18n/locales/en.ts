@@ -3902,6 +3902,38 @@ export const en = {
       submitFailed: "Video enhance submit failed",
       notConfigured: "Video enhance is not enabled",
     },
+    subtitleErase: {
+      action: "Erase Subtitles",
+      mode: "Version",
+      eraseMode: {
+        subtitle: "Subtitles only",
+        text: "Subtitles & text",
+      },
+      modelVersion: {
+        v4: "V4",
+        v5: "V5",
+      },
+      outputEncodeMode: {
+        quality: "Quality first",
+        size: "Size first",
+      },
+      eraseRatioLocation: "Erase regions",
+      refinedToggle: "Refined",
+      regionModeToggle: "Box-select",
+      regionModeHint: "Turn on to drag boxes over the node video",
+      regionReset: "Reset",
+      regionDelete: "Delete this region",
+      generate: "Generate",
+      notConfiguredHint:
+        "Enable AI MediaKit subtitle erase and configure an API key in AI / Resources interfaces",
+      openAiInterfaces: "Open interface settings",
+      sourceMissing: "Source video is missing",
+      createNodeFailed: "Failed to create subtitle erase node",
+      referenceLinkFailed:
+        "Subtitle erase node created, but the source video reference could not be linked automatically",
+      submitFailed: "Subtitle erase submit failed",
+      notConfigured: "Subtitle erase is not enabled",
+    },
     videoTrim: {
       action: "Trim",
       startTime: "Start",

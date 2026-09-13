@@ -14,10 +14,16 @@ import {
   type SubmitAiVideoRequest,
   VOLCANO_MEDIKIT_PRICING_RESOLUTIONS,
   VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES,
+  VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES,
+  VOLCANO_MEDIKIT_SUBTITLE_ERASE_SCOPES,
+  VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSIONS,
+  VOLCANO_MEDIKIT_SUBTITLE_ERASE_OUTPUT_ENCODE_MODES,
+  VIDEO_SUBTITLE_ERASE_MAX_REGIONS,
   VIDEO_ENHANCE_FPS_MAX,
   VIDEO_ENHANCE_FPS_MIN,
   clampVideoEnhanceFps,
   type SubmitVideoEnhanceRequest,
+  type SubmitVideoSubtitleEraseRequest,
   type SubmitVideoTrimRequest,
   type SubmitVideoConcatRequest,
   isSubmitVideoTrimRangeValid,
@@ -147,6 +153,7 @@ import {
 } from "../services/canvas-image-generation-job";
 import { runAfterResponse } from "../utils/run-after-response";
 import { persistGeneratingNodeContentToWorkflow, persistTextGeneratingPlaceholder } from "../services/persist-generating-node-content";
+import { submitVideoSubtitleEraseTask } from "../services/video-subtitle-erase-service";
 import { markMediaResourcesFailed } from "../services/mark-media-resources-failed";
 import { registerGeneratingPlaceholderResources } from "../services/register-generating-placeholder-resources";
 import {
@@ -2022,6 +2029,142 @@ platformAiRoutes.post(
         error instanceof VolcanoMediaKitApiError || error instanceof Error
           ? error.message
           : "Video enhance submit failed";
+      const status =
+        message.includes("not enabled") ||
+        message.includes("not configured") ||
+        message.includes("not found")
+          ? 400
+          : 502;
+      return c.json({ error: message }, status);
+    }
+  }
+);
+
+const submitSubtitleEraseSchema = z.object({
+  aiInterfaceId: z.string().min(1),
+  sourceVideoResourceId: z.string().min(1),
+  mode: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES),
+  eraseMode: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_SCOPES).optional(),
+  modelVersion: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSIONS).optional(),
+  outputEncodeMode: z
+    .enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_OUTPUT_ENCODE_MODES)
+    .optional(),
+  eraseRatioLocation: z
+    .array(
+      z.object({
+        topLeftX: z.number().min(0).max(1),
+        topLeftY: z.number().min(0).max(1),
+        bottomRightX: z.number().min(0).max(1),
+        bottomRightY: z.number().min(0).max(1),
+      })
+    )
+    .max(VIDEO_SUBTITLE_ERASE_MAX_REGIONS)
+    .optional(),
+  workflowId: z.string().optional(),
+  nodeId: z.string().optional(),
+  clientRequestId: z.string().min(1).max(128).optional(),
+});
+
+platformAiRoutes.post(
+  "/mediakit/subtitle-erase/submit",
+  zValidator("json", submitSubtitleEraseSchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const jwtPayload = c.get("jwtPayload");
+    const body = c.req.valid("json") as SubmitVideoSubtitleEraseRequest;
+    const db = createDatabase(c.env);
+
+    const existingJob = await findGenerationJobByClientRequestId(db, {
+      organizationId,
+      clientRequestId: body.clientRequestId,
+      modality: "video",
+    });
+    if (existingJob) {
+      return c.json(buildVideoSubmitResponseFromJob(existingJob));
+    }
+
+    try {
+      await assertNoActiveGenerationJobForNode(db, {
+        organizationId,
+        workflowId: body.workflowId,
+        nodeId: body.nodeId,
+        modality: "video",
+        clientRequestId: body.clientRequestId,
+      });
+    } catch (error) {
+      if (error instanceof ActiveGenerationJobConflictError) {
+        return c.json(
+          {
+            error: error.message,
+            code: error.code,
+            jobId: error.jobId,
+          },
+          409
+        );
+      }
+      throw error;
+    }
+
+    const gateResult = await runWithCloudStorageGenerativeGate(
+      c,
+      organizationId,
+      async () => true
+    );
+    if (gateResult instanceof Response) {
+      return gateResult;
+    }
+
+    try {
+      const result = await submitVideoSubtitleEraseTask(c.env, {
+        organizationId,
+        userId: jwtPayload?.sub,
+        body,
+      });
+
+      const workflowNodeContent = await persistGeneratingNodeContentToWorkflow(
+        c.env,
+        {
+          organizationId,
+          workflowId: body.workflowId,
+          nodeId: body.nodeId,
+          modality: "video",
+          entry: {
+            resourceIds: result.resourceIds,
+            jobId: result.jobId,
+            mimeType: "video/mp4",
+            params: {
+              videoSubtitleErase: {
+                mode: body.mode,
+                ...(body.mode === "refined"
+                  ? {
+                      eraseMode: body.eraseMode,
+                      modelVersion: body.modelVersion,
+                      outputEncodeMode: body.outputEncodeMode,
+                      ...(body.eraseRatioLocation?.length
+                        ? { eraseRatioLocation: body.eraseRatioLocation }
+                        : {}),
+                    }
+                  : {}),
+                sourceResourceId: body.sourceVideoResourceId,
+              },
+            },
+            aiInterfaceId: result.aiInterfaceId,
+          },
+        }
+      );
+
+      return c.json({
+        taskId: result.taskId,
+        aiInterfaceId: result.aiInterfaceId,
+        jobId: result.jobId,
+        resourceIds: result.resourceIds,
+        ...(workflowNodeContent ? { workflowNodeContent } : {}),
+      });
+    } catch (error) {
+      const message =
+        error instanceof VolcanoMediaKitApiError || error instanceof Error
+          ? error.message
+          : "Subtitle erase submit failed";
       const status =
         message.includes("not enabled") ||
         message.includes("not configured") ||
