@@ -3316,6 +3316,7 @@ export const zh: TranslationDictionary = {
       backToList: "返回角色库",
       availableEmpty: "暂无可引用的资源",
       insertToCanvas: "插入画布",
+      insertNotReady: "请等待入库完成后再插入",
       delete: "移除",
       deleteConfirmTitle: "从角色库移除该角色？",
       deleteConfirmDescription: "仅移除角色库记录，不会删除资源本身。",

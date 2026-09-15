@@ -377,7 +377,10 @@ export interface NodeContext {
   /** Load persisted text content by resource id (AI text references). */
   readTextContent?: (resourceId: string) => Promise<string | null>;
   /** Resolve a workflow media resource id to a fetch URL. */
-  resolveResourceUrl?: (resourceId: string) => Promise<string | null>;
+  resolveResourceUrl?: (
+    resourceId: string,
+    options?: { readonly generationSubmit?: boolean }
+  ) => Promise<string | null>;
   /** Resolve ephemeral vs cloud storage for AI image generation. */
   resolveAiImageStorage?: () => Promise<
     import("./ai-image-storage").AiImageStorageResolution

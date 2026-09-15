@@ -31,6 +31,10 @@ export interface ResourceIdReference {
   readonly cloudUploadFailed?: boolean;
   /** Platform cloud acceleration in progress or recently failed. */
   readonly cloudAccelerationStatus?: CloudAccelerationStatus;
+  /** Inserted from the character library — submit with asset://, not a download URL. */
+  readonly characterLibrary?: boolean;
+  /** Upstream private-library asset id (without the asset:// prefix). */
+  readonly upstreamAssetId?: string;
 }
 
 export type WorkflowMediaValue = ResourceIdReference;

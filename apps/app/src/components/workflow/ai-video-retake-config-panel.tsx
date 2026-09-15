@@ -1042,6 +1042,7 @@ export function AiVideoRetakeConfigPanel({
             workflowId,
             cloudConfigured,
             references: referenceMedia,
+            generationSubmit: true,
           });
 
           runVideoRetakePipeline({

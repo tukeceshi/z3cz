@@ -150,6 +150,7 @@ export interface RuntimeDependencies<Env = unknown> {
   resolveResourceUrl?: (params: {
     readonly organizationId: string;
     readonly resourceId: string;
+    readonly generationSubmit?: boolean;
   }) => Promise<string | null>;
   runtimeVersion?: string;
 }
@@ -1345,10 +1346,11 @@ export abstract class Runtime<Env = unknown> {
               })
           : undefined,
         resolveResourceUrl: this.resolveResourceUrl
-          ? (resourceId) =>
+          ? (resourceId, options) =>
               this.resolveResourceUrl!({
                 organizationId: context.organizationId,
                 resourceId,
+                generationSubmit: options?.generationSubmit,
               })
           : undefined,
         resolveAiImageStorage: this.resolveAiImageStorage

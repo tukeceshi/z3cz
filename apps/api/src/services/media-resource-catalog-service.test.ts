@@ -72,6 +72,8 @@ describe("registerRequestToCatalogInsert", () => {
       contentSha256: null,
       generating: false,
       failed: false,
+      cloudAccelerationStatus: null,
+      modelCanonicalId: null,
     });
   });
 });
@@ -117,7 +119,27 @@ describe("partitionResolvedMediaResourcesByMime", () => {
         url: "https://example.com/a.png",
       },
     ]);
-
     expect(result.referenceImageUrls).toEqual(["https://example.com/a.png"]);
+    expect(result.referenceVideoUrls).toEqual([]);
+    expect(result.referenceAudioUrls).toEqual([]);
+  });
+
+  it("keeps character-library asset urls in the matching mime bucket", () => {
+    const result = partitionResolvedMediaResourcesByMime([
+      {
+        resourceId: "res-img",
+        kind: "cloud",
+        mimeType: "image/png",
+        url: "asset://asset-img",
+      },
+      {
+        resourceId: "res-vid",
+        kind: "cloud",
+        mimeType: "video/mp4",
+        url: "asset://asset-vid",
+      },
+    ]);
+    expect(result.referenceImageUrls).toEqual(["asset://asset-img"]);
+    expect(result.referenceVideoUrls).toEqual(["asset://asset-vid"]);
   });
 });

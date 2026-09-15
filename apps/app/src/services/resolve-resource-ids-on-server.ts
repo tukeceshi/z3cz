@@ -16,6 +16,7 @@ function platformAiEndpoint(organizationId: string): string {
 export async function resolveResourceIdsOnServer(params: {
   readonly organizationId: string;
   readonly resourceIds: readonly string[];
+  readonly generationSubmit?: boolean;
 }): Promise<ResolveResourceRefsResponse> {
   if (params.resourceIds.length === 0) {
     return { resolved: [], unresolved: [] };
@@ -25,7 +26,10 @@ export async function resolveResourceIdsOnServer(params: {
     `${platformAiEndpoint(params.organizationId)}/resolve-resource-refs`,
     {
       method: "POST",
-      body: JSON.stringify({ resourceIds: params.resourceIds }),
+      body: JSON.stringify({
+        resourceIds: params.resourceIds,
+        ...(params.generationSubmit ? { generationSubmit: true } : {}),
+      }),
     }
   );
 }

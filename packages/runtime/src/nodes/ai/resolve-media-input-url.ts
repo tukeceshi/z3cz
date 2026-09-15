@@ -10,7 +10,8 @@ import type { NodeContext } from "../../node-types";
 
 export async function resolveMediaInputUrl(
   context: NodeContext,
-  ref: MediaReference | ResourceIdReference
+  ref: MediaReference | ResourceIdReference,
+  options?: { readonly generationSubmit?: boolean }
 ): Promise<string> {
   if (isEphemeralMediaReference(ref)) {
     return ref.url;
@@ -22,7 +23,7 @@ export async function resolveMediaInputUrl(
         "Resource URL resolution is not available for workflow media references."
       );
     }
-    const url = await context.resolveResourceUrl(ref.resourceId);
+    const url = await context.resolveResourceUrl(ref.resourceId, options);
     if (!url) {
       throw new Error(`Unable to resolve media resource: ${ref.resourceId}`);
     }

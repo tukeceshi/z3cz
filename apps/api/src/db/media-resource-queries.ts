@@ -39,6 +39,8 @@ function mapMediaResourceRow(
     modelCanonicalId: row.modelCanonicalId ?? null,
     interfaceId: row.interfaceId ?? null,
     source: row.source ?? null,
+    upstreamAssetId: row.upstreamAssetId ?? null,
+    upstreamAssetStatus: row.upstreamAssetStatus ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }

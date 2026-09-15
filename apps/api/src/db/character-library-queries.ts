@@ -1,10 +1,11 @@
-import type { CharacterLibraryEntry } from "@dafthunk/types";
+import {
+  CHARACTER_LIBRARY_SOURCE,
+  type CharacterLibraryEntry,
+} from "@dafthunk/types";
 
 import type { Database } from "../db";
 import { mediaResources } from "../db/schema";
 import { and, desc, eq } from "drizzle-orm";
-
-const CHARACTER_LIBRARY_SOURCE = "character_library";
 
 function mapEntry(row: typeof mediaResources.$inferSelect): CharacterLibraryEntry {
   return {

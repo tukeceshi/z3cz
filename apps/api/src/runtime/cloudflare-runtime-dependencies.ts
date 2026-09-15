@@ -14,12 +14,21 @@ import {
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
+import { MockDatasetService } from "../mocks/dataset-service";
+import { resolveAiAudioStorage } from "../services/ai-audio-storage";
+import { resolveAiImageStorage } from "../services/ai-image-storage";
+import { resolveAiVideoStorage } from "../services/ai-video-storage";
+import { assertCloudStorageHealthyForGenerativeMedia } from "../services/assert-cloud-storage-healthy-for-generative-media";
+import { resolveResourceRefs } from "../services/resolve-resource-refs";
+import { readTextContentBody } from "../services/text-content-service";
+import { createWorkflowGenerationJobTracker } from "../services/workflow-generation-job-tracker";
 import { creditChecksEnabled } from "../utils/credits";
+import { CloudflareAiInterfaceService } from "./cloudflare-ai-interface-service";
+import { CloudflareAudioModelService } from "./cloudflare-audio-model-service";
 import { CloudflareCredentialService } from "./cloudflare-credential-service";
 import { CloudflareCreditService } from "./cloudflare-credit-service";
-import { PostgresDatabaseService } from "./postgres-database-service";
-import { MockDatasetService } from "../mocks/dataset-service";
 import { CloudflareExecutionStore } from "./cloudflare-execution-store";
+import { CloudflareImageModelService } from "./cloudflare-image-model-service";
 import { CloudflareMailboxService } from "./cloudflare-mailbox-service";
 import { createCloudflareNodeRegistry } from "./cloudflare-node-registry";
 import {
@@ -28,23 +37,14 @@ import {
 } from "./cloudflare-object-store";
 import { CloudflareQueueService } from "./cloudflare-queue-service";
 import { CloudflareSchemaService } from "./cloudflare-schema-service";
-import { CloudflareToolRegistry } from "./cloudflare-tool-registry";
-import { createCodeModeExecutor } from "./code-mode-executor";
-import { CloudflareAiInterfaceService } from "./cloudflare-ai-interface-service";
-import { CloudflareImageModelService } from "./cloudflare-image-model-service";
 import { CloudflareTextModelService } from "./cloudflare-text-model-service";
+import { CloudflareToolRegistry } from "./cloudflare-tool-registry";
 import { CloudflareVideoModelService } from "./cloudflare-video-model-service";
-import { CloudflareAudioModelService } from "./cloudflare-audio-model-service";
+import { createCodeModeExecutor } from "./code-mode-executor";
+import { PostgresDatabaseService } from "./postgres-database-service";
 import { createSandboxExecutor } from "./sandbox-executor";
 import { createToolContext } from "./tool-context";
 import { runtimeVersion } from "./version";
-import { resolveAiImageStorage } from "../services/ai-image-storage";
-import { resolveAiVideoStorage } from "../services/ai-video-storage";
-import { resolveAiAudioStorage } from "../services/ai-audio-storage";
-import { assertCloudStorageHealthyForGenerativeMedia } from "../services/assert-cloud-storage-healthy-for-generative-media";
-import { createWorkflowGenerationJobTracker } from "../services/workflow-generation-job-tracker";
-import { readTextContentBody } from "../services/text-content-service";
-import { resolveResourceRefs } from "../services/resolve-resource-refs";
 
 export async function buildDependencies(
   env: Bindings,
@@ -131,6 +131,7 @@ export async function buildDependencies(
       const result = await resolveResourceRefs(env, {
         organizationId: params.organizationId,
         resourceIds: [params.resourceId],
+        generationSubmit: params.generationSubmit,
       });
       const hit = result.resolved.find(
         (entry) => entry.resourceId === params.resourceId

@@ -1,8 +1,9 @@
 import {
   isEphemeralMediaReference,
-  isResourceIdReference,
   isGrokImagineVideoCanonicalId,
   isMinimaxVideoCanonicalId,
+  isResourceIdReference,
+  isSeedanceCanonicalId,
   isVeoCanonicalId,
   type MediaReference,
   type NodeExecution,
@@ -10,8 +11,6 @@ import {
   type ObjectReference,
   type ResourceIdReference,
 } from "@dafthunk/types";
-
-import { submitVolcanoVideoTask } from "../../ai-interface/execute-volcano-video";
 import {
   createGrokVideoPollContinuation,
   submitGrokVideoTask,
@@ -24,17 +23,18 @@ import {
   createVeoVideoPollContinuation,
   submitVeoVideoTask,
 } from "../../ai-interface/execute-veo-video";
+import { submitVolcanoVideoTask } from "../../ai-interface/execute-volcano-video";
 import type { NodeContext } from "../../node-types";
 import { ExecutableNode, isObjectReference } from "../../node-types";
+import {
+  awaitVolcanoVideoOrPending,
+  createVolcanoVideoPollContinuation,
+} from "./await-volcano-video-or-pending";
 import { resolveMediaInputUrl } from "./resolve-media-input-url";
 import {
   readModelInterfaceIdInput,
   resolveModelInterfaceIdFromInputs,
 } from "./resolve-model-interface-id";
-import {
-  awaitVolcanoVideoOrPending,
-  createVolcanoVideoPollContinuation,
-} from "./await-volcano-video-or-pending";
 
 export const AI_VIDEO_NODE_TYPE = "ai-video" as const;
 export const AI_VIDEO_REFERENCE_INPUT = "reference_images" as const;
@@ -125,7 +125,9 @@ export class AiVideoNode extends ExecutableNode {
     const manualVideos = context.inputs.manual_videos;
     if (Array.isArray(manualVideos) && manualVideos.length > 0) {
       const refs = manualVideos.filter(
-        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
+        (
+          value
+        ): value is ObjectReference | MediaReference | ResourceIdReference =>
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
           isResourceIdReference(value)
@@ -137,18 +139,19 @@ export class AiVideoNode extends ExecutableNode {
 
     const prompt = context.inputs.prompt;
     const referenceValues = context.inputs[AI_VIDEO_REFERENCE_INPUT];
-    const referenceRefs: Array<MediaReference | ResourceIdReference> = Array.isArray(referenceValues)
-      ? referenceValues.filter(
-          (value): value is MediaReference | ResourceIdReference =>
-            isObjectReference(value) ||
-            isEphemeralMediaReference(value) ||
-            isResourceIdReference(value)
-        )
-      : isObjectReference(referenceValues) ||
-          isEphemeralMediaReference(referenceValues) ||
-          isResourceIdReference(referenceValues)
-        ? [referenceValues]
-        : [];
+    const referenceRefs: Array<MediaReference | ResourceIdReference> =
+      Array.isArray(referenceValues)
+        ? referenceValues.filter(
+            (value): value is MediaReference | ResourceIdReference =>
+              isObjectReference(value) ||
+              isEphemeralMediaReference(value) ||
+              isResourceIdReference(value)
+          )
+        : isObjectReference(referenceValues) ||
+            isEphemeralMediaReference(referenceValues) ||
+            isResourceIdReference(referenceValues)
+          ? [referenceValues]
+          : [];
 
     const hasPrompt = typeof prompt === "string" && prompt.trim().length > 0;
     if (!hasPrompt && referenceRefs.length === 0) {
@@ -212,12 +215,17 @@ export class AiVideoNode extends ExecutableNode {
         : undefined;
 
     const referenceImageUrls: string[] = [];
+    const generationSubmit = isSeedanceCanonicalId(modelCanonicalId.trim());
     for (const ref of referenceRefs) {
       try {
-        referenceImageUrls.push(await resolveMediaInputUrl(context, ref));
+        referenceImageUrls.push(
+          await resolveMediaInputUrl(context, ref, { generationSubmit })
+        );
       } catch (error) {
         return this.createErrorResult(
-          error instanceof Error ? error.message : "Failed to resolve reference image"
+          error instanceof Error
+            ? error.message
+            : "Failed to resolve reference image"
         );
       }
     }
@@ -268,26 +276,26 @@ export class AiVideoNode extends ExecutableNode {
             generationParams,
             referenceImageUrls,
           })
-      : isVeo
-        ? await submitVeoVideoTask({
-            apiKey: resolvedInterface.apiKey,
-            baseUrl: resolvedInterface.baseUrl,
-            providerModelId: resolvedModel.providerModelId,
-            prompt: typeof prompt === "string" ? prompt : "",
-            parameterRules: resolvedModel.parameterRules,
-            generationParams,
-          })
-        : await submitVolcanoVideoTask({
-            apiKey: resolvedInterface.apiKey,
-            baseUrl: resolvedInterface.baseUrl,
-            providerModelId: resolvedModel.providerModelId,
-            prompt: typeof prompt === "string" ? prompt : "",
-            parameterRules: resolvedModel.parameterRules,
-            generationParams,
-            referenceImageUrls,
-            videoEndpoints: resolvedInterface.videoEndpoints,
-            formatTransform: resolvedInterface.formatTransform,
-          });
+        : isVeo
+          ? await submitVeoVideoTask({
+              apiKey: resolvedInterface.apiKey,
+              baseUrl: resolvedInterface.baseUrl,
+              providerModelId: resolvedModel.providerModelId,
+              prompt: typeof prompt === "string" ? prompt : "",
+              parameterRules: resolvedModel.parameterRules,
+              generationParams,
+            })
+          : await submitVolcanoVideoTask({
+              apiKey: resolvedInterface.apiKey,
+              baseUrl: resolvedInterface.baseUrl,
+              providerModelId: resolvedModel.providerModelId,
+              prompt: typeof prompt === "string" ? prompt : "",
+              parameterRules: resolvedModel.parameterRules,
+              generationParams,
+              referenceImageUrls,
+              videoEndpoints: resolvedInterface.videoEndpoints,
+              formatTransform: resolvedInterface.formatTransform,
+            });
 
     if (submitResult.status === "failed" || !submitResult.taskId) {
       return this.createErrorResult(
@@ -335,28 +343,28 @@ export class AiVideoNode extends ExecutableNode {
             timeoutMinutes: 60,
             generationJobId: generationJobId ?? undefined,
           })
-      : isVeo
-        ? createVeoVideoPollContinuation({
-            nodeId: this.node.id,
-            taskId: submitResult.taskId,
-            pollUrl: submitResult.pollUrl ?? submitResult.taskId,
-            interfaceId,
-            organizationId: context.organizationId,
-            pollIntervalMs: 10_000,
-            timeoutMinutes: 60,
-            generationJobId: generationJobId ?? undefined,
-          })
-        : createVolcanoVideoPollContinuation({
-            nodeId: this.node.id,
-            taskId: submitResult.taskId,
-            pollUrl: submitResult.pollUrl ?? submitResult.taskId,
-            interfaceId,
-            organizationId: context.organizationId,
-            modelCanonicalId: modelCanonicalId.trim(),
-            pollIntervalMs: 10_000,
-            timeoutMinutes: 60,
-            generationJobId: generationJobId ?? undefined,
-          });
+        : isVeo
+          ? createVeoVideoPollContinuation({
+              nodeId: this.node.id,
+              taskId: submitResult.taskId,
+              pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+              interfaceId,
+              organizationId: context.organizationId,
+              pollIntervalMs: 10_000,
+              timeoutMinutes: 60,
+              generationJobId: generationJobId ?? undefined,
+            })
+          : createVolcanoVideoPollContinuation({
+              nodeId: this.node.id,
+              taskId: submitResult.taskId,
+              pollUrl: submitResult.pollUrl ?? submitResult.taskId,
+              interfaceId,
+              organizationId: context.organizationId,
+              modelCanonicalId: modelCanonicalId.trim(),
+              pollIntervalMs: 10_000,
+              timeoutMinutes: 60,
+              generationJobId: generationJobId ?? undefined,
+            });
 
     return awaitVolcanoVideoOrPending({
       context,
@@ -370,8 +378,7 @@ export class AiVideoNode extends ExecutableNode {
       nodeOutputs: AiVideoNode.nodeType.outputs ?? [],
       createSuccessResult: (outputs, usage) =>
         this.createSuccessResult(outputs, usage),
-      createErrorResult: (error, usage) =>
-        this.createErrorResult(error, usage),
+      createErrorResult: (error, usage) => this.createErrorResult(error, usage),
     });
   }
 }
