@@ -23,6 +23,8 @@ export interface MediaResourceRecord {
   readonly interfaceId: string | null;
   /** Catalog tag, e.g. "character_library". Null = ordinary resource. */
   readonly source: string | null;
+  readonly upstreamAssetId: string | null;
+  readonly upstreamAssetStatus: string | null;
   readonly createdAt: string;
 }
 

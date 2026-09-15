@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { makeRequest } from "@/services/utils";
 import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
+import { makeRequest } from "@/services/utils";
 
 import { resolveMediaReferencesForVideoGenerate } from "./resolve-references-for-generate";
 
@@ -115,5 +114,47 @@ describe("resolveMediaReferencesForVideoGenerate", () => {
       })
     ).rejects.toThrow("Unable to resolve resource references: missing-kind");
     expect(makeRequestMock).not.toHaveBeenCalled();
+  });
+
+  it("requests generation submit urls and keeps character-library asset://", async () => {
+    const resourceId = "res-char";
+    makeRequestMock.mockResolvedValue({
+      resolved: [
+        {
+          resourceId,
+          url: "asset://asset-1",
+          mimeType: "image/png",
+        },
+      ],
+      unresolved: [],
+    });
+
+    const result = await resolveMediaReferencesForVideoGenerate({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      cloudConfigured: true,
+      generationSubmit: true,
+      references: [
+        {
+          resourceId,
+          mimeType: "image/png",
+          kind: "cloud",
+          characterLibrary: true,
+          upstreamAssetId: "asset-1",
+        },
+      ],
+    });
+
+    expect(result.referenceImageUrls).toEqual(["asset://asset-1"]);
+    expect(makeRequestMock).toHaveBeenCalledWith(
+      "/org-1/platform-ai/resolve-resource-refs",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          resourceIds: [resourceId],
+          generationSubmit: true,
+        }),
+      })
+    );
   });
 });

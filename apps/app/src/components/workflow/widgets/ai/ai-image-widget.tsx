@@ -4,6 +4,7 @@ import {
   hasDisplayableWorkflowMedia,
   hasFailedResource,
   hasGeneratingResource,
+  isCharacterLibraryNodeMetadata,
   isMediaReference,
   type MediaReference,
   type ObjectReference,
@@ -12,6 +13,7 @@ import {
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import ZoomInIcon from "lucide-react/icons/zoom-in";
+import UserRoundIcon from "lucide-react/icons/user-round";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -352,6 +354,13 @@ function AiImageWidget({
               onNaturalSize={onNaturalSize}
               sharedUrlSet={sharedUrlSet}
             />
+          ) : null}
+
+          {isCharacterLibraryNodeMetadata(metadata) ? (
+            <div className="pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              <UserRoundIcon className="size-3" />
+              {t("workflow.characterLibrary.title")}
+            </div>
           ) : null}
 
           {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}

@@ -1,7 +1,4 @@
-import type {
-  ReferenceImageInline,
-  WorkflowMediaValue,
-} from "@dafthunk/types";
+import type { ReferenceImageInline, WorkflowMediaValue } from "@dafthunk/types";
 import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 
 import { collectResourceIds } from "@/services/ensure-resource-cached";
@@ -40,7 +37,11 @@ function assertReferenceUsableForGenerate(media: WorkflowMediaValue): void {
   if (!isResourceIdReference(media)) {
     throw new Error("Unable to resolve resource references");
   }
-  if (media.generating === true || media.failed === true || media.kind == null) {
+  if (
+    media.generating === true ||
+    media.failed === true ||
+    media.kind == null
+  ) {
     throw unusableReferenceError(media.resourceId);
   }
 }
@@ -103,6 +104,7 @@ async function resolveStagedDataUrls(
 async function resolveMediaGroup(params: {
   readonly organizationId: string;
   readonly media: readonly WorkflowMediaValue[];
+  readonly generationSubmit?: boolean;
 }): Promise<{
   readonly referenceImageUrls: readonly string[];
   readonly referenceImageInline: readonly ReferenceImageInline[];
@@ -140,6 +142,7 @@ async function resolveMediaGroup(params: {
       ? await resolveResourceIdsOnServer({
           organizationId: params.organizationId,
           resourceIds: cloudResourceIds,
+          generationSubmit: params.generationSubmit,
         })
       : { resolved: [], unresolved: [] };
 
@@ -198,10 +201,12 @@ export async function resolveReferencesForGenerate(params: {
   readonly workflowId?: string;
   readonly cloudConfigured?: boolean;
   readonly references: readonly WorkflowMediaValue[];
+  readonly generationSubmit?: boolean;
 }): Promise<ResolvedReferencesForGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
     media: params.references,
+    generationSubmit: params.generationSubmit,
   });
 
   return {
@@ -215,10 +220,12 @@ export async function resolveMediaReferencesForVideoGenerate(params: {
   readonly workflowId?: string;
   readonly cloudConfigured?: boolean;
   readonly references: readonly WorkflowMediaValue[];
+  readonly generationSubmit?: boolean;
 }): Promise<ResolvedMediaReferencesForVideoGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
     media: params.references,
+    generationSubmit: params.generationSubmit,
   });
 
   return {
@@ -234,10 +241,12 @@ export async function resolveMediaReferencesForTextGenerate(params: {
   readonly workflowId?: string;
   readonly cloudConfigured?: boolean;
   readonly references: readonly WorkflowMediaValue[];
+  readonly generationSubmit?: boolean;
 }): Promise<ResolvedMediaReferencesForTextGenerate> {
   const resolved = await resolveMediaGroup({
     organizationId: params.organizationId,
     media: params.references,
+    generationSubmit: params.generationSubmit,
   });
 
   return {

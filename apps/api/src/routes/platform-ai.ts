@@ -306,6 +306,7 @@ const tosPresignDownloadSchema = z.object({
 
 const resolveResourceRefsSchema = z.object({
   resourceIds: z.array(z.string().min(1)).min(1),
+  generationSubmit: z.boolean().optional(),
 });
 
 platformAiRoutes.post(
@@ -319,6 +320,7 @@ platformAiRoutes.post(
       const result = await resolveResourceRefs(c.env, {
         organizationId,
         resourceIds: body.resourceIds,
+        generationSubmit: body.generationSubmit,
       });
       return c.json(result);
     } catch (error) {

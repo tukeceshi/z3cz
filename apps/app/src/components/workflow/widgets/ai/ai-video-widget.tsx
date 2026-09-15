@@ -1,70 +1,78 @@
 import {
   AI_VIDEO_NODE_TYPE,
-  isAiVideoRetakePanel,
   getResourceIdFromValue,
   hasDisplayableWorkflowMedia,
   hasFailedResource,
   hasGeneratingResource,
+  isAiVideoRetakePanel,
+  isCharacterLibraryNodeMetadata,
   type MediaReference,
   type ObjectReference,
   readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useParams } from "react-router";
 import { useNodes } from "@xyflow/react";
+import UserRoundIcon from "lucide-react/icons/user-round";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { useAppToast } from "@/hooks/use-app-toast";
-import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
-import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
-import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
-import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
-import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
-import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
+import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
+import { useAppToast } from "@/hooks/use-app-toast";
+import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
+import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
+import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
+import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
+import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
-
-import { useOpenCreativeStudio } from "../../creative-studio-context";
-import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
-import type { GenerativeCardCoverRead } from "../../generative-history-utils";
-import { useGenerativeVideoFileUpload } from "../../use-generative-video-file-upload";
-import {
-  isGenerativePersistPhase,
-  isGenerativeProgressBusyPhase,
-  readGenerativeProgressPhase,
-} from "../../generative-progress-utils";
 import {
   isAiVideoGenerating,
   readAiVideoCardDisplay,
   readAiVideoResultHistory,
 } from "../../ai-video-node-utils";
+import { CanvasMediaCover } from "../../canvas-media-cover";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
+import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
 } from "../../generative-card-error-block";
-import { GenerativeCardNoticeBlock } from "../../generative-card-notice-block";
-import {
-  dismissGenerativeCancelledNotice,
-  isGenerativeCancelledNoticeVisible,
-  subscribeGenerativeCancelledNotice,
-} from "../../generative-generation-cancel";
-import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { readGenerativeCardError } from "../../generative-card-error-utils";
+import { GenerativeCardNoticeBlock } from "../../generative-card-notice-block";
 import {
   normalizeGenerativeCardUploadFile,
   readGenerativePrompt,
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
+import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
+import {
+  dismissGenerativeCancelledNotice,
+  isGenerativeCancelledNoticeVisible,
+  subscribeGenerativeCancelledNotice,
+} from "../../generative-generation-cancel";
+import type { GenerativeCardCoverRead } from "../../generative-history-utils";
+import {
+  isGenerativePersistPhase,
+  isGenerativeProgressBusyPhase,
+  readGenerativeProgressPhase,
+} from "../../generative-progress-utils";
 import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
-import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
-import { useGenerativeCardUpload } from "../../use-generative-card-upload";
-import { useWorkflow } from "../../workflow-context";
-import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
-import type { WorkflowNodeType } from "../../workflow-types";
-import { CanvasMediaCover } from "../../canvas-media-cover";
+import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { StudioVideoLightbox } from "../../studio-video-lightbox";
+import { useGenerativeCardUpload } from "../../use-generative-card-upload";
+import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
+import { useGenerativeVideoFileUpload } from "../../use-generative-video-file-upload";
+import { useWorkflow } from "../../workflow-context";
+import type { WorkflowNodeType } from "../../workflow-types";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
@@ -105,19 +113,14 @@ function AiVideoWidget({
       return cardDisplay;
     }
     const nodeData = node.data as WorkflowNodeType;
-    return readAiVideoCardDisplay(
-      nodeData.inputs,
-      nodeData.outputs,
-      metadata,
-      {
-        nodeId,
-        edges,
-        nodes: flowNodes.map((entry) => ({
-          id: entry.id,
-          data: entry.data as WorkflowNodeType,
-        })),
-      }
-    );
+    return readAiVideoCardDisplay(nodeData.inputs, nodeData.outputs, metadata, {
+      nodeId,
+      edges,
+      nodes: flowNodes.map((entry) => ({
+        id: entry.id,
+        data: entry.data as WorkflowNodeType,
+      })),
+    });
   }, [cardDisplay, edges, flowNodes, metadata, nodeId]);
   const initialLayout = useMemo(
     () => readNodeLayoutFromMetadata(metadata),
@@ -184,7 +187,8 @@ function AiVideoWidget({
     (!historyFailed && !generateError && effectiveCardDisplay.isBusy) ||
     progressPhase === "cancelled";
   useGenerativeMediaWorkSession(
-    uploading || (!historyFailed && !generateError && effectiveCardDisplay.isBusy)
+    uploading ||
+      (!historyFailed && !generateError && effectiveCardDisplay.isBusy)
   );
   const showCancelledNotice = useSyncExternalStore(
     subscribeGenerativeCancelledNotice,
@@ -205,8 +209,10 @@ function AiVideoWidget({
     persistPhase === "downloading" || progressPhase === "downloading";
   const coverVideo = effectiveCardDisplay.coverMedia[0];
   const hasVideo = effectiveCardDisplay.hasCover;
-  const activeVideoExpired = hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;
-  const activeVideoKey = hasVideo && coverVideo ? getResourceIdFromValue(coverVideo) : null;
+  const activeVideoExpired =
+    hasVideo && coverVideo ? isMediaExpired(coverVideo) : false;
+  const activeVideoKey =
+    hasVideo && coverVideo ? getResourceIdFromValue(coverVideo) : null;
   const coverMediaRef =
     hasVideo && !activeVideoExpired && coverVideo ? coverVideo : null;
   const { sharedUrlSet, fullDisplayUrl: videoDisplayUrl } =
@@ -252,7 +258,15 @@ function AiVideoWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
+      if (
+        disabled ||
+        blocksGenerativeMedia ||
+        !files?.length ||
+        !updateNodeData ||
+        !orgId ||
+        !workflowId
+      )
+        return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "video");
       if (!normalized) {
@@ -297,11 +311,11 @@ function AiVideoWidget({
         }}
       />
       <div
-          className={cn(
-            "relative h-full w-full overflow-hidden cursor-grab select-none",
-            uploading && "opacity-70",
-            className
-          )}
+        className={cn(
+          "relative h-full w-full overflow-hidden cursor-grab select-none",
+          uploading && "opacity-70",
+          className
+        )}
         onDoubleClick={(event) => {
           if (generateError) {
             event.stopPropagation();
@@ -327,7 +341,11 @@ function AiVideoWidget({
             kind="video"
             size="canvas"
             doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
-            busy={isGenerating || uploading || isGenerativeProgressBusyPhase(progressPhase)}
+            busy={
+              isGenerating ||
+              uploading ||
+              isGenerativeProgressBusyPhase(progressPhase)
+            }
             busyMessage={cardPlaceholder}
             canUpload={canUpload}
             onUploadClick={handleUploadClick}
@@ -342,14 +360,21 @@ function AiVideoWidget({
             fitMode="cover"
             className="h-full w-full rounded-none border-0"
             onNaturalSize={onNaturalSize}
-            onExpandView={
-              videoDisplayUrl ? handleOpenVideoLightbox : undefined
-            }
+            onExpandView={videoDisplayUrl ? handleOpenVideoLightbox : undefined}
             sharedUrlSet={sharedUrlSet}
           />
         ) : null}
 
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+        {isCharacterLibraryNodeMetadata(metadata) ? (
+          <div className="pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <UserRoundIcon className="size-3" />
+            {t("workflow.characterLibrary.title")}
+          </div>
+        ) : null}
+
+        {generateError ? (
+          <GenerativeCardErrorBlock error={generateError} />
+        ) : null}
 
         {isPersistDownloading ? (
           <div className="nodrag nopan nowheel absolute inset-x-0 bottom-3 z-50 flex justify-center px-2">

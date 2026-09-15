@@ -3481,6 +3481,7 @@ export const en = {
       backToList: "Back to library",
       availableEmpty: "No resources available to reference",
       insertToCanvas: "Insert to canvas",
+      insertNotReady: "Wait until the character is ready before inserting",
       delete: "Remove",
       deleteConfirmTitle: "Remove this character from the library?",
       deleteConfirmDescription:

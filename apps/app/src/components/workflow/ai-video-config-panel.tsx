@@ -11,6 +11,10 @@ import {
   VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   type ResourceIdReference,
   type MediaReference,
+  type CharacterLibraryEntry,
+  characterLibraryReferenceFromEntry,
+  withCharacterLibraryNodeMetadata,
+  isSeedanceCanonicalId,
   type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
@@ -106,16 +110,19 @@ import {
 } from "./ai-video-reference-mode";
 import { readNodeGenerationParams } from "./generative-card-params";
 import { useGenerativeParamsEditor } from "./use-generative-params-editor";
+import { withGenerativeManualContentMode } from "./generative-card-mode-utils";
 import {
   AI_IMAGE_OUTPUT_ID,
   mergeAiImageNodeCatalogInputs,
 } from "./ai-image-node-utils";
 import {
+  AI_VIDEO_OUTPUT_ID,
   AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX,
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
   countAiVideoReferenceCounts,
   canGenerateAiVideo,
+  mergeAiVideoNodeCatalogInputs,
   referencesFitVideoModelLimits,
   appendAiVideoGeneratedHistoryItems,
   withAiVideoGeneratingHistoryFailed,
@@ -747,43 +754,57 @@ export function AiVideoConfigPanel({
     setPickNodeOpen(false);
   };
 
-  const addImageReferenceNode = (
+  const addMediaReferenceNode = (
     value: ResourceIdReference,
-    offset: number
+    nodeType: typeof AI_IMAGE_NODE_TYPE | typeof AI_VIDEO_NODE_TYPE,
+    offset: number,
+    fromCharacterLibrary = false
   ): boolean => {
     const host = getNode(nodeId);
     if (!host) return false;
 
-    const catalog = nodeTypes.find((entry) => entry.type === AI_IMAGE_NODE_TYPE);
+    const catalog = nodeTypes.find((entry) => entry.type === nodeType);
     if (!catalog) return false;
 
-    const newId = `${AI_IMAGE_NODE_TYPE}-${Date.now()}-${offset}`;
+    const isVideo = nodeType === AI_VIDEO_NODE_TYPE;
+    const outputId = isVideo ? AI_VIDEO_OUTPUT_ID : AI_IMAGE_OUTPUT_ID;
+    const newId = `${nodeType}-${Date.now()}-${offset}`;
     const position = {
       x: host.position.x - 280,
       y: host.position.y + offset * 100,
     };
 
-    const catalogInputs = mergeAiImageNodeCatalogInputs(
-      catalog.type,
-      mergeAiTextNodeCatalogInputs(
-        catalog.type,
-        catalog.inputs.map((param) => ({
-          ...param,
-          id: param.name,
-          value: param.name === "manual_images" ? [value] : param.value,
-        })),
-        catalog
-      ),
-      catalog
-    );
-    const catalogOutputs = catalog.outputs.map((param) => ({
+    const mappedInputs = catalog.inputs.map((param) => ({
       ...param,
       id: param.name,
       value:
-        param.name === AI_IMAGE_OUTPUT_ID
+        param.name === (isVideo ? "manual_videos" : "manual_images")
           ? [value]
           : param.value,
     }));
+    const catalogInputs = isVideo
+      ? mergeAiVideoNodeCatalogInputs(
+          catalog.type,
+          mergeAiTextNodeCatalogInputs(catalog.type, mappedInputs, catalog),
+          catalog
+        )
+      : mergeAiImageNodeCatalogInputs(
+          catalog.type,
+          mergeAiTextNodeCatalogInputs(catalog.type, mappedInputs, catalog),
+          catalog
+        );
+    const catalogOutputs = catalog.outputs.map((param) => ({
+      ...param,
+      id: param.name,
+      value: param.name === outputId ? [value] : param.value,
+    }));
+
+    const metadata = fromCharacterLibrary
+      ? withCharacterLibraryNodeMetadata(
+          withGenerativeManualContentMode(undefined),
+          value.upstreamAssetId ?? ""
+        )
+      : undefined;
 
     const newNode = {
       id: newId,
@@ -792,11 +813,13 @@ export function AiVideoConfigPanel({
       data: {
         name: resolveGenerativeNodeDisplayName({
           nodeType: catalog.type,
-          baseName: resolveGenerativeNodeDefaultBaseName(
-            catalog.type,
-            catalog.name,
-            t
-          ),
+          baseName: fromCharacterLibrary
+            ? t("workflow.characterLibrary.title")
+            : resolveGenerativeNodeDefaultBaseName(
+                catalog.type,
+                catalog.name,
+                t
+              ),
           existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
           additionalSameTypeCount: offset,
         }),
@@ -806,6 +829,7 @@ export function AiVideoConfigPanel({
         outputs: catalogOutputs,
         executionState: "idle" as const,
         createObjectUrl,
+        ...(metadata ? { metadata } : {}),
       },
     };
 
@@ -814,7 +838,7 @@ export function AiVideoConfigPanel({
     return appendReferenceConnection(
       {
         source: newId,
-        sourceHandle: AI_IMAGE_OUTPUT_ID,
+        sourceHandle: outputId,
         target: nodeId,
         targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
       },
@@ -822,23 +846,41 @@ export function AiVideoConfigPanel({
     );
   };
 
-  const handleInsertCharacter = (resourceId: string, mimeType: string) => {
+  const addImageReferenceNode = (
+    value: ResourceIdReference,
+    offset: number
+  ): boolean => addMediaReferenceNode(value, AI_IMAGE_NODE_TYPE, offset);
+
+  const handleInsertCharacter = (entry: CharacterLibraryEntry) => {
     if (disabled) return;
+    const value = characterLibraryReferenceFromEntry(entry);
+    if (!value) {
+      toast.error("workflow.characterLibrary.insertNotReady");
+      return;
+    }
+    const mime = entry.mimeType.toLowerCase();
+    const isVideo = mime.startsWith("video/");
+    const isImage = mime.startsWith("image/");
+    if (!isVideo && !isImage) {
+      toast.error("workflow.aiVideoPanel.referenceRejected");
+      return;
+    }
     if (!canAcceptAiVideoReference({
       rules: modelRules,
-      kind: "image",
+      kind: isVideo ? "video" : "image",
       currentCounts: referenceCounts,
       targetNodeData: data,
     }).ok) {
       toast.error("workflow.aiVideoPanel.referenceRejected");
       return;
     }
-    const value: ResourceIdReference = {
-      resourceId,
-      kind: "cloud",
-      mimeType,
-    };
-    if (!addImageReferenceNode(value, 0)) {
+    const added = addMediaReferenceNode(
+      value,
+      isVideo ? AI_VIDEO_NODE_TYPE : AI_IMAGE_NODE_TYPE,
+      0,
+      true
+    );
+    if (!added) {
       toast.error("workflow.aiVideoPanel.referenceRejected");
     }
   };
@@ -990,6 +1032,7 @@ export function AiVideoConfigPanel({
         workflowId,
         cloudConfigured,
         references: referenceMedia,
+        generationSubmit: isSeedanceCanonicalId(effectiveModel.canonicalId),
       });
 
       const hasResolvedReferences =
@@ -1775,9 +1818,7 @@ export function AiVideoConfigPanel({
         onOpenChange={setCharacterLibraryOpen}
         organizationId={orgId ?? ""}
         interfaceId={effectiveModel?.interfaceId}
-        onInsert={(entry) =>
-          handleInsertCharacter(entry.resourceId, entry.mimeType)
-        }
+        onInsert={(entry) => handleInsertCharacter(entry)}
       />
     </>
   );
