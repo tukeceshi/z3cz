@@ -1,5 +1,6 @@
 import {
   getResourceIdFromValue,
+  isPublicCharacterLibraryResourceId,
   isUnloadedResourceRef,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
@@ -7,26 +8,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
+import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 import {
   EMPTY_MEDIA_DISPLAY_URL_SET,
   hasDisplayUrlForSize,
   isMediaDisplayUrlSetEmpty,
   type MediaDisplayUrlSet,
 } from "@/services/ai-media-cache-service";
-import { CACHE_STATS_EVENT } from "@/services/ai-media-cache-events";
 import { ingestCanvasMediaInBackground } from "@/services/ingest-canvas-media";
 import { dropStableBlobUrlsForMediaId } from "@/services/media-display-blob-url-registry";
 import type { MediaDisplaySize } from "@/services/media-display-size";
-import {
-  getWorkflowMediaUrlSet,
-  mediaDisplayUrlSetsEqual,
-  patchWorkflowMediaUrlSet,
-} from "@/services/workflow-media-address-catalog";
 import { resetMediaIngestState } from "@/services/media-ingest-coordinator";
 import {
   resolveMediaDisplayUrlSet,
   resolveStableMediaDisplayUrlSet,
 } from "@/services/resolve-resource-display-url";
+import {
+  getWorkflowMediaUrlSet,
+  mediaDisplayUrlSetsEqual,
+  patchWorkflowMediaUrlSet,
+} from "@/services/workflow-media-address-catalog";
 
 const DEFAULT_PREFERRED_SIZE: MediaDisplaySize = "canvas-s";
 
@@ -130,7 +131,13 @@ export function useMediaDisplayUrlSet({
   ensureSizeRef.current = ensureSize;
 
   const [urlSet, setUrlSet] = useState<MediaDisplayUrlSet>(() => {
-    if (!media || isUnloadedResourceRef(media) || !orgId || !workflowId || !mediaKey) {
+    if (
+      !media ||
+      isUnloadedResourceRef(media) ||
+      !orgId ||
+      !workflowId ||
+      !mediaKey
+    ) {
       return EMPTY_MEDIA_DISPLAY_URL_SET;
     }
     return readImmediateUrlSet({
@@ -184,6 +191,25 @@ export function useMediaDisplayUrlSet({
       !workflowId ||
       !mediaKey
     ) {
+      setUrlSet(EMPTY_MEDIA_DISPLAY_URL_SET);
+      return;
+    }
+
+    const previewUrl = currentMedia.previewUrl?.trim();
+    if (previewUrl) {
+      const previewSet: MediaDisplayUrlSet = {
+        full: previewUrl,
+        s: previewUrl,
+        m: previewUrl,
+        l: previewUrl,
+      };
+      setUrlSet((prev) =>
+        mediaDisplayUrlSetsEqual(prev, previewSet) ? prev : previewSet
+      );
+      return;
+    }
+
+    if (isPublicCharacterLibraryResourceId(mediaKey)) {
       setUrlSet(EMPTY_MEDIA_DISPLAY_URL_SET);
       return;
     }

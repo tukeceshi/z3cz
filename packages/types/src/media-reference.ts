@@ -35,6 +35,8 @@ export interface ResourceIdReference {
   readonly characterLibrary?: boolean;
   /** Upstream private-library asset id (without the asset:// prefix). */
   readonly upstreamAssetId?: string;
+  /** Original cover URL (public portraits). Display only; generate still uses asset://. */
+  readonly previewUrl?: string;
 }
 
 export type WorkflowMediaValue = ResourceIdReference;

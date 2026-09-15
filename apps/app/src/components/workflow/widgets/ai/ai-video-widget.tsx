@@ -6,6 +6,7 @@ import {
   hasGeneratingResource,
   isAiVideoRetakePanel,
   isCharacterLibraryNodeMetadata,
+  isPublicCharacterLibraryResourceId,
   type MediaReference,
   type ObjectReference,
   readNodeLayoutFromMetadata,
@@ -368,7 +369,11 @@ function AiVideoWidget({
         {isCharacterLibraryNodeMetadata(metadata) ? (
           <div className="pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
             <UserRoundIcon className="size-3" />
-            {t("workflow.characterLibrary.title")}
+            {t(
+              isPublicCharacterLibraryResourceId(activeVideoKey)
+                ? "workflow.characterLibrary.publicTitle"
+                : "workflow.characterLibrary.title"
+            )}
           </div>
         ) : null}
 

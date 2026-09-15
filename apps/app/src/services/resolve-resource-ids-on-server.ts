@@ -1,3 +1,5 @@
+import { isPublicCharacterLibraryResourceId } from "@dafthunk/types";
+
 import { makeRequest } from "@/services/utils";
 
 interface ResolveResourceRefsResponse {
@@ -18,20 +20,32 @@ export async function resolveResourceIdsOnServer(params: {
   readonly resourceIds: readonly string[];
   readonly generationSubmit?: boolean;
 }): Promise<ResolveResourceRefsResponse> {
-  if (params.resourceIds.length === 0) {
-    return { resolved: [], unresolved: [] };
+  const catalogIds = params.resourceIds.filter(
+    (id) => !isPublicCharacterLibraryResourceId(id)
+  );
+  const skipped = params.resourceIds.filter((id) =>
+    isPublicCharacterLibraryResourceId(id)
+  );
+  if (catalogIds.length === 0) {
+    return { resolved: [], unresolved: skipped };
   }
 
-  return makeRequest<ResolveResourceRefsResponse>(
+  const response = await makeRequest<ResolveResourceRefsResponse>(
     `${platformAiEndpoint(params.organizationId)}/resolve-resource-refs`,
     {
       method: "POST",
       body: JSON.stringify({
-        resourceIds: params.resourceIds,
+        resourceIds: catalogIds,
         ...(params.generationSubmit ? { generationSubmit: true } : {}),
       }),
     }
   );
+  return skipped.length === 0
+    ? response
+    : {
+        resolved: response.resolved,
+        unresolved: [...response.unresolved, ...skipped],
+      };
 }
 
 export async function isResourceIdCloudResolvable(params: {

@@ -1,37 +1,34 @@
-import { SettingsLayout } from "./components/settings-layout";
 import type { RouteObject, RouterState } from "react-router";
 import { Navigate } from "react-router";
-
 import { AdminProtectedRoute } from "./components/admin-protected-route";
-import { createRouteHead } from "./components/route-head";
 import { AdminLayout } from "./components/layouts/admin-layout";
 import { AppLayout } from "./components/layouts/app-layout";
 import { CanvasLayout } from "./components/layouts/canvas-layout";
-import { OrgLayout } from "./components/org-layout";
 import { OrgFeatureRoute } from "./components/org-feature-route";
+import { OrgLayout } from "./components/org-layout";
 import { OrgRedirect } from "./components/org-redirect";
-import { LoginPage } from "./pages/login-page";
-import { LandingPage } from "./pages/landing-page";
 import { ProtectedRoute } from "./components/protected-route";
+import { createRouteHead } from "./components/route-head";
+import { SettingsLayout } from "./components/settings-layout";
 import {
   AdminAiModelsPage,
-  AdminDashboardPage,
-  AdminModelInvocationsPage,
-  AdminPersistWorkersPage,
-  AdminOrganizationRedirectPage,
-  AdminSettingsPage,
-  AdminCompetitorPricingPage,
-  AdminLoginMethodsPage,
+  AdminApiForwardingDetailPage,
+  AdminApiForwardingPage,
   AdminBootstrapPage,
+  AdminCompetitorPricingPage,
+  AdminDashboardPage,
   AdminLegalDocumentsPage,
+  AdminLoginMethodsPage,
+  AdminModelInvocationsPage,
+  AdminOrganizationRedirectPage,
+  AdminPersistWorkersPage,
+  AdminSettingsPage,
   AdminStuckUsersPage,
   AdminSupportPage,
   AdminUserDetailPage,
   AdminUsersPage,
   AdminWorkflowDetailPage,
   AdminWorkflowSchemesPage,
-  AdminApiForwardingPage,
-  AdminApiForwardingDetailPage,
   AdminWorkflowsPage,
   ApiKeysPage,
   BillingPage,
@@ -44,7 +41,6 @@ import {
   IntegrationsPage,
   MembersPage,
   ModelCallsPage,
-  SeedanceVideoCheckPage,
   NotFoundPage,
   OrganizationAiInterfacesPage,
   OrganizationCloudAccelerationPage,
@@ -52,13 +48,16 @@ import {
   QueuesPage,
   SchemasPage,
   SecretsPage,
+  SeedanceVideoCheckPage,
   TemplateDetailPage,
   TemplatePreviewPage,
-  TemplateTryPage,
   TemplatesPage,
+  TemplateTryPage,
   WorkflowFolderPage,
   WorkflowsPage,
 } from "./lazy-pages";
+import { LandingPage } from "./pages/landing-page";
+import { LoginPage } from "./pages/login-page";
 
 export interface RouteHandle {
   head?:
@@ -437,7 +436,9 @@ export const routes: AppRouteObject[] = [
   },
   {
     path: "/tools/seedance-video-check",
-    element: <OrgRedirect to="/org/:organizationId/tools/seedance-video-check" />,
+    element: (
+      <OrgRedirect to="/org/:organizationId/tools/seedance-video-check" />
+    ),
   },
   {
     path: "/org/:organizationId/tools/seedance-video-check",

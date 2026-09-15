@@ -4,8 +4,8 @@ import FileText from "lucide-react/icons/file-text";
 import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
 import KeyRound from "lucide-react/icons/key-round";
-import Rocket from "lucide-react/icons/rocket";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
+import Rocket from "lucide-react/icons/rocket";
 import Settings from "lucide-react/icons/settings";
 import Sparkles from "lucide-react/icons/sparkles";
 import UserMinus from "lucide-react/icons/user-minus";
@@ -15,12 +15,12 @@ import { ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
+import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import { useTranslation } from "@/components/locale-provider";
 import { PageProvider } from "@/components/page-context";
-import { SiteBrandingEffect } from "@/components/site-branding-effect";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import type { NavMainProps } from "@/components/sidebar/nav-main";
+import { SiteBrandingEffect } from "@/components/site-branding-effect";
 import * as Sidebar from "@/components/ui/sidebar";
 import { useAdminSupportUnreadCount } from "@/services/admin-service";
 
@@ -150,7 +150,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Sidebar.SidebarProvider>
             <AppSidebar title={t("sidebar.admin")} groups={adminSidebarItems} />
             <Sidebar.SidebarInset className="bg-neutral-50 dark:bg-neutral-800">
-              <div className={`h-full w-full ${PAGE_SCROLL_CLASS}`}>{children}</div>
+              <div className={`h-full w-full ${PAGE_SCROLL_CLASS}`}>
+                {children}
+              </div>
             </Sidebar.SidebarInset>
           </Sidebar.SidebarProvider>
         </div>

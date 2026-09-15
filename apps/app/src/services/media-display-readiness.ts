@@ -25,6 +25,11 @@ export function resolveMediaDisplay(params: {
     return { phase: "empty", displayUrl: null };
   }
 
+  const previewUrl = params.media.previewUrl?.trim();
+  if (previewUrl) {
+    return { phase: "ready", displayUrl: previewUrl };
+  }
+
   if (params.stale) {
     return { phase: "loading", displayUrl: null };
   }

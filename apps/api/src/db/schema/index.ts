@@ -180,7 +180,9 @@ export const organizations = pgTable(
     overageLimit: integer("overage_limit"), // null = unlimited
     unlimitedUsage: boolean("unlimited_usage").notNull().default(false),
     creditsExhausted: boolean("credits_exhausted").notNull().default(false),
-    platformCloudAccelerationEnabled: boolean("platform_cloud_acceleration_enabled")
+    platformCloudAccelerationEnabled: boolean(
+      "platform_cloud_acceleration_enabled"
+    )
       .notNull()
       .default(false),
     persistWorkerPoolEnabled: boolean("persist_worker_pool_enabled")
@@ -677,6 +679,8 @@ export const mediaResources = pgTable(
     modelCanonicalId: text("model_canonical_id"),
     interfaceId: text("interface_id"),
     source: text("source"),
+    sourceWorkflowId: text("source_workflow_id"),
+    sourceCategory: text("source_category"),
     upstreamAssetId: text("upstream_asset_id"),
     upstreamAssetStatus: text("upstream_asset_status"),
     createdAt: createCreatedAt(),
@@ -686,6 +690,70 @@ export const mediaResources = pgTable(
     index("media_resources_org_source_idx").on(
       table.organizationId,
       table.source
+    ),
+  ]
+);
+
+export const characterLibraryCharacters = pgTable(
+  "character_library_characters",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    workflowId: text("workflow_id"),
+    name: text("name").notNull(),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [
+    index("character_library_characters_org_idx").on(table.organizationId),
+    index("character_library_characters_org_workflow_idx").on(
+      table.organizationId,
+      table.workflowId
+    ),
+  ]
+);
+
+export const characterLibraryCharacterItems = pgTable(
+  "character_library_character_items",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characterLibraryCharacters.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => mediaResources.id, { onDelete: "cascade" }),
+    createdAt: createCreatedAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.characterId, table.resourceId] }),
+    index("character_library_character_items_resource_idx").on(
+      table.resourceId
+    ),
+  ]
+);
+
+export const platformPublicCharacterLibrary = pgTable(
+  "platform_public_character_library",
+  {
+    assetId: text("asset_id").primaryKey(),
+    name: text("name").notNull().default(""),
+    imageUrl: text("image_url").notNull(),
+    gender: text("gender"),
+    age: integer("age"),
+    country: text("country"),
+    groupSid: text("group_sid").notNull(),
+    sortIndex: integer("sort_index").notNull().default(0),
+    syncedAt: timestamp("synced_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("platform_public_character_library_synced_idx").on(table.syncedAt),
+    index("platform_public_character_library_name_idx").on(table.name),
+    index("platform_public_character_library_group_idx").on(
+      table.groupSid,
+      table.sortIndex
     ),
   ]
 );

@@ -9,16 +9,17 @@ import type {
 import {
   getResourceIdFromValue,
   isCloudStoredResource,
+  isPublicCharacterLibraryResourceId,
   isResourceIdReference,
   mediaReferenceToWorkflowValue,
 } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
-import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
   cacheMediaFromUrl,
   getCachedMediaBlob,
 } from "@/services/ai-media-cache-service";
+import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import {
   commitNodeLayoutFromStaging,
   readGenerativeStagingBlob,
@@ -158,6 +159,9 @@ export async function ensureGenerativeMediaCached(params: {
 
   const mediaId = getResourceIdFromValue(params.media);
   if (!mediaId) return;
+  if (isPublicCharacterLibraryResourceId(mediaId)) {
+    return;
+  }
 
   if (params.blob) {
     await stageGenerativeMediaBlob({
@@ -320,7 +324,8 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
     throw new Error("AI staging blob not found");
   }
 
-  const mimeType = params.mimeType || entry.mimeType || "application/octet-stream";
+  const mimeType =
+    params.mimeType || entry.mimeType || "application/octet-stream";
   const nodeType = inferNodeTypeFromMediaKind(
     params.mediaKind ?? "reference",
     mimeType

@@ -1,5 +1,11 @@
-import type { ReferenceImageInline, WorkflowMediaValue } from "@dafthunk/types";
-import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
+import {
+  getResourceIdFromValue,
+  isResourceIdReference,
+  type ReferenceImageInline,
+  readPublicCharacterLibraryAssetId,
+  toCharacterLibraryAssetUrl,
+  type WorkflowMediaValue,
+} from "@dafthunk/types";
 
 import { collectResourceIds } from "@/services/ensure-resource-cached";
 import { readGenerativeStagingAsInline } from "@/services/generative-media-staging";
@@ -63,6 +69,24 @@ function pushResolvedUrl(params: {
     return;
   }
   params.referenceImageUrls.push(params.url);
+}
+
+function characterLibraryGenerateUrl(
+  entry: WorkflowMediaValue,
+  generationSubmit: boolean
+): string | null {
+  const publicAssetId = readPublicCharacterLibraryAssetId(entry.resourceId);
+  if (publicAssetId) {
+    return toCharacterLibraryAssetUrl(publicAssetId);
+  }
+  if (
+    generationSubmit &&
+    entry.characterLibrary === true &&
+    entry.upstreamAssetId
+  ) {
+    return toCharacterLibraryAssetUrl(entry.upstreamAssetId);
+  }
+  return null;
 }
 
 async function resolveStagedInline(
@@ -129,9 +153,33 @@ async function resolveMediaGroup(params: {
     (entry) => entry.kind === "local" || entry.kind === "ephemeral"
   );
 
+  const referenceImageUrls: string[] = [];
+  const referenceVideoUrls: string[] = [];
+  const referenceAudioUrls: string[] = [];
+  const unresolvedStaged: WorkflowMediaValue[] = [...stagedMedia];
+  const catalogMedia: WorkflowMediaValue[] = [];
+
+  for (const entry of cloudMedia) {
+    const assetUrl = characterLibraryGenerateUrl(
+      entry,
+      params.generationSubmit === true
+    );
+    if (assetUrl) {
+      pushResolvedUrl({
+        mimeType: entry.mimeType || "image/jpeg",
+        url: assetUrl,
+        referenceImageUrls,
+        referenceVideoUrls,
+        referenceAudioUrls,
+      });
+      continue;
+    }
+    catalogMedia.push(entry);
+  }
+
   const cloudResourceIds = [
     ...new Set(
-      cloudMedia
+      catalogMedia
         .map((entry) => lookupIdForMedia(entry))
         .filter((id): id is string => Boolean(id))
     ),
@@ -152,12 +200,7 @@ async function resolveMediaGroup(params: {
       .map((entry) => [entry.resourceId, entry])
   );
 
-  const referenceImageUrls: string[] = [];
-  const referenceVideoUrls: string[] = [];
-  const referenceAudioUrls: string[] = [];
-  const unresolvedStaged: WorkflowMediaValue[] = [...stagedMedia];
-
-  for (const entry of cloudMedia) {
+  for (const entry of catalogMedia) {
     const resourceId = lookupIdForMedia(entry);
     const hit = resourceId ? resolvedById.get(resourceId) : undefined;
     if (hit) {
