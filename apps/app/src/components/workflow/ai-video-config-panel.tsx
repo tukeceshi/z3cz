@@ -1,67 +1,139 @@
+import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
 import {
   AI_AUDIO_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
-  mergeImageGenerationParams,
-  normalizeVideoModelParameterRules,
-  readVideoPriceEstimateTier,
-  readVideoPriceEstimateBaseline480pWithoutVideo,
-  readVideoPriceEstimateDisplayFolds,
-  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
-  type ResourceIdReference,
-  type MediaReference,
+  type CancelGenerationJobResponse,
   type CharacterLibraryEntry,
   characterLibraryReferenceFromEntry,
-  withCharacterLibraryNodeMetadata,
+  isPublicCharacterLibraryResourceId,
   isSeedanceCanonicalId,
+  type MediaReference,
+  mergeImageGenerationParams,
+  normalizeVideoModelParameterRules,
   type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
-  type CancelGenerationJobResponse,
+  type ResourceIdReference,
+  readVideoPriceEstimateBaseline480pWithoutVideo,
+  readVideoPriceEstimateDisplayFolds,
+  readVideoPriceEstimateTier,
+  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
+  withCharacterLibraryNodeMetadata,
 } from "@dafthunk/types";
 import {
+  type Node as ReactFlowNode,
   useNodes,
   useReactFlow,
   useViewport,
-  type Node as ReactFlowNode,
 } from "@xyflow/react";
+import UserRoundIcon from "lucide-react/icons/user-round";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import UserRoundIcon from "lucide-react/icons/user-round";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAppToast } from "@/hooks/use-app-toast";
-import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
-import { useOrgUrl } from "@/hooks/use-org-url";
-import { cn } from "@/utils/utils";
-import { useOrgVideoPickerModels } from "@/services/platform-ai-model-service";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { useObjectService } from "@/services/object-service";
-import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
-import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
-import { CharacterLibraryDialog } from "./character-library-dialog";
+import { useAppToast } from "@/hooks/use-app-toast";
+import {
+  generativeVideoProgressButtonKey,
+  useGenerativeCloudJobProgress,
+} from "@/hooks/use-generative-cloud-job";
+import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
+import { useOrgUrl } from "@/hooks/use-org-url";
+import { useResolvedReferencedPrompt } from "@/hooks/use-resolved-referenced-prompt";
 import { fetchCharacterLibraryStatus } from "@/services/character-library";
-import { runAiVideoGeneration } from "./run-ai-video-generation";
+import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
+import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
+import { useObjectService } from "@/services/object-service";
+import { type PersistGenerativeMediaPhase } from "@/services/persist-generative-media-from-url";
+import { useOrgVideoPickerModels } from "@/services/platform-ai-model-service";
+import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
 import { uploadGenerativeMedia } from "@/services/upload-generative-media";
+import { cn } from "@/utils/utils";
+import { AiGenerateButton } from "./ai-generate-button";
 import {
-  type PersistGenerativeMediaPhase,
-} from "@/services/persist-generative-media-from-url";
-import { readActiveGenerationJobId } from "@/services/read-active-generation-job-id";
-import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
-
-import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
-import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
-import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
+  AI_IMAGE_OUTPUT_ID,
+  mergeAiImageNodeCatalogInputs,
+} from "./ai-image-node-utils";
+import { AiTextExpandButton } from "./ai-text-expand-overlay";
+import { AiTextModelPicker } from "./ai-text-model-picker";
+import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
+import {
+  AiTextReferenceBar,
+  type AiTextReferenceChip,
+} from "./ai-text-reference-bar";
+import {
+  AI_VIDEO_OUTPUT_ID,
+  AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX,
+  AI_VIDEO_PROMPT_HANDLE_ID,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+  appendAiVideoGeneratedHistoryItems,
+  canGenerateAiVideo,
+  countAiVideoReferenceCounts,
+  isAiVideoGenerating,
+  mergeAiVideoNodeCatalogInputs,
+  referencesFitVideoModelLimits,
+  withAiVideoGenerateError,
+  withAiVideoGeneratingFlag,
+  withAiVideoGeneratingHistoryFailed,
+  withAiVideoStagingPreview,
+} from "./ai-video-node-utils";
+import {
+  AiVideoParamsPopover,
+  buildDefaultVideoGenerationParams,
+} from "./ai-video-params-popover";
+import { AiVideoPriceEstimateChip } from "./ai-video-price-estimate-chip";
+import {
+  collectAiVideoUnifiedReferenceChips,
+  evaluateAiVideoPromptReferenceStructural,
+  hasAiVideoPromptReference,
+  listPickableAiVideoPromptSources,
+} from "./ai-video-prompt-reference";
+import {
+  annotateVideoReferenceChips,
+  clearReferenceModeAutoSwitchNoticeIfResolved,
+  resolveEffectiveVideoReferenceMode,
+  shouldShowReferenceModeAutoSwitchNotice,
+  syncVideoReferenceModeIfNeeded,
+} from "./ai-video-reference-mode";
+import {
+  canAcceptAiVideoReference,
+  evaluateAiVideoReferenceStructural,
+  listPickableAiVideoReferenceSources,
+  resolveAiVideoReferenceRules,
+} from "./ai-video-reference-policy";
+import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
+import { CharacterLibraryDialog } from "./character-library-dialog";
 import { useOpenCreativeStudio } from "./creative-studio-context";
+import type { CreativeStudioDetailViewRole } from "./creative-studio-detail-view";
+import { withGenerativeManualContentMode } from "./generative-card-mode-utils";
+import { readNodeGenerationParams } from "./generative-card-params";
+import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
+import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleration-offer";
+import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
+import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
+import {
+  GenerativeGenerationCancelledError,
+  isGenerativeGenerationCancelled,
+  isGenerativeGenerationCancelRejected,
+  showGenerativeCancelledNotice,
+} from "./generative-generation-cancel";
+import {
+  resolveGenerativeNodeDefaultBaseName,
+  resolveGenerativeNodeDisplayName,
+} from "./generative-node-naming";
+import {
+  GenerativePickNodeDialog,
+  type GenerativePickNodeEntry,
+} from "./generative-pick-node-dialog";
 import {
   clearGenerativeProgress,
   formatGenerativeBusyOverlayLabel,
@@ -71,103 +143,26 @@ import {
   withGenerativeProgress,
 } from "./generative-progress-utils";
 import {
-  GenerativeGenerationCancelledError,
-  isGenerativeGenerationCancelled,
-  isGenerativeGenerationCancelRejected,
-  showGenerativeCancelledNotice,
-} from "./generative-generation-cancel";
-import {
-  GenerativePickNodeDialog,
-  type GenerativePickNodeEntry,
-} from "./generative-pick-node-dialog";
-import {
   collectGenerativeReferenceMedia,
   studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
-import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
-import { AiGenerateButton } from "./ai-generate-button";
-import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
-import {
-  AiTextExpandButton,
-} from "./ai-text-expand-overlay";
-import { AiTextModelPicker } from "./ai-text-model-picker";
-import { useGenerativeModelCard } from "./use-generative-model-card";
-import {
-  AiTextReferenceBar,
-  type AiTextReferenceChip,
-} from "./ai-text-reference-bar";
-import {
-  AiVideoParamsPopover,
-  buildDefaultVideoGenerationParams,
-} from "./ai-video-params-popover";
-import { AiVideoPriceEstimateChip } from "./ai-video-price-estimate-chip";
-import {
-  annotateVideoReferenceChips,
-  clearReferenceModeAutoSwitchNoticeIfResolved,
-  resolveEffectiveVideoReferenceMode,
-  shouldShowReferenceModeAutoSwitchNotice,
-  syncVideoReferenceModeIfNeeded,
-} from "./ai-video-reference-mode";
-import { readNodeGenerationParams } from "./generative-card-params";
-import { useGenerativeParamsEditor } from "./use-generative-params-editor";
-import { withGenerativeManualContentMode } from "./generative-card-mode-utils";
-import {
-  AI_IMAGE_OUTPUT_ID,
-  mergeAiImageNodeCatalogInputs,
-} from "./ai-image-node-utils";
-import {
-  AI_VIDEO_OUTPUT_ID,
-  AI_VIDEO_PANEL_PROMPT_MIN_HEIGHT_PX,
-  AI_VIDEO_PROMPT_HANDLE_ID,
-  AI_VIDEO_REFERENCE_HANDLE_ID,
-  countAiVideoReferenceCounts,
-  canGenerateAiVideo,
-  mergeAiVideoNodeCatalogInputs,
-  referencesFitVideoModelLimits,
-  appendAiVideoGeneratedHistoryItems,
-  withAiVideoGeneratingHistoryFailed,
-  withAiVideoStagingPreview,
-  withAiVideoGeneratingFlag,
-  withAiVideoGenerateError,
-  isAiVideoGenerating,
-} from "./ai-video-node-utils";
-import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
+import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
-import { generativePromptWithinModelLimit } from "./generative-card-upload-utils";
-import {
-  resolveGenerativeNodeDefaultBaseName,
-  resolveGenerativeNodeDisplayName,
-} from "./generative-node-naming";
-import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
-import {
-  canAcceptAiVideoReference,
-  evaluateAiVideoReferenceStructural,
-  listPickableAiVideoReferenceSources,
-  resolveAiVideoReferenceRules,
-} from "./ai-video-reference-policy";
-import {
-  hasAiVideoPromptReference,
-  listPickableAiVideoPromptSources,
-  evaluateAiVideoPromptReferenceStructural,
-  collectAiVideoUnifiedReferenceChips,
-} from "./ai-video-prompt-reference";
-import { useBufferedTextValue } from "./use-buffered-text-value";
 import { ReferenceThumbUrlsProvider } from "./reference-thumb-urls-provider";
-import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
+import { runAiVideoGeneration } from "./run-ai-video-generation";
+import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
+import { useBufferedTextValue } from "./use-buffered-text-value";
+import { useGenerativeModelCard } from "./use-generative-model-card";
+import { useGenerativeParamsEditor } from "./use-generative-params-editor";
+import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import {
   appendVideoPromptRefToken,
   buildVideoPromptImageEdgeIndexMap,
-  compileVideoPromptForSubmit,
   compiledVideoPromptLength,
+  compileVideoPromptForSubmit,
   hasBrokenVideoPromptRefs,
 } from "./video-prompt-compile";
-import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleration-offer";
-import {
-  useGenerativeCloudJobProgress,
-  generativeVideoProgressButtonKey,
-} from "@/hooks/use-generative-cloud-job";
-import { useGenerativeGenerationSession } from "@/hooks/use-generative-generation-session";
-import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
+import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
 import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
@@ -222,15 +217,15 @@ export function AiVideoConfigPanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const generateInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
-  const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
-    null
-  );
+  const [persistPhase, setPersistPhase] =
+    useState<PersistGenerativeMediaPhase | null>(null);
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   const [pickNodeOpen, setPickNodeOpen] = useState(false);
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
 
   const promptValue = getInputString(data, "prompt");
-  const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+  const typedNodes =
+    nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
   const hasPromptReference = useMemo(
     () => hasAiVideoPromptReference({ nodeId, edges }),
@@ -388,7 +383,10 @@ export function AiVideoConfigPanel({
     if (!paramsEditor.isParamsIdle || disabled || !updateNodeData) {
       return;
     }
-    const flowNodes = typedNodes.map((node) => ({ id: node.id, data: node.data }));
+    const flowNodes = typedNodes.map((node) => ({
+      id: node.id,
+      data: node.data,
+    }));
     const liveNodeData =
       typedNodes.find((node) => node.id === nodeId)?.data ?? data;
     const counts = countAiVideoReferenceCounts(nodeId, edges, flowNodes);
@@ -419,7 +417,16 @@ export function AiVideoConfigPanel({
     if (shouldShowReferenceModeAutoSwitchNotice(nodeId, counts)) {
       toast.info("workflow.aiVideoPanel.referenceModeSwitched");
     }
-  }, [data, disabled, edges, nodeId, paramsEditor.isParamsIdle, toast, typedNodes, updateNodeData]);
+  }, [
+    data,
+    disabled,
+    edges,
+    nodeId,
+    paramsEditor.isParamsIdle,
+    toast,
+    typedNodes,
+    updateNodeData,
+  ]);
 
   const selectableModels = useMemo(
     () => models.filter((entry) => entry.selectable),
@@ -437,7 +444,7 @@ export function AiVideoConfigPanel({
     referenceCounts.imageCount +
       referenceCounts.videoCount +
       referenceCounts.audioCount >
-    0;
+      0;
 
   const allowUpload = modelRules.maxReferenceImages > 0;
 
@@ -471,7 +478,13 @@ export function AiVideoConfigPanel({
       return;
     }
     if (referencedPrompt === promptValue) return;
-    updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
+    updateNodeInput(
+      nodeId,
+      "prompt",
+      referencedPrompt,
+      data.inputs,
+      updateNodeData
+    );
   }, [
     data.inputs,
     disabled,
@@ -494,7 +507,8 @@ export function AiVideoConfigPanel({
   }, [displayPrompt, hasPromptReference, imageEdgeIndexMap, referencedPrompt]);
 
   const hasBrokenPromptRefs =
-    !hasPromptReference && hasBrokenVideoPromptRefs(displayPrompt, imageEdgeIndexMap);
+    !hasPromptReference &&
+    hasBrokenVideoPromptRefs(displayPrompt, imageEdgeIndexMap);
 
   const promptForGenerate = storedPromptCompile.ok
     ? storedPromptCompile.prompt.trim()
@@ -502,7 +516,8 @@ export function AiVideoConfigPanel({
 
   const promptCompiledLength = hasPromptReference
     ? referencedPrompt.length
-    : compiledVideoPromptLength(displayPrompt, imageEdgeIndexMap) ?? displayPrompt.length;
+    : (compiledVideoPromptLength(displayPrompt, imageEdgeIndexMap) ??
+      displayPrompt.length);
 
   const promptMaxLength = modelRules.promptMaxChars;
   const promptOverLimit = promptCompiledLength > promptMaxLength;
@@ -604,24 +619,24 @@ export function AiVideoConfigPanel({
     triggerSingleCloudAcceleration,
     triggerAlwaysCloudAcceleration,
   } = useGenerativeCloudJobProgress({
-      nodeId,
-      orgId,
-      workflowId,
-      cloudConfigured,
-      metadata: data.metadata,
-      isGenerating: isBusyForUi,
-      persistPhase,
-      autoResume: false,
-      updateNodeData,
-      setPersistPhase,
-      setIsGenerating,
-      applyBusyMetadata: (metadata, busy) =>
-        withAiVideoGeneratingFlag(metadata, busy),
-      onStaged: handleStaged,
-      shouldAbortJobPoll,
-      cloudAccelerationEnabled: true,
-      aiInterfaceId: effectiveModel?.interfaceId,
-    });
+    nodeId,
+    orgId,
+    workflowId,
+    cloudConfigured,
+    metadata: data.metadata,
+    isGenerating: isBusyForUi,
+    persistPhase,
+    autoResume: false,
+    updateNodeData,
+    setPersistPhase,
+    setIsGenerating,
+    applyBusyMetadata: (metadata, busy) =>
+      withAiVideoGeneratingFlag(metadata, busy),
+    onStaged: handleStaged,
+    shouldAbortJobPoll,
+    cloudAccelerationEnabled: true,
+    aiInterfaceId: effectiveModel?.interfaceId,
+  });
 
   useEffect(() => {
     if (!activeProgressPhase) {
@@ -677,14 +692,20 @@ export function AiVideoConfigPanel({
     return source?.data.name ?? edge.source;
   }, [edges, nodeId, typedNodes]);
 
-  const promptReferenceEditHint = t("workflow.aiVideoPanel.promptReferenceEditHint", {
-    nodeName:
-      promptReferenceSourceName ??
-      t("workflow.aiVideoPanel.promptReferenceEditHintFallback"),
-  });
+  const promptReferenceEditHint = t(
+    "workflow.aiVideoPanel.promptReferenceEditHint",
+    {
+      nodeName:
+        promptReferenceSourceName ??
+        t("workflow.aiVideoPanel.promptReferenceEditHintFallback"),
+    }
+  );
 
-  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
-    useGenerativeReferenceConnection();
+  const {
+    canConnectReference,
+    buildReferenceConnection,
+    appendReferenceConnection,
+  } = useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
     const edge = edges.find((entry) => entry.id === edgeId);
@@ -814,13 +835,16 @@ export function AiVideoConfigPanel({
         name: resolveGenerativeNodeDisplayName({
           nodeType: catalog.type,
           baseName: fromCharacterLibrary
-            ? t("workflow.characterLibrary.title")
+            ? isPublicCharacterLibraryResourceId(value.resourceId)
+              ? t("workflow.characterLibrary.publicTitle")
+              : t("workflow.characterLibrary.title")
             : resolveGenerativeNodeDefaultBaseName(
                 catalog.type,
                 catalog.name,
                 t
               ),
-          existingNodes: nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
+          existingNodes:
+            nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[],
           additionalSameTypeCount: offset,
         }),
         nodeType: catalog.type,
@@ -865,12 +889,14 @@ export function AiVideoConfigPanel({
       toast.error("workflow.aiVideoPanel.referenceRejected");
       return;
     }
-    if (!canAcceptAiVideoReference({
-      rules: modelRules,
-      kind: isVideo ? "video" : "image",
-      currentCounts: referenceCounts,
-      targetNodeData: data,
-    }).ok) {
+    if (
+      !canAcceptAiVideoReference({
+        rules: modelRules,
+        kind: isVideo ? "video" : "image",
+        currentCounts: referenceCounts,
+        targetNodeData: data,
+      }).ok
+    ) {
       toast.error("workflow.aiVideoPanel.referenceRejected");
       return;
     }
@@ -945,7 +971,9 @@ export function AiVideoConfigPanel({
 
   const handleInjectChip = (chip: AiTextReferenceChip) => {
     if (disabled || hasPromptReference || chip.kind !== "image") return;
-    promptBuffer.commit(appendVideoPromptRefToken(promptBuffer.value, chip.edgeId));
+    promptBuffer.commit(
+      appendVideoPromptRefToken(promptBuffer.value, chip.edgeId)
+    );
   };
 
   const handleGenerate = async () => {
@@ -1154,7 +1182,8 @@ export function AiVideoConfigPanel({
 
       if (completed.length === 0) {
         const firstError = results.find(
-          (result): result is PromiseRejectedResult => result.status === "rejected"
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected"
         );
         throw firstError?.reason instanceof Error
           ? firstError.reason
@@ -1241,10 +1270,7 @@ export function AiVideoConfigPanel({
         clearProgress();
       }
     } catch (error) {
-      if (
-        isGenerativeGenerationCancelled(error) ||
-        isCancelConfirmed()
-      ) {
+      if (isGenerativeGenerationCancelled(error) || isCancelConfirmed()) {
         if (isCancelConfirmed()) {
           applyCancelledUiState();
         }
@@ -1618,7 +1644,7 @@ export function AiVideoConfigPanel({
                     void handleUploadFiles(files);
                   }}
                   afterAddButton={
-                    characterLibraryEnabled && !disabled ? (
+                    disabled ? null : (
                       <TooltipProvider delayDuration={0}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1638,7 +1664,7 @@ export function AiVideoConfigPanel({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                    ) : null
+                    )
                   }
                   onInjectChip={handleInjectChip}
                 />
@@ -1718,7 +1744,9 @@ export function AiVideoConfigPanel({
                 orgId={orgId}
                 models={models as unknown as readonly OrgTextModelOption[]}
                 selectedOptionId={selectedOptionId}
-                chipModel={effectiveModel as unknown as OrgTextModelOption | undefined}
+                chipModel={
+                  effectiveModel as unknown as OrgTextModelOption | undefined
+                }
                 disabled={disabled || isLoading}
                 isLoading={isLoading}
                 loadError={Boolean(modelsError)}
@@ -1789,7 +1817,9 @@ export function AiVideoConfigPanel({
             <AiGenerateButton
               disabled={!canGenerate}
               isGenerating={isBusyForUi}
-              isCancelling={isCancelling || activeProgressPhase === "cancelling"}
+              isCancelling={
+                isCancelling || activeProgressPhase === "cancelling"
+              }
               canCancel={canCancelGeneration && !isCancelling}
               label={progressButtonLabel}
               cancelLabel={t("workflow.generativeCancel.action")}
@@ -1818,6 +1848,7 @@ export function AiVideoConfigPanel({
         onOpenChange={setCharacterLibraryOpen}
         organizationId={orgId ?? ""}
         interfaceId={effectiveModel?.interfaceId}
+        libraryEnabled={characterLibraryEnabled}
         onInsert={(entry) => handleInsertCharacter(entry)}
       />
     </>

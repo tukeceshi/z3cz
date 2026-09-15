@@ -13,6 +13,7 @@ import {
   isCloudObjectReference,
   isEphemeralMediaReference,
   isObjectReference,
+  isPublicCharacterLibraryResourceId,
   readCharacterLibrarySubmitUrl,
 } from "@dafthunk/types";
 import type { Bindings } from "../context";
@@ -311,11 +312,17 @@ export async function resolveMediaResources(
     return { resolved: [], unresolved: [] };
   }
 
-  const catalogRows = await getMediaResourcesByIds(db, {
-    organizationId: params.organizationId,
+  const catalogIds = trimmedIds.filter(
+    (id) => !isPublicCharacterLibraryResourceId(id)
+  );
 
-    resourceIds: trimmedIds,
-  });
+  const catalogRows =
+    catalogIds.length > 0
+      ? await getMediaResourcesByIds(db, {
+          organizationId: params.organizationId,
+          resourceIds: catalogIds,
+        })
+      : [];
 
   const resolved: ResolvedMediaResourceEntry[] = [];
 
@@ -326,6 +333,11 @@ export async function resolveMediaResources(
   const cloudResourceIds: string[] = [];
 
   for (const resourceId of trimmedIds) {
+    if (isPublicCharacterLibraryResourceId(resourceId)) {
+      unresolved.push(resourceId);
+      continue;
+    }
+
     const catalogEntry = catalogRows.find((row) => row.id === resourceId);
 
     if (!catalogEntry) {

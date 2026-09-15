@@ -6,44 +6,39 @@ import {
   hasGeneratingResource,
   isCharacterLibraryNodeMetadata,
   isMediaReference,
+  isPublicCharacterLibraryResourceId,
   type MediaReference,
   type ObjectReference,
   readNodeLayoutFromMetadata,
 } from "@dafthunk/types";
+import UserRoundIcon from "lucide-react/icons/user-round";
+import ZoomInIcon from "lucide-react/icons/zoom-in";
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
-import ZoomInIcon from "lucide-react/icons/zoom-in";
-import UserRoundIcon from "lucide-react/icons/user-round";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
-import { useAppToast } from "@/hooks/use-app-toast";
-import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
-import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
-import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
-import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
-import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
-import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
+import { formatGenerativePhaseLabel } from "@/components/workflow/generative-progress-utils";
+import { useAppToast } from "@/hooks/use-app-toast";
+import { useCanvasCardSize } from "@/hooks/use-canvas-card-size";
+import { generativeCardProgressKey } from "@/hooks/use-generative-cloud-job";
+import { useGenerativeMediaWorkSession } from "@/hooks/use-generative-media-before-unload";
+import { useGenerativeRecordErrorDisplay } from "@/hooks/use-generative-record-error-display";
+import { useGenerativeCardMediaDisplay } from "@/hooks/use-media-display-url";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 import { isMediaExpired } from "@/services/media-url-resolver";
+import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { cn } from "@/utils/utils";
-
-import { useOpenCreativeStudio } from "../../creative-studio-context";
-import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
-import {
-  isGenerativePersistPhase,
-  readGenerativeProgressPhase,
-  withGenerativeUploadProgress,
-} from "../../generative-progress-utils";
-import type { GenerativeCardCoverRead } from "../../generative-history-utils";
 import {
   readAiImageCardDisplay,
   readAiImageResultHistory,
   withAiImageGenerateError,
   withAiImageManualUpload,
 } from "../../ai-image-node-utils";
+import { CanvasMediaCover } from "../../canvas-media-cover";
+import { useOpenCreativeStudio } from "../../creative-studio-context";
+import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
 import {
   GenerativeCardErrorBlock,
   GenerativeCardErrorDetailDialog,
@@ -56,13 +51,18 @@ import {
   resolveGenerativeCardUploadError,
   withGenerativePromptCleared,
 } from "../../generative-card-upload-utils";
-import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
+import { GenerativeCloudAccelerationCardOffer } from "../../generative-cloud-acceleration-card-offer";
+import type { GenerativeCardCoverRead } from "../../generative-history-utils";
+import {
+  isGenerativePersistPhase,
+  readGenerativeProgressPhase,
+  withGenerativeUploadProgress,
+} from "../../generative-progress-utils";
 import { createPatchNodeLayoutMetadata } from "../../patch-node-layout-metadata";
-import { GenerativeCardEmptyUploadSlot } from "../../generative-card-empty-upload-slot";
+import { prepareGenerativeCardError } from "../../prepare-generative-card-error";
 import { useGenerativeCardUpload } from "../../use-generative-card-upload";
-import { CanvasMediaCover } from "../../canvas-media-cover";
-import { useWorkflow } from "../../workflow-context";
 import { useGenerativeNodeCardHydrateById } from "../../use-generative-node-card-hydrate";
+import { useWorkflow } from "../../workflow-context";
 import type { BaseWidgetProps } from "../widget";
 import { createWidget } from "../widget";
 
@@ -131,8 +131,7 @@ function AiImageWidget({
     historyItems.items[0];
   const selectedFailed = hasFailedResource(selectedHistoryItem?.images);
   const isGenerating =
-    (!selectedFailed && cardDisplay.isBusy) ||
-    progressPhase === "cancelled";
+    (!selectedFailed && cardDisplay.isBusy) || progressPhase === "cancelled";
   useGenerativeMediaWorkSession(
     uploading || (!selectedFailed && cardDisplay.isBusy)
   );
@@ -210,7 +209,15 @@ function AiImageWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
+      if (
+        disabled ||
+        blocksGenerativeMedia ||
+        !files?.length ||
+        !updateNodeData ||
+        !orgId ||
+        !workflowId
+      )
+        return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "image");
       if (!normalized) {
@@ -308,93 +315,99 @@ function AiImageWidget({
         }}
       />
       <Suspense fallback={null}>
-      <StudioImagePhotoProvider>
-        {canDownloadPrimaryImage && coverImage && imageDisplayUrl ? (
-          <StudioImageZoomHiddenTrigger
-            src={imageDisplayUrl}
-            triggerRef={imageZoomTriggerRef}
-          />
-        ) : null}
-        <div
-          className={cn(
-            "relative h-full w-full overflow-hidden cursor-grab select-none",
-            uploading && "opacity-70",
-            className
-          )}
-          onDoubleClick={(event) => {
-            if (generateError) {
-              event.stopPropagation();
-              setErrorDetailOpen(true);
-              return;
-            }
-            if (!isGenerating) {
-              event.stopPropagation();
-              openCreativeStudio();
-            }
-          }}
-        >
-          {!hasImage && !generateError ? (
-            <GenerativeCardEmptyUploadSlot
-              kind="image"
-              size="canvas"
-              doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
-              busy={isGenerating || uploading}
-              busyMessage={cardPlaceholder}
-              canUpload={canUpload}
-              onUploadClick={handleUploadClick}
-            />
-          ) : hasImage && coverImage && !generateError ? (
-            <CanvasMediaCover
-              media={coverImage}
-              nodeType="ai-image"
-              cardWidthPx={cardSize.width}
-              cardHeightPx={cardSize.height}
-              fitMode="cover"
-              className="h-full w-full rounded-none border-0"
-              onNaturalSize={onNaturalSize}
-              sharedUrlSet={sharedUrlSet}
+        <StudioImagePhotoProvider>
+          {canDownloadPrimaryImage && coverImage && imageDisplayUrl ? (
+            <StudioImageZoomHiddenTrigger
+              src={imageDisplayUrl}
+              triggerRef={imageZoomTriggerRef}
             />
           ) : null}
+          <div
+            className={cn(
+              "relative h-full w-full overflow-hidden cursor-grab select-none",
+              uploading && "opacity-70",
+              className
+            )}
+            onDoubleClick={(event) => {
+              if (generateError) {
+                event.stopPropagation();
+                setErrorDetailOpen(true);
+                return;
+              }
+              if (!isGenerating) {
+                event.stopPropagation();
+                openCreativeStudio();
+              }
+            }}
+          >
+            {!hasImage && !generateError ? (
+              <GenerativeCardEmptyUploadSlot
+                kind="image"
+                size="canvas"
+                doubleClickHintKey="workflow.studio.cardDoubleClickOpenStudio"
+                busy={isGenerating || uploading}
+                busyMessage={cardPlaceholder}
+                canUpload={canUpload}
+                onUploadClick={handleUploadClick}
+              />
+            ) : hasImage && coverImage && !generateError ? (
+              <CanvasMediaCover
+                media={coverImage}
+                nodeType="ai-image"
+                cardWidthPx={cardSize.width}
+                cardHeightPx={cardSize.height}
+                fitMode="cover"
+                className="h-full w-full rounded-none border-0"
+                onNaturalSize={onNaturalSize}
+                sharedUrlSet={sharedUrlSet}
+              />
+            ) : null}
 
-          {isCharacterLibraryNodeMetadata(metadata) ? (
-            <div className="pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              <UserRoundIcon className="size-3" />
-              {t("workflow.characterLibrary.title")}
-            </div>
-          ) : null}
+            {isCharacterLibraryNodeMetadata(metadata) ? (
+              <div className="pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <UserRoundIcon className="size-3" />
+                {t(
+                  isPublicCharacterLibraryResourceId(primaryImageKey)
+                    ? "workflow.characterLibrary.publicTitle"
+                    : "workflow.characterLibrary.title"
+                )}
+              </div>
+            ) : null}
 
-          {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+            {generateError ? (
+              <GenerativeCardErrorBlock error={generateError} />
+            ) : null}
 
-          {isPersistDownloading ? (
-            <div className="nodrag nopan nowheel absolute inset-x-0 bottom-3 z-50 flex justify-center px-2">
-              <GenerativeCloudAccelerationCardOffer nodeId={nodeId} />
-            </div>
-          ) : null}
+            {isPersistDownloading ? (
+              <div className="nodrag nopan nowheel absolute inset-x-0 bottom-3 z-50 flex justify-center px-2">
+                <GenerativeCloudAccelerationCardOffer nodeId={nodeId} />
+              </div>
+            ) : null}
 
-          {!generateError && canDownloadPrimaryImage && coverImage ? (
-            <div className="nodrag nopan nowheel absolute bottom-2 right-2 z-50">
-              <button
-                type="button"
-                className="nodrag nopan nowheel flex h-6 w-6 shrink-0 items-center justify-center text-white/75 transition-colors hover:text-white"
-                title={t("workflow.studio.viewImage")}
-                aria-label={t("workflow.studio.viewImage")}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                }}
-                onMouseDown={(event) => {
-                  event.stopPropagation();
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleOpenImageZoom();
-                }}
-              >
-                <ZoomInIcon className="h-4 w-4" strokeWidth={2} />
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </StudioImagePhotoProvider>
+            {!generateError && canDownloadPrimaryImage && coverImage ? (
+              <div className="nodrag nopan nowheel absolute bottom-2 right-2 z-50">
+                <button
+                  type="button"
+                  className="nodrag nopan nowheel flex h-6 w-6 shrink-0 items-center justify-center text-white/75 transition-colors hover:text-white"
+                  title={t("workflow.studio.viewImage")}
+                  aria-label={t("workflow.studio.viewImage")}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleOpenImageZoom();
+                  }}
+                >
+                  <ZoomInIcon className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </StudioImagePhotoProvider>
       </Suspense>
 
       {generateError ? (

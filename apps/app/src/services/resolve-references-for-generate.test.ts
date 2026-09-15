@@ -118,17 +118,6 @@ describe("resolveMediaReferencesForVideoGenerate", () => {
 
   it("requests generation submit urls and keeps character-library asset://", async () => {
     const resourceId = "res-char";
-    makeRequestMock.mockResolvedValue({
-      resolved: [
-        {
-          resourceId,
-          url: "asset://asset-1",
-          mimeType: "image/png",
-        },
-      ],
-      unresolved: [],
-    });
-
     const result = await resolveMediaReferencesForVideoGenerate({
       organizationId: "org-1",
       workflowId: "wf-1",
@@ -146,15 +135,27 @@ describe("resolveMediaReferencesForVideoGenerate", () => {
     });
 
     expect(result.referenceImageUrls).toEqual(["asset://asset-1"]);
-    expect(makeRequestMock).toHaveBeenCalledWith(
-      "/org-1/platform-ai/resolve-resource-refs",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          resourceIds: [resourceId],
-          generationSubmit: true,
-        }),
-      })
-    );
+    expect(makeRequestMock).not.toHaveBeenCalled();
+  });
+
+  it("submits public portraits as asset:// without catalog lookup", async () => {
+    const result = await resolveMediaReferencesForVideoGenerate({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      cloudConfigured: true,
+      references: [
+        {
+          resourceId: "public:asset-9",
+          mimeType: "image/jpeg",
+          kind: "cloud",
+          characterLibrary: true,
+          upstreamAssetId: "asset-9",
+          previewUrl: "https://cdn.example/p.jpg",
+        },
+      ],
+    });
+
+    expect(result.referenceImageUrls).toEqual(["asset://asset-9"]);
+    expect(makeRequestMock).not.toHaveBeenCalled();
   });
 });

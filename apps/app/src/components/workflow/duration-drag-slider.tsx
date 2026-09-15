@@ -1,4 +1,4 @@
-import { useCallback, type MouseEvent as ReactMouseEvent } from "react";
+import { type MouseEvent as ReactMouseEvent, useCallback } from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -20,6 +20,20 @@ function durationFromClientX(
   return Math.min(max, Math.max(min, min + Math.round(ratio * span)));
 }
 
+function percentFromValue(value: number, min: number, max: number): number {
+  const span = Math.max(max - min, 1);
+  return ((value - min) / span) * 100;
+}
+
+function DragThumb({ percent }: { readonly percent: number }) {
+  return (
+    <div
+      className="absolute top-1/2 size-3 -translate-y-1/2 rounded-full border border-border bg-background shadow-sm"
+      style={{ left: `calc(${percent}% - 6px)` }}
+    />
+  );
+}
+
 export interface DurationDragSliderProps {
   readonly min: number;
   readonly max: number;
@@ -39,8 +53,7 @@ export function DurationDragSlider({
   onPreview,
   onCommit,
 }: DurationDragSliderProps) {
-  const span = Math.max(max - min, 1);
-  const percent = ((value - min) / span) * 100;
+  const percent = percentFromValue(value, min, max);
 
   const handleMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -85,10 +98,7 @@ export function DurationDragSlider({
           className="absolute inset-y-0 left-0 rounded-full bg-primary"
           style={{ width: `${percent}%` }}
         />
-        <div
-          className="absolute top-1/2 size-3 -translate-y-1/2 rounded-full border border-border bg-background shadow-sm"
-          style={{ left: `calc(${percent}% - 6px)` }}
-        />
+        <DragThumb percent={percent} />
       </div>
     </div>
   );

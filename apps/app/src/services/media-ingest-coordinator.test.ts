@@ -92,4 +92,21 @@ describe("coordinateIngestCanvasMedia", () => {
     expect(ensureGenerativeMediaCached).toHaveBeenCalledTimes(1);
     expect(generateCacheResourceTiers).toHaveBeenCalledTimes(1);
   });
+
+  it("skips ingest for public character-library portraits", async () => {
+    await coordinateIngestCanvasMedia({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      media: {
+        resourceId: "public:asset-9",
+        mimeType: "image/jpeg",
+        previewUrl: "https://cdn.example/p.jpg",
+      },
+      nodeType: "ai-image",
+    });
+
+    expect(ensureGenerativeMediaCached).not.toHaveBeenCalled();
+    expect(generateCacheResourceTiers).not.toHaveBeenCalled();
+    expect(areResourcesCloudStored).not.toHaveBeenCalled();
+  });
 });

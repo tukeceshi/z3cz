@@ -3,26 +3,26 @@ import { Hono } from "hono";
 import { jwtMiddleware } from "../../auth";
 import { ApiContext } from "../../context";
 import { adminMiddleware } from "../../middleware/admin";
+import adminAiModelsRoutes from "./ai-models";
+import adminAuthConfigRoutes from "./auth-config";
+import adminBootstrapConfigRoutes from "./bootstrap-config";
+import adminCompetitorVideoPricingRoutes from "./competitor-video-pricing";
 import adminDatabasesRoutes from "./databases";
+import adminFeatureConfigRoutes from "./feature-config";
+import adminFormatTransformTemplateRoutes from "./format-transform-templates";
+import adminLegalDocumentsRoutes from "./legal-documents";
+import adminModelInvocationsRoutes from "./model-invocations";
 import adminObjectsRoutes from "./objects";
 import adminOnboardingRoutes from "./onboarding";
 import adminOnboardingMessageRoutes from "./onboarding-message";
 import adminOrganizationsRoutes from "./organizations";
 import adminPersistWorkerRoutes from "./persist-workers";
-import adminLegalDocumentsRoutes from "./legal-documents";
-import adminAiModelsRoutes from "./ai-models";
-import adminAuthConfigRoutes from "./auth-config";
-import adminBootstrapConfigRoutes from "./bootstrap-config";
-import adminModelInvocationsRoutes from "./model-invocations";
 import adminQueuesRoutes from "./queues";
 import adminSettingsRoutes from "./settings";
-import adminCompetitorVideoPricingRoutes from "./competitor-video-pricing";
-import adminFeatureConfigRoutes from "./feature-config";
 import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
 import adminUsersRoutes from "./users";
 import adminWorkflowSchemesRoutes from "./workflow-schemes";
-import adminFormatTransformTemplateRoutes from "./format-transform-templates";
 import adminWorkflowsRoutes from "./workflows";
 
 const adminRoutes = new Hono<ApiContext>();
@@ -36,7 +36,10 @@ adminRoutes.use("*", adminMiddleware);
 // Mount admin sub-routes
 adminRoutes.route("/stats", adminStatsRoutes);
 adminRoutes.route("/settings", adminSettingsRoutes);
-adminRoutes.route("/competitor-video-pricing", adminCompetitorVideoPricingRoutes);
+adminRoutes.route(
+  "/competitor-video-pricing",
+  adminCompetitorVideoPricingRoutes
+);
 adminRoutes.route("/legal-documents", adminLegalDocumentsRoutes);
 adminRoutes.route("/auth-config", adminAuthConfigRoutes);
 adminRoutes.route("/bootstrap-config", adminBootstrapConfigRoutes);

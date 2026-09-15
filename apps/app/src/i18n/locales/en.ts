@@ -416,17 +416,21 @@ export const en = {
     maintenanceHint:
       "When enabled, homepage visitors see a maintenance page and open canvas sessions show a blocking overlay.",
     maintenanceMessage: "Maintenance message",
-    maintenanceMessagePlaceholder: "The system is under maintenance. Please try again later.",
-    maintenanceMessageHelp: "Leave empty to use the default maintenance message.",
+    maintenanceMessagePlaceholder:
+      "The system is under maintenance. Please try again later.",
+    maintenanceMessageHelp:
+      "Leave empty to use the default maintenance message.",
   },
   maintenance: {
     canvasTitle: "System maintenance",
-    canvasDefaultMessage: "The system is under maintenance. Canvas editing is paused.",
+    canvasDefaultMessage:
+      "The system is under maintenance. Canvas editing is paused.",
     canvasStatusRefresh: "Refresh status",
     canvasStatusFetchFailed:
       "Unable to reach the service. Maintenance may still be in progress. Please try again.",
     homepageTitle: "System maintenance",
-    homepageDefaultMessage: "The system is under maintenance. Please try again later.",
+    homepageDefaultMessage:
+      "The system is under maintenance. Please try again later.",
     homepageRefresh: "Refresh",
   },
   competitorPricing: {
@@ -2114,7 +2118,8 @@ export const en = {
         toggleFailed: "Failed to update model enablement",
         characterLibrary: "Character library",
         groupNotCreated: "Not created",
-        characterLibraryRequirement: "Requires the private asset library service enabled on your Volcano account. Go to",
+        characterLibraryRequirement:
+          "Requires the private asset library service enabled on your Volcano account. Go to",
         characterLibraryRequirementLink: "Enable private asset library",
         characterLibraryRequirementAfterLink: ".",
         aliasSaveFailed: "Failed to save model alias",
@@ -2299,7 +2304,8 @@ export const en = {
         pricingPriceColumn: "Reference price / s",
         pricingMoreFpsLink: "More frame-rate pricing",
         subtitleEraseSection: "Subtitle erase",
-        subtitleErasePricingHint: "Reference price per second by erase duration",
+        subtitleErasePricingHint:
+          "Reference price per second by erase duration",
         subtitleEraseModes: {
           standard: "Standard",
           refined: "Refined",
@@ -2519,7 +2525,8 @@ export const en = {
       apiLogsTitle: "API logs",
       submitLogTitle: "Start check · CreateArkOfficialResultQuery",
       resultLogTitle: "Refresh result · GetArkOfficialResult",
-      pendingHint: "Volcano is still processing this query. Try again in a moment.",
+      pendingHint:
+        "Volcano is still processing this query. Try again in a moment.",
       fields: {
         isOfficial: "Official artifact detected",
         modelVersion: "Model version",
@@ -2541,7 +2548,8 @@ export const en = {
         cachedRequired: "Select a cached video.",
         cachedMissing: "Could not read the selected cached video.",
         sourceRequired: "Choose a video source.",
-        uploadFailed: "Cloud upload failed. Check cloud storage settings and try again.",
+        uploadFailed:
+          "Cloud upload failed. Check cloud storage settings and try again.",
         submitFailed: "Submit failed",
         resultFailed: "Failed to refresh result",
         debugTitle: "Error details",
@@ -3134,10 +3142,8 @@ export const en = {
         title: "Remove nodes",
         delete:
           "{{count}} node(s) contain generation records. You can restore them with Ctrl+Z after removal.",
-        undo:
-          "Undo will remove {{count}} node(s) with generation records from the canvas.",
-        redo:
-          "Redo will remove {{count}} node(s) with generation records from the canvas.",
+        undo: "Undo will remove {{count}} node(s) with generation records from the canvas.",
+        redo: "Redo will remove {{count}} node(s) with generation records from the canvas.",
         dontAskAgain: "Don't show this confirmation again",
       },
       themeTipTitle: "Background theme",
@@ -3473,25 +3479,50 @@ export const en = {
       run: "Run",
     },
     characterLibrary: {
-      title: "Character library",
+      title: "Private character library",
+      publicTitle: "Public character library",
       openTooltip: "Character library",
+      privateDisabledHint:
+        "Private library needs a model with character-library support. You can also switch to the public library at the top left.",
+      publicEmpty: "No matching public characters.",
+      searchPlaceholder:
+        "Enter appearance and style to find matching virtual portraits",
+      gender: "Gender",
+      age: "Age",
+      country: "Nationality",
+      all: "All",
+      loadMore: "Load more",
       empty: "Character library is empty",
+      categoryCharacter: "Character",
+      categoryImage: "Image",
+      categoryVideo: "Video",
+      categoryAudio: "Audio",
       add: "Add character",
       addFromExisting: "Pick from existing resources",
+      createCharacter: "New character",
+      characterNamePlaceholder: "Enter a name",
+      addToCharacter: "Add to character",
+      backToCharacters: "Back",
       backToList: "Back to library",
       availableEmpty: "No resources available to reference",
       insertToCanvas: "Insert to canvas",
       insertNotReady: "Wait until the character is ready before inserting",
       delete: "Remove",
-      deleteConfirmTitle: "Remove this character from the library?",
+      deleteConfirmTitle: "Remove this item from the library?",
       deleteConfirmDescription:
         "Only the library record is removed; the resource itself is kept.",
+      deleteCharacterTitle: "Delete this character?",
+      deleteCharacterDescription:
+        "Only the folder is removed; items stay in their original categories.",
+      removeFromCharacterTitle: "Remove from this character?",
+      removeFromCharacterDescription: "The item stays in the library.",
       statusImporting: "Importing",
       statusActive: "Ready",
       statusFailed: "Failed",
       retryImport: "Retry import",
       assetGroupId: "Asset group ID",
       groupNotCreated: "Not created",
+      workflow: "Workflow",
       loadFailed: "Failed to load",
     },
     aiTextPanel: {
@@ -3882,7 +3913,8 @@ export const en = {
       captureLastFrame: "Last frame",
       captureCurrentFrame: "Current frame",
       captureFrameSuccess: "Created image node “{{nodeName}}”",
-      captureFrameSuccessInSecondary: "Opened “{{nodeName}}” in the secondary editor",
+      captureFrameSuccessInSecondary:
+        "Opened “{{nodeName}}” in the secondary editor",
       captureFrameFailed: "Failed to capture frame",
     },
     videoEnhance: {
@@ -3953,7 +3985,8 @@ export const en = {
       openAiInterfaces: "Open interface settings",
       loadFailed: "Unable to load video",
       mediaKitComingSoon: "Cloud high-quality trim is coming soon",
-      sourceNotCloud: "High-quality trim requires the source video in cloud storage",
+      sourceNotCloud:
+        "High-quality trim requires the source video in cloud storage",
       submitFailed: "High-quality trim submit failed",
       webCodecsUnsupported: "This browser does not support local video trim",
       createNodeFailed: "Failed to create trim node",

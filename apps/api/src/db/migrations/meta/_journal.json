@@ -645,6 +645,41 @@
       "when": 1790840000000,
       "tag": "0097_media_resource_upstream_asset",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1790920000000,
+      "tag": "0098_media_resource_source_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1791000000000,
+      "tag": "0099_media_resource_source_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1791080000000,
+      "tag": "0100_character_library_characters",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1791160000000,
+      "tag": "0101_platform_public_character_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1791240000000,
+      "tag": "0102_public_character_library_groups",
+      "breakpoints": true
     }
   ]
 }

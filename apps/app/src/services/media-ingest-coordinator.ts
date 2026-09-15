@@ -1,10 +1,13 @@
-import { getResourceIdFromValue } from "@dafthunk/types";
-
+import {
+  getResourceIdFromValue,
+  isPublicCharacterLibraryResourceId,
+  type WorkflowMediaValue,
+} from "@dafthunk/types";
+import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
 import {
   generateCacheResourceTiers,
   getCachedMediaBlob,
 } from "@/services/ai-media-cache-service";
-import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
 import { areResourcesCloudStored } from "@/services/cloud-acceleration-decision";
 import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
 
@@ -38,7 +41,11 @@ function resolveIngestMediaId(params: IngestCanvasMediaParams): string | null {
   if (!params.workflowId) {
     return null;
   }
-  return getResourceIdFromValue(params.media);
+  const mediaId = getResourceIdFromValue(params.media);
+  if (!mediaId || isPublicCharacterLibraryResourceId(mediaId)) {
+    return null;
+  }
+  return mediaId;
 }
 
 const ingestCoordinator = new Map<string, IngestCoordinatorEntry>();

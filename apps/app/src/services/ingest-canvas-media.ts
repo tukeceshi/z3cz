@@ -3,14 +3,14 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   getResourceIdFromValue,
+  isPublicCharacterLibraryResourceId,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
-
-import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { readAiAudioCardAudios } from "@/components/workflow/ai-audio-node-utils";
 import { readAiImageCardImages } from "@/components/workflow/ai-image-node-utils";
 import { readAiVideoCardVideos } from "@/components/workflow/ai-video-node-utils";
+import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { getCachedMediaBlob } from "@/services/ai-media-cache-service";
 import {
   coordinateIngestCanvasMedia,
@@ -22,12 +22,15 @@ export type { IngestCanvasMediaParams };
 export async function ingestCanvasMedia(
   params: IngestCanvasMediaParams
 ): Promise<void> {
-  await coordinateIngestCanvasMedia(params);
-
   const mediaId = getResourceIdFromValue(params.media);
   if (!mediaId || !params.workflowId) {
     return;
   }
+  if (isPublicCharacterLibraryResourceId(mediaId)) {
+    return;
+  }
+
+  await coordinateIngestCanvasMedia(params);
 
   const cached = await getCachedMediaBlob({
     organizationId: params.organizationId,
@@ -71,7 +74,9 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key)) continue;
+        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+          continue;
+        }
         seen.add(key);
         items.push({ media, nodeType: "ai-image" });
       }
@@ -85,7 +90,9 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key)) continue;
+        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+          continue;
+        }
         seen.add(key);
         items.push({ media, nodeType: "ai-video" });
       }
@@ -99,7 +106,9 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key)) continue;
+        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+          continue;
+        }
         seen.add(key);
         items.push({ media, nodeType: "ai-audio" });
       }
