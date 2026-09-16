@@ -908,7 +908,7 @@ auth.get("/sub-account-invitations/:id", async (c) => {
         id: preview.id,
         email: preview.email,
         organizationName: preview.organizationName,
-        expiresAt: preview.expiresAt.toISOString(),
+        expiresAt: preview.expiresAt,
       },
     } satisfies GetSubAccountInvitationPreviewResponse);
   } catch (error) {

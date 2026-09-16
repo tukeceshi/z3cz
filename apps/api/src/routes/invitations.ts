@@ -43,8 +43,20 @@ invitationRoutes.get("/", async (c) => {
     const response: ListUserInvitationsResponse = {
       invitations: invitations.map((inv) => ({
         ...inv,
-        role: inv.role as "member" | "owner",
+        role: "member" as const,
         status: inv.status as "pending" | "accepted" | "declined" | "expired",
+        expiresAt:
+          inv.expiresAt instanceof Date
+            ? inv.expiresAt
+            : new Date(inv.expiresAt),
+        createdAt:
+          inv.createdAt instanceof Date
+            ? inv.createdAt
+            : new Date(inv.createdAt),
+        updatedAt:
+          inv.updatedAt instanceof Date
+            ? inv.updatedAt
+            : new Date(inv.updatedAt),
       })),
     };
     return c.json(response);

@@ -209,7 +209,7 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
     this.setApiHost(new URL(ctx.request.url).origin);
 
-    this.workflowState = undefined;
+    this.workflowState = null;
     if (!(await this.tryLoadState(workflowId, userId))) {
       connection.close(1008, "Failed to load workflow state");
       return;

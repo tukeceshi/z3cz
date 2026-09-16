@@ -7,13 +7,13 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { eq } from "drizzle-orm";
+import { VOLCANO_ARK_API_KEY_DURATION_SECONDS } from "@dafthunk/types";
 
 import { createDatabase } from "../src/db";
 import { organizationAiInterfaces } from "../src/db/schema";
 import { callVolcengineArkApi } from "../src/integrations/volcengine/client";
 import {
   VOLCANO_ARK_INFERENCE_BASE_URL,
-  VOLCANO_ARK_API_KEY_DURATION_SECONDS,
   VOLCANO_DEFAULT_PROJECT_NAME,
 } from "../src/integrations/volcengine/constants";
 import {

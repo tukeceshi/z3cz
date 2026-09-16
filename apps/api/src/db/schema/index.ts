@@ -1,6 +1,7 @@
 import type {
   GenerationJobResultJson,
   PlatformAiModelParameterRules,
+  SubAccountPermissions,
 } from "@dafthunk/types";
 import { relations } from "drizzle-orm";
 import {
@@ -301,7 +302,7 @@ export const memberships = pgTable(
       .$type<OrganizationRoleType>()
       .notNull()
       .default(OrganizationRole.MEMBER),
-    permissions: jsonb("permissions").$type<Record<string, unknown> | null>(),
+    permissions: jsonb("permissions").$type<SubAccountPermissions | null>(),
     createdAt: createCreatedAt(),
     updatedAt: createUpdatedAt(),
   },
@@ -1318,7 +1319,7 @@ export const invitations = pgTable(
       .$type<OrganizationRoleType>()
       .notNull()
       .default(OrganizationRole.MEMBER),
-    permissions: jsonb("permissions").$type<Record<string, unknown> | null>(),
+    permissions: jsonb("permissions").$type<SubAccountPermissions | null>(),
     status: text("status")
       .$type<InvitationStatusType>()
       .notNull()
