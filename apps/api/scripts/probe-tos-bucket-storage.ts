@@ -1,3 +1,4 @@
+import type { Bindings } from "../src/context";
 import { createDatabase } from "../src/db/index";
 import { getOrganizationAiInterfaceRow } from "../src/db/ai-interface-queries";
 import { getVolcanoCredentials } from "../src/integrations/volcengine/ensure-api-key";
@@ -9,10 +10,15 @@ const orgId = process.argv[2] ?? "019f9cf9-e5b3-720f-9b26-babb3ed15830";
 const ifaceId = process.argv[3] ?? "41713747-0341-45b1-ab4f-3c3c7a9cb184";
 
 async function main(): Promise<void> {
+  if (!process.env.DATABASE_URL || !process.env.SECRET_MASTER_KEY) {
+    throw new Error("DATABASE_URL and SECRET_MASTER_KEY are required");
+  }
+
   const env = {
     DATABASE_URL: process.env.DATABASE_URL,
     SECRET_MASTER_KEY: process.env.SECRET_MASTER_KEY,
-  } as const;
+  } as Pick<Bindings, "DATABASE_URL" | "SECRET_MASTER_KEY"> as Bindings;
+
   const db = createDatabase(env);
   const row = await getOrganizationAiInterfaceRow(db, orgId, ifaceId);
   if (!row) {

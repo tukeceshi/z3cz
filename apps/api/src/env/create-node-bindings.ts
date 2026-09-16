@@ -1,4 +1,7 @@
+import type { RuntimeParams } from "@dafthunk/runtime";
+
 import type { Bindings } from "../context";
+import type { WorkflowAgent } from "../durable-objects/workflow-agent";
 import { resolveSecret } from "./startup-secrets";
 import { setNodeBindings } from "./node-bindings-ref";
 import { MemoryKvNamespace } from "../storage/memory-kv";
@@ -13,7 +16,9 @@ function createStubRateLimit(): RateLimit {
   return {} as RateLimit;
 }
 
-function createStubDurableObjectNamespace<T>(): DurableObjectNamespace<T> {
+function createStubDurableObjectNamespace<
+  T extends Rpc.DurableObjectBranded | undefined = undefined,
+>(): DurableObjectNamespace<T> {
   return {
     idFromName: (name: string) =>
       ({
@@ -32,7 +37,7 @@ function createStubDurableObjectNamespace<T>(): DurableObjectNamespace<T> {
         "Durable Objects are not available in the Node.js runtime yet"
       );
     },
-  } as DurableObjectNamespace<T>;
+  } as unknown as DurableObjectNamespace<T>;
 }
 
 function createStubAnalytics(): AnalyticsEngineDataset {
@@ -45,7 +50,7 @@ function createStubAi(): Ai {
   return {} as Ai;
 }
 
-function createNodeExecuteWorkflowBinding(): Workflow<unknown> {
+function createNodeExecuteWorkflowBinding(): Workflow<RuntimeParams> {
   // Lazy import avoids circular dependency at module load time.
   return {
     create: async () => {
@@ -69,9 +74,9 @@ function createNodeExecuteWorkflowBinding(): Workflow<unknown> {
           `Workflow execution ${executionId} not found or finished`
         );
       }
-      return instance;
+      return instance as WorkflowInstance;
     },
-  } as Workflow<unknown>;
+  } as Workflow<RuntimeParams>;
 }
 
 function createStubQueue(): Queue {
@@ -93,7 +98,7 @@ export async function createNodeBindings(
     RATE_LIMIT_AUTH: createStubRateLimit(),
     RATE_LIMIT_EXECUTE: createStubRateLimit(),
     EXECUTE: createNodeExecuteWorkflowBinding(),
-    WORKFLOW_AGENT: createStubDurableObjectNamespace(),
+    WORKFLOW_AGENT: createStubDurableObjectNamespace<WorkflowAgent>(),
     AGENT_RUNNER: createNodeAgentRunnerNamespace(),
     EMAIL_AGENT_RUNNER: createNodeEmailAgentRunnerNamespace(),
     MAILBOX: createNodeMailboxNamespace(),

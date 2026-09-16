@@ -8,10 +8,12 @@ import { Bindings } from "../context";
 import { encryptSecret } from "../utils/encryption";
 import {
   DEFAULT_SUB_ACCOUNT_PERMISSIONS,
+  type SubAccountPermissions,
+} from "@dafthunk/types";
+import {
   mergeSubAccountPermissions,
   parseSubAccountPermissions,
 } from "../utils/sub-account-permissions";
-import type { SubAccountPermissions } from "@dafthunk/types";
 import {
   type ApiKeyInsert,
   apiKeys,
@@ -898,8 +900,15 @@ export async function deleteQueue(
 export async function getDatabases(
   db: ReturnType<typeof createDatabase>,
   organizationId: string
-) {
-  return await db
+): Promise<
+  Array<{
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>
+> {
+  const rows = await db
     .select({
       id: databases.id,
       name: databases.name,
@@ -908,6 +917,15 @@ export async function getDatabases(
     })
     .from(databases)
     .where(eq(databases.organizationId, organizationId));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    createdAt:
+      row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    updatedAt:
+      row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
+  }));
 }
 
 /**
