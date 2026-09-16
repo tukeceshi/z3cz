@@ -6,6 +6,7 @@ import {
 } from "./media-ingest-coordinator";
 
 const getCachedMediaBlob = vi.fn();
+const cacheMediaFromUrl = vi.fn();
 const ensureGenerativeMediaCached = vi.fn();
 const generateCacheResourceTiers = vi.fn();
 const notifyAiMediaCacheChanged = vi.fn();
@@ -13,6 +14,7 @@ const areResourcesCloudStored = vi.fn();
 
 vi.mock("@/services/ai-media-cache-service", () => ({
   getCachedMediaBlob: (...args: unknown[]) => getCachedMediaBlob(...args),
+  cacheMediaFromUrl: (...args: unknown[]) => cacheMediaFromUrl(...args),
   generateCacheResourceTiers: (...args: unknown[]) =>
     generateCacheResourceTiers(...args),
 }));
@@ -47,6 +49,7 @@ describe("coordinateIngestCanvasMedia", () => {
       mediaId: "media-1",
     });
     getCachedMediaBlob.mockResolvedValue(null);
+    cacheMediaFromUrl.mockResolvedValue(true);
     ensureGenerativeMediaCached.mockResolvedValue(undefined);
     generateCacheResourceTiers.mockResolvedValue(undefined);
     areResourcesCloudStored.mockResolvedValue(false);
@@ -70,13 +73,15 @@ describe("coordinateIngestCanvasMedia", () => {
           resolveIngest = resolve;
         })
     );
-    getCachedMediaBlob
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(new Blob(["fresh"]));
+    getCachedMediaBlob.mockResolvedValue(new Blob(["fresh"]));
+    getCachedMediaBlob.mockResolvedValueOnce(null);
+    getCachedMediaBlob.mockResolvedValueOnce(null);
 
     const first = coordinateIngestCanvasMedia(params);
+    await vi.waitFor(() => {
+      expect(ensureGenerativeMediaCached).toHaveBeenCalledTimes(1);
+    });
     const second = coordinateIngestCanvasMedia(params);
-
     resolveIngest?.();
     await Promise.all([first, second]);
 
@@ -93,7 +98,13 @@ describe("coordinateIngestCanvasMedia", () => {
     expect(generateCacheResourceTiers).toHaveBeenCalledTimes(1);
   });
 
-  it("skips ingest for public character-library portraits", async () => {
+  it("caches public character-library portraits from preview URL without cloud lookup", async () => {
+    resetMediaIngestState({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      mediaId: "public:asset-9",
+    });
+
     await coordinateIngestCanvasMedia({
       organizationId: "org-1",
       workflowId: "wf-1",
@@ -106,7 +117,66 @@ describe("coordinateIngestCanvasMedia", () => {
     });
 
     expect(ensureGenerativeMediaCached).not.toHaveBeenCalled();
-    expect(generateCacheResourceTiers).not.toHaveBeenCalled();
     expect(areResourcesCloudStored).not.toHaveBeenCalled();
+    expect(cacheMediaFromUrl).toHaveBeenCalledTimes(1);
+    const cacheCall = cacheMediaFromUrl.mock.calls[0]?.[0] as {
+      readonly fetchUrl?: string;
+      readonly media: { readonly resourceId: string };
+    };
+    expect(cacheCall.media.resourceId).toBe("public:asset-9");
+    expect(cacheCall.fetchUrl).toContain("platform-ai/media/proxy");
+    expect(cacheCall.fetchUrl).toContain(
+      encodeURIComponent("https://cdn.example/p.jpg")
+    );
+    expect(generateCacheResourceTiers).toHaveBeenCalledTimes(1);
+    expect(notifyAiMediaCacheChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips public portrait fetch when IndexedDB already has the blob", async () => {
+    resetMediaIngestState({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      mediaId: "public:asset-9",
+    });
+    getCachedMediaBlob.mockResolvedValue(new Blob(["cached"]));
+
+    await coordinateIngestCanvasMedia({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      media: {
+        resourceId: "public:asset-9",
+        mimeType: "image/jpeg",
+        previewUrl: "https://cdn.example/p.jpg",
+      },
+      nodeType: "ai-image",
+    });
+
+    expect(cacheMediaFromUrl).not.toHaveBeenCalled();
+    expect(ensureGenerativeMediaCached).not.toHaveBeenCalled();
+    expect(areResourcesCloudStored).not.toHaveBeenCalled();
+    expect(generateCacheResourceTiers).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache public portraits without a preview URL", async () => {
+    resetMediaIngestState({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      mediaId: "public:asset-9",
+    });
+
+    await coordinateIngestCanvasMedia({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      media: {
+        resourceId: "public:asset-9",
+        mimeType: "image/jpeg",
+      },
+      nodeType: "ai-image",
+    });
+
+    expect(cacheMediaFromUrl).not.toHaveBeenCalled();
+    expect(ensureGenerativeMediaCached).not.toHaveBeenCalled();
+    expect(areResourcesCloudStored).not.toHaveBeenCalled();
+    expect(generateCacheResourceTiers).not.toHaveBeenCalled();
   });
 });

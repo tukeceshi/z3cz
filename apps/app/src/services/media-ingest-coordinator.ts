@@ -5,10 +5,12 @@ import {
 } from "@dafthunk/types";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
 import {
+  cacheMediaFromUrl,
   generateCacheResourceTiers,
   getCachedMediaBlob,
 } from "@/services/ai-media-cache-service";
 import { areResourcesCloudStored } from "@/services/cloud-acceleration-decision";
+import { buildMediaProxyEndpoint } from "@/services/media-cache-fetch-utils";
 import { ensureGenerativeMediaCached } from "@/services/stage-generative-media";
 
 const FAILED_COOLDOWN_MS = 30_000;
@@ -41,11 +43,12 @@ function resolveIngestMediaId(params: IngestCanvasMediaParams): string | null {
   if (!params.workflowId) {
     return null;
   }
+  return getResourceIdFromValue(params.media);
+}
+
+function isPublicPortraitIngest(params: IngestCanvasMediaParams): boolean {
   const mediaId = getResourceIdFromValue(params.media);
-  if (!mediaId || isPublicCharacterLibraryResourceId(mediaId)) {
-    return null;
-  }
-  return mediaId;
+  return Boolean(mediaId && isPublicCharacterLibraryResourceId(mediaId));
 }
 
 const ingestCoordinator = new Map<string, IngestCoordinatorEntry>();
@@ -80,7 +83,7 @@ async function shouldRefreshIngestFromCloudStorage(
   params: IngestCanvasMediaParams
 ): Promise<boolean> {
   const mediaId = resolveIngestMediaId(params);
-  if (!mediaId) {
+  if (!mediaId || isPublicPortraitIngest(params)) {
     return false;
   }
   return areResourcesCloudStored({
@@ -103,6 +106,49 @@ async function finishIngestSideEffects(
   }
 }
 
+async function cachePublicPortraitPreview(
+  params: IngestCanvasMediaParams,
+  mediaId: string
+): Promise<void> {
+  if (!params.workflowId) {
+    return;
+  }
+
+  const previewUrl = params.media.previewUrl?.trim();
+  if (!previewUrl) {
+    return;
+  }
+
+  const cacheParams = {
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    mediaId,
+  };
+
+  if (await isMediaCachedInIndexedDb(cacheParams)) {
+    await finishIngestSideEffects(params, mediaId);
+    return;
+  }
+
+  const cachedOk = await cacheMediaFromUrl({
+    organizationId: params.organizationId,
+    workflowId: params.workflowId,
+    workflowName: params.workflowId,
+    media: params.media,
+    nodeType: params.nodeType,
+    fetchUrl: buildMediaProxyEndpoint(
+      params.organizationId,
+      previewUrl,
+      params.media.mimeType || "image/jpeg"
+    ),
+  });
+  if (!cachedOk) {
+    throw new Error("Media ingest did not populate local cache");
+  }
+
+  await finishIngestSideEffects(params, mediaId);
+}
+
 async function runIngestCanvasMediaWork(
   params: IngestCanvasMediaParams
 ): Promise<void> {
@@ -112,6 +158,11 @@ async function runIngestCanvasMediaWork(
 
   const mediaId = resolveIngestMediaId(params);
   if (!mediaId) {
+    return;
+  }
+
+  if (isPublicPortraitIngest(params)) {
+    await cachePublicPortraitPreview(params, mediaId);
     return;
   }
 

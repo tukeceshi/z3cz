@@ -3,7 +3,6 @@ import {
   AI_IMAGE_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   getResourceIdFromValue,
-  isPublicCharacterLibraryResourceId,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
@@ -24,9 +23,6 @@ export async function ingestCanvasMedia(
 ): Promise<void> {
   const mediaId = getResourceIdFromValue(params.media);
   if (!mediaId || !params.workflowId) {
-    return;
-  }
-  if (isPublicCharacterLibraryResourceId(mediaId)) {
     return;
   }
 
@@ -74,7 +70,7 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+        if (!key || seen.has(key)) {
           continue;
         }
         seen.add(key);
@@ -90,7 +86,7 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+        if (!key || seen.has(key)) {
           continue;
         }
         seen.add(key);
@@ -106,7 +102,7 @@ export function collectWorkflowCanvasMedia(
         data.metadata
       )) {
         const key = getResourceIdFromValue(media);
-        if (!key || seen.has(key) || isPublicCharacterLibraryResourceId(key)) {
+        if (!key || seen.has(key)) {
           continue;
         }
         seen.add(key);
