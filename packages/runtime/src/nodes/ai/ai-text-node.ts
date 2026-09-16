@@ -177,7 +177,7 @@ export class AiTextNode extends ExecutableNode {
 
 async function resolveMediaUrlsForTextModel(
   context: NodeContext,
-  refs: readonly Array<MediaReference | import("@dafthunk/types").ResourceIdReference>
+  refs: readonly MediaReference[]
 ): Promise<string[]> {
   const urls: string[] = [];
 

@@ -152,7 +152,7 @@ export function buildBodyFromSlots(params: {
     if (slot.kind === "openai-messages") {
       const history = readChatMessages(inputs.messages);
       if (history) {
-        const messages: Array<{ role: string; content: unknown }> = [];
+        const messages: Array<Record<string, unknown>> = [];
         if (slot.systemField) {
           const system = inputs[slot.systemField];
           if (typeof system === "string" && system.trim().length > 0) {
