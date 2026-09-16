@@ -1,8 +1,8 @@
 import { buildOrgModelOptionId } from "./org-model-label";
 import {
   normalizeVideoModelParameterRules,
-  PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
   type OrgVideoModelOption,
+  PLATFORM_AI_MODEL_RULES_SCHEMA_VERSION,
   type VideoModelParameterRules,
 } from "./platform-ai-model";
 import type { UpstreamParamProfileField } from "./upstream-param-profile";
@@ -30,12 +30,15 @@ export function isVideoEnhanceModelCanonicalId(canonicalId: string): boolean {
 export const VIDEO_ENHANCE_FPS_MIN = 20 as const;
 export const VIDEO_ENHANCE_FPS_MAX = 120 as const;
 export const VIDEO_ENHANCE_FPS_DEFAULT = 24 as const;
+export const VIDEO_ENHANCE_FPS_MARKS = [30, 60, 120] as const;
 
 function buildVideoEnhanceGenerationFields(
   enabledModes: readonly VolcanoMediaKitVideoEnhanceMode[]
 ): readonly UpstreamParamProfileField[] {
   const modes =
-    enabledModes.length > 0 ? enabledModes : VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES;
+    enabledModes.length > 0
+      ? enabledModes
+      : VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES;
   return [
     {
       name: "mode",

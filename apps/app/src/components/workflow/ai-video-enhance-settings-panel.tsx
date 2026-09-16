@@ -1,19 +1,27 @@
 import {
+  clampVideoEnhanceFps,
   listHigherVideoEnhanceResolutions,
-  VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODE_LABEL_KEYS,
   VIDEO_ENHANCE_DEFAULT_SOURCE_TIER,
   VIDEO_ENHANCE_FPS_DEFAULT,
+  VIDEO_ENHANCE_FPS_MARKS,
   VIDEO_ENHANCE_FPS_MAX,
   VIDEO_ENHANCE_FPS_MIN,
-  clampVideoEnhanceFps,
   type VideoEnhanceNodeConfig,
+  VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODE_LABEL_KEYS,
   type VolcanoMediaKitPricingResolution,
   type VolcanoMediaKitVideoEnhanceMode,
 } from "@dafthunk/types";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
-import { useDismissOnCanvasPointerDown } from "@/hooks/use-dismiss-on-canvas-pointer-down";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDismissOnCanvasPointerDown } from "@/hooks/use-dismiss-on-canvas-pointer-down";
+import { cn } from "@/utils/utils";
 import { DurationDragSlider } from "./duration-drag-slider";
 
 interface AiVideoEnhanceSettingsPanelProps {
@@ -33,6 +43,12 @@ interface AiVideoEnhanceSettingsPanelProps {
 
 const SELECT_TRIGGER_CLASS =
   "h-7 w-auto min-w-[6.5rem] max-w-[10rem] border-0 bg-muted/40 px-2 text-xs shadow-none focus:ring-0";
+
+const FPS_INPUT_CLASS = cn(
+  "h-5 w-9 rounded-md border-0 bg-muted/45 px-1 py-0.5 text-center text-xs tabular-nums shadow-none outline-none",
+  "focus-visible:border-0 focus-visible:bg-muted/65",
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+);
 
 type OpenEnhanceSelect = "mode" | "resolution" | null;
 
@@ -81,15 +97,45 @@ export function AiVideoEnhanceSettingsPanel({
 }: AiVideoEnhanceSettingsPanelProps) {
   const { t } = useTranslation();
   const [fpsPreview, setFpsPreview] = useState(value.fps);
+  const [fpsInputDraft, setFpsInputDraft] = useState<string | null>(null);
   const [openSelect, setOpenSelect] = useState<OpenEnhanceSelect>(null);
+  const isDraggingFpsRef = useRef(false);
+  const isFpsInputFocusedRef = useRef(false);
 
   useDismissOnCanvasPointerDown(openSelect !== null, () => {
     setOpenSelect(null);
   });
 
   useEffect(() => {
-    setFpsPreview(value.fps);
+    if (!isDraggingFpsRef.current && !isFpsInputFocusedRef.current) {
+      setFpsPreview(value.fps);
+    }
   }, [value.fps]);
+
+  const commitFps = useCallback(
+    (next: number) => {
+      const fps = clampVideoEnhanceFps(next);
+      setFpsPreview(fps);
+      onChange({ ...value, fps });
+    },
+    [onChange, value]
+  );
+
+  const handleFpsInputCommit = useCallback(
+    (raw: string) => {
+      isFpsInputFocusedRef.current = false;
+      setFpsInputDraft(null);
+      if (raw.trim() === "") {
+        return;
+      }
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      commitFps(parsed);
+    },
+    [commitFps]
+  );
 
   const resolutionOptions = useMemo(
     (): readonly VolcanoMediaKitPricingResolution[] =>
@@ -165,7 +211,11 @@ export function AiVideoEnhanceSettingsPanel({
             </SelectTrigger>
             <SelectContent>
               {resolutionOptions.map((resolution) => (
-                <SelectItem key={resolution} value={resolution} className="text-xs">
+                <SelectItem
+                  key={resolution}
+                  value={resolution}
+                  className="text-xs"
+                >
                   {resolution}
                 </SelectItem>
               ))}
@@ -175,20 +225,46 @@ export function AiVideoEnhanceSettingsPanel({
       </ParamRow>
 
       <ParamRow label={t("workflow.videoEnhance.fps")}>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
           <DurationDragSlider
             min={VIDEO_ENHANCE_FPS_MIN}
             max={VIDEO_ENHANCE_FPS_MAX}
             value={fpsPreview}
             disabled={disabled}
+            marks={VIDEO_ENHANCE_FPS_MARKS}
+            onDragStart={() => {
+              isDraggingFpsRef.current = true;
+              setFpsInputDraft(null);
+            }}
             onPreview={setFpsPreview}
-            onCommit={(next) =>
-              onChange({ ...value, fps: clampVideoEnhanceFps(next) })
-            }
+            onCommit={(next) => {
+              isDraggingFpsRef.current = false;
+              commitFps(next);
+            }}
           />
-          <span className="w-6 shrink-0 text-right text-xs tabular-nums text-foreground">
-            {fpsPreview}
-          </span>
+          <Input
+            type="text"
+            inputMode="numeric"
+            name="video_enhance_fps"
+            autoComplete="off"
+            value={fpsInputDraft ?? String(fpsPreview)}
+            disabled={disabled}
+            className={cn(
+              "nodrag nopan nowheel mt-0 shrink-0",
+              FPS_INPUT_CLASS
+            )}
+            onFocus={() => {
+              isFpsInputFocusedRef.current = true;
+              setFpsInputDraft(String(fpsPreview));
+            }}
+            onChange={(event) => setFpsInputDraft(event.target.value)}
+            onBlur={(event) => handleFpsInputCommit(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+          />
         </div>
       </ParamRow>
     </div>

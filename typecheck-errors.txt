@@ -1,0 +1,7 @@
+﻿docker : /app/scripts/dump-all-typecheck-errors.sh: 2: set: Illegal option -
+所在位置 C:\Users\tukec\AppData\Local\Temp\ps-script-a410134c-d3e2-444f-afc6-358046918b7d.ps1:105 字符: 1
++ docker exec dafthunk-api-dev sh /app/scripts/dump-all-typecheck-error ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (/app/scripts/du...llegal option -:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
