@@ -52,10 +52,6 @@ export function createEphemeralMediaExpiresAt(
   return new Date(nowMs + EPHEMERAL_MEDIA_TTL_MS).toISOString();
 }
 
-export const AI_MEDIA_CACHE_DEFAULT_LIMIT_MB = 1024 as const;
-export const AI_MEDIA_CACHE_MIN_LIMIT_MB = 500 as const;
-export const AI_MEDIA_CACHE_MAX_LIMIT_MB = 4096 as const;
-
 export interface AiMediaCacheSettings {
   readonly limitMb: number;
 }

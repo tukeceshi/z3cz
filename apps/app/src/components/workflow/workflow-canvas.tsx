@@ -34,6 +34,8 @@ import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { renameAiMediaCacheWorkflow } from "@/services/ai-media-cache-service";
+import { rememberAiMediaCacheWorkflowName } from "@/services/ai-media-cache-workflow-name";
 import { cn } from "@/utils/utils";
 
 import { AiEditorOverlays } from "./ai-editor-overlays";
@@ -45,9 +47,9 @@ import {
   useCanvasShortcutHintArrowOffset,
   useCanvasShortcutHintState,
 } from "./canvas-shortcut-hint";
+import type { GenerativeNodeAddOptions } from "./creative-studio-context";
 import type { CanvasFileDropPreviewState } from "./generative-card-upload-utils";
 import { useShiftSelectGate } from "./use-shift-select-gate";
-import type { GenerativeNodeAddOptions } from "./creative-studio-context";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import { WorkflowAddNodeMenu } from "./workflow-add-node-menu";
 import { WorkflowAddNodePreviewLine } from "./workflow-add-node-preview-line";
@@ -145,6 +147,7 @@ export interface WorkflowCanvasProps {
   ) => string | null;
   readonly onConnectWorkflow?: (connection: Connection) => void;
   readonly onRemoveNodes?: (nodeIds: readonly string[]) => void;
+  readonly workflowName?: string;
 }
 
 export function WorkflowCanvas({
@@ -196,6 +199,7 @@ export function WorkflowCanvas({
   onCreateGenerativeNode,
   onConnectWorkflow,
   onRemoveNodes,
+  workflowName = "",
 }: WorkflowCanvasProps) {
   const { organization } = useAuth();
   const { id: workflowId } = useParams<{ id: string }>();
@@ -235,6 +239,18 @@ export function WorkflowCanvas({
     []
   );
   const blockCardInteraction = useShiftSelectGate(selectedNodes.length);
+
+  useEffect(() => {
+    if (!organization?.id || !workflowId || !workflowName.trim()) {
+      return;
+    }
+    rememberAiMediaCacheWorkflowName(organization.id, workflowId, workflowName);
+    void renameAiMediaCacheWorkflow({
+      organizationId: organization.id,
+      workflowId,
+      workflowName,
+    });
+  }, [organization?.id, workflowId, workflowName]);
 
   useEffect(() => {
     if (!isDraggingRef?.current) {
@@ -299,6 +315,10 @@ export function WorkflowCanvas({
       setRemotionViewportOpen(false);
     }
   }, [parked]);
+
+  if (organization?.id && workflowId) {
+    rememberAiMediaCacheWorkflowName(organization.id, workflowId, workflowName);
+  }
 
   return (
     <TooltipProvider>
@@ -412,7 +432,7 @@ export function WorkflowCanvas({
                   ref={agentOverlayRef}
                   orgId={organization?.id}
                   workflowId={workflowId}
-                  workflowName={workflowId}
+                  workflowName={workflowName || workflowId}
                   remotionViewportOpen={remotionViewportOpen}
                   onToggleRemotionViewport={handleToggleRemotionViewport}
                   onOpenRemotionViewport={handleOpenRemotionViewport}

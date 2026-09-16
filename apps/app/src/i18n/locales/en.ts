@@ -3659,15 +3659,13 @@ export const en = {
     },
     aiMediaCache: {
       barLabel: "AI cache",
-      barUsage: "{{used}} / {{limit}}",
       loading: "…",
       panelTitle: "AI local cache",
       panelHint:
         "Local cache is always kept in this browser for canvas and studio preview, reducing repeat downloads. Cloud-persisted files are unaffected.",
-      limitLabel: "Size limit",
-      limitRange: "Range {{min}}–{{max}} MB",
-      currentUsage: "Using {{used}} / {{limit}}",
-      browserQuota: "Browser quota ~{{quota}}",
+      cleanupHint: "Cache is getting full",
+      quickClean: "Quick clean",
+      currentUsage: "Using {{used}}",
       selectAll: "Select all",
       empty: "No cached files",
       workflowCounts:

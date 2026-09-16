@@ -3480,15 +3480,13 @@ export const zh: TranslationDictionary = {
     },
     aiMediaCache: {
       barLabel: "AI 暂存",
-      barUsage: "{{used}} / {{limit}}",
       loading: "…",
       panelTitle: "AI 本地暂存",
       panelHint:
         "本地暂存始终保存在本浏览器，用于画布与创作视图预览，减少重复下载；不影响云端已持久化的文件。",
-      limitLabel: "容量上限",
-      limitRange: "可调范围 {{min}}–{{max}} MB",
-      currentUsage: "当前占用 {{used}} / {{limit}}",
-      browserQuota: "浏览器配额约 {{quota}}",
+      cleanupHint: "暂存占用较高，建议清理",
+      quickClean: "快速清理",
+      currentUsage: "当前占用 {{used}}",
       selectAll: "全选",
       empty: "暂无暂存文件",
       workflowCounts:

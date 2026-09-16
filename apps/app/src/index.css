@@ -587,7 +587,7 @@ html.dark .cm-content {
 /* Bottom-right React Flow attribution chip(s) */
 .workflow-flow-bottom-right {
   display: flex !important;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
   margin: 6px !important;
 }

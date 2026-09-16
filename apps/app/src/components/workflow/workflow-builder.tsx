@@ -793,6 +793,7 @@ export function WorkflowBuilder({
                 <WorkflowEditorMainArea
                   nodes={nodes}
                   edges={edges}
+                  workflowName={workflowName}
                   reactFlowInstance={reactFlowInstance}
                   canvasFileDropEnabled={!readOnly && interactive && !isCanvasFrozen}
                   onAddCanvasDropNodes={readOnly ? undefined : addGenerativeNodesBatch}
