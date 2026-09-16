@@ -1,47 +1,52 @@
 import {
-  AI_MEDIA_CACHE_DEFAULT_LIMIT_MB,
-  AI_MEDIA_CACHE_MAX_LIMIT_MB,
-  AI_MEDIA_CACHE_MIN_LIMIT_MB,
   type AiMediaCacheSettings,
   getResourceIdFromValue,
-  isResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-
+import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
 import {
-  createStableBlobUrl,
-  dropStableBlobUrlsForMediaId,
-  getStableBlobUrl,
-  mediaDisplayStableBlobUrlKey,
-  stagingBlobUrlKey,
-} from "@/services/media-display-blob-url-registry";
+  clampCacheLimitMb,
+  defaultLimitMbFromQuotaBytes,
+  isQuotaExceededError,
+  orderEntriesForEviction,
+} from "@/services/ai-media-cache-limit";
+import {
+  rememberAiMediaCacheWorkflowName,
+  resolveAiMediaCacheWorkflowName,
+} from "@/services/ai-media-cache-workflow-name";
+import { dropAiTextDisplayForMediaId } from "@/services/ai-text-display-registry";
+import {
+  CANVAS_TIER_SHORT_EDGE,
+  displaySizeToMaxWidth,
+} from "@/services/canvas-media-tier";
+import { invalidateAiTextHydrateState } from "@/services/ensure-ai-text-cached";
 import {
   generateImageThumbnail,
   readImageNaturalSize,
 } from "@/services/generate-image-thumbnail";
-import { readVideoNaturalSize } from "@/services/read-video-natural-size";
 import { generateVideoPoster } from "@/services/generate-video-poster";
-import { displaySizeToMaxWidth, CANVAS_TIER_SHORT_EDGE } from "@/services/canvas-media-tier";
-import type { MediaDisplaySize } from "@/services/media-display-size";
 import {
   mediaFetchInitForCacheUrl,
   mediaUrlSupportsBrowserCache,
 } from "@/services/media-cache-fetch-utils";
 import {
+  dropStableBlobUrlsForMediaId,
+  getStableBlobUrl,
+  mediaDisplayStableBlobUrlKey,
+  stagingBlobUrlKey,
+} from "@/services/media-display-blob-url-registry";
+import type { MediaDisplaySize } from "@/services/media-display-size";
+import { readVideoNaturalSize } from "@/services/read-video-natural-size";
+import {
   resolveMediaResourceFetchUrl,
   workflowMediaMimeType,
 } from "@/services/resolve-media-resource-fetch-url";
-import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
+import type { WorkflowMediaThumbTier } from "@/services/workflow-media-address-catalog";
 import {
   getWorkflowMediaUrlSet,
   registerWorkflowMediaFullUrl,
   registerWorkflowMediaThumbUrl,
 } from "@/services/workflow-media-address-catalog";
-import type { WorkflowMediaThumbTier } from "@/services/workflow-media-address-catalog";
-import {
-  dropAiTextDisplayForMediaId,
-} from "@/services/ai-text-display-registry";
-import { invalidateAiTextHydrateState } from "@/services/ensure-ai-text-cached";
 
 export type AiMediaCacheNodeType =
   | "ai-image"
@@ -107,12 +112,17 @@ export interface AiMediaCacheStats {
   readonly originalBytes: number;
   readonly thumbBytes: number;
   readonly limitBytes: number;
+  readonly maxLimitBytes: number | null;
   readonly browserQuotaBytes: number | null;
   readonly browserUsageBytes: number | null;
   readonly workflows: readonly AiMediaWorkflowSummary[];
 }
 
-export type AiMediaCacheTierKind = "thumb" | "canvas-s" | "canvas-m" | "canvas-l";
+export type AiMediaCacheTierKind =
+  | "thumb"
+  | "canvas-s"
+  | "canvas-m"
+  | "canvas-l";
 
 export interface AiMediaCacheTierSummary {
   readonly tier: AiMediaCacheTierKind;
@@ -173,7 +183,10 @@ function applyCountDelta(
   >,
   nodeType: AiMediaCacheEntry["nodeType"],
   sign: 1 | -1
-): Pick<AiMediaWorkflowSummary, "imageCount" | "videoCount" | "audioCount" | "entryCount"> {
+): Pick<
+  AiMediaWorkflowSummary,
+  "imageCount" | "videoCount" | "audioCount" | "entryCount"
+> {
   const delta = modalityCountDelta(nodeType, sign);
   return {
     imageCount: summary.imageCount + delta.imageCount,
@@ -183,19 +196,59 @@ function applyCountDelta(
   };
 }
 
-function clampLimitMb(value: number): number {
-  return Math.min(
-    AI_MEDIA_CACHE_MAX_LIMIT_MB,
-    Math.max(AI_MEDIA_CACHE_MIN_LIMIT_MB, Math.round(value))
-  );
+async function readBrowserQuotaBytes(): Promise<number | null> {
+  if (!navigator.storage?.estimate) {
+    return null;
+  }
+  try {
+    const estimate = await navigator.storage.estimate();
+    return typeof estimate.quota === "number" ? estimate.quota : null;
+  } catch {
+    return null;
+  }
 }
 
-function defaultMeta(): MetaRecord {
-  return {
-    key: META_KEY,
-    limitMb: AI_MEDIA_CACHE_DEFAULT_LIMIT_MB,
-    totalBytes: 0,
-  };
+async function readBrowserStorageEstimate(): Promise<{
+  readonly quotaBytes: number | null;
+  readonly usageBytes: number | null;
+}> {
+  if (!navigator.storage?.estimate) {
+    return { quotaBytes: null, usageBytes: null };
+  }
+  try {
+    const estimate = await navigator.storage.estimate();
+    return {
+      quotaBytes: typeof estimate.quota === "number" ? estimate.quota : null,
+      usageBytes: typeof estimate.usage === "number" ? estimate.usage : null,
+    };
+  } catch {
+    return { quotaBytes: null, usageBytes: null };
+  }
+}
+
+async function ensureMeta(
+  db: IDBDatabase,
+  quotaBytes?: number | null
+): Promise<MetaRecord> {
+  const quota =
+    quotaBytes === undefined ? await readBrowserQuotaBytes() : quotaBytes;
+  const maxMb = defaultLimitMbFromQuotaBytes(quota);
+  const existing = await readStoredMeta(db);
+  if (!existing) {
+    const next: MetaRecord = {
+      key: META_KEY,
+      limitMb: maxMb ?? 1,
+      totalBytes: 0,
+    };
+    await writeMeta(db, next);
+    return next;
+  }
+  if (maxMb != null && existing.limitMb > maxMb) {
+    const next = { ...existing, limitMb: maxMb };
+    await writeMeta(db, next);
+    return next;
+  }
+  return existing;
 }
 
 function entryKey(
@@ -246,7 +299,8 @@ function cacheWriteStoreNames(db: IDBDatabase): string[] {
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+    request.onerror = () =>
+      reject(request.error ?? new Error("IndexedDB open failed"));
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
       const db = request.result;
@@ -317,19 +371,29 @@ async function withDatabase<T>(
   }
 }
 
-async function readMeta(db: IDBDatabase): Promise<MetaRecord> {
+async function readStoredMeta(db: IDBDatabase): Promise<MetaRecord | null> {
   const transaction = db.transaction(META_STORE, "readonly");
   const result = await idbRequest<
     (MetaRecord & { readonly enabled?: boolean }) | undefined
   >(transaction.objectStore(META_STORE).get(META_KEY));
   if (!result) {
-    return defaultMeta();
+    return null;
   }
   return {
     key: META_KEY,
     limitMb: result.limitMb,
     totalBytes: result.totalBytes,
   };
+}
+
+async function readMeta(db: IDBDatabase): Promise<MetaRecord> {
+  return (
+    (await readStoredMeta(db)) ?? {
+      key: META_KEY,
+      limitMb: 1,
+      totalBytes: 0,
+    }
+  );
 }
 
 async function writeMeta(db: IDBDatabase, meta: MetaRecord): Promise<void> {
@@ -389,14 +453,20 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
         ...counts,
         totalBytes: prev.totalBytes + entry.byteSize,
         updatedAt:
-          entry.lastAccessAt > prev.updatedAt ? entry.lastAccessAt : prev.updatedAt,
+          entry.lastAccessAt > prev.updatedAt
+            ? entry.lastAccessAt
+            : prev.updatedAt,
       });
     } else {
       workflowMap.set(wfKey, {
         key: wfKey,
         organizationId: entry.organizationId,
         workflowId: entry.workflowId,
-        workflowName: entry.workflowName,
+        workflowName: resolveAiMediaCacheWorkflowName(
+          entry.organizationId,
+          entry.workflowId,
+          entry.workflowName
+        ),
         ...counts,
         totalBytes: entry.byteSize,
         updatedAt: entry.lastAccessAt,
@@ -406,7 +476,8 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
 
   const orphanThumbKeys: string[] = [];
   for (const thumb of thumbs) {
-    const parentKey = thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
+    const parentKey =
+      thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
     if (!parentKey || !entryKeys.has(parentKey)) {
       orphanThumbKeys.push(thumb.key);
       continue;
@@ -426,7 +497,10 @@ async function reconcileCacheMeta(db: IDBDatabase): Promise<void> {
     }
   }
 
-  if (orphanThumbKeys.length > 0 && db.objectStoreNames.contains(THUMBS_STORE)) {
+  if (
+    orphanThumbKeys.length > 0 &&
+    db.objectStoreNames.contains(THUMBS_STORE)
+  ) {
     await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
       const store = transaction.objectStore(THUMBS_STORE);
       for (const key of orphanThumbKeys) {
@@ -464,60 +538,71 @@ async function deleteEntry(db: IDBDatabase, key: string): Promise<void> {
   dropStableBlobUrlsForMediaId(entry.mediaId);
   dropAiTextDisplayForMediaId(entry.mediaId);
 
-  await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
-    transaction.objectStore(ENTRIES_STORE).delete(key);
-    if (db.objectStoreNames.contains(THUMBS_STORE)) {
-      deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), key);
+  await runTransaction(
+    db,
+    cacheWriteStoreNames(db),
+    "readwrite",
+    (transaction) => {
+      transaction.objectStore(ENTRIES_STORE).delete(key);
+      if (db.objectStoreNames.contains(THUMBS_STORE)) {
+        deleteEntryThumbs(transaction.objectStore(THUMBS_STORE), key);
+      }
     }
-  });
+  );
 
   await reconcileCacheMeta(db);
 }
 
-async function evictAgentChatUntilUnderLimit(
+async function evictOneOldest(
   db: IDBDatabase,
-  limitBytes: number
-): Promise<void> {
-  let meta = await readMeta(db);
-  if (meta.totalBytes <= limitBytes) return;
-
-  const entries = (await readAllEntries(db))
-    .filter((entry) => entry.nodeType === "agent-chat")
-    .sort((a, b) => a.lastAccessAt.localeCompare(b.lastAccessAt));
-
-  for (const entry of entries) {
-    if (meta.totalBytes <= limitBytes) break;
-    await deleteEntry(db, entry.key);
-    meta = await readMeta(db);
+  protectKey?: string
+): Promise<boolean> {
+  const entries = orderEntriesForEviction(await readAllEntries(db), protectKey);
+  const target = entries[0];
+  if (!target) {
+    return false;
   }
-
-  await reconcileCacheMeta(db);
+  await deleteEntry(db, target.key);
+  return true;
 }
 
 async function evictLruUntilUnderLimit(
   db: IDBDatabase,
-  limitBytes: number
+  limitBytes: number,
+  protectKey?: string
 ): Promise<void> {
   let meta = await readMeta(db);
   if (meta.totalBytes <= limitBytes) return;
 
-  const entries = await readAllEntries(db);
-  const byAccess = (
-    left: (typeof entries)[number],
-    right: (typeof entries)[number]
-  ): number => left.lastAccessAt.localeCompare(right.lastAccessAt);
-  const agentFirst = [
-    ...entries.filter((entry) => entry.nodeType === "agent-chat").sort(byAccess),
-    ...entries.filter((entry) => entry.nodeType !== "agent-chat").sort(byAccess),
-  ];
-
-  for (const entry of agentFirst) {
+  const ordered = orderEntriesForEviction(await readAllEntries(db), protectKey);
+  for (const entry of ordered) {
     if (meta.totalBytes <= limitBytes) break;
     await deleteEntry(db, entry.key);
     meta = await readMeta(db);
   }
 
   await reconcileCacheMeta(db);
+}
+
+async function runWriteWithQuotaRetry(
+  db: IDBDatabase,
+  protectKey: string | undefined,
+  write: () => Promise<void>
+): Promise<void> {
+  for (;;) {
+    try {
+      await write();
+      return;
+    } catch (error) {
+      if (!isQuotaExceededError(error)) {
+        throw error;
+      }
+      const removed = await evictOneOldest(db, protectKey);
+      if (!removed) {
+        throw error;
+      }
+    }
+  }
 }
 
 const IMAGE_TIER_SPECS: ReadonlyArray<{
@@ -603,8 +688,10 @@ async function storeThumb(
     blob: params.blob,
     byteSize: params.blob.size,
   };
-  await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
-    transaction.objectStore(THUMBS_STORE).put(record);
+  await runWriteWithQuotaRetry(db, params.parentEntryKey, async () => {
+    await runTransaction(db, THUMBS_STORE, "readwrite", (transaction) => {
+      transaction.objectStore(THUMBS_STORE).put(record);
+    });
   });
 }
 
@@ -779,7 +866,7 @@ export async function deleteCacheResourceTiers(
 
 export async function getAiMediaCacheSettings(): Promise<AiMediaCacheSettings> {
   return withDatabase(async (db) => {
-    const meta = await readMeta(db);
+    const meta = await ensureMeta(db);
     return { limitMb: meta.limitMb };
   });
 }
@@ -788,12 +875,14 @@ export async function setAiMediaCacheSettings(
   settings: Partial<AiMediaCacheSettings>
 ): Promise<AiMediaCacheSettings> {
   return withDatabase(async (db) => {
-    const meta = await readMeta(db);
+    const quotaBytes = await readBrowserQuotaBytes();
+    const meta = await ensureMeta(db, quotaBytes);
+    const maxMb = defaultLimitMbFromQuotaBytes(quotaBytes);
     const next: MetaRecord = {
       ...meta,
       limitMb:
         settings.limitMb !== undefined
-          ? clampLimitMb(settings.limitMb)
+          ? clampCacheLimitMb(settings.limitMb, maxMb)
           : meta.limitMb,
     };
     await writeMeta(db, next);
@@ -802,40 +891,87 @@ export async function setAiMediaCacheSettings(
   });
 }
 
+export async function renameAiMediaCacheWorkflow(params: {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+}): Promise<void> {
+  rememberAiMediaCacheWorkflowName(
+    params.organizationId,
+    params.workflowId,
+    params.workflowName
+  );
+  const workflowName = resolveAiMediaCacheWorkflowName(
+    params.organizationId,
+    params.workflowId,
+    params.workflowName
+  );
+  if (workflowName === params.workflowId) {
+    return;
+  }
+
+  await withDatabase(async (db) => {
+    const entries = (await readAllEntries(db)).filter(
+      (entry) =>
+        entry.organizationId === params.organizationId &&
+        entry.workflowId === params.workflowId &&
+        entry.workflowName !== workflowName
+    );
+    const wfKey = workflowKey(params.organizationId, params.workflowId);
+    const wfReadTx = db.transaction(WORKFLOWS_STORE, "readonly");
+    const summary = await idbRequest<WorkflowRecord | undefined>(
+      wfReadTx.objectStore(WORKFLOWS_STORE).get(wfKey)
+    );
+    if (entries.length === 0 && summary?.workflowName === workflowName) {
+      return;
+    }
+
+    await runTransaction(
+      db,
+      [ENTRIES_STORE, WORKFLOWS_STORE],
+      "readwrite",
+      (transaction) => {
+        const entriesStore = transaction.objectStore(ENTRIES_STORE);
+        for (const entry of entries) {
+          entriesStore.put({ ...entry, workflowName });
+        }
+        if (summary) {
+          transaction.objectStore(WORKFLOWS_STORE).put({
+            ...summary,
+            workflowName,
+          });
+        }
+      }
+    );
+  });
+}
+
 export async function getAiMediaCacheStats(
   organizationId: string
 ): Promise<AiMediaCacheStats> {
   return withDatabase(async (db) => {
     await reconcileCacheMeta(db);
-    const meta = await readMeta(db);
+    const { quotaBytes, usageBytes } = await readBrowserStorageEstimate();
+    const meta = await ensureMeta(db, quotaBytes);
+    const maxMb = defaultLimitMbFromQuotaBytes(quotaBytes);
     const workflows = await readWorkflowSummaries(db, organizationId);
     const entries = (await readAllEntries(db)).filter(
       (entry) => entry.organizationId === organizationId
     );
-    const originalBytes = entries.reduce((sum, entry) => sum + entry.byteSize, 0);
+    const originalBytes = entries.reduce(
+      (sum, entry) => sum + entry.byteSize,
+      0
+    );
     const thumbBytes = Math.max(0, meta.totalBytes - originalBytes);
-
-    let browserQuotaBytes: number | null = null;
-    let browserUsageBytes: number | null = null;
-    if (navigator.storage?.estimate) {
-      try {
-        const estimate = await navigator.storage.estimate();
-        browserQuotaBytes =
-          typeof estimate.quota === "number" ? estimate.quota : null;
-        browserUsageBytes =
-          typeof estimate.usage === "number" ? estimate.usage : null;
-      } catch {
-        // ignore
-      }
-    }
 
     return {
       totalBytes: meta.totalBytes,
       originalBytes,
       thumbBytes,
       limitBytes: meta.limitMb * 1024 * 1024,
-      browserQuotaBytes,
-      browserUsageBytes,
+      maxLimitBytes: maxMb == null ? null : maxMb * 1024 * 1024,
+      browserQuotaBytes: quotaBytes,
+      browserUsageBytes: usageBytes,
       workflows,
     };
   });
@@ -856,9 +992,18 @@ async function putCacheBlobRecord(params: {
       : new Blob([params.blob], { type: params.mimeType });
   const byteSize = storedBlob.size;
   const now = new Date().toISOString();
-  const key = entryKey(params.organizationId, params.workflowId, params.mediaId);
+  const key = entryKey(
+    params.organizationId,
+    params.workflowId,
+    params.mediaId
+  );
 
   return withDatabase(async (db) => {
+    const workflowName = resolveAiMediaCacheWorkflowName(
+      params.organizationId,
+      params.workflowId,
+      params.workflowName
+    );
     const existingTx = db.transaction(ENTRIES_STORE, "readonly");
     const existing = await idbRequest<CacheEntryRecord | undefined>(
       existingTx.objectStore(ENTRIES_STORE).get(key)
@@ -884,14 +1029,12 @@ async function putCacheBlobRecord(params: {
       key,
       organizationId: params.organizationId,
       workflowId: params.workflowId,
-      workflowName: params.workflowName,
+      workflowName,
       mediaId: params.mediaId,
       nodeType: params.nodeType,
       mimeType: params.mimeType,
       byteSize,
-      ...(naturalWidth && naturalHeight
-        ? { naturalWidth, naturalHeight }
-        : {}),
+      ...(naturalWidth && naturalHeight ? { naturalWidth, naturalHeight } : {}),
       createdAt: existing?.createdAt ?? now,
       lastAccessAt: now,
       blob: storedBlob,
@@ -904,7 +1047,9 @@ async function putCacheBlobRecord(params: {
     );
     const prevEntryCount =
       prev?.entryCount ??
-      (prev?.imageCount ?? 0) + (prev?.videoCount ?? 0) + (prev?.audioCount ?? 0);
+      (prev?.imageCount ?? 0) +
+        (prev?.videoCount ?? 0) +
+        (prev?.audioCount ?? 0);
     const counts = existing
       ? {
           imageCount: prev?.imageCount ?? 0,
@@ -923,34 +1068,34 @@ async function putCacheBlobRecord(params: {
           1
         );
 
-    await runTransaction(
-      db,
-      [ENTRIES_STORE, WORKFLOWS_STORE],
-      "readwrite",
-      (transaction) => {
-      transaction.objectStore(ENTRIES_STORE).put(record);
-      transaction.objectStore(WORKFLOWS_STORE).put({
-        key: wfKey,
-        organizationId: params.organizationId,
-        workflowId: params.workflowId,
-        workflowName: params.workflowName,
-        ...counts,
-        totalBytes: prev?.totalBytes ?? 0,
-        updatedAt: now,
-      });
+    await runWriteWithQuotaRetry(db, key, async () => {
+      await runTransaction(
+        db,
+        [ENTRIES_STORE, WORKFLOWS_STORE],
+        "readwrite",
+        (transaction) => {
+          transaction.objectStore(ENTRIES_STORE).put(record);
+          transaction.objectStore(WORKFLOWS_STORE).put({
+            key: wfKey,
+            organizationId: params.organizationId,
+            workflowId: params.workflowId,
+            workflowName,
+            ...counts,
+            totalBytes: prev?.totalBytes ?? 0,
+            updatedAt: now,
+          });
+        }
+      );
     });
 
     await reconcileCacheMeta(db);
 
-    const metaAfterWrite = await readMeta(db);
-    if (params.nodeType === "agent-chat") {
-      await evictAgentChatUntilUnderLimit(
-        db,
-        metaAfterWrite.limitMb * 1024 * 1024
-      );
-    } else {
-      await evictLruUntilUnderLimit(db, metaAfterWrite.limitMb * 1024 * 1024);
-    }
+    const metaAfterWrite = await ensureMeta(db);
+    await evictLruUntilUnderLimit(
+      db,
+      metaAfterWrite.limitMb * 1024 * 1024,
+      key
+    );
 
     if (params.nodeType === "ai-image" || params.nodeType === "ai-video") {
       await generateCacheResourceTiers({
@@ -958,6 +1103,12 @@ async function putCacheBlobRecord(params: {
         workflowId: params.workflowId,
         mediaId: params.mediaId,
       });
+      const metaAfterTiers = await ensureMeta(db);
+      await evictLruUntilUnderLimit(
+        db,
+        metaAfterTiers.limitMb * 1024 * 1024,
+        key
+      );
       notifyAiMediaCacheChanged();
     }
 
@@ -1043,7 +1194,11 @@ async function readCachedMediaEntry(
     readonly mediaId: string;
   }
 ): Promise<CacheEntryRecord | null> {
-  const key = entryKey(params.organizationId, params.workflowId, params.mediaId);
+  const key = entryKey(
+    params.organizationId,
+    params.workflowId,
+    params.mediaId
+  );
   const readTx = db.transaction(ENTRIES_STORE, "readonly");
   const entry = await idbRequest<CacheEntryRecord | undefined>(
     readTx.objectStore(ENTRIES_STORE).get(key)
@@ -1116,7 +1271,9 @@ export async function readCachedMediaBlobByMediaId(
   return { blob: record.blob, mimeType: entry.mimeType };
 }
 
-function tierKindToCanvasTier(tier: AiMediaCacheTierKind): WorkflowMediaThumbTier | null {
+function tierKindToCanvasTier(
+  tier: AiMediaCacheTierKind
+): WorkflowMediaThumbTier | null {
   if (tier === "canvas-s") return "s";
   if (tier === "canvas-m") return "m";
   if (tier === "canvas-l") return "l";
@@ -1529,19 +1686,24 @@ export async function clearAiMediaCache(params: {
 
     if (keysToDelete.length === 0) return;
 
-    await runTransaction(db, cacheWriteStoreNames(db), "readwrite", (transaction) => {
-      const entriesStore = transaction.objectStore(ENTRIES_STORE);
-      for (const key of keysToDelete) {
-        entriesStore.delete(key);
-      }
-
-      if (db.objectStoreNames.contains(THUMBS_STORE)) {
-        const thumbsStore = transaction.objectStore(THUMBS_STORE);
+    await runTransaction(
+      db,
+      cacheWriteStoreNames(db),
+      "readwrite",
+      (transaction) => {
+        const entriesStore = transaction.objectStore(ENTRIES_STORE);
         for (const key of keysToDelete) {
-          deleteEntryThumbs(thumbsStore, key);
+          entriesStore.delete(key);
+        }
+
+        if (db.objectStoreNames.contains(THUMBS_STORE)) {
+          const thumbsStore = transaction.objectStore(THUMBS_STORE);
+          for (const key of keysToDelete) {
+            deleteEntryThumbs(thumbsStore, key);
+          }
         }
       }
-    });
+    );
 
     await reconcileCacheMeta(db);
   });
@@ -1581,7 +1743,8 @@ function mimeToExtension(
     if (base.includes("markdown")) return "md";
     return "txt";
   }
-  if (nodeType === "agent-chat" || nodeType === "remotion-preview") return "json";
+  if (nodeType === "agent-chat" || nodeType === "remotion-preview")
+    return "json";
   const map: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
@@ -1660,7 +1823,10 @@ export async function batchLoadWorkflowMediaThumbBlobs(params: {
       return [];
     }
 
-    const transaction = db.transaction([ENTRIES_STORE, THUMBS_STORE], "readonly");
+    const transaction = db.transaction(
+      [ENTRIES_STORE, THUMBS_STORE],
+      "readonly"
+    );
     const entriesStore = transaction.objectStore(ENTRIES_STORE);
     const thumbsStore = transaction.objectStore(THUMBS_STORE);
 
@@ -1734,7 +1900,8 @@ export async function listWorkflowCacheResources(params: {
     const thumbsByParent = new Map<string, ThumbRecord[]>();
 
     for (const thumb of thumbs) {
-      const parentKey = thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
+      const parentKey =
+        thumb.parentEntryKey ?? parseThumbParentEntryKey(thumb.key);
       if (!parentKey) continue;
       const bucket = thumbsByParent.get(parentKey) ?? [];
       bucket.push(thumb);
@@ -1746,12 +1913,17 @@ export async function listWorkflowCacheResources(params: {
         const entryThumbs = thumbsByParent.get(entry.key) ?? [];
         const tierSummaries: AiMediaCacheTierSummary[] = entryThumbs
           .map((thumb) => ({
-            tier: thumb.tier ?? maxWidthToTierKind(thumb.maxWidth ?? CANVAS_TIER_SHORT_EDGE.s),
+            tier:
+              thumb.tier ??
+              maxWidthToTierKind(thumb.maxWidth ?? CANVAS_TIER_SHORT_EDGE.s),
             maxWidth: thumb.maxWidth ?? CANVAS_TIER_SHORT_EDGE.s,
             byteSize: thumb.byteSize,
           }))
           .sort((a, b) => a.maxWidth - b.maxWidth);
-        const thumbBytes = tierSummaries.reduce((sum, tier) => sum + tier.byteSize, 0);
+        const thumbBytes = tierSummaries.reduce(
+          (sum, tier) => sum + tier.byteSize,
+          0
+        );
 
         return {
           entryKey: entry.key,
@@ -1881,9 +2053,14 @@ async function readAllThumbs(db: IDBDatabase): Promise<ThumbRecord[]> {
 
 function parseCacheEntryKeyParts(
   entryKeyValue: string
-): { readonly organizationId: string; readonly workflowId: string; readonly mediaId: string } | null {
+): {
+  readonly organizationId: string;
+  readonly workflowId: string;
+  readonly mediaId: string;
+} | null {
   const pipeIndex = entryKeyValue.indexOf("|w");
-  const entryPart = pipeIndex >= 0 ? entryKeyValue.slice(0, pipeIndex) : entryKeyValue;
+  const entryPart =
+    pipeIndex >= 0 ? entryKeyValue.slice(0, pipeIndex) : entryKeyValue;
   const firstColon = entryPart.indexOf(":");
   const secondColon = entryPart.indexOf(":", firstColon + 1);
   if (firstColon < 0 || secondColon < 0) {

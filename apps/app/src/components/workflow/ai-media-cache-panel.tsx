@@ -1,13 +1,15 @@
-import {
-  AI_MEDIA_CACHE_MAX_LIMIT_MB,
-  AI_MEDIA_CACHE_MIN_LIMIT_MB,
-} from "@dafthunk/types";
 import ChevronDown from "lucide-react/icons/chevron-down";
 import ChevronRight from "lucide-react/icons/chevron-right";
 import Download from "lucide-react/icons/download";
 import RefreshCw from "lucide-react/icons/refresh-cw";
 import Trash2 from "lucide-react/icons/trash-2";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,13 +30,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   notifyAiMediaCacheChanged,
   useAiMediaCacheStats,
 } from "@/hooks/use-ai-media-cache";
 import {
+  pickQuickCleanWorkflowId,
+  shouldShowCacheCleanupHint,
+} from "@/services/ai-media-cache-limit";
+import {
+  type AiMediaCacheResourceSummary,
+  type AiMediaCacheTierKind,
   clearAiMediaCache,
   clearCacheEntriesByKeys,
   deleteCacheResourceTiers,
@@ -43,9 +50,6 @@ import {
   formatMegabytesCompact,
   listWorkflowCacheResources,
   regenerateCacheResourceTiers,
-  setAiMediaCacheSettings,
-  type AiMediaCacheResourceSummary,
-  type AiMediaCacheTierKind,
 } from "@/services/ai-media-cache-service";
 import { cn } from "@/utils/utils";
 
@@ -114,9 +118,9 @@ function WorkflowResourceList({
   readonly onChanged: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [resources, setResources] = useState<readonly AiMediaCacheResourceSummary[]>(
-    []
-  );
+  const [resources, setResources] = useState<
+    readonly AiMediaCacheResourceSummary[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -289,24 +293,74 @@ export function AiMediaCacheBar({
   readonly currentWorkflowId?: string;
 }) {
   const { t } = useTranslation();
-  const { stats } = useAiMediaCacheStats(organizationId);
+  const { stats, refresh } = useAiMediaCacheStats(organizationId);
   const [open, setOpen] = useState(false);
+  const [quickCleaning, setQuickCleaning] = useState(false);
 
   const label = useMemo(() => {
     if (!stats) return t("workflow.aiMediaCache.loading");
-    return `${formatMegabytesCompact(stats.totalBytes)} / ${formatMegabytesCompact(stats.limitBytes)}`;
+    return formatMegabytesCompact(stats.totalBytes);
   }, [stats, t]);
+
+  const showCleanupHint = Boolean(
+    stats && shouldShowCacheCleanupHint(stats.totalBytes, stats.limitBytes)
+  );
+  const quickCleanWorkflowId = stats
+    ? pickQuickCleanWorkflowId(stats.workflows, currentWorkflowId)
+    : null;
+
+  const handleQuickClean = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!quickCleanWorkflowId || quickCleaning) {
+      return;
+    }
+    setQuickCleaning(true);
+    try {
+      await clearAiMediaCache({
+        organizationId,
+        workflowIds: [quickCleanWorkflowId],
+      });
+      notifyAiMediaCacheChanged();
+      await refresh();
+    } finally {
+      setQuickCleaning(false);
+    }
+  };
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title={t("workflow.aiMediaCache.barLabel")}
-        className="workflow-flow-attribution"
-      >
-        {label}
-      </button>
+      <div className="flex flex-col items-end gap-1">
+        {showCleanupHint ? (
+          <div className="flex max-w-56 items-center gap-1 rounded-md border border-border/70 bg-background/90 px-1.5 py-1 text-[10px] leading-tight shadow-sm">
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="min-w-0 text-left text-muted-foreground hover:text-foreground"
+            >
+              {t("workflow.aiMediaCache.cleanupHint")}
+            </button>
+            {quickCleanWorkflowId ? (
+              <button
+                type="button"
+                disabled={quickCleaning}
+                onClick={(event) => void handleQuickClean(event)}
+                className="shrink-0 rounded px-1 font-medium text-foreground hover:bg-muted disabled:opacity-60"
+              >
+                {t("workflow.aiMediaCache.quickClean")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title={t("workflow.aiMediaCache.barLabel")}
+          className="workflow-flow-attribution"
+        >
+          {label}
+        </button>
+      </div>
       <AiMediaCachePanel
         organizationId={organizationId}
         currentWorkflowId={currentWorkflowId}
@@ -325,7 +379,6 @@ export function AiMediaCachePanel({
 }: AiMediaCachePanelProps) {
   const { t } = useTranslation();
   const { stats, refresh } = useAiMediaCacheStats(organizationId);
-  const [limitMb, setLimitMb] = useState(1024);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(
     null
@@ -336,23 +389,10 @@ export function AiMediaCachePanel({
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    if (!stats) return;
-    setLimitMb(Math.round(stats.limitBytes / (1024 * 1024)));
-  }, [stats]);
-
-  useEffect(() => {
     if (!open) {
       setExpandedWorkflowId(null);
     }
   }, [open]);
-
-  const handleSaveSettings = useCallback(async () => {
-    await setAiMediaCacheSettings({
-      limitMb,
-    });
-    notifyAiMediaCacheChanged();
-    await refresh();
-  }, [limitMb, refresh]);
 
   const handleToggleWorkflow = (workflowId: string, checked: boolean) => {
     setSelected((prev) => {
@@ -411,58 +451,21 @@ export function AiMediaCachePanel({
             {t("workflow.aiMediaCache.panelHint")}
           </p>
 
-          <div className="space-y-4 rounded-lg border p-3">
-            <div className="space-y-2">
-              <Label htmlFor="ai-cache-limit">
-                {t("workflow.aiMediaCache.limitLabel")}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="ai-cache-limit"
-                  type="number"
-                  min={AI_MEDIA_CACHE_MIN_LIMIT_MB}
-                  max={AI_MEDIA_CACHE_MAX_LIMIT_MB}
-                  value={limitMb}
-                  onChange={(event) =>
-                    setLimitMb(Number(event.target.value) || AI_MEDIA_CACHE_MIN_LIMIT_MB)
-                  }
-                  onBlur={() => void handleSaveSettings()}
-                  className="w-28"
-                />
-                <span className="text-sm text-muted-foreground">MB</span>
-              </div>
+          {stats ? (
+            <div className="space-y-1 rounded-lg border p-3 text-sm">
+              <p>
+                {t("workflow.aiMediaCache.currentUsage", {
+                  used: formatBytes(stats.totalBytes),
+                })}
+              </p>
               <p className="text-xs text-muted-foreground">
-                {t("workflow.aiMediaCache.limitRange", {
-                  min: AI_MEDIA_CACHE_MIN_LIMIT_MB,
-                  max: AI_MEDIA_CACHE_MAX_LIMIT_MB,
+                {t("workflow.aiMediaCache.usageBreakdown", {
+                  original: formatBytes(stats.originalBytes),
+                  thumbs: formatBytes(stats.thumbBytes),
                 })}
               </p>
             </div>
-
-            {stats ? (
-              <div className="space-y-1 text-sm">
-                <p>
-                  {t("workflow.aiMediaCache.currentUsage", {
-                    used: formatBytes(stats.totalBytes),
-                    limit: formatBytes(stats.limitBytes),
-                  })}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("workflow.aiMediaCache.usageBreakdown", {
-                    original: formatBytes(stats.originalBytes),
-                    thumbs: formatBytes(stats.thumbBytes),
-                  })}
-                </p>
-                {stats.browserQuotaBytes ? (
-                  <p className="text-xs text-muted-foreground">
-                    {t("workflow.aiMediaCache.browserQuota", {
-                      quota: formatBytes(stats.browserQuotaBytes),
-                    })}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          ) : null}
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -492,7 +495,8 @@ export function AiMediaCachePanel({
                       key={row.workflowId}
                       className={cn(
                         "rounded-md border px-2 py-1.5",
-                        row.workflowId === currentWorkflowId && "border-primary/30 bg-muted/20"
+                        row.workflowId === currentWorkflowId &&
+                          "border-primary/30 bg-muted/20"
                       )}
                     >
                       <div className="flex items-start gap-2">
@@ -500,7 +504,10 @@ export function AiMediaCachePanel({
                           type="checkbox"
                           checked={selected.has(row.workflowId)}
                           onChange={(event) =>
-                            handleToggleWorkflow(row.workflowId, event.target.checked)
+                            handleToggleWorkflow(
+                              row.workflowId,
+                              event.target.checked
+                            )
                           }
                           className="mt-1 size-4 rounded border"
                         />
