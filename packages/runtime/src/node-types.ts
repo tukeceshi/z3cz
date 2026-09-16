@@ -23,6 +23,8 @@ import type { ToolDefinition, ToolReference } from "./tool-types";
 import type { CodeModeExecutor } from "./utils/code-mode";
 import type { SandboxExecutor } from "./utils/sandbox-mode";
 
+export type { ObjectStore };
+
 /**
  * Generic blob parameter type that accepts any MIME type.
  * Semantic types below provide workflow connection validation while allowing
