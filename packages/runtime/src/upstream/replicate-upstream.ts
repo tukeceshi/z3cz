@@ -1,5 +1,4 @@
 import type { ParameterValue, UpstreamPollContinuation } from "@dafthunk/types";
-import { replicateOwnerName } from "@dafthunk/types";
 
 import { isBlobParameter, toUint8Array } from "../node-types";
 import type { NodeContext } from "../node-types";
@@ -79,10 +78,20 @@ function extractOutputObject(
 
 function extractOutputUrls(output: ReplicateOutput): string[] {
   if (typeof output === "string") return [output];
-  if (Array.isArray(output)) {
-    return output.filter((value): value is string => typeof value === "string");
+  if (!Array.isArray(output)) {
+    return [];
   }
-  return [];
+  const urls: string[] = [];
+  for (const value of output) {
+    if (typeof value === "string") {
+      urls.push(value);
+    }
+  }
+  return urls;
+}
+
+function replicateOwnerName(model: string): string {
+  return model.split(":", 2)[0] ?? model;
 }
 
 async function presignBlobInput(

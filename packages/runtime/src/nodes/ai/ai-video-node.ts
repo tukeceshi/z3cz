@@ -199,6 +199,12 @@ export class AiVideoNode extends ExecutableNode {
       );
     }
 
+    if (!context.resolveAiInterface) {
+      return this.createErrorResult(
+        "No AI interface configured. Please set up an AI interface in your organization settings."
+      );
+    }
+
     const resolvedInterface = await context.resolveAiInterface({
       interfaceId,
       modelCanonicalId,
