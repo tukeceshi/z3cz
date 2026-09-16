@@ -1,0 +1,123 @@
+apps/api/src/app.ts(77,44): error TS2322: Type 'Promise<typeof import("/app/apps/api/src/routes/robots")>' is not assignable to type 'Promise<RouteModule>'.
+apps/api/src/env/create-node-bindings.ts(159,5): error TS2353: Object literal may only specify known properties, and 'GOOGLE_API_KEY' does not exist in type 'Bindings'.
+apps/api/src/integrations/volcengine/mediakit-client.test.ts(13,11): error TS2353: Object literal may only specify known properties, and 'duration' does not exist in type '{ readonly video_url?: string | undefined; readonly url?: string | undefined; }'.
+apps/api/src/integrations/volcengine/query-tos-bucket-storage.test.ts(25,43): error TS2353: Object literal may only specify known properties, and 'MetricDataResults' does not exist in type 'GetMetricDataResult'.
+apps/api/src/integrations/volcengine/snapshot.ts(186,20): error TS18047: 'refreshedMetadata' is possibly 'null'.
+apps/api/src/integrations/volcengine/snapshot.ts(186,20): error TS18046: 'refreshedMetadata.models' is of type 'unknown'.
+apps/api/src/lazy-route.ts(83,10): error TS2339: Property 'duplex' does not exist on type 'RequestInit<CfProperties<unknown>>'.
+apps/api/src/routes/ai-interfaces.ts(299,6): error TS1360: Type 'ZodObject<{ provider: ZodEnum<{ custom: "custom"; openai: "openai"; deepseek: "deepseek"; doubao_volcano: "doubao_volcano"; }>; name: ZodString; apiKey: ZodOptional<ZodString>; ... 12 more ...; mediaKitApiKey: ZodOptional<...>; }, $strip>' does not satisfy the expected type 'ZodType<CreateOrganizationAiInterfaceRequest, unknown, $ZodTypeInternals<CreateOrganizationAiInterfaceRequest, unknown>>'.
+apps/api/src/routes/ai-interfaces.ts(439,6): error TS1360: Type 'ZodObject<{ name: ZodOptional<ZodString>; apiKey: ZodOptional<ZodString>; accessKeyId: ZodOptional<ZodString>; ... 20 more ...; isDefault: ZodOptional<...>; }, $strip>' does not satisfy the expected type 'ZodType<UpdateOrganizationAiInterfaceRequest, unknown, $ZodTypeInternals<UpdateOrganizationAiInterfaceRequest, unknown>>'.
+apps/api/src/routes/ai-interfaces.ts(1296,9): error TS2322: Type 'VolcanoInterfaceMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1350,9): error TS2322: Type 'VolcanoInterfaceMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1364,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1377,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1395,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1416,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1424,51): error TS2345: Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type 'SingleModelProviderMetadata'.
+apps/api/src/routes/ai-interfaces.ts(1469,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1514,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1516,11): error TS2345: Argument of type 'Record<string, { sourceTemplateId: string; upstreamParams: { id: string; name: string; valueType: "string" | "number" | "boolean" | "string[]" | "object[]"; }[]; paramMappings: { upstreamParamId: string; sourcePath?: string | undefined; collectMode?: "all" | ... 1 more ... | undefined; transform?: "ratio_resolution_...' is not assignable to parameter of type 'Readonly<Record<string, SingleModelFormatTransform | null | undefined>>'.
+apps/api/src/routes/ai-interfaces.ts(1520,51): error TS2345: Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type 'SingleModelProviderMetadata'.
+apps/api/src/routes/ai-interfaces.ts(1568,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1586,9): error TS2322: Type 'SingleModelProviderMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1588,11): error TS2345: Argument of type 'Record<string, { enabled: boolean; upstreamModelId: string; modality: "text" | "audio" | "image" | "video"; canonicalId?: string | undefined; alias?: string | undefined; formatTransform?: { ...; } | undefined; capabilityLimits?: { ...; } | undefined; }>' is not assignable to parameter of type 'Readonly<Record<string, OrgModelInstanceConfig>>'.
+apps/api/src/routes/ai-interfaces.ts(1591,11): error TS18048: 'metadataUpdate' is possibly 'undefined'.
+apps/api/src/routes/ai-interfaces.ts(1592,11): error TS18048: 'metadataUpdate' is possibly 'undefined'.
+apps/api/src/routes/ai-interfaces.ts(1592,41): error TS2339: Property 'useOfficial' does not exist on type '{}'.
+apps/api/src/routes/ai-interfaces.ts(1593,51): error TS2345: Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type 'SingleModelProviderMetadata'.
+apps/api/src/routes/ai-interfaces.ts(1604,11): error TS18048: 'metadataUpdate' is possibly 'undefined'.
+apps/api/src/routes/ai-interfaces.ts(1605,11): error TS18048: 'metadataUpdate' is possibly 'undefined'.
+apps/api/src/routes/ai-interfaces.ts(1605,41): error TS2339: Property 'useOfficial' does not exist on type '{}'.
+apps/api/src/routes/ai-interfaces.ts(1607,46): error TS18048: 'metadataUpdate' is possibly 'undefined'.
+apps/api/src/routes/ai-interfaces.ts(1607,46): error TS2769: No overload matches this call.
+apps/api/src/routes/ai-interfaces.ts(1608,18): error TS18046: 'config' is of type 'unknown'.
+apps/api/src/routes/ai-interfaces.ts(1608,36): error TS18046: 'config' is of type 'unknown'.
+apps/api/src/routes/ai-interfaces.ts(1611,31): error TS18046: 'config' is of type 'unknown'.
+apps/api/src/routes/ai-interfaces.ts(1703,26): error TS18046: 'error' is of type 'unknown'.
+apps/api/src/routes/ai-interfaces.ts(1713,9): error TS2322: Type 'VolcanoInterfaceMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/ai-interfaces.ts(1730,9): error TS2322: Type 'VolcanoInterfaceMetadata' is not assignable to type 'Record<string, unknown>'.
+apps/api/src/routes/form-triggers.ts(159,43): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/health.ts(13,48): error TS2352: Conversion of type 'Bindings' to type 'Record<string, string>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/routes/http-triggers.ts(61,56): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/http-triggers.ts(81,7): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/internal/persist-workers.ts(131,18): error TS2352: Conversion of type '{ finalMedia: Record<string, unknown>[]; }' to type 'PersistWorkerCompleteJobRequest' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/routes/organizations.ts(120,69): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/organizations.ts(219,60): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/organizations.ts(338,7): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/platform-ai.ts(1819,9): error TS2322: Type 'readonly ReferenceImageInline[] | undefined' is not assignable to type 'readonly { readonly mimeType: string; readonly dataBase64: string; }[] | undefined'.
+apps/api/src/routes/platform-ai.ts(2741,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+apps/api/src/routes/types.test.ts(60,3): error TS1360: Type '{ waitUntil: () => void; passThroughOnException: () => void; }' does not satisfy the expected type 'ExecutionContext<unknown>'.
+apps/api/src/routes/types.test.ts(71,7): error TS2345: Argument of type '{ waitUntil: () => void; passThroughOnException: () => void; }' is not assignable to parameter of type 'ExecutionContext'.
+apps/api/src/routes/workflows.ts(163,44): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+apps/api/src/routes/workflows.ts(205,7): error TS2345: Argument of type '{ id: string; name: string; schemeId: string; trigger: WorkflowTrigger | undefined; runtime: WorkflowRuntime; nodes: Node[]; edges: Edge[]; }' is not assignable to parameter of type 'Workflow'.
+apps/api/src/routes/workflows.ts(241,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+apps/api/src/routes/workflows.ts(492,45): error TS2304: Cannot find name 'Bindings'.
+apps/api/src/runtime/node-email-agent-runner.ts(556,14): error TS2352: Conversion of type '{ fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>; deliverReply: (args: { threadId: string; text: string; }) => Promise<{ accepted: boolean; }>; }' to type 'DurableObjectStub<undefined>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/runtime/postgres-database-service.ts(17,3): error TS2344: Type 'string' does not satisfy the constraint '(...args: any) => any'.
+apps/api/src/runtime/postgres-database-service.ts(40,24): error TS2345: Argument of type 'TransactionSql<{}>' is not assignable to parameter of type 'never'.
+apps/api/src/runtime/postgres-database-service.ts(47,32): error TS2339: Property 'unsafe' does not exist on type 'never'.
+apps/api/src/runtime/postgres-database-service.ts(55,31): error TS2339: Property 'unsafe' does not exist on type 'never'.
+apps/api/src/runtime/tool-context.ts(46,5): error TS2739: Type 'Bindings' is missing the following properties from type 'NodeEnv': DATASETS, DATASETS_AUTORAG
+apps/api/src/server-bootstrap.ts(42,9): error TS2352: Conversion of type '{ incoming: unknown; outgoing: unknown; }' to type 'Bindings' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/server-bootstrap.ts(62,11): error TS2352: Conversion of type 'Record<string, unknown>' to type 'Bindings' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/services/bootstrap-asset-store.test.ts(84,8): error TS2551: Property 'utimeSync' does not exist on type 'typeof import("node:fs")'. Did you mean 'utimesSync'?
+apps/api/src/services/bootstrap-persist-worker.ts(2,24): error TS7016: Could not find a declaration file for module 'ssh2'. '/app/node_modules/.pnpm/ssh2@1.17.0/node_modules/ssh2/lib/index.js' implicitly has an 'any' type.
+apps/api/src/services/bootstrap-persist-worker.ts(59,31): error TS7006: Parameter 'error' implicitly has an 'any' type.
+apps/api/src/services/bootstrap-persist-worker.ts(59,38): error TS7006: Parameter 'stream' implicitly has an 'any' type.
+apps/api/src/services/email-service.ts(168,16): error TS2339: Property 'env' does not exist on type 'EmailService'.
+apps/api/src/services/email-service.ts(170,16): error TS2339: Property 'env' does not exist on type 'EmailService'.
+apps/api/src/services/execute-text-model.ts(153,35): error TS2339: Property 'candidate' does not exist on type '{ readonly env: Bindings; readonly db: Database; readonly organizationId: string; readonly canonicalId: string; readonly interfaceId: string; readonly effectivePrompt: string; ... 5 more ...; readonly upstreamLog?: UpstreamRequestLogSink | undefined; }'.
+apps/api/src/services/generation-job-service.ts(419,5): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+apps/api/src/services/generation-job-service.ts(578,5): error TS2322: Type 'string | null' is not assignable to type 'string'.
+apps/api/src/services/generation-job-service.ts(665,5): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+apps/api/src/services/org-video-task.ts(118,7): error TS2322: Type 'readonly { readonly mimeType: string; readonly dataBase64: string; }[] | undefined' is not assignable to type 'readonly ReferenceImageInline[] | undefined'.
+apps/api/src/services/org-video-task.ts(145,5): error TS2322: Type 'readonly { readonly mimeType: string; readonly dataBase64: string; }[] | undefined' is not assignable to type 'readonly ReferenceImageInline[] | undefined'.
+apps/api/src/services/persist-generating-node-content.ts(2,3): error TS2724: '"@dafthunk/types"' has no exported member named 'AppendAudioGeneratingContentParams'. Did you mean 'AppendMediaGeneratingContentParams'?
+apps/api/src/services/persist-worker-pool-service.ts(83,20): error TS2352: Conversion of type 'RowList<Record<string, unknown>[]>' to type 'ClaimableJobRow[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/services/persist-worker-pool-service.ts(300,25): error TS18048: 'pendingMedia' is possibly 'undefined'.
+apps/api/src/services/send-registration-verification-email.ts(69,37): error TS7016: Could not find a declaration file for module 'nodemailer'. '/app/node_modules/.pnpm/nodemailer@6.10.1/node_modules/nodemailer/lib/nodemailer.js' implicitly has an 'any' type.
+apps/api/src/services/single-node-executor.ts(88,27): error TS2554: Expected 2 arguments, but got 1.
+apps/api/src/services/validate-generation-job-upload.test.ts(56,23): error TS2339: Property 'storageBackend' does not exist on type 'MediaReference'.
+apps/api/src/services/validate-generation-job-upload.ts(63,33): error TS2345: Argument of type 'MediaReference' is not assignable to parameter of type 'ObjectReference'.
+apps/api/src/services/validate-generation-job-upload.ts(99,33): error TS2345: Argument of type 'MediaReference' is not assignable to parameter of type 'ObjectReference'.
+apps/api/src/services/video-concat-service.ts(20,8): error TS2459: Module '"../db/generation-job-queries"' declares 'GenerationJobRecord' locally, but it is not exported.
+apps/api/src/services/video-enhance-service.ts(22,8): error TS2459: Module '"../db/generation-job-queries"' declares 'GenerationJobRecord' locally, but it is not exported.
+apps/api/src/services/video-trim-service.ts(22,8): error TS2459: Module '"../db/generation-job-queries"' declares 'GenerationJobRecord' locally, but it is not exported.
+apps/api/src/services/workflow-executor.ts(98,7): error TS2322: Type '{ emailMessage: EmailMessage; userPlan?: string | undefined; unlimitedUsage?: boolean | undefined; overageLimit?: number | null | undefined; subscriptionStatus?: string | undefined; workflow: { ...; }; userId: string; organizationId: string; computeCredits: number; }' is not assignable to type 'RuntimeParams'.
+apps/api/src/services/workflow-executor.ts(115,7): error TS2322: Type '{ httpRequest: HttpRequest; userPlan?: string | undefined; unlimitedUsage?: boolean | undefined; overageLimit?: number | null | undefined; subscriptionStatus?: string | undefined; workflow: { ...; }; userId: string; organizationId: string; computeCredits: number; }' is not assignable to type 'RuntimeParams'.
+apps/api/src/services/workflow-executor.ts(131,7): error TS2322: Type '{ formSubmission: { record: Record<string, unknown>; timestamp: number; }; userPlan?: string | undefined; unlimitedUsage?: boolean | undefined; overageLimit?: number | null | undefined; ... 4 more ...; computeCredits: number; }' is not assignable to type 'RuntimeParams'.
+apps/api/src/services/workflow-executor.ts(140,5): error TS2322: Type '{ httpRequest: HttpRequest; userPlan?: string | undefined; unlimitedUsage?: boolean | undefined; overageLimit?: number | null | undefined; subscriptionStatus?: string | undefined; workflow: { ...; }; userId: string; organizationId: string; computeCredits: number; }' is not assignable to type 'RuntimeParams'.
+apps/api/src/storage/blob-store-r2-adapter.ts(68,45): error TS2339: Property 'contentType' does not exist on type 'Headers | R2HTTPMetadata'.
+apps/api/src/storage/blob-store-r2-adapter.ts(69,46): error TS2339: Property 'cacheControl' does not exist on type 'Headers | R2HTTPMetadata'.
+apps/api/src/storage/blob-store-r2-adapter.ts(78,9): error TS2741: Property 'toJSON' is missing in type '{}' but required in type 'R2Checksums'.
+apps/api/src/storage/blob-store-r2-adapter.ts(80,9): error TS2322: Type 'Headers | R2HTTPMetadata' is not assignable to type 'R2HTTPMetadata | undefined'.
+apps/api/src/storage/blob-store-r2-adapter.ts(114,5): error TS2741: Property 'toJSON' is missing in type '{}' but required in type 'R2Checksums'.
+apps/api/src/utils/encryption.test.ts(28,3): error TS2353: Object literal may only specify known properties, and 'AI_SEARCH' does not exist in type 'Bindings'.
+apps/api/src/utils/node-types.test.ts(41,67): error TS2352: Conversion of type '{ getNodeTypes: () => { id: string; name: string; type: string; tags: never[]; icon: string; inputs: never[]; outputs: never[]; }[]; }' to type 'CloudflareNodeRegistry' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+apps/api/src/utils/workflows.test.ts(40,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: Node[]; edges: Edge[]; }' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(56,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: Node[]; edges: Edge[]; }' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(79,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: ({ outputs: { name: string; type: "string"; }[]; id: string; name: string; type: string; description?: string; icon?: string; position: Position; inputs: Parameter[]; error?: string; functionCalling?: boolean; metadata?: Record<string, string>; } | { ...; })[]; e...' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(101,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: ({ outputs: { name: string; type: "string"; }[]; id: string; name: string; type: string; description?: string; icon?: string; position: Position; inputs: Parameter[]; error?: string; functionCalling?: boolean; metadata?: Record<string, string>; } | { ...; })[]; e...' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(132,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: Node[]; edges: Edge[]; }' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(154,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: Node[]; edges: Edge[]; }' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(178,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: ({ outputs: { name: string; type: "string"; }[]; id: string; name: string; type: string; description?: string; icon?: string; position: Position; inputs: Parameter[]; error?: string; functionCalling?: boolean; metadata?: Record<string, string>; } | { ...; })[]; e...' but required in type 'Workflow'.
+apps/api/src/utils/workflows.test.ts(200,13): error TS2741: Property 'schemeId' is missing in type '{ id: string; name: string; trigger: "manual"; nodes: ({ outputs: { name: string; type: "string"; }[]; id: string; name: string; type: string; description?: string; icon?: string; position: Position; inputs: Parameter[]; error?: string; functionCalling?: boolean; metadata?: Record<string, string>; } | { ...; })[]; e...' but required in type 'Workflow'.
+apps/api/src/utils/workflows.ts(38,9): error TS2304: Cannot find name 'validateWorkflowGraphAgainstCatalog'.
+packages/runtime/src/ai-interface/apply-forwarding-mappings.ts(13,26): error TS2307: Cannot find module 'jsonpath-plus' or its corresponding type declarations.
+packages/runtime/src/execution-errors.ts(16,8): error TS2307: Cannot find module '@dafthunk/utils' or its corresponding type declarations.
+packages/runtime/src/specification/concurrent-errors-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/conditional-branching-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/edge-cases-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/failing-execution-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/input-collection-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/monitoring-updates-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/multi-step-execution-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/node-execution-errors-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/output-handling-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/parallel-execution-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/skip-logic-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/state-consistency-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/status-computation-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/successful-execution-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/topological-ordering-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+packages/runtime/src/specification/workflow-validation-spec.ts(2,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.

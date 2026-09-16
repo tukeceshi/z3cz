@@ -1,4 +1,8 @@
-import { type MouseEvent as ReactMouseEvent, useCallback } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useMemo,
+} from "react";
 
 import { cn } from "@/utils/utils";
 
@@ -39,6 +43,7 @@ export interface DurationDragSliderProps {
   readonly max: number;
   readonly value: number;
   readonly disabled?: boolean;
+  readonly marks?: readonly number[];
   readonly onDragStart?: () => void;
   readonly onPreview: (next: number) => void;
   readonly onCommit: (next: number) => void;
@@ -49,11 +54,16 @@ export function DurationDragSlider({
   max,
   value,
   disabled = false,
+  marks,
   onDragStart,
   onPreview,
   onCommit,
 }: DurationDragSliderProps) {
   const percent = percentFromValue(value, min, max);
+  const visibleMarks = useMemo(
+    () => (marks ?? []).filter((mark) => mark >= min && mark <= max),
+    [marks, max, min]
+  );
 
   const handleMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -83,23 +93,80 @@ export function DurationDragSlider({
     [disabled, max, min, onCommit, onDragStart, onPreview]
   );
 
+  const handleMarkMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>, mark: number) => {
+      if (disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onDragStart?.();
+      onPreview(mark);
+      onCommit(mark);
+    },
+    [disabled, onCommit, onDragStart, onPreview]
+  );
+
   return (
     <div
-      data-testid="duration-drag-track"
       className={cn(
-        "nodrag nopan nowheel relative flex h-5 min-w-0 flex-1 cursor-pointer touch-none select-none items-center",
+        "nodrag nopan nowheel relative flex min-w-0 flex-1 flex-col",
         disabled && "pointer-events-none opacity-50"
       )}
-      onMouseDown={handleMouseDown}
     >
-      <div className="pointer-events-none relative h-1 w-full">
-        <div className="absolute inset-0 rounded-full bg-primary/20" />
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-primary"
-          style={{ width: `${percent}%` }}
-        />
-        <DragThumb percent={percent} />
+      <div
+        data-testid="duration-drag-track"
+        className="relative flex h-5 w-full cursor-pointer touch-none select-none items-center"
+        onMouseDown={handleMouseDown}
+      >
+        <div className="pointer-events-none relative h-1 w-full">
+          <div className="absolute inset-0 rounded-full bg-primary/20" />
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-primary"
+            style={{ width: `${percent}%` }}
+          />
+          {visibleMarks.map((mark) => (
+            <div
+              key={mark}
+              className="absolute top-1/2 h-1.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/40"
+              style={{ left: `${percentFromValue(mark, min, max)}%` }}
+            />
+          ))}
+          <DragThumb percent={percent} />
+        </div>
+        {visibleMarks.map((mark) => (
+          <button
+            key={mark}
+            type="button"
+            aria-label={String(mark)}
+            className="absolute top-1/2 z-10 h-5 w-4 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${percentFromValue(mark, min, max)}%` }}
+            onMouseDown={(event) => handleMarkMouseDown(event, mark)}
+          />
+        ))}
       </div>
+      {visibleMarks.length > 0 ? (
+        <div className="relative h-3.5">
+          {visibleMarks.map((mark) => {
+            const markPercent = percentFromValue(mark, min, max);
+            const align =
+              mark === max ? "-translate-x-full" : "-translate-x-1/2";
+            return (
+              <button
+                key={mark}
+                type="button"
+                data-testid={`duration-drag-mark-${mark}`}
+                className={cn(
+                  "absolute top-0 p-0 text-[10px] leading-none text-muted-foreground hover:text-foreground",
+                  align
+                )}
+                style={{ left: `${markPercent}%` }}
+                onMouseDown={(event) => handleMarkMouseDown(event, mark)}
+              >
+                {mark}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

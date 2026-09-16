@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { referencesFitVideoModelReferenceLimits } from "./platform-ai-model";
 import {
-  buildVideoEnhanceOrgModelOption,
   buildVideoEnhanceModelParameterRules,
+  buildVideoEnhanceOrgModelOption,
   clampVideoEnhanceFps,
   inferVideoEnhanceResolutionTier,
   isVideoEnhanceModelCanonicalId,
@@ -11,6 +11,9 @@ import {
   parseVideoEnhanceNodeConfig,
   parseVideoEnhanceSourceTierFromLabel,
   serializeVideoEnhanceNodeConfig,
+  VIDEO_ENHANCE_FPS_MARKS,
+  VIDEO_ENHANCE_FPS_MAX,
+  VIDEO_ENHANCE_FPS_MIN,
   VIDEO_ENHANCE_META_KEY,
   VIDEO_ENHANCE_MODEL_CANONICAL_ID,
   VIDEO_ENHANCE_MODEL_PARAMETER_RULES,
@@ -18,9 +21,9 @@ import {
 
 describe("video-enhance", () => {
   it("identifies the virtual enhance model id", () => {
-    expect(isVideoEnhanceModelCanonicalId(VIDEO_ENHANCE_MODEL_CANONICAL_ID)).toBe(
-      true
-    );
+    expect(
+      isVideoEnhanceModelCanonicalId(VIDEO_ENHANCE_MODEL_CANONICAL_ID)
+    ).toBe(true);
     expect(isVideoEnhanceModelCanonicalId("doubao-seedance-2")).toBe(false);
   });
 
@@ -53,9 +56,10 @@ describe("video-enhance", () => {
     expect(option?.canonicalId).toBe(VIDEO_ENHANCE_MODEL_CANONICAL_ID);
     expect(option?.interfaceId).toBe("iface-1");
     expect(
-      buildVideoEnhanceModelParameterRules(["fast", "standard"]).generationFields.find(
-        (field) => field.name === "mode"
-      )?.enumValues
+      buildVideoEnhanceModelParameterRules([
+        "fast",
+        "standard",
+      ]).generationFields.find((field) => field.name === "mode")?.enumValues
     ).toEqual(["fast", "standard"]);
   });
 
@@ -86,6 +90,14 @@ describe("video-enhance", () => {
     expect(clampVideoEnhanceFps(24)).toBe(24);
     expect(clampVideoEnhanceFps(10)).toBe(20);
     expect(clampVideoEnhanceFps(200)).toBe(120);
+  });
+
+  it("keeps fps slider marks inside the allowed range", () => {
+    expect(VIDEO_ENHANCE_FPS_MARKS).toEqual([30, 60, 120]);
+    for (const mark of VIDEO_ENHANCE_FPS_MARKS) {
+      expect(mark).toBeGreaterThanOrEqual(VIDEO_ENHANCE_FPS_MIN);
+      expect(mark).toBeLessThanOrEqual(VIDEO_ENHANCE_FPS_MAX);
+    }
   });
 
   it("round-trips node config in metadata", () => {
