@@ -81,6 +81,28 @@ describe("ensureLocalResourcesUploaded", () => {
     ).rejects.toBeInstanceOf(LocalReferenceCloudUploadError);
   });
 
+  it("skips public character-library portraits without catalog or upload", async () => {
+    const media = [
+      {
+        resourceId: "public:asset-9",
+        mimeType: "image/jpeg",
+        previewUrl: "https://cdn.example/p.jpg",
+      },
+    ] as const;
+
+    const result = await ensureLocalResourcesUploaded({
+      organizationId: "org-1",
+      workflowId: "wf-1",
+      media,
+      cloudConfigured: true,
+    });
+
+    expect(result).toEqual(media);
+    expect(cloudResolvableMock).not.toHaveBeenCalled();
+    expect(readStagingMock).not.toHaveBeenCalled();
+    expect(uploadFromStagingMock).not.toHaveBeenCalled();
+  });
+
   it("uploads from staging when the resource is not yet cloud-resolvable", async () => {
     cloudResolvableMock
       .mockResolvedValueOnce(false)
