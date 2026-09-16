@@ -11,6 +11,8 @@ function baseMetadata(
     credentialMode: "volcengine_iam",
     accessKeyId: "AKLT",
     secretAccessKeyEncrypted: "enc",
+    arkApiKeyDurationSeconds: 3600,
+    region: "cn-beijing",
     models: {},
     ...patch,
   };
@@ -27,13 +29,15 @@ describe("volcanoNeedsModelScopedArkKey", () => {
           },
           models: {
             "deepseek-v4-flash": {
+              canonicalId: "deepseek-v4-flash",
               enabled: true,
-              providerModelId: "deepseek-v4-flash-260425",
+              upstreamModelId: "deepseek-v4-flash-260425",
               modality: "text",
             },
             "doubao-seed-evolving": {
+              canonicalId: "doubao-seed-evolving",
               enabled: true,
-              providerModelId: "doubao-seed-evolving",
+              upstreamModelId: "doubao-seed-evolving",
               modality: "text",
             },
           },
@@ -51,13 +55,15 @@ describe("volcanoNeedsModelScopedArkKey", () => {
           },
           models: {
             "deepseek-v4-flash": {
+              canonicalId: "deepseek-v4-flash",
               enabled: true,
-              providerModelId: "deepseek-v4-flash-260425",
+              upstreamModelId: "deepseek-v4-flash-260425",
               modality: "text",
             },
             "doubao-seed-evolving": {
+              canonicalId: "doubao-seed-evolving",
               enabled: false,
-              providerModelId: "doubao-seed-evolving",
+              upstreamModelId: "doubao-seed-evolving",
               modality: "text",
             },
           },

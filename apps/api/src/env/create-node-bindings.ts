@@ -1,6 +1,9 @@
 import type { RuntimeParams } from "@dafthunk/runtime";
 
 import type { Bindings } from "../context";
+import type { AgentRunner } from "../durable-objects/agent-runner";
+import type { EmailAgentRunner } from "../durable-objects/email-agent-runner";
+import type { MailboxDO } from "../durable-objects/mailbox-do";
 import type { WorkflowAgent } from "../durable-objects/workflow-agent";
 import { resolveSecret } from "./startup-secrets";
 import { setNodeBindings } from "./node-bindings-ref";
@@ -74,7 +77,7 @@ function createNodeExecuteWorkflowBinding(): Workflow<RuntimeParams> {
           `Workflow execution ${executionId} not found or finished`
         );
       }
-      return instance as WorkflowInstance;
+      return instance as unknown as WorkflowInstance;
     },
   } as Workflow<RuntimeParams>;
 }
@@ -93,15 +96,18 @@ export async function createNodeBindings(
     DATABASE_URL:
       env.DATABASE_URL ??
       "postgresql://postgres:postgres@localhost:5432/postgres",
-    KV: new MemoryKvNamespace(),
+    KV: new MemoryKvNamespace() as unknown as KVNamespace,
     RATE_LIMIT_DEFAULT: createStubRateLimit(),
     RATE_LIMIT_AUTH: createStubRateLimit(),
     RATE_LIMIT_EXECUTE: createStubRateLimit(),
     EXECUTE: createNodeExecuteWorkflowBinding(),
     WORKFLOW_AGENT: createStubDurableObjectNamespace<WorkflowAgent>(),
-    AGENT_RUNNER: createNodeAgentRunnerNamespace(),
-    EMAIL_AGENT_RUNNER: createNodeEmailAgentRunnerNamespace(),
-    MAILBOX: createNodeMailboxNamespace(),
+    AGENT_RUNNER:
+      createNodeAgentRunnerNamespace() as unknown as DurableObjectNamespace<AgentRunner>,
+    EMAIL_AGENT_RUNNER:
+      createNodeEmailAgentRunnerNamespace() as unknown as DurableObjectNamespace<EmailAgentRunner>,
+    MAILBOX:
+      createNodeMailboxNamespace() as unknown as DurableObjectNamespace<MailboxDO>,
     WORKFLOW_QUEUE: createStubQueue(),
     RESSOURCES: storage.RESSOURCES,
     AI: createStubAi(),
