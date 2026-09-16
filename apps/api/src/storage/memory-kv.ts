@@ -3,7 +3,7 @@ interface MemoryKvEntry {
   expiration?: number;
 }
 
-export class MemoryKvNamespace implements KVNamespace {
+export class MemoryKvNamespace {
   private readonly store = new Map<string, MemoryKvEntry>();
 
   async get(
@@ -22,6 +22,18 @@ export class MemoryKvNamespace implements KVNamespace {
       return JSON.parse(entry.value) as object;
     }
     return entry.value;
+  }
+
+  async getWithMetadata<Metadata = unknown>(
+    key: string,
+    type?: "text" | "json" | "arrayBuffer" | "stream"
+  ): Promise<KVNamespaceGetWithMetadataResult<string, Metadata>> {
+    const value = await this.get(key, type);
+    return {
+      value: typeof value === "string" ? value : null,
+      metadata: null as Metadata,
+      cacheStatus: null,
+    };
   }
 
   async put(
@@ -49,7 +61,9 @@ export class MemoryKvNamespace implements KVNamespace {
     this.store.delete(key);
   }
 
-  async list(options?: KVNamespaceListOptions): Promise<KVNamespaceListResult> {
+  async list(
+    options?: KVNamespaceListOptions
+  ): Promise<KVNamespaceListResult<unknown, string>> {
     const prefix = options?.prefix ?? "";
     const keys = [...this.store.keys()]
       .filter((key) => key.startsWith(prefix))

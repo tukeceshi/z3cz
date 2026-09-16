@@ -802,15 +802,18 @@ describe("pruneVolcanoMetadataToCatalog", () => {
       accessKeyId: "ak",
       secretAccessKeyEncrypted: "enc",
       region: "cn-beijing",
+      arkApiKeyDurationSeconds: 3600,
       models: {
         "doubao-seedream-5-pro": {
+          canonicalId: "doubao-seedream-5-pro",
           enabled: true,
-          providerModelId: "doubao-seedream-5-0-pro-260628",
+          upstreamModelId: "doubao-seedream-5-0-pro-260628",
           modality: "image",
         },
         "doubao-seedream-5": {
+          canonicalId: "doubao-seedream-5",
           enabled: true,
-          providerModelId: "doubao-seedream-5-0-260128",
+          upstreamModelId: "doubao-seedream-5-0-260128",
           modality: "image",
         },
       },
@@ -818,6 +821,8 @@ describe("pruneVolcanoMetadataToCatalog", () => {
         "doubao-seedream-5-pro": {
           status: "open",
           probedAt: "2026-07-11T00:00:00.000Z",
+          errorCode: null,
+          message: null,
         },
       },
     });

@@ -117,6 +117,10 @@ describe("seedance official result volcano calls", () => {
       log: {
         action: "CreateArkOfficialResultQuery",
         httpStatus: 200,
+        request: {
+          Type: "content_url",
+          ContentURL: "https://example.com/video.mp4",
+        },
         response: envelope,
       },
     } satisfies Partial<SeedanceOfficialResultCallError>);
