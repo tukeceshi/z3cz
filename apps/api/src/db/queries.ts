@@ -50,7 +50,6 @@ import {
   memberships,
   type OrganizationInsert,
   OrganizationRole,
-  type OrganizationRoleType,
   organizations,
   type QueueInsert,
   type QueueRow,
@@ -200,7 +199,8 @@ export async function saveUser(
   });
 }
 
-const BOOTSTRAP_ADVISORY_LOCK_KEY = 0x6461667468756e6b;
+/** First four bytes of "dafthunk" — fits JS number and pg int4 lock keys. */
+const BOOTSTRAP_ADVISORY_LOCK_KEY = 0x64616674;
 
 export class EmailAlreadyRegisteredError extends Error {
   constructor() {

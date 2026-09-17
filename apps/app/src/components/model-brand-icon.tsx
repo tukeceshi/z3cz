@@ -81,7 +81,7 @@ const GROUP_ID_BRAND_KEYS: Partial<Record<string, ModelBrandKey>> = {
 export function isSelectableBrandIcon(
   value: string
 ): value is Exclude<ModelBrandKey, "volcano" | "tos"> {
-  return Object.prototype.hasOwnProperty.call(BRAND_ICON_SVGS, value);
+  return Object.hasOwn(BRAND_ICON_SVGS, value);
 }
 
 function brandFromGroupId(

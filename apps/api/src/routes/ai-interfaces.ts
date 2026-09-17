@@ -1,6 +1,5 @@
 import type {
   AiInterfaceProvider,
-  CreateOrganizationAiInterfaceRequest,
   ListOrganizationAiInterfacesResponse,
   OrganizationAiInterface,
   ListFormatTransformTemplatesResponse,
@@ -8,10 +7,8 @@ import type {
   UpdateOrganizationAiInterfaceRequest,
   VolcanoInterfaceMetadata,
   VolcanoProbeActivationResponse,
-  VolcanoProbeCredentialsRequest,
   VolcanoProbeTosBucketsResponse,
   VolcanoSnapshotFetchResponse,
-  VolcanoSnapshotResponse,
 } from "@dafthunk/types";
 import {
   ALL_AI_INTERFACE_PROVIDERS,
@@ -131,7 +128,6 @@ import type { VolcanoInterfaceSetupQueueMessage } from "@dafthunk/types";
 import {
   mergeApiKeyHintIntoMetadata,
   readApiKeyHint,
-  withApiKeyHint,
 } from "../utils/api-key-hint";
 
 function mapAiInterfaceError(
@@ -1283,7 +1279,7 @@ aiInterfaceRoutes.patch(
         return c.json({ error: "AI interface not found" }, 404);
       }
 
-      let apiKeyEncrypted: string | undefined =
+      const apiKeyEncrypted: string | undefined =
         body.apiKey !== undefined
           ? await encryptSecret(body.apiKey, c.env, organizationId)
           : undefined;
@@ -1543,7 +1539,7 @@ aiInterfaceRoutes.patch(
       }
 
       if (body.singleModelCapabilityLimitsByCanonicalId !== undefined) {
-        let current = parseSingleModelMetadata(
+        const current = parseSingleModelMetadata(
           metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
         );
         if (!current) {
@@ -1585,7 +1581,7 @@ aiInterfaceRoutes.patch(
       }
 
       if (body.singleModelModels !== undefined) {
-        let current = parseSingleModelMetadata(
+        const current = parseSingleModelMetadata(
           metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
         );
         if (!current) {

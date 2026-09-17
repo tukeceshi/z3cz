@@ -34,14 +34,6 @@ async function streamToBytes(
   return out;
 }
 
-function headersToRecord(headers: Headers): Record<string, string> {
-  const record: Record<string, string> = {};
-  for (const [key, value] of headers.entries()) {
-    record[key] = value;
-  }
-  return record;
-}
-
 export async function handleIncomingEmail(
   message: ForwardableEmailMessage,
   env: Bindings,
@@ -91,8 +83,6 @@ export async function handleIncomingEmail(
   // message to the org's mailbox. This happens for EVERY inbound message �?
   // even when no workflow is subscribed �?so the mailbox is a complete record.
   const rawBytes = await streamToBytes(raw);
-  const rawContent = new TextDecoder().decode(rawBytes);
-  const headersRecord = headersToRecord(headers);
 
   const mailbox = await persistInboundEmail({
     env,

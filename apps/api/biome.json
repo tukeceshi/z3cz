@@ -1,5 +1,12 @@
 {
   "extends": "//",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
   "linter": {
     "rules": {
       "recommended": false,

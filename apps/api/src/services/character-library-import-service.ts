@@ -30,7 +30,6 @@ import {
 } from "../integrations/volcengine/asset-library";
 import type { VolcengineCredentials } from "../integrations/volcengine/client";
 import { isSingleModelProviderMetadata } from "@dafthunk/types";
-import type { VolcanoInterfaceMetadata } from "@dafthunk/types";
 import {
   isVolcanoMetadata,
   parseInterfaceMetadata,

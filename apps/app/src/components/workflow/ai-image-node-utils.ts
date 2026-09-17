@@ -408,7 +408,7 @@ export function withAiImageResourceGeneratingCleared(
     })),
   };
 
-  let inputs = upsertInputValue(
+  const inputs = upsertInputValue(
     current.inputs,
     AI_IMAGE_HISTORY_INPUT_ID,
     nextHistory,
@@ -489,7 +489,7 @@ export function withAiImageGeneratingHistoryFailed(
     items: nextItems,
     selectedId: selected?.id ?? null,
   };
-  let inputs = upsertInputValue(
+  const inputs = upsertInputValue(
     current.inputs,
     AI_IMAGE_HISTORY_INPUT_ID,
     nextHistory,
@@ -521,7 +521,7 @@ export function withAiImageResourcesMarkedFailed(
     })),
   };
 
-  let inputs = upsertInputValue(
+  const inputs = upsertInputValue(
     current.inputs,
     AI_IMAGE_HISTORY_INPUT_ID,
     nextHistory,

@@ -157,7 +157,7 @@ export function preserveInFlightGenerativeMetadata(
     return incoming;
   }
 
-  let next = incoming ? { ...incoming } : {};
+  const next = incoming ? { ...incoming } : {};
   let changed = false;
   for (const key of IN_FLIGHT_GENERATIVE_METADATA_KEYS) {
     const localValue = local[key];

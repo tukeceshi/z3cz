@@ -3,7 +3,6 @@ import type {
   GenerateAiImageResponse,
   GenerationJobModality,
   GenerationJobRecord,
-  MediaReference,
   SubmitAiVideoResponse,
 } from "@dafthunk/types";
 import { isMediaReference } from "@dafthunk/types";

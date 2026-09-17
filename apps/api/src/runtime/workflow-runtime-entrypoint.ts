@@ -18,7 +18,6 @@ import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
 import {
   createWorkflowRuntime,
-  type WorkflowRuntime,
 } from "./cloudflare-workflow-runtime";
 
 // Internal params injected by Agent.runWorkflow() �?matches AgentWorkflowParams<T>

@@ -22,7 +22,7 @@ function resolveMountPrefix(c: Context<ApiContext>): string | null {
     return null;
   }
 
-  let pattern = matchedRoute.path
+  const pattern = matchedRoute.path
     .replace(/\/\*.*$/, "")
     .replace(/\*.*$/, "")
     .replace(/\/+$/, "");

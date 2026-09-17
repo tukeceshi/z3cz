@@ -6,7 +6,6 @@ import type {
   ListPersistWorkersResponse,
   PersistWorker,
   PersistWorkerPoolSettings,
-  RedeployPersistWorkerRequest,
   RedeployPersistWorkerResponse,
   UpdatePersistWorkerRequest,
   UpdatePersistWorkerResponse,

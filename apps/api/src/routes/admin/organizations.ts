@@ -241,7 +241,7 @@ async function fetchExecutionCount(
       ? "dafthunk_executions_production"
       : "dafthunk_executions_development";
 
-  // CF Analytics Engine SQL requires `COUNT()` with zero arguments â€?`COUNT(*)`
+  // CF Analytics Engine SQL requires `COUNT()` with zero arguments  - `COUNT(*)`
   // is rejected with `COUNT() function must have 0 arguments`.
   const aeSql = `
     SELECT COUNT() AS count

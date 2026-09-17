@@ -1,6 +1,5 @@
 import type {
   ClientMessage,
-  WorkflowErrorMessage,
   WorkflowExecuteMessage,
   WorkflowExecution,
   WorkflowExecutionUpdateMessage,
@@ -470,15 +469,6 @@ class NodeWorkflowSessionHub {
       session.persistTimer = null;
       void this.writeSessionToStore(session);
     }, PERSIST_DEBOUNCE_MS);
-  }
-
-  private async persistNow(session: NodeWorkflowSession): Promise<void> {
-    if (session.persistTimer) {
-      clearTimeout(session.persistTimer);
-      session.persistTimer = null;
-    }
-    session.pendingPersist = null;
-    await this.writeSessionToStore(session);
   }
 
   private async flushPersist(session: NodeWorkflowSession): Promise<void> {

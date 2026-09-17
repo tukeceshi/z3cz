@@ -1562,10 +1562,8 @@ platformAiRoutes.post(
       });
     }
 
-    let audios: MediaReference[];
-
     const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
-    audios = [
+    const audios: MediaReference[] = [
       await objectStore.writeObject(audioData, mimeType, organizationId),
     ];
 

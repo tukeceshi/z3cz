@@ -53,7 +53,6 @@ import {
   registerActiveEditorWorkflow,
   unregisterActiveEditorWorkflow,
 } from "../services/workflow-public-broadcast";
-import { ExecutionManager } from "../services/execution-manager";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
 import {
@@ -140,10 +139,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
   private static readonly STORAGE_PREFIX_FEEDBACK_FORM = "fform:";
 
   initialState: WorkflowAgentState = {};
-
-  // In-memory caches — reconstructed on demand after hibernation wake.
-  // Loss of these fields is harmless; they are never the source of truth.
-  private executionManager: ExecutionManager | null = null;
   private workflowState: WorkflowState | null = null;
   private organizationId: string | null = null;
   private graphRev = 0;
@@ -570,72 +565,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     });
   }
 
-  private async subscribeToExecution(
-    connection: Connection,
-    executionId: string
-  ): Promise<void> {
-    mergeConnectionState(connection, { executionId });
-
-    // Check DO storage for a buffered execution update
-    const key = WorkflowAgent.STORAGE_PREFIX_EXEC_BUFFER + executionId;
-    const buffered = await this.storage.get<BufferedExecution>(key);
-    if (buffered) {
-      if (
-        this.workflowState &&
-        buffered.execution.workflowId !== this.workflowState.id
-      ) {
-        return;
-      }
-      // Only delete buffer after a successful send
-      if (this.trySendExecutionUpdate(connection, buffered.execution)) {
-        await this.storage.delete(key);
-      }
-    }
-  }
-
-  private async startExecution(
-    connection: Connection,
-    parameters?: Record<string, unknown>
-  ): Promise<void> {
-    if (!this.workflowState || !this.organizationId) {
-      connection.close(1011, "Workflow not initialized");
-      return;
-    }
-
-    const userId = this.state?.userId;
-    if (!userId) {
-      connection.close(1011, "User not identified");
-      return;
-    }
-
-    if (!this.executionManager) {
-      this.executionManager = new ExecutionManager({ env: this.env });
-    }
-
-    try {
-      const { executionId, execution } =
-        await this.executionManager.executeWorkflow(
-          this.workflowState,
-          this.organizationId,
-          userId,
-          parameters
-        );
-
-      mergeConnectionState(connection, { executionId });
-      this.sendExecutionUpdate(connection, execution);
-    } catch (error) {
-      console.error("Failed to execute workflow:", error);
-      this.sendExecutionUpdate(connection, {
-        id: "",
-        workflowId: this.workflowState.id,
-        status: "error",
-        nodeExecutions: [],
-        error:
-          error instanceof Error ? error.message : "Failed to execute workflow",
-      });
-    }
-  }
-
   // ── Execution updates ─────────────────────────────────────────────────
 
   /**
@@ -854,22 +783,6 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
 
     await this.storage.put(key, { submitted: true, submittedAt: Date.now() });
     return { success: true };
-  }
-
-  // ── Persistence ───────────────────────────────────────────────────────
-
-  private async persistNow(): Promise<void> {
-    if (!this.workflowState || !this.organizationId) {
-      return;
-    }
-
-    this.cancelPersistSchedules();
-    await this.storage.delete(WorkflowAgent.STORAGE_KEY_DIRTY);
-    await this.persistToDatabaseFrom({
-      workflowState: this.workflowState,
-      organizationId: this.organizationId,
-      apiHost: this.state?.apiHost,
-    });
   }
 
   /**
