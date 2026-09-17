@@ -25,7 +25,7 @@ function mergeTableRow(originalLine: string, editedLine: string): string {
     if (editedCell.trim() === originalCell.trim()) {
       return originalCell;
     }
-    return editedCell.trim();
+    return ` ${editedCell.trim()} `;
   });
 
   return buildTableRow(mergedCells);
@@ -37,7 +37,7 @@ export function patchMarkdownTableEdit(
 ): string {
   const originalBody = original.replace(/\n+$/, "");
   const editedBody = edited.replace(/\n+$/, "");
-  const trailingNewlines = original.slice(originalBody.length) || "\n";
+  const trailingNewlines = original.slice(originalBody.length);
 
   const originalLines = originalBody.split("\n");
   const editedLines = editedBody.split("\n");

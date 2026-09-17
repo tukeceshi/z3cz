@@ -148,6 +148,39 @@ class MockWorkflowRuntime extends Runtime<Bindings> {
  * Mock workflow entrypoint for testing.
  * Adapter that connects test infrastructure to the mock runtime.
  */
+export function createMockRuntimeDependencies(
+  env: Bindings
+): RuntimeDependencies<Bindings> {
+  const nodeRegistry = new MockNodeRegistry(env, true);
+  const objectStore = new CloudflareObjectStore(
+    env.RESSOURCES,
+    buildPresignedUrlConfig(env)
+  );
+  const credentialProvider = new MockCredentialService();
+  const toolRegistry = new MockToolRegistry(
+    nodeRegistry,
+    (nodeId: string, inputs: Record<string, unknown>) =>
+      createToolContext(nodeId, inputs, env, objectStore, credentialProvider)
+  );
+
+  return {
+    nodeRegistry,
+    credentialProvider,
+    executionStore: new MockExecutionStore(),
+    monitoringService: new MockMonitoringService(),
+    creditService: {
+      hasEnoughCredits: async () => true,
+      recordUsage: async () => {},
+      settleAvailability: async () => {},
+    },
+    objectStore,
+    toolRegistry,
+    databaseService: new MockDatabaseService(),
+    datasetService: new MockDatasetService(),
+    queueService: new MockQueueService(),
+  };
+}
+
 class MockWorkflowEntrypoint extends WorkflowEntrypoint<
   Bindings,
   RuntimeParams
@@ -156,43 +189,10 @@ class MockWorkflowEntrypoint extends WorkflowEntrypoint<
 
   constructor(ctx: ExecutionContext, env: Bindings) {
     super(ctx, env);
-
-    // Create mock dependencies
-    const nodeRegistry = new MockNodeRegistry(env, true);
-    const objectStore = new CloudflareObjectStore(
-      env.RESSOURCES,
-      buildPresignedUrlConfig(env)
+    this.runtime = new MockWorkflowRuntime(
+      env,
+      createMockRuntimeDependencies(env)
     );
-    const credentialProvider = new MockCredentialService();
-    const toolRegistry = new MockToolRegistry(
-      nodeRegistry,
-      (nodeId: string, inputs: Record<string, unknown>) =>
-        createToolContext(nodeId, inputs, env, objectStore, credentialProvider)
-    );
-    const databaseService = new MockDatabaseService();
-    const datasetService = new MockDatasetService();
-    const queueService = new MockQueueService();
-
-    // Create test-friendly dependencies
-    const dependencies: RuntimeDependencies<Bindings> = {
-      nodeRegistry,
-      credentialProvider,
-      executionStore: new MockExecutionStore(),
-      monitoringService: new MockMonitoringService(),
-      creditService: {
-        hasEnoughCredits: async () => true,
-        recordUsage: async () => {},
-        settleAvailability: async () => {},
-      },
-      objectStore,
-      toolRegistry,
-      databaseService,
-      datasetService,
-      queueService,
-    };
-
-    // Create runtime with dependencies
-    this.runtime = new MockWorkflowRuntime(env, dependencies);
   }
 
   /**

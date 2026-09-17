@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -8,12 +9,16 @@ import {
   resolveBootstrapAssetDiskPath,
 } from "./bootstrap-asset-store";
 
+function diskUrl(filePath: string): URL {
+  return pathToFileURL(filePath);
+}
+
 function makeTempDir(): string {
   const dir = path.join(
-    process.cwd(),
+    "/tmp",
     `.vitest-bootstrap-assets-${Date.now()}-${Math.random().toString(16).slice(2)}`
   );
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(diskUrl(dir), { recursive: true });
   return dir;
 }
 
@@ -23,7 +28,7 @@ describe("bootstrap-asset-store", () => {
   afterEach(() => {
     invalidateBootstrapAssetCache();
     if (tempDir) {
-      fs.rmSync(tempDir, { force: true, recursive: true });
+      fs.rmSync(diskUrl(tempDir), { force: true, recursive: true });
       tempDir = "";
     }
     delete process.env.BOOTSTRAP_ASSETS_DIR;
@@ -32,7 +37,7 @@ describe("bootstrap-asset-store", () => {
   it("loads shell manifest metadata", () => {
     tempDir = makeTempDir();
     fs.writeFileSync(
-      path.join(tempDir, "bootstrap-manifest.json"),
+      diskUrl(path.join(tempDir, "bootstrap-manifest.json")),
       JSON.stringify({
         version: 1,
         entry: "/assets/entry.js",
@@ -55,7 +60,7 @@ describe("bootstrap-asset-store", () => {
     tempDir = makeTempDir();
     const manifestPath = path.join(tempDir, "bootstrap-manifest.json");
     fs.writeFileSync(
-      manifestPath,
+      diskUrl(manifestPath),
       JSON.stringify({
         version: 1,
         entry: "/assets/entry.js",
@@ -68,9 +73,9 @@ describe("bootstrap-asset-store", () => {
     process.env.BOOTSTRAP_ASSETS_DIR = tempDir;
     expect(getBootstrapManifest()?.manifestVersion).toBe("old");
 
-    const previousMtime = fs.statSync(manifestPath).mtimeMs;
+    const previousMtime = fs.statSync(diskUrl(manifestPath)).mtimeMs;
     fs.writeFileSync(
-      manifestPath,
+      diskUrl(manifestPath),
       JSON.stringify({
         version: 1,
         entry: "/assets/entry.js",
@@ -81,7 +86,11 @@ describe("bootstrap-asset-store", () => {
       })
     );
     const nextMtime = previousMtime + 1000;
-    fs.utimesSync(manifestPath, new Date(nextMtime), new Date(nextMtime));
+    fs.utimesSync(
+      diskUrl(manifestPath),
+      new Date(nextMtime),
+      new Date(nextMtime)
+    );
 
     expect(getBootstrapManifest()?.manifestVersion).toBe("new");
   });
@@ -100,10 +109,10 @@ describe("bootstrap-asset-store", () => {
     tempDir = makeTempDir();
     const distDir = path.join(tempDir, "dist");
     const publicDir = path.join(tempDir, "public", "landing");
-    fs.mkdirSync(distDir, { recursive: true });
-    fs.mkdirSync(publicDir, { recursive: true });
+    fs.mkdirSync(diskUrl(distDir), { recursive: true });
+    fs.mkdirSync(diskUrl(publicDir), { recursive: true });
     const publicFile = path.join(publicDir, "dollface.jpg");
-    fs.writeFileSync(publicFile, "landing-bytes");
+    fs.writeFileSync(diskUrl(publicFile), "landing-bytes");
 
     expect(
       resolveBootstrapAssetDiskPath(distDir, "/landing/dollface.jpg")

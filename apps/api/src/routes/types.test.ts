@@ -24,7 +24,12 @@ vi.mock("../utils/workflow-scheme", () => ({
 
 const { defaultTypesCatalog, generativeNodeTypes, getAllNodeTypesMock } =
   vi.hoisted(() => {
-    const generativeNodeTypes = ["ai-text", "ai-image", "ai-video"] as const;
+    const generativeNodeTypes = [
+      "ai-text",
+      "ai-image",
+      "ai-video",
+      "ai-audio",
+    ] as const;
 
     function createCatalogNodeType(type: string): NodeType {
       return {

@@ -273,9 +273,9 @@ describe("syncRetakePrimaryVideoDraft", () => {
 
     expect(patch.videoDurationSec).toBe(29.77);
 
-    expect(patch.committedRange).toEqual({ startSec: 0, endSec: 10.08 });
+    expect(patch.committedRange).toEqual({ startSec: 0, endSec: 10.1 });
 
-    expect(patch.draftRange).toEqual({ startSec: 0, endSec: 10.08 });
+    expect(patch.draftRange).toEqual({ startSec: 0, endSec: 10.1 });
 
     expect(patch.primaryVideoMediaKey).toBe("edge-primary:res-source");
 

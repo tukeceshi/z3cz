@@ -7,7 +7,10 @@ import {
   recallMediaDisplayUrlSet,
   rememberMediaDisplayUrlSet,
 } from "./media-display-url-set-memory";
-import { resetWorkflowMediaAddressCatalog } from "./workflow-media-address-catalog";
+import {
+  populateWorkflowMediaThumbBlobs,
+  resetWorkflowMediaAddressCatalog,
+} from "./workflow-media-address-catalog";
 
 const base = {
   organizationId: "org-1",
@@ -20,8 +23,17 @@ afterEach(() => {
   resetWorkflowMediaAddressCatalog();
 });
 
+function activateCatalog(): void {
+  populateWorkflowMediaThumbBlobs({
+    organizationId: base.organizationId,
+    workflowId: base.workflowId,
+    items: [],
+  });
+}
+
 describe("media-display-url-set-memory", () => {
   it("recalls a remembered thumb set by media id", () => {
+    activateCatalog();
     const urlSet = { full: "blob:full", s: "blob:s", m: null, l: null };
     rememberMediaDisplayUrlSet({ ...base, urlSet });
 
@@ -38,6 +50,7 @@ describe("media-display-url-set-memory", () => {
   });
 
   it("forgets sets for a media id", () => {
+    activateCatalog();
     rememberMediaDisplayUrlSet({
       ...base,
       urlSet: { full: "blob:full", s: null, m: null, l: null },

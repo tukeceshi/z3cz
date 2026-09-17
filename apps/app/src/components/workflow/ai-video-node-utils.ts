@@ -976,9 +976,17 @@ export function countAiVideoReferenceCountsForNode(
     readonly targetHandle?: string | null;
   }[],
   nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[],
-  _targetNodeData?: Pick<WorkflowNodeType, "metadata">
+  targetNodeData?: Pick<WorkflowNodeType, "metadata">
 ): SubmitAiVideoMediaReferenceCounts {
-  return countAiVideoReferenceCounts(targetNodeId, edges, nodes);
+  const counts = countAiVideoReferenceCounts(targetNodeId, edges, nodes);
+  if (!isAiVideoRetakePanel(targetNodeData?.metadata) || counts.videoCount > 0) {
+    return counts;
+  }
+  // Empty retake still occupies the primary source slot for model-limit checks.
+  return {
+    ...counts,
+    videoCount: 1,
+  };
 }
 
 /** @deprecated Prefer countAiVideoReferenceCounts. */

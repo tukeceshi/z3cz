@@ -30,5 +30,5 @@
 export { MockExecutionStore } from "./execution-store";
 export { MockMonitoringService } from "./monitoring-service";
 export { MockNodeRegistry } from "./node-registry";
-export { MockRuntime } from "./runtime";
+export { createMockRuntimeDependencies, MockRuntime } from "./runtime";
 export { MockToolRegistry } from "./tool-registry";

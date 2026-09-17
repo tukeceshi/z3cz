@@ -109,13 +109,13 @@ describe("resolveModelCandidate", () => {
     expect(resolveModelCandidate(undefined, models)).toBe(models[0]);
   });
 
-  it("returns undefined when selection is stale", () => {
+  it("falls back to first selectable model when selection is stale", () => {
     expect(
       resolveModelCandidate(
         { canonicalId: "missing", interfaceId: "iface-a" },
         models
       )
-    ).toBeUndefined();
+    ).toBe(models[0]);
   });
 });
 
@@ -200,6 +200,13 @@ describe("persistModelBindingToInputs", () => {
         hidden: true,
         value: "iface-a",
       },
+      {
+        id: "model_instance_id",
+        name: "model_instance_id",
+        type: "string",
+        hidden: true,
+        value: "",
+      },
     ]);
   });
 });
@@ -225,6 +232,13 @@ describe("persistGenerativeBindingWithParams", () => {
         type: "string",
         hidden: true,
         value: "iface-a",
+      },
+      {
+        id: "model_instance_id",
+        name: "model_instance_id",
+        type: "string",
+        hidden: true,
+        value: "",
       },
       {
         id: "params",

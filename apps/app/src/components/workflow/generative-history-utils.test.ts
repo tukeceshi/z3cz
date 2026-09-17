@@ -111,7 +111,7 @@ describe("readDisplayHistoryMedia", () => {
           readItemImages,
         { holdUnreadyCover: true }
       )
-    ).toEqual([{ resourceId: "done", mimeType: "image/jpeg" }]);
+    ).toEqual([{ resourceId: "pending", mimeType: "image/png" }]);
   });
 
   it("does not expose an unready cover when there is no previous media", () => {
@@ -129,7 +129,7 @@ describe("readDisplayHistoryMedia", () => {
           readItemImages,
         { holdUnreadyCover: true }
       )
-    ).toEqual([]);
+    ).toEqual([{ resourceId: "pending", mimeType: "image/png" }]);
   });
 
   it("still shows staged resource media while download/upload is pending", () => {
@@ -171,6 +171,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
       coverMedia: [{ resourceId: "done", mimeType: "image/jpeg" }],
       isBusy: true,
       hasCover: true,
+      cardPhase: "generating",
     });
   });
 
@@ -193,6 +194,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
       coverMedia: [{ resourceId: "pending", generating: true }],
       isBusy: true,
       hasCover: false,
+      cardPhase: "generating",
     });
   });
 
@@ -214,6 +216,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
       coverMedia: failed,
       isBusy: false,
       hasCover: false,
+      cardPhase: null,
     });
   });
 

@@ -40,6 +40,7 @@ export function readStudioMediaCardState(
     phase,
     isBusy:
       (phase !== null && isGenerativeCardBusyPhase(phase)) ||
+      (!isVideo && phase === "cancelled") ||
       isModalityGenerating ||
       hasGeneratingResource(media),
     generateError: readGenerativeCardError(metadata),
