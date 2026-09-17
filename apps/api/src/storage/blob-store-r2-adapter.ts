@@ -1,5 +1,18 @@
 import type { BlobStore } from "./blob-store";
 
+const emptyChecksums: R2Checksums = {
+  toJSON: () => ({}),
+};
+
+function readPutHttpMetadata(
+  httpMetadata?: R2HTTPMetadata | Headers
+): R2HTTPMetadata | undefined {
+  if (!httpMetadata || httpMetadata instanceof Headers) {
+    return undefined;
+  }
+  return httpMetadata;
+}
+
 /**
  * Adapts BlobStore to the Cloudflare R2Bucket shape so existing stores and
  * ObjectStore implementations keep working on the Node runtime.
@@ -27,7 +40,7 @@ export function createR2BucketFromBlobStore(store: BlobStore): R2Bucket {
         size: body.byteLength,
         etag: `"${body.byteLength}"`,
         httpEtag: `"${body.byteLength}"`,
-        checksums: {},
+        checksums: emptyChecksums,
         uploaded: new Date(),
         httpMetadata: result.contentType
           ? { contentType: result.contentType }
@@ -64,9 +77,10 @@ export function createR2BucketFromBlobStore(store: BlobStore): R2Bucket {
           : data instanceof ArrayBuffer
             ? new Uint8Array(data)
             : data;
+      const putHttpMetadata = readPutHttpMetadata(options?.httpMetadata);
       await store.put(key, bytes, {
-        contentType: options?.httpMetadata?.contentType,
-        cacheControl: options?.httpMetadata?.cacheControl,
+        contentType: putHttpMetadata?.contentType,
+        cacheControl: putHttpMetadata?.cacheControl,
         customMetadata: options?.customMetadata,
       });
       return {
@@ -75,11 +89,13 @@ export function createR2BucketFromBlobStore(store: BlobStore): R2Bucket {
         size: bytes.byteLength,
         etag: `"${bytes.byteLength}"`,
         httpEtag: `"${bytes.byteLength}"`,
-        checksums: {},
+        checksums: emptyChecksums,
         uploaded: new Date(),
-        httpMetadata: options?.httpMetadata ?? {},
+        httpMetadata: putHttpMetadata ?? {},
         customMetadata: options?.customMetadata ?? {},
-      };
+        storageClass: "Standard",
+        writeHttpMetadata: () => {},
+      } as R2Object;
     },
 
     async delete(keys: string | string[]): Promise<void> {
@@ -111,9 +127,11 @@ function toR2Object(entry: {
     size: entry.size,
     etag: `"${entry.size}"`,
     httpEtag: `"${entry.size}"`,
-    checksums: {},
+    checksums: emptyChecksums,
     uploaded: entry.uploaded,
     httpMetadata: entry.contentType ? { contentType: entry.contentType } : {},
     customMetadata: entry.customMetadata ?? {},
-  };
+    storageClass: "Standard",
+    writeHttpMetadata: () => {},
+  } as R2Object;
 }

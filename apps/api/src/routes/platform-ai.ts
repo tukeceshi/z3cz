@@ -2727,6 +2727,14 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
 
     const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
 
+    const videoUrl = pollResult.videoUrl;
+    if (!videoUrl) {
+      return c.json({
+        status: "failed" as const,
+        error: "Video URL missing from upstream poll result",
+      });
+    }
+
     const downloadResult = await withOrgApiForwarding(
       {
         db,
@@ -2738,7 +2746,7 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
         downloadOrgVideo({
       apiKey: iface.apiKey,
       canonicalId: modelCanonicalId,
-      videoUrl: pollResult.videoUrl,
+      videoUrl,
       storageMode: storageResolution.storageMode,
       objectStore,
       organizationId,

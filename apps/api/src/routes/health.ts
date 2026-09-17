@@ -10,7 +10,9 @@ health.get("/", async (c) => {
   let storageProvider: string = "unknown";
   try {
     const { createStorageBuckets } = await import("../storage/storage-provider");
-    const storage = await createStorageBuckets(c.env as Record<string, string>);
+    const storage = await createStorageBuckets(
+      c.env as unknown as Record<string, string>
+    );
     storageProvider = storage.provider;
   } catch {
     storageProvider = "unavailable";

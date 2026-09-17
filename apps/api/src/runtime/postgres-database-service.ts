@@ -13,9 +13,7 @@ import {
 } from "../db/user-database-schema";
 
 type PostgresClient = ReturnType<typeof postgres>;
-type PostgresTransaction = Parameters<
-  Parameters<PostgresClient["begin"]>[0]
->[0];
+type PostgresTransaction = postgres.TransactionSql;
 
 function convertPlaceholders(
   sqlStr: string,
@@ -44,7 +42,7 @@ class PostgresDatabaseConnection implements DatabaseConnection {
   async query(sqlStr: string, params?: unknown[]): Promise<QueryResult> {
     const { sql, params: pgParams } = convertPlaceholders(sqlStr, params);
     return this.runInSchema(async (tx) => {
-      const results = await tx.unsafe(sql, pgParams);
+      const results = await tx.unsafe(sql, pgParams as never[]);
       return { results: [...results] as unknown[] };
     });
   }
@@ -52,7 +50,7 @@ class PostgresDatabaseConnection implements DatabaseConnection {
   async execute(sqlStr: string, params?: unknown[]): Promise<QueryResult> {
     const { sql, params: pgParams } = convertPlaceholders(sqlStr, params);
     return this.runInSchema(async (tx) => {
-      const result = await tx.unsafe(sql, pgParams);
+      const result = await tx.unsafe(sql, pgParams as never[]);
       return {
         results: [],
         meta: {

@@ -150,7 +150,7 @@ export async function executeTextModel(params: {
   const modelOption = options.find(
     (entry) =>
       entry.interfaceId === params.interfaceId &&
-      entry.instanceId === params.candidate.instanceId
+      entry.instanceId === candidate.instanceId
   );
 
   const result = await executeTextModelCandidate({

@@ -73,7 +73,7 @@ function buildMountedRequest(c: Context<ApiContext>): Request {
     headers.set(LAZY_ROUTE_ORG_HEADER, organizationId);
   }
 
-  const init: RequestInit = {
+  const init: RequestInit & { duplex?: "half" } = {
     method: c.req.raw.method,
     headers,
   };

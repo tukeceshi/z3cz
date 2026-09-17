@@ -81,7 +81,7 @@ describe("bootstrap-asset-store", () => {
       })
     );
     const nextMtime = previousMtime + 1000;
-    fs.utimeSync(manifestPath, new Date(nextMtime), new Date(nextMtime));
+    fs.utimesSync(manifestPath, new Date(nextMtime), new Date(nextMtime));
 
     expect(getBootstrapManifest()?.manifestVersion).toBe("new");
   });

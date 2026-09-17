@@ -57,6 +57,9 @@ interface MediaKitTaskQueryResponse {
   readonly result?: {
     readonly video_url?: string;
     readonly url?: string;
+    readonly duration?: number;
+    readonly fps?: number;
+    readonly resolution?: string;
   };
 }
 

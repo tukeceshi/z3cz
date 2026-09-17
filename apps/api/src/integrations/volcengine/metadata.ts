@@ -253,7 +253,10 @@ export function normalizeVolcanoInterfaceMetadata(
 }
 
 export function serializeInterfaceMetadata(
-  metadata: VolcanoInterfaceMetadata | Record<string, unknown>
+  metadata:
+    | VolcanoInterfaceMetadata
+    | import("@dafthunk/types").SingleModelProviderMetadata
+    | Record<string, unknown>
 ): string {
   return JSON.stringify(metadata);
 }

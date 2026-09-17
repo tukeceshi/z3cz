@@ -116,7 +116,7 @@ organizationRoutes.delete("/:id", async (c) => {
 
 organizationRoutes.get("/:id/memberships", requireOrganizationOwner(), async (c) => {
   const db = createDatabase(c.env);
-  const organizationId = c.req.param("id");
+  const organizationId = c.req.param("id") ?? "";
   const memberships = await getOrganizationMembershipsWithUsers(db, organizationId);
 
   const response: ListMembershipsResponse = {
@@ -215,7 +215,7 @@ organizationRoutes.delete(
 
 organizationRoutes.get("/:id/invitations", requireOrganizationOwner(), async (c) => {
   const db = createDatabase(c.env);
-  const organizationId = c.req.param("id");
+  const organizationId = c.req.param("id") ?? "";
   const invitations = await getOrganizationInvitations(db, organizationId);
 
   const response: ListInvitationsResponse = {
@@ -330,8 +330,8 @@ organizationRoutes.delete(
     }
 
     const db = createDatabase(c.env);
-    const organizationId = c.req.param("id");
-    const invitationId = c.req.param("invitationId");
+    const organizationId = c.req.param("id") ?? "";
+    const invitationId = c.req.param("invitationId") ?? "";
 
     const success = await deleteInvitation(
       db,

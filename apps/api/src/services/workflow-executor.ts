@@ -6,7 +6,14 @@
  */
 
 import type { BlobParameter, RuntimeParams } from "@dafthunk/runtime";
-import type { Node, WorkflowExecution, WorkflowRuntime } from "@dafthunk/types";
+import type {
+  Node,
+  Workflow,
+  WorkflowExecution,
+  WorkflowRuntime,
+  WorkflowTrigger,
+} from "@dafthunk/types";
+import { WORKFLOW_SCHEME_BASIC_CANVAS_ID } from "@dafthunk/types";
 import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
 import { createSimulatedEmailMessage } from "../utils/email";
@@ -76,15 +83,18 @@ export class WorkflowExecutor {
       env,
     } = options;
 
+    const runtimeWorkflow: Workflow = {
+      id: workflow.id,
+      name: workflow.name,
+      schemeId: WORKFLOW_SCHEME_BASIC_CANVAS_ID,
+      trigger: workflow.trigger as WorkflowTrigger,
+      runtime: workflow.runtime,
+      nodes: workflow.nodes,
+      edges: workflow.edges,
+    };
+
     const baseExecutionParams = {
-      workflow: {
-        id: workflow.id,
-        name: workflow.name,
-        trigger: workflow.trigger,
-        runtime: workflow.runtime,
-        nodes: workflow.nodes,
-        edges: workflow.edges,
-      },
+      workflow: runtimeWorkflow,
       userId,
       organizationId,
       computeCredits,

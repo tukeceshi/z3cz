@@ -25,7 +25,6 @@ const createMockEnv = (masterKey?: string): Bindings => ({
   WORKFLOW_QUEUE: {} as Queue,
   RESSOURCES: {} as R2Bucket,
   AI: {} as Ai,
-  AI_SEARCH: {} as AiSearchNamespace,
   BROWSER: {} as Fetcher,
   EXECUTIONS: {} as AnalyticsEngineDataset,
   WEB_HOST: "",
