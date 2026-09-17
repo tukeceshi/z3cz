@@ -4,7 +4,6 @@ import type {
   TransformPollMapping,
 } from "@dafthunk/types";
 import {
-  DEFAULT_FORMAT_TRANSFORM_PROVIDER,
   isTransformMappingConfigComplete,
   isTransformPollMappingComplete,
   resolveSingleModelGroupLabel,

@@ -428,6 +428,8 @@ export interface UseGraphOperationsReturn {
         readonly x: number;
         readonly y: number;
       };
+      readonly manualContent?: boolean;
+      readonly selected?: boolean;
     }
   ) => string | null;
   addGenerativeNodesBatch: (
@@ -455,7 +457,9 @@ export interface UseGraphOperationsReturn {
   addNodeMenu: WorkflowAddNodeMenuState | null;
   closeAddNodeMenu: () => void;
   handlePaneClick: () => void;
-  handlePaneContextMenu: (event: MouseEvent) => void;
+  handlePaneContextMenu: (
+    event: globalThis.MouseEvent | MouseEvent
+  ) => void;
   handleAddNodeMenuSelect: (
     nodeType: AiGenerativeNodeType,
     menu: WorkflowAddNodeMenuState
@@ -480,7 +484,7 @@ export function useGraphOperations({
   validateConnection = () => true,
   createObjectUrl,
   disabled: readOnlyDisabled = false,
-  allowedNodeTypes,
+  allowedNodeTypes: _allowedNodeTypes,
   nodeTypes = [],
   orgId,
   generativeDefaults,
@@ -1008,7 +1012,7 @@ export function useGraphOperations({
   }, [addNodeMenu, closeAddNodeMenu]);
 
   const handlePaneContextMenu = useCallback(
-    (event: MouseEvent) => {
+    (event: globalThis.MouseEvent | MouseEvent) => {
       if (graphEditBlocked || !reactFlowInstance) {
         return;
       }

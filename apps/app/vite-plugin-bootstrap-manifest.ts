@@ -8,7 +8,7 @@ import type {
   BootstrapPrefetchPack,
   BootstrapStaticAsset,
 } from "@dafthunk/types";
-import type { OutputBundle, OutputChunk, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { LANDING_STATIC_ASSET_PATHS } from "./src/bootstrap/landing-static-assets";
 import {
@@ -34,6 +34,27 @@ interface ViteManifestChunk {
   readonly css?: readonly string[];
   readonly imports?: readonly string[];
 }
+
+interface OutputChunk {
+  readonly type: "chunk";
+  readonly fileName: string;
+  readonly imports: readonly string[];
+  readonly dynamicImports?: readonly string[];
+  readonly facadeModuleId?: string | null;
+  readonly isEntry?: boolean;
+  readonly moduleIds?: readonly string[];
+  readonly modules?: Record<string, { readonly originalLength?: number }>;
+  readonly viteMetadata?: {
+    readonly importedCss?: Set<string> | readonly string[];
+  };
+}
+
+interface OutputAsset {
+  readonly type: "asset";
+  readonly fileName: string;
+}
+
+type OutputBundle = Record<string, OutputChunk | OutputAsset>;
 
 function toAssetPath(fileName: string): string {
   const normalized = fileName.replace(/^\/+/, "");

@@ -76,18 +76,21 @@ export function generativeReferenceMetadataForModel(
     case "text":
       return textReferenceMetadataFromRules(
         normalizeTextModelParameterRules(
-          (model as { parameterRules: TextModelParameterRules }).parameterRules
+          (model as unknown as { parameterRules: TextModelParameterRules })
+            .parameterRules
         )
       );
     case "image":
       return imageReferenceMetadataFromRules(
         normalizeImageModelParameterRules(
-          (model as { parameterRules: ImageModelParameterRules }).parameterRules
+          (model as unknown as { parameterRules: ImageModelParameterRules })
+            .parameterRules
         )
       );
     case "video": {
       const videoRules = normalizeVideoModelParameterRules(
-        (model as { parameterRules: VideoModelParameterRules }).parameterRules
+        (model as unknown as { parameterRules: VideoModelParameterRules })
+          .parameterRules
       );
       const supportsTaskCancel =
         (model as OrgVideoModelOption).supportsTaskCancel === true;

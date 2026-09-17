@@ -20,7 +20,7 @@ export interface GenerativeReferenceConnectionSnapshot {
 
 export function useGenerativeReferenceConnection() {
   const { setEdges } = useReactFlow();
-  const nodes = useNodes();
+  const nodes = useNodes<ReactFlowNode<WorkflowNodeType>>();
   const { edges, disabled } = useWorkflow();
   const { generativeReferenceCatalogs } = useWorkflowActions();
   const { createObjectUrl } = useObjectService();

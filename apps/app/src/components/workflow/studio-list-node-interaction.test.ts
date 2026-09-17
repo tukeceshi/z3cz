@@ -39,6 +39,11 @@ function createActions(): StudioListNodeActions & {
     openSecondary: vi.fn(),
     replacePrimary: vi.fn(),
     promoteSecondaryToPrimary: vi.fn(),
+  } as unknown as StudioListNodeActions & {
+    openPrimary: ReturnType<typeof vi.fn>;
+    openSecondary: ReturnType<typeof vi.fn>;
+    replacePrimary: ReturnType<typeof vi.fn>;
+    promoteSecondaryToPrimary: ReturnType<typeof vi.fn>;
   };
 }
 

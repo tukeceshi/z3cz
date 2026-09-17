@@ -57,7 +57,7 @@ export function readCloudVideoCoverResource(
   data: WorkflowNodeType
 ): MediaReference | null {
   const cover = readVideoEnhanceCoverCandidate(data);
-  if (!cover || !isCloudStoredResource(cover)) {
+  if (!cover || !("kind" in cover) || !isCloudStoredResource(cover)) {
     return null;
   }
   return cover;
@@ -68,7 +68,7 @@ export async function isVideoEnhanceCoverReady(params: {
   readonly organizationId: string;
   readonly workflowId: string;
 }): Promise<boolean> {
-  if (isCloudStoredResource(params.cover)) {
+  if ("kind" in params.cover && isCloudStoredResource(params.cover)) {
     return true;
   }
   const mediaId = getResourceIdFromValue(params.cover);

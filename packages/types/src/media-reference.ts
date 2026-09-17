@@ -39,9 +39,15 @@ export interface ResourceIdReference {
   readonly previewUrl?: string;
 }
 
-export type WorkflowMediaValue = ResourceIdReference;
+export type MediaReference =
+  | ObjectReference
+  | EphemeralMediaReference
+  | ResourceIdReference;
 
-export type MediaReference = ObjectReference | EphemeralMediaReference;
+export type WorkflowMediaValue = MediaReference;
+
+/** @deprecated Use MediaReference — stored, object, and ephemeral refs share the UI boundary. */
+export type AnyMediaRef = MediaReference;
 
 /** Upstream ephemeral media links remain valid for about one hour. */
 export const EPHEMERAL_MEDIA_TTL_MS = 3_600_000 as const;
@@ -142,19 +148,25 @@ export function isResourceIdReference(
   return true;
 }
 
-export function isGeneratingResourceRef(value: unknown): boolean {
+export function isGeneratingResourceRef(
+  value: unknown
+): value is ResourceIdReference {
   return isResourceIdReference(value) && value.generating === true;
 }
 
-export function isCancellingResourceRef(value: unknown): boolean {
+export function isCancellingResourceRef(
+  value: unknown
+): value is ResourceIdReference {
   return isResourceIdReference(value) && value.cancelling === true;
 }
 
-export function isFailedResourceRef(value: unknown): boolean {
+export function isFailedResourceRef(value: unknown): value is ResourceIdReference {
   return isResourceIdReference(value) && value.failed === true;
 }
 
-export function isCloudAcceleratingResourceRef(value: unknown): boolean {
+export function isCloudAcceleratingResourceRef(
+  value: unknown
+): value is ResourceIdReference {
   return (
     isResourceIdReference(value) &&
     isCloudAccelerationInProgress(value.cloudAccelerationStatus)
@@ -198,7 +210,7 @@ export function hasFailedResource(
 export function isWorkflowMediaValue(
   value: unknown
 ): value is WorkflowMediaValue {
-  return isResourceIdReference(value);
+  return isMediaReference(value);
 }
 
 /** Ready to show on the card — not generating or failed. */
@@ -249,7 +261,11 @@ export function workflowMediaMimeType(
 }
 
 export function isMediaReference(value: unknown): value is MediaReference {
-  return isObjectReference(value) || isEphemeralMediaReference(value);
+  return (
+    isResourceIdReference(value) ||
+    isObjectReference(value) ||
+    isEphemeralMediaReference(value)
+  );
 }
 
 export function isCloudObjectReference(

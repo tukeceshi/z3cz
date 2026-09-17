@@ -3,6 +3,7 @@ import {
   AI_TEXT_NODE_TYPE,
   buildOrgModelOptionId,
   type OrgTextModelOption,
+  type TextModelParameterRules,
 } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
@@ -16,6 +17,7 @@ import {
 import { createProjectedModelFits } from "./generative-model-ref-fit";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
 
 function mockTextModel(
   canonicalId: string,
@@ -32,7 +34,7 @@ function mockTextModel(
     displayName: canonicalId,
     modality: "text",
     providerModelId: canonicalId,
-    parameterRules: rules,
+    parameterRules: rules as unknown as TextModelParameterRules,
     selectable: true,
     description: "",
     sortOrder: 0,
@@ -71,23 +73,23 @@ describe("add-node reference model before validation", () => {
       sourceNodeType: AI_IMAGE_NODE_TYPE,
     });
 
-    const defaultNodeData: WorkflowNodeType = {
+    const defaultNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_TEXT_NODE_TYPE,
       name: "text-new",
       inputs: [
-        { id: "model", value: current.canonicalId },
-        { id: "ai_interface_id", value: current.interfaceId },
+        testWorkflowParam({ id: "model", value: current.canonicalId }),
+        testWorkflowParam({ id: "ai_interface_id", value: current.interfaceId }),
       ],
       outputs: [{ id: "text", name: "text", type: "string" }],
-    };
+    });
 
     const nodesBeforeSwitch = [
-      makeFlowNode("image-1", {
+      makeFlowNode("image-1", testWorkflowNodeData({
         nodeType: AI_IMAGE_NODE_TYPE,
         name: "Image 1",
         inputs: [],
         outputs: [{ id: "images", name: "images", type: "image" }],
-      }),
+      })),
       makeFlowNode("text-new", defaultNodeData),
     ];
 

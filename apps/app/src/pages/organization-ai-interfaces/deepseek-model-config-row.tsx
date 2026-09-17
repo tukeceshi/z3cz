@@ -1,4 +1,3 @@
-import type { OrgTextModelOption } from "@dafthunk/types";
 import { Settings } from "lucide-react";
 
 import { CredentialPlainInput } from "@/components/credential-secret-input";

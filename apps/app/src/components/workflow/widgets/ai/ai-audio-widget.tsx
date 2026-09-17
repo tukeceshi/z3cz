@@ -1,13 +1,12 @@
 import {
   AI_AUDIO_NODE_TYPE,
-  getResourceIdFromValue,
   hasDisplayableWorkflowMedia,
   hasFailedResource,
   hasGeneratingResource,
   type MediaReference,
   type ObjectReference,
 } from "@dafthunk/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { useAuth } from "@/components/auth-context";

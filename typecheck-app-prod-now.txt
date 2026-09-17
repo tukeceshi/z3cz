@@ -1,0 +1,4 @@
+﻿src/components/workflow/workflow-connection-validation.test.ts(99,11): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Pick<Edge<WorkflowEdgeType>, "source" | "target" | "sourceHandle" | "targetHandle">'.
+undefined
+E:\Code\z3cz\apps\app:
+鈥塃RR_PNPM_RECURSIVE_EXEC_FIRST_FAIL鈥?Command failed with exit code 2: tsc --noEmit --pretty false

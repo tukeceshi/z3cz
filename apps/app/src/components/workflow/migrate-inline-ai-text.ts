@@ -15,7 +15,7 @@ import {
   AI_TEXT_RESULT_INPUT_ID,
   readAiTextResultHistory,
 } from "./ai-text-node-utils";
-import type { WorkflowNodeType } from "./workflow-types";
+import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 import { stageAiTextContent } from "@/services/ai-text-storage-service";
 import { saveTextContent } from "@/services/text-content-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
@@ -141,10 +141,10 @@ export async function migrateInlineAiTextNodeData(
       ...working,
       inputs: working.inputs.map((input) =>
         input.id === AI_TEXT_RESULT_HISTORY_INPUT_ID
-          ? {
+          ? ({
               ...input,
               value: { items: migratedItems, selectedId: history.selectedId },
-            }
+            } as WorkflowParameter)
           : input
       ),
     };

@@ -142,6 +142,11 @@ export function useGenerativeCloudJobProgress(
     jobId: string
   ) => Promise<ResolveGenerativeJobMediaResult>;
   readonly activeProgressPhase: GenerativeProgressPhase | null;
+  readonly cloudAccelerationOfferVisible: boolean;
+  readonly cloudAccelerationDialogOpen: boolean;
+  readonly setCloudAccelerationDialogOpen: (open: boolean) => void;
+  readonly triggerSingleCloudAcceleration: () => void;
+  readonly triggerAlwaysCloudAcceleration: () => void;
 } {
   const resumeAttemptedRef = useRef(false);
   const initialResumeJobIdRef = useRef(

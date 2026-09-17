@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CompositionEvent,
   type FocusEvent,
 } from "react";
 
@@ -19,7 +18,7 @@ export interface BufferedTextValue {
   readonly onFocus: () => void;
   readonly onBlur: () => void;
   readonly onCompositionStart: () => void;
-  readonly onCompositionEnd: (event: CompositionEvent<HTMLTextAreaElement>) => void;
+  readonly onCompositionEnd: () => void;
 }
 
 /**
@@ -138,13 +137,10 @@ export function useBufferedTextValue(
     clearScheduled();
   }, [clearScheduled]);
 
-  const onCompositionEnd = useCallback(
-    (_event: CompositionEvent<HTMLTextAreaElement>) => {
+  const onCompositionEnd = useCallback(() => {
       composingRef.current = false;
       schedulePersist(localValueRef.current);
-    },
-    [schedulePersist]
-  );
+    }, [schedulePersist]);
 
   return {
     value: localValue,

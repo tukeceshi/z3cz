@@ -32,7 +32,6 @@ import {
   evaluateAiAudioPromptReferenceStructural,
   isAiAudioPromptReferenceTarget,
 } from "./ai-audio-prompt-reference";
-import { AI_AUDIO_PROMPT_HANDLE_ID } from "./ai-audio-node-utils";
 import {
   evaluateAiTextReferenceStructural,
   isAiTextKeywordsTarget,
@@ -92,21 +91,6 @@ const VIRTUAL_REFERENCE_INPUTS: Readonly<
   },
   [AI_IMAGE_PROMPT_HANDLE_ID]: {
     id: AI_IMAGE_PROMPT_HANDLE_ID,
-    type: "any",
-    repeated: false,
-  },
-  [AI_VIDEO_REFERENCE_HANDLE_ID]: {
-    id: AI_VIDEO_REFERENCE_HANDLE_ID,
-    type: "any",
-    repeated: true,
-  },
-  [AI_VIDEO_PROMPT_HANDLE_ID]: {
-    id: AI_VIDEO_PROMPT_HANDLE_ID,
-    type: "any",
-    repeated: false,
-  },
-  [AI_AUDIO_PROMPT_HANDLE_ID]: {
-    id: AI_AUDIO_PROMPT_HANDLE_ID,
     type: "any",
     repeated: false,
   },
@@ -231,7 +215,10 @@ export function resolveConnectionEndpoints(
 export interface ValidateWorkflowConnectionParams {
   readonly connection: Connection;
   readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
-  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
+  readonly edges: readonly Pick<
+    ReactFlowEdge<WorkflowEdgeType>,
+    "source" | "target" | "sourceHandle" | "targetHandle"
+  >[];
   readonly generativeReferenceCatalogs?: GenerativeReferenceModelCatalogs;
   readonly extraValidate?: (connection: Connection) => boolean;
   readonly disabled?: boolean;

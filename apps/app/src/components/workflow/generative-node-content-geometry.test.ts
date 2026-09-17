@@ -44,7 +44,7 @@ describe("generative-node-content-geometry", () => {
       data: { nodeType: AI_IMAGE_NODE_TYPE },
       measured: { width: 400, height: 300 },
       internals: { positionAbsolute: { x: 10, y: 20 } },
-    } as InternalNode<Node>;
+    } as unknown as InternalNode<Node>;
 
     expect(resolveGenerativeNodeContentSize(node)).toEqual({
       width: AI_IMAGE_CARD_WIDTH_PX,
@@ -65,12 +65,12 @@ describe("generative-node-content-geometry", () => {
       id: "text-1",
       data: { nodeType: AI_TEXT_NODE_TYPE },
       internals: { positionAbsolute: { x: 0, y: 0 } },
-    } as InternalNode<Node>;
+    } as unknown as InternalNode<Node>;
     const image = {
       id: "img-1",
       data: { nodeType: AI_IMAGE_NODE_TYPE },
       internals: { positionAbsolute: { x: 0, y: 0 } },
-    } as InternalNode<Node>;
+    } as unknown as InternalNode<Node>;
 
     expect(resolveGenerativeLayoutContentSize(AI_TEXT_NODE_TYPE)).toEqual({
       width: AI_TEXT_CARD_WIDTH_PX,
@@ -106,13 +106,13 @@ describe("generative-node-content-geometry", () => {
       },
       measured: { width: 482, height: 277 },
       internals: { positionAbsolute: { x: 360, y: -1176 } },
-    } as InternalNode<Node>;
+    } as unknown as InternalNode<Node>;
     const target = {
       id: "video-target",
       data: { nodeType: AI_VIDEO_NODE_TYPE },
       measured: { width: 482, height: 277 },
       internals: { positionAbsolute: { x: 1032, y: -1176 } },
-    } as InternalNode<Node>;
+    } as unknown as InternalNode<Node>;
 
     expect(resolveGenerativeLayoutContentSize(AI_VIDEO_NODE_TYPE, source)).toEqual({
       width: 468,

@@ -44,6 +44,10 @@ export interface FlowConnectionLike {
   } | null;
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
+  readonly toHandle?: {
+    readonly type: string;
+    readonly id?: string | null;
+  } | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
 }
 
@@ -343,6 +347,7 @@ export function resolveGenerativePreviewConnection(
   if (!targetNode) return null;
 
   const targetType = readNodeType(targetNode) ?? hoveredType;
+  if (!targetType) return null;
   const snap = snapFromGenerativeReferenceTarget(
     targetNode,
     targetType,

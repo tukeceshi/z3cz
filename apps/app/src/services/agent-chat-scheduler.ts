@@ -920,10 +920,9 @@ export async function runAgentScheduler(
         break;
       }
     }
+    const lastBlock = lastTalkIndex >= 0 ? blocks[lastTalkIndex] : undefined;
     const lastTalk =
-      lastTalkIndex >= 0 && blocks[lastTalkIndex]?.kind === "talk"
-        ? blocks[lastTalkIndex].text
-        : answer.talk;
+      lastBlock?.kind === "talk" ? lastBlock.text : answer.talk;
     const judgment = parseEventJudgment(lastTalk);
     if (lastTalkIndex >= 0 && judgment.talk !== lastTalk.trim()) {
       if (judgment.talk) {

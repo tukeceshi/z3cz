@@ -778,7 +778,7 @@ function StudioPrimaryDownload({
   const ext =
     nodeType === "ai-audio"
       ? "mp3"
-      : (media.mimeType.split("/")[1] ??
+      : (media.mimeType?.split("/")[1] ??
         (nodeType === "ai-video" ? "mp4" : "png"));
 
   return (

@@ -75,6 +75,9 @@ function characterLibraryGenerateUrl(
   entry: WorkflowMediaValue,
   generationSubmit: boolean
 ): string | null {
+  if (!isResourceIdReference(entry)) {
+    return null;
+  }
   const publicAssetId = readPublicCharacterLibraryAssetId(entry.resourceId);
   if (publicAssetId) {
     return toCharacterLibraryAssetUrl(publicAssetId);
@@ -148,9 +151,12 @@ async function resolveMediaGroup(params: {
     assertReferenceUsableForGenerate(entry);
   }
 
-  const cloudMedia = params.media.filter((entry) => entry.kind === "cloud");
+  const cloudMedia = params.media.filter(
+    (entry) => "kind" in entry && entry.kind === "cloud"
+  );
   const stagedMedia = params.media.filter(
-    (entry) => entry.kind === "local" || entry.kind === "ephemeral"
+    (entry) =>
+      "kind" in entry && (entry.kind === "local" || entry.kind === "ephemeral")
   );
 
   const referenceImageUrls: string[] = [];

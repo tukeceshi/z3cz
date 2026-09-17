@@ -12,8 +12,6 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateAiVideoReferenceStructural,
 } from "./ai-video-reference-policy";
-import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
-import { AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
 import {
   applyModelBindingToNodeData,
   generativeModelBindingHandlersForModality,
@@ -24,6 +22,7 @@ import {
 } from "./generative-reference-metadata";
 import { resolveAiImageReferenceRules } from "./ai-image-reference-policy";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
 
 describe("parseNonNegativeInt", () => {
   it("preserves zero", () => {
@@ -108,13 +107,13 @@ describe("generativeReferenceMetadataForModel", () => {
 
 describe("resolveAiImageReferenceRules", () => {
   it("uses metadata snapshot when catalog is unavailable", () => {
-    const nodeData: WorkflowNodeType = {
+    const nodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_IMAGE_NODE_TYPE,
       name: "image",
-      inputs: [{ id: "model", value: "custom-image" }],
+      inputs: [testWorkflowParam({ id: "model", value: "custom-image" })],
       outputs: [],
       metadata: { refMaxImages: "1" },
-    };
+    });
 
     expect(resolveAiImageReferenceRules({ targetNodeData: nodeData }).maxReferenceImages).toBe(
       1
@@ -127,10 +126,10 @@ describe("resolveAiImageReferenceRules", () => {
 
 describe("evaluateAiVideoReferenceStructural", () => {
   it("rejects video references when metadata limit is zero", () => {
-    const targetNodeData: WorkflowNodeType = {
+    const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
-      inputs: [{ id: "model", value: "custom-video" }],
+      inputs: [testWorkflowParam({ id: "model", value: "custom-video" })],
       outputs: [],
       metadata: {
         refMaxImages: "2",
@@ -138,7 +137,7 @@ describe("evaluateAiVideoReferenceStructural", () => {
         refMaxAudios: "0",
         refReferenceMode: "first_last_frame",
       },
-    };
+    });
 
     const verdict = evaluateAiVideoReferenceStructural({
       targetNodeId: "video-1",
@@ -151,7 +150,12 @@ describe("evaluateAiVideoReferenceStructural", () => {
         { id: "video-1", data: targetNodeData },
         {
           id: "video-2",
-          data: { nodeType: AI_VIDEO_NODE_TYPE, name: "src", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_VIDEO_NODE_TYPE,
+            name: "src",
+            inputs: [],
+            outputs: [],
+          }),
         },
       ],
     });
@@ -186,12 +190,12 @@ describe("applyModelBindingToNodeData", () => {
 
     const patch = applyModelBindingToNodeData({
       model,
-      current: {
+      current: testWorkflowNodeData({
         nodeType: AI_VIDEO_NODE_TYPE,
         name: "video",
         inputs: [],
         outputs: [],
-      },
+      }),
       modality: "video",
       updateWorkflowDefault: false,
       handlers: generativeModelBindingHandlersForModality("video"),

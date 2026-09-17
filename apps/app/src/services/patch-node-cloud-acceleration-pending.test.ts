@@ -2,6 +2,7 @@ import { AI_IMAGE_NODE_TYPE } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
+import { testWorkflowParam } from "@/components/workflow/workflow-test-fixtures";
 
 import { patchWorkflowNodeCloudAccelerationPending } from "./patch-node-cloud-acceleration-pending";
 
@@ -12,7 +13,7 @@ describe("patchWorkflowNodeCloudAccelerationPending", () => {
       nodeType: AI_IMAGE_NODE_TYPE,
       executionState: "idle",
       inputs: [
-        {
+        testWorkflowParam({
           id: "images_result",
           name: "images_result",
           type: "json",
@@ -24,7 +25,7 @@ describe("patchWorkflowNodeCloudAccelerationPending", () => {
               kind: "ephemeral",
             },
           ],
-        },
+        }),
         {
           id: "images_history",
           name: "images_history",
@@ -49,7 +50,9 @@ describe("patchWorkflowNodeCloudAccelerationPending", () => {
           },
         },
       ],
-      outputs: [{ id: "images", name: "images", type: "json", value: [] }],
+      outputs: [
+        testWorkflowParam({ id: "images", name: "images", type: "json", value: [] }),
+      ],
     };
 
     const patch = patchWorkflowNodeCloudAccelerationPending(node);

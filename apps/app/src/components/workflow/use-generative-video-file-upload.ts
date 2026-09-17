@@ -149,6 +149,6 @@ export function useGenerativeVideoFileUpload(): UseGenerativeVideoFileUploadResu
   return {
     uploadVideoFileToNode: uploadVideoFileToNodeForNode,
     blocksGenerativeMedia,
-    canUpload: Boolean(updateNodeData && orgId && workflowId && !blocksGenerativeMedia),
+    canUpload: Boolean(orgId && workflowId && !blocksGenerativeMedia),
   };
 }

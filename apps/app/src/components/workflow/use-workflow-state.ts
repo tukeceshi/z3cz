@@ -1,32 +1,20 @@
-import type { AiGenerativeNodeType, ObjectReference, WorkflowEditorViewport, WorkflowGenerativeDefaults, WorkflowTrigger } from "@dafthunk/types";
+import type { ObjectReference, WorkflowEditorViewport, WorkflowGenerativeDefaults } from "@dafthunk/types";
 import type {
   Connection,
-  IsValidConnection,
-  OnConnect,
-  OnConnectEnd,
-  OnConnectStart,
-  OnEdgesChange,
-  OnNodesChange,
   Edge as ReactFlowEdge,
-  ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import type { RefObject, MouseEvent } from "react";
-import { useMemo } from "react";
+import type { RefObject } from "react";
 
 import type { PendingDetachConfirm } from "./use-graph-history";
 import { useClipboard } from "./use-clipboard";
-import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
-import { useGraphOperations } from "./use-graph-operations";
+import {
+  useGraphOperations,
+  type UseGraphOperationsReturn,
+} from "./use-graph-operations";
 import { useGraphPersistence } from "./use-graph-persistence";
 import { useLayout } from "./use-layout";
-import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
-import type {
-  NodeExecutionUpdate,
-  NodeType,
-  WorkflowEdgeType,
-  WorkflowNodeType,
-} from "./workflow-types";
+import type { NodeType, WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
 interface UseWorkflowStateProps {
   initialNodes?: ReactFlowNode<WorkflowNodeType>[];
@@ -45,77 +33,14 @@ interface UseWorkflowStateProps {
   requestDetachConfirm?: (pending: PendingDetachConfirm) => void;
 }
 
-interface UseWorkflowStateReturn {
-  nodes: ReactFlowNode<WorkflowNodeType>[];
-  edges: ReactFlowEdge<WorkflowEdgeType>[];
-  selectedNodes: ReactFlowNode<WorkflowNodeType>[];
-  selectedEdges: ReactFlowEdge<WorkflowEdgeType>[];
-  reactFlowInstance: ReactFlowInstance<
-    ReactFlowNode<WorkflowNodeType>,
-    ReactFlowEdge<WorkflowEdgeType>
-  > | null;
-  onNodesChange: OnNodesChange<ReactFlowNode<WorkflowNodeType>>;
-  onEdgesChange: OnEdgesChange<ReactFlowEdge<WorkflowEdgeType>>;
-  onConnect: OnConnect;
-  onConnectStart: OnConnectStart;
-  onConnectEnd: OnConnectEnd;
-  onNodeDragStart: () => void;
-  onNodeDragStop: (
-    event: React.MouseEvent,
-    node: ReactFlowNode<WorkflowNodeType>
-  ) => void;
-  isValidConnection: IsValidConnection<ReactFlowEdge<WorkflowEdgeType>>;
-  handleNodeSelect: (
-    template: NodeType,
-    options?: { readonly panIntoView?: boolean }
-  ) => string | null;
-  setReactFlowInstance: (
-    instance: ReactFlowInstance<
-      ReactFlowNode<WorkflowNodeType>,
-      ReactFlowEdge<WorkflowEdgeType>
-    > | null
-  ) => void;
-  updateNodeExecution: (nodeId: string, update: NodeExecutionUpdate) => void;
-  batchUpdateNodeExecutions: (
-    updates: Readonly<Record<string, NodeExecutionUpdate>>
-  ) => void;
-  updateNodeData: (
-    nodeId: string,
-    data:
-      | Partial<WorkflowNodeType>
-      | ((current: WorkflowNodeType) => Partial<WorkflowNodeType>)
-  ) => void;
-  updateEdgeData: (edgeId: string, data: Partial<WorkflowEdgeType>) => void;
-  deleteNode: (nodeId: string) => void;
-  deleteEdge: (edgeId: string) => void;
-  deleteSelected: () => void;
-  deselectAll: () => void;
-  selectNode: (nodeId: string) => void;
-  addTriggerNodes: (trigger: WorkflowTrigger) => void;
-  removeTriggerNodes: () => void;
+interface UseWorkflowStateReturn extends UseGraphOperationsReturn {
+  applyLayout: () => void;
   duplicateNode: (nodeId: string) => void;
   duplicateSelected: () => void;
-  applyLayout: () => void;
   copySelected: () => void;
   cutSelected: () => void;
   pasteFromClipboard: () => void;
   hasClipboardData: boolean;
-  soleSelectedNodeId: string | null;
-  isDraggingRef: RefObject<boolean>;
-  addNodeMenu: WorkflowAddNodeMenuState | null;
-  closeAddNodeMenu: () => void;
-  handlePaneClick: () => void;
-  handlePaneContextMenu: (event: MouseEvent) => void;
-  handleAddNodeMenuSelect: (
-    nodeType: AiGenerativeNodeType,
-    menu: WorkflowAddNodeMenuState
-  ) => void;
-  generativeReferenceCatalogs: GenerativeReferenceModelCatalogs;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  captureHistory: () => void;
 }
 
 const NOOP = () => {};

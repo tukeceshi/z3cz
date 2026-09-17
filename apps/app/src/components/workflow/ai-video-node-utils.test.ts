@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 if (!("localStorage" in globalThis)) {
   Object.defineProperty(globalThis, "localStorage", {
@@ -25,14 +26,16 @@ function createVideoNode(history: unknown): WorkflowNodeType {
     name: "Video 1",
     nodeType: "ai-video",
     inputs: [
-      {
+      testWorkflowParam({
         id: AI_VIDEO_HISTORY_INPUT_ID,
         name: AI_VIDEO_HISTORY_INPUT_ID,
         type: "json",
         value: history,
-      },
+      }),
     ],
-    outputs: [{ id: "videos", name: "videos", type: "video", value: [] }],
+    outputs: [
+      testWorkflowParam({ id: "videos", name: "videos", type: "video", value: [] }),
+    ],
     executionState: "idle",
   };
 }

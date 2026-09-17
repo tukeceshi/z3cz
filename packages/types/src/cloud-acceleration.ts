@@ -77,9 +77,9 @@ export interface CloudAccelerationResourceSnapshot {
 }
 
 /** Catalog row already in org cloud storage. */
-export function isCloudStoredResource(
-  entry: Pick<CloudAccelerationResourceSnapshot, "kind">
-): boolean {
+export function isCloudStoredResource(entry: {
+  readonly kind?: string;
+}): boolean {
   return entry.kind === "cloud";
 }
 

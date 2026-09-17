@@ -5,7 +5,7 @@ import type { OrgImageModelOption } from "@dafthunk/types";
 import { applyHistoryItemSettingsToNode } from "./apply-history-item-settings";
 import type { WorkflowNodeType } from "./workflow-types";
 
-const imageModel: OrgImageModelOption = {
+const imageModel = {
   optionId: "iface:seed-3.0",
   canonicalId: "seed-3.0",
   interfaceId: "iface-1",
@@ -32,7 +32,7 @@ const imageModel: OrgImageModelOption = {
   description: "",
   sortOrder: 0,
   brandIcon: "sparkles",
-};
+} as unknown as OrgImageModelOption;
 
 function baseNode(): WorkflowNodeType {
   return {

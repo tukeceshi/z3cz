@@ -116,7 +116,7 @@ export function CreativeStudioView() {
 
   const { t } = useTranslation();
 
-  const nodes = useNodes<WorkflowNodeType>();
+  const nodes = useNodes<ReactFlowNode<WorkflowNodeType>>();
 
   const {
 

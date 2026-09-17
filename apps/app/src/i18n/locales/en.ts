@@ -33,6 +33,8 @@ export const en = {
     created: "Created",
     noData: "No data available.",
     personal: "Personal",
+    error: "Error",
+    close: "Close",
   },
   nav: {
     organization: "Organization",
@@ -3797,6 +3799,8 @@ export const en = {
       historyModel: "Model",
       historyParams: "Parameters",
       historyExpandToNode: "Expand to new node",
+      historyExpandFailed: "Could not expand history to a new node",
+      historyExpandSuccess: "Expanded history to a new node",
       historyWatermark: "Watermark",
       historyPrompt: "Prompt used",
     },
@@ -4217,4 +4221,8 @@ export const en = {
   },
 } as const;
 
-export type TranslationDictionary = typeof en;
+type DeepStringify<T> = T extends string
+  ? string
+  : { readonly [K in keyof T]: DeepStringify<T[K]> };
+
+export type TranslationDictionary = DeepStringify<typeof en>;

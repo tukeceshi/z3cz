@@ -9,6 +9,7 @@ import {
 } from "./ai-video-retake-primary-ref";
 import type { GenerativeReferenceChip } from "./generative-reference-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 const sourceVideo: WorkflowNodeType = {
   name: "Source",
@@ -16,7 +17,7 @@ const sourceVideo: WorkflowNodeType = {
   icon: "video",
   inputs: [],
   outputs: [
-    {
+    testWorkflowParam({
       id: "videos",
       name: "videos",
       type: "json",
@@ -27,7 +28,7 @@ const sourceVideo: WorkflowNodeType = {
           mimeType: "video/mp4",
         },
       ],
-    },
+    }),
   ],
   executionState: "idle",
   createObjectUrl: () => "blob:source",

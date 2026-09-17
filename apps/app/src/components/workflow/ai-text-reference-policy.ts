@@ -110,6 +110,7 @@ export function countAiTextReferences(
   let text = 0;
   let image = 0;
   let video = 0;
+  let audio = 0;
 
   for (const edge of edges) {
     if (
@@ -123,9 +124,10 @@ export function countAiTextReferences(
     if (kind === "text") text += 1;
     else if (kind === "image") image += 1;
     else if (kind === "video") video += 1;
+    else if (kind === "audio") audio += 1;
   }
 
-  return { text, image, video };
+  return { text, image, video, audio };
 }
 
 export function preferredSourceHandle(

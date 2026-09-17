@@ -73,8 +73,8 @@ export function LoginDialogProvider({ children }: { children: ReactNode }) {
         options?.dismissible === false
           ? false
           : current.open
-            ? current.dismissible && options?.dismissible !== false
-            : options?.dismissible !== false,
+            ? current.dismissible
+            : true,
       subAccountInvitationId:
         options?.subAccountInvitationId ??
         (current.open ? current.subAccountInvitationId : undefined),

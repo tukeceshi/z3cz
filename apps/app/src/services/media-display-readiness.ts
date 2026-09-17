@@ -1,4 +1,4 @@
-import type { WorkflowMediaValue } from "@dafthunk/types";
+import { isResourceIdReference, type WorkflowMediaValue } from "@dafthunk/types";
 
 import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
 import {
@@ -25,7 +25,9 @@ export function resolveMediaDisplay(params: {
     return { phase: "empty", displayUrl: null };
   }
 
-  const previewUrl = params.media.previewUrl?.trim();
+  const previewUrl = isResourceIdReference(params.media)
+    ? params.media.previewUrl?.trim()
+    : undefined;
   if (previewUrl) {
     return { phase: "ready", displayUrl: previewUrl };
   }

@@ -31,13 +31,13 @@ async function readDocxMarkdown(file: File): Promise<string> {
 
   // Vitest/Node uses lib/unzip (buffer); browser uses browser/unzip (arrayBuffer).
   if (typeof window === "undefined") {
-    const converted = await mammoth.convertToMarkdown({
+    const converted = await mammoth.extractRawText({
       buffer: Buffer.from(arrayBuffer),
     });
     return converted.value;
   }
 
-  const converted = await mammoth.convertToMarkdown({ arrayBuffer });
+  const converted = await mammoth.extractRawText({ arrayBuffer });
   return converted.value;
 }
 

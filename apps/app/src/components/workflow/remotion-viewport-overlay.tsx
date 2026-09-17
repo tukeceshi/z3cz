@@ -139,7 +139,7 @@ export function RemotionViewportOverlay({
           ...current,
           component: () => renderRemotionCompileError(error),
         }));
-      } else {
+      } else if (result.component) {
         setCompileError(null);
         setCompiled({
           component: result.component,
@@ -191,8 +191,8 @@ export function RemotionViewportOverlay({
     }
     compileTimerRef.current = window.setTimeout(() => {
       const result = compileRemotionSource(sourceCode);
-      if (result.error) {
-        setCompileError(result.error);
+      if (result.error || !result.component) {
+        setCompileError(result.error ?? "Compile failed");
         return;
       }
       setCompileError(null);

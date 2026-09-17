@@ -31,7 +31,12 @@ function hideOtherHints(except: () => void): void {
 }
 
 interface HoverClickHintProps {
-  readonly children: ReactElement;
+  readonly children: ReactElement<{
+    readonly ref?: (node: HTMLElement | null) => void;
+    readonly onMouseEnter?: (event: MouseEvent<HTMLElement>) => void;
+    readonly onMouseLeave?: (event: MouseEvent<HTMLElement>) => void;
+    readonly onClick?: (event: MouseEvent<HTMLElement>) => void;
+  }>;
   readonly content: ReactNode;
   readonly contentClassName?: string;
   readonly align?: "start" | "center" | "end";

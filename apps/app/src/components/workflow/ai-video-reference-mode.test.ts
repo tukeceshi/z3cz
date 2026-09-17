@@ -23,6 +23,7 @@ import {
 import { evaluateAiVideoReferenceStructural } from "./ai-video-reference-policy";
 import type { GenerativeReferenceChip } from "./generative-reference-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
 
 describe("shouldShowReferenceModeAutoSwitchNotice", () => {
   it("shows at most once per node and reference count signature", () => {
@@ -65,18 +66,18 @@ describe("shouldAutoSwitchVideoReferenceMode", () => {
 
 describe("syncVideoReferenceModeIfNeeded", () => {
   it("writes reference_image into params and metadata", () => {
-    const nodeData: WorkflowNodeType = {
+    const nodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
       inputs: [
-        {
+        testWorkflowParam({
           id: "params",
           value: { reference_mode: "first_last_frame" },
-        },
+        }),
       ],
       outputs: [],
       metadata: { refReferenceMode: "first_last_frame" },
-    };
+    });
 
     const patch = syncVideoReferenceModeIfNeeded({
       nodeData,
@@ -105,15 +106,30 @@ describe("syncVideoReferenceModeIfNeeded", () => {
         { id: "video-1", data: nodeData },
         {
           id: "img-1",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "a", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "a",
+            inputs: [],
+            outputs: [],
+          }),
         },
         {
           id: "img-2",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "b", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "b",
+            inputs: [],
+            outputs: [],
+          }),
         },
         {
           id: "img-3",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "c", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "c",
+            inputs: [],
+            outputs: [],
+          }),
         },
       ],
     });
@@ -126,10 +142,10 @@ describe("syncVideoReferenceModeIfNeeded", () => {
 
 describe("evaluateAiVideoReferenceStructural", () => {
   it("allows a third image while first_last_frame metadata is set", () => {
-    const targetNodeData: WorkflowNodeType = {
+    const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
-      inputs: [{ id: "model", value: "custom-video" }],
+      inputs: [testWorkflowParam({ id: "model", value: "custom-video" })],
       outputs: [],
       metadata: {
         refMaxImages: "4",
@@ -137,7 +153,7 @@ describe("evaluateAiVideoReferenceStructural", () => {
         refMaxAudios: "3",
         refReferenceMode: "first_last_frame",
       },
-    };
+    });
     const edges = [
       {
         source: "img-1",
@@ -164,15 +180,30 @@ describe("evaluateAiVideoReferenceStructural", () => {
         { id: "video-1", data: targetNodeData },
         {
           id: "img-1",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "a", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "a",
+            inputs: [],
+            outputs: [],
+          }),
         },
         {
           id: "img-2",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "b", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "b",
+            inputs: [],
+            outputs: [],
+          }),
         },
         {
           id: "img-3",
-          data: { nodeType: AI_IMAGE_NODE_TYPE, name: "c", inputs: [], outputs: [] },
+          data: testWorkflowNodeData({
+            nodeType: AI_IMAGE_NODE_TYPE,
+            name: "c",
+            inputs: [],
+            outputs: [],
+          }),
         },
       ],
     });
@@ -181,10 +212,10 @@ describe("evaluateAiVideoReferenceStructural", () => {
   });
 
   it("reserves one video reference slot for retake panel nodes", () => {
-    const targetNodeData: WorkflowNodeType = {
+    const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "retake",
-      inputs: [{ id: "model", value: "seedance" }],
+      inputs: [testWorkflowParam({ id: "model", value: "seedance" })],
       outputs: [],
       metadata: withAiVideoPanelKind(
         {
@@ -194,7 +225,7 @@ describe("evaluateAiVideoReferenceStructural", () => {
         },
         "retake"
       ),
-    };
+    });
 
     const verdict = evaluateAiVideoReferenceStructural({
       targetNodeId: "video-retake-1",
@@ -207,12 +238,12 @@ describe("evaluateAiVideoReferenceStructural", () => {
         { id: "video-retake-1", data: targetNodeData },
         {
           id: "video-src",
-          data: {
+          data: testWorkflowNodeData({
             nodeType: AI_VIDEO_NODE_TYPE,
             name: "source",
             inputs: [],
             outputs: [],
-          },
+          }),
         },
       ],
     });
@@ -224,12 +255,12 @@ describe("evaluateAiVideoReferenceStructural", () => {
   });
 
   it("allows canvas video on retake when model rules permit after trim reservation", () => {
-    const targetNodeData: WorkflowNodeType = {
+    const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "retake",
       inputs: [
-        { id: "model", value: "doubao-seedance-2-5" },
-        { id: "ai_interface_id", value: "iface-seedance" },
+        testWorkflowParam({ id: "model", value: "doubao-seedance-2-5" }),
+        testWorkflowParam({ id: "ai_interface_id", value: "iface-seedance" }),
       ],
       outputs: [],
       metadata: withAiVideoPanelKind(
@@ -240,7 +271,7 @@ describe("evaluateAiVideoReferenceStructural", () => {
         },
         "retake"
       ),
-    };
+    });
 
     const verdict = evaluateAiVideoReferenceStructural({
       targetNodeId: "video-retake-1",
@@ -253,12 +284,12 @@ describe("evaluateAiVideoReferenceStructural", () => {
         { id: "video-retake-1", data: targetNodeData },
         {
           id: "video-src",
-          data: {
+          data: testWorkflowNodeData({
             nodeType: AI_VIDEO_NODE_TYPE,
             name: "source",
             inputs: [],
             outputs: [],
-          },
+          }),
         },
       ],
       models: [
@@ -276,17 +307,17 @@ describe("evaluateAiVideoReferenceStructural", () => {
   });
 
   it("does not reserve a video slot for normal video nodes", () => {
-    const targetNodeData: WorkflowNodeType = {
+    const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
-      inputs: [{ id: "model", value: "seedance" }],
+      inputs: [testWorkflowParam({ id: "model", value: "seedance" })],
       outputs: [],
       metadata: {
         refMaxImages: "4",
         refMaxVideos: "1",
         refMaxAudios: "0",
       },
-    };
+    });
 
     const verdict = evaluateAiVideoReferenceStructural({
       targetNodeId: "video-1",
@@ -299,12 +330,12 @@ describe("evaluateAiVideoReferenceStructural", () => {
         { id: "video-1", data: targetNodeData },
         {
           id: "video-src",
-          data: {
+          data: testWorkflowNodeData({
             nodeType: AI_VIDEO_NODE_TYPE,
             name: "source",
             inputs: [],
             outputs: [],
-          },
+          }),
         },
       ],
     });
@@ -344,13 +375,18 @@ describe("annotateVideoReferenceChips", () => {
 
 describe("resolveEffectiveVideoReferenceMode", () => {
   it("prefers params over metadata", () => {
-    const nodeData: WorkflowNodeType = {
+    const nodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
-      inputs: [{ id: "params", value: { reference_mode: "reference_image" } }],
+      inputs: [
+        testWorkflowParam({
+          id: "params",
+          value: { reference_mode: "reference_image" },
+        }),
+      ],
       outputs: [],
       metadata: { refReferenceMode: "first_last_frame" },
-    };
+    });
 
     expect(
       resolveEffectiveVideoReferenceMode(
@@ -364,17 +400,17 @@ describe("resolveEffectiveVideoReferenceMode", () => {
 
 describe("buildVideoReferenceModeSwitchPatch", () => {
   it("preserves other generation params", () => {
-    const current: WorkflowNodeType = {
+    const current: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "video",
       inputs: [
-        {
+        testWorkflowParam({
           id: "params",
           value: { reference_mode: "first_last_frame", duration: 5 },
-        },
+        }),
       ],
       outputs: [],
-    };
+    });
 
     const patch = buildVideoReferenceModeSwitchPatch(current);
     const params = patch.inputs?.find((input) => input.id === "params")?.value;

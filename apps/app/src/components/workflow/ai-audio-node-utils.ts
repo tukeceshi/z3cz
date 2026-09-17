@@ -20,7 +20,6 @@ import {
   AI_GENERATIVE_PANEL_WIDTH_PX,
 } from "./ai-generative-panel-utils";
 import {
-  isGenerativeManualContent,
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
 } from "./generative-card-mode-utils";
@@ -68,7 +67,7 @@ export const AI_AUDIO_MAX_HISTORY_ITEMS = 30;
 export interface AiAudioResultHistoryItem {
   readonly id: string;
   /** Always one audio per history row (legacy multi-audio rows are split on read). */
-  readonly audios: readonly MediaReference[];
+  readonly audios: readonly WorkflowMediaValue[];
   readonly prompt: string;
   readonly params?: Readonly<Record<string, unknown>>;
   readonly platformModelId?: string;
@@ -779,7 +778,5 @@ export function resolveAiAudioModelRules(
   if (model) {
     return normalizeAudioModelParameterRules(model.parameterRules);
   }
-  return normalizeAudioModelParameterRules(
-    model?.parameterRules ?? DEFAULT_AUDIO_MODEL_PARAMETER_RULES
-  );
+  return normalizeAudioModelParameterRules(DEFAULT_AUDIO_MODEL_PARAMETER_RULES);
 }

@@ -114,7 +114,7 @@ export function useGenerativeNodeCardHydrate(
       return;
     }
 
-    let media = null as ReturnType<typeof readAiImageCardPrimaryImage> | undefined;
+    let media: ReturnType<typeof readAiImageCardPrimaryImage> | undefined;
     let ingestNodeType: "ai-image" | "ai-video" | "ai-audio" | null = null;
 
     if (nodeType === AI_IMAGE_NODE_TYPE) {
@@ -155,7 +155,7 @@ export function useGenerativeNodeCardHydrate(
 
 /** Canvas widgets — resolve full node from React Flow store. */
 export function useGenerativeNodeCardHydrateById(nodeId: string): void {
-  const nodes = useNodes<WorkflowNodeType>();
+  const nodes = useNodes<ReactFlowNode<WorkflowNodeType>>();
   const node = useMemo(
     () => nodes.find((entry) => entry.id === nodeId) ?? null,
     [nodeId, nodes]
@@ -164,7 +164,14 @@ export function useGenerativeNodeCardHydrateById(nodeId: string): void {
   useGenerativeNodeCardHydrate(
     node ?? {
       id: nodeId,
-      data: { inputs: [], outputs: [], metadata: {}, nodeType: "" },
+      data: {
+        name: "",
+        inputs: [],
+        outputs: [],
+        metadata: {},
+        nodeType: "",
+        executionState: "idle",
+      },
     }
   );
 }

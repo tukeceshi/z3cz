@@ -209,7 +209,9 @@ function OrganizationAiInterfacesPageContent() {
               key={iface.id}
               organizationId={organizationId!}
               iface={iface}
-              onUpdated={refreshInterfaces}
+              onUpdated={async () => {
+                await refreshInterfaces();
+              }}
               onDelete={() => handleRequestDelete(iface)}
             />
           ))}
@@ -218,7 +220,9 @@ function OrganizationAiInterfacesPageContent() {
               key={iface.id}
               organizationId={organizationId!}
               iface={iface}
-              onUpdated={refreshInterfaces}
+              onUpdated={async () => {
+                await refreshInterfaces();
+              }}
               onDelete={() => handleRequestDelete(iface)}
             />
           ))}
@@ -287,7 +291,9 @@ function OrganizationAiInterfacesPageContent() {
           onOpenChange={(open) => {
             if (!open) setInterfaceToDelete(null);
           }}
-          onDeleted={refreshInterfaces}
+          onDeleted={async () => {
+            await refreshInterfaces();
+          }}
         />
       ) : null}
 
@@ -296,7 +302,9 @@ function OrganizationAiInterfacesPageContent() {
           open={addWizardOpen}
           organizationId={organizationId}
           onOpenChange={setAddWizardOpen}
-          onCreated={refreshInterfaces}
+          onCreated={async () => {
+            await refreshInterfaces();
+          }}
         />
       ) : null}
 

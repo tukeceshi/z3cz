@@ -324,7 +324,7 @@ export function normalizeAiTextNodeDataForPersist(
       : output
   );
 
-  return { ...data, inputs, outputs };
+  return { ...data, inputs: inputs as WorkflowParameter[], outputs: outputs as WorkflowParameter[] };
 }
 
 export function buildResourceIdReference(params: {

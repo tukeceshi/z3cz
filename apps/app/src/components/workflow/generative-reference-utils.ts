@@ -91,8 +91,14 @@ export function resolveReferenceMediaFromSource(params: {
 export function collectGenerativeReferenceChips(params: {
   readonly nodeId: string;
   readonly targetHandle: string;
-  readonly edges: readonly ReactFlowEdge<WorkflowEdgeType>[];
-  readonly nodes: readonly ReactFlowNode<WorkflowNodeType>[];
+  readonly edges: readonly {
+    readonly id?: string;
+    readonly source: string;
+    readonly target: string;
+    readonly sourceHandle?: string | null;
+    readonly targetHandle?: string | null;
+  }[];
+  readonly nodes: readonly Pick<ReactFlowNode<WorkflowNodeType>, "id" | "data">[];
   readonly classifyKind: (
     nodeType: string | undefined
   ) => AiTextReferenceKind | null;
@@ -130,7 +136,7 @@ export function collectGenerativeReferenceChips(params: {
 
       return [
         {
-          edgeId: edge.id,
+          edgeId: edge.id ?? `${edge.source}:${edge.target}`,
           sourceNodeId: edge.source,
           kind,
           label: sourceData.name || edge.source,

@@ -58,7 +58,7 @@ export interface VideoPromptMentionEditorProps {
   readonly onFocus?: () => void;
   readonly onBlur?: () => void;
   readonly onCompositionStart?: () => void;
-  readonly onCompositionEnd?: (event: CompositionEvent<HTMLDivElement>) => void;
+  readonly onCompositionEnd?: (event: CompositionEvent<Element>) => void;
 }
 
 function serializeEditorRoot(root: HTMLElement): string {

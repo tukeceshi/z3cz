@@ -1,5 +1,4 @@
 import type { AiGenerativeNodeType, PatchNodeLayoutMetadata } from "@dafthunk/types";
-import type { ReactFlowInstance } from "@xyflow/react";
 import { useCallback, useRef, useState, type DragEvent } from "react";
 
 import { useAuth } from "@/components/auth-context";
@@ -34,6 +33,7 @@ import { hasStudioReferenceDrag } from "./studio-reference-drag";
 import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useWorkflow } from "./workflow-context";
 import { getViewportCenterFlowPoint } from "./workflow-node-placement";
+import type { WorkflowReactFlowInstance } from "./workflow-types";
 
 interface GenerativeDropUploadParams {
   readonly nodeId: string;
@@ -133,7 +133,7 @@ function startGenerativeDropUpload(params: GenerativeDropUploadParams): void {
 
 function scheduleCanvasDropNodeSelection(params: {
   readonly nodeIds: readonly string[];
-  readonly generationRef: { readonly current: number };
+  readonly generationRef: { current: number };
   readonly onSelectDroppedNodes?: (nodeIds: readonly string[]) => void;
 }): void {
   if (params.nodeIds.length === 0 || !params.onSelectDroppedNodes) {
@@ -191,7 +191,7 @@ function isCanvasFileDropOnNode(event: DragEvent): boolean {
 }
 
 export function useCanvasGenerativeFileDrop(params: {
-  readonly reactFlowInstance: ReactFlowInstance | null;
+  readonly reactFlowInstance: WorkflowReactFlowInstance | null;
   readonly enabled: boolean;
   readonly onAddCanvasDropNodes?: (
     items: readonly AddGenerativeNodesBatchItem[]

@@ -9,6 +9,20 @@ import {
   resolveHistoryModelLabel,
   splitHistoryMediaRows,
 } from "./generative-history-utils";
+
+type TestHistoryMedia = {
+  resourceId: string;
+  generating?: boolean;
+  mimeType?: string;
+  failed?: boolean;
+};
+
+function readItemImages(item: {
+  images: TestHistoryMedia[];
+}): readonly TestHistoryMedia[] {
+  return item.images;
+}
+
 describe("splitHistoryMediaRows", () => {
   it("expands multi-media rows and keeps single rows", () => {
     const items = splitHistoryMediaRows({
@@ -17,7 +31,7 @@ describe("splitHistoryMediaRows", () => {
         { id: "b", createdAt: "t", images: ["3"] },
       ],
       getMedia: (item) => item.images,
-      withMedia: (item, images) => ({ ...item, images }),
+      withMedia: (item, images) => ({ ...item, images: [...images] }),
     });
 
     expect(items).toEqual([
@@ -44,7 +58,7 @@ describe("readDisplayHistoryMedia", () => {
           },
         ],
       },
-      (item) => item.images
+        readItemImages
     );
     expect(media).toEqual([{ resourceId: "done", mimeType: "image/jpeg" }]);
   });
@@ -60,7 +74,7 @@ describe("readDisplayHistoryMedia", () => {
             { id: "gen-1", images: [{ resourceId: "done" }] },
           ],
         },
-        (item) => item.images
+          readItemImages
       )
     ).toEqual(failed);
   });
@@ -73,7 +87,7 @@ describe("readDisplayHistoryMedia", () => {
           selectedId: "gen-1",
           items: [{ id: "gen-1", images: generating }],
         },
-        (item) => item.images
+          readItemImages
       )
     ).toEqual(generating);
   });
@@ -94,7 +108,7 @@ describe("readDisplayHistoryMedia", () => {
             },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual([{ resourceId: "done", mimeType: "image/jpeg" }]);
@@ -112,7 +126,7 @@ describe("readDisplayHistoryMedia", () => {
             },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual([]);
@@ -126,7 +140,7 @@ describe("readDisplayHistoryMedia", () => {
           selectedId: "gen-1",
           items: [{ id: "gen-1", images: staged }],
         },
-        (item) => item.images,
+          readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual(staged);
@@ -150,7 +164,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({
@@ -172,7 +186,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({
@@ -193,7 +207,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             { id: "gen-1", images: [{ resourceId: "done" }] },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { isModalityGenerating: false }
       )
     ).toEqual({
@@ -214,7 +228,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             { id: "gen-1", images: [{ resourceId: "done", mimeType: "image/jpeg" }] },
           ],
         },
-        (item) => item.images,
+          readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({

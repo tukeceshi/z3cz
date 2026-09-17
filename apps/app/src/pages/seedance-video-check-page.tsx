@@ -81,7 +81,7 @@ function SeedanceVideoCheckPageContent() {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const { getOrgUrl } = useOrgUrl();
-  const { toast } = useAppToast();
+  const toast = useAppToast();
   const orgId = organization?.id;
 
   const { interfaces, isInterfacesLoading } =
@@ -224,11 +224,7 @@ function SeedanceVideoCheckPageContent() {
     } catch (error) {
       setSubmitLog(readSeedanceVideoCheckErrorLog(error));
       setErrorDetail(formatErrorDetail(error));
-      toast({
-        title: t("pages.seedanceVideoCheck.errors.submitFailed"),
-        description: error instanceof Error ? error.message : t("common.error"),
-        variant: "destructive",
-      });
+      toast.error("pages.seedanceVideoCheck.errors.submitFailed");
     } finally {
       setIsSubmitting(false);
     }
@@ -247,11 +243,7 @@ function SeedanceVideoCheckPageContent() {
     } catch (error) {
       setResultLog(readSeedanceVideoCheckErrorLog(error));
       setErrorDetail(formatErrorDetail(error));
-      toast({
-        title: t("pages.seedanceVideoCheck.errors.resultFailed"),
-        description: error instanceof Error ? error.message : t("common.error"),
-        variant: "destructive",
-      });
+      toast.error("pages.seedanceVideoCheck.errors.resultFailed");
     } finally {
       setIsRefreshingResult(false);
     }

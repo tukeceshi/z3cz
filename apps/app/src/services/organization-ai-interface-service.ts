@@ -7,7 +7,6 @@ import type {
   VolcanoProbeActivationResponse,
   VolcanoProbeTosBucketsResponse,
   VolcanoSnapshotFetchResponse,
-  VolcanoSnapshotResponse,
 } from "@dafthunk/types";
 import useSWR from "swr";
 
@@ -251,7 +250,10 @@ export async function updateVolcanoTosStorage(
   }
 ): Promise<OrganizationAiInterface> {
   return updateOrganizationAiInterface(organizationId, interfaceId, {
-    tosStorage: input,
+    tosStorage: {
+      ...input,
+      prefix: "z3cz",
+    },
   });
 }
 

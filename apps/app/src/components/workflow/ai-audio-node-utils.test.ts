@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 if (!("localStorage" in globalThis)) {
   Object.defineProperty(globalThis, "localStorage", {
@@ -25,14 +26,16 @@ function createAudioNode(history: unknown): WorkflowNodeType {
     name: "Audio 1",
     nodeType: "ai-audio",
     inputs: [
-      {
+      testWorkflowParam({
         id: AI_AUDIO_HISTORY_INPUT_ID,
         name: AI_AUDIO_HISTORY_INPUT_ID,
         type: "json",
         value: history,
-      },
+      }),
     ],
-    outputs: [{ id: "audios", name: "audios", type: "audio", value: [] }],
+    outputs: [
+      testWorkflowParam({ id: "audios", name: "audios", type: "audio", value: [] }),
+    ],
     executionState: "idle",
   };
 }

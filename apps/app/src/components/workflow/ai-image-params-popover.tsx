@@ -1,9 +1,7 @@
 import {
   applyAiImageRatioToPrompt as applyAiImageRatioToPromptFromTypes,
   formatImageGenerationOptionLabel,
-  mergeImageGenerationParams,
   resolveGenerateCountOptions,
-  resolveImageGenerateCount,
   resolveNumericEnumBounds,
   sanitizeImageGenerationParams,
   type UpstreamParamProfileField,

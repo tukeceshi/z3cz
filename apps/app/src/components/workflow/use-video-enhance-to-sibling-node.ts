@@ -113,7 +113,9 @@ export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
       const nodeName = resolveEnhanceNodeName(sourceName, typedNodes);
       const nodeId = `${AI_VIDEO_NODE_TYPE}-enhance-${Date.now()}`;
       const position = findOpenNodePositionFromSource({
-        sourceNode,
+        sourceNode: sourceNode as unknown as Parameters<
+          typeof findOpenNodePositionFromSource
+        >[0]["sourceNode"],
         targetNodeType: AI_VIDEO_NODE_TYPE,
         existingNodes: typedNodes,
       });

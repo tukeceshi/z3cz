@@ -9,7 +9,7 @@ import {
 } from "./generative-card-params";
 import type { WorkflowParameter } from "./workflow-types";
 
-const FIELDS: readonly UpstreamParamProfileField[] = [
+const FIELDS = [
   {
     name: "ratio",
     type: "string",
@@ -21,7 +21,7 @@ const FIELDS: readonly UpstreamParamProfileField[] = [
     type: "boolean",
     default: false,
   },
-];
+] as unknown as readonly UpstreamParamProfileField[];
 
 describe("readNodeGenerationParams", () => {
   it("returns empty object when params input is missing", () => {

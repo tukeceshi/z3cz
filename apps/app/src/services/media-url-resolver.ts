@@ -9,7 +9,6 @@ import {
 import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 import {
-  createCloudObjectUrl,
   resolveMediaCacheFetchUrl,
   resolveMediaFetchUrl,
 } from "@/services/media-object-url";

@@ -33,7 +33,7 @@ import {
 import type { OrgModelBindingRef } from "./org-model-selection-utils";
 import { withGenerativeGeneratedContentMode } from "./generative-card-mode-utils";
 import { WORKFLOW_NODE_ADD_GAP_PX } from "./workflow-node-placement";
-import type { NodeType, WorkflowNodeType } from "./workflow-types";
+import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export type HistoryExpandKind = "image" | "video" | "audio";
 
@@ -67,10 +67,10 @@ function upsertParam(
 ): WorkflowNodeType["inputs"] {
   if (inputs.some((input) => input.id === id)) {
     return inputs.map((input) =>
-      input.id === id ? { ...input, value } : input
+      input.id === id ? ({ ...input, value } as WorkflowParameter) : input
     );
   }
-  return [...inputs, { id, name: id, type, value }];
+  return [...inputs, { id, name: id, type, value } as WorkflowParameter];
 }
 
 export function buildSiblingNodeFromHistoryItem(params: {

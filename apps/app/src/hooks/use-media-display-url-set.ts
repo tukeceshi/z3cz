@@ -1,6 +1,7 @@
 import {
   getResourceIdFromValue,
   isPublicCharacterLibraryResourceId,
+  isResourceIdReference,
   isUnloadedResourceRef,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
@@ -195,7 +196,9 @@ export function useMediaDisplayUrlSet({
       return;
     }
 
-    const previewUrl = currentMedia.previewUrl?.trim();
+    const previewUrl = isResourceIdReference(currentMedia)
+      ? currentMedia.previewUrl?.trim()
+      : undefined;
     if (previewUrl) {
       const previewSet: MediaDisplayUrlSet = {
         full: previewUrl,

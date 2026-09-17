@@ -13,7 +13,7 @@ import HistoryIcon from "lucide-react/icons/history";
 import Maximize2Icon from "lucide-react/icons/maximize-2";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useParams } from "react-router";
-import { useEdges, useNodes } from "@xyflow/react";
+import { useEdges, useNodes, type Edge as ReactFlowEdge } from "@xyflow/react";
 
 import { useAuth } from "@/components/auth-context";
 import { useTranslation } from "@/components/locale-provider";
@@ -122,7 +122,7 @@ export interface GenerativeNodeTopToolbarProps {
   readonly nodeId: string;
   readonly data: WorkflowNodeType;
   readonly zoom: number;
-  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
 }
 
 export function GenerativeNodeTopToolbar({
@@ -136,7 +136,7 @@ export function GenerativeNodeTopToolbar({
   const orgId = organization?.id;
   const { id: workflowId } = useParams<{ id: string }>();
   const { updateNodeData, disabled = false } = useWorkflow();
-  const edges = useEdges<WorkflowEdgeType>();
+  const edges = useEdges<ReactFlowEdge<WorkflowEdgeType>>();
   const flowNodes = useNodes();
   const openCreativeStudio = useOpenCreativeStudio(nodeId);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -239,7 +239,8 @@ export function GenerativeNodeTopToolbar({
   useEffect(() => {
     if (
       !videoEnhanceCoverCandidate ||
-      isCloudStoredResource(videoEnhanceCoverCandidate) ||
+      ("kind" in videoEnhanceCoverCandidate &&
+        isCloudStoredResource(videoEnhanceCoverCandidate)) ||
       !orgId ||
       !workflowId
     ) {
@@ -279,7 +280,7 @@ export function GenerativeNodeTopToolbar({
       return `audio-${resourceId}.mp3`;
     }
     if (nodeType === AI_VIDEO_NODE_TYPE) {
-      return `video-${resourceId}.${coverMedia.mimeType.split("/")[1] ?? "mp4"}`;
+      return `video-${resourceId}.${coverMedia.mimeType?.split("/")[1] ?? "mp4"}`;
     }
     return `image-${resourceId}.${coverMedia.mimeType?.split("/")[1] ?? "png"}`;
   }, [coverMedia, nodeId, nodeType]);

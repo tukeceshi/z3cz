@@ -945,7 +945,7 @@ export function countAiVideoReferenceCounts(
   }[],
   nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[]
 ): SubmitAiVideoMediaReferenceCounts {
-  const counts: SubmitAiVideoMediaReferenceCounts = {
+  const counts = {
     imageCount: 0,
     videoCount: 0,
     audioCount: 0,
@@ -976,7 +976,7 @@ export function countAiVideoReferenceCountsForNode(
     readonly targetHandle?: string | null;
   }[],
   nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[],
-  targetNodeData?: Pick<WorkflowNodeType, "metadata">
+  _targetNodeData?: Pick<WorkflowNodeType, "metadata">
 ): SubmitAiVideoMediaReferenceCounts {
   return countAiVideoReferenceCounts(targetNodeId, edges, nodes);
 }

@@ -126,7 +126,6 @@ export function VolcanoMediaKitSettingsDialog({
             <CredentialSecretInput
               id="volcano_mediakit_api_key"
               name="volcano_mediakit_api_key"
-              autoComplete="off"
               value={apiKeyDraft}
               placeholder={
                 hasApiKey

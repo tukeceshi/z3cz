@@ -10,6 +10,7 @@ import {
   findOpenNodePositionNearPoint,
 } from "./workflow-node-placement";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData } from "./workflow-test-fixtures";
 
 function node(
   id: string,
@@ -18,13 +19,13 @@ function node(
 ) {
   return {
     id,
-    data: {
+    data: testWorkflowNodeData({
       nodeType,
       name: id,
       inputs: [],
       outputs: [],
       ...data,
-    } as WorkflowNodeType,
+    }),
   };
 }
 
@@ -87,14 +88,14 @@ describe("findOpenNodePositionFromSource", () => {
       sourceNode: {
         id: "source",
         position: { x: 100, y: 200 },
-        data: { nodeType: AI_TEXT_NODE_TYPE },
+        data: testWorkflowNodeData({ nodeType: AI_TEXT_NODE_TYPE }),
       },
       targetNodeType: AI_IMAGE_NODE_TYPE,
       existingNodes: [
         {
           id: "source",
           position: { x: 100, y: 200 },
-          data: { nodeType: AI_TEXT_NODE_TYPE },
+          data: testWorkflowNodeData({ nodeType: AI_TEXT_NODE_TYPE }),
         },
       ],
     });

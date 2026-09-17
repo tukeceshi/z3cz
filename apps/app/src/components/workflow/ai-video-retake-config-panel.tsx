@@ -158,7 +158,9 @@ const RETAKE_TRIGGER_SUMMARY_FIELD_NAMES = new Set([
 function readModelResolutionFallback(
   generationFields: readonly { readonly name: string; readonly default?: unknown }[]
 ): string {
-  const base = buildDefaultVideoGenerationParams(generationFields);
+  const base = buildDefaultVideoGenerationParams(
+    generationFields as readonly import("@dafthunk/types").UpstreamParamProfileField[]
+  );
   return typeof base.resolution === "string" && base.resolution.trim().length > 0
     ? base.resolution
     : "720p";
@@ -971,7 +973,7 @@ export function AiVideoRetakeConfigPanel({
               target: nodeId,
               targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
             },
-            { nodes: [...nodes, newNode] }
+            { nodes: [...nodes, newNode] as ReactFlowNode<WorkflowNodeType>[] }
           )
         ) {
           toast.error("workflow.aiVideoPanel.referenceRejected");
@@ -1031,7 +1033,7 @@ export function AiVideoRetakeConfigPanel({
           }
 
           const referenceMedia = collectRetakeSupplementalReferenceMedia({
-            nodeId,
+            targetNodeId: nodeId,
             edges,
             nodes: typedNodes.map((node) => ({ id: node.id, data: node.data })),
             inputs: data.inputs,
@@ -1055,7 +1057,7 @@ export function AiVideoRetakeConfigPanel({
               startSec: draft.draftRange.startSec,
               endSec: draft.draftRange.endSec,
             },
-            videoDurationSec: draft.videoDurationSec,
+            videoDurationSec: draft.videoDurationSec ?? 0,
             highQuality: draft.highQuality,
             mediaKitInterfaceId,
             cloudConfigured,

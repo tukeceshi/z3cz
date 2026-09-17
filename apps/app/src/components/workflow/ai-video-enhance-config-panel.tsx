@@ -134,7 +134,9 @@ export function AiVideoEnhanceConfigPanel({
         updateNodeData(nodeId, (current) =>
           appendAiVideoGeneratedHistoryItems(current, result.media, {
             prompt: "",
-            params: draftConfig ?? undefined,
+            params: draftConfig as unknown as
+              | Readonly<Record<string, unknown>>
+              | undefined,
             aiInterfaceId,
           })
         );
@@ -276,7 +278,9 @@ export function AiVideoEnhanceConfigPanel({
               resolvedJob.media,
               {
                 prompt: "",
-                params: draftConfig,
+                params: draftConfig as unknown as Readonly<
+                  Record<string, unknown>
+                >,
                 aiInterfaceId: mediaKitInterfaceId,
                 jobId: response.jobId,
               }

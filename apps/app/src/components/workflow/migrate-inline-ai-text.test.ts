@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AI_TEXT_OUTPUT_ID, AI_TEXT_RESULT_HISTORY_INPUT_ID, AI_TEXT_RESULT_INPUT_ID } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData } from "./workflow-test-fixtures";
 import {
   buildInlineAiTextFingerprint,
   nodeHasInlineAiText,
@@ -23,7 +24,7 @@ vi.mock("@/utils/text-content-utils", () => ({
 }));
 
 function createTextNode(overrides?: Partial<WorkflowNodeType>): WorkflowNodeType {
-  return {
+  return testWorkflowNodeData({
     id: "node-1",
     type: "workflowNode",
     name: "AI Text",
@@ -33,7 +34,7 @@ function createTextNode(overrides?: Partial<WorkflowNodeType>): WorkflowNodeType
     outputs: [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
     metadata: undefined,
     ...overrides,
-  };
+  });
 }
 
 describe("migrate-inline-ai-text detection", () => {

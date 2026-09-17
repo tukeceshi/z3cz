@@ -97,23 +97,10 @@ import {
   InputOutputType,
   NodeExecutionState,
   WorkflowParameter,
-  type WorkflowNodeType as CanvasWorkflowNodeType,
+  type WorkflowNodeType,
 } from "./workflow-types";
 
-export interface WorkflowNodeType {
-  name: string;
-  inputs: WorkflowParameter[];
-  outputs: WorkflowParameter[];
-  error?: string | null;
-  executionState: NodeExecutionState;
-  nodeType?: string;
-  icon: string;
-  functionCalling?: boolean;
-  asTool?: boolean;
-  /** Editor-/runtime-internal flags that round-trip through save/load. */
-  metadata?: Record<string, string>;
-  createObjectUrl: (objectReference: ObjectReference) => string;
-}
+export type { WorkflowNodeType };
 
 export const TypeBadge = memo(
   ({
@@ -278,8 +265,8 @@ function generativeCardBoxStyle(
 
 interface WorkflowNodeBottomPanelHostProps {
   readonly nodeId: string;
-  readonly data: CanvasWorkflowNodeType;
-  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly data: WorkflowNodeType;
+  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
   readonly contentVisible: boolean;
   readonly isDragging: boolean;
 }
@@ -319,8 +306,8 @@ function WorkflowNodeBottomPanelHost({
 
 interface WorkflowNodeTopToolbarHostProps {
   readonly nodeId: string;
-  readonly data: CanvasWorkflowNodeType;
-  readonly createObjectUrl: (objectReference: ObjectReference) => string;
+  readonly data: WorkflowNodeType;
+  readonly createObjectUrl?: (objectReference: ObjectReference) => string;
   readonly contentVisible: boolean;
   readonly isDragging: boolean;
 }
@@ -429,7 +416,7 @@ export const WorkflowNode = memo(
           !isAiVideoResultSiblingNodeId(id)) &&
         !(isAiTextNode && emptyTextEditing));
     const bottomPanelData = useWorkflowNodeBottomPanelData(
-      data as unknown as CanvasWorkflowNodeType
+      data as unknown as WorkflowNodeType
     );
     const isGenerativeConnectionTarget = useGenerativeConnectionHighlight(
       id,
@@ -539,7 +526,7 @@ export const WorkflowNode = memo(
               edges,
               nodes: flowNodes.map((node) => ({
                 id: node.id,
-                data: node.data as CanvasWorkflowNodeType,
+                data: node.data as WorkflowNodeType,
               })),
             }
           : undefined,
@@ -621,7 +608,7 @@ export const WorkflowNode = memo(
           <div className="absolute left-1/2 z-10 -translate-x-1/2 bottom-full mb-7">
             <WorkflowNodeTopToolbarHost
               nodeId={id}
-              data={data as unknown as CanvasWorkflowNodeType}
+              data={data as unknown as WorkflowNodeType}
               createObjectUrl={data.createObjectUrl}
               contentVisible={showTopToolbarContent}
               isDragging={isDragging}
@@ -708,7 +695,7 @@ export const WorkflowNode = memo(
               modality={
                 isAiImageNode ? "image" : isAiVideoNode ? "video" : "audio"
               }
-              data={data as unknown as CanvasWorkflowNodeType}
+              data={data as unknown as WorkflowNodeType}
             />
           ) : null}
 

@@ -21,7 +21,7 @@ function mockTextNode(id: string) {
       nodeType: AI_TEXT_NODE_TYPE,
       inputs: [],
       outputs: [{ id: AI_TEXT_OUTPUT_ID, type: "string", name: "text" }],
-    } as WorkflowNodeType,
+    } as unknown as WorkflowNodeType,
     position: { x: 0, y: 0 },
   };
 }
@@ -37,7 +37,7 @@ function mockAudioNode(
       metadata,
       inputs: [],
       outputs: [{ id: "audios", type: "audio", name: "audios" }],
-    } as WorkflowNodeType,
+    } as unknown as WorkflowNodeType,
     position: { x: 200, y: 0 },
   };
 }

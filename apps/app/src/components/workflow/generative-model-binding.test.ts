@@ -4,6 +4,7 @@ import {
   AI_VIDEO_NODE_TYPE,
   buildOrgModelOptionId,
   type OrgTextModelOption,
+  type TextModelParameterRules,
   type WorkflowGenerativeDefaults,
 } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
@@ -19,6 +20,7 @@ import { createProjectedModelFits } from "./generative-model-ref-fit";
 import { AI_IMAGE_PROMPT_HANDLE_ID } from "./ai-image-node-utils";
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
 
 function mockTextModel(
   canonicalId: string,
@@ -35,7 +37,7 @@ function mockTextModel(
     displayName: canonicalId,
     modality: "text",
     providerModelId: canonicalId,
-    parameterRules: rules,
+    parameterRules: rules as unknown as TextModelParameterRules,
     selectable: true,
     description: "",
     sortOrder: 0,
@@ -45,15 +47,15 @@ function mockTextModel(
 }
 
 function nodeDataWithModel(model: OrgTextModelOption): WorkflowNodeType {
-  return {
+  return testWorkflowNodeData({
     nodeType: AI_TEXT_NODE_TYPE,
     name: "text",
     inputs: [
-      { id: "model", value: model.canonicalId },
-      { id: "ai_interface_id", value: model.interfaceId },
+      testWorkflowParam({ id: "model", value: model.canonicalId }),
+      testWorkflowParam({ id: "ai_interface_id", value: model.interfaceId }),
     ],
     outputs: [],
-  };
+  });
 }
 
 describe("resolveModelForNewReference", () => {
@@ -150,17 +152,17 @@ describe("applySelectedModelRecord", () => {
     const existingParams = { ratio: "16:9" };
 
     for (const modality of modalities) {
-      const current: WorkflowNodeType = {
+      const current: WorkflowNodeType = testWorkflowNodeData({
         nodeType: AI_TEXT_NODE_TYPE,
         name: modality,
         inputs: [
-          { id: "model", value: "old-model" },
-          { id: "ai_interface_id", value: "old-iface" },
-          { id: "model_instance_id", value: "old-instance" },
-          { id: "params", type: "json", value: existingParams },
+          testWorkflowParam({ id: "model", value: "old-model" }),
+          testWorkflowParam({ id: "ai_interface_id", value: "old-iface" }),
+          testWorkflowParam({ id: "model_instance_id", value: "old-instance" }),
+          testWorkflowParam({ id: "params", type: "json", value: existingParams }),
         ],
         outputs: [],
-      };
+      });
       let defaults: WorkflowGenerativeDefaults | undefined = {
         [modality]: {
           canonicalId: "old-model",
@@ -204,12 +206,12 @@ describe("applySelectedModelRecord", () => {
 describe("applyModelBindingToNodeData", () => {
   it("writes node inputs without updating workflow defaults for auto-switch", () => {
     const model = mockTextModel("video-capable", { maxVideoReferences: 1 });
-    const current: WorkflowNodeType = {
+    const current: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_TEXT_NODE_TYPE,
       name: "text",
-      inputs: [{ id: "model", value: "no-video" }],
+      inputs: [testWorkflowParam({ id: "model", value: "no-video" })],
       outputs: [],
-    };
+    });
     let defaultChanged = false;
 
     const patch = applyModelBindingToNodeData({

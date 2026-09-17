@@ -411,7 +411,8 @@ export function adaptCanvasImportDocument(
       stickerCount: unwrapped.stickerCount,
       groupCount: unwrapped.groupCount,
       skippedUnknown: adapted.skippedUnknown,
-      foreignModel: "foreignModel" in adapted ? adapted.foreignModel : false,
+      foreignModel:
+        "foreignModel" in adapted ? Boolean(adapted.foreignModel) : false,
     }),
   };
 }

@@ -1,6 +1,5 @@
 import {
   getResourceIdFromValue,
-  type MediaReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 

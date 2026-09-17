@@ -147,6 +147,29 @@ function ClipboardModifierShortcutRow({
   );
 }
 
+function readShortcutLabelLines(item: object): readonly string[] | undefined {
+  if (!("labelLines" in item) || !Array.isArray(item.labelLines)) {
+    return undefined;
+  }
+  return item.labelLines.every((line) => typeof line === "string")
+    ? item.labelLines
+    : undefined;
+}
+
+function readShortcutKeys(item: object): readonly string[] | undefined {
+  if (!("keys" in item) || !Array.isArray(item.keys)) {
+    return undefined;
+  }
+  return item.keys.every((key) => typeof key === "string") ? item.keys : undefined;
+}
+
+function readShortcutKeysContent(item: object): ReactNode | undefined {
+  if (!("keysContent" in item)) {
+    return undefined;
+  }
+  return item.keysContent as ReactNode;
+}
+
 interface LibtvShortcutRowProps {
   readonly label?: string;
   readonly labelLines?: readonly string[];
@@ -433,18 +456,18 @@ export function CanvasShortcutHintPanel({
             {leftShortcuts.map((item) => (
               <LibtvShortcutRow
                 key={
-                  "label" in item && item.label
+                  "label" in item && typeof item.label === "string"
                     ? item.label
-                    : "labelLines" in item
-                      ? item.labelLines.join("-")
-                      : ""
+                    : (readShortcutLabelLines(item)?.join("-") ?? "")
                 }
-                label={"label" in item ? item.label : undefined}
-                labelLines={"labelLines" in item ? item.labelLines : undefined}
-                keys={"keys" in item ? item.keys : undefined}
-                keysContent={
-                  "keysContent" in item ? item.keysContent : undefined
+                label={
+                  "label" in item && typeof item.label === "string"
+                    ? item.label
+                    : undefined
                 }
+                labelLines={readShortcutLabelLines(item)}
+                keys={readShortcutKeys(item)}
+                keysContent={readShortcutKeysContent(item)}
               />
             ))}
           </div>
@@ -455,18 +478,18 @@ export function CanvasShortcutHintPanel({
             {rightShortcuts.map((item) => (
               <LibtvShortcutRow
                 key={
-                  "label" in item && item.label
+                  "label" in item && typeof item.label === "string"
                     ? item.label
-                    : "labelLines" in item
-                      ? item.labelLines.join("-")
-                      : ""
+                    : (readShortcutLabelLines(item)?.join("-") ?? "")
                 }
-                label={"label" in item ? item.label : undefined}
-                labelLines={"labelLines" in item ? item.labelLines : undefined}
-                keys={"keys" in item ? item.keys : undefined}
-                keysContent={
-                  "keysContent" in item ? item.keysContent : undefined
+                label={
+                  "label" in item && typeof item.label === "string"
+                    ? item.label
+                    : undefined
                 }
+                labelLines={readShortcutLabelLines(item)}
+                keys={readShortcutKeys(item)}
+                keysContent={readShortcutKeysContent(item)}
               />
             ))}
           </div>

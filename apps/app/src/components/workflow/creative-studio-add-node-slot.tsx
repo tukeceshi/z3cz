@@ -48,7 +48,7 @@ interface DropZoneShellProps {
 }
 
 function DropZoneShell({
-  fileDragOver,
+  fileDragOver: _fileDragOver,
   uploading,
   onDragEnter,
   onDragOver,

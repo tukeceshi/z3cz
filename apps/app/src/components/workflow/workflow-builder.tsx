@@ -58,6 +58,7 @@ import type {
   NodeType,
   WorkflowEdgeType,
   WorkflowNodeType,
+  WorkflowReactFlowInstance,
 } from "./workflow-types";
 
 const CreativeStudioView = lazy(() =>
@@ -73,7 +74,7 @@ function prefetchCreativeStudioView(): void {
 function usePrefetchCreativeStudioView(): void {
   useEffect(() => {
     const run = () => prefetchCreativeStudioView();
-    if ("requestIdleCallback" in window) {
+    if (typeof window.requestIdleCallback === "function") {
       const idleId = window.requestIdleCallback(run, { timeout: 2000 });
       return () => window.cancelIdleCallback(idleId);
     }
@@ -975,7 +976,7 @@ function CreativeStudioCanvasSync({
 }
 
 type WorkflowEditorMainAreaProps = ComponentProps<typeof WorkflowCanvas> & {
-  readonly reactFlowInstance: ReactFlowInstance | null;
+  readonly reactFlowInstance: WorkflowReactFlowInstance | null;
   readonly canvasFileDropEnabled: boolean;
   readonly onAddCanvasDropNodes?: (
     items: readonly AddGenerativeNodesBatchItem[]

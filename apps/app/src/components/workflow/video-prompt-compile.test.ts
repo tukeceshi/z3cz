@@ -107,7 +107,7 @@ describe("listBrokenVideoPromptRefEdgeIds", () => {
       { edgeId: "edge-a", kind: "image" },
     ]);
     expect(
-      listBrokenVideoPromptRefEdgeIds("{{ref:a}} {{ref:b}}", map).sort()
+      [...listBrokenVideoPromptRefEdgeIds("{{ref:a}} {{ref:b}}", map)].sort()
     ).toEqual(["a", "b"]);
   });
 });

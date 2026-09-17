@@ -1,5 +1,5 @@
 import type { CancelGenerationJobResponse } from "@dafthunk/types";
-import { cancelGenerationJob, cancelGenerationJobByClientRequestId } from "@/services/platform-ai-model-service";
+import { cancelGenerationJob } from "@/services/platform-ai-model-service";
 
 import {
   clearGenerativeProgress,

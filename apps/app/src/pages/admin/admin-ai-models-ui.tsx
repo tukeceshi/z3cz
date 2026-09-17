@@ -374,10 +374,10 @@ export function SettingsSection({
   readonly title: string;
   readonly titleAddon?: ReactNode;
   readonly action?: ReactNode;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
   readonly stacked?: boolean;
   readonly compact?: boolean;
-  readonly columns?: 2 | 3;
+  readonly columns?: 1 | 2 | 3;
 }) {
   const gridClass =
     columns === 3 ? ADMIN_SETTINGS_GRID_CLASS : ADMIN_SETTINGS_GRID_2_CLASS;

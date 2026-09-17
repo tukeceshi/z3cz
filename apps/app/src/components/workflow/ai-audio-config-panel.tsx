@@ -1,6 +1,6 @@
 import {
-  AI_TEXT_NODE_TYPE,
   normalizeAudioModelParameterRules,
+  type OrgAudioModelOption,
   type OrgTextModelOption,
 } from "@dafthunk/types";
 import {
@@ -85,7 +85,7 @@ import {
 } from "@/hooks/use-generative-cloud-job";
 import { formatGenerativePhaseLabel } from "./generative-progress-utils";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
-import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AiAudioConfigPanelProps {
   readonly nodeId: string;
@@ -159,7 +159,7 @@ export function AiAudioConfigPanel({
     });
 
   const modelFitsCurrentRefs = useCallback(
-    (_model: OrgTextModelOption) => true,
+    (_model: OrgAudioModelOption) => true,
     []
   );
 
@@ -175,7 +175,7 @@ export function AiAudioConfigPanel({
     refreshModels,
     nodeInputs,
     cardGenerationParams,
-  } = useGenerativeModelCard({
+  } = useGenerativeModelCard<OrgAudioModelOption>({
     orgId,
     modality: "audio",
     data,
@@ -274,7 +274,7 @@ export function AiAudioConfigPanel({
     [nodeId, updateNodeData]
   );
 
-  const { syncProgress, clearProgress, resolveJobMedia, activeProgressPhase } =
+  const { syncProgress, resolveJobMedia, activeProgressPhase } =
     useGenerativeCloudJobProgress({
       nodeId,
       orgId,
@@ -348,7 +348,7 @@ export function AiAudioConfigPanel({
   );
 
   const previewStudioReferenceDrop = useCallback(
-    (sourceNodeId: string, sourceHandle: string) => {
+    (sourceNodeId: string, _sourceHandle: string) => {
       const source = typedNodes.find((node) => node.id === sourceNodeId);
       if (!source) return "rejected" as const;
       return studioReferenceDropPreviewFromVerdict(
@@ -741,7 +741,7 @@ export function AiAudioConfigPanel({
               onRetryLoad={() => {
                 void refreshModels();
               }}
-              modelFitsCurrentRefs={modelFitsCurrentRefs}
+              modelFitsCurrentRefs={() => true}
               onSelect={applyModelSelection}
             />
             {cardGenerationParams.visible ? (

@@ -61,7 +61,7 @@ async function resolveMediaFetchUrl(params: {
 
 /** Read-only async limits for AI text panel reference pick (size / duration / text length). */
 export async function validateGenerativeReferenceContentLimits(params: {
-  readonly kind: "text" | "image" | "video";
+  readonly kind: "text" | "image" | "video" | "audio";
   readonly rules: TextModelParameterRules;
   readonly sourceData: WorkflowNodeType;
   readonly targetNodeType?: string;

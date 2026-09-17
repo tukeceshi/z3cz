@@ -21,7 +21,7 @@ import {
   withGenerativeTrimmingProgress,
 } from "./generative-progress-utils";
 import { createDefaultAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
-import type { NodeType, WorkflowNodeType } from "./workflow-types";
+import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 export type AiVideoSiblingBusyKind = "trimming" | "generating" | "none";
 
@@ -221,7 +221,7 @@ export function buildLockedRetakeCopyNode(params: {
           type: "json",
           hidden: true,
           value: draft,
-        },
+        } as unknown as WorkflowParameter,
       ],
       metadata: withAiVideoPanelKind(hiddenPanel, "retake"),
     },

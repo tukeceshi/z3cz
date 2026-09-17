@@ -538,7 +538,7 @@ export function withAiTextHistorySelection(
     metadata: settings.patch.metadata ?? current.metadata,
   };
 
-  const result = withAiTextResult(working, selected.text, {
+  const result = withAiTextResult(working, selected.text ?? "", {
     inputs: upsertInputValue(
       working.inputs,
       AI_TEXT_RESULT_HISTORY_INPUT_ID,

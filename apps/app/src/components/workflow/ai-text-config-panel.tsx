@@ -6,7 +6,6 @@ import {
   isClientCancelledTextModelError,
   type MediaReference,
   type OrgTextModelOption,
-  type TextModelParameterRules,
 } from "@dafthunk/types";
 import {
   useNodes,
@@ -30,7 +29,6 @@ import {
   isAiTextReferencePendingFromChips,
   resolveAiTextReferenceInputsFromChips,
 } from "./resolve-ai-text-result";
-import { useObjectService } from "@/services/object-service";
 import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-references-for-generate";
 
 import { AiGenerateButton } from "./ai-generate-button";
@@ -108,7 +106,6 @@ export function AiTextConfigPanel({
   const { t } = useTranslation();
   const toast = useAppToast();
   const { getOrgUrl } = useOrgUrl();
-  const { createObjectUrl } = useObjectService();
   const orgId = organization?.id;
   const { id: workflowId } = useParams<{ id: string }>();
   const { configured: cloudConfigured } = useCloudStorageCanvasContext();

@@ -274,7 +274,9 @@ export function AdminApiForwardingPage() {
 
         onOpenChange={setCreateOpen}
 
-        onCreated={refreshTemplates}
+        onCreated={async () => {
+          await refreshTemplates();
+        }}
 
       />
 

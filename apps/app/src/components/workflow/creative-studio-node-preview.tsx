@@ -581,7 +581,7 @@ export function CreativeStudioReferenceThumbs({
   max = 3,
 }: CreativeStudioReferenceThumbsProps) {
   const { edges = [] } = useWorkflow();
-  const nodes = useNodes<WorkflowNodeType>();
+  const nodes = useNodes<ReactFlowNode<WorkflowNodeType>>();
 
   const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
   const nodeType = data.nodeType ?? "";
