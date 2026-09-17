@@ -251,21 +251,11 @@ export function readAiImageResultHistory(
 function toStoredWorkflowMedia(
   images: readonly (WorkflowMediaValue | MediaReference)[]
 ): WorkflowMediaValue[] {
-  return images.map((image) => {
-    const stored = isWorkflowMediaValue(image)
-      ? image
-      : mediaReferenceToWorkflowValue(image);
-    if (!isResourceIdReference(stored)) {
-      return stored;
-    }
-    const {
-      generating: _generating,
-      cloudAccelerationStatus: _cloudAccelerationStatus,
-      failed: _failed,
-      ...rest
-    } = stored;
-    return rest;
-  });
+  // Keep generating/failed flags. withAiImageResult also writes the selected
+  // history row; stripping them made pending/failed cards look ready.
+  return images.map((image) =>
+    isWorkflowMediaValue(image) ? image : mediaReferenceToWorkflowValue(image)
+  );
 }
 
 export function withAiImageResult(

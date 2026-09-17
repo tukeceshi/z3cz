@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformAiModel, PlatformAiModelParameterRules } from "@dafthunk/types";
 import { DEFAULT_TEXT_MODEL_PARAMETER_RULES } from "@dafthunk/types";
 
-const listPlatformAiModels = vi.fn();
+const { listPlatformAiModels } = vi.hoisted(() => ({
+  listPlatformAiModels: vi.fn(),
+}));
 
 vi.mock("../db/platform-ai-model-queries", () => ({
   listPlatformAiModels,

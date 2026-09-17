@@ -199,6 +199,7 @@ describe("withAiImageGeneratingHistoryFailed", () => {
     expect(history.items[0]?.images[0]).toEqual({
       resourceId: "pending-1",
       mimeType: "image/png",
+      kind: "ephemeral",
       failed: true,
     });
     expect(history.items[0]?.jobId).toBe("job-2");

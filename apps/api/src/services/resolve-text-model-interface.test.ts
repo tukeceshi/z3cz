@@ -1,4 +1,5 @@
 import type {
+  OrganizationAiInterface,
   PlatformAiModel,
   PlatformAiModelParameterRules,
   VolcanoInterfaceMetadata,
@@ -8,7 +9,15 @@ import {
   isOfficialOrgModelEndpoint,
   VOLCANO_AGGREGATE_MODEL_CATALOG,
 } from "@dafthunk/types";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { listOrganizationAiInterfaces } = vi.hoisted(() => ({
+  listOrganizationAiInterfaces: vi.fn(),
+}));
+
+vi.mock("../db/ai-interface-queries", () => ({
+  listOrganizationAiInterfaces,
+}));
 
 import {
   ensureVolcanoModelsIncludePlatformCatalog,
@@ -89,21 +98,40 @@ describe("toVolcanoCatalogEntriesFromPlatform", () => {
   });
 });
 
-describe("resolveOrgModelInterfaceBinding", () => {
-  it("resolves using modality-specific options without requiring text catalog membership", async () => {
-    const candidateSpy = vi
-      .spyOn(
-        await import("./resolve-text-model-interface"),
-        "resolveOrgModelInterfaceCandidate"
-      )
-      .mockResolvedValue({
-        instanceId: "doubao-seedream-5",
-        interfaceId: "iface-1",
-        interfaceName: "Volcano",
-        channelKind: "aggregate",
-        providerModelId: "seedream-id",
-      });
+const volcanoSeedreamInterface: OrganizationAiInterface = {
+  id: "iface-1",
+  organizationId: "org-1",
+  name: "Volcano",
+  provider: "doubao_volcano",
+  enabled: true,
+  isDefault: true,
+  hasApiKey: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  metadata: {
+    credentialMode: "volcengine_iam",
+    accessKeyId: "ak",
+    secretAccessKeyEncrypted: "enc",
+    arkApiKeyDurationSeconds: 3600,
+    region: "cn-beijing",
+    models: {
+      "doubao-seedream-5": {
+        canonicalId: "doubao-seedream-5",
+        enabled: true,
+        upstreamModelId: "seedream-id",
+        modality: "image",
+      },
+    },
+  },
+};
 
+describe("resolveOrgModelInterfaceBinding", () => {
+  beforeEach(() => {
+    listOrganizationAiInterfaces.mockReset();
+    listOrganizationAiInterfaces.mockResolvedValue([volcanoSeedreamInterface]);
+  });
+
+  it("resolves using modality-specific options without requiring text catalog membership", async () => {
     const db = {} as import("../db").Database;
     const listOptions = vi.fn(async () => [
       {
@@ -137,23 +165,10 @@ describe("resolveOrgModelInterfaceBinding", () => {
       parameterRules: { promptMaxChars: 2000 },
     });
     expect(listOptions).toHaveBeenCalledWith(db, "org-1");
-    candidateSpy.mockRestore();
+    expect(listOrganizationAiInterfaces).toHaveBeenCalledWith(db, "org-1");
   });
 
   it("returns null when binding is not selectable", async () => {
-    const candidateSpy = vi
-      .spyOn(
-        await import("./resolve-text-model-interface"),
-        "resolveOrgModelInterfaceCandidate"
-      )
-      .mockResolvedValue({
-        instanceId: "doubao-seedream-5",
-        interfaceId: "iface-1",
-        interfaceName: "Volcano",
-        channelKind: "aggregate",
-        providerModelId: "seedream-id",
-      });
-
     const db = {} as import("../db").Database;
     const listOptions = vi.fn(async () => [
       {
@@ -177,7 +192,7 @@ describe("resolveOrgModelInterfaceBinding", () => {
     );
 
     expect(resolved).toBeNull();
-    candidateSpy.mockRestore();
+    expect(listOrganizationAiInterfaces).not.toHaveBeenCalled();
   });
 });
 
