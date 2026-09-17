@@ -347,5 +347,5 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
 export function cloudUploadToResourceId(
   object: ObjectReference
 ): ResourceIdReference {
-  return mediaReferenceToWorkflowValue(object) as ResourceIdReference;
+  return mediaReferenceToWorkflowValue(object);
 }
