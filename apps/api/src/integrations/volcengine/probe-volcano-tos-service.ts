@@ -4,7 +4,6 @@ import type {
 
 import {
   TOS_ACCOUNT_DISABLE_CODE,
-  TosRequestError,
   VOLCANO_TOS_NOT_OPENED_CODE,
   isTosBucketAlreadyExistsCode,
   isTosRequestError,

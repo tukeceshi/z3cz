@@ -116,7 +116,7 @@ export async function syncTextContent(params: {
     throw new Error(`Text sync failed (${response.status})`);
   }
 
-  let text = params.localText ?? "";
+  const text = params.localText ?? "";
   let contentSha256 = params.localSha ?? "";
   let conflict = false;
   let downloadUrl: string | undefined;

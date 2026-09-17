@@ -20,7 +20,6 @@ import {
   WORKFLOW_SCHEME_BASIC_CANVAS_ID,
 } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
-import type { Context } from "hono";
 import { Hono } from "hono";
 import { v7 as uuid } from "uuid";
 import { z } from "zod";

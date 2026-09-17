@@ -1,5 +1,4 @@
 import type { Bindings } from "../context";
-import { getAllNodeTypes } from "./node-types";
 
 export {
   assertWorkflowExecutableAgainstCatalog,

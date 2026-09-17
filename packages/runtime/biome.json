@@ -1,5 +1,12 @@
 {
   "extends": ["../../biome.json"],
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
   "linter": {
     "rules": {
       "suspicious": {

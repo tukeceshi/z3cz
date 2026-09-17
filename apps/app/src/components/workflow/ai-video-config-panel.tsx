@@ -1357,14 +1357,8 @@ export function AiVideoConfigPanel({
       }));
       toast.errorRaw(cardError.summary);
     } finally {
-      if (isCancelConfirmed()) {
-        generateInFlightRef.current = false;
-        setPersistPhase(null);
-        setIsGenerating(false);
-        return;
-      }
       generateInFlightRef.current = false;
-      if (ownsJobProgress) {
+      if (!isCancelConfirmed() && ownsJobProgress) {
         updateNodeData?.(nodeId, (current) => ({
           metadata: withAiVideoGeneratingFlag(
             clearGenerativeProgress(current.metadata),

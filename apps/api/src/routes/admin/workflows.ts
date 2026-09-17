@@ -96,7 +96,7 @@ adminWorkflowsRoutes.get(
  * GET /admin/workflows/:id
  *
  * Get full details for a specific workflow including nodes/edges so the
- * admin detail page can render with a single round-trip. No org filter ù?
+ * admin detail page can render with a single round-trip. No org filter  -
  * the admin auth middleware on this router is the safety net, matching how
  * every other /admin/* endpoint exposes cross-org data.
  */

@@ -27,5 +27,12 @@
     "formatter": {
       "trailingCommas": "es5"
     }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
   }
 }

@@ -432,7 +432,9 @@ describe("aggregatePackageUsage", () => {
     expect(usage?.remaining).toBe(400_000);
     expect(usage?.expired).toBe(100_000);
     expect(usage?.used).toBe(1_300_000);
-    expect(usage?.remaining! + usage!.expired + usage!.used).toBe(usage?.quota);
+    expect(
+      (usage?.remaining ?? 0) + (usage?.expired ?? 0) + (usage?.used ?? 0)
+    ).toBe(usage?.quota);
   });
 
   it("counts entire UsedUp total as used when AvailableAmount remains", () => {

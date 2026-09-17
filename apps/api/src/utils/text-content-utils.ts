@@ -106,7 +106,6 @@ export function syncOpsFromBaseToPending(
     return appendText.length > 0 ? [{ op: "append", text: appendText }] : [];
   }
 
-  const pendingText = textDecoder.decode(pendingBytes);
   return [
     {
       op: "replace",

@@ -244,7 +244,7 @@ export class CloudflareCredentialService implements CredentialService {
           cause ??
             (dbError instanceof Error ? dbError.message : String(dbError))
         );
-        // Token refresh succeeded â€?return it for this execution.
+        // Token refresh succeeded  - return it for this execution.
         // Next execution will refresh again since the DB wasn't updated.
       }
 

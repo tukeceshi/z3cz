@@ -32,7 +32,7 @@ const workflowFolderRoutes = new Hono<ApiContext>();
 workflowFolderRoutes.use("*", jwtMiddleware);
 workflowFolderRoutes.use("*", requireWorkflowRouteAccess());
 
-const coverSchema = z.object({
+const _coverSchema = z.object({
   coverObjectId: z.string().min(1).nullable(),
   coverMimeType: z.string().min(1).nullable(),
 });
