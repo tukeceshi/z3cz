@@ -28,9 +28,7 @@ async function readPlainTextFile(file: File): Promise<string> {
 async function readDocxMarkdown(file: File): Promise<string> {
   const mammoth = await import("mammoth");
   const arrayBuffer = await file.arrayBuffer();
-
-  // Vitest/Node uses lib/unzip (buffer); browser uses browser/unzip (arrayBuffer).
-  if (typeof window === "undefined") {
+  if (typeof Buffer !== "undefined") {
     const converted = await mammoth.extractRawText({
       buffer: Buffer.from(arrayBuffer),
     });

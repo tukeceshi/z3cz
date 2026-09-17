@@ -211,7 +211,7 @@ describe("evaluateAiVideoReferenceStructural", () => {
     expect(verdict.ok).toBe(true);
   });
 
-  it("reserves one video reference slot for retake panel nodes", () => {
+  it("lets the first canvas video fill the retake primary slot", () => {
     const targetNodeData: WorkflowNodeType = testWorkflowNodeData({
       nodeType: AI_VIDEO_NODE_TYPE,
       name: "retake",
@@ -226,31 +226,58 @@ describe("evaluateAiVideoReferenceStructural", () => {
         "retake"
       ),
     });
+    const sourceData = testWorkflowNodeData({
+      nodeType: AI_VIDEO_NODE_TYPE,
+      name: "source",
+      inputs: [],
+      outputs: [],
+    });
 
-    const verdict = evaluateAiVideoReferenceStructural({
+    const first = evaluateAiVideoReferenceStructural({
       targetNodeId: "video-retake-1",
-      sourceNodeId: "video-src",
+      sourceNodeId: "video-primary",
       sourceHandle: AI_VIDEO_OUTPUT_ID,
       sourceNodeType: AI_VIDEO_NODE_TYPE,
       targetNodeData,
       edges: [],
       nodes: [
         { id: "video-retake-1", data: targetNodeData },
+        { id: "video-primary", data: sourceData },
+      ],
+    });
+    expect(first.ok).toBe(true);
+
+    const extra = evaluateAiVideoReferenceStructural({
+      targetNodeId: "video-retake-1",
+      sourceNodeId: "video-extra",
+      sourceHandle: AI_VIDEO_OUTPUT_ID,
+      sourceNodeType: AI_VIDEO_NODE_TYPE,
+      targetNodeData,
+      edges: [
         {
-          id: "video-src",
+          source: "video-primary",
+          target: "video-retake-1",
+          sourceHandle: AI_VIDEO_OUTPUT_ID,
+          targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
+        },
+      ],
+      nodes: [
+        { id: "video-retake-1", data: targetNodeData },
+        { id: "video-primary", data: sourceData },
+        {
+          id: "video-extra",
           data: testWorkflowNodeData({
             nodeType: AI_VIDEO_NODE_TYPE,
-            name: "source",
+            name: "extra",
             inputs: [],
             outputs: [],
           }),
         },
       ],
     });
-
-    expect(verdict.ok).toBe(false);
-    if (!verdict.ok) {
-      expect(verdict.reason).toBe("video_limit");
+    expect(extra.ok).toBe(false);
+    if (!extra.ok) {
+      expect(extra.reason).toBe("video_limit");
     }
   });
 

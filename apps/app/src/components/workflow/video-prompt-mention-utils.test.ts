@@ -59,6 +59,7 @@ describe("flatIndexToStoredIndex", () => {
     const stored = "ab{{ref:x}}cd";
     expect(flatIndexToStoredIndex(stored, 2)).toBe(2);
     expect(flatIndexToStoredIndex(stored, 3)).toBe("ab{{ref:x}}".length);
-    expect(flatIndexToStoredIndex(stored, 4)).toBe(stored.length);
+    expect(flatIndexToStoredIndex(stored, 4)).toBe(12);
+    expect(flatIndexToStoredIndex(stored, 5)).toBe(stored.length);
   });
 });

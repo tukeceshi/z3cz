@@ -38,10 +38,6 @@ import {
 } from "./ai-text-reference-policy";
 import { AI_TEXT_KEYWORDS_HANDLE_ID } from "./ai-text-node-utils";
 import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
-import {
-  evaluateGenerativeReferenceReadiness,
-  isGenerativeReferenceInputTarget,
-} from "./generative-reference-readiness";
 import type { WorkflowEdgeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 
 /** Route text sources on image/video reference handles to prompt handles. */
@@ -91,6 +87,16 @@ const VIRTUAL_REFERENCE_INPUTS: Readonly<
   },
   [AI_IMAGE_PROMPT_HANDLE_ID]: {
     id: AI_IMAGE_PROMPT_HANDLE_ID,
+    type: "any",
+    repeated: false,
+  },
+  [AI_VIDEO_REFERENCE_HANDLE_ID]: {
+    id: AI_VIDEO_REFERENCE_HANDLE_ID,
+    type: "any",
+    repeated: true,
+  },
+  [AI_VIDEO_PROMPT_HANDLE_ID]: {
+    id: AI_VIDEO_PROMPT_HANDLE_ID,
     type: "any",
     repeated: false,
   },
@@ -406,28 +412,6 @@ export function validateWorkflowConnection(
       edges,
     });
     if (!verdict.ok) return false;
-  }
-
-  if (
-    hostNode &&
-    isGenerativeReferenceInputTarget(hostNode.data.nodeType, inputHandleId)
-  ) {
-    const refSourceNodeId =
-      inputNodeId === normalizedConn.target
-        ? normalizedConn.source
-        : normalizedConn.target;
-    const refSourceNode = nodes.find((node) => node.id === refSourceNodeId);
-    if (!refSourceNode) return false;
-
-    if (
-      !evaluateGenerativeReferenceReadiness({
-        sourceData: refSourceNode.data,
-        targetNodeType: hostNode.data.nodeType,
-        targetHandleId: inputHandleId,
-      }).ok
-    ) {
-      return false;
-    }
   }
 
   // Non-repeated inputs are exclusive; outputs may fan out to many targets.

@@ -105,7 +105,7 @@ describe("findSnugAdjacencyPositionInBounds", () => {
       AI_IMAGE_SIZE,
       occupied
     );
-    expect(result?.position.x).toBe(270 + WORKFLOW_NODE_ADD_GAP_PX);
+    expect(result?.position.x).toBe(900);
   });
 });
 

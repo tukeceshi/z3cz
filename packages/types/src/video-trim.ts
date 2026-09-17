@@ -61,9 +61,7 @@ export function snapVideoTrimSec(valueSec: number): number {
   if (!Number.isFinite(valueSec)) {
     return 0;
   }
-  return (
-    Math.round(valueSec / VIDEO_TRIM_SNAP_STEP_SEC) * VIDEO_TRIM_SNAP_STEP_SEC
-  );
+  return Math.round(valueSec / VIDEO_TRIM_SNAP_STEP_SEC) / 10;
 }
 
 export function createDefaultVideoTrimRange(

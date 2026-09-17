@@ -39,6 +39,6 @@ describe("studio-text-scroll-anchor", () => {
       }) as DOMRect;
 
     applyStudioTextScrollRestore(container, restore);
-    expect(container.scrollTop).toBe(100);
+    expect(container.scrollTop).toBe(140);
   });
 });

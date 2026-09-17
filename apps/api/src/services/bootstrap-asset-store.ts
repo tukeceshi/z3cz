@@ -1,9 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import type { BootstrapManifest } from "@dafthunk/types";
 
 const MANIFEST_FILE = "bootstrap-manifest.json";
+
+function diskUrl(filePath: string): URL {
+  return pathToFileURL(filePath);
+}
 
 let cachedManifest: BootstrapManifest | null = null;
 let cachedRoot: string | null = null;
@@ -11,7 +16,7 @@ let cachedMtimeMs = 0;
 
 function manifestMtimeMs(root: string): number {
   try {
-    return fs.statSync(path.join(root, MANIFEST_FILE)).mtimeMs;
+    return fs.statSync(diskUrl(path.join(root, MANIFEST_FILE))).mtimeMs;
   } catch {
     return 0;
   }
@@ -28,7 +33,7 @@ function resolveBootstrapRoot(): string | null {
 
   for (const candidate of candidates) {
     const manifestPath = path.join(candidate, MANIFEST_FILE);
-    if (fs.existsSync(manifestPath)) {
+    if (fs.existsSync(diskUrl(manifestPath))) {
       return candidate;
     }
   }
@@ -37,7 +42,7 @@ function resolveBootstrapRoot(): string | null {
 }
 
 function readManifestFromDisk(root: string): BootstrapManifest {
-  const raw = fs.readFileSync(path.join(root, MANIFEST_FILE), "utf8");
+  const raw = fs.readFileSync(diskUrl(path.join(root, MANIFEST_FILE)), "utf8");
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Invalid bootstrap manifest");
@@ -46,7 +51,7 @@ function readManifestFromDisk(root: string): BootstrapManifest {
 }
 
 export function getBootstrapAssetsRoot(): string | null {
-  if (cachedRoot && fs.existsSync(path.join(cachedRoot, MANIFEST_FILE))) {
+  if (cachedRoot && fs.existsSync(diskUrl(path.join(cachedRoot, MANIFEST_FILE)))) {
     const mtimeMs = manifestMtimeMs(cachedRoot);
     if (cachedManifest && mtimeMs === cachedMtimeMs) {
       return cachedRoot;
@@ -82,11 +87,11 @@ export function resolveBootstrapAssetDiskPath(
 ): string {
   const relative = assetPath.replace(/^\/+/, "");
   const distPath = path.join(root, relative);
-  if (fs.existsSync(distPath)) {
+  if (fs.existsSync(diskUrl(distPath))) {
     return distPath;
   }
   const publicPath = path.join(root, "..", "public", relative);
-  if (fs.existsSync(publicPath)) {
+  if (fs.existsSync(diskUrl(publicPath))) {
     return publicPath;
   }
   return distPath;

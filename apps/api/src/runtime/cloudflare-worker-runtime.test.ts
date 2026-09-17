@@ -1,13 +1,12 @@
 /**
  * Complete specification test suite for Worker Runtime (direct execution)
  *
- * This file runs all runtime specification tests against the Worker Runtime
- * (CloudflareWorkerRuntime) which uses direct execution without Workflows infrastructure.
- *
- * This is faster than workflow-runtime.test.ts but doesn't test durable execution.
- * Both test files run the same 50 specification tests to ensure consistent behavior.
+ * This file runs all runtime specification tests against WorkerRuntime with
+ * the same mock dependencies as workflow-runtime tests (no Postgres, spec
+ * harness math nodes). Production createWorkerRuntime is covered elsewhere.
  */
 import { env } from "cloudflare:test";
+import { WorkerRuntime } from "@dafthunk/runtime";
 import {
   type RuntimeFactory,
   testConcurrentErrors,
@@ -28,15 +27,16 @@ import {
   testWorkflowValidation,
 } from "@dafthunk/runtime/specification";
 import type { Bindings } from "../context";
-import { createWorkerRuntime } from "./cloudflare-worker-runtime";
+import { createMockRuntimeDependencies } from "../mocks/runtime";
 
-// Run all specifications against Worker Runtime
 const runtimeName = "WorkerRuntime";
 const factory: RuntimeFactory = () => {
-  const runtimePromise = createWorkerRuntime(env as Bindings);
+  const runtime = new WorkerRuntime(
+    env as Bindings,
+    createMockRuntimeDependencies(env as Bindings)
+  );
   return {
-    run: (params, instanceId) =>
-      runtimePromise.then((runtime) => runtime.run(params, instanceId)),
+    run: (params, instanceId) => runtime.run(params, instanceId),
   };
 };
 

@@ -12,8 +12,18 @@ const mammothFixture = path.resolve(
   "../../../node_modules/mammoth/test/test-data/simple-list.docx"
 );
 
+function fileFromBytes(name: string, bytes: Uint8Array, type = ""): File {
+  const copy = bytes.slice();
+  const file = new File([copy], name, { type });
+  Object.defineProperty(file, "arrayBuffer", {
+    value: async () =>
+      copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength),
+  });
+  return file;
+}
+
 function fileFromString(name: string, content: string, type = ""): File {
-  return new File([content], name, { type });
+  return fileFromBytes(name, new TextEncoder().encode(content), type);
 }
 
 describe("readTextCardUploadFile", () => {
@@ -45,9 +55,11 @@ describe("readTextCardUploadFile", () => {
 
   it("reads docx via mammoth", async () => {
     const buffer = readFileSync(mammothFixture);
-    const file = new File([buffer], "simple-list.docx", {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
+    const file = fileFromBytes(
+      "simple-list.docx",
+      new Uint8Array(buffer),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
 
     const result = await readTextCardUploadFile(file);
     expect(result.ok).toBe(true);

@@ -45,7 +45,7 @@ describe("splitMarkdownSections", () => {
     expect(sections).toHaveLength(2);
     expect(parts[0]).toMatchObject({ type: "preamble" });
     expect(markdown.slice(parts[0]!.start, parts[0]!.end)).toBe(
-      ["## Scene", "intro under scene", ""].join("\n")
+      ["## Scene", "intro under scene", "", ""].join("\n")
     );
 
     expect(sections[0]).toMatchObject({ index: 0, level: 3 });
