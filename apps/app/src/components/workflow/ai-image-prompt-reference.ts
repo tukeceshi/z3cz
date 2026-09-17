@@ -1,4 +1,4 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, type MediaReference } from "@dafthunk/types";
+import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";

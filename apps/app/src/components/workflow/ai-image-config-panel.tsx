@@ -3,8 +3,6 @@ import {
   AI_TEXT_NODE_TYPE,
   normalizeImageModelParameterRules,
   type ResourceIdReference,
-  type MediaReference,
-  type ObjectReference,
   type OrgImageModelOption,
   type OrgTextModelOption,
 } from "@dafthunk/types";
@@ -48,7 +46,6 @@ import {
   type GenerativePickNodeEntry,
 } from "./generative-pick-node-dialog";
 import {
-  collectGenerativeReferenceChips,
   collectImageReferenceMedia,
   studioReferenceDropPreviewFromVerdict,
 } from "./generative-reference-utils";
@@ -113,7 +110,7 @@ import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleratio
 import { useGenerativeCloudJobProgress, generativeProgressButtonKey, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
 import { formatGenerativePhaseLabel } from "./generative-progress-utils";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
-import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AiImageConfigPanelProps {
   readonly nodeId: string;
@@ -143,7 +140,7 @@ export function AiImageConfigPanel({
     onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
-  const { setNodes, setEdges, getNode } = useReactFlow();
+  const { setNodes, getNode } = useReactFlow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
@@ -223,19 +220,6 @@ export function AiImageConfigPanel({
         nodeId,
         edges,
         nodes: typedNodes,
-      }),
-    [edges, nodeId, typedNodes]
-  );
-
-  const imageReferenceChips = useMemo(
-    () =>
-      collectGenerativeReferenceChips({
-        nodeId,
-        targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
-        edges,
-        nodes: typedNodes,
-        classifyKind: (nodeType) =>
-          nodeType === AI_IMAGE_NODE_TYPE ? "image" : null,
       }),
     [edges, nodeId, typedNodes]
   );
@@ -353,7 +337,6 @@ export function AiImageConfigPanel({
 
   const {
     syncProgress,
-    clearProgress,
     resolveJobMedia,
     activeProgressPhase,
     cloudAccelerationOfferVisible,
@@ -599,7 +582,7 @@ export function AiImageConfigPanel({
               target: nodeId,
               targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
             },
-            { nodes: [...nodes, newNode] }
+            { nodes: [...nodes, newNode] as ReactFlowNode<WorkflowNodeType>[] }
           )
         ) {
           toast.error("workflow.aiImagePanel.referenceRejected");

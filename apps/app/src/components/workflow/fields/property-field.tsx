@@ -64,7 +64,7 @@ export interface PropertyFieldProps {
   onToggleVisibility?: () => void;
   disabled?: boolean;
   connected?: boolean;
-  createObjectUrl: (objectReference: ObjectReference) => string;
+  createObjectUrl?: (objectReference: ObjectReference) => string;
   autoFocus?: boolean;
   headerOnly?: boolean;
 }
@@ -113,9 +113,10 @@ export function PropertyField({
   // Check if this is a downloadable file type with a value
   const isFileType = FILE_TYPES.includes(parameter.type);
   const hasFileValue = isFileType && isObjectReference(value);
-  const downloadUrl = hasFileValue
-    ? createObjectUrl(value as ObjectReference)
-    : null;
+  const downloadUrl =
+    hasFileValue && createObjectUrl
+      ? createObjectUrl(value as ObjectReference)
+      : null;
 
   const copyableValue = NON_COPYABLE_TYPES.includes(parameter.type)
     ? null

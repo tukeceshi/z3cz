@@ -436,7 +436,7 @@ export function isToolAllowed(name: string, mode: AgentSessionMode): boolean {
     return tool.kind === "read";
   }
   if (mode === "draft") {
-    return tool.kind === "read" || tool.kind === "make";
+    return tool.kind === "read";
   }
   return true;
 }

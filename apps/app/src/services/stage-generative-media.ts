@@ -1,5 +1,4 @@
 import type {
-  MediaReference,
   ObjectReference,
   PatchNodeLayoutMetadata,
   ResourceIdReference,
@@ -348,5 +347,5 @@ export async function uploadGenerativeMediaFromLocalStaging(params: {
 export function cloudUploadToResourceId(
   object: ObjectReference
 ): ResourceIdReference {
-  return mediaReferenceToWorkflowValue(object);
+  return mediaReferenceToWorkflowValue(object) as ResourceIdReference;
 }

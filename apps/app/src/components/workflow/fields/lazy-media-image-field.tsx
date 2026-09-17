@@ -32,7 +32,7 @@ function isElementVisible(element: HTMLElement, root: HTMLElement | null): boole
 
 export function LazyMediaImageField({
   value,
-  createObjectUrl,
+  createObjectUrl: _createObjectUrl,
   className,
   size = "thumb",
   scrollRoot = null,
@@ -69,7 +69,6 @@ export function LazyMediaImageField({
       {visible ? (
         <MediaImageField
           value={value}
-          createObjectUrl={createObjectUrl}
           className="h-full w-full"
           size={size}
         />

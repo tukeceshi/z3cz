@@ -89,7 +89,7 @@ function useSummedReferenceVideoDurationSeconds(
             workflowId,
             nodeType: "ai-video",
           });
-          const src = urlSet.full ?? urlSet.preview;
+          const src = urlSet.full ?? urlSet.l ?? urlSet.m ?? urlSet.s;
           if (!src) {
             continue;
           }

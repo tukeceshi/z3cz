@@ -1,6 +1,5 @@
 import type {
   Edge as WorkflowBackendEdge,
-  Node as WorkflowBackendNode,
   ObjectReference,
 } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";

@@ -14,6 +14,7 @@ import {
   resolveReferencedAiTextFromEdges,
 } from "./resolve-ai-text-result";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData } from "./workflow-test-fixtures";
 
 vi.mock("@/services/ai-text-cache-layer", () => ({
   readAiTextFullBodyFromStaging: vi.fn(async () => "staged body"),
@@ -24,7 +25,7 @@ function createTextNode(
     Pick<WorkflowNodeType, "id" | "inputs" | "outputs" | "metadata">
   >
 ): WorkflowNodeType {
-  return {
+  return testWorkflowNodeData({
     id: "node-1",
     type: "workflowNode",
     name: "AI Text",
@@ -37,7 +38,7 @@ function createTextNode(
     ],
     metadata: undefined,
     ...overrides,
-  };
+  });
 }
 
 describe("resolve-ai-text-result", () => {

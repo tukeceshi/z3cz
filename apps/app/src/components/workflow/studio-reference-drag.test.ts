@@ -18,7 +18,7 @@ function makeNode(
 ): Pick<ReactFlowNode<WorkflowNodeType>, "id" | "data"> {
   return {
     id,
-    data: { nodeType, inputs: [], outputs: [] } as WorkflowNodeType,
+    data: { nodeType, inputs: [], outputs: [] } as unknown as WorkflowNodeType,
   };
 }
 
@@ -50,11 +50,11 @@ describe("studio-reference-drag", () => {
     const dataTransfer = {
       types: [] as string[],
       store: "",
-      setData(type: string, value: string) {
+      setData(this: { types: string[]; store: string }, type: string, value: string) {
         this.types = [type];
         this.store = value;
       },
-      getData(type: string) {
+      getData(this: { types: string[]; store: string }, type: string) {
         return type === STUDIO_REFERENCE_DRAG_MIME ? this.store : "";
       },
     } as unknown as DataTransfer;

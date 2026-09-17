@@ -11,7 +11,7 @@ import {
 } from "./generative-workflow-param-defaults";
 import { paramRecordsEqual } from "./param-records-equal";
 
-const FIELDS: readonly UpstreamParamProfileField[] = [
+const FIELDS = [
   {
     name: "ratio",
     type: "string",
@@ -23,7 +23,7 @@ const FIELDS: readonly UpstreamParamProfileField[] = [
     type: "boolean",
     default: false,
   },
-];
+] as unknown as readonly UpstreamParamProfileField[];
 
 describe("mergeWorkflowParamDefaults", () => {
   it("keeps fields missing from the incoming save", () => {
@@ -89,7 +89,7 @@ describe("commitGenerativeParamWindow", () => {
           type: "string",
           value: "iface-a",
         },
-        { id: "params", name: "params", type: "object", value: {} },
+        { id: "params", name: "params", type: "json", value: {} },
       ],
       updateNodeData,
       modality: "image",
@@ -105,7 +105,7 @@ describe("commitGenerativeParamWindow", () => {
       fields: FIELDS,
       nodeId: "node-1",
       nodeInputs: [
-        { id: "params", name: "params", type: "object", value: {} },
+        { id: "params", name: "params", type: "json", value: {} },
       ],
       updateNodeData,
     });
@@ -127,7 +127,7 @@ describe("commitGenerativeParamWindow", () => {
           type: "string",
           value: "iface-a",
         },
-        { id: "params", name: "params", type: "object", value: {} },
+        { id: "params", name: "params", type: "json", value: {} },
       ],
       updateNodeData,
       modality: "image",
@@ -150,7 +150,7 @@ describe("commitGenerativeParamWindow", () => {
         {
           id: "params",
           name: "params",
-          type: "object",
+          type: "json",
           value: { ratio: "1:1", watermark: false },
         },
       ],

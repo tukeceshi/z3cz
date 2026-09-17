@@ -15,6 +15,7 @@ import {
 } from "./sync-retake-primary-video";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 
 
@@ -54,7 +55,7 @@ const sourceVideo: WorkflowNodeType = {
 
   outputs: [
 
-    {
+    testWorkflowParam({
 
       id: "videos",
 
@@ -76,7 +77,7 @@ const sourceVideo: WorkflowNodeType = {
 
       ],
 
-    },
+    }),
 
   ],
 

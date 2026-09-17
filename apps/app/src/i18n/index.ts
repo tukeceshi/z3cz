@@ -74,7 +74,7 @@ export function createTranslator(
   fallbackDictionary?: TranslationDictionary
 ) {
   return (
-    key: TranslationKey,
+    key: string,
     params?: Record<string, string | number>
   ): string => {
     let value = getNestedValue(dictionary, key);
@@ -103,7 +103,10 @@ export function createTranslator(
   };
 }
 
-export type TranslateFn = ReturnType<typeof createTranslator>;
+export type TranslateFn = (
+  key: string,
+  params?: Record<string, string | number>
+) => string;
 
 export function readStoredLocale(): AppLocale | null {
   const stored = localStorage.getItem(LOCALE_STORAGE_KEY);

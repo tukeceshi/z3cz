@@ -351,7 +351,7 @@ async function seedAssetCache(
       .map(([assetPath, bytes]) =>
         cache.put(
           assetPath,
-          new Response(bytes, {
+          new Response(new Uint8Array(bytes), {
             headers: { "Content-Type": contentTypeForAssetPath(assetPath) },
           })
         )

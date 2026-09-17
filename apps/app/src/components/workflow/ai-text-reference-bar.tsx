@@ -124,7 +124,7 @@ export function ReferenceHoverPreview({
   readonly thumbUrl?: string | null;
 }) {
   const media = chipMedia(chip);
-  const { displayUrl: hookThumbUrl, phase } = useReferenceThumbUrl({
+  const { displayUrl: hookThumbUrl } = useReferenceThumbUrl({
     media,
     nodeType: mediaNodeTypeForChip(chip),
     paused: thumbUrlOverride !== undefined,

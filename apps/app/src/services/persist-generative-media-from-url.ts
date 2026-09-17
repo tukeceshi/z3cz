@@ -1,7 +1,6 @@
 import type { ResourceIdReference, WorkflowMediaValue } from "@dafthunk/types";
 
 import type { GenerativeProgressPhase } from "@/components/workflow/generative-progress-utils";
-import { GenerativeGenerationCancelledError } from "@/components/workflow/generative-generation-cancel";
 import { runGenerationJobPersistWorker } from "@/services/generation-job-persist-worker";
 
 export type PersistGenerativeMediaPhase = "downloading" | "uploading";

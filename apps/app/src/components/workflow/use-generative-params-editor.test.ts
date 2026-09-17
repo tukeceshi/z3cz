@@ -24,7 +24,7 @@ const NODE_INPUTS = [
     type: "string",
     value: "iface-a",
   },
-  { id: "params", name: "params", type: "object", value: { ratio: "1:1" } },
+  { id: "params", name: "params", type: "json", value: { ratio: "1:1" } },
 ] satisfies WorkflowParameter[];
 
 function renderEditor(

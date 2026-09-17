@@ -9,13 +9,16 @@ import {
   withAiImageGeneratingHistoryFailed,
 } from "./ai-image-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 function createImageNode(): WorkflowNodeType {
   return {
     name: "Image 1",
     nodeType: "ai-image",
     inputs: [],
-    outputs: [{ id: "images", name: "images", type: "image", value: [] }],
+    outputs: [
+      testWorkflowParam({ id: "images", name: "images", type: "image", value: [] }),
+    ],
     executionState: "idle",
   };
 }
@@ -84,13 +87,13 @@ describe("readAiImageCardImages", () => {
   it("prefers selected history media over stale images_result", () => {
     const node = createImageNode();
     node.inputs = [
-      {
+      testWorkflowParam({
         id: "images_result",
         name: "images_result",
         type: "json",
         hidden: true,
         value: [{ resourceId: "old-done", mimeType: "image/jpeg" }],
-      },
+      }),
       {
         id: "images_history",
         name: "images_history",
@@ -129,7 +132,7 @@ describe("readAiImageCardImages", () => {
   it("keeps the last ready image while selected history is generating", () => {
     const node = createImageNode();
     node.inputs = [
-      {
+      testWorkflowParam({
         id: "images_result",
         name: "images_result",
         type: "json",
@@ -141,7 +144,7 @@ describe("readAiImageCardImages", () => {
             generating: true,
           },
         ],
-      },
+      }),
       {
         id: "images_history",
         name: "images_history",

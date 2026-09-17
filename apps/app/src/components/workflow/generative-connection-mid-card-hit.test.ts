@@ -19,7 +19,7 @@ function mockTextNode(id: string): InternalNode<Node> {
       inputs: [],
     },
     internals: { positionAbsolute: { x: 0, y: 0 } },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 function mockImageNode(id: string): InternalNode<Node> {
@@ -32,7 +32,7 @@ function mockImageNode(id: string): InternalNode<Node> {
     },
     measured: { width: 280, height: 280 },
     internals: { positionAbsolute: { x: 400, y: 0 } },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 function mockVideoNode(id: string): InternalNode<Node> {
@@ -45,7 +45,7 @@ function mockVideoNode(id: string): InternalNode<Node> {
     },
     measured: { width: 280, height: 280 },
     internals: { positionAbsolute: { x: 900, y: 0 } },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 function mockNodeElement(id: string): Element {
@@ -111,7 +111,7 @@ describe("generative connection mid-card hit-test", () => {
 
     const context = {
       domNode,
-      transform: [0, 0, 1] as const,
+      transform: [0, 0, 1] as [number, number, number],
     };
 
     const preview = resolveGenerativePreviewConnection(

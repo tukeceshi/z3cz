@@ -412,7 +412,6 @@ export function SingleModelConfigDialog({
             <CredentialPlainInput
               id="single-model-config-endpoint"
               name="single_model_config_endpoint"
-              type="url"
               value={baseUrl}
               onChange={(event) => setBaseUrl(event.target.value)}
             />
@@ -493,7 +492,7 @@ export function SingleModelConfigDialog({
               <SingleModelInstanceList
                 availableModels={modelPoolOptions}
                 instances={modelInstances}
-                onChange={setModelInstances}
+                onChange={(instances) => setModelInstances([...instances])}
                 modelColumnLabel={t("pages.aiInterfaces.singleModel.modelColumn")}
                 modelIdLabel={t("pages.aiInterfaces.singleModel.modelId")}
                 addModelLabel={t("pages.aiInterfaces.singleModel.addModel")}

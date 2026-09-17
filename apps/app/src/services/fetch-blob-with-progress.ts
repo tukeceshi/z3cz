@@ -208,7 +208,7 @@ async function readStreamToBlob(
 
 
 
-    chunks.push(value);
+    chunks.push(new Uint8Array(value));
 
     loadedBytes += value.byteLength;
 

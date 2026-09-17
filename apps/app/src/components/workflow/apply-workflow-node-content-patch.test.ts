@@ -2,19 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 function createImageNode(): WorkflowNodeType {
   return {
     name: "Image 1",
     nodeType: "ai-image",
     inputs: [
-      {
+      testWorkflowParam({
         id: "images_result",
         name: "images_result",
         type: "json",
         hidden: true,
         value: [{ resourceId: "done-1", mimeType: "image/jpeg" }],
-      },
+      }),
       {
         id: "images_history",
         name: "images_history",
@@ -24,12 +25,12 @@ function createImageNode(): WorkflowNodeType {
       },
     ],
     outputs: [
-      {
+      testWorkflowParam({
         id: "images",
         name: "images",
         type: "image",
         value: [{ resourceId: "done-1", mimeType: "image/jpeg" }],
-      },
+      }),
     ],
     executionState: "idle",
   };

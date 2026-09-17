@@ -402,7 +402,7 @@ export function AiVideoTrimBottomPanel({
         return;
       }
       const sourceResourceId = getResourceIdFromValue(session.sourceMedia);
-      if (!sourceResourceId || !isCloudStoredResource(session.sourceMedia)) {
+      if (!sourceResourceId || !("kind" in session.sourceMedia && isCloudStoredResource(session.sourceMedia))) {
         toast.error("workflow.videoTrim.sourceNotCloud");
         return;
       }

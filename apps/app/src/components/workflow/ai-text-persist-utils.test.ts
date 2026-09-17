@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 
 if (!("localStorage" in globalThis)) {
   Object.defineProperty(globalThis, "localStorage", {
@@ -27,20 +28,20 @@ function createTextNode(history: unknown, result?: unknown): WorkflowNodeType {
     name: "文字 1",
     nodeType: "ai-text",
     inputs: [
-      {
+      testWorkflowParam({
         id: AI_TEXT_RESULT_HISTORY_INPUT_ID,
         name: AI_TEXT_RESULT_HISTORY_INPUT_ID,
         type: "json",
         value: history,
-      },
+      }),
       ...(result
         ? [
-            {
+            testWorkflowParam({
               id: AI_TEXT_RESULT_INPUT_ID,
               name: AI_TEXT_RESULT_INPUT_ID,
-              type: "json" as const,
+              type: "json",
               value: result,
-            },
+            }),
           ]
         : []),
     ],

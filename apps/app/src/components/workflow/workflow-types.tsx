@@ -1,4 +1,10 @@
-import type { NodeType, Parameter, ParameterType } from "@dafthunk/types";
+import type {
+  NodeType,
+  ObjectReference,
+  Parameter,
+  ParameterType,
+} from "@dafthunk/types";
+import type { Edge, Node, ReactFlowInstance } from "@xyflow/react";
 
 // Re-export NodeType for convenience
 export type { NodeType };
@@ -34,6 +40,7 @@ export interface WorkflowNodeType extends Record<string, unknown> {
    * through the wire format without polluting the parameter list.
    */
   metadata?: Record<string, string>;
+  createObjectUrl?: (objectReference: ObjectReference) => string;
 }
 
 // Edge Types
@@ -43,6 +50,10 @@ export interface WorkflowEdgeType extends Record<string, unknown> {
   sourceType?: string;
   targetType?: string;
 }
+
+export type FlowNode = Node<WorkflowNodeType>;
+export type FlowEdge = Edge<WorkflowEdgeType>;
+export type WorkflowReactFlowInstance = ReactFlowInstance<FlowNode, FlowEdge>;
 
 // Component Props Types
 export type WorkflowExecutionStatus =

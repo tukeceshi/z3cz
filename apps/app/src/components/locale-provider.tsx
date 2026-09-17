@@ -20,7 +20,6 @@ import {
   resolveInitialLocale,
   type TranslateFn,
   type TranslationDictionary,
-  type TranslationKey,
 } from "@/i18n";
 import { makeRequest } from "@/services/utils";
 
@@ -106,7 +105,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
   const t = useMemo<TranslateFn>(() => {
     if (!dictionary) {
-      return (key: TranslationKey) => key;
+      return (key: string) => key;
     }
     return createTranslator(locale, dictionary);
   }, [dictionary, locale]);

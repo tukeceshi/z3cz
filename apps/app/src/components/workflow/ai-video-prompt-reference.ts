@@ -2,7 +2,6 @@ import {
   AI_TEXT_NODE_TYPE,
   AI_VIDEO_NODE_TYPE,
   isAiVideoEnhancePanel,
-  type MediaReference,
 } from "@dafthunk/types";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 

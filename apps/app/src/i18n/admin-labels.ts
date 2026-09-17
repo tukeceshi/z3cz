@@ -1,8 +1,10 @@
 import type { ListStage, OnboardingStage } from "@/services/admin-service";
 
-import type { TranslateFn } from "../index";
+import type { TranslateFn } from "@/i18n";
 
-const STAGE_KEY_MAP: Record<ListStage, `admin.stages.${ListStage}`> = {
+type StageKey = OnboardingStage | "dormant";
+
+const STAGE_KEY_MAP: Record<StageKey, `admin.stages.${StageKey}`> = {
   signed_up: "admin.stages.signed_up",
   tour_completed: "admin.stages.tour_completed",
   workflow_created: "admin.stages.workflow_created",

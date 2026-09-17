@@ -583,7 +583,7 @@ export function buildSingleModelInterfaceMetadata(params: {
 
 export function isSingleModelAiInterface(params: {
   readonly provider: string;
-  readonly metadata: unknown;
+  readonly metadata?: unknown;
 }): boolean {
   return (
     params.provider === "custom" &&

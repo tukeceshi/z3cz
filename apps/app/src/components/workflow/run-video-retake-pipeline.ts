@@ -11,7 +11,7 @@ import {
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
-import type { TranslationKey } from "@/i18n";
+import type { TranslateFn } from "@/i18n";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import {
   buildMediaProxyEndpoint,
@@ -68,15 +68,10 @@ type UpdateNodeDataFn = (
   updater: (current: WorkflowNodeType) => Partial<WorkflowNodeType>
 ) => void;
 
-type TranslateFn = (
-  key: TranslationKey,
-  values?: Record<string, string | number>
-) => string;
-
 interface AppToast {
-  readonly error: (key: TranslationKey) => void;
+  readonly error: (key: string) => void;
   readonly errorRaw: (message: string) => void;
-  readonly success: (key: TranslationKey) => void;
+  readonly success: (key: string) => void;
 }
 
 function isCloudSourceMedia(media: MediaReference): boolean {
@@ -172,10 +167,10 @@ function withRetakeGenerateMetadata(
     { phase: params.phase, jobId: params.jobId }
   );
   if (!params.supportsTaskCancel) {
-    return next;
+    return next ?? {};
   }
   return {
-    ...next,
+    ...(next ?? {}),
     [REF_SUPPORTS_TASK_CANCEL_META_KEY]: "1",
   };
 }

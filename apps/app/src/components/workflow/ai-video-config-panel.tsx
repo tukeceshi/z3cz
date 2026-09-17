@@ -1,4 +1,3 @@
-import type { PatchNodeLayoutMetadata } from "@dafthunk/types";
 import {
   AI_AUDIO_NODE_TYPE,
   AI_IMAGE_NODE_TYPE,
@@ -8,18 +7,17 @@ import {
   type CharacterLibraryEntry,
   characterLibraryReferenceFromEntry,
   isPublicCharacterLibraryResourceId,
+  isResourceIdReference,
   isSeedanceCanonicalId,
   type MediaReference,
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
-  type ObjectReference,
   type OrgTextModelOption,
   type OrgVideoModelOption,
   type ResourceIdReference,
   readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
-  VIDEO_PRICE_ESTIMATE_RESOLUTIONS,
   withCharacterLibraryNodeMetadata,
 } from "@dafthunk/types";
 import {
@@ -121,7 +119,6 @@ import { GenerativeCloudAccelerationOffer } from "./generative-cloud-acceleratio
 import type { GenerativeConfigPanelLayout } from "./generative-config-panel-shell";
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
 import {
-  GenerativeGenerationCancelledError,
   isGenerativeGenerationCancelled,
   isGenerativeGenerationCancelRejected,
   showGenerativeCancelledNotice,
@@ -164,7 +161,7 @@ import {
 } from "./video-prompt-compile";
 import { VideoPromptMentionEditor } from "./video-prompt-mention-editor";
 import { updateNodeInput, useWorkflow } from "./workflow-context";
-import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type { WorkflowNodeType } from "./workflow-types";
 
 export interface AiVideoConfigPanelProps {
   readonly nodeId: string;
@@ -194,7 +191,7 @@ export function AiVideoConfigPanel({
     onGenerativeDefaultChange,
   } = useWorkflow();
   const nodes = useNodes();
-  const { setNodes, setEdges, getNode } = useReactFlow();
+  const { setNodes, getNode } = useReactFlow();
   const { zoom } = useViewport();
   const { organization } = useAuth();
   const { t } = useTranslation();
@@ -866,7 +863,7 @@ export function AiVideoConfigPanel({
         target: nodeId,
         targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
       },
-      { nodes: [...nodes, newNode] }
+      { nodes: [...nodes, newNode] as ReactFlowNode<WorkflowNodeType>[] }
     );
   };
 
@@ -957,7 +954,7 @@ export function AiVideoConfigPanel({
           mediaKind: "reference",
         });
 
-        if (!addImageReferenceNode(value, offset)) {
+        if (!isResourceIdReference(value) || !addImageReferenceNode(value, offset)) {
           toast.error("workflow.aiVideoPanel.referenceRejected");
           continue;
         }

@@ -230,7 +230,7 @@ export interface AdminQueue {
   updatedAt: Date;
 }
 
-export interface AdminQueue {
+export interface AdminDatabase {
   id: string;
   name: string;
   organizationId: string;

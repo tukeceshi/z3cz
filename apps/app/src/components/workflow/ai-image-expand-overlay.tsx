@@ -14,7 +14,7 @@ import { MediaImageField } from "./fields/media-image-field";
 import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 
 function isVideoMedia(media: MediaReference): boolean {
-  return media.mimeType.startsWith("video/");
+  return media.mimeType?.startsWith("video/") ?? false;
 }
 
 interface ExpandMediaPreviewProps {
@@ -24,7 +24,7 @@ interface ExpandMediaPreviewProps {
 
 function ExpandMediaPreview({
   media,
-  createObjectUrl,
+  createObjectUrl: _createObjectUrl,
 }: ExpandMediaPreviewProps) {
   const { t } = useTranslation();
   const expired = isMediaExpired(media);
@@ -72,7 +72,6 @@ function ExpandMediaPreview({
   return (
     <MediaImageField
       value={media}
-      createObjectUrl={createObjectUrl}
       className="min-h-[200px]"
     />
   );

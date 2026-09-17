@@ -106,7 +106,7 @@ interface SliderFieldProps {
 }
 
 function SliderFieldSection({
-  field,
+  field: _field,
   title,
   value,
   min,

@@ -1,23 +1,17 @@
 import {
   type AppLocale,
   applyVideoPricePromoFold,
-  computeCostPerOutputSecond,
   computeLibtvConvertedYuan,
   computeLibtvCredits,
   computeLibtvCreditsForClipSplit,
   computePlanAccountCount,
-  computeSplitVideoPriceEstimateForModel,
-  computeVideoPriceEstimateForModel,
-  DEFAULT_HOMEPAGE_VIDEO_SCENARIOS,
   formatVideoPricePromoDateRange,
   formatVideoPricePromoFold,
-  formatVideoTokenMillions,
   type HomepageVideoScenario,
   isVideoPriceCompareCompetitor,
   isVideoPricePromoAnyResolution,
   isVideoPricePromoDate,
   isVideoPricePromoNoteCompetitor,
-  LANDING_VIDEO_PRICE_MODEL_ID,
   type LibtvComparisonConfig,
   type LibtvPlan,
   type LibtvPlanCycle,
@@ -27,15 +21,11 @@ import {
   libtvPlansForCycle,
   matchLibtvPricePromo,
   matchLowestCoveringPlan,
-  matchVideoModelPricePromo,
   type PublicVideoPriceEstimateModel,
-  planVideoEstimateClips,
   readLibtvPlanCyclePrice,
   readVideoPriceCompetitorPublicUrl,
-  readVideoPriceEstimateTier,
   resolveLibtvRateModelId,
   splitClipOutputSeconds,
-  VIDEO_DURATION_MAX,
   VIDEO_RATIO_OPTIONS,
   type VideoClipPlan,
   type VideoPriceCompareCompetitor,
@@ -44,7 +34,6 @@ import {
 import ChevronDown from "lucide-react/icons/chevron-down";
 import TriangleAlert from "lucide-react/icons/triangle-alert";
 import {
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -85,8 +74,6 @@ const BILLING_RATIOS: readonly BillingRatio[] = VIDEO_RATIO_OPTIONS.filter(
   (ratio): ratio is BillingRatio => ratio !== "adaptive"
 );
 const LANDING_DEFAULT_RATIO = "16:9" as const;
-const LANDING_DEFAULT_RESOLUTION = "720p";
-const LANDING_DEFAULT_DURATION_SEC = 15;
 const LANDING_TIME_MAX_SEC = 24 * 60 * 60;
 export { LANDING_TIME_MAX_SEC };
 type TimeUnit = "sec" | "min";
@@ -96,8 +83,6 @@ const DURATION_INPUT_CLASS = cn(
   "focus:bg-muted/65",
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 );
-const LANDING_CARD_CLASS =
-  "bg-white dark:bg-neutral-800 dark:border-neutral-700";
 const COMPACT_BUTTON_CLASS =
   "inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-muted/20 px-2 text-xs text-foreground hover:bg-muted/40";
 const COMPACT_CHIP_TRIGGER_CLASS =
@@ -260,85 +245,6 @@ export function LandingComparePlanTableHeader() {
 
 function scenarioTimeUnit(durationSec: number): TimeUnit {
   return durationSec >= 60 ? "min" : "sec";
-}
-
-function ratioFrameClass(value: string): string {
-  switch (value) {
-    case "21:9":
-      return "h-2 w-5";
-    case "16:9":
-      return "h-2.5 w-4.5";
-    case "4:3":
-      return "h-3 w-4";
-    case "1:1":
-      return "h-3.5 w-3.5";
-    case "3:4":
-      return "h-4 w-3";
-    case "9:16":
-      return "h-4.5 w-2.5";
-    default:
-      return "h-3.5 w-3.5";
-  }
-}
-
-function RatioTiles(props: {
-  readonly value: BillingRatio;
-  readonly onSelect: (option: BillingRatio) => void;
-}) {
-  return (
-    <div className="flex gap-0.5 rounded-lg border border-border/70 bg-muted/20 p-0.5">
-      {BILLING_RATIOS.map((option) => (
-        <button
-          key={option}
-          type="button"
-          className={cn(
-            "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-0.5 py-1.5 transition-colors",
-            props.value === option
-              ? "bg-background text-foreground shadow-sm dark:bg-neutral-900"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => props.onSelect(option)}
-        >
-          <span
-            className={cn(
-              "rounded-[2px] border border-current text-foreground",
-              ratioFrameClass(option)
-            )}
-          />
-          <span className="w-full truncate text-center text-[10px] leading-none">
-            {option}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SegmentedControl(props: {
-  readonly options: readonly string[];
-  readonly value: string;
-  readonly formatOption?: (option: string) => string;
-  readonly onSelect: (option: string) => void;
-}) {
-  return (
-    <div className="flex rounded-lg border border-border/70 bg-muted/20 p-0.5">
-      {props.options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          className={cn(
-            "min-w-0 rounded-md px-2 py-1 text-xs transition-colors",
-            props.value === option
-              ? "bg-background text-foreground shadow-sm dark:bg-neutral-900"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => props.onSelect(option)}
-        >
-          {props.formatOption ? props.formatOption(option) : option}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function TimeAmountControl(props: {
@@ -668,31 +574,6 @@ function landingCompetitorPromoFolds(
     }
   }
   return folds;
-}
-
-function OptionMenu(props: {
-  readonly label: string;
-  readonly children: ReactNode;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly contentClassName?: string;
-}) {
-  return (
-    <Popover open={props.open} onOpenChange={props.onOpenChange}>
-      <PopoverTrigger asChild>
-        <button type="button" className={COMPACT_BUTTON_CLASS}>
-          <span>{props.label}</span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className={cn("w-auto p-1", props.contentClassName)}
-      >
-        {props.children}
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 function DiscountMark(props: { readonly label: string }) {

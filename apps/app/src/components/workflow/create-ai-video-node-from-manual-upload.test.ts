@@ -1,4 +1,4 @@
-import { AI_VIDEO_NODE_TYPE, isAiVideoRetakePanel } from "@dafthunk/types";
+import { AI_VIDEO_NODE_TYPE, isAiVideoRetakePanel, type NodeType } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -65,7 +65,7 @@ const stubCatalog = {
   icon: "video",
   inputs: [],
   outputs: [{ name: "videos", type: "json" as const }],
-};
+} as unknown as NodeType;
 
 describe("buildLockedRetakeCopyNode", () => {
   it("creates a locked retake node without manual video copy", () => {

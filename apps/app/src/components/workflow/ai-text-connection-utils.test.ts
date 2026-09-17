@@ -26,7 +26,7 @@ function mockTextNode(
     id,
     data: { nodeType: AI_TEXT_NODE_TYPE },
     internals: { positionAbsolute: position },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 function mockImageNode(
@@ -39,7 +39,7 @@ function mockImageNode(
     data: { nodeType: AI_IMAGE_NODE_TYPE },
     measured,
     internals: { positionAbsolute: position },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 function mockVideoNode(
@@ -52,7 +52,7 @@ function mockVideoNode(
     data: { nodeType: AI_VIDEO_NODE_TYPE },
     measured,
     internals: { positionAbsolute: position },
-  } as InternalNode<Node>;
+  } as unknown as InternalNode<Node>;
 }
 
 describe("ai-text-connection-utils", () => {

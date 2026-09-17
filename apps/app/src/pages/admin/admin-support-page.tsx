@@ -5,7 +5,7 @@ import Paperclip from "lucide-react/icons/paperclip";
 import PenSquare from "lucide-react/icons/pen-square";
 import Send from "lucide-react/icons/send";
 import X from "lucide-react/icons/x";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { InsetError } from "@/components/inset-error";

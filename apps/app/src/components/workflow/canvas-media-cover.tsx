@@ -1,5 +1,4 @@
 import {
-  createDefaultVideoRetakeTrimRange,
   createDefaultVideoTrimRange,
   isAiVideoRetakePanel,
   readAiVideoRetakeDraftFromInputs,
@@ -432,7 +431,9 @@ function CanvasVideoCover({
   const trimSessionApi = useOptionalVideoTrimSession();
   const trimActive = Boolean(nodeId && trimSessionApi?.isTrimActiveForNode(nodeId));
   const trimSession =
-    trimActive && trimSessionApi?.session?.sourceNodeId === nodeId
+    trimSessionApi &&
+    trimActive &&
+    trimSessionApi.session?.sourceNodeId === nodeId
       ? trimSessionApi.session
       : null;
   const subtitleEraseApi = useOptionalSubtitleEraseSession();

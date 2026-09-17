@@ -1,5 +1,5 @@
 import type { WorkflowEditorViewport } from "@dafthunk/types";
-import type { ReactFlowInstance } from "@xyflow/react";
+import type { WorkflowReactFlowInstance } from "./workflow-types";
 
 export function isValidWorkflowEditorViewport(
   value: unknown
@@ -44,7 +44,7 @@ export function viewportNearlyEqual(
 
 /** Matches React Flow `setCenter` target viewport (x/y before pan animation). */
 export function computeViewportForFlowCenter(
-  reactFlowInstance: ReactFlowInstance,
+  _reactFlowInstance: WorkflowReactFlowInstance,
   centerX: number,
   centerY: number,
   zoom: number
@@ -65,7 +65,7 @@ const PANE_READY_TIMEOUT_MS = 500;
 
 /** Apply saved viewport after the React Flow pane has a stable non-zero size. */
 export function restoreEditorViewportWhenPaneStable(
-  instance: ReactFlowInstance,
+  instance: WorkflowReactFlowInstance,
   viewport: WorkflowEditorViewport,
   onRestored: () => void
 ): () => void {

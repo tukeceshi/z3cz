@@ -164,10 +164,20 @@ function applyCloudAccelerationSync(
   sync: { readonly resourceIds: readonly string[]; readonly status: "pending" | "active" }
 ): Partial<WorkflowNodeType> {
   return (
-    patchNodeMediaCloudAccelerationStatus(node, {
-      resourceIds: sync.resourceIds,
-      status: sync.status,
-    }) ?? {}
+    (patchNodeMediaCloudAccelerationStatus(
+      {
+        id: "",
+        name: node.name,
+        type: node.nodeType ?? "",
+        position: { x: 0, y: 0 },
+        inputs: node.inputs,
+        outputs: node.outputs,
+      } as unknown as import("@dafthunk/types").Node,
+      {
+        resourceIds: sync.resourceIds,
+        status: sync.status,
+      }
+    ) as Partial<WorkflowNodeType> | null) ?? {}
   );
 }
 

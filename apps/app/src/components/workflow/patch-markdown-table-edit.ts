@@ -1,6 +1,5 @@
 import {
   buildTableRow,
-  isTableRow,
   isTableSeparator,
   parseTableRow,
 } from "./parse-markdown-table";

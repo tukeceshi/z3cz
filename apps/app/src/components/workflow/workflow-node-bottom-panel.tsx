@@ -46,7 +46,7 @@ const TWO_COLUMN_MIN_ITEMS = 4;
 export interface WorkflowNodeBottomPanelProps {
   nodeId: string;
   data: WorkflowNodeType;
-  createObjectUrl: (objectReference: ObjectReference) => string;
+  createObjectUrl?: (objectReference: ObjectReference) => string;
 }
 
 function workflowNodeBottomPanelPropsAreEqual(

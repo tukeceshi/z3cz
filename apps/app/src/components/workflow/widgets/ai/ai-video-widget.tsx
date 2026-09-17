@@ -15,7 +15,6 @@ import { useNodes } from "@xyflow/react";
 import UserRoundIcon from "lucide-react/icons/user-round";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -94,7 +93,7 @@ function AiVideoWidget({
   nodeId,
   prompt,
   metadata,
-  createObjectUrl,
+  createObjectUrl: _createObjectUrl,
 }: AiVideoWidgetProps) {
   useGenerativeNodeCardHydrateById(nodeId);
   const { t } = useTranslation();
@@ -241,8 +240,6 @@ function AiVideoWidget({
     if (!videoDisplayUrl) return;
     setVideoLightboxOpen(true);
   }, [videoDisplayUrl]);
-
-  const isUploadBlocked = disabled || blocksGenerativeMedia;
 
   const { canUpload, handleUploadClick, uploadConfirmDialog } =
     useGenerativeCardUpload({

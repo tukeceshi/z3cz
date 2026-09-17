@@ -94,7 +94,7 @@ function AiImageWidget({
   nodeId,
   prompt,
   metadata,
-  createObjectUrl,
+  createObjectUrl: _createObjectUrl,
 }: AiImageWidgetProps) {
   useGenerativeNodeCardHydrateById(nodeId);
   const { t } = useTranslation();

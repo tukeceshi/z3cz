@@ -24,8 +24,8 @@ export interface RetakePrimaryVideoRef {
 
 type FlowEdgeRef = Pick<
   ReactFlowEdge<WorkflowEdgeType>,
-  "id" | "source" | "target" | "sourceHandle" | "targetHandle"
->;
+  "source" | "target" | "sourceHandle" | "targetHandle"
+> & { readonly id?: string };
 
 type FlowNodeRef = Pick<ReactFlowNode<WorkflowNodeType>, "id" | "data">;
 
@@ -90,7 +90,7 @@ export function resolveRetakePrimaryVideoRef(params: {
       const media = resolveVideoMediaFromEdge({ edge, nodes: params.nodes });
       if (media) {
         return {
-          edgeId: edge.id,
+          edgeId: edge.id ?? `${edge.source}:${edge.target}`,
           sourceNodeId: edge.source,
           media,
         };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compileRemotionSource } from "./remotion-live-compile";
+import { compileRemotionSource, type RemotionCompileSuccess } from "./remotion-live-compile";
 import { DEFAULT_REMOTION_SOURCE_CODE } from "./remotion-viewport-staging";
 
 describe("remotion live compile", () => {
@@ -8,10 +8,11 @@ describe("remotion live compile", () => {
     const result = compileRemotionSource(DEFAULT_REMOTION_SOURCE_CODE);
     expect(result.error).toBeUndefined();
     expect(typeof result.component).toBe("function");
-    expect(result.durationInFrames).toBe(90);
-    expect(result.fps).toBe(30);
-    expect(result.width).toBe(1280);
-    expect(result.height).toBe(720);
+    const compiled = result as unknown as RemotionCompileSuccess;
+    expect(compiled.durationInFrames).toBe(90);
+    expect(compiled.fps).toBe(30);
+    expect(compiled.width).toBe(1280);
+    expect(compiled.height).toBe(720);
   });
 
   it("reads duration from official Composition", () => {
@@ -31,7 +32,7 @@ function RemotionRoot() {
   );
 }`);
     expect(result.error).toBeUndefined();
-    expect(result.durationInFrames).toBe(200);
+    expect((result as unknown as RemotionCompileSuccess).durationInFrames).toBe(200);
     expect(typeof result.component).toBe("function");
   });
 

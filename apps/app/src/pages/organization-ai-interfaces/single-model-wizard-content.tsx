@@ -791,7 +791,7 @@ export function SingleModelWizardContent({
               applyCustomVideoRules
             ),
             endpointRules,
-          }),
+          }) as unknown as Readonly<Record<string, unknown>>,
           enabled: true,
           isDefault: false,
         });
@@ -847,7 +847,7 @@ export function SingleModelWizardContent({
               applyCustomVideoRules
             ),
             endpointRules,
-          }),
+          }) as unknown as Readonly<Record<string, unknown>>,
           enabled: true,
           isDefault: true,
         });
@@ -903,7 +903,6 @@ export function SingleModelWizardContent({
             <CredentialPlainInput
               id="single-model-endpoint"
               name="single_model_endpoint"
-              type="url"
               value={endpointUrl}
               onChange={(event) => setEndpointUrl(event.target.value)}
             />
@@ -960,7 +959,7 @@ export function SingleModelWizardContent({
                 <SingleModelInstanceList
                   availableModels={modelPoolOptions}
                   instances={modelInstances}
-                  onChange={setModelInstances}
+                  onChange={(instances) => setModelInstances([...instances])}
                   modelColumnLabel={t(
                     "pages.aiInterfaces.singleModel.modelColumn"
                   )}

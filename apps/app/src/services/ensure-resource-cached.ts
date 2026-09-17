@@ -27,7 +27,7 @@ export class LocalReferenceCloudUploadError extends Error {
 function clearedCloudUploadFailed(
   item: WorkflowMediaValue
 ): WorkflowMediaValue {
-  if (item.cloudUploadFailed !== true) {
+  if (!isResourceIdReference(item) || item.cloudUploadFailed !== true) {
     return item;
   }
   const { cloudUploadFailed: _ignored, ...rest } = item;

@@ -1527,7 +1527,7 @@ export async function getCanvasTierUrlSet(params: {
       return null;
     }
 
-    const tierUrls: Partial<CanvasTierUrlSet> = {};
+    const tierUrls: { s?: string; m?: string; l?: string } = {};
     const widths = {
       s: CANVAS_TIER_SHORT_EDGE.s,
       m: CANVAS_TIER_SHORT_EDGE.m,

@@ -62,6 +62,8 @@ describe("generative-resource-ref-utils", () => {
       },
       media[1],
     ]);
-    expect(applyResourceKind(media[0]!, "cloud").kind).toBe("cloud");
+    expect(
+      (applyResourceKind(media[0]!, "cloud") as unknown as { kind: string }).kind
+    ).toBe("cloud");
   });
 });

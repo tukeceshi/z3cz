@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowParam } from "./workflow-test-fixtures";
 import { readStudioModelLabel } from "./creative-studio-media-meta";
 
 function createImageNode(model = "current-panel-model"): WorkflowNodeType {
@@ -28,7 +29,9 @@ function createImageNode(model = "current-panel-model"): WorkflowNodeType {
         },
       },
     ],
-    outputs: [{ id: "images", name: "images", type: "image", value: [] }],
+    outputs: [
+      testWorkflowParam({ id: "images", name: "images", type: "image", value: [] }),
+    ],
     executionState: "idle",
   };
 }

@@ -18,10 +18,10 @@ export const secretKeyMaskClassName =
   "[-webkit-text-security:disc] [text-security:disc]";
 
 export const credentialAutofillIgnoreProps = {
-  autoComplete: "off",
+  autoComplete: "off" as const,
   "data-1p-ignore": true,
   "data-lpignore": "true",
-} as const satisfies InputHTMLAttributes<HTMLInputElement>;
+};
 
 type CredentialInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,

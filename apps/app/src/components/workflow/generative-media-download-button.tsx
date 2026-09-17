@@ -197,7 +197,7 @@ export async function downloadGenerativeTextContent(params: {
     workflowId: params.workflowId,
     reference,
   });
-  if (stagedBody.trim()) {
+  if (stagedBody?.trim()) {
     triggerBlobDownload(
       new Blob([stagedBody], { type: "text/plain;charset=utf-8" }),
       params.fileName
@@ -209,7 +209,6 @@ export async function downloadGenerativeTextContent(params: {
     media: reference,
     organizationId: params.organizationId,
     workflowId: params.workflowId,
-    nodeType: "ai-text",
     size: "full",
   });
   if (!src) {

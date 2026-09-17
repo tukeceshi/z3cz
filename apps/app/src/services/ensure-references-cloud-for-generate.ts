@@ -1,5 +1,5 @@
 import type { WorkflowMediaValue } from "@dafthunk/types";
-import { getResourceIdFromValue } from "@dafthunk/types";
+import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 import { toast } from "sonner";
 
 import {
@@ -26,7 +26,7 @@ function translateApp(key: TranslationKey): string {
 function withoutCloudUploadFailed(
   item: WorkflowMediaValue
 ): WorkflowMediaValue {
-  if (item.cloudUploadFailed !== true) {
+  if (!isResourceIdReference(item) || item.cloudUploadFailed !== true) {
     return item;
   }
   const { cloudUploadFailed: _ignored, ...rest } = item;

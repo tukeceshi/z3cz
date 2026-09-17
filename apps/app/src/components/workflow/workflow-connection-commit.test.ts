@@ -1,4 +1,5 @@
 import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import { AI_IMAGE_PROMPT_HANDLE_ID, AI_IMAGE_REFERENCE_HANDLE_ID } from "./ai-image-node-utils";
@@ -9,19 +10,18 @@ import {
 } from "./workflow-connection-commit";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
 import type { WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData } from "./workflow-test-fixtures";
 
-function node(id: string, nodeType: string): {
-  id: string;
-  data: WorkflowNodeType;
-} {
+function node(id: string, nodeType: string): Node<WorkflowNodeType> {
   return {
     id,
-    data: {
+    position: { x: 0, y: 0 },
+    data: testWorkflowNodeData({
       nodeType,
       name: id,
       inputs: [],
       outputs: [{ id: AI_TEXT_OUTPUT_ID, name: AI_TEXT_OUTPUT_ID, type: "string" }],
-    } as WorkflowNodeType,
+    }),
   };
 }
 

@@ -7,7 +7,6 @@ import {
   normalizeTextModelParameterRules,
   normalizeVideoModelParameterRules,
   type AiGenerativeNodeType,
-  type OrgAudioModelOption,
   type OrgImageModelOption,
   type OrgTextModelOption,
   type OrgVideoModelOption,
@@ -28,17 +27,10 @@ import {
 } from "./ai-video-node-utils";
 import {
   classifyReferenceFromNodeType,
-  emptyAiTextReferenceCounts,
   referencesFitModelLimits,
   type AiTextReferenceCounts,
 } from "./ai-text-node-utils";
 import type { OrgModelBindingRef } from "./org-model-selection-utils";
-
-type GenerativeOrgModel =
-  | OrgTextModelOption
-  | OrgImageModelOption
-  | OrgVideoModelOption
-  | OrgAudioModelOption;
 
 export function textModelFitsReferenceCounts(
   model: OrgTextModelOption,
@@ -94,7 +86,12 @@ export function projectedReferenceCountsForConnection(params: {
   readonly audioReferenceCount: number;
   readonly countsAsPromptOnly: boolean;
 } {
-  const textCounts = emptyAiTextReferenceCounts();
+  const textCounts = {
+    text: 0,
+    image: 0,
+    video: 0,
+    audio: 0,
+  };
   let imageReferenceCount = 0;
   let videoReferenceCount = 0;
   let audioReferenceCount = 0;

@@ -1,9 +1,9 @@
 import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
-import type { ReactFlowInstance, Node as ReactFlowNode } from "@xyflow/react";
+import type { Node as ReactFlowNode } from "@xyflow/react";
 
 import { resolveGenerativeLayoutContentSize } from "./generative-node-content-geometry";
 import { GENERATIVE_EDGE_PLUS_OUTER_PX } from "./generative-edge-connection-config";
-import type { WorkflowNodeType } from "./workflow-types";
+import type { WorkflowReactFlowInstance } from "./workflow-types";
 
 /** Same spacing as organize layout (ELK node / layer gaps). */
 export const WORKFLOW_NODE_GAP_PX = 100;
@@ -53,7 +53,7 @@ export interface NodePlacementResult {
 }
 
 type PlacementNode = Pick<
-  ReactFlowNode<WorkflowNodeType>,
+  ReactFlowNode,
   "id" | "position" | "measured" | "width" | "height" | "data"
 >;
 
@@ -112,7 +112,7 @@ export function collectOccupiedRects(
     .filter((node) => node.id !== excludeNodeId)
     .map((node) => {
       const dims = resolveWorkflowNodeCardSizeForPlacement(
-        node.data.nodeType,
+        typeof node.data.nodeType === "string" ? node.data.nodeType : undefined,
         node
       );
       return {
@@ -170,7 +170,7 @@ export function getViewportCenterFromBounds(bounds: FlowBounds): FlowPoint {
 }
 
 export function getViewportCenterFlowPoint(
-  reactFlowInstance: ReactFlowInstance,
+  reactFlowInstance: WorkflowReactFlowInstance,
   padding: {
     readonly top?: number;
     readonly right?: number;
@@ -183,7 +183,7 @@ export function getViewportCenterFlowPoint(
 }
 
 export function getViewportFlowBounds(
-  reactFlowInstance: ReactFlowInstance,
+  reactFlowInstance: WorkflowReactFlowInstance,
   padding: {
     readonly top?: number;
     readonly right?: number;
@@ -462,8 +462,12 @@ export function findOpenNodePositionFromSource(params: {
   readonly existingNodes: readonly PlacementNode[];
   readonly dropFlowY?: number;
 }): FlowPoint {
+  const sourceNodeType =
+    typeof params.sourceNode.data.nodeType === "string"
+      ? params.sourceNode.data.nodeType
+      : undefined;
   const sourceDims = resolveWorkflowNodeDimensions(
-    params.sourceNode.data.nodeType,
+    sourceNodeType,
     params.sourceNode
   );
   const targetDims = resolveWorkflowNodeCardSizeForPlacement(
@@ -489,7 +493,7 @@ export function findOpenNodePositionFromSource(params: {
 }
 
 export function findOpenNodePosition(params: {
-  readonly reactFlowInstance: ReactFlowInstance;
+  readonly reactFlowInstance: WorkflowReactFlowInstance;
   readonly nodeType: string | undefined;
   readonly existingNodes: readonly PlacementNode[];
 }): NodePlacementResult {

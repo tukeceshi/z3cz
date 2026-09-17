@@ -1,4 +1,4 @@
-import type { MediaReference, ResourceIdReference } from "@dafthunk/types";
+import type { ResourceIdReference } from "@dafthunk/types";
 import { hasCloudAcceleratingResource } from "@dafthunk/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";

@@ -1991,7 +1991,7 @@ export function collectAiTextMediaReferences(keywords: unknown): {
     if (!isMediaReference(entry)) {
       continue;
     }
-    if (isVideoMimeType(entry.mimeType)) {
+    if (isVideoMimeType(entry.mimeType ?? "")) {
       videos.push(entry);
     } else {
       images.push(entry);

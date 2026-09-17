@@ -626,7 +626,6 @@ export function AdminHomepageVideoScenariosSection(
                     id="homepage_scenario_ref_count"
                     name="homepage_scenario_ref_count"
                     inputMode="numeric"
-                    autoComplete="off"
                     value={String(editorDraft.params.referencedClipCount)}
                     onChange={(event) =>
                       setEditorDraft({
@@ -648,7 +647,6 @@ export function AdminHomepageVideoScenariosSection(
                     id="homepage_scenario_ref_sec"
                     name="homepage_scenario_ref_sec"
                     inputMode="numeric"
-                    autoComplete="off"
                     value={String(editorDraft.params.avgReferenceSec)}
                     onChange={(event) =>
                       setEditorDraft({

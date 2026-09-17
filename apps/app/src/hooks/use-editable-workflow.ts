@@ -14,10 +14,9 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
-import { useTranslation } from "@/components/locale-provider";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { publishWorkflowPublicState } from "@/lib/workflow-public-maintenance-bridge";
-import { stripTransientGenerativeMetadata, preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
+import { preserveInFlightGenerativeMetadata } from "@/components/workflow/generative-card-error-utils";
 import { buildWorkflowPayload } from "@/components/workflow/build-workflow-payload";
 import type {
   NodeType,
@@ -90,7 +89,6 @@ export function useEditableWorkflow({
   >(undefined);
 
   const { organization } = useAuth();
-  const { t } = useTranslation();
   const onWorkflowSyncRef = useRef(onWorkflowSync);
   onWorkflowSyncRef.current = onWorkflowSync;
 

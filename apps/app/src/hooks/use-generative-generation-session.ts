@@ -172,7 +172,9 @@ export function useGenerativeGenerationSession(
   }, [executeCancel, options.metadata, options.orgId]);
 
   useEffect(() => {
-    registerGenerativeGenerationCancel(options.nodeId, cancel);
+    registerGenerativeGenerationCancel(options.nodeId, () => {
+      void cancel();
+    });
     return () => {
       unregisterGenerativeGenerationCancel(options.nodeId);
     };

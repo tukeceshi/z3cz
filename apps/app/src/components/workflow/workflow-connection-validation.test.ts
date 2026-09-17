@@ -15,6 +15,7 @@ import {
   validateWorkflowConnection,
 } from "./workflow-connection-validation";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
 
 function makeNode(
   id: string,
@@ -23,12 +24,12 @@ function makeNode(
   return {
     id,
     position: { x: 0, y: 0 },
-    data: {
+    data: testWorkflowNodeData({
       name: id,
       inputs: [],
       outputs: [],
       ...overrides,
-    },
+    }),
   };
 }
 
@@ -95,7 +96,6 @@ describe("workflow connection output fan-out", () => {
       nodes: [source, imageA],
       edges: [
         {
-          id: "e-prompt",
           source: "text-1",
           target: "image-1",
           sourceHandle: AI_TEXT_OUTPUT_ID,
@@ -224,12 +224,12 @@ describe("validateWorkflowConnection generative catalogs", () => {
     const sourceVideo = makeNode("src-video", {
       nodeType: AI_VIDEO_NODE_TYPE,
       inputs: [
-        {
+        testWorkflowParam({
           id: AI_VIDEO_RESULT_INPUT_ID,
           name: AI_VIDEO_RESULT_INPUT_ID,
           type: "json",
           value: [{ resourceId: "res-1", mimeType: "video/mp4" }],
-        },
+        }),
       ],
       outputs: [
         {

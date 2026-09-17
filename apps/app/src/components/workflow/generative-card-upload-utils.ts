@@ -311,7 +311,7 @@ export function withGenerativePromptCleared(
 ): WorkflowParameter[] {
   return inputs.map((input) =>
     input.id === "prompt" ? { ...input, value: "" } : input
-  );
+  ) as WorkflowParameter[];
 }
 
 export type GenerativeCardUploadKind = "image" | "video" | "audio";

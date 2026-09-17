@@ -177,7 +177,7 @@ export async function uploadBlobToCloudWorkflow(params: {
   readonly nodeType: "ai-image" | "ai-video" | "ai-audio";
   readonly resourceId?: string;
 }): Promise<WorkflowMediaValue> {
-  const workflowId = requireStagingWorkflowId(params.workflowId);
+  requireStagingWorkflowId(params.workflowId);
   const resourceId = params.resourceId?.trim() || allocateGenerativeMediaResourceId();
 
   try {

@@ -1,6 +1,7 @@
 import {
   getResourceIdFromValue,
   isPublicCharacterLibraryResourceId,
+  isResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 import { notifyAiMediaCacheChanged } from "@/services/ai-media-cache-events";
@@ -114,7 +115,9 @@ async function cachePublicPortraitPreview(
     return;
   }
 
-  const previewUrl = params.media.previewUrl?.trim();
+  const previewUrl = isResourceIdReference(params.media)
+    ? params.media.previewUrl?.trim()
+    : undefined;
   if (!previewUrl) {
     return;
   }

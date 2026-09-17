@@ -37,6 +37,8 @@ import type { WorkflowNodeType } from "./workflow-types";
 
 interface WorkflowEdgeProps extends EdgeProps<ReactFlowEdge<WorkflowEdgeType>> {
   zIndex?: number;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 }
 
 interface SmoothStepPathParams {
@@ -232,7 +234,7 @@ export const WorkflowConnectionLine = memo(
       [nodeLookup]
     );
 
-    const { previewConnection, snap: generativeSnap, previewAllowed } = useMemo(
+    const { snap: generativeSnap, previewAllowed } = useMemo(
       () =>
         buildGenerativeDragPreviewState(
           connection,

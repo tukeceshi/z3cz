@@ -134,7 +134,7 @@ export interface WorkflowCanvasProps {
   ) => void;
   onCloseAddNodeMenu?: () => void;
   onPaneClick?: () => void;
-  onPaneContextMenu?: (event: React.MouseEvent) => void;
+  onPaneContextMenu?: (event: MouseEvent | React.MouseEvent) => void;
   canvasFileDropPreview?: CanvasFileDropPreviewState;
   onCanvasFileDragOver?: (event: React.DragEvent) => void;
   onCanvasFileDragLeave?: (event: React.DragEvent) => void;
@@ -166,7 +166,7 @@ export function WorkflowCanvas({
   onMoveEnd,
   onInit,
   onQuickAddAiNode,
-  onPickCanvasFiles,
+  onPickCanvasFiles: _onPickCanvasFiles,
   onUndo,
   onRedo,
   canUndo = false,
@@ -330,7 +330,7 @@ export function WorkflowCanvas({
           selectedNodes.length > 1 && WORKFLOW_MULTI_SELECTED_CLASS
         )}
       >
-        <ReactFlow
+        <ReactFlow<ReactFlowNode<WorkflowNodeType>, ReactFlowEdge<WorkflowEdgeType>>
           nodes={renderNodes}
           edges={edges}
           proOptions={{ hideAttribution: true }}

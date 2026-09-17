@@ -15,11 +15,7 @@ export async function resolveTrimSourceVideoUrl(params: {
 }): Promise<string | null> {
   const mediaId = getResourceIdFromValue(params.media);
   if (mediaId) {
-    const cached = await readCachedMediaBlobByMediaId({
-      organizationId: params.organizationId,
-      workflowId: params.workflowId,
-      mediaId,
-    });
+    const cached = await readCachedMediaBlobByMediaId(mediaId);
     if (cached?.blob) {
       return URL.createObjectURL(cached.blob);
     }

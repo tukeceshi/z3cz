@@ -89,7 +89,9 @@ export function isWorkflowHandleConnected(
   if (connectedHandles instanceof Set) {
     return connectedHandles.has(key);
   }
-  return connectedHandles.includes(key);
+  return Array.isArray(connectedHandles)
+    ? connectedHandles.includes(key)
+    : false;
 }
 
 export const useWorkflowActions = (): WorkflowActionsContextValue =>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { WorkflowNodeType } from "./workflow-types";
 import type { NodeType } from "./workflow-types";
+import { testWorkflowNodeData } from "./workflow-test-fixtures";
 import {
   AI_TEXT_BODY_OUTPUT_ID,
   AI_TEXT_KEYWORDS_HANDLE_ID,
@@ -25,7 +26,7 @@ import { isGenerativeManualContent } from "./generative-card-mode-utils";
 function createTextNode(
   overrides?: Partial<Pick<WorkflowNodeType, "inputs" | "outputs">>
 ): WorkflowNodeType {
-  return {
+  return testWorkflowNodeData({
     id: "node-1",
     type: "workflowNode",
     name: "AI Text",
@@ -36,7 +37,7 @@ function createTextNode(
       overrides?.outputs ??
       [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
     metadata: undefined,
-  };
+  });
 }
 
 describe("mergeAiTextNodeCatalogInputs", () => {
@@ -124,7 +125,6 @@ describe("ai-text-node-utils editing behavior", () => {
   });
 
   it("reads session body when result is an external reference", () => {
-    const node = createTextNode();
     const text = readAiTextResult(
       [
         {

@@ -35,6 +35,8 @@ export const zh: TranslationDictionary = {
     created: "已创建",
     noData: "暂无数据。",
     personal: "个人",
+    error: "错误",
+    close: "关闭",
   },
   nav: {
     organization: "组织",
@@ -3611,6 +3613,8 @@ export const zh: TranslationDictionary = {
       historyModel: "模型",
       historyParams: "参数",
       historyExpandToNode: "展开为新节点",
+      historyExpandFailed: "无法将历史展开为新节点",
+      historyExpandSuccess: "已将历史展开为新节点",
       historyWatermark: "水印",
       historyPrompt: "使用的提示词",
     },
