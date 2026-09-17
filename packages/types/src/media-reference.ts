@@ -241,7 +241,7 @@ export function getResourceIdFromValue(value: unknown): string | null {
 /** API/job MediaReference → workflow JSON (resourceId only). */
 export function mediaReferenceToWorkflowValue(
   ref: MediaReference
-): WorkflowMediaValue {
+): ResourceIdReference {
   return {
     resourceId: getResourceId(ref),
     mimeType: ref.mimeType,
