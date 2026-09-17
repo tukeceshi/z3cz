@@ -98,7 +98,7 @@ export async function claimPersistJobForWorker(
         ORDER BY ready_at ASC NULLS LAST, updated_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
-      `)) as ClaimableJobRow[];
+      `)) as unknown as ClaimableJobRow[];
 
       const candidate = rows[0];
       if (!candidate) {
@@ -297,7 +297,7 @@ export async function completePersistJobFromWorker(
     await registerMediaResourceTransitions(db, {
       organizationId: mapped.organizationId,
       transitions: validatedFinalMedia.map((reference, index) => ({
-        fromResourceId: pendingMedia[index]?.resourceId,
+        fromResourceId: pendingMedia?.[index]?.resourceId,
         reference,
       })),
     });

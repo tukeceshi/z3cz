@@ -25,7 +25,7 @@ import { Hono } from "hono";
 import { v7 as uuid } from "uuid";
 import { z } from "zod";
 import { jwtMiddleware } from "../auth";
-import { ApiContext } from "../context";
+import { ApiContext, type Bindings } from "../context";
 import {
   createDatabase,
   deleteQueueTrigger as deleteDbQueueTrigger,
@@ -160,7 +160,7 @@ workflowRoutes.post(
     }
 
     try {
-      assertTriggerAllowedByScheme(scheme, data.trigger);
+      assertTriggerAllowedByScheme(scheme, data.trigger ?? "manual");
       assertRuntimeAllowedByScheme(scheme, data.runtime || "workflow");
     } catch (error) {
       return c.json(
@@ -193,7 +193,7 @@ workflowRoutes.post(
       id: workflowId,
       name: workflowName,
       schemeId: scheme.id,
-      trigger: data.trigger,
+      trigger: data.trigger ?? "manual",
       runtime: data.runtime || "workflow",
       nodes,
       edges,
@@ -238,7 +238,7 @@ workflowRoutes.post(
       name: workflowData.name,
       description: data.description,
       schemeId: scheme.id,
-      trigger: workflowData.trigger,
+      trigger: workflowData.trigger ?? "manual",
       runtime: workflowData.runtime,
       organizationId: organizationId,
       folderId: data.folderId ?? null,

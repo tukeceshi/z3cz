@@ -85,7 +85,7 @@ export async function executeSingleNodeWorkflow(
       "../runtime/node-durable-workflow-runtime"
     );
     const executionId = crypto.randomUUID();
-    const runtime = await createNodeDurableWorkflowRuntime(env);
+    const runtime = await createNodeDurableWorkflowRuntime(env, async () => {});
     return runtime.execute(durableParams, executionId);
   }
 

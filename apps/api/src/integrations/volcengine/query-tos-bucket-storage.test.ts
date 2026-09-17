@@ -22,7 +22,9 @@ describe("readLatestMetricDataPointGiB", () => {
   });
 
   it("returns null when no data points exist", () => {
-    expect(readLatestMetricDataPointGiB({ MetricDataResults: [] })).toBeNull();
+    expect(
+      readLatestMetricDataPointGiB({ Data: { MetricDataResults: [] } })
+    ).toBeNull();
     expect(readLatestMetricDataPointGiB({})).toBeNull();
   });
 });

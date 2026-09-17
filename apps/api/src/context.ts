@@ -69,6 +69,7 @@ export interface Bindings {
   SUPPORT_EMAIL_FROM?: string;
   HUGGINGFACE_API_KEY?: string;
   REPLICATE_API_TOKEN?: string;
+  GOOGLE_API_KEY?: string;
   TAVILY_API_KEY?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;

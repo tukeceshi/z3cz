@@ -561,7 +561,7 @@ export function createNodeEmailAgentRunnerNamespace(): DurableObjectNamespace {
         },
         deliverReply: (args: { threadId: string; text: string }) =>
           instance.deliverReply(args),
-      } as DurableObjectStub;
+      } as unknown as DurableObjectStub;
     },
   } as DurableObjectNamespace;
 }

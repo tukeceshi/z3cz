@@ -57,7 +57,7 @@ vi.mock("../utils/node-types", () => ({
 const mockExecutionCtx = {
   waitUntil: () => {},
   passThroughOnException: () => {},
-} satisfies ExecutionContext;
+} as unknown as ExecutionContext;
 
 describe("Types Route Tests", () => {
   let app: Hono<ApiContext>;

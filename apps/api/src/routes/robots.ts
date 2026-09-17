@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
-const robots = new Hono();
+import type { ApiContext } from "../context";
+
+const robots = new Hono<ApiContext>();
 
 robots.get("/", (c) => {
   const robotsTxt = `User-agent: Twitterbot

@@ -1,5 +1,4 @@
 import type {
-  AppendAudioGeneratingContentParams,
   AppendImageGeneratingContentParams,
   AppendMediaGeneratingContentParams,
   AppendTextGeneratingContentParams,

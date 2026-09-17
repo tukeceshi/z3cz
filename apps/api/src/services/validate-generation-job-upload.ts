@@ -3,7 +3,11 @@ import type {
   GenerationJobRecord,
   MediaReference,
 } from "@dafthunk/types";
-import { isCloudObjectReference, isMediaReference } from "@dafthunk/types";
+import {
+  isCloudObjectReference,
+  isMediaReference,
+  isObjectReference,
+} from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
@@ -60,7 +64,7 @@ export function validateGenerationJobUploadMedia(
       );
     }
 
-    if (!isCloudObjectReference(candidate)) {
+    if (!isObjectReference(candidate) || !isCloudObjectReference(candidate)) {
       throw new GenerationJobUploadValidationError(
         `Uploaded media at index ${index} must be a Volcano TOS object reference`
       );
@@ -96,7 +100,7 @@ export async function assertGenerationJobUploadKeysBelongToOrg(
   const prefixWithSlash = prefix.endsWith("/") ? prefix : `${prefix}/`;
 
   for (const media of finalMedia) {
-    if (!isCloudObjectReference(media)) {
+    if (!isObjectReference(media) || !isCloudObjectReference(media)) {
       throw new GenerationJobUploadValidationError(
         "Uploaded media must be stored in Volcano TOS"
       );

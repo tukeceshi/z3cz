@@ -55,7 +55,7 @@ httpTriggerRoutes.on(
   "/:workflowId",
   createExecuteRateLimitMiddleware(),
   async (c) => {
-    const workflowId = c.req.param("workflowId");
+    const workflowId = c.req.param("workflowId") ?? "";
     const db = createDatabase(c.env);
 
     const workflow = await getWorkflowByIdUnscoped(db, workflowId);

@@ -128,7 +128,7 @@ internalPersistWorkerRoutes.post(
     }
 
     const jobId = c.req.param("jobId");
-    const body = c.req.valid("json") as PersistWorkerCompleteJobRequest;
+    const body = c.req.valid("json") as unknown as PersistWorkerCompleteJobRequest;
     const db = createDatabase(c.env);
 
     const job = await completePersistJobFromWorker(c.env, db, {

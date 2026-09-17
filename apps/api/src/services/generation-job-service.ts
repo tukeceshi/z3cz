@@ -399,7 +399,7 @@ async function tryCancelUpstreamVideoTask(
     buildVideoPollUrl({
       baseUrl: iface.baseUrl,
       submitPath: videoEndpoints.submitPath,
-      taskId: job.upstreamTaskId,
+      taskId: job.upstreamTaskId ?? "",
       useFullSubmitUrl: videoEndpoints.useFullSubmitUrl,
     });
 
@@ -414,9 +414,9 @@ async function tryCancelUpstreamVideoTask(
       cancelOrgVideoTask({
     apiKey: iface.apiKey,
     canonicalId: job.modelCanonicalId,
-    pollUrl,
+    pollUrl: pollUrl ?? undefined,
     baseUrl: iface.baseUrl,
-    upstreamTaskId: job.upstreamTaskId,
+    upstreamTaskId: job.upstreamTaskId ?? undefined,
     videoEndpoints,
     upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
       })
@@ -575,7 +575,7 @@ export async function pollVideoGenerationJob(
     apiKey: iface.apiKey,
     canonicalId: job.modelCanonicalId,
     baseUrl,
-    upstreamTaskId: job.upstreamTaskId,
+    upstreamTaskId: job.upstreamTaskId ?? "",
     videoPollUrl: job.resultJson?.videoPollUrl,
     videoEndpoints: iface.videoEndpoints,
     formatTransform: iface.formatTransform,
@@ -662,7 +662,7 @@ export async function pollVideoGenerationJob(
   const resultJson: GenerationJobResultJson = {
     ...restResult,
     pendingMedia: [pendingItem],
-    upstreamTaskId: job.upstreamTaskId,
+    upstreamTaskId: job.upstreamTaskId ?? undefined,
     aiInterfaceId: job.interfaceId,
   };
 

@@ -4,7 +4,9 @@ import type {
   ListOrganizationAiInterfacesResponse,
   OrganizationAiInterface,
   ListFormatTransformTemplatesResponse,
+  SingleModelProviderMetadata,
   UpdateOrganizationAiInterfaceRequest,
+  VolcanoInterfaceMetadata,
   VolcanoProbeActivationResponse,
   VolcanoProbeCredentialsRequest,
   VolcanoProbeTosBucketsResponse,
@@ -118,6 +120,11 @@ import {
 } from "../integrations/volcengine/tos-errors";
 import { getVolcanoCredentials } from "../integrations/volcengine/ensure-api-key";
 import { ensureVolcanoTosBucketCreated } from "../integrations/volcengine/create-volcano-tos-bucket";
+
+type InterfaceMetadataDraft =
+  | VolcanoInterfaceMetadata
+  | SingleModelProviderMetadata
+  | Record<string, unknown>;
 import { ensureCharacterLibraryAssetGroup } from "../services/character-library-import-service";
 import { VOLCANO_TOS_DEFAULT_PREFIX } from "@dafthunk/types";
 import type { VolcanoInterfaceSetupQueueMessage } from "@dafthunk/types";
@@ -296,7 +303,7 @@ const createSchema = z
         path: ["baseUrl"],
       });
     }
-  }) satisfies z.ZodType<CreateOrganizationAiInterfaceRequest>;
+  });
 
 const transformValueTypeSchema = z.enum([
   "string",
@@ -405,7 +412,7 @@ const updateSchema = z
           enabled: z.boolean(),
           upstreamModelId: z.string(),
           modality: z.enum(["text", "image", "video", "audio"]),
-          canonicalId: z.string().optional(),
+          canonicalId: z.string().trim().min(1),
           alias: z.string().optional(),
           formatTransform: singleModelFormatTransformSchema.optional(),
           capabilityLimits: singleModelCapabilityLimitsSchema.optional(),
@@ -436,13 +443,13 @@ const updateSchema = z
         path: ["accessKeyId"],
       });
     }
-  }) satisfies z.ZodType<UpdateOrganizationAiInterfaceRequest>;
+  });
 
 const probeCredentialsSchema = z.object({
   accessKeyId: z.string().trim().min(1),
   secretAccessKey: z.string().trim().min(1),
   canonicalIds: z.array(z.string()).optional(),
-}) satisfies z.ZodType<VolcanoProbeCredentialsRequest>;
+});
 
 const probeTosBucketsSchema = z.object({
   accessKeyId: z.string().trim().min(1),
@@ -1281,7 +1288,7 @@ aiInterfaceRoutes.patch(
           ? await encryptSecret(body.apiKey, c.env, organizationId)
           : undefined;
 
-      let metadataUpdate: Record<string, unknown> | undefined = body.metadata;
+      let metadataUpdate: InterfaceMetadataDraft | undefined = body.metadata;
       const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
 
       if (body.accessKeyId !== undefined || body.secretAccessKey !== undefined) {
@@ -1337,7 +1344,7 @@ aiInterfaceRoutes.patch(
         metadataUpdate = mergeVolcanoSupportsCharacterLibrary(
           current,
           body.volcanoSupportsCharacterLibrary
-        ) as unknown as Record<string, unknown>;
+        );
       }
 
       if (body.volcanoModelAlias) {
@@ -1417,11 +1424,13 @@ aiInterfaceRoutes.patch(
           current,
           body.singleModelEndpointRules
         );
+        const endpointRulesMetadata = parseSingleModelMetadata(metadataUpdate);
         if (
           body.singleModelEndpointRules.useOfficial === false &&
           current.singleModelCategory === "video" &&
           body.singleModelFormatTransformsByCanonicalId === undefined &&
-          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+          endpointRulesMetadata &&
+          !hasRequiredSingleModelFormatTransforms(endpointRulesMetadata)
         ) {
           return c.json(
             {
@@ -1513,11 +1522,15 @@ aiInterfaceRoutes.patch(
         }
         metadataUpdate = mergeSingleModelFormatTransformsMetadata(
           current,
-          body.singleModelFormatTransformsByCanonicalId
+          body.singleModelFormatTransformsByCanonicalId as NonNullable<
+            UpdateOrganizationAiInterfaceRequest["singleModelFormatTransformsByCanonicalId"]
+          >
         );
+        const formatTransformsMetadata = parseSingleModelMetadata(metadataUpdate);
         if (
           current.singleModelCategory === "video" &&
-          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+          formatTransformsMetadata &&
+          !hasRequiredSingleModelFormatTransforms(formatTransformsMetadata)
         ) {
           return c.json(
             {
@@ -1583,14 +1596,17 @@ aiInterfaceRoutes.patch(
             return c.json({ error: "Model ID cannot be empty" }, 400);
           }
         }
-        metadataUpdate = mergeSingleModelModelsMetadata(
+        const mergedSingleModelMetadata = mergeSingleModelModelsMetadata(
           current,
-          body.singleModelModels
+          body.singleModelModels as NonNullable<
+            UpdateOrganizationAiInterfaceRequest["singleModelModels"]
+          >
         );
+        metadataUpdate = mergedSingleModelMetadata;
         if (
-          metadataUpdate.singleModelCategory === "video" &&
-          metadataUpdate.endpointRules?.useOfficial === false &&
-          !hasRequiredSingleModelFormatTransforms(metadataUpdate)
+          mergedSingleModelMetadata.singleModelCategory === "video" &&
+          mergedSingleModelMetadata.endpointRules?.useOfficial === false &&
+          !hasRequiredSingleModelFormatTransforms(mergedSingleModelMetadata)
         ) {
           return c.json(
             {
@@ -1601,10 +1617,10 @@ aiInterfaceRoutes.patch(
           );
         }
         if (
-          metadataUpdate.singleModelCategory === "video" &&
-          metadataUpdate.endpointRules?.useOfficial === false
+          mergedSingleModelMetadata.singleModelCategory === "video" &&
+          mergedSingleModelMetadata.endpointRules?.useOfficial === false
         ) {
-          for (const config of Object.values(metadataUpdate.models)) {
+          for (const config of Object.values(mergedSingleModelMetadata.models)) {
             if (!config.enabled || config.modality !== "video") {
               continue;
             }
@@ -1700,7 +1716,10 @@ aiInterfaceRoutes.patch(
             if (isVolcanoTosNotOpenedError(error)) {
               return c.json(
                 {
-                  error: error.message,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "The account does not open TOS service.",
                   code: VOLCANO_TOS_NOT_OPENED_CODE,
                 },
                 409

@@ -46,7 +46,7 @@ describe("node-types", () => {
         createNodeType("ai-audio"),
         createNodeType("http-request"),
       ],
-    } as Awaited<ReturnType<typeof createCloudflareNodeRegistry>>);
+    } as unknown as Awaited<ReturnType<typeof createCloudflareNodeRegistry>>);
 
     const env = {} as Bindings;
     const nodeTypes = await getAllNodeTypes(env);

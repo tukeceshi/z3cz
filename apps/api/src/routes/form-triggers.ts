@@ -132,7 +132,7 @@ async function buildFormResponse(
  * Returns the form config so the public page can render it.
  */
 formTriggerRoutes.get("/:workflowId", async (c) => {
-  const resolved = await resolveForm(c, c.req.param("workflowId"));
+  const resolved = await resolveForm(c, c.req.param("workflowId") ?? "");
   if (resolved === "not_found") {
     return c.json({ error: "Form not found" }, 404);
   }
@@ -156,7 +156,8 @@ formTriggerRoutes.post(
   "/:workflowId",
   createExecuteRateLimitMiddleware(),
   async (c) => {
-    const resolved = await resolveForm(c, c.req.param("workflowId"));
+    const workflowId = c.req.param("workflowId") ?? "";
+    const resolved = await resolveForm(c, workflowId);
     if (resolved === "not_found") {
       return c.json({ error: "Form not found" }, 404);
     }

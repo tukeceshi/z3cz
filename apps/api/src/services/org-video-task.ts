@@ -28,6 +28,7 @@ import type { CloudImageUploadTarget } from "@dafthunk/runtime/ai-interface/exec
 import type { ObjectStore } from "@dafthunk/runtime";
 import type {
   FormatTransformConfig,
+  ReferenceImageInline,
   ResolvedSingleModelVideoEndpoints,
   VideoModelParameterRules,
 } from "@dafthunk/types";
@@ -65,10 +66,7 @@ export async function submitOrgVideoTask(params: {
   readonly parameterRules: VideoModelParameterRules;
   readonly generationParams?: Readonly<Record<string, unknown>>;
   readonly referenceImageUrls?: readonly string[];
-  readonly referenceImageInline?: ReadonlyArray<{
-    readonly mimeType: string;
-    readonly dataBase64: string;
-  }>;
+  readonly referenceImageInline?: readonly ReferenceImageInline[];
   readonly referenceVideoUrls?: readonly string[];
   readonly referenceAudioUrls?: readonly string[];
   readonly upstreamLog?: UpstreamRequestLogSink;

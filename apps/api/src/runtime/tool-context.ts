@@ -1,6 +1,7 @@
 import type {
   CredentialService,
   NodeContext,
+  NodeEnv,
   ObjectStore,
 } from "@dafthunk/runtime";
 
@@ -43,6 +44,6 @@ export function createToolContext(
     schemaService: services?.schemaService,
     codeModeExecutor: services?.codeModeExecutor,
     sandboxExecutor: services?.sandboxExecutor,
-    env,
+    env: env as unknown as NodeEnv,
   };
 }

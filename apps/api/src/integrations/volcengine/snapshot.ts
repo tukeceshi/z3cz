@@ -3,6 +3,7 @@ import {
   VOLCANO_PRICING_EFFECTIVE_DATE,
   buildVolcanoMediaKitSnapshot,
   resolveInterfaceModelAlias,
+  type VolcanoInterfaceMetadata,
   type VolcanoModelUsage,
   type VolcanoResourcePackageRow,
   type VolcanoSnapshotResponse,
@@ -107,10 +108,11 @@ export async function buildVolcanoSnapshot(params: {
     throw new Error("Volcano credentials not configured");
   }
 
-  let refreshedMetadata = parseInterfaceMetadata(ensured.metadataRaw);
-  if (!isVolcanoMetadata(refreshedMetadata)) {
+  const parsedMetadata = parseInterfaceMetadata(ensured.metadataRaw);
+  if (!isVolcanoMetadata(parsedMetadata)) {
     throw new Error("Volcano metadata not configured");
   }
+  let refreshedMetadata: VolcanoInterfaceMetadata = parsedMetadata;
 
   const aggregateCatalog = await listAggregateVolcanoCatalogEntries(db);
   const alignedMetadata = pruneVolcanoMetadataToCatalog(

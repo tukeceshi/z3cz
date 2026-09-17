@@ -10,6 +10,8 @@ export {
   validateWorkflow,
 } from "@dafthunk/runtime";
 
+import { validateWorkflowGraphAgainstCatalog } from "./workflow-catalog-validation";
+
 export {
   getCatalogNodeTypeSet,
   validateWorkflowGraphAgainstCatalog,

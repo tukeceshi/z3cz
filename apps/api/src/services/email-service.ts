@@ -58,10 +58,12 @@ export interface ThreadedEmailResult {
  * via the Cloudflare Email Service binding.
  */
 export class EmailService {
+  private readonly env: Bindings;
   private binding: SendEmail;
   private fromAddress: string;
 
   constructor(env: Bindings) {
+    this.env = env;
     if (!env.SEND_EMAIL) {
       throw new Error("SEND_EMAIL binding is not configured");
     }

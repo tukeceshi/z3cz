@@ -5,6 +5,8 @@ import type {
   GenerationJobStatus,
   MediaReference,
 } from "@dafthunk/types";
+
+export type { GenerationJobRecord };
 import { ACTIVE_GENERATION_JOB_STATUSES } from "@dafthunk/types";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 

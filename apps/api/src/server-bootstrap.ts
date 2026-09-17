@@ -39,7 +39,7 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
       Object.assign(serverEnv, bindings);
       return honoFetch(
         request,
-        serverEnv as Bindings,
+        serverEnv as unknown as Bindings,
         serverEnv as unknown as ExecutionContext
       );
     }
@@ -59,7 +59,7 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
         Object.assign(executionCtx, bindings);
         return honoFetch(
           request,
-          executionCtx as Bindings,
+          executionCtx as unknown as Bindings,
           executionCtx as unknown as ExecutionContext
         );
       }
