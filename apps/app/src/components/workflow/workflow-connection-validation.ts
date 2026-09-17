@@ -90,16 +90,7 @@ const VIRTUAL_REFERENCE_INPUTS: Readonly<
     type: "any",
     repeated: false,
   },
-  [AI_VIDEO_REFERENCE_HANDLE_ID]: {
-    id: AI_VIDEO_REFERENCE_HANDLE_ID,
-    type: "any",
-    repeated: true,
-  },
-  [AI_VIDEO_PROMPT_HANDLE_ID]: {
-    id: AI_VIDEO_PROMPT_HANDLE_ID,
-    type: "any",
-    repeated: false,
-  },
+  // Video uses the same handle ids (reference_images / prompt_reference).
 };
 
 function workflowParameterTypesConnect(
