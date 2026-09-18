@@ -24,6 +24,9 @@ dafthunk_deps_look_complete() {
       if [ ! -e apps/api/node_modules/.bin/tsx ]; then
         return 1
       fi
+      if [ ! -e packages/runtime/node_modules/vitest ] || [ ! -e packages/geo/node_modules/vitest ]; then
+        return 1
+      fi
       ;;
     app)
       if [ ! -d apps/app/node_modules ]; then

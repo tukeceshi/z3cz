@@ -1,0 +1,75 @@
+---
+description: GitHub Actions Lint/Test 失败时的 CL 审查与复现流程。用户贴 Actions URL、说再修复、出方案、审查 CI 时使用。
+alwaysApply: false
+---
+
+# CI / CL 审查方案
+
+会话里 `@09-ci-cl-review` 或说「按 CI CL 审查方案」。只出方案时不改代码、不提交。用户说「执行」才动手。
+
+## CI 闸门（顺序固定）
+
+工作流：`.github/workflows/lint-and-test.yml`（ubuntu、Node 22、frozen lockfile）。
+
+1. `pnpm run lint` = `typecheck` && `pnpm --parallel lint`（Biome `biome check`）&& `knip`
+2. `pnpm run test` = api + runtime + geo 的 vitest（Lint 红则 **Test skipped**）
+
+`knip` 脚本带 `|| true`，**不会让 CI 变红**。Node 20 deprecated 是警告，忽略。
+
+| 信号 | 卡在哪 | 本地复现 |
+|------|--------|----------|
+| Lint 红、Test skipped | 还没到测试 | 先 `pnpm run lint` |
+| annotations 有 `error TS…`，exit **2** | typecheck | `pnpm run typecheck` |
+| 只有 `exit code 1`，无 TS 行号 | Biome | `pnpm --parallel lint` |
+| Lint 绿、Test 红 | vitest | `pnpm run test` |
+
+取证：打开 run → 失败 step → annotations / job logs。公开页可能只有 exit code；以 step 名 + 退出码分流。
+
+## 本地复现（必须与 CI 同一条命令）
+
+```bash
+pnpm run lint
+pnpm run test
+```
+
+Windows：工作区常是 CRLF，Biome format 会把**全仓**报成脏（diff 带 `␍`）。那是本机噪音，**不是** Ubuntu CI 的错误。仓库索引是 LF（`git ls-files --eol` 看 `i/lf`）。
+
+拆开判断：
+
+```bash
+pnpm run typecheck
+pnpm --parallel exec biome check --formatter-enabled=false --assist-enabled=false
+```
+
+对**本次改动文件**，用 git blob（LF）或只看不含 `␍` 的 format diff。不要用本机「全仓库 format 全红」判断 CI。
+
+## 分类（一次只修当前闸门）
+
+- **产品逻辑**：改实现 + 测试
+- **过期测试**：改测试，不改产品行为
+- **环境**：Postgres、workerd、UTF-16/坏 UTF-8、Windows CRLF → mock 或修文件，不当产品 bug
+- **闸门短路**：刚修好 tsc，立刻再跑 Biome，禁止先推「再修复」
+
+修完当前闸门后，必须再跑**完整** `pnpm run lint`，过了才 `pnpm run test`。不要假设「tsc 绿了 CI 就绿」。
+
+## 推之前关门清单
+
+- [ ] `pnpm run typecheck` 为 0
+- [ ] 本次改动文件 `biome check <files>` 为 0（LF 语义）
+- [ ] 相关 Vitest 为 0
+- [ ] 无 `typecheck-*.txt` / `tmp-*.json` / 探针日志进版本库
+- [ ] 无重复对象键、未使用 import、UTF-16、损坏的 `—`/`≥`
+- [ ] 用户明确要求才 `git commit` / push
+
+## 本仓库已踩坑（每次扫）
+
+1. 图片/视频虚拟输入共用 handle id：`reference_images`、`prompt_reference`。`VIRTUAL_REFERENCE_INPUTS` 只能写一组，视频走同一 key。
+2. Biome 2 默认 organizeImports 会扫几百文件；已在各包 `biome.json` 关掉。不要随手打开，除非准备全仓 format。
+3. worker-runtime 规格测试不要连生产 Postgres，用 `createMockRuntimeDependencies`。
+4. spec 数学 / fork / join 节点只注册进 `MockNodeRegistry`（`spec-harness-nodes`），不进生产 catalog。
+5. 重拍视频槽：只在没有主视频边时预留 +1，不要无条件 +1。
+6. Lint 红则 Test 不跑：先过 lint 再改测试。
+
+## 一轮顺序
+
+取证（step + exit code + 文件）→ 同命令复现 → 分类 → 只修当前闸门 → 完整 `pnpm run lint` → `pnpm run test` → 清单全勾 → 用户要求再提交 → 用新 Actions run 验证。

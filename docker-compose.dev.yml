@@ -49,8 +49,12 @@ services:
       - .:/app
       - dafthunk_node_modules_api_root:/app/node_modules
       - dafthunk_node_modules_api:/app/apps/api/node_modules
-      # 遮盖宿主机兄弟包 node_modules，避免 Windows 路径泄漏进 Linux 容器
+      # 遮盖宿主机兄弟包 / packages node_modules，避免 Windows 路径泄漏进 Linux 容器
       - dafthunk_node_modules_api_mask_app:/app/apps/app/node_modules
+      - dafthunk_node_modules_api_runtime:/app/packages/runtime/node_modules
+      - dafthunk_node_modules_api_geo:/app/packages/geo/node_modules
+      - dafthunk_node_modules_api_types:/app/packages/types/node_modules
+      - dafthunk_node_modules_api_utils:/app/packages/utils/node_modules
       - dafthunk_pnpm_store:/pnpm/store
       - dafthunk_local_storage:/app/data/storage
       - dafthunk_secrets:/data/secrets
@@ -153,6 +157,10 @@ volumes:
   dafthunk_node_modules_api_root:
   dafthunk_node_modules_api:
   dafthunk_node_modules_api_mask_app:
+  dafthunk_node_modules_api_runtime:
+  dafthunk_node_modules_api_geo:
+  dafthunk_node_modules_api_types:
+  dafthunk_node_modules_api_utils:
   dafthunk_node_modules_app_root:
   dafthunk_node_modules_app:
   dafthunk_node_modules_app_mask_api:

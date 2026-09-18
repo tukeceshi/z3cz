@@ -1,0 +1,91 @@
+---
+description: CL 测试失败梳理：跑测、出 bug 清单、分类产品/过期测试/环境。用户说梳理测试、出 bug 清单、再跑一遍、审查测试时使用。
+alwaysApply: false
+---
+
+# CL 测试流程方案
+
+会话里 `@10-cl-test-review` 或说「按 CL 测试方案梳理」。只出清单/方案时不改代码、不提交。用户说「执行」才动手。
+
+Lint / typecheck / Biome 走 `@09-ci-cl-review`。本规则只管 **测试失败**。Lint 红则 CI 的 Test 是 skipped，先过 lint。
+
+## 范围
+
+| 命令 | 覆盖 | 是否 CI |
+|------|------|---------|
+| `pnpm run test` | `@dafthunk/api` + `runtime` + `geo` | 是 |
+| `pnpm --filter '@dafthunk/app' test` | 画布 / 前端 vitest | **否**（本地梳理要跑） |
+| `pnpm --filter '@dafthunk/api' test:integration` | 集成测 | 否 |
+
+api 用 `@cloudflare/vitest-pool-workers`（workerd）。runtime / geo / app 是 Node vitest。
+
+默认梳理范围 = **CI 三包 + app**。用户只贴 Actions URL 时，只对 CI 三包出清单。
+
+## 一轮顺序
+
+1. **跑测**：先全量（范围内），不要只跑「感觉相关」的文件就出总清单。
+2. **出清单**：每个失败一条，按下表。未分类不准修。
+3. **分类**：产品 / 过期测试 / 夹具缺失 / 环境 / 误报。
+4. **方案**：每条一句话怎么动；只出方案时停在这里。
+5. **执行**：一次只动同一分类（先环境/夹具，再产品，最后过期测试）。
+6. **回跑**：先失败用例，再范围内全量。再出清单；空清单才算这轮完。
+
+禁止：修完就宣称绿、不重跑；把 runner 崩溃当单个用例失败；为过测试削弱断言却不写清产品意图。
+
+## 跑法
+
+```bash
+pnpm run test
+pnpm --filter '@dafthunk/app' test
+```
+
+缩小复现（清单里的文件）：
+
+```bash
+pnpm --filter '@dafthunk/api' exec vitest run src/path/to/file.test.ts
+pnpm --filter '@dafthunk/app' exec vitest run src/path/to/file.test.ts
+pnpm --filter '@dafthunk/runtime' exec vitest run src/path/to/file.test.ts
+```
+
+Windows 上 workerd 连 `localhost:5432` 失败会 **打崩整个 api 测试进程**，后面用例不再出现。先搜 `ECONNREFUSED` / `Postgres`，当环境/夹具，不要当「后面全红」。
+
+## 清单格式（每次交付）
+
+```
+- [ ] T1  包  文件::用例
+      现象：断言失败 | 抛错 | runner 崩溃
+      期望 / 实际：…
+      分类：产品 | 过期测试 | 夹具缺失 | 环境 | 误报
+      处理：一句话
+```
+
+同根因合并编号（T1a/T1b），不要把 20 个相同 mock 缺口写成 20 个产品 bug。
+
+## 分类标准
+
+| 分类 | 判据 | 处理 |
+|------|------|------|
+| **产品** | 实现违反当前产品规则；改测试会把错误行为钉死 | 改实现 + 保留/补强断言 |
+| **过期测试** | 产品已改（例如结构校验不再看资源是否就绪），测试仍旧合同 | 改测试对齐产品，不改行为 |
+| **夹具缺失** | 测试 registry / mock 没注册节点、没 stub 依赖；生产代码正确 | 只改 mock / `spec-harness-nodes` / 测试入口 |
+| **环境** | 无 Postgres、路径/`file://`、workerd、编码 | mock 或测平台可运行的路径；不当产品 bug |
+| **误报** | 浮点、时间、locale、并行顺序 | 收紧比较方式（如 `/10` 再比），不删断言 |
+
+本仓库对照：
+
+- 产品：重拍视频槽无条件 +1；`cancelled` 仍当 busy
+- 过期测试：连线仍断言「资源未缓存则不可连」；markdown 单元格 padding；`types.test` 漏 `ai-audio`
+- 夹具：MockNodeRegistry 无 addition/fork；规格测走生产 `WorkerRuntime`+Postgres
+- 环境：`ECONNREFUSED 5432`；bootstrap `diskUrl` 在 Windows 不是 `file://`
+- 误报：`snapVideoTrimSec` 浮点
+
+## 改代码时的边界
+
+- 夹具：`apps/api/src/mocks/`、`packages/runtime/src/specification/spec-harness-nodes.ts`。不把测试专用节点推进生产 catalog。
+- worker 规格测用 `createMockRuntimeDependencies`，禁止测里连真库。
+- 不要提交 `tmp-*.json`、vitest reporter 输出、`typecheck-*.txt`。
+- 用户明确要求才 commit。
+
+## 复审（「再跑一遍 / 再次审查」）
+
+重新跑范围内全量，按同一格式出**新清单**（只含这一跑的失败）。已修条目写「已关」+ 用哪条命令验证。新失败标「回归」还是「原先被 runner 崩溃挡住」。
